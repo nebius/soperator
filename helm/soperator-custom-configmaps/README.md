@@ -41,7 +41,7 @@ configMaps:
     enabled: true
 
 enroot:
-  useTmpfsStorage: false
+  useDedicatedImageStorage: true
 ```
 
 ## Values
@@ -55,7 +55,7 @@ enroot:
 | `configMaps.motd.name` | Name of MOTD ConfigMap | `motd-nebius-o11y` |
 | `configMaps.imageStorage.enabled` | Enable image storage ConfigMap | `true` |
 | `configMaps.imageStorage.name` | Name of image storage ConfigMap | `image-storage` |
-| `enroot.useTmpfsStorage` | Store Enroot cache, data, and runtime paths under `/mnt/memory/enroot` | `false` |
+| `enroot.useDedicatedImageStorage` | Store Enroot cache/data/runtime under `/mnt/image-storage/enroot` | `true` |
 
 ## Deployed ConfigMaps
 

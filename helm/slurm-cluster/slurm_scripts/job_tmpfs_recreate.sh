@@ -31,17 +31,15 @@ else
     mkdir -p "${JOB_TMPFS_DIR:?}" || true
 fi
 
-# This is used when Enroot is configured to use the job tmpfs directory for its cache, data and runtime directories,
-# i.e. when enroot.useTmpfsStorage is true
+# This is used when Enroot is configured to use tmpfs-backed data and runtime directories,
+# i.e. when enroot.useDedicatedImageStorage is false.
 ENROOT_TMPFS_DIR="${TMPFS_DIR}/enroot"
 
 mkdir -p \
-    "${ENROOT_TMPFS_DIR:?}/cache" \
     "${ENROOT_TMPFS_DIR:?}/data" \
     "${ENROOT_TMPFS_DIR:?}/runtime"
 
 chmod 1777 \
     "${ENROOT_TMPFS_DIR:?}" \
-    "${ENROOT_TMPFS_DIR:?}/cache" \
     "${ENROOT_TMPFS_DIR:?}/data" \
     "${ENROOT_TMPFS_DIR:?}/runtime"

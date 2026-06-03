@@ -162,8 +162,8 @@ pushd "${jaildir}"
         flock etc/complement_jail_setcap_enroot_aufs2ovlfs.lock -c "setcap cap_sys_admin,cap_mknod+pe usr/bin/enroot-aufs2ovlfs"
     fi
 
-    echo "Create shared directory for caching Pyxis sqshfs files"
-    mkdir -m 1777 -p var/cache/enroot-container-images
+    echo "Create shared directories for caching Pyxis sqshfs files and Enroot OCI data"
+    install -d -m 1777 var/cache/enroot-container-images var/cache/enroot
 
     echo "Bind-mount pyxis plugin from container to the jail"
     touch "usr/lib/slurm/spank_pyxis.so"
