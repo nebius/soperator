@@ -165,6 +165,16 @@ func (n *Node) IsInvalidState() bool {
 	return exists
 }
 
+func (n *Node) IsRebootIssuedState() bool {
+	_, exists := n.States[api.V0041NodeStateREBOOTISSUED]
+	return exists
+}
+
+func (n *Node) IsRebootRequestedState() bool {
+	_, exists := n.States[api.V0041NodeStateREBOOTREQUESTED]
+	return exists
+}
+
 // baseStates defines the mutually exclusive base states of a Slurm node.
 // The node state is a 32-bit integer where the lowest 4 bits (0x0000000f) encode
 // exactly 6 mutually exclusive base states: IDLE, DOWN, ALLOCATED, ERROR, MIXED, UNKNOWN.
