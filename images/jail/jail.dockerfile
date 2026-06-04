@@ -34,6 +34,11 @@ RUN apt update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+COPY ansible/squashfuse.yml /opt/ansible/squashfuse.yml
+COPY ansible/roles/squashfuse /opt/ansible/roles/squashfuse
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local squashfuse.yml -t squashfuse
+
 COPY ansible/sssd.yml /opt/ansible/sssd.yml
 COPY ansible/roles/sssd /opt/ansible/roles/sssd
 RUN cd /opt/ansible && \
@@ -128,4 +133,3 @@ COPY --from=untaped /jail_restic /jail_restic
 COPY images/jail/populate_jail_entrypoint.sh /opt/bin/
 RUN chmod +x /opt/bin/populate_jail_entrypoint.sh
 ENTRYPOINT ["/opt/bin/populate_jail_entrypoint.sh"]
-

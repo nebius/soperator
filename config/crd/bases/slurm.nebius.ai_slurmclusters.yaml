@@ -1226,6 +1226,7 @@ spec:
                   pyxis:
                     importerPath: /opt/slurm_scripts/pyxis_caching_importer.sh
                     required: true
+                    useSquashfuse: false
                 description: PlugStackConfig represents the Plugin stack configurations
                   in `plugstack.conf`.
                 properties:
@@ -1317,6 +1318,7 @@ spec:
                     default:
                       importerPath: /opt/slurm_scripts/pyxis_caching_importer.sh
                       required: true
+                      useSquashfuse: false
                     description: Pyxis represents the 'Pyxis' SPANK plugin configuration.
                     properties:
                       containerImageSave:
@@ -1341,6 +1343,12 @@ spec:
                         description: |-
                           Required defines if Pyxis is 'required' for SLURM.
                           Otherwise, 'optional'.
+                        type: boolean
+                      useSquashfuse:
+                        default: false
+                        description: |-
+                          UseSquashfuse enables Pyxis to start importer-produced SquashFS images directly through squashfuse.
+                          When disabled, Pyxis still uses ImporterPath for image caching but lets Enroot create the runtime rootfs.
                         type: boolean
                     type: object
                 type: object

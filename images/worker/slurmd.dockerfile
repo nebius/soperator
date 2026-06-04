@@ -78,7 +78,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
 
 # Install slurm pyxis plugin
 ARG SLURM_VERSION
-ARG PYXIS_VERSION=0.23.0
+ARG PYXIS_VERSION=0.24.0
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \

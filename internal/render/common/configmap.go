@@ -606,6 +606,7 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			"container_scope=global",
 			"sbatch_support=1",
 			fmt.Sprintf("importer=%s", cluster.PlugStackConfig.Pyxis.ImporterPath),
+			fmt.Sprintf("use_squashfuse=%d", utils.Ternary(cluster.PlugStackConfig.Pyxis.UseSquashfuse != nil && *cluster.PlugStackConfig.Pyxis.UseSquashfuse, 1, 0)),
 		},
 		" ",
 	))

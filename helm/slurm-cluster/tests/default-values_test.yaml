@@ -73,6 +73,9 @@ tests:
           path: spec.plugStackConfig.pyxis.required
           value: true
       - equal:
+          path: spec.plugStackConfig.pyxis.useSquashfuse
+          value: false
+      - equal:
           path: spec.plugStackConfig.pyxis.importerPath
           value: "/opt/slurm_scripts/pyxis_caching_importer.sh"
       - equal:

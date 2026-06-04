@@ -142,7 +142,7 @@ pushd "${jaildir}"
     echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
     mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
     mkdir -p /etc/enroot/mounts.d
-    echo '/opt/slurm_scripts/task_prolog.sh' | sudo tee /etc/enroot/mounts.d/task_prolog.fstab
+    printf '%s\n' '/opt/slurm_scripts/task_prolog.sh /opt/slurm_scripts/task_prolog.sh none x-create=file,bind,ro,nosuid,nodev,private,nofail 0 0' | sudo tee /etc/enroot/mounts.d/task_prolog.fstab
     mount --rbind /etc/enroot etc/enroot
     mount --bind /usr/share/enroot usr/share/enroot
     mount --bind /usr/lib/enroot usr/lib/enroot
@@ -162,8 +162,8 @@ pushd "${jaildir}"
         flock etc/complement_jail_setcap_enroot_aufs2ovlfs.lock -c "setcap cap_sys_admin,cap_mknod+pe usr/bin/enroot-aufs2ovlfs"
     fi
 
-    echo "Create shared directory for caching Pyxis sqshfs files"
-    mkdir -m 1777 -p var/cache/enroot-container-images
+    echo "Create shared directories for caching Pyxis sqshfs files and Enroot OCI data"
+    install -d -m 1777 var/cache/enroot-container-images var/cache/enroot
 
     echo "Bind-mount pyxis plugin from container to the jail"
     touch "usr/lib/slurm/spank_pyxis.so"
