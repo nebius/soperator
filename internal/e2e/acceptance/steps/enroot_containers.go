@@ -29,8 +29,9 @@ const (
 )
 
 type EnrootContainers struct {
-	exec  framework.Exec
-	slurm *framework.SlurmClient
+	exec        framework.Exec
+	slurm       *framework.SlurmClient
+	clusterName string
 
 	workers          []string
 	connectionWorker string
@@ -40,10 +41,11 @@ type EnrootContainers struct {
 	squashStatBefore string
 }
 
-func NewEnrootContainers(exec framework.Exec, slurm *framework.SlurmClient) *EnrootContainers {
+func NewEnrootContainers(exec framework.Exec, slurm *framework.SlurmClient, clusterName string) *EnrootContainers {
 	return &EnrootContainers{
-		exec:  exec,
-		slurm: slurm,
+		exec:        exec,
+		slurm:       slurm,
+		clusterName: clusterName,
 	}
 }
 
@@ -433,7 +435,7 @@ func (s *EnrootContainers) submitEnrootJob(ctx context.Context, containerName, j
 		s.connectionWorker = s.workers[0]
 	}
 
-	image, err := PrepullContainerImageEnroot(ctx, s.exec)
+	image, err := PrepullContainerImageEnroot(ctx, s.exec, s.clusterName)
 	if err != nil {
 		return err
 	}

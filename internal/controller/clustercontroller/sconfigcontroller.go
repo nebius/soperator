@@ -13,9 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
-	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/rest"
 	"nebius.ai/slurm-operator/internal/render/sconfigcontroller"
 	"nebius.ai/slurm-operator/internal/utils"
@@ -93,7 +91,7 @@ func (r SlurmClusterReconciler) ValidateSConfigController(
 		ctx,
 		types.NamespacedName{
 			Namespace: clusterValues.Namespace,
-			Name:      naming.BuildDeploymentName(consts.ComponentTypeSConfigController),
+			Name:      clusterValues.SConfigController.Deployment.Name,
 		},
 		existing,
 	)

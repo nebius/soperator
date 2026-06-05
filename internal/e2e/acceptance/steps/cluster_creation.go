@@ -362,7 +362,7 @@ func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 
 func (s *ClusterCreation) checkWelcomeOutput(ctx context.Context) error {
 	output, err := s.exec.RunWithDefaultRetry(ctx,
-		"kubectl", "exec", "-n", clusterCreationNamespace, "login-0", "--", "sh", "-lc",
+		"kubectl", "exec", "-n", clusterCreationNamespace, s.state.SlurmClusterName+"-login-0", "--", "sh", "-lc",
 		"/etc/update-motd.d/00-welcome && /etc/update-motd.d/20-slurm-stats")
 	if err != nil {
 		return fmt.Errorf("render welcome output: %w", err)

@@ -105,6 +105,20 @@ func buildStatefulSetWithMaxUnavailableFrom(
 
 // endregion StatefulSet
 
+// region DaemonSet
+
+type DaemonSet struct {
+	Name string
+}
+
+func buildDaemonSetFrom(name string) DaemonSet {
+	return DaemonSet{
+		Name: name,
+	}
+}
+
+// endregion DaemonSet
+
 // region CR version
 
 func buildCRVersionFrom(ctx context.Context, crVersion string) string {
