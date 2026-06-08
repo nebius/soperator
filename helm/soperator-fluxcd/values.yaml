@@ -160,7 +160,7 @@ observability:
       interval: 30s
       scrapeTimeout: 10s
     logs:
-      version: 0.117.*
+      version: 0.149.*
       interval: 15m
       timeout: 15m
       install:
@@ -198,7 +198,7 @@ observability:
       driftDetection:
         mode: warn
     events:
-      version: 0.117.*
+      version: 0.149.*
       interval: 5m
       timeout: 5m
       install:
