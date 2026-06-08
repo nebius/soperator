@@ -192,6 +192,7 @@ spec:
             - type: move
               from: attributes.app
               to: attributes["syslog.appname"]
+              output: move-logtype
             - id: parse-syslog
               type: syslog_parser
               protocol: rfc3164
@@ -202,7 +203,8 @@ spec:
               if: '"message" in attributes'
             - id: not-syslog
               type: noop
-            - type: move
+            - id: move-logtype
+              type: move
               from: attributes["logtype"]
               to: resource["app.kubernetes.io/name"]
         {{- end }}
