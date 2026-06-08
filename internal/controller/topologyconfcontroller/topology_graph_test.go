@@ -366,6 +366,83 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"SwitchName=spine-X Switches=leaf-A,leaf-B", // Should NOT include leaf-C
 			},
 		},
+		{
+			name: "gpu-cluster-id labels produce two unconnected fabric roots",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1", "gpu-cluster-id": "fab-a"},
+				"node2": {"tier-1": "switch2", "tier-2": "spine2", "gpu-cluster-id": "fab-b"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"a-0"},
+				"node2": {"b-0"},
+			},
+			allNodeNames: []string{"a-0", "b-0"},
+			expected: []string{
+				"SwitchName=fab-a Switches=spine1",
+				"SwitchName=fab-b Switches=spine2",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=spine2 Switches=switch2",
+				"SwitchName=switch1 Nodes=a-0",
+				"SwitchName=switch2 Nodes=b-0",
+			},
+		},
+		{
+			name: "gpu-cluster-id is the root of the tier-1/tier-2 path",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1", "gpu-cluster-id": "cluster-x"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"a-0"},
+			},
+			allNodeNames: []string{"a-0"},
+			expected: []string{
+				"SwitchName=cluster-x Switches=spine1",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=switch1 Nodes=a-0",
+			},
+		},
+		{
+			name:          "Powered-down nodes (no labels) fall back to root/unknown",
+			labelsByNode:  map[string]tc.NodeTopologyLabels{},
+			gpuPodsByNode: map[string][]string{},
+			allNodeNames:  []string{"a-0", "a-1", "b-0"},
+			expected: []string{
+				"SwitchName=root Switches=unknown",
+				"SwitchName=unknown Nodes=a-0,a-1,b-0",
+			},
+		},
+		{
+			name: "Mixed: labeled node under its fabric, powered-down under root/unknown",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1", "gpu-cluster-id": "fab-a"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"a-0"},
+			},
+			allNodeNames: []string{"a-0", "def-0"},
+			expected: []string{
+				"SwitchName=fab-a Switches=spine1",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=switch1 Nodes=a-0",
+				"SwitchName=root Switches=unknown",
+				"SwitchName=unknown Nodes=def-0",
+			},
+		},
+		{
+			name: "Running node with tiers but no gpu-cluster-id stays under root",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"a-0"},
+			},
+			allNodeNames: []string{"a-0"},
+			expected: []string{
+				"SwitchName=root Switches=spine1",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=switch1 Nodes=a-0",
+			},
+		},
 	}
 
 	for _, tt := range tests {
