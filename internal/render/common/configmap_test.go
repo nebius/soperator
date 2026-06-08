@@ -344,6 +344,19 @@ func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
 	}
 }
 
+func TestRenderSlurmConfigMapWithLargeSuspendTime(t *testing.T) {
+	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{
+		SlurmConfig: slurmv1.SlurmConfig{
+			SuspendTime: ptr.To[int32](1000000000),
+		},
+	})
+
+	slurmConfig := result.Data[consts.ConfigMapKeySlurmConfig]
+	assert.Contains(t, slurmConfig, "SuspendTime=1000000000")
+	assert.NotContains(t, slurmConfig, "SuspendTime=-1")
+	assert.NotContains(t, slurmConfig, "SuspendTime=INFINITE")
+}
+
 func TestRenderPlugstack(t *testing.T) {
 	t.Run("Pyxis no options", func(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
