@@ -19,11 +19,6 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	CRVersion string `json:"crVersion,omitempty"` // TODO backward compatibility
 
-	// ClusterType define type of slurm worker nodes
-	// +kubebuilder:validation:Enum=gpu;cpu
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="gpu"
-	ClusterType string `json:"clusterType,omitempty"`
 	// Maintenance defines the maintenance window for the cluster.
 	// It can have the following values:
 	// - none: No maintenance is performed. The cluster operates normally.
@@ -111,7 +106,7 @@ type SlurmClusterSpec struct {
 	// PlugStackConfig represents the Plugin stack configurations in `plugstack.conf`.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ pyxis: { required: true, containerImageSave: "/var/cache/enroot-container-images/" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
+	// +kubebuilder:default={ pyxis: { required: true, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
 	PlugStackConfig PlugStackConfig `json:"plugStackConfig,omitempty"`
 
 	// SConfigController defines the desired state of controller that watches after configs
@@ -222,7 +217,7 @@ type PlugStackConfig struct {
 	// Pyxis represents the 'Pyxis' SPANK plugin configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ required: true, containerImageSave: "/var/cache/enroot-container-images/" }
+	// +kubebuilder:default={ required: true, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }
 	Pyxis PluginConfigPyxis `json:"pyxis,omitempty"`
 
 	// NcclDebug represents the 'NCCL Debug' SPANK plugin configuration.
@@ -247,6 +242,14 @@ type PluginConfigPyxis struct {
 	// +kubebuilder:default=true
 	Required *bool `json:"required,omitempty"`
 
+	// Path to the executable for pyxis importer extension.
+	// File should be available to execute for every user in Slurm.
+	// More docs: https://github.com/NVIDIA/pyxis/tree/v0.23.0/importers.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/opt/slurm_scripts/pyxis_caching_importer.sh"
+	ImporterPath string `json:"importerPath,omitempty"`
+
 	// ContainerImageSave represents an absolute path to the file or directory where SquashFS files will be stored.
 	// If the specified file or directory already exists, it will be reused.
 	// If the path does not exist, it will be created.
@@ -256,7 +259,7 @@ type PluginConfigPyxis struct {
 	// If the option argument is empty (""), SquashFS files will not be stored.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="/var/cache/enroot-container-images/"
+	// +kubebuilder:deprecation:warning="The ContainerImageSave field is deprecated and will be removed in a future release"
 	ContainerImageSave string `json:"containerImageSave,omitempty"`
 }
 
@@ -868,6 +871,8 @@ type SlurmNodeController struct {
 	// +kubebuilder:validation:Required
 	Munge NodeContainer `json:"munge"`
 
+	SidecarSSSD `json:",inline"`
+
 	// Volumes represents the volume configurations for the controller node
 	//
 	// +kubebuilder:validation:Required
@@ -885,6 +890,16 @@ type SlurmNodeController struct {
 	//
 	// +kubebuilder:validation:Optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
+	// OpenMetrics configures slurmctld's native OpenMetrics endpoint
+	// (https://slurm.schedmd.com/metrics.html) and the Prometheus ServiceMonitor
+	// that scrapes it. When enabled, sets MetricsType=metrics/openmetrics in
+	// slurm.conf and renders a ServiceMonitor against the slurmctld Service.
+	// The endpoint is unauthenticated HTTP on the slurmctld port.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={enabled: true, serviceMonitor: {interval: "30s", scrapeTimeout: "28s"}}
+	OpenMetrics OpenMetrics `json:"openMetrics,omitempty"`
 }
 
 // SlurmNodeControllerVolumes define the volumes for the Slurm controller node
@@ -918,6 +933,8 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Required
 	Munge NodeContainer `json:"munge"`
+
+	SidecarSSSD `json:",inline"`
 
 	// SshdServiceType represents the service type for the SSH daemon
 	// Must be one of [corev1.ServiceTypeLoadBalancer] or [corev1.ServiceTypeNodePort]
@@ -960,6 +977,32 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeLoginVolumes `json:"volumes"`
+}
+
+// SidecarSSSD defines the shared SSSD sidecar configuration for Slurm node pods.
+type SidecarSSSD struct {
+	// Sssd represents the sssd container configuration
+	//
+	// +kubebuilder:validation:Optional
+	Sssd *NodeContainer `json:"sssd,omitempty"`
+
+	// SSSDDebugLevel defines the SSSD debug verbosity level.
+	// Lower values are suitable for production, higher values are intended for troubleshooting.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	SSSDDebugLevel int32 `json:"sssdDebugLevel,omitempty"`
+
+	// SSSDConfSecretRefName is the name of the Secret containing sssd.conf for the node and sssd sidecar containers.
+	//
+	// +kubebuilder:validation:Optional
+	SSSDConfSecretRefName string `json:"sssdConfSecretRefName,omitempty"`
+
+	// SSSDLdapCAConfigMapRefName is the name of the ConfigMap containing LDAP CA certificates for the sssd sidecar.
+	//
+	// +kubebuilder:validation:Optional
+	SSSDLdapCAConfigMapRefName string `json:"sssdLdapCAConfigMapRefName,omitempty"`
 }
 
 // SlurmNodeLoginVolumes defines the volumes for the Slurm login node
@@ -1198,6 +1241,61 @@ type NodeVolumeMount struct {
 	//
 	// +kubebuilder:validation:Optional
 	VolumeClaimTemplateSpec *corev1.PersistentVolumeClaimSpec `json:"volumeClaimTemplateSpec,omitempty"`
+}
+
+// OpenMetrics configures slurmctld's native OpenMetrics endpoint and the
+// Prometheus ServiceMonitor that scrapes it.
+//
+// PrivateData must NOT be set in slurm.conf or Slurm silently disables
+// the metrics plugin.
+type OpenMetrics struct {
+	// Enabled gates both the slurm.conf MetricsType=metrics/openmetrics line
+	// and the ServiceMonitor that scrapes the endpoint.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// ServiceMonitor configures the Prometheus ServiceMonitor scraping
+	// slurmctld's OpenMetrics subendpoints.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={interval: "30s", scrapeTimeout: "28s"}
+	ServiceMonitor OpenMetricsServiceMonitor `json:"serviceMonitor,omitempty"`
+}
+
+// OpenMetricsServiceMonitor configures the ServiceMonitor that scrapes
+// slurmctld's native OpenMetrics endpoint. Relabel hooks are intentionally
+// omitted: Slurm's native label set is fixed and small, and users who need
+// to rewrite labels can do it Prometheus-side. The "job" label on scraped
+// metrics defaults to the controller Service name.
+type OpenMetricsServiceMonitor struct {
+	// Interval for scraping metrics.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="30s"
+	Interval prometheusv1.Duration `json:"interval,omitempty"`
+
+	// ScrapeTimeout defines the timeout for scraping metrics.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="28s"
+	ScrapeTimeout prometheusv1.Duration `json:"scrapeTimeout,omitempty"`
+
+	// Endpoints lists which slurmctld OpenMetrics subendpoints to scrape.
+	// An empty list means all five are scraped: jobs, jobs-users-accts, nodes,
+	// partitions, scheduler.
+	//
+	// CARDINALITY WARNING: "jobs-users-accts" is unbounded — Slurm creates a
+	// new series for every (user, account) that has ever submitted a job, and
+	// those series stay around in Prometheus until they fall out of retention.
+	// Slurm's docs (https://slurm.schedmd.com/metrics.html) explicitly say not
+	// to send this endpoint to long-term storage. Drop it from this list if
+	// your Prometheus / VictoriaMetrics setup is sensitive to high cardinality.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:items:Enum=jobs;jobs-users-accts;nodes;partitions;scheduler
+	Endpoints []string `json:"endpoints,omitempty"`
 }
 
 // PodMonitorConfig defines a prometheus PodMonitor object.

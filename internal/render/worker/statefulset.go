@@ -29,6 +29,7 @@ func RenderNodeSetStatefulSet(
 	nodeSet *values.SlurmNodeSet,
 	secrets *slurmv1.Secrets,
 	cgroupVersion string,
+	clusterWithGPU bool,
 	topologyPluginEnabled bool,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
@@ -50,6 +51,14 @@ func RenderNodeSetStatefulSet(
 	initContainers := slices.Clone(nodeSet.CustomInitContainers)
 	initContainers = append(initContainers,
 		common.RenderContainerMunge(&nodeSet.ContainerMunge),
+	)
+	if nodeSet.ContainerSSSD != nil {
+		initContainers = append(initContainers, common.RenderContainerSSSD(
+			nodeSet.ContainerSSSD,
+			common.SSSDLdapCAConfigMap(nodeSet.SSSDLdapCAConfigMapName),
+		))
+	}
+	initContainers = append(initContainers,
 		RenderContainerWorkerInit(
 			clusterName, &nodeSet.ContainerSlurmd, topologyPluginEnabled,
 			nodeSet.GPU.Enabled, topologyTimeOut,
@@ -72,7 +81,7 @@ func RenderNodeSetStatefulSet(
 		)
 	}
 
-	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet, topologyPluginEnabled, cgroupVersion)
+	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet, topologyPluginEnabled, cgroupVersion, clusterWithGPU)
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}
@@ -124,6 +133,11 @@ func RenderNodeSetStatefulSet(
 		spec.PriorityClassName = nodeSet.PriorityClass
 	}
 
+	annotations := map[string]string{
+		"kruise.io/auto-generate-persistent-pod-state": "true",
+		"kruise.io/preferred-persistent-topology":      "kubernetes.io/hostname",
+	}
+
 	pvcRetentionPolicy := nodeSet.PersistentVolumeClaimRetentionPolicy
 	if pvcRetentionPolicy == nil {
 		pvcRetentionPolicy = &kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy{
@@ -134,9 +148,10 @@ func RenderNodeSetStatefulSet(
 
 	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      nodeSet.StatefulSet.Name,
-			Namespace: nodeSet.ParentalCluster.Namespace,
-			Labels:    labels,
+			Name:        nodeSet.StatefulSet.Name,
+			Namespace:   nodeSet.ParentalCluster.Namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: kruisev1b1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,

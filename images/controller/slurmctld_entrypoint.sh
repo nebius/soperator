@@ -13,6 +13,9 @@ echo "Bind-mount REST JWT secret key from K8S secret"
 touch /var/spool/slurmctld/jwt_hs256.key
 mount --bind /mnt/rest-jwt-key/rest_jwt.key /var/spool/slurmctld/jwt_hs256.key
 
+echo "Bind mount pipes for sssd"
+mount --bind /var/lib/sss/pipes var/lib/sss/pipes
+
 echo "Symlink slurm configs from K8S config map"
 rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
 

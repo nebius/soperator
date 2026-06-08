@@ -1,0 +1,106 @@
+suite: test nodesets ephemeral settings
+templates:
+  - templates/nodeset.yaml
+tests:
+  - it: should render zero initial ephemeral nodes
+    set:
+      nodesets:
+        - name: worker-payg
+          replicas: 2
+          maxUnavailable: "20%"
+          ephemeralNodes: true
+          initialNumberEphemeralNodes: 0
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+      - equal:
+          path: spec.maxUnavailable
+          value: "20%"
+      - equal:
+          path: spec.ephemeralNodes
+          value: true
+      - equal:
+          path: spec.initialNumberEphemeralNodes
+          value: 0
+
+  - it: should keep zero initial ephemeral nodes when ephemeralNodes is false
+    set:
+      nodesets:
+        - name: worker-static
+          replicas: 2
+          ephemeralNodes: false
+          initialNumberEphemeralNodes: 0
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    asserts:
+      - equal:
+          path: spec.initialNumberEphemeralNodes
+          value: 0
+      - notExists:
+          path: spec.ephemeralNodes
+
+  - it: should not render initial ephemeral nodes when the value is omitted
+    set:
+      nodesets:
+        - name: worker-default
+          replicas: 2
+          ephemeralNodes: true
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    asserts:
+      - equal:
+          path: spec.ephemeralNodes
+          value: true
+      - notExists:
+          path: spec.initialNumberEphemeralNodes

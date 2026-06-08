@@ -42,7 +42,6 @@ import (
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
-	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -67,6 +66,7 @@ import (
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;delete;patch
 //+kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=get;list;watch;update;patch;delete;create
+//+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=core,resources=podtemplates,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs,verbs=get;list;watch;update;patch;delete;create
@@ -94,6 +94,7 @@ type SlurmClusterReconciler struct {
 	Role                *reconciler.RoleReconciler
 	RoleBinding         *reconciler.RoleBindingReconciler
 	PodMonitor          *reconciler.PodMonitorReconciler
+	ServiceMonitor      *reconciler.ServiceMonitorReconciler
 	Deployment          *reconciler.DeploymentReconciler
 	MariaDb             *reconciler.MariaDbReconciler
 	MariaDbGrant        *reconciler.MariaDbGrantReconciler
@@ -117,6 +118,7 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Role:                reconciler.NewRoleReconciler(r),
 		RoleBinding:         reconciler.NewRoleBindingReconciler(r),
 		PodMonitor:          reconciler.NewPodMonitorReconciler(r),
+		ServiceMonitor:      reconciler.NewServiceMonitorReconciler(r),
 		Deployment:          reconciler.NewDeploymentReconciler(r),
 		MariaDb:             reconciler.NewMariaDbReconciler(r),
 		MariaDbGrant:        reconciler.NewMariaDbGrantReconciler(r),
@@ -236,31 +238,25 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		return ctrl.Result{}, fmt.Errorf("listing node sets: %w", err)
 	}
 
-	// Set cluster type to GPU if at least one NodeSet has GPU enabled
-	if sliceutils.IsEmptySeq(
-		sliceutils.FilterSeq(
-			sliceutils.MapSliceSeq(
-				nodeSets,
-				func(nodeSet slurmv1alpha1.NodeSet) bool {
-					return nodeSet.Spec.GPU.Enabled
-				},
-			),
-			func(b bool) bool {
-				return b
-			},
-		),
-	) {
-		clusterValues.ClusterType = consts.ClusterTypeCPU
-	} else {
-		clusterValues.ClusterType = consts.ClusterTypeGPU
-	}
+	clusterValues.ClusterWithGPU = values.BuildClusterWithGPUFromNodeSets(nodeSets)
 
 	// region Reconciliation
 	logger.Info("Starting reconciliation of Slurm Cluster")
+	populateJailRes := ctrl.Result{}
 
 	if !check.IsModeSkipPopulateJail(clusterValues.PopulateJail.Maintenance) {
-		if err := r.ReconcilePopulateJail(ctx, clusterValues, cluster); err != nil {
+		var populateJailNotReady bool
+		populateJailRes, populateJailNotReady, err = r.ReconcilePopulateJail(ctx, clusterValues, cluster)
+		if err != nil {
 			return ctrl.Result{}, err
+		}
+		// Skip rest of reconciliation if the populate-jail Job exists but hasn't
+		// completed yet — login/worker pods must not be created while restic
+		// restore is still running. Independent of the maintenance-overwrite
+		// requeue handled at the end of this function (which deliberately lets
+		// login/worker reconcilers run so they can scale to zero).
+		if populateJailNotReady {
+			return populateJailRes, nil
 		}
 	}
 
@@ -489,6 +485,10 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 	// endregion Availability
 
 	logger.Info("Finished reconciliation of Slurm Cluster")
+
+	if populateJailRes.RequeueAfter > 0 && res.RequeueAfter == 0 && !res.Requeue {
+		res.RequeueAfter = populateJailRes.RequeueAfter
+	}
 
 	return res, err
 }
@@ -850,6 +850,7 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 			Check: check.IsPrometheusOperatorCRDInstalled,
 			Objects: []client.Object{
 				&prometheusv1.PodMonitor{},
+				&prometheusv1.ServiceMonitor{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
 		},

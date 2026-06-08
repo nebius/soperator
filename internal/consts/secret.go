@@ -11,6 +11,8 @@ const (
 	SecretSshdKeysPrivateFileMode  = int32(0600)
 	SecretSshdKeysPublicFileMode   = int32(0644)
 	SecretSshdKeysName             = "sshd-keys"
+	SecretSSSDConfName             = "sssd-conf"
+	SecretSSSDConfFileMode         = int32(0600)
 	SecretSshdPublicKeysPostfix    = ".pub"
 	SecretSshdECDSAKeyName         = "ssh_host_ecdsa_key"
 	SecretSshdECDSAPubKeyName      = SecretSshdECDSAKeyName + SecretSshdPublicKeysPostfix

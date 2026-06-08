@@ -10,7 +10,6 @@ import (
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/naming"
-	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -134,6 +133,7 @@ func renderContainerNodeSetSlurmd(
 	nodeSet *values.SlurmNodeSet,
 	topologyEnabled bool,
 	cgroupVersion string,
+	clusterWithGPU bool,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
@@ -149,6 +149,12 @@ func renderContainerNodeSetSlurmd(
 		renderVolumeMountSysctl(),
 		renderVolumeMountSupervisordConfigMap(),
 		renderVolumeMountSshdConfigs(),
+	}
+	if nodeSet.ContainerSSSD != nil {
+		volumeMounts = append(volumeMounts,
+			common.RenderVolumeMountSSSDSocket(),
+			common.RenderVolumeMountSSSDConf(),
+		)
 	}
 	if nodeSet.GPU.Enabled {
 		volumeMounts = append(volumeMounts, renderVolumeMountNvidia())
@@ -224,7 +230,8 @@ func renderContainerNodeSetSlurmd(
 		Env: append(
 			renderNodeSetSlurmdEnv(
 				cgroupVersion,
-				utils.Ternary(nodeSet.GPU.Enabled, consts.ClusterTypeGPU, consts.ClusterTypeCPU),
+				clusterWithGPU,
+				nodeSet.GPU.Enabled,
 				nodeSet.GPU.Nvidia.GDRCopyEnabled,
 				nodeSet.NodeExtra,
 			),
@@ -246,7 +253,13 @@ func renderContainerNodeSetSlurmd(
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeUnconfined,
 			},
-			ProcMount:       ptr.To(nodeSet.ContainerSlurmd.ProcMount),
+			ProcMount: func() *corev1.ProcMountType {
+				if nodeSet.ContainerSlurmd.ProcMount == "" {
+					return nil
+				}
+				v := nodeSet.ContainerSlurmd.ProcMount
+				return &v
+			}(),
 			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
 		},
 		Resources:                resources,
@@ -267,7 +280,8 @@ func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
 
 func renderNodeSetSlurmdEnv(
 	cgroupVersion string,
-	clusterType consts.ClusterType,
+	clusterWithGPU bool,
+	nodeSetGPUEnabled bool,
 	enableGDRCopy bool,
 	slurmNodeExtra string,
 ) []corev1.EnvVar {
@@ -282,8 +296,12 @@ func renderNodeSetSlurmdEnv(
 			},
 		},
 		{
-			Name:  "SLURM_CLUSTER_TYPE",
-			Value: clusterType.String(),
+			Name:  "SLURM_CLUSTER_WITH_GPU",
+			Value: strconv.FormatBool(clusterWithGPU),
+		},
+		{
+			Name:  "NODESET_GPU_ENABLED",
+			Value: strconv.FormatBool(nodeSetGPUEnabled),
 		},
 	}
 

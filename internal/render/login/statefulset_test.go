@@ -7,7 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -34,7 +33,6 @@ func TestRenderStatefulSet_PriorityClass(t *testing.T) {
 			// Setup test data
 			namespace := "test-namespace"
 			clusterName := "test-cluster"
-			clusterType := consts.ClusterTypeGPU
 			nodeFilters := []slurmv1.K8sNodeFilter{
 				{
 					Name: "test-filter",
@@ -99,7 +97,7 @@ func TestRenderStatefulSet_PriorityClass(t *testing.T) {
 			result, err := RenderStatefulSet(
 				namespace,
 				clusterName,
-				clusterType,
+				true,
 				nodeFilters,
 				secrets,
 				volumeSources,

@@ -4,6 +4,7 @@ const (
 	ContainerNameSlurmctld         = SlurmctldName
 	ContainerNameAccounting        = AccountingName
 	ContainerNameMunge             = Munge
+	ContainerNameSSSD              = "sssd"
 	ContainerNameSlurmd            = SlurmdName
 	ContainerNameREST              = Slurmrestd
 	ContainerNameSshd              = SshdName

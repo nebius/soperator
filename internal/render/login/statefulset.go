@@ -22,7 +22,7 @@ import (
 func RenderStatefulSet(
 	namespace,
 	clusterName string,
-	clusterType consts.ClusterType,
+	clusterWithGPU bool,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
@@ -51,6 +51,17 @@ func RenderStatefulSet(
 	sshAppArmorProfile := login.ContainerSshd.AppArmorProfile
 	if login.UseDefaultAppArmorProfile {
 		sshAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
+	}
+
+	initContainers := append(
+		login.CustomInitContainers,
+		common.RenderContainerMunge(&login.ContainerMunge),
+	)
+	if login.ContainerSSSD != nil {
+		initContainers = append(initContainers, common.RenderContainerSSSD(
+			login.ContainerSSSD,
+			common.SSSDLdapCAConfigMap(login.SSSDLdapCAConfigMapName),
+		))
 	}
 
 	return kruisev1b1.StatefulSet{
@@ -90,20 +101,18 @@ func RenderStatefulSet(
 					Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameSshd),
 				},
 				Spec: corev1.PodSpec{
-					HostUsers:    login.HostUsers,
-					Affinity:     nodeFilter.Affinity,
-					NodeSelector: nodeFilter.NodeSelector,
-					Tolerations:  nodeFilter.Tolerations,
-					InitContainers: append(
-						login.CustomInitContainers,
-						common.RenderContainerMunge(&login.ContainerMunge),
-					),
+					HostUsers:      login.HostUsers,
+					Affinity:       nodeFilter.Affinity,
+					NodeSelector:   nodeFilter.NodeSelector,
+					Tolerations:    nodeFilter.Tolerations,
+					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						renderContainerSshd(
-							clusterType,
+							clusterWithGPU,
 							&login.ContainerSshd,
 							login.JailSubMounts,
 							login.CustomVolumeMounts,
+							login.ContainerSSSD,
 							sshAppArmorProfile,
 						),
 					},

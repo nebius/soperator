@@ -49,6 +49,17 @@ pushd "${jaildir}"
     echo "Bind-mount /etc/hosts"
     mount --bind /etc/hosts etc/hosts
 
+    echo "Bind mount sssd.conf if exists"
+    if [[ -f /etc/sssd/sssd.conf ]]; then
+      mount --bind /etc/sssd etc/sssd
+    fi
+
+    echo "Bind-mount SSSD sockets if they exist"
+    if [[ -d /var/lib/sss/pipes ]]; then
+      mkdir -p var/lib/sss/pipes
+      mount --bind /var/lib/sss/pipes var/lib/sss/pipes
+    fi
+
     echo "Bind-mount jail submounts from upper ${upperdir} into the actual ${jaildir}"
     submounts=$( \
         findmnt --output TARGET --submounts --target / --pairs | \
@@ -69,7 +80,7 @@ pushd "${jaildir}"
         fi
     done <<< "$submounts"
 
-    if [ -n "$worker" ] && [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
+    if [ -n "$worker" ] && [ "$NODESET_GPU_ENABLED" = "true" ]; then
         echo "Run nvidia-container-cli to propagate NVIDIA drivers, CUDA, NVML and other GPU-related stuff to the jail"
 
         # Disable ldconfig to prevent race between the workers.
@@ -117,7 +128,7 @@ pushd "${jaildir}"
     fi
 
     echo "Bind-mount slurm client"
-    /opt/bin/slurm/bind_slurm_common.sh -j ${jaildir}
+    /opt/bin/slurm/bind_slurm_common.sh -j "${jaildir}"
 
     echo "Bind-mount slurm chroot plugin from container to the jail"
     mkdir -p usr/lib/slurm
@@ -159,21 +170,8 @@ pushd "${jaildir}"
     echo 'Creating Soperator output directory'
     mkdir -m 777 -p opt/soperator-outputs
 
-    if [ -n "$worker" ]; then
-        echo "Bind-mount slurmd spool directory from the host because it should be propagated to the jail"
-        mount --bind /var/spool/slurmd var/spool/slurmd/
-    fi
-
-    if [ -n "$worker" ]; then
-         # slurmd package tree https://gist.github.com/asteny/9eb5089a10a793834d12a5b2449cc2b9
-         echo "Bind-mount slurmd binaries from container to the jail"
-         touch usr/sbin/slurmd usr/sbin/slurmstepd
-         mount --bind /usr/sbin/slurmd usr/sbin/slurmd
-         mount --bind /usr/sbin/slurmstepd usr/sbin/slurmstepd
-    fi
-
-    # For login node with cluster type GPU
-    if [ -z "$worker" ] && [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; then
+    # For login nodes in GPU clusters and CPU workers in GPU clusters
+    if { [ -z "$worker" ] && [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; } || { [ -n "$worker" ] && [ "$SLURM_CLUSTER_WITH_GPU" = "true" ] && [ "$NODESET_GPU_ENABLED" != "true" ]; }; then
         while [ ! -f "etc/gpu_libs_installed.flag" ]; do
             echo "Waiting for GPU libs to be propagated to the jail from a worker node"
             sleep 10
@@ -186,6 +184,13 @@ pushd "${jaildir}"
 
     # For worker node only
     if [ -n "$worker" ]; then
+        echo "Bind-mount slurmd spool directory from the host because it should be propagated to the jail"
+        mount --bind /var/spool/slurmd var/spool/slurmd/
+        # slurmd package tree https://gist.github.com/asteny/9eb5089a10a793834d12a5b2449cc2b9
+        echo "Bind-mount slurmd binaries from container to the jail"
+        touch usr/sbin/slurmd usr/sbin/slurmstepd
+        mount --bind /usr/sbin/slurmd usr/sbin/slurmd
+        mount --bind /usr/sbin/slurmstepd usr/sbin/slurmstepd
         echo "Update linker cache inside the jail"
         echo "  libnvidia-ml.so.1 exists before ldconfig: $(test -e usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1 && echo 'yes' || echo 'NO')"
         echo "  libnvidia-ml versioned file size before ldconfig: $(stat -c%s usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.*.* 2>/dev/null || echo 'NOT FOUND')"

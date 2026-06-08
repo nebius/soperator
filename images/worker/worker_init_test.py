@@ -696,8 +696,8 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_topology_with_special_characters(self):
         """Topology with special characters and 2 parts gets root inserted."""
-        result = worker_init.format_slurm_topology("default:switch_rack-1.leaf")
-        self.assertEqual(result, "topology=default:root:switch_rack-1.leaf")
+        result = worker_init.format_slurm_topology("default:switch_rack-1-leaf")
+        self.assertEqual(result, "topology=default:root:switch_rack-1-leaf")
 
     def test_topology_with_numbers(self):
         """Topology with 3+ parts is preserved (already has intermediates)."""

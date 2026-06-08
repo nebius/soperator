@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -81,6 +82,7 @@ type PodEphemeralStorageCheck struct {
 	clientset        kubernetes.Interface
 	restConfig       *rest.Config
 	usageThreshold   float64
+	resumeThreshold  float64
 	slurmAPIClients  *slurmapi.ClientSet
 }
 
@@ -91,6 +93,7 @@ func NewPodEphemeralStorageCheck(
 	restConfig *rest.Config,
 	reconcileTimeout time.Duration,
 	usageThreshold float64,
+	resumeThreshold float64,
 	slurmAPIClients *slurmapi.ClientSet,
 ) (*PodEphemeralStorageCheck, error) {
 	r := reconciler.NewReconciler(client, scheme, recorder)
@@ -106,6 +109,7 @@ func NewPodEphemeralStorageCheck(
 		clientset:        clientset,
 		restConfig:       restConfig,
 		usageThreshold:   usageThreshold,
+		resumeThreshold:  resumeThreshold,
 		slurmAPIClients:  slurmAPIClients,
 	}, nil
 }
@@ -283,11 +287,43 @@ func (r *PodEphemeralStorageCheck) ReconcilePodEphemeralStorageCheckForPod(ctx c
 			if err := r.handleHighStorageUsage(ctx, pod, info); err != nil {
 				return err
 			}
+		} else if info.UsagePercent < r.resumeThreshold {
+			if err := r.handleLowStorageUsage(ctx, pod); err != nil {
+				return err
+			}
 		}
 
 	}
 
 	return nil
+}
+
+func (r *PodEphemeralStorageCheck) initSlurmClientAndGetNode(
+	ctx context.Context, pod *corev1.Pod,
+) (types.NamespacedName, slurmapi.Node, error) {
+	slurmClusterName, err := r.getSlurmClusterName(ctx, pod.Namespace)
+	if err != nil {
+		return types.NamespacedName{}, slurmapi.Node{}, fmt.Errorf("getting SlurmCluster name: %w for pod %s/%s", err, pod.Namespace, pod.Name)
+	}
+	if slurmClusterName == "" {
+		return types.NamespacedName{}, slurmapi.Node{}, fmt.Errorf("not found SlurmCluster for pod %s/%s", pod.Namespace, pod.Name)
+	}
+
+	slurmClusterNamespacedName := types.NamespacedName{
+		Name:      slurmClusterName,
+		Namespace: pod.Namespace,
+	}
+
+	if err := r.InitSlurmAPIClients(slurmClusterNamespacedName, slurmClusterName); err != nil {
+		return types.NamespacedName{}, slurmapi.Node{}, fmt.Errorf("initializing Slurm API clients: %w", err)
+	}
+
+	slurmNode, err := r.getSlurmNode(ctx, slurmClusterNamespacedName, pod.Name)
+	if err != nil {
+		return types.NamespacedName{}, slurmapi.Node{}, fmt.Errorf("getting Slurm node: %w for pod %s/%s", err, pod.Namespace, pod.Name)
+	}
+
+	return slurmClusterNamespacedName, slurmNode, nil
 }
 
 func (r *PodEphemeralStorageCheck) handleHighStorageUsage(ctx context.Context, pod *corev1.Pod, info EphemeralStorageInfo) error {
@@ -299,37 +335,18 @@ func (r *PodEphemeralStorageCheck) handleHighStorageUsage(ctx context.Context, p
 		"threshold", fmt.Sprintf("%.2f%%", r.usageThreshold),
 	)
 
-	err := r.createEphemeralStorageEvent(ctx, pod, info)
+	if err := r.createEphemeralStorageEvent(ctx, pod, info); err != nil {
+		return err
+	}
+
+	slurmClusterNamespacedName, slurmNode, err := r.initSlurmClientAndGetNode(ctx, pod)
 	if err != nil {
 		return err
 	}
 
-	slurmClusterName, err := r.getSlurmClusterName(ctx, pod.Namespace)
-	if err != nil {
-		return fmt.Errorf("getting SlurmCluster name: %w for pod %s/%s", err, pod.Namespace, pod.Name)
-	}
-	if slurmClusterName == "" {
-		return fmt.Errorf("not found SlurmCluster for pod %s/%s", pod.Namespace, pod.Name)
-	}
-
-	slurmClusterNamespacedName := types.NamespacedName{
-		Name:      slurmClusterName,
-		Namespace: pod.Namespace,
-	}
-
-	err = r.InitSlurmAPIClients(slurmClusterNamespacedName, slurmClusterName)
-	if err != nil {
-		return fmt.Errorf("initializing Slurm API clients: %w", err)
-	}
-
-	slurmNodeName, err := r.getSlurmNode(ctx, slurmClusterNamespacedName, pod.Name)
-	if err != nil {
-		return fmt.Errorf("getting Slurm node: %w for pod %s/%s", err, pod.Namespace, pod.Name)
-	}
-	if err := r.checkSlurmNodeDrainStatus(ctx, slurmNodeName, pod); err != nil {
+	if err := r.checkSlurmNodeDrainStatus(ctx, slurmNode, pod); err != nil {
 		if err.Error() == "node needs draining" {
-			err = r.drainSlurmNode(ctx, slurmClusterNamespacedName, slurmNodeName.Name, info)
-			if err != nil {
+			if err := r.drainSlurmNode(ctx, slurmClusterNamespacedName, slurmNode.Name, info); err != nil {
 				return fmt.Errorf("draining Slurm node: %w for pod %s/%s", err, pod.Namespace, pod.Name)
 			}
 		} else {
@@ -412,7 +429,6 @@ func (r *PodEphemeralStorageCheck) checkSlurmNodeDrainStatus(ctx context.Context
 	}
 	logger.Info("slurm node", "nodeStates", slurmNodeName.States)
 	if slurmNodeName.IsIdleDrained() {
-		logger.V(1).Info("slurm node is fully drained", "nodeStates", slurmNodeName.States)
 		return nil
 	}
 
@@ -581,6 +597,62 @@ func (c *PodEphemeralStorageCheck) getSlurmNode(
 	return node, nil
 }
 
+func (r *PodEphemeralStorageCheck) handleLowStorageUsage(ctx context.Context, pod *corev1.Pod) error {
+	slurmClusterNamespacedName, slurmNode, err := r.initSlurmClientAndGetNode(ctx, pod)
+	if err != nil {
+		return err
+	}
+
+	if !r.isDrainedByEphemeralStorageCheck(slurmNode) {
+		return nil
+	}
+
+	return r.undrainSlurmNode(ctx, slurmClusterNamespacedName, slurmNode.Name)
+}
+
+func (r *PodEphemeralStorageCheck) isDrainedByEphemeralStorageCheck(node slurmapi.Node) bool {
+	if !node.IsDrainState() {
+		return false
+	}
+	if node.Reason == nil {
+		return false
+	}
+	return strings.HasPrefix(node.Reason.Reason, consts.SlurmUserReasonHC+" pod_ephemeral_storage")
+}
+
+func (c *PodEphemeralStorageCheck) undrainSlurmNode(
+	ctx context.Context,
+	slurmClusterName types.NamespacedName,
+	slurmNodeName string,
+) error {
+	logger := log.FromContext(ctx).WithName(PodEphemeralStorageCheckName).
+		WithValues(
+			"slurmNodeName", slurmNodeName,
+			"slurmCluster", slurmClusterName,
+		)
+	logger.Info("undraining slurm node after ephemeral storage usage dropped below threshold")
+
+	slurmAPIClient, found := c.slurmAPIClients.GetClient(slurmClusterName)
+	if !found {
+		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
+	}
+
+	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
+		api.V0041UpdateNodeMsg{
+			State: ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateRESUME}),
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("post undrain slurm node: %w", err)
+	}
+	if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
+		return fmt.Errorf("post undrain returned errors: %v", *resp.JSON200.Errors)
+	}
+
+	logger.Info("slurm node state is updated to RESUME")
+	return nil
+}
+
 func (c *PodEphemeralStorageCheck) drainSlurmNode(
 	ctx context.Context,
 	slurmClusterName types.NamespacedName,
@@ -588,11 +660,11 @@ func (c *PodEphemeralStorageCheck) drainSlurmNode(
 	info EphemeralStorageInfo,
 ) error {
 	message := fmt.Sprintf(
-		"pod_ephemeral_storage %.2f%% of ephemeral storage is used. Clean up volumes from 'ssh %s /opt/soperator_utils/fs_usage.sh -l', "+
-			"delete leftover containers from 'ssh %s enroot list' and 'ssh %s docker ps -a', "+
-			"reboot the node using 'scontrol reboot %s', "+
-			"or stop-start the InstanceId from 'scontrol show node %s'",
-		info.UsagePercent, slurmNodeName, slurmNodeName, slurmNodeName, slurmNodeName, slurmNodeName,
+		"pod_ephemeral_storage %.2[1]f%% of ephemeral storage is used. Clean up volumes from 'ssh %[2]s /opt/soperator_utils/fs_usage.sh -l', "+
+			"delete leftover containers from 'ssh %[2]s enroot list' and 'ssh %[2]s docker ps -a', "+
+			"reboot the node using 'scontrol reboot %[2]s', "+
+			"or stop-start the InstanceId from 'scontrol show node %[2]s'. And 'scontrol update nodename=%[2]s state=resume' after resolving the issue.",
+		info.UsagePercent, slurmNodeName,
 	)
 	reason := consts.SlurmUserReasonHC + " " + message
 	logger := log.FromContext(ctx).WithName("SlurmNodesController.drainSlurmNode").
