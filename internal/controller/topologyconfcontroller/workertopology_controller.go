@@ -278,6 +278,7 @@ func (r *WorkerTopologyReconciler) buildNodeSetTopologyConfig(
 	}
 
 	allNodeNames := collectAllNodeNames(nodeSetList)
+	fabricByNode := collectFabricByNode(nodeSetList)
 
 	gpuPodsByNode, err := r.collectScheduledGPUPodsByNode(ctx, nodeSetList, slurmCluster.Name, namespace)
 	if err != nil {
@@ -289,10 +290,10 @@ func (r *WorkerTopologyReconciler) buildNodeSetTopologyConfig(
 		if slurmCluster.Spec.Topology != nil {
 			blockSize = slurmCluster.Spec.Topology.BlockSize
 		}
-		return r.BuildTopologyBlocks(ctx, blockSize, nodeTopologyCM, gpuPodsByNode, allNodeNames)
+		return r.BuildTopologyBlocks(ctx, blockSize, nodeTopologyCM, gpuPodsByNode, allNodeNames, fabricByNode)
 	}
 
-	return r.BuildTopologyConfig(ctx, nodeTopologyCM, gpuPodsByNode, allNodeNames)
+	return r.BuildTopologyConfig(ctx, nodeTopologyCM, gpuPodsByNode, allNodeNames, fabricByNode)
 }
 
 // collectAllNodeNames returns every Slurm node name derived from the NodeSets' replica ranges,
@@ -306,6 +307,23 @@ func collectAllNodeNames(nodeSetList []v1alpha1.NodeSet) []string {
 		}
 	}
 	return names
+}
+
+// collectFabricByNode maps every Slurm node name to the IB fabric of its NodeSet
+// (spec.topology.fabric). NodeSets without an explicit fabric are left out of the map; the
+// topology builders fall back to the default fabric for those.
+func collectFabricByNode(nodeSetList []v1alpha1.NodeSet) map[string]string {
+	fabricByNode := make(map[string]string)
+	for _, nodeSet := range nodeSetList {
+		fabric := nodeSet.Spec.Topology.Fabric
+		if fabric == "" {
+			continue
+		}
+		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
+			fabricByNode[fmt.Sprintf("%s-%d", nodeSet.Name, i)] = fabric
+		}
+	}
+	return fabricByNode
 }
 
 // collectScheduledGPUPodsByNode returns pods of GPU-enabled NodeSets that are scheduled to a K8s
@@ -407,6 +425,7 @@ func (r *WorkerTopologyReconciler) BuildTopologyBlocks(
 	topologyNodeLabelsCM *corev1.ConfigMap,
 	gpuPodsByNode map[string][]string,
 	allNodeNames []string,
+	fabricByNode map[string]string,
 ) (string, error) {
 	bs := defBlockSize
 	if blockSize != nil {
@@ -418,7 +437,7 @@ func (r *WorkerTopologyReconciler) BuildTopologyBlocks(
 		return "", fmt.Errorf("deserialize node block topology: %w", err)
 	}
 
-	blocks := BuildTopologyBlocks(ctx, labelsByNode, gpuPodsByNode, allNodeNames)
+	blocks := BuildTopologyBlocks(ctx, labelsByNode, gpuPodsByNode, allNodeNames, fabricByNode)
 
 	config := strings.Join(blocks.RenderConfigLines(), "\n") + "\n"
 	config = fmt.Sprintf("%sBlockSizes=%d\n", config, bs)
@@ -432,12 +451,13 @@ func (r *WorkerTopologyReconciler) BuildTopologyConfig(
 	topologyNodeLabelsCM *corev1.ConfigMap,
 	gpuPodsByNode map[string][]string,
 	allNodeNames []string,
+	fabricByNode map[string]string,
 ) (string, error) {
 	labelsByNode, err := r.ParseNodeTopologyLabels(topologyNodeLabelsCM.Data)
 	if err != nil {
 		return "", fmt.Errorf("deserialize node tree topology: %w", err)
 	}
-	graph := BuildTopologyGraph(ctx, labelsByNode, gpuPodsByNode, allNodeNames)
+	graph := BuildTopologyGraph(ctx, labelsByNode, gpuPodsByNode, allNodeNames, fabricByNode)
 	config := strings.Join(graph.RenderConfigLines(), "\n") + "\n"
 	return config, nil
 }

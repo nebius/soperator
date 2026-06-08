@@ -27165,6 +27165,18 @@ spec:
                       type: string
                   type: object
                 type: array
+              topology:
+                description: Topology defines network-topology settings for this NodeSet.
+                properties:
+                  fabric:
+                    default: root
+                    description: |-
+                      Fabric is the IB fabric this NodeSet belongs to. Its workers are grouped under a
+                      per-fabric root switch (named after the fabric) so Slurm never schedules a job across
+                      fabrics. Powered-down / unscheduled nodes are placed under "<fabric>.unknown".
+                      Defaults to "root", which preserves the single-fabric behavior.
+                    type: string
+                type: object
               workerAnnotations:
                 additionalProperties:
                   type: string
