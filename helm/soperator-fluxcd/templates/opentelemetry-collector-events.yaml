@@ -177,6 +177,7 @@ spec:
             - otlp
             {{- end }}
             processors:
+            - k8s_attributes
             - transform
             - memory_limiter
             - batch
