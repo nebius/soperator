@@ -38,6 +38,7 @@ spec:
   targetNamespace: logs-system
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
+  {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
   {{- if .Values.observability.opentelemetry.logs.overrideValues }}
     {{- toYaml .Values.observability.opentelemetry.logs.overrideValues | nindent 4 }}
   {{- else }}
@@ -197,9 +198,10 @@ spec:
         prometheus: null
       processors:
         batch:
-          send_batch_max_size: 700
-          send_batch_size: 250
-        k8sattributes:
+          timeout: {{ $batch.timeout | default "1s" }}
+          send_batch_size: {{ $batch.sendBatchSize | default 250 }}
+          send_batch_max_size: {{ $batch.sendBatchMaxSize | default 700 }}
+        k8s_attributes:
           pod_association:
           - sources:
             - from: resource_attribute
@@ -240,7 +242,7 @@ spec:
             - set(attributes["sp_resource_id"], "${env:CLUSTER_ID}")
             {{- end }}
       exporters:
-        otlphttp/victorialogs:
+        otlp_http/victorialogs:
           compression: gzip
           encoding: proto
           logs_endpoint: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
@@ -281,7 +283,12 @@ spec:
         {{- if .Values.observability.opentelemetry.metrics.enabled }}
         telemetry:
           metrics:
-            address: 0.0.0.0:8888
+            readers:
+              - pull:
+                  exporter:
+                    prometheus:
+                      host: 0.0.0.0
+                      port: 8888
         {{- end }}
         extensions:
         - health_check
@@ -295,12 +302,12 @@ spec:
             - filelog
             - filelog/health_checker
             processors:
-            - k8sattributes
+            - k8s_attributes
             - transform
             - memory_limiter
             - batch
             exporters:
-            - otlphttp/victorialogs
+            - otlp_http/victorialogs
             {{- if $hasPublicEndpoint }}
             - otlp
             {{- end }}
