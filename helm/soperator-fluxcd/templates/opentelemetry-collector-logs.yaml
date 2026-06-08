@@ -32,6 +32,7 @@ spec:
   targetNamespace: logs-system
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
+  {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
   {{- if .Values.observability.opentelemetry.logs.overrideValues }}
     {{- toYaml .Values.observability.opentelemetry.logs.overrideValues | nindent 4 }}
   {{- else }}
@@ -49,7 +50,7 @@ spec:
         - list
     config:
       exporters:
-        otlphttp/victoriametrics:
+        otlp_http/victoriametrics:
           compression: gzip
           encoding: proto
           logs_endpoint: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
@@ -88,9 +89,10 @@ spec:
         {{- end }}
       processors:
         batch:
-          send_batch_max_size: 700
-          send_batch_size: 250
-        k8sattributes:
+          timeout: {{ $batch.timeout | default "1s" }}
+          send_batch_size: {{ $batch.sendBatchSize | default 250 }}
+          send_batch_max_size: {{ $batch.sendBatchMaxSize | default 700 }}
+        k8s_attributes:
           extract:
             labels:
             - from: pod
@@ -190,6 +192,7 @@ spec:
             - type: move
               from: attributes.app
               to: attributes["syslog.appname"]
+              output: move-logtype
             - id: parse-syslog
               type: syslog_parser
               protocol: rfc3164
@@ -200,7 +203,8 @@ spec:
               if: '"message" in attributes'
             - id: not-syslog
               type: noop
-            - type: move
+            - id: move-logtype
+              type: move
               from: attributes["logtype"]
               to: resource["app.kubernetes.io/name"]
         {{- end }}
@@ -317,7 +321,12 @@ spec:
         {{- if .Values.observability.opentelemetry.metrics.enabled }}
         telemetry:
           metrics:
-            address: 0.0.0.0:8888
+            readers:
+              - pull:
+                  exporter:
+                    prometheus:
+                      host: 0.0.0.0
+                      port: 8888
         {{- end }}
         extensions:
         - health_check
@@ -328,12 +337,12 @@ spec:
         pipelines:
           logs:
             exporters:
-            - otlphttp/victoriametrics
+            - otlp_http/victoriametrics
             {{- if $hasPublicEndpoint }}
             - otlp
             {{- end }}
             processors:
-            - k8sattributes
+            - k8s_attributes
             - transform
             - memory_limiter
             - batch
