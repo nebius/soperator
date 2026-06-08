@@ -50,7 +50,7 @@ spec:
         - list
     config:
       exporters:
-        otlphttp/victoriametrics:
+        otlp_http/victoriametrics:
           compression: gzip
           encoding: proto
           logs_endpoint: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
@@ -92,7 +92,7 @@ spec:
           timeout: {{ $batch.timeout | default "1s" }}
           send_batch_size: {{ $batch.sendBatchSize | default 2000 }}
           send_batch_max_size: {{ $batch.sendBatchMaxSize | default 5000 }}
-        k8sattributes:
+        k8s_attributes:
           extract:
             labels:
             - from: pod
@@ -335,12 +335,12 @@ spec:
         pipelines:
           logs:
             exporters:
-            - otlphttp/victoriametrics
+            - otlp_http/victoriametrics
             {{- if $hasPublicEndpoint }}
             - otlp
             {{- end }}
             processors:
-            - k8sattributes
+            - k8s_attributes
             - transform
             - memory_limiter
             - batch

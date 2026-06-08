@@ -218,7 +218,7 @@ spec:
           timeout: {{ $batch.timeout | default "1s" }}
           send_batch_size: {{ $batch.sendBatchSize | default 2000 }}
           send_batch_max_size: {{ $batch.sendBatchMaxSize | default 5000 }}
-        k8sattributes:
+        k8s_attributes:
           pod_association:
           - sources:
             - from: resource_attribute
@@ -259,7 +259,7 @@ spec:
             - set(attributes["sp_resource_id"], "${env:CLUSTER_ID}")
             {{- end }}
       exporters:
-        otlphttp/victorialogs:
+        otlp_http/victorialogs:
           compression: gzip
           encoding: proto
           logs_endpoint: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
@@ -319,12 +319,12 @@ spec:
             - filelog
             - filelog/health_checker
             processors:
-            - k8sattributes
+            - k8s_attributes
             - transform
             - memory_limiter
             - batch
             exporters:
-            - otlphttp/victorialogs
+            - otlp_http/victorialogs
             {{- if $hasPublicEndpoint }}
             - otlp
             {{- end }}
