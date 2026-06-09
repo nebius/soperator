@@ -93,7 +93,7 @@ spec:
           - '--metric-allowlist=kube_node_info'
           - '--metric-allowlist=kube_customresource_.*'
           - '--metric-allowlist=kube_node_labels'
-          - '--metric-labels-allowlist=nodes=[nebius.com/driverful,nebius.com/gpu,nebius.com/node-group-id,slurm.nebius.ai/nodeset,slurm.nebius.ai/workload]'
+          - '--metric-labels-allowlist=nodes=[nebius.com/driverful,nebius.com/gpu,nebius.com/gpu-name,nebius.com/node-group-id,nebius.com/nvlink-instance-group,nebius.com/resource-preset,slurm.nebius.ai/nodeset,slurm.nebius.ai/nodeset-name,slurm.nebius.ai/workload]'
         rbac:
           extraRules:
             - apiGroups:
