@@ -355,6 +355,7 @@ func TestRenderSlurmConfigMapWithLargeSuspendTime(t *testing.T) {
 	assert.Contains(t, slurmConfig, "SuspendTime=1000000000")
 	assert.NotContains(t, slurmConfig, "SuspendTime=-1")
 	assert.NotContains(t, slurmConfig, "SuspendTime=INFINITE")
+}
 
 func TestRenderSlurmConfig_MetricsType(t *testing.T) {
 	tests := []struct {
