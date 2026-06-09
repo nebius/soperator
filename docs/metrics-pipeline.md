@@ -104,7 +104,8 @@ Key Metrics:
   - 8081 - Telemetry endpoint (self-monitoring)
 - Metrics: Pod state metrics (filtered subset)
 - Deployment: Single replica deployment in `monitoring-system` namespace
-- Configuration: `--resources=pods` with metric allowlist filtering
+- Configuration: pod/node collectors with metric allowlist filtering
+- Scrape size: inherits the global vmagent scrape size by default; `observability.vmStack.values.kubeStateMetrics.maxScrapeSize` can raise the main `http` endpoint limit for large clusters
 
 Connection Example:
 ```bash
@@ -162,7 +163,7 @@ curl "http://localhost:8429/api/v1/query?query=up"
 
 #### Remote Write to Nebius Cloud
 - Endpoint: `https://write.monitoring.{region}.nebius.cloud/projects/{projectId}/buckets/soperator/prometheus`
-- Authentication: Bearer token from `/mnt/cloud-metadata/tsa-token`
+- Authentication: Bearer token from `/mnt/imds/tsa-token`, populated and refreshed by the vmagent IMDS token sidecar
 - When: Enabled with `publicEndpointEnabled: true`
 
 ### Visualization

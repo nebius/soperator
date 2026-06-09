@@ -3,6 +3,7 @@ package common
 import (
 	"cmp"
 	"fmt"
+	"math/bits"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -102,11 +103,15 @@ func AddNodeSetsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values
 	}
 }
 
-// AddNodesToSlurmConfig adds all node names to the slurm config
+// AddNodesToSlurmConfig adds all node names to the slurm config.
+//
+// All replicas in a NodeSet share an identical body, so we emit one line per
+// NodeSet using Slurm hostlist range syntax. This keeps the ConfigMap well
+// under the Kubernetes 1 MiB object size limit on large clusters.
 //
 // Example output:
-// NodeName=gb200-0-0 State=CLOUD NodeHostname=gb200-0-0 NodeAddr=gb200-0-0.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
-// NodeName=gb200-0-1 State=CLOUD NodeHostname=gb200-0-1 NodeAddr=gb200-0-1.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-0-0 State=CLOUD NodeAddr=gb200-0-0.gb200-0.soperator.svc RealMemory=1612639 Feature=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-1-[0-17] State=CLOUD NodeAddr=gb200-1-[0-17].gb200-1.soperator.svc RealMemory=1612639 Feature=platform-gb200,gb200-rack-1 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
 func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
 	res.AddComment("Nodes section")
 
@@ -124,59 +129,60 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 			continue
 		}
 
-		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
-			nodeName := fmt.Sprintf("%s-%d", nodeSet.Name, i)
-
-			nodeAddr := fmt.Sprintf(
-				"%s.%s",
-				nodeName,
-				naming.BuildNodeSetUmbrellaServiceFQDN(nodeSet.Namespace, cluster.Name),
-			)
-			realMemory := strconv.FormatInt(
-				RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}),
-				10,
-			)
-
-			var nodeConfigParts []string
-			nodeConfigParts = append(nodeConfigParts,
-				fmt.Sprintf("NodeHostname=%s", nodeName),
-				fmt.Sprintf("NodeAddr=%s", nodeAddr),
-				fmt.Sprintf("RealMemory=%s", realMemory),
-			)
-			if nodeSet.Spec.Slurmd.Port != 0 {
-				nodeConfigParts = append(nodeConfigParts, fmt.Sprintf("Port=%d", nodeSet.Spec.Slurmd.Port))
-			}
-			nodeConfig := strings.Join(nodeConfigParts, " ")
-
-			if len(nodeSet.Spec.NodeConfig.Features) > 0 {
-				features := strings.Join(nodeSet.Spec.NodeConfig.Features, ",")
-				nodeConfig = fmt.Sprintf("%s %s%s", nodeConfig, nodeFeatureKey, features)
-			}
-
-			// Remove feature and state overrides
-			staticConfig := strings.Join(
-				slices.Filter(
-					nil,
-					strings.Split(nodeSet.Spec.NodeConfig.Static, " "),
-					func(s string) bool {
-						return !strings.HasPrefix(s, nodeFeatureKey) &&
-							!strings.HasPrefix(s, stateKey)
-					},
-				),
-				" ",
-			)
-
-			if len(nodeConfig) > 0 {
-				nodeConfig = fmt.Sprintf("%s %s", nodeConfig, staticConfig)
-			}
-
-			// Create static nodes with state CLOUD.
-			// Otherwise, nodes will disappear from the Slurm state every time the corresponding K8s pods don't run.
-			res.AddProperty(
-				"NodeName",
-				fmt.Sprintf("%s State=CLOUD %s", nodeName, nodeConfig),
-			)
+		var nodeRange string
+		if nodeSet.Spec.Replicas == 1 {
+			nodeRange = fmt.Sprintf("%s-0", nodeSet.Name)
+		} else {
+			nodeRange = fmt.Sprintf("%s-[0-%d]", nodeSet.Name, nodeSet.Spec.Replicas-1)
 		}
+
+		nodeAddr := fmt.Sprintf(
+			"%s.%s",
+			nodeRange,
+			naming.BuildNodeSetUmbrellaServiceFQDN(nodeSet.Namespace, cluster.Name),
+		)
+		realMemory := strconv.FormatInt(
+			RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}),
+			10,
+		)
+
+		var nodeConfigParts []string
+		nodeConfigParts = append(nodeConfigParts,
+			fmt.Sprintf("NodeAddr=%s", nodeAddr),
+			fmt.Sprintf("RealMemory=%s", realMemory),
+		)
+		if nodeSet.Spec.Slurmd.Port != 0 {
+			nodeConfigParts = append(nodeConfigParts, fmt.Sprintf("Port=%d", nodeSet.Spec.Slurmd.Port))
+		}
+		nodeConfig := strings.Join(nodeConfigParts, " ")
+
+		if len(nodeSet.Spec.NodeConfig.Features) > 0 {
+			features := strings.Join(nodeSet.Spec.NodeConfig.Features, ",")
+			nodeConfig = fmt.Sprintf("%s %s%s", nodeConfig, nodeFeatureKey, features)
+		}
+
+		staticConfig := strings.Join(
+			slices.Filter(
+				nil,
+				strings.Split(nodeSet.Spec.NodeConfig.Static, " "),
+				func(s string) bool {
+					return !strings.HasPrefix(s, nodeFeatureKey) &&
+						!strings.HasPrefix(s, stateKey)
+				},
+			),
+			" ",
+		)
+
+		if len(nodeConfig) > 0 {
+			nodeConfig = fmt.Sprintf("%s %s", nodeConfig, staticConfig)
+		}
+
+		// State=CLOUD keeps nodes registered in Slurm even when the
+		// corresponding K8s pods are not running.
+		res.AddProperty(
+			"NodeName",
+			fmt.Sprintf("%s State=CLOUD %s", nodeRange, nodeConfig),
+		)
 	}
 }
 
@@ -250,7 +256,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	{
 		svcName := cluster.NodeController.Service.Name
-		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", "controller-0", svcName))
+		controllerHostname := cluster.NodeController.StatefulSet.Name + "-0"
+		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", controllerHostname, svcName))
 	}
 
 	res.AddComment("")
@@ -322,10 +329,12 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SlurmdTimeout", 180)
 	res.AddProperty("TCPTimeout", 15)
 	res.AddProperty("WaitTime", 0)
+	total := totalWorkerNodes(cluster)
+	connMax := max(int32(1024), nextPow2(total*2))
 	if cluster.HasEphemeralNodes() {
-		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=1024,conmgr_threads=32,cloud_dns,idle_on_node_suspend")
+		res.AddProperty("SlurmctldParameters", fmt.Sprintf("conmgr_max_connections=%d,conmgr_threads=32,cloud_dns,idle_on_node_suspend", connMax))
 	} else {
-		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=1024,conmgr_threads=32")
+		res.AddProperty("SlurmctldParameters", fmt.Sprintf("conmgr_max_connections=%d,conmgr_threads=32", connMax))
 	}
 
 	res.AddProperty("RebootProgram", "/opt/bin/slurm/reboot.sh")
@@ -359,8 +368,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
-	res.AddProperty("MaxNodeCount", "1024")
-	res.AddProperty("MaxArraySize", "1024")
+	res.AddProperty("MaxNodeCount", max(int32(1024), nextPow2(total*2)))
+	res.AddProperty("MaxArraySize", max(int32(1024), total*5))
 	res.AddProperty("JobRequeue", 1)
 	res.AddProperty("PreemptMode", "REQUEUE")
 	res.AddProperty("PreemptType", "preempt/partition_prio")
@@ -448,6 +457,22 @@ func buildSuspendExcNodes(cluster *values.SlurmCluster) string {
 	}
 
 	return strings.Join(staticNodeSets, ",")
+}
+
+func totalWorkerNodes(cluster *values.SlurmCluster) int32 {
+	var total int32
+	for _, ns := range cluster.NodeSets {
+		total += ns.Spec.Replicas
+	}
+	return total
+}
+
+// nextPow2 returns the smallest power of 2 >= n (minimum 1).
+func nextPow2(n int32) int32 {
+	if n <= 1 {
+		return 1
+	}
+	return 1 << bits.Len(uint(n-1))
 }
 
 // addSlurmConfigProperties adds properties from the given struct to the config file
@@ -582,6 +607,7 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			"container_scope=global",
 			"sbatch_support=1",
 			fmt.Sprintf("importer=%s", cluster.PlugStackConfig.Pyxis.ImporterPath),
+			fmt.Sprintf("use_squashfuse=%d", utils.Ternary(cluster.PlugStackConfig.Pyxis.UseSquashfuse != nil && *cluster.PlugStackConfig.Pyxis.UseSquashfuse, 1, 0)),
 		},
 		" ",
 	))

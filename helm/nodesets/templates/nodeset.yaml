@@ -19,12 +19,20 @@ metadata:
     {{- end }}
 
 spec:
+  {{- with $.Values.clusterName }}
+  clusterName: {{ . | quote }}
+  {{- end }}
+
   {{- with (.replicas | default 1) }}
   replicas: {{ . }}
   {{- end }}
 
   {{- with (.maxUnavailable | default "20%") }}
   maxUnavailable: {{ . }}
+  {{- end }}
+
+  {{- with .maxConcurrentStartup }}
+  maxConcurrentStartup: {{ . }}
   {{- end }}
 
   {{- if .ephemeralNodes }}
@@ -150,6 +158,7 @@ spec:
     security:
       limitsConfig: {{ get (.security | default dict) "limitsConfig" | quote }}
       appArmorProfile: {{ get (.security | default dict) "appArmorProfile" | default "unconfined" | quote }}
+      procMount: {{ get (.security | default dict) "procMount" | default "Default" | quote }}
   {{- end }}
 
   {{- with (required ".Values.nodesets[*].munge is required." .munge) }}

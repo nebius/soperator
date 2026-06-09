@@ -12,6 +12,7 @@ type ExpectedNodeSet struct {
 }
 
 type ClusterState struct {
+	SlurmClusterName string
 	Workers          []WorkerPodRef
 	GPUWorkers       []WorkerPodRef
 	WorkersByNodeSet map[string][]WorkerPodRef

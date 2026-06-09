@@ -21,6 +21,10 @@ spec:
   slurmConfig:
     {{- toYaml .Values.slurmConfig | nindent 4 }}
   {{- end }}
+  {{- if .Values.topology }}
+  topology:
+    {{- toYaml .Values.topology | nindent 4 }}
+  {{- end }}
   {{- if .Values.customSlurmConfig }}
   customSlurmConfig: |
 {{- .Values.customSlurmConfig | nindent 4 }}
@@ -90,7 +94,7 @@ spec:
   volumeSources:
     - name: slurm-scripts
       configMap:
-        name: slurm-scripts
+        name: {{ include "slurm-cluster.slurmScriptsCMName" . }}
         defaultMode: 0755
     {{- range .Values.volumeSources }}
     - name: {{ .name | quote }}
@@ -453,6 +457,16 @@ spec:
       {{- end }}
       {{- if .Values.slurmNodes.exporter.collectionInterval }}
       collectionInterval: {{ .Values.slurmNodes.exporter.collectionInterval | quote }}
+      {{- end }}
+      {{- if .Values.slurmNodes.exporter.jobSource }}
+      jobSource: {{ .Values.slurmNodes.exporter.jobSource | quote }}
+      {{- end }}
+      {{- with .Values.slurmNodes.exporter.accountingJobStates }}
+      accountingJobStates:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.slurmNodes.exporter.accountingJobsLookback }}
+      accountingJobsLookback: {{ .Values.slurmNodes.exporter.accountingJobsLookback | quote }}
       {{- end }}
       {{- if .Values.slurmNodes.exporter.podMonitorConfig }}
       podMonitorConfig:

@@ -117,10 +117,10 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	if _, err := w.RunWithDefaultRetry(ctx, "kubectl", "get", "pods", "-n", soperatorNamespace); err != nil {
 		return err
 	}
-	if err := verifyPodReady(ctx, w, soperatorNamespace, "login-0"); err != nil {
+	if err := verifyPodReady(ctx, w, soperatorNamespace, state.SlurmClusterName+"-login-0"); err != nil {
 		return fmt.Errorf("verify login pod: %w", err)
 	}
-	if err := verifyPodReady(ctx, w, soperatorNamespace, "controller-0"); err != nil {
+	if err := verifyPodReady(ctx, w, soperatorNamespace, state.SlurmClusterName+"-controller-0"); err != nil {
 		return fmt.Errorf("verify controller pod: %w", err)
 	}
 	if _, err := w.Controller().RunWithDefaultRetry(ctx, "true"); err != nil {
@@ -156,6 +156,7 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 
 	log.Printf("acceptance: discovered workers: %s", workerNames(state.Workers))
 	log.Printf("acceptance: discovered GPU workers: %s", workerNames(state.GPUWorkers))
+	log.Printf("acceptance: discovered workers by nodeset: %s", workersByNodeSetSummary(state.WorkersByNodeSet))
 	return nil
 }
 
@@ -181,8 +182,8 @@ func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
 	steps.NewInternalSSH(w, slurm).Register(sc)
 	steps.NewPackageInstallation(w, slurm).Register(sc)
 	steps.NewNodeReplacement(w, slurm).Register(sc)
-	steps.NewDockerContainers(w, slurm).Register(sc)
-	steps.NewEnrootContainers(w, slurm).Register(sc)
+	steps.NewDockerContainers(w, slurm, r.state.SlurmClusterName).Register(sc)
+	steps.NewEnrootContainers(w, slurm, r.state.SlurmClusterName).Register(sc)
 	steps.NewTopology(r.state, w).Register(sc)
 
 	registerSkipHook(sc)
@@ -257,6 +258,25 @@ func workerNames(workers []framework.WorkerPodRef) string {
 		names = append(names, worker.Name)
 	}
 	return strings.Join(names, ", ")
+}
+
+func workersByNodeSetSummary(workersByNodeSet map[string][]framework.WorkerPodRef) string {
+	if len(workersByNodeSet) == 0 {
+		return "<none>"
+	}
+
+	names := make([]string, 0, len(workersByNodeSet))
+	for nodeSet := range workersByNodeSet {
+		names = append(names, nodeSet)
+	}
+	sort.Strings(names)
+
+	parts := make([]string, 0, len(names))
+	for _, nodeSet := range names {
+		parts = append(parts, fmt.Sprintf("%s=[%s]", nodeSet, workerNames(workersByNodeSet[nodeSet])))
+	}
+
+	return strings.Join(parts, "; ")
 }
 
 func verifyPodReady(ctx context.Context, w *world, namespace, name string) error {

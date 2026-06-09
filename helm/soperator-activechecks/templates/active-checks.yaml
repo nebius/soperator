@@ -6,13 +6,15 @@
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: ActiveCheck
 metadata:
-  name: {{ $name | quote }}
+  name: {{ printf "%s-%s" $root.Values.slurmClusterRefName $name | quote }}
 spec:
   checkType: {{ $check.checkType | quote }}
-  name: {{ $name | quote }}
+  name: {{ printf "%s-%s" $root.Values.slurmClusterRefName $name | quote }}
   {{- with $check.dependsOn }}
   dependsOn:
-{{ toYaml . | indent 4 }}
+    {{- range . }}
+    - {{ printf "%s-%s" $root.Values.slurmClusterRefName . | quote }}
+    {{- end }}
   {{- end }}
   slurmClusterRefName: {{ $root.Values.slurmClusterRefName | quote }}
   {{- with $check.schedule }}
@@ -28,6 +30,30 @@ spec:
   suspend: {{ default false $check.suspend }}
   activeDeadlineSeconds: {{ default 1800 $check.activeDeadlineSeconds }}
   runAfterCreation: {{ default false $check.runAfterCreation }}
+  {{- $nodeSelector := $root.Values.nodeSelector }}
+  {{- if hasKey $check "nodeSelector" }}
+    {{- $nodeSelector = $check.nodeSelector }}
+  {{- end }}
+  {{- with $nodeSelector }}
+  nodeSelector:
+{{ toYaml . | indent 4 }}
+  {{- end }}
+  {{- $affinity := $root.Values.affinity }}
+  {{- if hasKey $check "affinity" }}
+    {{- $affinity = $check.affinity }}
+  {{- end }}
+  {{- with $affinity }}
+  affinity:
+{{ toYaml . | indent 4 }}
+  {{- end }}
+  {{- $tolerations := $root.Values.tolerations }}
+  {{- if hasKey $check "tolerations" }}
+    {{- $tolerations = $check.tolerations }}
+  {{- end }}
+  {{- with $tolerations }}
+  tolerations:
+{{ toYaml . | indent 4 }}
+  {{- end }}
   {{- if eq $check.checkType "slurmJob" }}
   slurmJobSpec:
 {{ include "soperator-activechecks.slurmJobSpec" (dict "check" $check "ctx" $root) | indent 4 }}

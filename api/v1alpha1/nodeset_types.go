@@ -114,6 +114,12 @@ const (
 
 // NodeSetSpec defines the desired state of NodeSet
 type NodeSetSpec struct {
+	// ClusterName is the name of the SlurmCluster this NodeSet belongs to.
+	// Must be in the same namespace as the NodeSet.
+	//
+	// +kubebuilder:validation:Optional
+	ClusterName string `json:"clusterName,omitempty"`
+
 	// Replicas specifies the number of worker nodes in the NodeSet.
 	//
 	// Defaults to 1 if not specified.
@@ -131,6 +137,18 @@ type NodeSetSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="20%"
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+
+	// MaxConcurrentStartup caps the number of worker pods created in parallel
+	// during initial NodeSet scale-out (i.e. cluster creation or NodeSet growth).
+	// Value can be an absolute number (ex: 500) or a percentage of desired pods (ex: 10%).
+	// Maps to the underlying kruise AdvancedStatefulSet's scaleStrategy.maxUnavailable.
+	// Prevents overloading the Slurm controller with simultaneous slurmd registrations
+	// on large clusters.
+	// Defaults to 500.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=500
+	MaxConcurrentStartup *intstr.IntOrString `json:"maxConcurrentStartup,omitempty"`
 
 	// EphemeralNodes enables ephemeral node behavior for this NodeSet.
 	// When true, nodes will use dynamic topology injection instead of legacy topology.conf.

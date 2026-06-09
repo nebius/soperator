@@ -1,6 +1,7 @@
 package soperatorchecks
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -18,7 +19,7 @@ func TestMaintenanceConditionTypeConfiguration(t *testing.T) {
 	scheme := runtime.NewScheme()
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
 
 	tests := []struct {
 		name                  string
@@ -101,7 +102,7 @@ func TestDefaultMaintenanceConditionTypeConstant(t *testing.T) {
 	scheme := runtime.NewScheme()
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
 
 	slurmAPIController := NewSlurmAPIClientsController(client, scheme, recorder, slurmAPIClients, "")
 	k8sController := NewK8SNodesController(client, scheme, recorder, 15*time.Minute, true, "", "")
@@ -145,7 +146,7 @@ func TestMaintenanceConditionTypeIntegration(t *testing.T) {
 			scheme := runtime.NewScheme()
 			client := fake.NewClientBuilder().WithScheme(scheme).Build()
 			recorder := record.NewFakeRecorder(10)
-			slurmAPIClients := slurmapi.NewClientSet()
+			slurmAPIClients := slurmapi.NewClientSet(context.Background())
 
 			maintenanceConditionType := tc.cmdLineArg
 			if maintenanceConditionType == "" {

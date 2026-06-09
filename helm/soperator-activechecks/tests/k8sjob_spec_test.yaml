@@ -5,7 +5,7 @@ tests:
   - it: should render k8sJobSpec with correct structure
     documentSelector:
       path: metadata.name
-      value: test-k8sjob
+      value: test-cluster-test-k8sjob
     set:
       slurmClusterRefName: test-cluster
       images:
@@ -44,10 +44,59 @@ tests:
       - exists:
           path: spec.k8sJobSpec.mungeContainer.image
 
+  - it: should render global scheduling fields
+    documentSelector:
+      path: metadata.name
+      value: test-cluster-test-scheduling
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+        munge: "munge-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: slurm.nebius.ai/nodeset
+                    operator: In
+                    values:
+                      - worker
+      tolerations:
+        - key: slurm.nebius.ai/nodeset
+          operator: Equal
+          value: worker
+          effect: NoSchedule
+      checks:
+        test-scheduling:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              command: ["echo", "test"]
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - equal:
+          path: spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: slurm.nebius.ai/nodeset
+      - equal:
+          path: spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]
+          value: worker
+      - equal:
+          path: spec.tolerations[0].key
+          value: slurm.nebius.ai/nodeset
+      - equal:
+          path: spec.tolerations[0].value
+          value: worker
+
   - it: should allow overriding k8sJob container image
     documentSelector:
       path: metadata.name
-      value: test-k8sjob-image-override
+      value: test-cluster-test-k8sjob-image-override
     set:
       slurmClusterRefName: test-cluster
       images:
@@ -75,7 +124,7 @@ tests:
   - it: should not render appArmorProfile at k8sJobSpec level (regression test)
     documentSelector:
       path: metadata.name
-      value: test-apparmorprofile-placement
+      value: test-cluster-test-apparmorprofile-placement
     set:
       slurmClusterRefName: test-cluster
       images:
@@ -103,7 +152,7 @@ tests:
   - it: should resolve NCCL tests version from map for CUDA 12.9.0
     documentSelector:
       path: metadata.name
-      value: test-nccl-map-lookup
+      value: test-cluster-test-nccl-map-lookup
     set:
       slurmClusterRefName: test-cluster
       cudaVersion: "12.9.0"
@@ -143,7 +192,7 @@ tests:
   - it: should resolve NCCL tests version from map for CUDA 13.0.2
     documentSelector:
       path: metadata.name
-      value: test-nccl-map-lookup-alt
+      value: test-cluster-test-nccl-map-lookup-alt
     set:
       slurmClusterRefName: test-cluster
       cudaVersion: "13.0.2"
@@ -186,7 +235,7 @@ tests:
   - it: should use flat override when ncclTestsVersion is set
     documentSelector:
       path: metadata.name
-      value: test-nccl-flat-override
+      value: test-cluster-test-nccl-flat-override
     set:
       slurmClusterRefName: test-cluster
       cudaVersion: "12.9.0"
@@ -225,7 +274,7 @@ tests:
   - it: should allow explicit hostUsers false override
     documentSelector:
       path: metadata.name
-      value: test-hostusers-override-false
+      value: test-cluster-test-hostusers-override-false
     set:
       slurmClusterRefName: test-cluster
       hostUsers: false
@@ -249,7 +298,7 @@ tests:
   - it: should allow explicit hostUsers true override
     documentSelector:
       path: metadata.name
-      value: test-hostusers-override-true
+      value: test-cluster-test-hostusers-override-true
     set:
       slurmClusterRefName: test-cluster
       hostUsers: true
