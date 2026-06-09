@@ -189,11 +189,12 @@ type SlurmConfig struct {
 	// +kubebuilder:default="SwitchAsNodeRank"
 	TopologyParam string `json:"topologyParam,omitempty"`
 	// SuspendTime is the idle time in seconds after which ephemeral (CLOUD) nodes become eligible
-	// for automatic power down. A negative value (the default, -1) disables automatic power down.
-	// Automatic power up is unaffected by this setting.
+	// for automatic power down. The default is a large finite value so Slurm power-save remains
+	// enabled; with INFINITE/-1 and no partition-level finite SuspendTime, Slurm disables
+	// power-save and scontrol power down cannot trigger SuspendProgram.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=-1
+	// +kubebuilder:default=1000000000
 	SuspendTime *int32 `json:"suspendTime,omitempty"`
 }
 
