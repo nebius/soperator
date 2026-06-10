@@ -25,8 +25,12 @@ const (
 )
 
 func RenderSlurmConfigEntrypoint() renderutils.ConfigFile {
+	// Keep override_slurm.conf last so user overrides take precedence over
+	// generated files and any future rootfs-provided config snippets.
 	return renderutils.NewAsIsConfig(
-		slurmConfigEntrypointWarning + "\n\ninclude " + slurmConfigPath(consts.ConfigMapKeySlurmGenConfig),
+		slurmConfigEntrypointWarning + "\n\n" +
+			"include " + slurmConfigPath(consts.ConfigMapKeySlurmGenConfig) + "\n" +
+			"include " + slurmConfigPath(consts.ConfigMapKeyCustomSlurmConfig),
 	)
 }
 

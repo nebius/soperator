@@ -421,10 +421,6 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		}
 	}
 
-	res.AddComment("")
-	res.AddComment(fmt.Sprintf("Include %s", slurmConfigPath(consts.ConfigMapKeyCustomSlurmConfig)))
-	res.AddPropertyWithConnector("include", slurmConfigPath(consts.ConfigMapKeyCustomSlurmConfig), renderutils.SpaceConnector)
-
 	return res
 }
 
