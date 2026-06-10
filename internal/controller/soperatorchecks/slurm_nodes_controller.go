@@ -186,7 +186,14 @@ func (c *SlurmNodesController) processDegradedNode(
 	}
 
 	switch node.Reason.Reason {
-	case consts.SlurmNodeReasonKillTaskFailed, consts.SlurmNodeReasonNodeReboot:
+	case consts.SlurmNodeReasonKillTaskFailed:
+		log.FromContext(ctx).WithName("SlurmNodesController.processDegradedNode").Info(
+			"skipping node reboot processing for kill task failed reason",
+			"nodeName", node.Name,
+			"reason", node.Reason.Reason,
+			"instanceID", node.InstanceID)
+		return nil
+	case consts.SlurmNodeReasonNodeReboot:
 		return c.processKillTaskFailed(ctx, k8sNode, slurmClusterName, node)
 	case consts.SlurmNodeReasonNodeReplacement:
 		return c.processSlurmNodeMaintenance(ctx, k8sNode, slurmClusterName, node.Name)

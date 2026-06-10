@@ -9,8 +9,14 @@ import (
 
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
@@ -148,6 +154,55 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 				require.EqualValues(t, tt.want, got)
 			}
 		})
+	}
+}
+
+func TestSlurmNodesController_processDegradedNode_KillTaskFailedDoesNotMarkNodeNeedReboot(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	k8sNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "k8s-node",
+		},
+	}
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(k8sNode).
+		Build()
+
+	controller := NewSlurmNodesController(
+		client,
+		scheme,
+		record.NewFakeRecorder(10),
+		slurmapi.NewClientSet(),
+		time.Minute,
+		false,
+		false,
+		client,
+		consts.DefaultMaintenanceConditionType,
+	)
+
+	err := controller.processDegradedNode(ctx, types.NamespacedName{
+		Namespace: "namespace",
+		Name:      "slurm-cluster",
+	}, slurmapi.Node{
+		Name:       "worker-0",
+		InstanceID: k8sNode.Name,
+		Reason: ptr.To(slurmapi.NodeReason{
+			Reason: consts.SlurmNodeReasonKillTaskFailed,
+		}),
+	})
+	require.NoError(t, err)
+
+	var updatedNode corev1.Node
+	require.NoError(t, client.Get(ctx, types.NamespacedName{Name: k8sNode.Name}, &updatedNode))
+
+	for _, condition := range updatedNode.Status.Conditions {
+		require.NotEqual(t, consts.SoperatorChecksK8SNodeDegraded, condition.Type)
+		require.NotEqual(t, string(consts.ReasonNodeNeedReboot), condition.Reason)
 	}
 }
 
