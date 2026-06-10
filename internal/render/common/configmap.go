@@ -25,7 +25,7 @@ import (
 // RenderConfigMapSlurmConfigs renders new [corev1.ConfigMap] containing '.conf' files for the following components:
 //
 // [consts.ConfigMapKeySlurmConfig] - Slurm config entrypoint
-// [consts.ConfigMapKeyAutogenSlurmConfig] - Generated Slurm config
+// [consts.ConfigMapKeySlurmGenConfig] - Generated Slurm config
 // [consts.ConfigMapKeyCGroupConfig] - Cgroup config
 // [consts.ConfigMapKeySpankConfig] - SPANK plugins config
 // [consts.ConfigMapKeyGresConfig] - GRES config
@@ -38,14 +38,14 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) corev1.ConfigMap 
 			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeySlurmConfig:        RenderSlurmConfigEntrypoint().Render(),
-			consts.ConfigMapKeyAutogenSlurmConfig: WithManagedSlurmConfigWarning(generateSlurmConfig(cluster)).Render(),
-			consts.ConfigMapKeyRESTConfig:         WithManagedSlurmConfigWarning(generateRESTConfig()).Render(),
-			consts.ConfigMapKeyCustomSlurmConfig:  WithOverrideSlurmConfigWarning(generateCustomSlurmConfig(cluster)).Render(),
-			consts.ConfigMapKeyCGroupConfig:       WithManagedSlurmConfigWarning(generateCGroupConfig(cluster)).Render(),
-			consts.ConfigMapKeySpankConfig:        WithManagedSlurmConfigWarning(generateSpankConfig(cluster)).Render(),
-			consts.ConfigMapKeyGresConfig:         WithManagedSlurmConfigWarning(generateGresConfig(cluster)).Render(),
-			consts.ConfigMapKeyMPIConfig:          WithManagedSlurmConfigWarning(generateMPIConfig(cluster)).Render(),
+			consts.ConfigMapKeySlurmConfig:       RenderSlurmConfigEntrypoint().Render(),
+			consts.ConfigMapKeySlurmGenConfig:    WithManagedSlurmConfigWarning(generateSlurmConfig(cluster)).Render(),
+			consts.ConfigMapKeyRESTConfig:        WithManagedSlurmConfigWarning(generateRESTConfig()).Render(),
+			consts.ConfigMapKeyCustomSlurmConfig: WithOverrideSlurmConfigWarning(generateCustomSlurmConfig(cluster)).Render(),
+			consts.ConfigMapKeyCGroupConfig:      WithManagedSlurmConfigWarning(generateCGroupConfig(cluster)).Render(),
+			consts.ConfigMapKeySpankConfig:       WithManagedSlurmConfigWarning(generateSpankConfig(cluster)).Render(),
+			consts.ConfigMapKeyGresConfig:        WithManagedSlurmConfigWarning(generateGresConfig(cluster)).Render(),
+			consts.ConfigMapKeyMPIConfig:         WithManagedSlurmConfigWarning(generateMPIConfig(cluster)).Render(),
 		},
 	}
 }
@@ -70,7 +70,7 @@ func RenderJailedConfigSlurmConfigs(cluster *values.SlurmCluster) slurmv1alpha1.
 			},
 			Items: []corev1.KeyToPath{
 				{Key: consts.ConfigMapKeySlurmConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeySlurmConfig)},
-				{Key: consts.ConfigMapKeyAutogenSlurmConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyAutogenSlurmConfig)},
+				{Key: consts.ConfigMapKeySlurmGenConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeySlurmGenConfig)},
 				{Key: consts.ConfigMapKeyRESTConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyRESTConfig)},
 				{Key: consts.ConfigMapKeyCustomSlurmConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyCustomSlurmConfig)},
 				{Key: consts.ConfigMapKeyCGroupConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyCGroupConfig)},
