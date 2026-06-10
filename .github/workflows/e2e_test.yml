@@ -376,8 +376,6 @@ jobs:
 
       - name: Acceptance Tests
         timeout-minutes: 90
-        env:
-          E2E_REPORT_DIR: e2e-reports/acceptance
         run: |
           bin/e2e acceptance
 
