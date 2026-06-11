@@ -17,19 +17,6 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-func assertEnvValue(t *testing.T, envs []corev1.EnvVar, name, expectedValue string) {
-	t.Helper()
-
-	for _, env := range envs {
-		if env.Name == name {
-			assert.Equal(t, expectedValue, env.Value)
-			return
-		}
-	}
-
-	t.Fatalf("env var %s not found", name)
-}
-
 func Test_RenderContainerWorkerInit(t *testing.T) {
 	container := &values.Container{
 		NodeContainer: slurmv1.NodeContainer{
@@ -153,92 +140,6 @@ func Test_RenderContainerWorkerInit_K8SServiceName(t *testing.T) {
 	}
 }
 
-func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
-	tests := []struct {
-		name                   string
-		clusterType            consts.ClusterType
-		nodeSetGPUEnabled      bool
-		expectedClusterType    string
-		expectedNodeSetGPUFlag string
-	}{
-		{
-			name:                   "gpu cluster with gpu nodeset",
-			clusterType:            consts.ClusterTypeGPU,
-			nodeSetGPUEnabled:      true,
-			expectedClusterType:    "gpu",
-			expectedNodeSetGPUFlag: "true",
-		},
-		{
-			name:                   "gpu cluster with cpu nodeset",
-			clusterType:            consts.ClusterTypeGPU,
-			nodeSetGPUEnabled:      false,
-			expectedClusterType:    "gpu",
-			expectedNodeSetGPUFlag: "false",
-		},
-		{
-			name:                   "cpu cluster with cpu nodeset",
-			clusterType:            consts.ClusterTypeCPU,
-			nodeSetGPUEnabled:      false,
-			expectedClusterType:    "cpu",
-			expectedNodeSetGPUFlag: "false",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			nodeSet := &values.SlurmNodeSet{
-				Name: "test-nodeset",
-				ParentalCluster: client.ObjectKey{
-					Namespace: "test-namespace",
-					Name:      "test-cluster",
-				},
-				ContainerSlurmd: values.Container{
-					NodeContainer: slurmv1.NodeContainer{
-						Image:           "test-image",
-						ImagePullPolicy: corev1.PullIfNotPresent,
-						Resources: corev1.ResourceList{
-							corev1.ResourceMemory:           resource.MustParse("1Gi"),
-							corev1.ResourceCPU:              resource.MustParse("100m"),
-							corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
-						},
-					},
-				},
-				ContainerMunge: values.Container{
-					NodeContainer: slurmv1.NodeContainer{
-						Image: "munge-image",
-					},
-				},
-				VolumeSpool: corev1.VolumeSource{
-					HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
-				},
-				VolumeJail: corev1.VolumeSource{
-					HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
-				},
-				StatefulSet: values.StatefulSet{
-					Replicas: 1,
-				},
-				ServiceUmbrella:          values.Service{Name: "test-umbrella"},
-				SupervisorDConfigMapName: "supervisord-config",
-				SSHDConfigMapName:        "sshd-config",
-				GPU:                      &slurmv1alpha1.GPUSpec{Enabled: tt.nodeSetGPUEnabled},
-			}
-
-			result, err := worker.RenderNodeSetStatefulSet(
-				"test-cluster",
-				nodeSet,
-				&slurmv1.Secrets{},
-				consts.CGroupV2,
-				tt.clusterType,
-				false,
-			)
-			assert.NoError(t, err)
-
-			assertEnvValue(t, result.Spec.Template.Spec.Containers[0].Env, "SLURM_CLUSTER_TYPE", tt.expectedClusterType)
-			assertEnvValue(t, result.Spec.Template.Spec.Containers[0].Env, "NODESET_GPU_ENABLED", tt.expectedNodeSetGPUFlag)
-		})
-	}
-}
-
 func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 	createNodeSet := func(ephemeralNodes *bool, waitTimeout int32) *values.SlurmNodeSet {
 		return &values.SlurmNodeSet{
@@ -336,7 +237,6 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 				nodeSet,
 				&slurmv1.Secrets{},
 				consts.CGroupV2,
-				consts.ClusterTypeGPU,
 				tt.topologyPluginEnabled,
 			)
 			assert.NoError(t, err)
@@ -475,7 +375,6 @@ func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testin
 				tt.nodeSet,
 				&slurmv1.Secrets{},
 				consts.CGroupV2,
-				consts.ClusterTypeGPU,
 				false,
 			)
 			assert.NoError(t, err)
@@ -578,7 +477,7 @@ func TestRenderNodeSetStatefulSet_EphemeralNodesReserveOrdinals(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeSet := createNodeSetWithActiveNodes(tt.ephemeralNodes, tt.activeNodes)
 
-			result, err := worker.RenderNodeSetStatefulSet("test-cluster", nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, consts.ClusterTypeGPU, false)
+			result, err := worker.RenderNodeSetStatefulSet("test-cluster", nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, false)
 			assert.NoError(t, err)
 
 			// Verify replicas

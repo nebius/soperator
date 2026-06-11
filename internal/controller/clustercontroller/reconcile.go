@@ -42,6 +42,7 @@ import (
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -235,7 +236,24 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 		return ctrl.Result{}, fmt.Errorf("listing node sets: %w", err)
 	}
 
-	clusterValues.ClusterType = values.BuildClusterTypeFromNodeSets(nodeSets)
+	// Set cluster type to GPU if at least one NodeSet has GPU enabled
+	if sliceutils.IsEmptySeq(
+		sliceutils.FilterSeq(
+			sliceutils.MapSliceSeq(
+				nodeSets,
+				func(nodeSet slurmv1alpha1.NodeSet) bool {
+					return nodeSet.Spec.GPU.Enabled
+				},
+			),
+			func(b bool) bool {
+				return b
+			},
+		),
+	) {
+		clusterValues.ClusterType = consts.ClusterTypeCPU
+	} else {
+		clusterValues.ClusterType = consts.ClusterTypeGPU
+	}
 
 	// region Reconciliation
 	logger.Info("Starting reconciliation of Slurm Cluster")
