@@ -16,7 +16,7 @@ if ! mountpoint -q "${TMPFS_DIR}"; then
     exit 0
 fi
 
-if [ -z "${SLURM_JOB_ID}" ]; then
+if [ -z "${SLURM_JOB_ID:-}" ]; then
     echo "Slurm job id is not defined"
     exit 0
 fi
@@ -27,6 +27,7 @@ if [ -d "${JOB_TMPFS_DIR}" ]; then
     echo "Cleaning up existing job tmpfs directory (${JOB_TMPFS_DIR})"
     rm -rf -- "${JOB_TMPFS_DIR:?}"/..?* "${JOB_TMPFS_DIR:?}"/.[!.]* "${JOB_TMPFS_DIR:?}"/* || true
 else
-    echo "Creating job tmpfs directory ($JOB_TMPFS_DIR)"
+    echo "Creating job tmpfs directory with 777 permissions ($JOB_TMPFS_DIR)"
+    umask 000
     mkdir -p "${JOB_TMPFS_DIR:?}" || true
 fi
