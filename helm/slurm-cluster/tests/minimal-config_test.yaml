@@ -146,9 +146,6 @@ tests:
     asserts:
       # Test all the default values from kubebuilder annotations
       - equal:
-          path: spec.clusterType
-          value: gpu
-      - equal:
           path: spec.maintenance
           value: none
       - equal:

@@ -221,14 +221,12 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 		requeue := false
 		latestHandledFinalStateTime := lastHandledFinalStateTime
-		totalJobs := 0
 		for _, slurmJobID := range ids {
 			slurmJobs, err := slurmAPIClient.GetJobsByID(ctx, slurmJobID)
 			if err != nil {
 				logger.Error(err, "failed to get slurm job status")
 				return ctrl.Result{}, err
 			}
-			totalJobs += len(slurmJobs)
 
 			for _, slurmJob := range slurmJobs {
 				if fmt.Sprint(slurmJob.ID) == firstJobId {

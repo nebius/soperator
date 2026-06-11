@@ -97,6 +97,23 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"preemptible":      preemptibleValue(ns.Preemptible),
 			"features":         nil,
 			"create_partition": nil,
+			"node_local_jail_submounts": []map[string]interface{}{
+				{
+					"name":            "local-data",
+					"mount_path":      "/mnt/local-data",
+					"size_gibibytes":  1024,
+					"disk_type":       "NETWORK_SSD",
+					"filesystem_type": "ext4",
+				},
+			},
+			"node_local_image_disk": map[string]interface{}{
+				"enabled": true,
+				"spec": map[string]interface{}{
+					"size_gibibytes":  930,
+					"filesystem_type": "ext4",
+					"disk_type":       "NETWORK_SSD_IO_M3",
+				},
+			},
 		}
 		nodesetWorkers = append(nodesetWorkers, entry)
 	}

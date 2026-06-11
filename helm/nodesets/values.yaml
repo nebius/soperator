@@ -25,10 +25,13 @@ priorityClasses:
 images:
   munge:
     repository: "cr.eu-north1.nebius.cloud/soperator/munge"
-    tag: "3.0.6-slurm25.11.3"
+    tag: "4.0.2-slurm25.11.3"
+  sssd:
+    repository: "cr.eu-north1.nebius.cloud/soperator/sssd"
+    tag: "2.9.4-1-63"
   slurmd:
     repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-    tag: "3.0.6-slurm25.11.3"
+    tag: "4.0.2-slurm25.11.3"
 # NodeSets configuration
 # Each NodeSet defines a group of worker nodes with specific characteristics
 nodesets:
@@ -51,6 +54,9 @@ nodesets:
     # Topology data is read from the topology-node-labels ConfigMap at runtime.
     # Optional, defaults to false
     ephemeralNodes: false
+    # Initial number of nodes when ephemeralNodes is true.
+    # Optional, defaults to 1
+    initialNumberEphemeralNodes: 1
     # Maximum time (in seconds) to wait for topology data before starting slurmd.
     # Only used when ephemeralNodes is true.
     # Optional, defaults to 180
@@ -92,7 +98,7 @@ nodesets:
       # Optional
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-        tag: "3.0.6-slurm25.11.3"
+        tag: "4.0.2-slurm25.11.3"
         pullPolicy: "IfNotPresent"
       customEnv:
         - name: "NVIDIA_DRIVER_CAPABILITIES"
@@ -182,7 +188,7 @@ nodesets:
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/munge"
         # Optional
-        tag: "3.0.6-slurm25.11.3"
+        tag: "4.0.2-slurm25.11.3"
         pullPolicy: "IfNotPresent"
       # Munge container resources
       resources:
@@ -201,6 +207,21 @@ nodesets:
         # Optional, defaults to empty string
         # e.g. `* soft nofile 1024`
         limitsConfig: ""
+    # Optional SSSD native sidecar for worker pods.
+    sssd:
+      enabled: false
+      sssdDebugLevel: 0
+      resources:
+        cpu: "200m"
+        memory: "500Mi"
+        ephemeralStorage: "5Gi"
+      # livenessProbe: {}
+      # readinessProbe: {}
+      security:
+        appArmorProfile: "unconfined"
+        limitsConfig: ""
+    sssdConfSecretRefName: ""
+    sssdLdapCAConfigMapRefName: ""
     # Name of the custom SupervisorD config ConfigMap
     # Optional, defaults to empty string (use default SupervisorD config)
     configMapRefSupervisord: ""
@@ -241,7 +262,7 @@ nodesets:
     # Optional, defaults to empty list
     customInitContainers:
       - name: say-hi
-        image: busybox
+        image: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/busybox
         command: ["echo", "Hi!"]
   - name: worker-cpu
     replicas: 6
@@ -271,6 +292,15 @@ nodesets:
         cpu: "2000m"
         memory: "4Gi"
         ephemeralStorage: "5Gi"
+    sssd:
+      enabled: false
+      resources:
+        cpu: "500m"
+        memory: "500Mi"
+        ephemeralStorage: "5Gi"
+      security:
+        appArmorProfile: "unconfined"
+        limitsConfig: ""
     priorityClass: *priorityClassHigh
     nodeSelector:
       slurm.nebius.ai/nodeset-name: "worker-cpu"

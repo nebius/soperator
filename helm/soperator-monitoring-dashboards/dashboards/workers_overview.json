@@ -4213,7 +4213,7 @@
   "preload": false,
   "refresh": "",
   "schemaVersion": 40,
-  "tags": ["workers-overview"],
+  "tags": ["nebius", "soperator", "workers-overview"],
   "templating": {
     "list": [
       {

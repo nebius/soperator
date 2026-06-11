@@ -18,6 +18,11 @@ on:
         required: false
         default: ""
         type: string
+      run_unstable_tests:
+        description: "Run acceptance scenarios tagged @unstable"
+        required: false
+        default: "false"
+        type: string
 
 permissions:
   contents: read
@@ -77,7 +82,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload run metadata
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-run-metadata
           path: /tmp/e2e-run-metadata.json
@@ -160,6 +165,7 @@ jobs:
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
       PROFILE_ENV_VAR: ${{ inputs.profile_env_var || vars.PROFILE_ENV_VAR }}
       E2E_PROFILE: ${{ vars[inputs.profile_env_var || vars.PROFILE_ENV_VAR] }}
+      RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
 
     steps:
       - name: Checkout repository
@@ -177,7 +183,7 @@ jobs:
         run: echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
       - name: Install Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.12.2"
           terraform_wrapper: false
@@ -386,6 +392,32 @@ jobs:
           # provider plugin comm names are truncated, match by full cmdline
           pkill -9 -f terraform-provider || true
 
+      - name: Acceptance Tests
+        timeout-minutes: 90
+        env:
+          E2E_REPORT_DIR: e2e-reports/acceptance
+        run: |
+          bin/e2e acceptance
+
+      - name: Acceptance Summary
+        if: always()
+        shell: bash
+        run: |
+          json="e2e-reports/acceptance/acceptance.cucumber.json"
+          if [[ ! -f "$json" ]]; then
+            echo "no cucumber report at $json"
+            exit 0
+          fi
+          python3 .github/scripts/acceptance_summary.py "$json" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Acceptance Reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: acceptance-reports
+          path: e2e-reports/acceptance/
+          retention-days: 14
+
       - name: K8s Cluster Info and NodeGroups
         if: always()
         shell: bash
@@ -508,7 +540,7 @@ jobs:
 
       - name: Upload Full Kubernetes Cluster Info
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: cluster-info
           path: ./cluster-info
@@ -541,7 +573,7 @@ jobs:
 
       - name: Upload Jail
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           archive: false
           name: jail
