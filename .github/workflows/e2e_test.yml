@@ -373,6 +373,25 @@ jobs:
 
           bin/e2e apply
 
+      - name: Kill leftover Terraform processes
+        if: always()
+        shell: bash
+        run: |
+          # A timed-out Terraform Apply can leave terraform running: the
+          # runner's process-tree kill misses reparented orphans. The survivor
+          # keeps creating resources concurrently with Terraform Destroy and
+          # leaks them (SCHED-1865). Kill everything terraform-related before
+          # any further terraform interaction.
+          for name in e2e terraform; do
+            pids=$(pgrep -x "$name" || true)
+            if [ -n "$pids" ]; then
+              echo "Killing leftover '$name' processes: $pids"
+              pkill -9 -x "$name" || true
+            fi
+          done
+          # provider plugin comm names are truncated, match by full cmdline
+          pkill -9 -f terraform-provider || true
+
       - name: Acceptance Tests
         timeout-minutes: 90
         env:
