@@ -1,6 +1,7 @@
 Feature: Enroot containers
   @gpu
   Scenario: Enroot and Pyxis cache images and clean up runtime data
+    Given Enroot materialized runtime storage is enabled
     Given a long-running Enroot NCCL job is submitted on two GPU workers
     When the Enroot NCCL job is running
     Then Enroot cache is populated on local storage on a worker
