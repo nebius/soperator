@@ -139,6 +139,10 @@ pushd "${jaildir}"
     touch usr/lib/slurm/spanknccldebug.so
     mount --bind "/${SLURM_LIB_PATH}/spanknccldebug.so" "usr/lib/slurm/spanknccldebug.so"
 
+    echo "Bind-mount NCCL Inspector PreConf SPANK plugin from container to the jail"
+    touch usr/lib/slurm/spank_nccl_inspector_preconf.so
+    mount --bind "/${SLURM_LIB_PATH}/spank_nccl_inspector_preconf.so" "usr/lib/slurm/spank_nccl_inspector_preconf.so"
+
     echo "Bind-mount /etc/enroot, /usr/share/enroot and /usr/lib/enroot"
     mkdir -p etc/enroot usr/share/enroot usr/lib/enroot
     mkdir -p /etc/enroot/mounts.d
