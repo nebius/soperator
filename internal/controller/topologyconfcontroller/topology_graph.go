@@ -9,6 +9,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"nebius.ai/slurm-operator/internal/consts"
 	slurmpattern "nebius.ai/slurm-operator/internal/utils/slurm/pattern"
 )
 
@@ -44,35 +45,25 @@ func (g TopologyGraph) AddEdge(parent, child string) {
 	g.children[parent][child] = struct{}{}
 }
 
-// ensureSingleRoot ensures the topology forms a single tree by adding all parentless switches
-// as children of a single "root" switch. This is required for Slurm's strong connectivity
-// requirement - all nodes must be reachable from each other for job scheduling to work.
-func (g TopologyGraph) ensureSingleRoot() {
-	// Find all nodes that have parents
-	hasParent := make(map[string]bool)
-	for _, children := range g.children {
-		for child := range children {
-			hasParent[child] = true
-		}
-	}
+const (
+	// defaultFabric is the root switch used for nodes that carry no gpu-cluster-id label, and
+	// for powered-down / unscheduled nodes whose fabric is unknown. It keeps the legacy
+	// single-root behavior.
+	defaultFabric = "root"
 
-	// Collect all parentless switches (except "root" itself)
-	var rootChildren []string
-	for switch_ := range g.children {
-		if !hasParent[switch_] && switch_ != "root" {
-			rootChildren = append(rootChildren, switch_)
-		}
-	}
+	// unknownSwitch is the catch-all switch (under defaultFabric) for nodes that have no usable
+	// IB topology labels.
+	unknownSwitch = "unknown"
+)
 
-	// Always connect top-level switches to a synthetic "root" switch.
-	// This guarantees a stable single-root tree in topology.conf.
-	if len(rootChildren) > 0 {
-		// Sort children for consistent output
-		slices.Sort(rootChildren)
-		for _, child := range rootChildren {
-			g.AddEdge("root", child)
-		}
+// fabricFromLabels returns the IB fabric / root switch a node belongs to. It is the value of the
+// node's gpu-cluster-id label (recorded under consts.TopologyKeyGPUClusterID), or defaultFabric
+// when the label is absent.
+func fabricFromLabels(labels NodeTopologyLabels) string {
+	if fabric := labels[consts.TopologyKeyGPUClusterID]; fabric != "" {
+		return fabric
 	}
+	return defaultFabric
 }
 
 // RenderConfigLines renders only SWITCH vertices as Slurm topology configuration lines.
@@ -111,15 +102,19 @@ func (g TopologyGraph) RenderConfigLines() []string {
 	return lines
 }
 
-// BuildTopologyGraph constructs a single tree topology in two stages.
+// BuildTopologyGraph constructs the tree topology in two stages.
 //
-// Stage 1 places every Slurm node from allNodeNames under the synthetic "unknown" switch, so the
-// topology stays complete and stable regardless of pod lifecycle (powered-down ephemeral nodes
-// included). Stage 2 overlays IB switches: GPU pods that are scheduled to a labeled K8s node
-// (gpuPodsByNode) are moved from "unknown" onto their real switch path. Non-GPU nodes and
-// unscheduled or unlabeled GPU nodes stay under "unknown".
+// Stage 1 places every Slurm node from allNodeNames under the "unknown" switch, so the topology
+// stays complete and stable regardless of pod lifecycle (powered-down ephemeral nodes included).
+// Stage 2 overlays IB switches: GPU pods that are scheduled to a labeled K8s node (gpuPodsByNode)
+// are moved off "unknown" onto their real switch path. Non-GPU nodes and unscheduled or unlabeled
+// GPU nodes stay under "unknown".
 //
-// The tree construction ensures strong connectivity required for Slurm job scheduling.
+// Instead of a single synthetic "root", each IB fabric gets its own root switch named after the
+// node's gpu-cluster-id label (see fabricFromLabels). These fabric roots stay unconnected, so
+// Slurm never schedules a single job across fabrics. Nodes whose K8s node carries no gpu-cluster-id
+// label - including powered-down / unscheduled nodes whose label is unknown - fall back to the
+// default "root"/"unknown" switches, preserving the legacy single-fabric output.
 func BuildTopologyGraph(
 	ctx context.Context,
 	labelsByNode map[string]NodeTopologyLabels,
@@ -128,6 +123,17 @@ func BuildTopologyGraph(
 ) TopologyGraph {
 	logger := log.FromContext(ctx).WithName(WorkerTopologyReconcilerName)
 	graph := newTopologyGraph()
+
+	// topSwitchesByFabric tracks, per fabric, the switches that top a node's IB path (or the
+	// "unknown" switch). After all edges are built we attach those that turn out to be parentless
+	// to their fabric root - mirroring the old single-root logic, but per fabric.
+	topSwitchesByFabric := make(map[string]map[string]struct{})
+	addTopSwitch := func(fabric, sw string) {
+		if topSwitchesByFabric[fabric] == nil {
+			topSwitchesByFabric[fabric] = make(map[string]struct{})
+		}
+		topSwitchesByFabric[fabric][sw] = struct{}{}
+	}
 
 	// Stage 2: place scheduled GPU pods onto their IB switch path.
 	placed := make(map[string]struct{})
@@ -144,28 +150,52 @@ func BuildTopologyGraph(
 			continue
 		}
 
+		fabric := fabricFromLabels(labels)
+		topSwitch := pathToRoot[len(pathToRoot)-1]
 		for _, worker := range workers {
 			graph.AddEdge(pathToRoot[0], worker)
 			placed[worker] = struct{}{}
 		}
+		addTopSwitch(fabric, topSwitch)
 		for i := range len(pathToRoot) - 1 {
 			graph.AddEdge(pathToRoot[i+1], pathToRoot[i])
 		}
 	}
 
-	// Stage 1: every node not placed on a real switch goes under "unknown".
-	const unknownSwitchName = "unknown"
+	// Stage 1: every node not placed on a real switch goes under the default "unknown" switch. The
+	// gpu-cluster-id of powered-down / unscheduled nodes is unknown, so they default to "root".
 	for _, name := range allNodeNames {
 		if _, ok := placed[name]; ok {
 			continue
 		}
-		graph.AddEdge(unknownSwitchName, name)
+		graph.AddEdge(unknownSwitch, name)
+		addTopSwitch(defaultFabric, unknownSwitch)
 	}
 
-	// Ensure all top-level switches are under a single root
-	graph.ensureSingleRoot()
+	graph.attachFabricRoots(topSwitchesByFabric)
 
 	return graph
+}
+
+// attachFabricRoots connects each fabric's top switches to a root switch named after the fabric,
+// but only those that are still parentless once the whole tree is built. A switch that tops a
+// shallow node's path may be an intermediate switch in a deeper node's path (heterogeneous tier
+// depths); such switches already have a parent and must not be re-parented to the fabric root.
+func (g TopologyGraph) attachFabricRoots(topSwitchesByFabric map[string]map[string]struct{}) {
+	hasParent := make(map[string]bool)
+	for _, children := range g.children {
+		for child := range children {
+			hasParent[child] = true
+		}
+	}
+
+	for fabric, switches := range topSwitchesByFabric {
+		for sw := range switches {
+			if !hasParent[sw] {
+				g.AddEdge(fabric, sw)
+			}
+		}
+	}
 }
 
 // labelsToPath converts labels to a path to the root of the topology tree.
@@ -176,18 +206,20 @@ func BuildTopologyGraph(
 //
 // The labels must be in the format "tier-N" where N is a positive integer starting from 1.
 // If any label is missing (or empty), it returns an error.
-// In case of "tier-0" label provided - we ignore it and check only remaining "tier-N" labels.
-// ("tier-0" used for defining block, not IB topology)
+// Non-tier keys (e.g. "tier-0", used for defining a block, and the gpu-cluster-id key) are ignored:
+// only contiguous "tier-N" labels starting from 1 form the IB topology path.
 func labelsToPath(labels map[string]string) ([]string, error) {
-	if len(labels) == 0 {
+	numOfTiers := 0
+	for key := range labels {
+		if key != "tier-0" && strings.HasPrefix(key, "tier-") {
+			numOfTiers++
+		}
+	}
+	if numOfTiers == 0 {
 		return nil, fmt.Errorf("no labels found for node")
 	}
-	pathToRoot := make([]string, 0, len(labels))
 
-	numOfTiers := len(labels)
-	if _, hasTierZero := labels["tier-0"]; hasTierZero {
-		numOfTiers--
-	}
+	pathToRoot := make([]string, 0, numOfTiers)
 	for i := range numOfTiers {
 		key := "tier-" + strconv.Itoa(i+1)
 		curTierLabel := labels[key]

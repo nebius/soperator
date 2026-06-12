@@ -44,6 +44,25 @@ func TestExtractTierLabels(t *testing.T) {
 	}
 }
 
+func TestExtractTierLabels_GPUClusterID(t *testing.T) {
+	k8sNodeLabels := map[string]string{
+		consts.DefaultTopologyLabelPrefix + "/tier-1":         "leaf00",
+		consts.DefaultTopologyLabelPrefix + "/tier-2":         "spine00",
+		consts.DefaultTopologyLabelPrefix + "/gpu-cluster-id": "cluster-x",
+	}
+
+	expected := map[string]string{
+		"tier-1":         "leaf00",
+		"tier-2":         "spine00",
+		"gpu-cluster-id": "cluster-x",
+	}
+
+	result := tc.ExtractTierLabels(k8sNodeLabels, consts.DefaultTopologyLabelPrefix)
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("ExtractTierLabels() = %v, want %v", result, expected)
+	}
+}
+
 func TestUpdateTopologyConfigMap(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)

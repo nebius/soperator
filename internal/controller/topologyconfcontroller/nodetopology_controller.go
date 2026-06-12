@@ -203,6 +203,13 @@ func ExtractTierLabels(k8sNodeLabels map[string]string, topologyLabelPrefix stri
 			tierLabels[tierKey] = value
 		}
 	}
+
+	// The gpu-cluster-id label names the IB fabric / root switch the node belongs to. Store it
+	// alongside the tiers under a reserved key so the topology builder can use it as the root.
+	if id, ok := k8sNodeLabels[topologyLabelPrefix+consts.GPUClusterIDSuffix]; ok && id != "" {
+		tierLabels[consts.TopologyKeyGPUClusterID] = id
+	}
+
 	return tierLabels
 }
 
@@ -484,7 +491,9 @@ func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 				_, newHasLabel := newNode.Labels[r.tierOneLabel()]
 				_, oldHasLabel := oldNode.Labels[r.tierOneLabel()]
 
-				return newHasLabel || (oldHasLabel && oldNode.Labels[r.tierOneLabel()] != newNode.Labels[r.tierOneLabel()])
+				gpuClusterIDChanged := oldNode.Labels[r.gpuClusterIDLabel()] != newNode.Labels[r.gpuClusterIDLabel()]
+
+				return newHasLabel || gpuClusterIDChanged || (oldHasLabel && oldNode.Labels[r.tierOneLabel()] != newNode.Labels[r.tierOneLabel()])
 			},
 			DeleteFunc: func(e event.DeleteEvent) bool {
 				node, ok := e.Object.(*corev1.Node)
@@ -628,6 +637,10 @@ func (r *NodeTopologyReconciler) tierZeroLabel() string {
 
 func (r *NodeTopologyReconciler) tierOneLabel() string {
 	return r.topologyLabelPrefix + consts.TierOneSuffix
+}
+
+func (r *NodeTopologyReconciler) gpuClusterIDLabel() string {
+	return r.topologyLabelPrefix + consts.GPUClusterIDSuffix
 }
 
 // Legacy methods for backward compatibility with tests
