@@ -450,7 +450,7 @@ slurmNodes:
         volumeSourceName: "jail"
       customMounts: []
     # Slurmctld native OpenMetrics endpoint (https://slurm.schedmd.com/metrics.html).
-    # When enabled (default), sets MetricsType=metrics/openmetrics in slurm.conf
+    # When enabled (default), sets MetricsType=metrics/openmetrics in slurm.gen.conf
     # and renders a ServiceMonitor scraping /metrics/jobs, /metrics/jobs-users-accts,
     # /metrics/nodes, /metrics/partitions, /metrics/scheduler on the slurmctld port.
     # The endpoint is unauthenticated HTTP; it's only reachable in-cluster via
