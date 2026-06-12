@@ -48,7 +48,7 @@ func TestParseOptionsRejectsExtraArgs(t *testing.T) {
 	assert.ErrorContains(t, err, "unexpected acceptance arguments")
 }
 
-func TestExpectedNodeSetsFromLiveList(t *testing.T) {
+func TestDiscoveredNodeSetsFromLiveList(t *testing.T) {
 	nodeSets := slurmv1alpha1.NodeSetList{
 		Items: []slurmv1alpha1.NodeSet{
 			{
@@ -77,16 +77,16 @@ func TestExpectedNodeSetsFromLiveList(t *testing.T) {
 		},
 	}
 
-	expected := expectedNodeSetsFromLiveList(nodeSets, "soperator")
-	require.Len(t, expected, 2)
+	discovered := discoveredNodeSetsFromLiveList(nodeSets, "soperator")
+	require.Len(t, discovered, 2)
 
-	assert.Equal(t, "worker-cpu", expected[0].Name)
-	assert.Equal(t, 3, expected[0].Size)
-	assert.False(t, expected[0].HasGPU)
+	assert.Equal(t, "worker-cpu", discovered[0].Name)
+	assert.Equal(t, 3, discovered[0].Size)
+	assert.False(t, discovered[0].HasGPU)
 
-	assert.Equal(t, "worker-gpu", expected[1].Name)
-	assert.Equal(t, 2, expected[1].Size)
-	assert.True(t, expected[1].HasGPU)
+	assert.Equal(t, "worker-gpu", discovered[1].Name)
+	assert.Equal(t, 2, discovered[1].Size)
+	assert.True(t, discovered[1].HasGPU)
 }
 
 func TestReportFormat(t *testing.T) {
