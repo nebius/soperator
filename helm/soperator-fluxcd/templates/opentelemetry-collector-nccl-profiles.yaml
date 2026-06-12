@@ -1,0 +1,375 @@
+{{- if and .Values.observability.enabled .Values.observability.vmStack.enabled .Values.observability.ncclProfiles.enabled -}}
+
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-otelcol-nccl-profiles-cm
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.observability.ncclProfiles.driftDetection }}
+  driftDetection:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  chart:
+    spec:
+      chart: raw
+      interval: {{ .Values.observability.ncclProfiles.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-bedag
+      version: {{ .Values.observability.ncclProfiles.version.bedag }}
+
+  dependsOn:
+    - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+
+  install:
+    {{- toYaml .Values.observability.ncclProfiles.install | nindent 4 }}
+  upgrade:
+    {{- toYaml .Values.observability.ncclProfiles.upgrade | nindent 4 }}
+  interval: {{ .Values.observability.ncclProfiles.interval }}
+  timeout: {{ .Values.observability.ncclProfiles.timeout }}
+  releaseName: {{ .Values.observability.ncclProfiles.releaseName }}-cm
+  targetNamespace: {{ .Values.observability.vmStack.namespace }}
+
+  values:
+  {{- if .Values.observability.ncclProfiles.configMapOverrideValues }}
+    {{- toYaml .Values.observability.ncclProfiles.configMapOverrideValues | nindent 4 }}
+  {{- else }}
+    resources:
+    - apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        namespace: {{ .Values.observability.vmStack.namespace }}
+        name: {{ .Values.observability.ncclProfiles.releaseName }}-agent
+      data:
+        relay: |
+          exporters:
+            otlphttp/victoriametrics:
+              compression: gzip
+              encoding: proto
+              metrics_endpoint: {{ .Values.observability.ncclProfiles.values.metricsEndpoint | default "http://vmsingle-metrics-victoria-metrics-k8s-stack:8429/opentelemetry/v1/metrics" }}
+              timeout: {{ .Values.observability.ncclProfiles.values.metricsExporterTimeout | default "15s" }}
+              retry_on_failure:
+                enabled: true
+                initial_interval: 1s
+                max_interval: 10s
+                max_elapsed_time: 5m
+              sending_queue:
+                enabled: true
+                queue_size: {{ .Values.observability.ncclProfiles.values.metricsExporterSendingQueueSize | default 2000 }}
+                num_consumers: {{ .Values.observability.ncclProfiles.values.metricsExporterNumConsumers | default 4 }}
+
+          receivers:
+            filelog/nccl_metrics:
+              include:
+                - {{ .Values.observability.ncclProfiles.values.dumpDir }}/*/*/*.log
+              poll_interval: {{ .Values.observability.ncclProfiles.values.pollInterval | default "30s" }}
+              retry_on_failure:
+                enabled: true
+              include_file_path: true
+              start_at: beginning
+              {{- if .Values.observability.ncclProfiles.values.deleteAfterRead.enabled }}
+              delete_after_read: true
+              delete_after_read_min_age: {{ .Values.observability.ncclProfiles.values.deleteAfterRead.minAge | default "1m" }}
+              {{- else }}
+              delete_after_read: false
+              {{- end }}
+              {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+              storage: file_storage
+              {{- end }}
+
+              operators:
+                - id: parse_nccl_profile_path
+                  type: regex_parser
+                  parse_from: attributes["log.file.path"]
+                  regex: ^.*/(?P<job_id>[^/]+)/(?P<step_id>[^/]+)/(?P<worker_name>.+)-pid(?P<hostname_pid>[^/]+)\.log$
+
+                - if: attributes["job_id"] != nil
+                  type: copy
+                  from: attributes.job_id
+                  to: resource["{{ .Values.observability.ncclProfiles.values.exportLabels.slurmJobId | default "slurm_job_id" }}"]
+
+                - if: attributes["step_id"] != nil
+                  type: copy
+                  from: attributes.step_id
+                  to: resource["{{ .Values.observability.ncclProfiles.values.exportLabels.slurmStepId | default "slurm_step_id" }}"]
+
+                - if: attributes["hostname_pid"] != nil
+                  type: copy
+                  from: attributes.hostname_pid
+                  to: resource["{{ .Values.observability.ncclProfiles.values.exportLabels.hostnamePid | default "hostname_pid" }}"]
+
+          connectors:
+            ncclmetrics:
+
+          service:
+            {{- if .Values.observability.opentelemetry.metrics.enabled }}
+            telemetry:
+              metrics:
+                readers:
+                  - pull:
+                      exporter:
+                        prometheus:
+                          host: 0.0.0.0
+                          port: 8889
+            {{- end }}
+            extensions:
+              - health_check
+              {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+              - file_storage
+              {{- end }}
+            pipelines:
+              logs/nccl_metrics:
+                receivers:
+                  - filelog/nccl_metrics
+                exporters:
+                  - ncclmetrics
+
+              metrics/nccl_metrics:
+                receivers:
+                  - ncclmetrics
+                exporters:
+                  - otlphttp/victoriametrics
+
+          extensions:
+            {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+            file_storage:
+              directory: /var/lib/otelcol
+            {{- end }}
+            health_check:
+              endpoint: 0.0.0.0:13133
+  {{- end }}
+
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-opentelemetry-collector-nccl-profiles-cm
+      optional: true
+      valuesKey: values.yaml
+
+    - kind: ConfigMap
+      name: opentelemetry-collector-nccl-profiles-cm
+      optional: true
+      valuesKey: values.yaml
+---
+
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ include "soperator-fluxcd.fullname" . }}-otelcol-nccl-profiles
+  labels:
+  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.observability.ncclProfiles.driftDetection }}
+  driftDetection:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  chart:
+    spec:
+      chart: opentelemetry-collector
+      interval: {{ .Values.observability.ncclProfiles.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-opentelemetry-collector
+      version: {{ .Values.observability.ncclProfiles.version.opentelemetryCollector }}
+
+  dependsOn:
+    - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+    - name: {{ include "soperator-fluxcd.fullname" . }}-vm-stack
+    - name: {{ include "soperator-fluxcd.fullname" . }}-otelcol-nccl-profiles-cm
+
+  install:
+    {{- toYaml .Values.observability.ncclProfiles.install | nindent 4 }}
+  upgrade:
+    {{- toYaml .Values.observability.ncclProfiles.upgrade | nindent 4 }}
+  interval: {{ .Values.observability.ncclProfiles.interval }}
+  timeout: {{ .Values.observability.ncclProfiles.timeout }}
+  releaseName: {{ .Values.observability.ncclProfiles.releaseName }}
+  targetNamespace: {{ .Values.observability.vmStack.namespace }}
+
+  values:
+  {{- if .Values.observability.ncclProfiles.collectorOverrideValues }}
+    {{- toYaml .Values.observability.ncclProfiles.collectorOverrideValues | nindent 4 }}
+  {{- else }}
+    clusterRole:
+      create: true
+      rules:
+        - apiGroups:
+            - ""
+          resources:
+            - pods
+            - namespaces
+          verbs:
+            - get
+            - watch
+            - list
+
+    image:
+      pullPolicy: IfNotPresent
+      repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
+      tag: {{ .Values.observability.ncclProfiles.values.nebiusO11yAgentVersion | default "2.0.3" }}
+
+    {{- if eq (.Values.observability.ncclProfiles.values.mode | default "shared") "shared" }}
+    mode: deployment
+    replicaCount: 1   # Only one replica to avoid file lock conflicts on shared storage and prevent log duplication
+
+    rollout:
+      strategy: Recreate  # Ensure old pod terminates before new one starts to maintain max one pod running
+
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: slurm.nebius.ai/nodeset
+                  operator: In
+                  values:
+                    - "system"
+    {{- else }}{{- if eq (.Values.observability.ncclProfiles.values.mode | default "shared") "nodeLocal" }}
+    mode: daemonset
+
+    rollout:
+      rollingUpdate:
+        maxUnavailable: 50%
+      strategy: RollingUpdate
+
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: slurm.nebius.ai/nodeset
+                  operator: In
+                  values:
+                    - "worker"
+
+    tolerations:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Exists
+    {{- end }}{{- end }}
+
+    extraVolumes:
+      - name: nccl-profiles
+        hostPath:
+          path: {{ .Values.observability.ncclProfiles.values.dumpDir }}
+          type: Directory
+
+      {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+      - name: varlibotelcol
+        hostPath:
+          path: /var/lib/otelcol
+          type: DirectoryOrCreate
+      {{- end }}
+
+    extraVolumeMounts:
+      - name: nccl-profiles
+        mountPath: /mnt/jail/opt/soperator-outputs/nccl_profiles/
+        readOnly: true
+
+      {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+      - name: varlibotelcol
+        mountPath: /var/lib/otelcol
+      {{- end }}
+
+    extraEnvs:
+      - name: GOMAXPROCS
+        value: "1"
+
+    securityContext:
+      runAsGroup: 0
+      runAsUser: 10001
+    service: # No external access needed - this collector only reads files and sends to Victoria Logs
+      enabled: false
+    serviceAccount:
+      create: true
+
+    {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+    initContainers:
+      - command:
+          - sh
+          - "-c"
+          - 'chown -R 10001: /var/lib/otelcol'
+        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        name: init-fs
+        securityContext:
+          runAsGroup: 0
+          runAsUser: 0
+        volumeMounts:
+          - name: varlibotelcol
+            mountPath: /var/lib/otelcol
+    {{- else }}
+    initContainers: []
+    {{- end }}
+
+    resources:
+      {{- toYaml .Values.observability.ncclProfiles.values.resources | nindent 6 }}
+
+    useGOMEMLIMIT: {{ .Values.observability.ncclProfiles.values.useGoMemLimit | default true }}
+
+    {{- if .Values.observability.opentelemetry.metrics.enabled }}
+    command:
+      extraArgs:
+        - "--feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress"
+    {{- end }}
+
+    ports:
+      jaeger-compact:
+        enabled: false
+      jaeger-grpc:
+        enabled: false
+      jaeger-thrift:
+        enabled: false
+      metrics:
+        {{- if .Values.observability.opentelemetry.metrics.enabled }}
+        enabled: true
+        containerPort: 8889
+        servicePort: 8889
+        {{- else }}
+        enabled: false
+        {{- end }}
+      otlp:
+        enabled: false
+      otlp-http:
+        enabled: false
+      zipkin:
+        enabled: false
+
+    podMonitor:
+      {{- if .Values.observability.opentelemetry.metrics.enabled }}
+      enabled: true
+      metricsEndpoints:
+        - port: metrics
+          interval: {{ .Values.observability.opentelemetry.metrics.interval | default "30s" }}
+          scrapeTimeout: {{ .Values.observability.opentelemetry.metrics.scrapeTimeout | default "10s" }}
+          relabelings:
+            - sourceLabels: [ __meta_kubernetes_pod_name ]
+              targetLabel: pod
+            - sourceLabels: [ __meta_kubernetes_node_name ]
+              targetLabel: node
+            - replacement: otel-collector-nccl-profiles
+              targetLabel: collector
+      {{- else }}
+      enabled: false
+      {{- end }}
+
+    config: {}
+    configMap:
+      create: false
+      existingName: {{ .Values.observability.ncclProfiles.releaseName }}-agent
+  {{- end }}
+
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-opentelemetry-collector-nccl-profiles
+      optional: true
+      valuesKey: values.yaml
+
+    - kind: ConfigMap
+      name: opentelemetry-collector-nccl-profiles
+      optional: true
+      valuesKey: values.yaml
+
+{{- end -}}
