@@ -142,6 +142,7 @@ rules:
   - nodeconfigurators
   - nodesetpowerstates
   - nodesets
+  - resourcepatchpolicies
   - slurmclusters
   verbs:
   - create
@@ -157,6 +158,7 @@ rules:
   - jailedconfigs/finalizers
   - nodeconfigurators/finalizers
   - nodesets/finalizers
+  - resourcepatchpolicies/finalizers
   - slurmclusters/finalizers
   verbs:
   - update
@@ -167,6 +169,7 @@ rules:
   - nodeconfigurators/status
   - nodesetpowerstates/status
   - nodesets/status
+  - resourcepatchpolicies/status
   - slurmclusters/status
   verbs:
   - get
