@@ -1,0 +1,53 @@
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ResourcePatchPolicy
+metadata:
+  name: gpu-cluster-customizations
+  namespace: default
+spec:
+  targetRef:
+    group: slurm.nebius.ai
+    kind: SlurmCluster
+    name: my-cluster
+  type: JSONPatch
+  priority: 0
+  patches:
+    # Add a service-mesh sidecar annotation to worker pods.
+    - resourceRef:
+        kind: StatefulSet
+        name: "my-cluster-worker"
+      jsonPatch:
+        - op: add
+          path: "/spec/template/metadata/annotations/sidecar.istio.io~1inject"
+          value: "true"
+    # Set an NLB annotation on the login service.
+    - resourceRef:
+        kind: Service
+        name: "my-cluster-login"
+      jsonPatch:
+        - op: add
+          path: "/metadata/annotations/service.beta.kubernetes.io~1aws-load-balancer-type"
+          value: "nlb"
+---
+apiVersion: slurm.nebius.ai/v1alpha1
+kind: ResourcePatchPolicy
+metadata:
+  name: slurm-config-extras
+  namespace: default
+spec:
+  targetRef:
+    group: slurm.nebius.ai
+    kind: SlurmCluster
+    name: my-cluster
+  type: JSONMergePatch
+  priority: 10
+  patches:
+    - resourceRef:
+        kind: ConfigMap
+        name: "my-cluster-slurm-config"
+      jsonMergePatch:
+        metadata:
+          annotations:
+            custom-key: "custom-value"
+        data:
+          extra.conf: |
+            SomeExtraConfig=value

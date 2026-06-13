@@ -27279,6 +27279,328 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.19.0
+  name: resourcepatchpolicies.slurm.nebius.ai
+spec:
+  group: slurm.nebius.ai
+  names:
+    kind: ResourcePatchPolicy
+    listKind: ResourcePatchPolicyList
+    plural: resourcepatchpolicies
+    singular: resourcepatchpolicy
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Kind of the target resource
+      jsonPath: .spec.targetRef.kind
+      name: Target Kind
+      type: string
+    - description: Name of the target resource
+      jsonPath: .spec.targetRef.name
+      name: Target Name
+      type: string
+    - description: Patch type
+      jsonPath: .spec.type
+      name: Type
+      type: string
+    - description: Whether the policy was accepted
+      jsonPath: .status.conditions[?(@.type=="Accepted")].status
+      name: Accepted
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          ResourcePatchPolicy enables modifications to Kubernetes resources generated
+          by soperator for SlurmCluster, NodeSet and NodeConfigurator objects.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ResourcePatchPolicySpec defines the desired state of ResourcePatchPolicy.
+            properties:
+              patches:
+                description: Patches is the list of patches to apply to generated
+                  resources.
+                items:
+                  description: ResourcePatch targets a specific generated Kubernetes
+                    resource.
+                  properties:
+                    jsonMergePatch:
+                      description: |-
+                        JSONMergePatch contains an RFC 7386 merge patch object. Used when type is
+                        "JSONMergePatch".
+                      x-kubernetes-preserve-unknown-fields: true
+                    jsonPatch:
+                      description: JSONPatch contains RFC 6902 operations. Used when
+                        type is "JSONPatch".
+                      items:
+                        description: JSONPatchOperation is a single RFC 6902 operation.
+                        properties:
+                          from:
+                            description: From is the source path for move and copy
+                              operations.
+                            type: string
+                          op:
+                            description: 'Op is the operation: "add", "remove", "replace",
+                              "move", "copy", "test".'
+                            enum:
+                            - add
+                            - remove
+                            - replace
+                            - move
+                            - copy
+                            - test
+                            type: string
+                          path:
+                            description: Path is the JSON Pointer (RFC 6901) to the
+                              target field.
+                            minLength: 1
+                            type: string
+                          value:
+                            description: Value is the value to apply. Required for
+                              add, replace and test.
+                            x-kubernetes-preserve-unknown-fields: true
+                        required:
+                        - op
+                        - path
+                        type: object
+                      type: array
+                    resourceRef:
+                      description: ResourceRef selects which generated Kubernetes
+                        resource to patch.
+                      properties:
+                        apiVersion:
+                          description: |-
+                            APIVersion of the resource (e.g. "apps/v1"). When set, it must match the
+                            generated resource's apiVersion. Defaults to matching any version.
+                          type: string
+                        kind:
+                          description: |-
+                            Kind of the generated Kubernetes resource (e.g. StatefulSet, Service,
+                            ConfigMap, DaemonSet).
+                          minLength: 1
+                          type: string
+                        name:
+                          description: |-
+                            Name is the exact name of the generated resource to patch. When empty,
+                            all resources of the given kind are matched.
+                          type: string
+                      required:
+                      - kind
+                      type: object
+                  required:
+                  - resourceRef
+                  type: object
+                minItems: 1
+                type: array
+              priority:
+                default: 0
+                description: |-
+                  Priority determines the order in which policies are applied to the same
+                  resource. Lower values are applied first.
+                format: int32
+                type: integer
+              targetRef:
+                description: |-
+                  TargetRef identifies the SlurmCluster, NodeSet or NodeConfigurator this
+                  policy applies to.
+                properties:
+                  group:
+                    default: slurm.nebius.ai
+                    description: Group is the API group of the target resource.
+                    type: string
+                  kind:
+                    description: Kind is the kind of the target resource.
+                    enum:
+                    - SlurmCluster
+                    - NodeSet
+                    - NodeConfigurator
+                    type: string
+                  name:
+                    description: Name is the name of the target resource.
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace is the namespace of the target resource. Defaults to the
+                      namespace of the ResourcePatchPolicy.
+                    type: string
+                required:
+                - group
+                - kind
+                - name
+                type: object
+              type:
+                description: |-
+                  Type is the patch mechanism: "JSONPatch" (RFC 6902) or "JSONMergePatch"
+                  (RFC 7386).
+                enum:
+                - JSONPatch
+                - JSONMergePatch
+                type: string
+            required:
+            - patches
+            - targetRef
+            - type
+            type: object
+          status:
+            description: ResourcePatchPolicyStatus defines the observed state of ResourcePatchPolicy.
+            properties:
+              conditions:
+                description: Conditions describe the current state of the policy.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              patchedResources:
+                description: |-
+                  PatchedResources lists the resources matched during the last
+                  reconciliation of the target and whether each patch was applied.
+                items:
+                  description: PatchedResourceStatus reports the outcome of patching
+                    a single resource.
+                  properties:
+                    applied:
+                      description: Applied indicates whether the patch was applied
+                        successfully.
+                      type: boolean
+                    message:
+                      description: Message provides details, typically on failure.
+                      type: string
+                    resource:
+                      description: Resource identifies the patched resource.
+                      properties:
+                        apiVersion:
+                          description: API version of the referent.
+                          type: string
+                        fieldPath:
+                          description: |-
+                            If referring to a piece of an object instead of an entire object, this string
+                            should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                            For example, if the object reference is to a container within a pod, this would take on a value like:
+                            "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                            the event) or if no container name is specified "spec.containers[2]" (container with
+                            index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                            referencing a part of an object.
+                          type: string
+                        kind:
+                          description: |-
+                            Kind of the referent.
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                          type: string
+                        name:
+                          description: |-
+                            Name of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                        namespace:
+                          description: |-
+                            Namespace of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                          type: string
+                        resourceVersion:
+                          description: |-
+                            Specific resourceVersion to which this reference is made, if any.
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                          type: string
+                        uid:
+                          description: |-
+                            UID of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  required:
+                  - applied
+                  - resource
+                  type: object
+                type: array
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: slurmclusters.slurm.nebius.ai
 spec:
   group: slurm.nebius.ai

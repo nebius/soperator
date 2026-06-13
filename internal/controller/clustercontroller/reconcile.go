@@ -40,6 +40,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/state"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
+	"nebius.ai/slurm-operator/internal/resourcepatch"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 	"nebius.ai/slurm-operator/internal/values"
@@ -99,8 +100,9 @@ type SlurmClusterReconciler struct {
 	AppArmorProfile     *reconciler.AppArmorProfileReconciler
 }
 
-func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *SlurmClusterReconciler {
+func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder, enableResourcePatchPolicy bool) *SlurmClusterReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
+	r.EnableResourcePatchPolicy = enableResourcePatchPolicy
 	return &SlurmClusterReconciler{
 		Reconciler:          r,
 		ConfigMap:           reconciler.NewConfigMapReconciler(r),
@@ -617,6 +619,13 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 		handler.EnqueueRequestsFromMapFunc(r.findObjectsForNodeSet),
 		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 	)
+
+	if r.EnableResourcePatchPolicy {
+		controllerBuilder.Watches(
+			&slurmv1alpha1.ResourcePatchPolicy{},
+			handler.EnqueueRequestsFromMapFunc(resourcepatch.MapPolicyToTarget(slurmv1.KindSlurmCluster)),
+		)
+	}
 
 	resourceChecks := r.createResourceChecks(saPredicate)
 
