@@ -7,6 +7,7 @@ resources:
 - bases/slurm.nebius.ai_nodesets.yaml
 - bases/slurm.nebius.ai_slurmclusters.yaml
 - bases/slurm.nebius.ai_jailedconfigs.yaml
+- bases/slurm.nebius.ai_resourcepatchpolicies.yaml
 
 #+kubebuilder:scaffold:crdkustomizeresource
 

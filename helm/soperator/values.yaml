@@ -29,6 +29,10 @@ controllerManager:
       nodeconfigurator: true
       nodeset: true
       topology: true
+      # Experimental ResourcePatchPolicy feature: registers the policy status
+      # controller and enables in-memory patching of generated resources in the
+      # cluster, nodeset and nodeconfigurator reconcilers. Opt-in.
+      resourcepatchpolicy: false
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:

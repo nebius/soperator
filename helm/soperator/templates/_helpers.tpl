@@ -53,7 +53,7 @@ Create the name of the service account to use
 {{- end }}
 
 {{- define "soperator.controllersAvailable" -}}
-cluster,nodeconfigurator,nodeset,topology
+cluster,nodeconfigurator,nodeset,topology,resourcepatchpolicy
 {{- end }}
 
 {{- define "soperator.controllersSpec" -}}
