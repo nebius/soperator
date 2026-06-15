@@ -30,6 +30,8 @@ import (
 	"nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/render/common"
+	renderutils "nebius.ai/slurm-operator/internal/render/utils"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 )
 
@@ -122,8 +124,9 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	existingTopology := existingTopologyConfig.Data[consts.ConfigMapKeyTopologyConfig]
+	renderedDesiredTopology := renderManagedTopologyConfig(desiredTopology)
 
-	desiredHash := r.calculateConfigHash(desiredTopology)
+	desiredHash := r.calculateConfigHash(renderedDesiredTopology)
 	existingHash := r.calculateConfigHash(existingTopology)
 
 	if desiredHash == existingHash {
@@ -234,9 +237,13 @@ func (r *WorkerTopologyReconciler) renderTopologyConfigMap(namespace, resourceNa
 			Namespace: namespace,
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeyTopologyConfig: config,
+			consts.ConfigMapKeyTopologyConfig: renderManagedTopologyConfig(config),
 		},
 	}
+}
+
+func renderManagedTopologyConfig(config string) string {
+	return common.WithManagedSlurmConfigWarning(renderutils.NewAsIsConfig(config)).Render()
 }
 
 func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace, resourceName, clusterName string) *v1alpha1.JailedConfig {
@@ -492,6 +499,7 @@ func (r *WorkerTopologyReconciler) calculateConfigHash(config string) string {
 
 func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace, resourceName, config, clusterName string) error {
 	configMapKey := client.ObjectKey{Name: resourceName, Namespace: namespace}
+	renderedConfig := renderManagedTopologyConfig(config)
 	existingConfigMap := &corev1.ConfigMap{}
 	err := r.Client.Get(ctx, configMapKey, existingConfigMap)
 	if err != nil {
@@ -502,7 +510,7 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 					Namespace: namespace,
 				},
 				Data: map[string]string{
-					consts.ConfigMapKeyTopologyConfig: config,
+					consts.ConfigMapKeyTopologyConfig: renderedConfig,
 				},
 			}
 			if err := r.Client.Create(ctx, cm); err != nil {
@@ -512,7 +520,7 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 			return fmt.Errorf("get ConfigMap %s: %w", resourceName, err)
 		}
 	} else {
-		existingConfigMap.Data[consts.ConfigMapKeyTopologyConfig] = config
+		existingConfigMap.Data[consts.ConfigMapKeyTopologyConfig] = renderedConfig
 		if err := r.Client.Update(ctx, existingConfigMap); err != nil {
 			return fmt.Errorf("update ConfigMap %s: %w", existingConfigMap.Name, err)
 		}

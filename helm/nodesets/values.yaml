@@ -88,7 +88,7 @@ nodesets:
       # root switch so Slurm never schedules a job across fabrics.
       # Optional, defaults to "root" (single-fabric behavior)
       fabric: "root"
-    # Node configuration values to be set in slurm.conf
+    # Node configuration values to be rendered into slurm_base.conf.noedit
     # Optional
     nodeConfig:
       # Slurm Node Features

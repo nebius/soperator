@@ -23,6 +23,7 @@ import (
 	"nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 )
 
@@ -169,6 +170,8 @@ func (r *ActiveCheckPrologReconciler) updatePrologConfigMap(ctx context.Context,
 
 func (r *ActiveCheckPrologReconciler) getPrologScript() string {
 	return `#!/bin/bash
+
+` + common.ManagedSlurmConfigWarning() + `
 
 ACTIVE_CHECK_NAME="$SLURM_JOB_NAME"
 echo "Active check name: $ACTIVE_CHECK_NAME"
