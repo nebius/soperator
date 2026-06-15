@@ -209,7 +209,7 @@ spec:
     image:
       pullPolicy: IfNotPresent
       repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
-      tag: {{ .Values.observability.ncclProfiles.values.nebiusO11yAgentVersion | default "2.0.3" }}
+      tag: {{ .Values.observability.ncclProfiles.values.nebiusO11yAgentVersion | default "2.0.10" }}
 
     {{- if eq (.Values.observability.ncclProfiles.values.mode | default "shared") "shared" }}
     mode: deployment
