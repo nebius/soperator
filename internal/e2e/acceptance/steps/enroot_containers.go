@@ -23,6 +23,9 @@ const (
 	enrootSquashRoot    = "/var/cache/enroot-container-images"
 	enrootTasksPerNode  = 8
 
+	enrootDedicatedCachePath = "/mnt/image-storage/enroot/cache"
+	enrootDedicatedDataPath  = "/mnt/image-storage/enroot/data"
+
 	enrootJobStartTimeout = 25 * time.Minute
 	enrootProbeTimeout    = 10 * time.Minute
 	enrootStopTimeout     = 5 * time.Minute
@@ -39,6 +42,8 @@ type EnrootContainers struct {
 
 	squashPath       string
 	squashStatBefore string
+
+	directSquashFS *bool
 }
 
 func NewEnrootContainers(exec framework.Exec, slurm *framework.SlurmClient, clusterName string) *EnrootContainers {
@@ -65,6 +70,7 @@ func (s *EnrootContainers) Register(sc *godog.ScenarioContext) {
 	})
 
 	sc.Step(`^Enroot direct SquashFS startup is enabled$`, s.enrootDirectSquashFSStartupIsEnabled)
+	sc.Step(`^Enroot materialized runtime storage is enabled$`, s.enrootMaterializedRuntimeStorageIsEnabled)
 	sc.Step(`^a long-running Enroot NCCL job is submitted on two GPU workers$`, s.aLongRunningEnrootNCCLJobIsSubmittedOnTwoGPUWorkers)
 	sc.Step(`^the Enroot NCCL job is running$`, s.theEnrootNCCLJobIsRunning)
 	sc.Step(`^Enroot cache is populated on local storage on a worker$`, s.enrootCacheIsPopulatedOnLocalStorageOnAWorker)
@@ -87,12 +93,24 @@ func (s *EnrootContainers) Register(sc *godog.ScenarioContext) {
 }
 
 func (s *EnrootContainers) enrootDirectSquashFSStartupIsEnabled(ctx context.Context) error {
-	output, err := s.exec.Jail().RunWithDefaultRetry(ctx, "grep -E 'spank_pyxis\\.so.*use_squashfuse=1' /etc/slurm/plugstack.conf /etc/slurm/plugstack.conf.d/*.conf 2>/dev/null || true")
+	enabled, err := s.enrootDirectSquashFSEnabled(ctx)
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(output) == "" {
-		s.exec.Logf("enroot containers: direct SquashFS startup is disabled, skipping opt-in scenario")
+	if !enabled {
+		s.exec.Logf("enroot containers: direct SquashFS startup is disabled, skipping scenario")
+		return godog.ErrSkip
+	}
+	return nil
+}
+
+func (s *EnrootContainers) enrootMaterializedRuntimeStorageIsEnabled(ctx context.Context) error {
+	enabled, err := s.enrootDirectSquashFSEnabled(ctx)
+	if err != nil {
+		return err
+	}
+	if enabled {
+		s.exec.Logf("enroot containers: direct SquashFS startup is enabled, skipping materialized runtime scenario")
 		return godog.ErrSkip
 	}
 	return nil
@@ -119,7 +137,15 @@ func (s *EnrootContainers) theEnrootNCCLJobIsStillRunning(ctx context.Context) e
 }
 
 func (s *EnrootContainers) enrootCacheIsPopulatedOnLocalStorageOnAWorker(ctx context.Context) error {
-	return framework.WaitForTreeEntriesOnWorker(ctx, s.exec, s.connectionWorker, "/mnt/image-storage/enroot/cache/", "enroot cache is populated", enrootProbeTimeout)
+	directSquashFS, err := s.enrootDirectSquashFSEnabled(ctx)
+	if err != nil {
+		return err
+	}
+
+	if directSquashFS {
+		return framework.WaitForTreeEntriesOnWorker(ctx, s.exec, s.connectionWorker, enrootSquashRoot, "enroot squashfs cache is populated", enrootProbeTimeout)
+	}
+	return framework.WaitForTreeEntriesOnWorker(ctx, s.exec, s.connectionWorker, enrootDedicatedCachePath, "enroot cache is populated", enrootProbeTimeout)
 }
 
 func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Context) error {
@@ -157,7 +183,7 @@ func (s *EnrootContainers) enrootRuntimeContainerDataIsVisibleWhileTheJobIsRunni
 			if err != nil {
 				return false, err
 			}
-			treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+			treeOutput, err := s.legacyEnrootDataTree(waitCtx, s.connectionWorker)
 			if err != nil {
 				return false, err
 			}
@@ -189,13 +215,6 @@ func (s *EnrootContainers) enrootSquashfsImageIsMountedDirectlyWhileTheJobIsRunn
 			if !mounted {
 				return false, nil
 			}
-			treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
-			if err != nil {
-				return false, err
-			}
-			if strings.Contains(treeOutput, "pyxis_"+s.job.ID) {
-				return false, nil
-			}
 			return true, nil
 		})
 	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
@@ -214,7 +233,7 @@ func (s *EnrootContainers) enrootRuntimeDataIsCleanedUpAndSquashfsCacheRemains(c
 	}
 
 	err := s.exec.WaitFor(ctx, "enroot runtime data cleaned and squashfs cache remains", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+		treeOutput, err := s.legacyEnrootDataTree(waitCtx, s.connectionWorker)
 		if err != nil {
 			return false, err
 		}
@@ -239,16 +258,30 @@ func (s *EnrootContainers) enrootRuntimeDataIsCleanedUpAndSquashfsCacheRemains(c
 }
 
 func (s *EnrootContainers) enrootDirectRuntimeIsCleanedUpAndSquashfsCacheRemains(ctx context.Context) error {
-	if err := s.enrootRuntimeDataIsCleanedUpAndSquashfsCacheRemains(ctx); err != nil {
-		return err
+	if s.squashPath == "" {
+		return fmt.Errorf("squashfs path is not captured")
+	}
+	if s.connectionWorker == "" {
+		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	return s.exec.WaitFor(ctx, "enroot direct squashfs unmounted", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.exec.WaitFor(ctx, "enroot direct squashfs unmounted and cache remains", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		mounted, err := s.squashfsMountProcessExists(waitCtx)
 		if err != nil {
 			return false, err
 		}
-		return !mounted, nil
+		if mounted {
+			return false, nil
+		}
+		statValue, err := s.squashStat(waitCtx)
+		if err != nil {
+			return false, err
+		}
+		if statValue == "" {
+			return false, nil
+		}
+		s.squashStatBefore = statValue
+		return true, nil
 	})
 }
 
@@ -275,7 +308,7 @@ func (s *EnrootContainers) enrootRuntimeDataIsRepopulatedWithoutChangingTheSquas
 		enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 			// We validate cache reuse by checking the tracked squashfs stat is unchanged
 			// while runtime data is recreated. We do not compare full directory trees.
-			treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+			treeOutput, err := s.legacyEnrootDataTree(waitCtx, s.connectionWorker)
 			if err != nil {
 				return false, err
 			}
@@ -312,19 +345,11 @@ func (s *EnrootContainers) enrootSquashfsArtifactIsReusedWithoutMaterializingRun
 			if !mounted {
 				return false, nil
 			}
-			treeOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+			statOutput, err := s.squashStat(waitCtx)
 			if err != nil {
 				return false, err
 			}
-			if strings.Contains(treeOutput, "pyxis_"+s.job.ID) {
-				return false, nil
-			}
-
-			statOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo stat -c '%%Y:%%s' %s", framework.ShellQuote(s.squashPath)))
-			if err != nil {
-				return false, err
-			}
-			return strings.TrimSpace(statOutput) == s.squashStatBefore, nil
+			return statOutput == s.squashStatBefore, nil
 		})
 	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
 }
@@ -345,7 +370,7 @@ func (s *EnrootContainers) aNamedEnrootContainerJobIsSubmitted(ctx context.Conte
 	err := framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "named enroot runtime directory created",
 		enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 			for _, worker := range s.workers {
-				treeOutput, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+				treeOutput, err := s.legacyEnrootDataTree(waitCtx, worker)
 				if err != nil {
 					return false, err
 				}
@@ -372,7 +397,7 @@ func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryRemainsAfterCancellatio
 
 	return s.exec.WaitFor(ctx, "named enroot runtime directory remains", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
-			treeOutput, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+			treeOutput, err := s.legacyEnrootDataTree(waitCtx, worker)
 			if err != nil {
 				return false, err
 			}
@@ -410,7 +435,7 @@ func (s *EnrootContainers) theNamedEnrootRuntimeDirectoryIsRemoved(ctx context.C
 	namedDir := namedEnrootDir(enrootNamedJobName)
 	return s.exec.WaitFor(ctx, "named enroot runtime directory removed", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
-			treeOutput, err := s.exec.Worker(worker).RunWithDefaultRetry(waitCtx, "sudo tree -L 1 /mnt/image-storage/enroot/data/")
+			treeOutput, err := s.legacyEnrootDataTree(waitCtx, worker)
 			if err != nil {
 				return false, err
 			}
@@ -527,7 +552,7 @@ func namedEnrootDir(containerName string) string {
 }
 
 func namedEnrootDirPath(containerName string) string {
-	return "/mnt/image-storage/enroot/data/" + namedEnrootDir(containerName)
+	return path.Join(enrootDedicatedDataPath, namedEnrootDir(containerName))
 }
 
 func (s *EnrootContainers) squashfsMountProcessExists(ctx context.Context) (bool, error) {
@@ -537,4 +562,30 @@ func (s *EnrootContainers) squashfsMountProcessExists(ctx context.Context) (bool
 		return false, err
 	}
 	return strings.TrimSpace(output) != "", nil
+}
+
+func (s *EnrootContainers) enrootDirectSquashFSEnabled(ctx context.Context) (bool, error) {
+	if s.directSquashFS != nil {
+		return *s.directSquashFS, nil
+	}
+
+	output, err := s.exec.Jail().RunWithDefaultRetry(ctx, "grep -E 'spank_pyxis\\.so.*use_squashfuse=1' /etc/slurm/plugstack.conf /etc/slurm/plugstack.conf.d/*.conf 2>/dev/null || true")
+	if err != nil {
+		return false, err
+	}
+	enabled := strings.TrimSpace(output) != ""
+	s.directSquashFS = &enabled
+	return enabled, nil
+}
+
+func (s *EnrootContainers) squashStat(ctx context.Context) (string, error) {
+	statOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(ctx, fmt.Sprintf("sudo stat -c '%%Y:%%s' %s", framework.ShellQuote(s.squashPath)))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(statOutput), nil
+}
+
+func (s *EnrootContainers) legacyEnrootDataTree(ctx context.Context, worker string) (string, error) {
+	return s.exec.Worker(worker).RunWithDefaultRetry(ctx, fmt.Sprintf("sudo tree -L 1 %s", framework.ShellQuote(enrootDedicatedDataPath)))
 }

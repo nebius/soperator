@@ -16,6 +16,7 @@ import (
 	"github.com/cucumber/godog"
 	corev1 "k8s.io/api/core/v1"
 
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
 	"nebius.ai/slurm-operator/internal/e2e/acceptance/steps"
 )
@@ -33,9 +34,11 @@ const (
 type Runner struct {
 	state            *framework.ClusterState
 	runUnstableTests bool
+	kubectlContext   string
+	reportDir        string
 }
 
-func NewRunner(state *framework.ClusterState, runUnstableTests bool) *Runner {
+func NewRunner(state *framework.ClusterState, runUnstableTests bool, kubectlContext, reportDir string) *Runner {
 	if state == nil {
 		state = &framework.ClusterState{
 			WorkersByNodeSet: make(map[string][]framework.WorkerPodRef),
@@ -47,11 +50,13 @@ func NewRunner(state *framework.ClusterState, runUnstableTests bool) *Runner {
 	return &Runner{
 		state:            state,
 		runUnstableTests: runUnstableTests,
+		kubectlContext:   kubectlContext,
+		reportDir:        reportDir,
 	}
 }
 
 func (r *Runner) Run(ctx context.Context) error {
-	w := newWorld(r.state)
+	w := newWorld(r.state, r.kubectlContext)
 	if err := discoverCluster(ctx, w, r.state); err != nil {
 		return fmt.Errorf("discover cluster before suite: %w", err)
 	}
@@ -63,15 +68,9 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	tags := r.tagFilter()
 
-	format := "pretty"
-	if dir := os.Getenv("E2E_REPORT_DIR"); dir != "" {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return fmt.Errorf("create report dir %q: %w", dir, err)
-		}
-		format = fmt.Sprintf("pretty,cucumber:%s,junit:%s",
-			filepath.Join(dir, "acceptance.cucumber.json"),
-			filepath.Join(dir, "acceptance.junit.xml"),
-		)
+	format, err := reportFormat(r.reportDir)
+	if err != nil {
+		return err
 	}
 
 	suite := godog.TestSuite{
@@ -102,7 +101,7 @@ func (r *Runner) tagFilter() string {
 	var filters []string
 
 	if !r.runUnstableTests {
-		log.Printf("acceptance: RUN_UNSTABLE_TESTS=false, excluding @unstable scenarios")
+		log.Printf("acceptance: run-unstable=false, excluding @unstable scenarios")
 		filters = append(filters, "~@unstable")
 	}
 	if !r.state.HasGPUWorkers() {
@@ -114,7 +113,7 @@ func (r *Runner) tagFilter() string {
 }
 
 func discoverCluster(ctx context.Context, w *world, state *framework.ClusterState) error {
-	if _, err := w.RunWithDefaultRetry(ctx, "kubectl", "get", "pods", "-n", soperatorNamespace); err != nil {
+	if _, err := w.Kubectl().RunWithDefaultRetry(ctx, "get", "pods", "-n", soperatorNamespace); err != nil {
 		return err
 	}
 	if err := verifyPodReady(ctx, w, soperatorNamespace, state.SlurmClusterName+"-login-0"); err != nil {
@@ -129,6 +128,13 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	if _, err := w.Jail().RunWithDefaultRetry(ctx, "true"); err != nil {
 		return fmt.Errorf("exec login jail sanity check: %w", err)
 	}
+
+	discoveredNodeSets, err := discoverNodeSets(ctx, w, state.SlurmClusterName)
+	if err != nil {
+		return fmt.Errorf("discover NodeSets: %w", err)
+	}
+	state.DiscoveredNodeSets = discoveredNodeSets
+	log.Printf("acceptance: discovered nodesets: %s", discoveredNodeSetSummary(state.DiscoveredNodeSets))
 
 	workerOutput, err := w.Controller().RunWithDefaultRetry(ctx, `sinfo -hN -p main -o '%N'`)
 	if err != nil {
@@ -153,11 +159,64 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	}
 	state.Workers = workers
 	classifyWorkers(state)
+	if err := verifyDiscoveredWorkers(state); err != nil {
+		return err
+	}
 
 	log.Printf("acceptance: discovered workers: %s", workerNames(state.Workers))
 	log.Printf("acceptance: discovered GPU workers: %s", workerNames(state.GPUWorkers))
 	log.Printf("acceptance: discovered workers by nodeset: %s", workersByNodeSetSummary(state.WorkersByNodeSet))
 	return nil
+}
+
+func reportFormat(reportDir string) (string, error) {
+	if reportDir == "" {
+		return "pretty", nil
+	}
+	if err := os.MkdirAll(reportDir, 0o755); err != nil {
+		return "", fmt.Errorf("create report dir %q: %w", reportDir, err)
+	}
+	return fmt.Sprintf("pretty,cucumber:%s,junit:%s",
+		filepath.Join(reportDir, "acceptance.cucumber.json"),
+		filepath.Join(reportDir, "acceptance.junit.xml"),
+	), nil
+}
+
+func discoverNodeSets(ctx context.Context, w *world, clusterName string) ([]framework.DiscoveredNodeSet, error) {
+	output, err := w.Kubectl().RunWithDefaultRetry(ctx, "get", "nodesets", "-n", soperatorNamespace, "-o", "json")
+	if err != nil {
+		return nil, err
+	}
+
+	var nodeSets slurmv1alpha1.NodeSetList
+	if err := json.Unmarshal([]byte(output), &nodeSets); err != nil {
+		return nil, fmt.Errorf("decode NodeSet list: %w", err)
+	}
+
+	discovered := discoveredNodeSetsFromLiveList(nodeSets, clusterName)
+	if len(discovered) == 0 {
+		return nil, fmt.Errorf("no NodeSets found in namespace %s for Slurm cluster %q", soperatorNamespace, clusterName)
+	}
+	return discovered, nil
+}
+
+func discoveredNodeSetsFromLiveList(nodeSets slurmv1alpha1.NodeSetList, clusterName string) []framework.DiscoveredNodeSet {
+	discovered := make([]framework.DiscoveredNodeSet, 0, len(nodeSets.Items))
+	for _, nodeSet := range nodeSets.Items {
+		if nodeSet.Spec.ClusterName != "" && nodeSet.Spec.ClusterName != clusterName {
+			continue
+		}
+		discovered = append(discovered, framework.DiscoveredNodeSet{
+			Name:   nodeSet.Name,
+			Size:   int(nodeSet.Spec.Replicas),
+			HasGPU: nodeSet.Spec.GPU.Enabled,
+		})
+	}
+
+	sort.Slice(discovered, func(i, j int) bool {
+		return discovered[i].Name < discovered[j].Name
+	})
+	return discovered
 }
 
 func featurePaths() []string {
@@ -175,7 +234,7 @@ func featurePaths() []string {
 func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
 	registerTimingHooks(sc)
 
-	w := newWorld(r.state)
+	w := newWorld(r.state, r.kubectlContext)
 	slurm := framework.NewSlurmClient(w)
 
 	steps.NewClusterCreation(r.state, w).Register(sc)
@@ -238,10 +297,11 @@ func registerTimingHooks(sc *godog.ScenarioContext) {
 	})
 }
 
-func newWorld(state *framework.ClusterState) *world {
+func newWorld(state *framework.ClusterState, kubectlContext string) *world {
 	return &world{
-		logPrefix: "acceptance",
-		state:     state,
+		logPrefix:      "acceptance",
+		state:          state,
+		kubectlContext: kubectlContext,
 	}
 }
 
@@ -279,8 +339,23 @@ func workersByNodeSetSummary(workersByNodeSet map[string][]framework.WorkerPodRe
 	return strings.Join(parts, "; ")
 }
 
+func discoveredNodeSetSummary(nodeSets []framework.DiscoveredNodeSet) string {
+	if len(nodeSets) == 0 {
+		return "<none>"
+	}
+	parts := make([]string, 0, len(nodeSets))
+	for _, nodeSet := range nodeSets {
+		nodeType := "cpu"
+		if nodeSet.HasGPU {
+			nodeType = "gpu"
+		}
+		parts = append(parts, fmt.Sprintf("%s=%d/%s", nodeSet.Name, nodeSet.Size, nodeType))
+	}
+	return strings.Join(parts, ", ")
+}
+
 func verifyPodReady(ctx context.Context, w *world, namespace, name string) error {
-	output, err := w.RunWithDefaultRetry(ctx, "kubectl", "get", "pod", "-n", namespace, name, "-o", "json")
+	output, err := w.Kubectl().RunWithDefaultRetry(ctx, "get", "pod", "-n", namespace, name, "-o", "json")
 	if err != nil {
 		return err
 	}
@@ -301,25 +376,25 @@ func verifyPodReady(ctx context.Context, w *world, namespace, name string) error
 }
 
 func classifyWorkers(state *framework.ClusterState) {
-	state.WorkersByNodeSet = make(map[string][]framework.WorkerPodRef, len(state.ExpectedNodeSets))
+	state.WorkersByNodeSet = make(map[string][]framework.WorkerPodRef, len(state.DiscoveredNodeSets))
 	state.GPUWorkers = nil
 
-	if len(state.ExpectedNodeSets) == 0 {
+	if len(state.DiscoveredNodeSets) == 0 {
 		return
 	}
 
-	expected := slices.Clone(state.ExpectedNodeSets)
-	sort.Slice(expected, func(i, j int) bool {
-		return len(expected[i].Name) > len(expected[j].Name)
+	discovered := slices.Clone(state.DiscoveredNodeSets)
+	sort.Slice(discovered, func(i, j int) bool {
+		return len(discovered[i].Name) > len(discovered[j].Name)
 	})
 
-	gpuByName := make(map[string]bool, len(expected))
-	for _, nodeSet := range expected {
+	gpuByName := make(map[string]bool, len(discovered))
+	for _, nodeSet := range discovered {
 		gpuByName[nodeSet.Name] = nodeSet.HasGPU
 	}
 
 	for _, worker := range state.Workers {
-		for _, nodeSet := range expected {
+		for _, nodeSet := range discovered {
 			prefix := nodeSet.Name + "-"
 			if !strings.HasPrefix(worker.Name, prefix) {
 				continue
@@ -331,4 +406,25 @@ func classifyWorkers(state *framework.ClusterState) {
 			break
 		}
 	}
+}
+
+func verifyDiscoveredWorkers(state *framework.ClusterState) error {
+	var problems []string
+	for _, nodeSet := range state.DiscoveredNodeSets {
+		liveWorkers := len(state.WorkersByNodeSet[nodeSet.Name])
+		if liveWorkers != nodeSet.Size {
+			problems = append(problems, fmt.Sprintf("NodeSet %s live workers in Slurm=%d desired=%d", nodeSet.Name, liveWorkers, nodeSet.Size))
+		}
+	}
+
+	desiredWorkers := state.DesiredWorkerCount()
+	if desiredWorkers > 0 && len(state.Workers) != desiredWorkers {
+		problems = append(problems, fmt.Sprintf("discovered workers=%d desired=%d", len(state.Workers), desiredWorkers))
+	}
+
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		return fmt.Errorf("%s", strings.Join(problems, "; "))
+	}
+	return nil
 }

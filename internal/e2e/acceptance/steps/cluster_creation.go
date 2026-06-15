@@ -43,14 +43,13 @@ func (s *ClusterCreation) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^all HelmReleases are Ready$`, s.checkHelmReleasesReady)
 	sc.Step(`^all SlurmCluster CRs are available$`, s.checkSlurmClustersReady)
 	sc.Step(`^all NodeSet CRs are ready$`, s.checkNodeSetsReady)
-	sc.Step(`^configured nodesets match the live cluster$`, s.checkExpectedNodeSets)
 	sc.Step(`^main and hidden partitions are present and sane$`, s.checkPartitions)
 	sc.Step(`^all Slurm nodes are healthy$`, s.checkSlurmNodeHealth)
 	sc.Step(`^all ActiveChecks completed successfully$`, s.checkActiveChecks)
 	sc.Step(`^login welcome output shows cluster information$`, s.checkWelcomeOutput)
 	sc.Step(`^main partition smoke job succeeds$`, s.checkMainSmokeJob)
 	sc.Step(`^hidden partition smoke job succeeds$`, s.checkHiddenSmokeJob)
-	sc.Step(`^each configured nodeset accepts a targeted smoke job$`, s.checkNodeSetSmokeJobs)
+	sc.Step(`^each discovered nodeset accepts a targeted smoke job$`, s.checkNodeSetSmokeJobs)
 }
 
 func (s *ClusterCreation) checkPodsReady(ctx context.Context) error {
@@ -191,51 +190,6 @@ func (s *ClusterCreation) checkNodeSetsReady(ctx context.Context) error {
 	return nil
 }
 
-func (s *ClusterCreation) checkExpectedNodeSets(ctx context.Context) error {
-	if len(s.state.ExpectedNodeSets) == 0 {
-		s.exec.Logf("cluster creation: no expected nodesets configured, skipping nodeset/profile comparison")
-		return nil
-	}
-
-	var nodeSets slurmv1alpha1.NodeSetList
-	if err := kubectlJSON(ctx, s.exec, &nodeSets, "get", "nodesets", "-A", "-o", "json"); err != nil {
-		return fmt.Errorf("list NodeSets: %w", err)
-	}
-
-	actual := make(map[string]slurmv1alpha1.NodeSet, len(nodeSets.Items))
-	for _, nodeSet := range nodeSets.Items {
-		actual[nodeSet.Name] = nodeSet
-	}
-
-	var problems []string
-	for _, expected := range s.state.ExpectedNodeSets {
-		nodeSet, ok := actual[expected.Name]
-		if !ok {
-			problems = append(problems, fmt.Sprintf("NodeSet %s is missing", expected.Name))
-			continue
-		}
-		if int(nodeSet.Spec.Replicas) != expected.Size {
-			problems = append(problems, fmt.Sprintf("NodeSet %s desired=%d expected=%d", expected.Name, nodeSet.Spec.Replicas, expected.Size))
-		}
-
-		liveWorkers := len(s.state.WorkersByNodeSet[expected.Name])
-		if liveWorkers != expected.Size {
-			problems = append(problems, fmt.Sprintf("NodeSet %s live workers in Slurm=%d expected=%d", expected.Name, liveWorkers, expected.Size))
-		}
-	}
-
-	expectedWorkers := s.state.ExpectedWorkerCount()
-	if expectedWorkers > 0 && len(s.state.Workers) != expectedWorkers {
-		problems = append(problems, fmt.Sprintf("discovered workers=%d expected=%d", len(s.state.Workers), expectedWorkers))
-	}
-
-	if len(problems) > 0 {
-		sort.Strings(problems)
-		return fmt.Errorf("%s", strings.Join(problems, "; "))
-	}
-	return nil
-}
-
 func (s *ClusterCreation) checkPartitions(ctx context.Context) error {
 	allPartitions, err := s.exec.Controller().RunWithDefaultRetry(ctx, "scontrol show partitions --oneliner")
 	if err != nil {
@@ -361,8 +315,8 @@ func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkWelcomeOutput(ctx context.Context) error {
-	output, err := s.exec.RunWithDefaultRetry(ctx,
-		"kubectl", "exec", "-n", clusterCreationNamespace, s.state.SlurmClusterName+"-login-0", "--", "sh", "-lc",
+	output, err := s.exec.Kubectl().RunWithDefaultRetry(ctx,
+		"exec", "-n", clusterCreationNamespace, s.state.SlurmClusterName+"-login-0", "--", "sh", "-lc",
 		"/etc/update-motd.d/00-welcome && /etc/update-motd.d/20-slurm-stats")
 	if err != nil {
 		return fmt.Errorf("render welcome output: %w", err)
@@ -407,13 +361,13 @@ func (s *ClusterCreation) checkHiddenSmokeJob(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkNodeSetSmokeJobs(ctx context.Context) error {
-	if len(s.state.ExpectedNodeSets) == 0 {
-		s.exec.Logf("cluster creation: no expected nodesets configured, skipping per-nodeset smoke jobs")
+	if len(s.state.DiscoveredNodeSets) == 0 {
+		s.exec.Logf("cluster creation: no discovered nodesets configured, skipping per-nodeset smoke jobs")
 		return nil
 	}
 
 	var problems []string
-	for _, nodeSet := range s.state.ExpectedNodeSets {
+	for _, nodeSet := range s.state.DiscoveredNodeSets {
 		workers := slices.Clone(s.state.WorkersByNodeSet[nodeSet.Name])
 		if len(workers) == 0 {
 			problems = append(problems, fmt.Sprintf("%s has no discovered workers", nodeSet.Name))
@@ -454,7 +408,7 @@ type helmReleaseStatusRef struct {
 }
 
 func kubectlJSON(ctx context.Context, exec framework.Exec, out any, args ...string) error {
-	output, err := exec.RunWithDefaultRetry(ctx, "kubectl", args...)
+	output, err := exec.Kubectl().RunWithDefaultRetry(ctx, args...)
 	if err != nil {
 		return err
 	}
