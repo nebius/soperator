@@ -494,7 +494,7 @@ func TestRenderPlugstack(t *testing.T) {
 		assert.Contains(t, result, "required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 importer=/opt/importer.sh use_squashfuse=1")
 	})
 
-	t.Run("NCCL no options", func(t *testing.T) {
+	t.Run("NCCL Debug no options", func(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
 			PlugStackConfig: slurmv1.PlugStackConfig{
 				NcclDebug: slurmv1.PluginConfigNcclDebug{},
@@ -504,7 +504,7 @@ func TestRenderPlugstack(t *testing.T) {
 		assert.Contains(t, result, "optional spanknccldebug.so enabled=0 log-level=INFO out-file=0 out-dir=/opt/soperator-outputs/nccl_logs out-stdout=0")
 	})
 
-	t.Run("NCCL options", func(t *testing.T) {
+	t.Run("NCCL Debug options", func(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
 			PlugStackConfig: slurmv1.PlugStackConfig{
 				NcclDebug: slurmv1.PluginConfigNcclDebug{
@@ -521,6 +521,33 @@ func TestRenderPlugstack(t *testing.T) {
 		assert.Contains(t, result, "required spanknccldebug.so enabled=1 log-level=TRACE out-file=1 out-dir=/tmp out-stdout=1")
 	})
 
+	t.Run("NCCL Inspector Pre-Configuration no options", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{
+			PlugStackConfig: slurmv1.PlugStackConfig{
+				NcclInspectorPreConf: slurmv1.PluginConfigNcclInspectorPreConf{},
+			},
+		}).Render()
+		assert.NotEmpty(t, result)
+		assert.Contains(t, result, "optional spank_nccl_inspector_preconf.so enabled=0 profiler-plugin=/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so dump-dir=/opt/soperator-outputs/nccl_profiles/%j/%s dump-verbose=0 dump-thread-interval-microseconds=1000000")
+	})
+
+	t.Run("NCCL Inspector Pre-Configuration options", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{
+			PlugStackConfig: slurmv1.PlugStackConfig{
+				NcclInspectorPreConf: slurmv1.PluginConfigNcclInspectorPreConf{
+					Required:                       ptr.To(true),
+					Enabled:                        ptr.To(true),
+					ProfilerPlugin:                 "/usr/lib/a.so",
+					DumpDir:                        "/tmp",
+					DumpVerbose:                    ptr.To(true),
+					DumpThreadIntervalMicroseconds: 500,
+				},
+			},
+		}).Render()
+		assert.NotEmpty(t, result)
+		assert.Contains(t, result, "required spank_nccl_inspector_preconf.so enabled=1 profiler-plugin=/usr/lib/a.so dump-dir=/tmp dump-verbose=1 dump-thread-interval-microseconds=500")
+	})
+
 	t.Run("Custom not provided", func(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
 			PlugStackConfig: slurmv1.PlugStackConfig{
@@ -528,7 +555,7 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Equal(t, 3, len(strings.Split(result, "\n")))
+		assert.Equal(t, 4, len(strings.Split(result, "\n")))
 	})
 
 	t.Run("Custom no options", func(t *testing.T) {
@@ -540,7 +567,7 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Equal(t, 4, len(strings.Split(result, "\n")))
+		assert.Equal(t, 5, len(strings.Split(result, "\n")))
 		assert.Contains(t, result, "optional /lol/kek.so")
 	})
 
@@ -563,7 +590,7 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Equal(t, 5, len(strings.Split(result, "\n")))
+		assert.Equal(t, 6, len(strings.Split(result, "\n")))
 		assert.Contains(t, result, "required /lol/kek.so lol=kek")
 		assert.Contains(t, result, "required /kek/lol.so kek=lol")
 	})

@@ -81,6 +81,13 @@ nodesets:
         # Whether GDRCopy should be enabled
         # Optional, defaults to false
         gdrCopyEnabled: true
+    # Network topology configuration
+    # Optional
+    topology:
+      # IB fabric this NodeSet belongs to. Its workers are grouped under a per-fabric
+      # root switch so Slurm never schedules a job across fabrics.
+      # Optional, defaults to "root" (single-fabric behavior)
+      fabric: "root"
     # Node configuration values to be rendered into slurm_base.conf.noedit
     # Optional
     nodeConfig:

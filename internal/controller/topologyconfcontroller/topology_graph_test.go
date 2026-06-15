@@ -15,6 +15,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 		labelsByNode  map[string]tc.NodeTopologyLabels
 		gpuPodsByNode map[string][]string
 		allNodeNames  []string
+		fabricByNode  map[string]string
 		expected      []string
 	}{
 		{
@@ -366,11 +367,104 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"SwitchName=spine-X Switches=leaf-A,leaf-B", // Should NOT include leaf-C
 			},
 		},
+		{
+			name: "Two NodeSet fabrics produce two unconnected fabric roots",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1"},
+				"node2": {"tier-1": "switch2", "tier-2": "spine2"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"a-0"},
+				"node2": {"b-0"},
+			},
+			allNodeNames: []string{"a-0", "b-0"},
+			fabricByNode: map[string]string{
+				"a-0": "fab-a",
+				"b-0": "fab-b",
+			},
+			expected: []string{
+				"SwitchName=fab-a Switches=spine1",
+				"SwitchName=fab-b Switches=spine2",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=spine2 Switches=switch2",
+				"SwitchName=switch1 Nodes=a-0",
+				"SwitchName=switch2 Nodes=b-0",
+			},
+		},
+		{
+			name: "Fabric is the root of the tier-1/tier-2 path",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"a-0"},
+			},
+			allNodeNames: []string{"a-0"},
+			fabricByNode: map[string]string{"a-0": "cluster-x"},
+			expected: []string{
+				"SwitchName=cluster-x Switches=spine1",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=switch1 Nodes=a-0",
+			},
+		},
+		{
+			name:          "Powered-down nodes land under their fabric's unknown switch",
+			labelsByNode:  map[string]tc.NodeTopologyLabels{},
+			gpuPodsByNode: map[string][]string{},
+			allNodeNames:  []string{"a-0", "a-1", "b-0"},
+			fabricByNode: map[string]string{
+				"a-0": "fab-a",
+				"a-1": "fab-a",
+				"b-0": "fab-b",
+			},
+			expected: []string{
+				"SwitchName=fab-a Switches=fab-a.unknown",
+				"SwitchName=fab-b Switches=fab-b.unknown",
+				"SwitchName=fab-a.unknown Nodes=a-0,a-1",
+				"SwitchName=fab-b.unknown Nodes=b-0",
+			},
+		},
+		{
+			name: "Mixed: explicit fabric NodeSet and defaulted NodeSet",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"a-0"},
+			},
+			allNodeNames: []string{"a-0", "def-0"},
+			fabricByNode: map[string]string{
+				"a-0": "fab-a",
+				// "def-0" has no fabric -> defaults to "root"/"unknown".
+			},
+			expected: []string{
+				"SwitchName=fab-a Switches=spine1",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=switch1 Nodes=a-0",
+				"SwitchName=root Switches=unknown",
+				"SwitchName=unknown Nodes=def-0",
+			},
+		},
+		{
+			name: "Running node with tiers but no fabric stays under root",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"a-0"},
+			},
+			allNodeNames: []string{"a-0"},
+			expected: []string{
+				"SwitchName=root Switches=spine1",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=switch1 Nodes=a-0",
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			graph := tc.BuildTopologyGraph(context.Background(), tt.labelsByNode, tt.gpuPodsByNode, tt.allNodeNames)
+			graph := tc.BuildTopologyGraph(context.Background(), tt.labelsByNode, tt.gpuPodsByNode, tt.allNodeNames, tt.fabricByNode)
 			result := graph.RenderConfigLines()
 			require.ElementsMatch(t, tt.expected, result)
 		})
@@ -395,7 +489,7 @@ func TestRenderTopologyConfig_MergesSwitches(t *testing.T) {
 
 	allNodeNames := []string{"worker-a", "worker-b", "worker-c", "worker-d", "worker-e"}
 
-	graph := tc.BuildTopologyGraph(context.Background(), labelsByNode, podsByNode, allNodeNames)
+	graph := tc.BuildTopologyGraph(context.Background(), labelsByNode, podsByNode, allNodeNames, nil)
 	lines := graph.RenderConfigLines()
 
 	require.Contains(t, lines, "SwitchName=spine-0 Switches=leaf-[0-1],leaf-cpu-[0,2],leafkek1")
