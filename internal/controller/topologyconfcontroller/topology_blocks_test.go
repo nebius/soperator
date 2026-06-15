@@ -26,7 +26,7 @@ func TestBuildTopologyBlocks_GroupsWorkersByTierZero(t *testing.T) {
 		}
 		allNodeNames := []string{"pod1", "pod2", "pod3", "pod4"}
 
-		blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames)
+		blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames, nil)
 		lines := blocks.RenderConfigLines()
 
 		require.True(t, len(lines) != 0, "expected non-empty block lines")
@@ -51,7 +51,7 @@ func TestBuildTopologyBlocks_GroupsWorkersByTierZero(t *testing.T) {
 		}
 		allNodeNames := []string{"pod-1", "pod-2", "pod-3", "pod-4"}
 
-		blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames)
+		blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames, nil)
 		lines := blocks.RenderConfigLines()
 
 		require.True(t, len(lines) != 0, "expected non-empty block lines")
@@ -81,7 +81,7 @@ func TestBuildTopologyBlocks_AssignsUnknownBlock(t *testing.T) {
 	// pod3 is a node with no scheduled GPU pod (e.g. powered down or CPU) -> unknown.
 	allNodeNames := []string{"pod1", "pod2", "pod3"}
 
-	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames)
+	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames, nil)
 	result := parseBlockLines(t, blocks.RenderConfigLines())
 
 	require.Equal(t, map[string][]string{
@@ -102,7 +102,7 @@ func TestBuildTopologyBlocks_RenderMergesWorkerNodes(t *testing.T) {
 
 	allNodeNames := []string{"worker-0", "worker-1", "worker-cpu-0", "worker-2", "worker-cpu-1", "workerkek1"}
 
-	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, podsByNode, allNodeNames)
+	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, podsByNode, allNodeNames, nil)
 	lines := blocks.RenderConfigLines()
 
 	require.Equal(t, []string{
@@ -111,8 +111,30 @@ func TestBuildTopologyBlocks_RenderMergesWorkerNodes(t *testing.T) {
 }
 
 func TestBuildTopologyBlocks_RenderEmpty(t *testing.T) {
-	blocks := tc.BuildTopologyBlocks(context.Background(), map[string]tc.NodeTopologyLabels{}, map[string][]string{}, nil)
+	blocks := tc.BuildTopologyBlocks(context.Background(), map[string]tc.NodeTopologyLabels{}, map[string][]string{}, nil, nil)
 	require.Nil(t, blocks.RenderConfigLines())
+}
+
+// Powered-down nodes from different fabrics must not share one "unknown" block.
+func TestBuildTopologyBlocks_PerFabricUnknown(t *testing.T) {
+	allNodeNames := []string{"a-0", "a-1", "b-0", "def-0"}
+	fabricByNode := map[string]string{
+		"a-0": "fab-a",
+		"a-1": "fab-a",
+		"b-0": "fab-b",
+		// "def-0" has no fabric -> defaults to the legacy "unknown" block.
+	}
+
+	blocks := tc.BuildTopologyBlocks(
+		context.Background(),
+		map[string]tc.NodeTopologyLabels{}, map[string][]string{}, allNodeNames, fabricByNode,
+	)
+
+	require.Equal(t, map[string][]string{
+		"fab-a.unknown": {"a-[0-1]"},
+		"fab-b.unknown": {"b-0"},
+		"unknown":       {"def-0"},
+	}, parseBlockLines(t, blocks.RenderConfigLines()))
 }
 
 func parseBlockLines(t *testing.T, lines []string) map[string][]string {

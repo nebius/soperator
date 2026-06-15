@@ -57,6 +57,13 @@ spec:
     {{- end }}
   {{- end }}
 
+  {{- with (.topology | default dict) }}
+  {{- with .fabric }}
+  topology:
+    fabric: {{ . | quote }}
+  {{- end }}
+  {{- end }}
+
   {{- with .nodeConfig }}
   nodeConfig:
     {{- with .features }}

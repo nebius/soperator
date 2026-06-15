@@ -230,6 +230,11 @@ type NodeSetSpec struct {
 	// +kubebuilder:validation:Optional
 	GPU GPUSpec `json:"gpu,omitempty"`
 
+	// Topology defines network-topology settings for this NodeSet.
+	//
+	// +kubebuilder:validation:Optional
+	Topology NodeSetTopology `json:"topology,omitempty"`
+
 	// ConfigMapRefSupervisord defines the config name of Supervisord for the slurmd container.
 	// Specifying a custom name allows providing custom config for the Supervisord.
 	//
@@ -503,6 +508,18 @@ type NodeConfig struct {
 	// GRESConfig provides a possibility to define node-scoped settings in gres.conf.
 	// Multiple lines can be passed. Each line will be prefixed with NodeName=<node-names-from-the-nodeset>.
 	GRESConfig []string `json:"gresConfig,omitempty"`
+}
+
+// NodeSetTopology defines network-topology settings for the NodeSet.
+type NodeSetTopology struct {
+	// Fabric is the IB fabric this NodeSet belongs to. Its workers are grouped under a
+	// per-fabric root switch (named after the fabric) so Slurm never schedules a job across
+	// fabrics. Powered-down / unscheduled nodes are placed under "<fabric>.unknown".
+	// Defaults to "root", which preserves the single-fabric behavior.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="root"
+	Fabric string `json:"fabric,omitempty"`
 }
 
 // GPUSpec defines the settings related to GPU support
