@@ -39,10 +39,11 @@ export HOME=~soperatorchecks
 
 # Auto-detect GPU requirement from the sbatch script's #SBATCH directives.
 # If the script requests GPU resources but the cluster has no GPU workers,
-# skip the check. Missing slurm.conf is fail-open (surface the real problem).
+# skip the check. Missing Slurm base config is fail-open (surface the real problem).
 if grep -qE '#SBATCH\s+.*(--gpus-per-node|--gpus\b|--gres=gpu|-G\s)' /opt/bin/sbatch.sh; then
-    if [[ -f /etc/slurm/slurm.conf ]] && ! grep -q '^[^#]*Gres=gpu' /etc/slurm/slurm.conf; then
-        SKIP_REASON="script requires GPU but no GPU nodes in slurm.conf"
+    SLURM_BASE_CONFIG="/etc/slurm/slurm_base.conf.noedit"
+    if [[ -f "$SLURM_BASE_CONFIG" ]] && ! grep -q '^[^#]*Gres=gpu' "$SLURM_BASE_CONFIG"; then
+        SKIP_REASON="script requires GPU but no GPU nodes in slurm_base.conf.noedit"
         echo "$SKIP_REASON — marking check '$ACTIVE_CHECK_NAME' as Skipped"
 
         K8S_JOB_NAME=$(kubectl get pod "$K8S_POD_NAME" -n "$K8S_POD_NAMESPACE" \

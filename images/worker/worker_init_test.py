@@ -375,28 +375,28 @@ class TestGetEnvironmentVariables(unittest.TestCase):
             os.environ,
             {"SLURM_TOPOLOGY_PLUGIN": worker_init.TOPOLOGY_PLUGIN_BLOCK},
         ):
-            result = worker_init.get_topology_plugin("/missing/slurm.conf")
+            result = worker_init.get_topology_plugin("/missing/slurm_base.conf.noedit")
         self.assertEqual(result, worker_init.TOPOLOGY_PLUGIN_BLOCK)
 
-    def test_get_topology_plugin_from_slurm_conf(self):
-        """Topology plugin is read from slurm.conf when env is not set."""
+    def test_get_topology_plugin_from_slurm_base_config(self):
+        """Topology plugin is read from slurm_base.conf.noedit when env is not set."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            slurm_conf = os.path.join(temp_dir, "slurm.conf")
-            with open(slurm_conf, "w") as f:
+            slurm_base_config = os.path.join(temp_dir, "slurm_base.conf.noedit")
+            with open(slurm_base_config, "w") as f:
                 f.write("# comment\nTopologyPlugin = topology/block # inline\n")
 
             env = os.environ.copy()
             env.pop("SLURM_TOPOLOGY_PLUGIN", None)
             with mock.patch.dict(os.environ, env, clear=True):
-                result = worker_init.get_topology_plugin(slurm_conf)
+                result = worker_init.get_topology_plugin(slurm_base_config)
         self.assertEqual(result, worker_init.TOPOLOGY_PLUGIN_BLOCK)
 
     def test_get_topology_plugin_defaults_to_tree(self):
-        """Missing slurm.conf defaults to topology/tree."""
+        """Missing slurm_base.conf.noedit defaults to topology/tree."""
         env = os.environ.copy()
         env.pop("SLURM_TOPOLOGY_PLUGIN", None)
         with mock.patch.dict(os.environ, env, clear=True):
-            result = worker_init.get_topology_plugin("/missing/slurm.conf")
+            result = worker_init.get_topology_plugin("/missing/slurm_base.conf.noedit")
         self.assertEqual(result, worker_init.TOPOLOGY_PLUGIN_TREE)
 
     def test_get_controller_max_attempts_default(self):
