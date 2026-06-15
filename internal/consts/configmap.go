@@ -14,9 +14,9 @@ const (
 	ConfigMapNameSupervisord       = supervisord
 
 	ConfigMapKeySlurmConfig             = "slurm.conf"
-	ConfigMapKeySlurmGenConfig          = "slurm.gen.conf"
+	ConfigMapKeySlurmBaseConfig         = "slurm_base.conf.noedit"
 	ConfigMapKeyRESTConfig              = "slurm_rest.conf"
-	ConfigMapKeyCustomSlurmConfig       = "override_slurm.conf"
+	ConfigMapKeySlurmK8sExtraConfig     = "slurm_k8s_extra.conf.noedit"
 	ConfigMapKeyCGroupConfig            = "cgroup.conf"
 	ConfigMapKeySpankConfig             = "plugstack.conf"
 	ConfigMapKeyGresConfig              = "gres.conf"

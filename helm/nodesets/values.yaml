@@ -81,7 +81,7 @@ nodesets:
         # Whether GDRCopy should be enabled
         # Optional, defaults to false
         gdrCopyEnabled: true
-    # Node configuration values to be rendered into slurm.gen.conf
+    # Node configuration values to be rendered into slurm_base.conf.noedit
     # Optional
     nodeConfig:
       # Slurm Node Features
