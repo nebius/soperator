@@ -15,7 +15,7 @@ Environment Variables (wait-topology):
     TOPOLOGY_CONFIGMAP_PATH: Path to mounted ConfigMap (default: /tmp/slurm/topology-node-labels)
     TOPOLOGY_WAIT_TIMEOUT: Max wait time in seconds (default: 180)
     TOPOLOGY_POLL_INTERVAL: Poll interval in seconds (default: 5)
-    SLURM_TOPOLOGY_PLUGIN: Slurm topology plugin override (default: read from slurm.conf)
+    SLURM_TOPOLOGY_PLUGIN: Optional override; unset reads slurm_base.conf.noedit.
 """
 
 import argparse
@@ -41,7 +41,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 # Constants
 SLURM_CONFIG_LINK_SOURCE: Path = Path("/mnt/jail/etc/slurm")
 SLURM_CONFIG_LINK_TARGET: Path = Path("/etc/slurm")
-SLURM_CONFIG_PATH: Path = Path("/etc/slurm/slurm.conf")
+SLURM_CONFIG_PATH: Path = Path("/etc/slurm/slurm_base.conf.noedit")
 SLURM_TOPOLOGY_CONFIG_PATH: Path = Path("/etc/slurm/topology.conf")
 
 TOPOLOGY_PLUGIN_TREE: str = "topology/tree"
@@ -200,15 +200,15 @@ def get_topology_poll_interval() -> int:
     return int(os.environ.get("TOPOLOGY_POLL_INTERVAL", "5"))
 
 
-def get_topology_plugin(slurm_conf_path: Path = SLURM_CONFIG_PATH) -> str:
+def get_topology_plugin(slurm_config_path: Path = SLURM_CONFIG_PATH) -> str:
     """Get the configured Slurm topology plugin."""
     topology_plugin: str = os.environ.get("SLURM_TOPOLOGY_PLUGIN", "").strip()
     if topology_plugin:
         return topology_plugin.lower()
 
-    slurm_conf_path: Path = Path(slurm_conf_path)
+    slurm_config_path: Path = Path(slurm_config_path)
     try:
-        with slurm_conf_path.open("r") as f:
+        with slurm_config_path.open("r") as f:
             pattern: re.Pattern[str] = re.compile(
                 r"^TopologyPlugin\s*=\s*(\S+)", re.IGNORECASE
             )
@@ -218,7 +218,7 @@ def get_topology_plugin(slurm_conf_path: Path = SLURM_CONFIG_PATH) -> str:
                 if match:
                     return match.group(1).lower()
     except (IOError, OSError) as e:
-        logger.info("Failed to read topology plugin from %s: %s", slurm_conf_path, e)
+        logger.info("Failed to read topology plugin from %s: %s", slurm_config_path, e)
 
     return TOPOLOGY_PLUGIN_TREE
 

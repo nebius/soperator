@@ -45,7 +45,7 @@ func TestActiveCheckJobReconciler_SkippedAnnotation(t *testing.T) {
 		activeCheckName = "cuda-samples"
 		jobName         = "cuda-samples-12345"
 		podName         = "cuda-samples-12345-abcde"
-		skipReason      = "no GPU nodes in slurm.conf"
+		skipReason      = "no GPU nodes in slurm_base.conf.noedit"
 	)
 
 	activeCheck := &slurmv1alpha1.ActiveCheck{
@@ -157,7 +157,7 @@ func TestActiveCheckJobReconciler_SkippedAnnotation_Idempotent(t *testing.T) {
 			Name:      jobName,
 			Namespace: ns,
 			Annotations: map[string]string{
-				consts.ActiveCheckSkippedReasonAnnotation:  "no GPU nodes in slurm.conf",
+				consts.ActiveCheckSkippedReasonAnnotation:  "no GPU nodes in slurm_base.conf.noedit",
 				K8sAnnotationSoperatorChecksFinalStateTime: preExistingFinalTime,
 			},
 			Labels: map[string]string{
