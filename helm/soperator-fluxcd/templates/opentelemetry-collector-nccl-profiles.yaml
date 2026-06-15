@@ -37,6 +37,7 @@ spec:
   {{- if .Values.observability.ncclProfiles.configMapOverrideValues }}
     {{- toYaml .Values.observability.ncclProfiles.configMapOverrideValues | nindent 4 }}
   {{- else }}
+  {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
     resources:
     - apiVersion: v1
       kind: ConfigMap
@@ -60,6 +61,9 @@ spec:
                 enabled: true
                 queue_size: {{ .Values.observability.ncclProfiles.values.metricsExporterSendingQueueSize | default 2000 }}
                 num_consumers: {{ .Values.observability.ncclProfiles.values.metricsExporterNumConsumers | default 4 }}
+                {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+                storage: file_storage
+                {{- end }}
 
           receivers:
             filelog/nccl_metrics:
@@ -104,6 +108,12 @@ spec:
           connectors:
             ncclmetrics:
 
+          processors:
+            batch:
+              timeout: {{ $batch.timeout | default "5s" }}
+              send_batch_size: {{ $batch.sendBatchSize | default 2000 }}
+              send_batch_max_size: {{ $batch.sendBatchMaxSize | default 5000 }}
+
           service:
             {{- if .Values.observability.opentelemetry.metrics.enabled }}
             telemetry:
@@ -130,6 +140,8 @@ spec:
               metrics/nccl_metrics:
                 receivers:
                   - ncclmetrics
+                processors:
+                  - batch
                 exporters:
                   - otlphttp/victoriametrics
 
@@ -273,10 +285,6 @@ spec:
       - name: varlibotelcol
         mountPath: /var/lib/otelcol
       {{- end }}
-
-    extraEnvs:
-      - name: GOMAXPROCS
-        value: "1"
 
     securityContext:
       runAsGroup: 0
