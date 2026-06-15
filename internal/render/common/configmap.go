@@ -598,19 +598,22 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	res.AddLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
 
-	res.AddLine(strings.Join(
-		[]string{
-			utils.Ternary(cluster.PlugStackConfig.Pyxis.Required != nil && *cluster.PlugStackConfig.Pyxis.Required, "required", "optional"),
-			"spank_pyxis.so",
-			"runtime_path=/run/pyxis",
-			"execute_entrypoint=0",
-			"container_scope=global",
-			"sbatch_support=1",
-			fmt.Sprintf("importer=%s", cluster.PlugStackConfig.Pyxis.ImporterPath),
-			fmt.Sprintf("use_squashfuse=%d", utils.Ternary(cluster.PlugStackConfig.Pyxis.UseSquashfuse != nil && *cluster.PlugStackConfig.Pyxis.UseSquashfuse, 1, 0)),
-		},
-		" ",
-	))
+	{
+		opts := cluster.PlugStackConfig.Pyxis.DeepCopy()
+		res.AddLine(strings.Join(
+			[]string{
+				formatBoolPtr(opts.Required, "required", "optional"),
+				"spank_pyxis.so",
+				"runtime_path=/run/pyxis",
+				"execute_entrypoint=0",
+				"container_scope=global",
+				"sbatch_support=1",
+				fmt.Sprintf("importer=%s", opts.ImporterPath),
+				fmt.Sprintf("use_squashfuse=%d", formatBoolPtr(opts.UseSquashfuse, 1, 0)),
+			},
+			" ",
+		))
+	}
 
 	{
 		opts := cluster.PlugStackConfig.NcclDebug.DeepCopy()
@@ -618,11 +621,27 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			[]string{
 				utils.Ternary(opts.Required, "required", "optional"),
 				"spanknccldebug.so",
-				fmt.Sprintf("enabled=%d", utils.Ternary(opts.Enabled != nil && *opts.Enabled, 1, 0)),
+				fmt.Sprintf("enabled=%d", formatBoolPtr(opts.Enabled, 1, 0)),
 				fmt.Sprintf("log-level=%s", utils.Ternary(opts.LogLevel != "", opts.LogLevel, "INFO")),
 				fmt.Sprintf("out-file=%d", utils.Ternary(opts.OutputToFile, 1, 0)),
 				fmt.Sprintf("out-dir=%s", utils.Ternary(opts.OutputDirectory != "", opts.OutputDirectory, "/opt/soperator-outputs/nccl_logs")),
 				fmt.Sprintf("out-stdout=%d", utils.Ternary(opts.OutputToStdOut, 1, 0)),
+			},
+			" ",
+		))
+	}
+
+	{
+		opts := cluster.PlugStackConfig.NcclInspectorPreConf.DeepCopy()
+		res.AddLine(strings.Join(
+			[]string{
+				formatBoolPtr(opts.Required, "required", "optional"),
+				"spank_nccl_inspector_preconf.so",
+				fmt.Sprintf("enabled=%d", formatBoolPtr(opts.Enabled, 1, 0)),
+				fmt.Sprintf("profiler-plugin=%s", utils.Ternary(opts.ProfilerPlugin != "", opts.ProfilerPlugin, "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so")),
+				fmt.Sprintf("dump-dir=%s", utils.Ternary(opts.DumpDir != "", opts.DumpDir, "/opt/soperator-outputs/nccl_profiles/%j/%s")),
+				fmt.Sprintf("dump-verbose=%d", formatBoolPtr(opts.DumpVerbose, 1, 0)),
+				fmt.Sprintf("dump-thread-interval-microseconds=%d", utils.Ternary(opts.DumpThreadIntervalMicroseconds > 0, opts.DumpThreadIntervalMicroseconds, 1000000)),
 			},
 			" ",
 		))
@@ -644,6 +663,10 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	}
 
 	return res
+}
+
+func formatBoolPtr[T comparable](v *bool, ifTrue, ifFalse T) T {
+	return utils.Ternary(v != nil && *v, ifTrue, ifFalse)
 }
 
 func generateGresConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {

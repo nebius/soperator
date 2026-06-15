@@ -172,6 +172,13 @@ plugStackConfig:
     outputToFile: true
     outputToStdOut: false
     outputDirectory: "/opt/soperator-outputs/nccl_logs"
+  ncclInspectorPreConf:
+    required: false
+    enabled: false
+    profilerPlugin: "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so"
+    dumpDir: "/opt/soperator-outputs/nccl_profiles/%j/%s"
+    dumpVerbose: false
+    dumpThreadIntervalMicroseconds: 1000000
   customPlugins: []
 #  customPlugins:
 #    - required: true
