@@ -2,6 +2,7 @@ package controller
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/utils/stringutils"
@@ -47,6 +48,69 @@ func renderContainerSlurmctld(container *values.Container, customMounts []slurmv
 			Requests: container.Resources,
 		},
 		LivenessProbe:            container.LivenessProbe,
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+	}
+}
+
+func renderContainerSlurmControllerProxy(container *values.Container) corev1.Container {
+	return corev1.Container{
+		Name:            consts.ContainerNameSlurmControllerProxy,
+		Image:           container.Image,
+		ImagePullPolicy: container.ImagePullPolicy,
+		Command: []string{
+			"/bin/bash", "-c",
+		},
+		Args: []string{
+			// language=bash
+			stringutils.Dedent(`
+			set -eu
+
+			ln -sf /mnt/jail/etc/passwd /etc/passwd
+			ln -sf /mnt/jail/etc/group /etc/group
+			ln -sf /mnt/jail/etc/shadow /etc/shadow
+			ln -sf /mnt/jail/etc/gshadow /etc/gshadow
+			chown -h 0:42 /etc/{shadow,gshadow}
+
+			rm -rf /etc/slurm && ln -s /mnt/jail/etc/slurm /etc/slurm
+
+			while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
+
+			exec /opt/soperator/bin/slurm-controller-proxy --listen=:6821
+			`),
+		},
+		Ports: []corev1.ContainerPort{{
+			Name:          consts.ContainerPortNameSlurmControllerProxy,
+			ContainerPort: consts.ContainerPortSlurmControllerProxy,
+			Protocol:      corev1.ProtocolTCP,
+		}},
+		VolumeMounts: []corev1.VolumeMount{
+			common.RenderVolumeMountJail(),
+			common.RenderVolumeMountMungeSocket(),
+			common.RenderVolumeMountRESTJWTKey(),
+		},
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: consts.ContainerPathHealthz,
+					Port: intstr.FromString(consts.ContainerPortNameSlurmControllerProxy),
+				},
+			},
+			PeriodSeconds: 5,
+		},
+		LivenessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: consts.ContainerPathHealthz,
+					Port: intstr.FromString(consts.ContainerPortNameSlurmControllerProxy),
+				},
+			},
+			InitialDelaySeconds: 30,
+			PeriodSeconds:       10,
+		},
+		SecurityContext: &corev1.SecurityContext{
+			AppArmorProfile: common.ParseAppArmorProfile(container.AppArmorProfile),
+		},
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}

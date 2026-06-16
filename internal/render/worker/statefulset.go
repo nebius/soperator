@@ -144,8 +144,9 @@ func RenderNodeSetStatefulSet(
 	}
 
 	annotations := map[string]string{
-		"kruise.io/auto-generate-persistent-pod-state": "true",
-		"kruise.io/preferred-persistent-topology":      "kubernetes.io/hostname",
+		"kruise.io/auto-generate-persistent-pod-state":        "true",
+		"kruise.io/preferred-persistent-topology":             "kubernetes.io/hostname",
+		consts.AnnotationSoperatorRollingUpdateMaxUnavailable: nodeSet.StatefulSet.MaxUnavailable.String(),
 	}
 
 	pvcRetentionPolicy := nodeSet.PersistentVolumeClaimRetentionPolicy

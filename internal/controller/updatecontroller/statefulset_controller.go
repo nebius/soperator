@@ -19,15 +19,15 @@ package updatecontroller
 import (
 	"context"
 	"fmt"
-	"strings"
+	"sort"
 	"time"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -40,10 +40,11 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/slurmapi"
+	"nebius.ai/slurm-operator/internal/slurmproxy"
 )
 
 const (
-	labelToDelete = "kekus/todelete"
+	RollingUpdateControllerName = "rollingupdate"
 )
 
 const (
@@ -53,27 +54,28 @@ const (
 type RollingUpdateReconciler struct {
 	*reconciler.Reconciler
 
-	slurmAPIClients *slurmapi.ClientSet
+	slurmAPIClients   *slurmapi.ClientSet
+	slurmProxyClients *slurmproxy.ClientSet
 }
 
 func NewRollingUpdateReconciler(
 	client client.Client, scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
+	slurmProxyClients *slurmproxy.ClientSet,
 ) *RollingUpdateReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	return &RollingUpdateReconciler{
-		Reconciler:      r,
-		slurmAPIClients: slurmAPIClients,
+		Reconciler:        r,
+		slurmAPIClients:   slurmAPIClients,
+		slurmProxyClients: slurmProxyClients,
 	}
 }
 
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets/finalizers,verbs=update
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;update;delete
-//	+kubebuilder:rbac:groups=slurm.nebius.ai,resources=rollingupdatestate,verbs=get;list;watch;create;update;patch;delete
-//	+kubebuilder:rbac:groups=slurm.nebius.ai,resources=rollingupdatestate/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -87,13 +89,11 @@ func (r *RollingUpdateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	sts := &kruisev1b1.StatefulSet{}
 	err := r.Get(ctx, req.NamespacedName, sts)
 	if err != nil {
-		if client.IgnoreNotFound(err) != nil {
-			return ctrl.Result{}, client.IgnoreNotFound(err)
-		}
 		if client.IgnoreNotFound(err) == nil {
 			logger.Info("statefulset not found, might be deleted", "namespace", req.Namespace, "name", req.Name)
 			return ctrl.Result{}, nil
 		}
+		return ctrl.Result{}, err
 	}
 
 	labels := sts.GetLabels()
@@ -169,79 +169,154 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 ) error {
 	logger := log.FromContext(ctx).WithName("rolling-update-reconciler")
 
-	slurmNodesToReboot := []string{}
+	if len(outdatedPods) == 0 {
+		logger.Info("no outdated pods found", "namespace", sts.Namespace, "name", sts.Name)
+		return nil
+	}
+
+	slurmClient, ok := r.slurmAPIClients.GetClient(types.NamespacedName{
+		Namespace: sts.Namespace,
+		Name:      clusterName,
+	})
+	if !ok {
+		logger.Info("no slurm api client", "namespace", sts.Namespace, "clusterName", clusterName)
+		return fmt.Errorf("no slurm api client for %s/%s", sts.Namespace, clusterName)
+	}
+
+	if r.slurmProxyClients == nil {
+		return fmt.Errorf("slurm controller proxy client set is not configured")
+	}
+	slurmProxyClient, ok := r.slurmProxyClients.GetClient(types.NamespacedName{
+		Namespace: sts.Namespace,
+		Name:      clusterName,
+	})
+	if !ok {
+		logger.Info("no slurm controller proxy client", "namespace", sts.Namespace, "clusterName", clusterName)
+		return fmt.Errorf("no slurm controller proxy client for %s/%s", sts.Namespace, clusterName)
+	}
+
+	sort.Slice(outdatedPods, func(i, j int) bool {
+		return outdatedPods[i].Name < outdatedPods[j].Name
+	})
+
+	type rebootCandidate struct {
+		pod       corev1.Pod
+		slurmNode slurmapi.Node
+	}
+
+	candidates := make([]rebootCandidate, 0, len(outdatedPods))
+	inFlightReady := 0
 	for _, pod := range outdatedPods {
-		if pod.Labels[labelToDelete] == "true" {
-			if err := r.Delete(ctx, &pod); err != nil {
-				return err
-			}
-			continue
-		}
-
-		slurmClient, ok := r.slurmAPIClients.GetClient(types.NamespacedName{
-			Namespace: sts.Namespace,
-			Name:      clusterName,
-		})
-		if !ok {
-			logger.Info("no slurm clients", "namespace", sts.Namespace, "clusterName", clusterName)
-			return fmt.Errorf("no slurm clients")
-		}
-
 		slurmNode, err := slurmClient.GetNode(ctx, pod.Name)
 		if err != nil {
 			return err
 		}
 
 		if slurmNode.IsRebootIssuedState() || slurmNode.IsRebootRequestedState() {
+			if podReady(&pod) {
+				inFlightReady++
+			}
 			continue
 		}
 
-		if pod.Labels[labelToDelete] != "True" {
+		candidates = append(candidates, rebootCandidate{pod: pod, slurmNode: slurmNode})
+	}
+
+	budget := rebootBudget(sts)
+	unavailable := unavailableReplicas(sts)
+	availableSlots := budget - unavailable - inFlightReady
+	if availableSlots <= 0 {
+		logger.Info(
+			"rolling update budget is exhausted",
+			"budget", budget,
+			"unavailable", unavailable,
+			"inFlightReady", inFlightReady,
+		)
+		return nil
+	}
+
+	slurmNodesToReboot := make([]string, 0, availableSlots)
+	for _, candidate := range candidates {
+		if len(slurmNodesToReboot) >= availableSlots {
+			break
+		}
+
+		pod := candidate.pod
+		if pod.Labels[consts.LabelSoperatorDeleteAfterReboot] != consts.LabelSoperatorRollingUpdateValue {
+			patchBase := pod.DeepCopy()
 			if pod.Labels == nil {
 				pod.Labels = map[string]string{}
 			}
-			pod.Labels[labelToDelete] = "True"
-			if err := r.Update(ctx, &pod); err != nil {
-				return err
+			pod.Labels[consts.LabelSoperatorDeleteAfterReboot] = consts.LabelSoperatorRollingUpdateValue
+			if err := r.Patch(ctx, &pod, client.MergeFrom(patchBase)); err != nil {
+				return fmt.Errorf("label pod %s/%s for reboot handoff: %w", pod.Namespace, pod.Name, err)
 			}
 		}
 
-		slurmNodesToReboot = append(slurmNodesToReboot, slurmNode.Name)
+		slurmNodesToReboot = append(slurmNodesToReboot, candidate.slurmNode.Name)
 	}
 
-	rebooterCronJob := &batchv1.CronJob{}
-	err := r.Get(ctx, types.NamespacedName{
-		Namespace: sts.Namespace,
-		Name:      "rebooter",
-	}, rebooterCronJob)
-	if err != nil {
-		return err
+	if len(slurmNodesToReboot) == 0 {
+		logger.Info("all outdated pods already have reboot requested", "namespace", sts.Namespace, "name", sts.Name)
+		return nil
 	}
 
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:    rebooterCronJob.Namespace,
-			GenerateName: rebooterCronJob.Name + "-",
-			Labels:       rebooterCronJob.Spec.JobTemplate.Labels,
-			Annotations:  rebooterCronJob.Spec.JobTemplate.Annotations,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(rebooterCronJob, batchv1.SchemeGroupVersion.WithKind("CronJob")),
-			},
-		},
-		Spec: *rebooterCronJob.Spec.JobTemplate.Spec.DeepCopy(),
-	}
-	appendSlurmNodeEnv(job, slurmNodesToReboot)
-
-	if err := r.Create(ctx, job); err != nil {
-		return err
-	}
-	if err := r.waitForJobCompletion(ctx, client.ObjectKeyFromObject(job)); err != nil {
-		return err
+	if err := slurmProxyClient.RebootNodes(ctx, slurmproxy.RebootNodesRequest{
+		Nodes:     slurmNodesToReboot,
+		Reason:    slurmproxy.DefaultReason,
+		NextState: slurmproxy.RebootNextStateResume,
+	}); err != nil {
+		return fmt.Errorf("schedule slurm reboot through controller proxy: %w", err)
 	}
 
-	logger.Info("oki poki")
+	logger.Info("scheduled slurm reboot through controller proxy", "nodes", slurmNodesToReboot)
 
 	return nil
+}
+
+func rebootBudget(sts *kruisev1b1.StatefulSet) int {
+	replicas := defaultSTSReplicasCount
+	if sts.Spec.Replicas != nil {
+		replicas = *sts.Spec.Replicas
+	}
+	if replicas <= 0 {
+		return 0
+	}
+
+	maxUnavailable := intstr.FromInt32(1)
+	if raw := sts.GetAnnotations()[consts.AnnotationSoperatorRollingUpdateMaxUnavailable]; raw != "" {
+		maxUnavailable = intstr.Parse(raw)
+	}
+
+	budget, err := intstr.GetScaledValueFromIntOrPercent(&maxUnavailable, int(replicas), false)
+	if err != nil || budget < 1 {
+		return 1
+	}
+	if budget > int(replicas) {
+		return int(replicas)
+	}
+	return budget
+}
+
+func unavailableReplicas(sts *kruisev1b1.StatefulSet) int {
+	replicas := defaultSTSReplicasCount
+	if sts.Spec.Replicas != nil {
+		replicas = *sts.Spec.Replicas
+	}
+	unavailable := replicas - sts.Status.ReadyReplicas
+	if unavailable < 0 {
+		return 0
+	}
+	return int(unavailable)
+}
+
+func podReady(pod *corev1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady {
+			return condition.Status == corev1.ConditionTrue
+		}
+	}
+	return false
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -253,56 +328,24 @@ func (r *RollingUpdateReconciler) SetupWithManager(
 
 	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(&kruisev1b1.StatefulSet{}, builder.WithPredicates(predicate.Funcs{
-			CreateFunc: func(tce event.TypedCreateEvent[client.Object]) bool { return true },
-			// TODO: update only in case of label added
-			UpdateFunc:  func(tue event.TypedUpdateEvent[client.Object]) bool { return false },
+			CreateFunc: func(tce event.TypedCreateEvent[client.Object]) bool {
+				return rollingUpdateEnabled(tce.Object)
+			},
+			UpdateFunc: func(tue event.TypedUpdateEvent[client.Object]) bool {
+				return rollingUpdateEnabled(tue.ObjectNew)
+			},
 			DeleteFunc:  func(tde event.TypedDeleteEvent[client.Object]) bool { return false },
 			GenericFunc: func(tge event.TypedGenericEvent[client.Object]) bool { return false },
 		})).
-		Named("kekus").
+		Named(RollingUpdateControllerName).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout))
 
 	return controllerBuilder.Complete(r)
 }
 
-func appendSlurmNodeEnv(job *batchv1.Job, slurmNodes []string) {
-
-	envVar := corev1.EnvVar{Name: "SLURM_NODES", Value: strings.Join(slurmNodes, ",")}
-
-	for i := range job.Spec.Template.Spec.InitContainers {
-		job.Spec.Template.Spec.InitContainers[i].Env = append(job.Spec.Template.Spec.InitContainers[i].Env, envVar)
+func rollingUpdateEnabled(obj client.Object) bool {
+	if obj == nil {
+		return false
 	}
-	for i := range job.Spec.Template.Spec.Containers {
-		job.Spec.Template.Spec.Containers[i].Env = append(job.Spec.Template.Spec.Containers[i].Env, envVar)
-	}
-}
-
-func (r *RollingUpdateReconciler) waitForJobCompletion(ctx context.Context, key client.ObjectKey) error {
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		job := &batchv1.Job{}
-		if err := r.Get(ctx, key, job); err != nil {
-			return err
-		}
-
-		for _, condition := range job.Status.Conditions {
-			if condition.Status != corev1.ConditionTrue {
-				continue
-			}
-			switch condition.Type {
-			case batchv1.JobComplete, batchv1.JobSuccessCriteriaMet:
-				return nil
-			case batchv1.JobFailed, batchv1.JobFailureTarget:
-				return fmt.Errorf("job %s/%s failed: %s", job.Namespace, job.Name, condition.Message)
-			}
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-		}
-	}
+	return obj.GetLabels()[consts.LabelSoperatorRollingUpdateEnabled] == consts.LabelSoperatorRollingUpdateValue
 }

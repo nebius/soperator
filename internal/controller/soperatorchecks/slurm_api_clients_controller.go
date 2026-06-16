@@ -21,6 +21,7 @@ import (
 	"nebius.ai/slurm-operator/internal/jwt"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/slurmapi"
+	"nebius.ai/slurm-operator/internal/slurmproxy"
 )
 
 var (
@@ -30,7 +31,8 @@ var (
 type SlurmAPIClientsController struct {
 	*reconciler.Reconciler
 
-	slurmAPIClients *slurmapi.ClientSet
+	slurmAPIClients   *slurmapi.ClientSet
+	slurmProxyClients *slurmproxy.ClientSet
 }
 
 func NewSlurmAPIClientsController(
@@ -38,12 +40,14 @@ func NewSlurmAPIClientsController(
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
+	slurmProxyClients *slurmproxy.ClientSet,
 ) *SlurmAPIClientsController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
 	return &SlurmAPIClientsController{
-		Reconciler:      r,
-		slurmAPIClients: slurmAPIClients,
+		Reconciler:        r,
+		slurmAPIClients:   slurmAPIClients,
+		slurmProxyClients: slurmProxyClients,
 	}
 }
 
@@ -75,7 +79,8 @@ func (c *SlurmAPIClientsController) Reconcile(ctx context.Context, req ctrl.Requ
 
 	logger.Info("Adding new slurm api client")
 
-	jwtToken := jwt.NewToken(c.Client).For(req.NamespacedName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
+	tokenRegistry := jwt.NewTokenRegistry().Build()
+	jwtToken := jwt.NewToken(c.Client).For(req.NamespacedName, "root").WithRegistry(tokenRegistry)
 	slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, req.Name), req.Namespace)
 	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
 	if err != nil {
@@ -84,6 +89,23 @@ func (c *SlurmAPIClientsController) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	c.slurmAPIClients.AddClient(req.NamespacedName, slurmAPIClient)
+
+	if c.slurmProxyClients != nil {
+		proxyToken := jwt.NewToken(c.Client).For(req.NamespacedName, slurmproxy.DefaultClientUser).WithRegistry(tokenRegistry)
+		proxyServer := fmt.Sprintf(
+			"http://%s.%s:%d",
+			naming.BuildServiceName(consts.ComponentTypeController, req.Name),
+			req.Namespace,
+			consts.ContainerPortSlurmControllerProxy,
+		)
+		slurmProxyClient, err := slurmproxy.NewClient(proxyServer, proxyToken, slurmapi.DefaultHTTPClient())
+		if err != nil {
+			logger.Error(err, "failed to create slurm controller proxy client")
+			return ctrl.Result{}, err
+		}
+
+		c.slurmProxyClients.AddClient(req.NamespacedName, slurmProxyClient)
+	}
 
 	return ctrl.Result{}, nil
 }

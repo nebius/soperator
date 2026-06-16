@@ -347,7 +347,7 @@ func (r NodeSetReconciler) executeReconciliation(
 				stepLogger := log.FromContext(stepCtx)
 				stepLogger.V(1).Info("Reconciling")
 
-				desired := worker.RenderRole(nodeSet.Namespace, cluster.Name, nodeSet)
+				desired := worker.RenderRole(nodeSet.Namespace, cluster.Name, nodeSetValues)
 				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
 				stepLogger.V(1).Info("Rendered")
 

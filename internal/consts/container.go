@@ -1,22 +1,23 @@
 package consts
 
 const (
-	ContainerNameSlurmctld         = SlurmctldName
-	ContainerNameAccounting        = AccountingName
-	ContainerNameMunge             = Munge
-	ContainerNameSSSD              = "sssd"
-	ContainerNameSlurmd            = SlurmdName
-	ContainerNameREST              = Slurmrestd
-	ContainerNameSshd              = SshdName
-	ContainerNameWorkerInit        = "worker-init"
-	ContainerNameDockerProxy       = "docker-proxy"
-	ContainerNameWaitForDatabase   = "wait-for-database"
-	ContainerNameWaitForAccounting = "wait-for-accounting"
-	ContainerNamePopulateJail      = populateJail
-	ContainerNameExporter          = Exporter
-	ContainerNameRebooter          = "rebooter"
-	ContainerNameCustom            = "custom-container"
-	ContainerNameSConfigController = SConfigControllerName
+	ContainerNameSlurmctld            = SlurmctldName
+	ContainerNameSlurmControllerProxy = "slurm-controller-proxy"
+	ContainerNameAccounting           = AccountingName
+	ContainerNameMunge                = Munge
+	ContainerNameSSSD                 = "sssd"
+	ContainerNameSlurmd               = SlurmdName
+	ContainerNameREST                 = Slurmrestd
+	ContainerNameSshd                 = SshdName
+	ContainerNameWorkerInit           = "worker-init"
+	ContainerNameDockerProxy          = "docker-proxy"
+	ContainerNameWaitForDatabase      = "wait-for-database"
+	ContainerNameWaitForAccounting    = "wait-for-accounting"
+	ContainerNamePopulateJail         = populateJail
+	ContainerNameExporter             = Exporter
+	ContainerNameRebooter             = "rebooter"
+	ContainerNameCustom               = "custom-container"
+	ContainerNameSConfigController    = SConfigControllerName
 
 	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"
 
@@ -27,4 +28,8 @@ const (
 	ContainerPortNameMonitoring = "monitoring"
 	ContainerPortMonitoring     = 8081
 	ContainerPathMonitoring     = "/metrics"
+	ContainerPathHealthz        = "/healthz"
+
+	ContainerPortNameSlurmControllerProxy = "slurmctl-proxy"
+	ContainerPortSlurmControllerProxy     = 6821
 )

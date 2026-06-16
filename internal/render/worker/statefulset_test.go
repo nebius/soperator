@@ -682,6 +682,13 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 				assert.Equal(t, tt.expectedMaxUnavailable, *result.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
 					"UpdateStrategy.RollingUpdate.MaxUnavailable governs the update path and must not be affected")
 			}
+
+			assert.Equal(
+				t,
+				tt.expectedMaxUnavailable.String(),
+				result.Annotations[consts.AnnotationSoperatorRollingUpdateMaxUnavailable],
+				"rolling update controller annotation should preserve NodeSet.MaxUnavailable",
+			)
 		})
 	}
 }

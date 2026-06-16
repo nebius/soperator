@@ -30,6 +30,20 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -v -o power-manager ./cmd/powermanager
 
+FROM go-base AS slurmcontrollerproxy_builder
+
+ARG GO_LDFLAGS=""
+ARG CGO_ENABLED=0
+ARG GOOS=linux
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY cmd/slurmcontrollerproxy cmd/slurmcontrollerproxy
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
+    go build -v -o slurm-controller-proxy ./cmd/slurmcontrollerproxy
+
 # https://github.com/nebius/ml-containers/pull/81
 FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260421092341 AS controller_slurmctld
 
@@ -54,6 +68,9 @@ RUN mkdir -p /var/log/slurm/multilog && \
 COPY --from=powermanager_builder /build/power-manager /opt/soperator/bin/power-manager
 RUN chmod 755 /opt/soperator/bin/power-manager
 
+COPY --from=slurmcontrollerproxy_builder /build/slurm-controller-proxy /opt/soperator/bin/slurm-controller-proxy
+RUN chmod 755 /opt/soperator/bin/slurm-controller-proxy
+
 # Copy power management scripts for Slurm ResumeProgram/SuspendProgram
 COPY images/controller/power_resume.sh /opt/soperator/bin/power_resume.sh
 COPY images/controller/power_suspend.sh /opt/soperator/bin/power_suspend.sh
@@ -63,4 +80,3 @@ RUN chmod 755 /opt/soperator/bin/power_resume.sh /opt/soperator/bin/power_suspen
 COPY images/controller/slurmctld_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmctld_entrypoint.sh
 ENTRYPOINT ["/opt/bin/slurm/slurmctld_entrypoint.sh"]
-

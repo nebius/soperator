@@ -45,4 +45,5 @@ const (
 
 	LabelSoperatorRollingUpdateEnabled = K8sGroupNameSoperator + "/rolling-update-enabled"
 	LabelSoperatorRollingUpdateValue   = "true"
+	LabelSoperatorDeleteAfterReboot    = K8sGroupNameSoperator + "/delete-after-reboot"
 )

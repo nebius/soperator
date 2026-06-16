@@ -50,6 +50,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controllersenabled"
 	metricsopts "nebius.ai/slurm-operator/internal/metrics"
 	"nebius.ai/slurm-operator/internal/slurmapi"
+	"nebius.ai/slurm-operator/internal/slurmproxy"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	//+kubebuilder:scaffold:imports
@@ -275,6 +276,7 @@ func main() {
 	}
 
 	slurmAPIClients := slurmapi.NewClientSet(ctx)
+	slurmProxyClients := slurmproxy.NewClientSet()
 
 	if controllersSet.Enabled("slurmapiclients") {
 		if err = soperatorchecks.NewSlurmAPIClientsController(
@@ -282,6 +284,7 @@ func main() {
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
 			slurmAPIClients,
+			slurmProxyClients,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
 		}

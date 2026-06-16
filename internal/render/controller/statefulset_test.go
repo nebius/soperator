@@ -176,8 +176,8 @@ func TestRenderStatefulSet(t *testing.T) {
 
 			// Check containers
 			containers := result.Spec.Template.Spec.Containers
-			if len(containers) != 1 {
-				t.Errorf("Expected 1 container, got %d", len(containers))
+			if len(containers) != 2 {
+				t.Errorf("Expected 2 containers, got %d", len(containers))
 			} else {
 				container := containers[0]
 				if container.Name != consts.ContainerNameSlurmctld {
@@ -185,6 +185,14 @@ func TestRenderStatefulSet(t *testing.T) {
 				}
 				if container.Image != tt.controller.ContainerSlurmctld.NodeContainer.Image {
 					t.Errorf("Container image = %v, want %v", container.Image, tt.controller.ContainerSlurmctld.NodeContainer.Image)
+				}
+
+				proxyContainer := containers[1]
+				if proxyContainer.Name != consts.ContainerNameSlurmControllerProxy {
+					t.Errorf("Container name = %v, want %v", proxyContainer.Name, consts.ContainerNameSlurmControllerProxy)
+				}
+				if proxyContainer.Image != tt.controller.ContainerSlurmctld.NodeContainer.Image {
+					t.Errorf("Container image = %v, want %v", proxyContainer.Image, tt.controller.ContainerSlurmctld.NodeContainer.Image)
 				}
 			}
 
@@ -290,6 +298,9 @@ func TestRenderStatefulSet_SSSD(t *testing.T) {
 	}
 	assert.Contains(t, mountNames, consts.VolumeNameSSSDConf)
 	assert.Contains(t, mountNames, consts.VolumeNameSSSDSocket)
+
+	proxy := result.Spec.Template.Spec.Containers[1]
+	assert.Equal(t, consts.ContainerNameSlurmControllerProxy, proxy.Name)
 }
 
 func TestRenderStatefulSetWithMaintenance(t *testing.T) {
