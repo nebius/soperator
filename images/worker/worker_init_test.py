@@ -137,6 +137,44 @@ class TestFormatSlurmTopology(unittest.TestCase):
         )
         self.assertEqual(result, "topology=default:block1")
 
+    def test_fabric_is_top_switch_for_tier_path(self):
+        """A configured fabric is used as the top-of-tree switch instead of "root"."""
+        result = worker_init.format_slurm_topology(
+            '{"tier-1":"leaf01","tier-2":"spine01"}',
+            worker_init.TOPOLOGY_PLUGIN_TREE,
+            "fab-a",
+        )
+        self.assertEqual(result, "topology=default:fab-a:spine01:leaf01")
+
+    def test_fabric_key_value_and_bare_forms(self):
+        """The fabric also applies to key/value and bare-name inputs."""
+        self.assertEqual(
+            worker_init.format_slurm_topology(
+                "tier-1=leaf01", worker_init.TOPOLOGY_PLUGIN_TREE, "fab-a"
+            ),
+            "topology=default:fab-a:leaf01",
+        )
+        self.assertEqual(
+            worker_init.format_slurm_topology(
+                "leaf01", worker_init.TOPOLOGY_PLUGIN_TREE, "fab-a"
+            ),
+            "topology=default:fab-a:leaf01",
+        )
+
+    def test_fabric_empty_defaults_to_root(self):
+        """An empty/whitespace fabric falls back to the legacy "root" top switch."""
+        result = worker_init.format_slurm_topology(
+            '{"tier-1":"leaf01"}', worker_init.TOPOLOGY_PLUGIN_TREE, "  "
+        )
+        self.assertEqual(result, "topology=default:root:leaf01")
+
+    def test_fabric_ignored_for_block_topology(self):
+        """Block topology has no root hierarchy, so the fabric is not applied."""
+        result = worker_init.format_slurm_topology(
+            '{"tier-0":"block1"}', worker_init.TOPOLOGY_PLUGIN_BLOCK, "fab-a"
+        )
+        self.assertEqual(result, "topology=default:block1")
+
     def test_named_block_topology_preserves_topology_name(self):
         """Block topology with an explicit topology name is preserved."""
         result = worker_init.format_slurm_topology(
@@ -320,6 +358,26 @@ class TestGetEnvironmentVariables(unittest.TestCase):
         with mock.patch.dict(os.environ, env, clear=True):
             with self.assertRaises(KeyError):
                 worker_init.get_node_name()
+
+    def test_get_topology_fabric_default(self):
+        """Get fabric returns "root" when the env var is not set."""
+        env = os.environ.copy()
+        env.pop("SLURM_TOPOLOGY_FABRIC", None)
+        with mock.patch.dict(os.environ, env, clear=True):
+            result = worker_init.get_topology_fabric()
+        self.assertEqual(result, "root")
+
+    def test_get_topology_fabric_custom(self):
+        """Get fabric returns the configured value when set."""
+        with mock.patch.dict(os.environ, {"SLURM_TOPOLOGY_FABRIC": "fab-a"}):
+            result = worker_init.get_topology_fabric()
+        self.assertEqual(result, "fab-a")
+
+    def test_get_topology_fabric_empty_defaults_to_root(self):
+        """An empty fabric env var falls back to "root"."""
+        with mock.patch.dict(os.environ, {"SLURM_TOPOLOGY_FABRIC": "  "}):
+            result = worker_init.get_topology_fabric()
+        self.assertEqual(result, "root")
 
     def test_get_topology_path_default(self):
         """Get topology path returns default when not set."""
@@ -746,6 +804,46 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
 
         mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
         mock_apply.assert_called_once_with("worker-0", "topology=default:unknown")
+
+    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
+    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
+    @mock.patch.dict(
+        os.environ, {"HOSTNAME": "worker-0", "SLURM_TOPOLOGY_FABRIC": "fab-a"}
+    )
+    def test_non_gpu_applies_per_fabric_unknown_topology(
+        self, mock_gpu, mock_apply, mock_wait_hostname
+    ):
+        """Non-GPU node with a fabric joins <fabric>:<fabric>.unknown."""
+        with mock.patch(
+            "worker_init.get_topology_plugin",
+            return_value=worker_init.TOPOLOGY_PLUGIN_TREE,
+        ):
+            worker_init.wait_for_topology()
+
+        mock_apply.assert_called_once_with(
+            "worker-0", "topology=default:fab-a:fab-a.unknown"
+        )
+
+    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
+    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
+    @mock.patch.dict(
+        os.environ, {"HOSTNAME": "worker-0", "SLURM_TOPOLOGY_FABRIC": "fab-a"}
+    )
+    def test_non_gpu_applies_per_fabric_unknown_block(
+        self, mock_gpu, mock_apply, mock_wait_hostname
+    ):
+        """Non-GPU node with a fabric in block mode joins the <fabric>.unknown block."""
+        with mock.patch(
+            "worker_init.get_topology_plugin",
+            return_value=worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        ):
+            worker_init.wait_for_topology()
+
+        mock_apply.assert_called_once_with(
+            "worker-0", "topology=default:fab-a.unknown"
+        )
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")

@@ -67,6 +67,7 @@ func RenderNodeSetStatefulSet(
 			nodeSet.GPU.Enabled,
 			topologyTimeOut,
 			topologyPlugin,
+			nodeSet.TopologyFabric,
 		),
 	)
 

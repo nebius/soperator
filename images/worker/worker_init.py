@@ -200,6 +200,29 @@ def get_topology_poll_interval() -> int:
     return int(os.environ.get("TOPOLOGY_POLL_INTERVAL", "5"))
 
 
+def get_topology_fabric() -> str:
+    """Get the IB fabric / top-of-tree switch name for this node's NodeSet.
+
+    Must match the operator's per-fabric root switch (spec.topology.fabric), which the operator
+    renders as the parentless switch in topology.conf. Defaults to "root" for NodeSets without an
+    explicit fabric, matching the operator's default single-root tree.
+    """
+    fabric: str = os.environ.get("SLURM_TOPOLOGY_FABRIC", "").strip()
+    return fabric or "root"
+
+
+def unknown_switch_name(fabric: str) -> str:
+    """Return the catch-all switch/block name for nodes of the given fabric without IB labels.
+
+    Must match the operator's unknownSwitchName: the default fabric keeps the legacy "unknown"
+    name; named fabrics use "<fabric>.unknown".
+    """
+    fabric = (fabric or "root").strip()
+    if fabric == "root":
+        return "unknown"
+    return f"{fabric}.unknown"
+
+
 def get_topology_plugin(slurm_config_path: Path = SLURM_CONFIG_PATH) -> str:
     """Get the configured Slurm topology plugin."""
     topology_plugin: str = os.environ.get("SLURM_TOPOLOGY_PLUGIN", "").strip()
@@ -434,7 +457,7 @@ def read_topology_for_node(topology_path: Path, node_name: str) -> str:
 
 
 def format_slurm_topology(
-    topology: str, topology_plugin: str = TOPOLOGY_PLUGIN_TREE
+    topology: str, topology_plugin: str = TOPOLOGY_PLUGIN_TREE, fabric: str = "root"
 ) -> str:
     """
     Format topology string for Slurm --conf option.
@@ -470,6 +493,7 @@ def format_slurm_topology(
     topology: str = topology.strip()
     topology_plugin: str = (topology_plugin or TOPOLOGY_PLUGIN_TREE).strip().lower()
     block_topology: bool = topology_plugin == TOPOLOGY_PLUGIN_BLOCK
+    fabric: str = (fabric or "root").strip()
 
     if topology.startswith("{"):
         try:
@@ -478,7 +502,7 @@ def format_slurm_topology(
             if block_topology:
                 return _format_block_topology(parts)
 
-            return _format_tier_topology(parts)
+            return _format_tier_topology(parts, fabric)
         except json.JSONDecodeError:
             logger.warning("Failed to parse topology as JSON: %s", topology)
 
@@ -489,10 +513,10 @@ def format_slurm_topology(
 
         colon_parts: list[str] = topology.split(":")
 
-        # "name:leaf" -> add root: "topology=name:root:leaf"
+        # "name:leaf" -> add the fabric root: "topology=name:<fabric>:leaf"
         # "name:sw1:sw2:sw3" -> already has intermediates, keep as-is
         if len(colon_parts) == 2:
-            return f"topology={colon_parts[0]}:root:{colon_parts[1]}"
+            return f"topology={colon_parts[0]}:{fabric}:{colon_parts[1]}"
 
         return f"topology={topology}"
 
@@ -503,12 +527,12 @@ def format_slurm_topology(
         if block_topology:
             return _format_block_topology(parts)
 
-        return _format_tier_topology(parts)
+        return _format_tier_topology(parts, fabric)
 
     if block_topology:
         return f"topology=default:{topology}"
 
-    return f"topology=default:root:{topology}"
+    return f"topology=default:{fabric}:{topology}"
 
 
 def _parse_key_value_topology(topology: str) -> dict[str, str]:
@@ -544,12 +568,13 @@ def _format_block_topology(parts: dict[str, str]) -> str:
     return f"topology=default:{block_name}"
 
 
-def _format_tier_topology(parts: dict[str, str]) -> str:
+def _format_tier_topology(parts: dict[str, str], fabric: str = "root") -> str:
     """
     Format tier-based topology from a dictionary.
 
     Args:
         parts: Dictionary with tier keys like {"tier-1": "switch1", "tier-2": "rack1"}
+        fabric: IB fabric / top-of-tree switch name (the operator's per-fabric root).
 
     Returns:
         Formatted Slurm Topology string with the full switch hierarchy.
@@ -577,15 +602,17 @@ def _format_tier_topology(parts: dict[str, str]) -> str:
             except (ValueError, IndexError):
                 continue
 
+    fabric = (fabric or "root").strip()
+
     if tier_keys:
         # Sort descending: highest tier first (spine/root-side), lowest last (leaf)
         tier_keys.sort(key=lambda x: x[0], reverse=True)
         switches: list[str] = [parts[k] for _, k in tier_keys]
-        return f"topology=default:root:{':'.join(switches)}"
+        return f"topology=default:{fabric}:{':'.join(switches)}"
 
     if parts:
         first_value: str = next(iter(parts.values()))
-        return f"topology=default:root:{first_value}"
+        return f"topology=default:{fabric}:{first_value}"
 
     return ""
 
@@ -653,9 +680,12 @@ def wait_for_topology() -> None:
     topology_plugin: str = get_topology_plugin()
 
     if not is_gpu_enabled():
-        topology: str = "topology=default:root:unknown"
+        fabric: str = get_topology_fabric()
+        unknown: str = unknown_switch_name(fabric)
         if topology_plugin == TOPOLOGY_PLUGIN_BLOCK:
-            topology = "topology=default:unknown"
+            topology: str = f"topology=default:{unknown}"
+        else:
+            topology = f"topology=default:{fabric}:{unknown}"
 
         logger.info(
             "NODESET_GPU_ENABLED is not set to 'true', "
@@ -721,7 +751,9 @@ def wait_for_topology() -> None:
         )
         time.sleep(poll_interval)
 
-    topology: str = format_slurm_topology(raw_topology, topology_plugin)
+    topology: str = format_slurm_topology(
+        raw_topology, topology_plugin, get_topology_fabric()
+    )
     if not topology:
         logger.error("Failed to format topology from raw data: %s", raw_topology)
         sys.exit(1)
