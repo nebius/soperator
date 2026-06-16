@@ -60,6 +60,11 @@ type SlurmNodeSet struct {
 	EphemeralNodes               *bool
 	EphemeralTopologyWaitTimeout int32
 
+	// TopologyFabric is the IB fabric / top-of-tree switch name (spec.topology.fabric). It is
+	// passed to worker-init so the dynamic topology path it declares matches the operator's
+	// per-fabric root switch in topology.conf.
+	TopologyFabric string
+
 	ActiveNodes []int32
 }
 
@@ -137,6 +142,7 @@ func BuildSlurmNodeSetFrom(
 		//
 		EphemeralNodes:               nsSpec.EphemeralNodes,
 		EphemeralTopologyWaitTimeout: nsSpec.EphemeralTopologyWaitTimeout,
+		TopologyFabric:               nsSpec.Topology.Fabric,
 	}
 
 	// region Submounts
