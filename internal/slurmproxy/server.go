@@ -223,15 +223,6 @@ func (r *RebootNodesRequest) normalizeAndValidate() error {
 		return fmt.Errorf("reason is too long: got %d bytes, max %d", len(r.Reason), maxReasonLength)
 	}
 
-	if r.NextState == "" {
-		r.NextState = RebootNextStateResume
-	}
-	switch r.NextState {
-	case RebootNextStateResume, RebootNextStateDown:
-	default:
-		return fmt.Errorf("unsupported nextState %q", r.NextState)
-	}
-
 	return nil
 }
 

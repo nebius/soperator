@@ -82,7 +82,6 @@ func TestRebootNodesRequestValidate(t *testing.T) {
 
 	require.NoError(t, req.normalizeAndValidate())
 	require.Equal(t, DefaultReason, req.Reason)
-	require.Equal(t, RebootNextStateResume, req.NextState)
 }
 
 func signedToken(t *testing.T, key []byte, user string) string {

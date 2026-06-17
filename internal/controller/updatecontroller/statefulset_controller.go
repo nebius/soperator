@@ -242,12 +242,12 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 		}
 
 		pod := candidate.pod
-		if pod.Labels[consts.LabelSoperatorDeleteAfterReboot] != consts.LabelSoperatorRollingUpdateValue {
+		if pod.Labels[consts.LabelSoperatorDeleteCandidate] != consts.LabelSoperatorDeleteCandidateValue {
 			patchBase := pod.DeepCopy()
 			if pod.Labels == nil {
 				pod.Labels = map[string]string{}
 			}
-			pod.Labels[consts.LabelSoperatorDeleteAfterReboot] = consts.LabelSoperatorRollingUpdateValue
+			pod.Labels[consts.LabelSoperatorDeleteCandidate] = consts.LabelSoperatorDeleteCandidateValue
 			if err := r.Patch(ctx, &pod, client.MergeFrom(patchBase)); err != nil {
 				return fmt.Errorf("label pod %s/%s for reboot handoff: %w", pod.Namespace, pod.Name, err)
 			}
@@ -262,9 +262,8 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 	}
 
 	if err := slurmProxyClient.RebootNodes(ctx, slurmproxy.RebootNodesRequest{
-		Nodes:     slurmNodesToReboot,
-		Reason:    slurmproxy.DefaultReason,
-		NextState: slurmproxy.RebootNextStateResume,
+		Nodes:  slurmNodesToReboot,
+		Reason: slurmproxy.DefaultReason,
 	}); err != nil {
 		return fmt.Errorf("schedule slurm reboot through controller proxy: %w", err)
 	}

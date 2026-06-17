@@ -10,17 +10,9 @@ const (
 	EndpointRebootNodes = "/v1/nodes/reboot"
 )
 
-type RebootNextState string
-
-const (
-	RebootNextStateResume RebootNextState = "RESUME"
-	RebootNextStateDown   RebootNextState = "DOWN"
-)
-
 type RebootNodesRequest struct {
-	Nodes     []string        `json:"nodes"`
-	Reason    string          `json:"reason,omitempty"`
-	NextState RebootNextState `json:"nextState,omitempty"`
+	Nodes  []string `json:"nodes"`
+	Reason string   `json:"reason,omitempty"`
 }
 
 type RebootNodesResponse struct {

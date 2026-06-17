@@ -22,16 +22,21 @@ NS="$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)"
 TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
 CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 POD_URL="https://kubernetes.default.svc/api/v1/namespaces/$NS/pods/$POD_NAME"
-DELETE_AFTER_REBOOT_LABEL="slurm.nebius.ai/delete-after-reboot"
+DELETE_CANDIDATE_LABEL="slurm.nebius.ai/delete-candidate"
+DELETE_CANDIDATE_LABEL_VALUE="true"
 
 if POD_JSON="$(curl -fsS --cacert "$CACERT" \
     -H "Authorization: Bearer $TOKEN" \
-    "$POD_URL")" && [[ "$POD_JSON" == *"\"$DELETE_AFTER_REBOOT_LABEL\":\"true\""* ]]; then
+    "$POD_URL")" && jq -e \
+        --arg label "$DELETE_CANDIDATE_LABEL" \
+        --arg value "$DELETE_CANDIDATE_LABEL_VALUE" \
+        '.metadata.labels[$label] == $value' \
+        <<<"$POD_JSON" >/dev/null; then
     curl -fsS --cacert "$CACERT" \
         -H "Authorization: Bearer $TOKEN" \
         -H "Content-Type: application/merge-patch+json" \
         -X PATCH \
-        -d "{\"metadata\":{\"labels\":{\"$DELETE_AFTER_REBOOT_LABEL\":\"false\"}}}" \
+        -d "{\"metadata\":{\"labels\":{\"$DELETE_CANDIDATE_LABEL\":\"false\"}}}" \
         "$POD_URL"
     curl -fsS --cacert "$CACERT" \
         -H "Authorization: Bearer $TOKEN" \

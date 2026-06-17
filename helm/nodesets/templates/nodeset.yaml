@@ -31,6 +31,8 @@ spec:
   maxUnavailable: {{ . }}
   {{- end }}
 
+  updateStrategy: {{ (.updateStrategy | default "rollingUpdate") | quote }}
+
   {{- with .maxConcurrentStartup }}
   maxConcurrentStartup: {{ . }}
   {{- end }}
