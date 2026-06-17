@@ -32,7 +32,7 @@ func RenderRole(namespace, clusterName string, nodeSet *values.SlurmNodeSet) rba
 				APIGroups:     []string{""},
 				Resources:     []string{"pods"},
 				ResourceNames: resourceNames,
-				Verbs:         []string{"get", "patch", "update", "delete"},
+				Verbs:         []string{"get", "patch"},
 			},
 		},
 	}

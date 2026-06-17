@@ -49,7 +49,7 @@ func TestRenderRole_ResourceNames(t *testing.T) {
 			role := worker.RenderRole("default", "soperator", tt.nodeSet)
 
 			assert.Len(t, role.Rules, 1)
-			assert.Equal(t, []string{"get", "patch", "update", "delete"}, role.Rules[0].Verbs)
+			assert.Equal(t, []string{"get", "patch"}, role.Rules[0].Verbs)
 			assert.Equal(t, tt.expectedPods, role.Rules[0].ResourceNames)
 			assert.Equal(t, consts.ComponentTypeNodeSet.String(), role.Labels[consts.LabelComponentKey])
 		})

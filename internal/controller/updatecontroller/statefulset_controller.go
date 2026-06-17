@@ -75,7 +75,7 @@ func NewRollingUpdateReconciler(
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets/finalizers,verbs=update
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;update;patch
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -174,6 +174,28 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 		return nil
 	}
 
+	sort.Slice(outdatedPods, func(i, j int) bool {
+		return outdatedPods[i].Name < outdatedPods[j].Name
+	})
+
+	podsToStop := make([]corev1.Pod, 0, len(outdatedPods))
+	deletedPods := 0
+	for _, pod := range outdatedPods {
+		if pod.Labels[consts.LabelSoperatorDeleteCandidate] != consts.LabelSoperatorDeleteCandidateValueDeleting {
+			podsToStop = append(podsToStop, pod)
+			continue
+		}
+
+		if err := r.Delete(ctx, &pod); client.IgnoreNotFound(err) != nil {
+			return fmt.Errorf("delete pod %s/%s marked as delete candidate: %w", pod.Namespace, pod.Name, err)
+		}
+		deletedPods++
+	}
+	if deletedPods > 0 {
+		logger.Info("deleted outdated pods marked as delete candidates", "count", deletedPods)
+		return nil
+	}
+
 	slurmClient, ok := r.slurmAPIClients.GetClient(types.NamespacedName{
 		Namespace: sts.Namespace,
 		Name:      clusterName,
@@ -195,18 +217,14 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 		return fmt.Errorf("no slurm controller proxy client for %s/%s", sts.Namespace, clusterName)
 	}
 
-	sort.Slice(outdatedPods, func(i, j int) bool {
-		return outdatedPods[i].Name < outdatedPods[j].Name
-	})
-
 	type rebootCandidate struct {
 		pod       corev1.Pod
 		slurmNode slurmapi.Node
 	}
 
-	candidates := make([]rebootCandidate, 0, len(outdatedPods))
+	candidates := make([]rebootCandidate, 0, len(podsToStop))
 	inFlightReady := 0
-	for _, pod := range outdatedPods {
+	for _, pod := range podsToStop {
 		slurmNode, err := slurmClient.GetNode(ctx, pod.Name)
 		if err != nil {
 			return err
@@ -242,12 +260,12 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 		}
 
 		pod := candidate.pod
-		if pod.Labels[consts.LabelSoperatorDeleteCandidate] != consts.LabelSoperatorDeleteCandidateValue {
+		if pod.Labels[consts.LabelSoperatorDeleteCandidate] != consts.LabelSoperatorDeleteCandidateValueStopping {
 			patchBase := pod.DeepCopy()
 			if pod.Labels == nil {
 				pod.Labels = map[string]string{}
 			}
-			pod.Labels[consts.LabelSoperatorDeleteCandidate] = consts.LabelSoperatorDeleteCandidateValue
+			pod.Labels[consts.LabelSoperatorDeleteCandidate] = consts.LabelSoperatorDeleteCandidateValueStopping
 			if err := r.Patch(ctx, &pod, client.MergeFrom(patchBase)); err != nil {
 				return fmt.Errorf("label pod %s/%s for reboot handoff: %w", pod.Namespace, pod.Name, err)
 			}

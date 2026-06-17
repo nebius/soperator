@@ -43,8 +43,9 @@ const (
 
 	AnnotationConfigHash = K8sGroupNameSoperator + "/config-hash"
 
-	LabelSoperatorRollingUpdateEnabled = K8sGroupNameSoperator + "/rolling-update-enabled"
-	LabelSoperatorRollingUpdateValue   = "true"
-	LabelSoperatorDeleteCandidate      = K8sGroupNameSoperator + "/delete-candidate"
-	LabelSoperatorDeleteCandidateValue = "true"
+	LabelSoperatorRollingUpdateEnabled         = K8sGroupNameSoperator + "/rolling-update-enabled"
+	LabelSoperatorRollingUpdateValue           = "true"
+	LabelSoperatorDeleteCandidate              = K8sGroupNameSoperator + "/delete-candidate"
+	LabelSoperatorDeleteCandidateValueStopping = "stopping"
+	LabelSoperatorDeleteCandidateValueDeleting = "deleting"
 )
