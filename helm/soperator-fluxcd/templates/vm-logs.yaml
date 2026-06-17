@@ -17,7 +17,7 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-victoriametrics
-      version: 0.9.*
+      version: {{ .Values.observability.vmLogs.version }}
   install:
     {{- toYaml .Values.observability.vmLogs.install | nindent 4 }}
   interval: {{ .Values.observability.vmLogs.interval }}
@@ -27,8 +27,8 @@ spec:
   upgrade:
     {{- toYaml .Values.observability.vmLogs.upgrade | nindent 4 }}
   values:
-  {{- if .Values.observability.vmStack.overrideValues }}
-    {{- toYaml .Values.observability.vmStack.overrideValues | nindent 4 }}
+  {{- if .Values.observability.vmLogs.overrideValues }}
+    {{- toYaml .Values.observability.vmLogs.overrideValues | nindent 4 }}
   {{- else }}
     dashboards:
       enabled: true
