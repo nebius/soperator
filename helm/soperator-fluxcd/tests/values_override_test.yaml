@@ -281,6 +281,23 @@ tests:
       - equal:
           path: spec.values.configMap.existingName
           value: opentelemetry-collector-nccl-profiles-agent
+      - equal:
+          path: spec.values.command.extraArgs[0]
+          value: --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress,filelog.allowFileDeletion
+
+  - it: should enable file deletion feature gate when delete after read is enabled
+    set:
+      observability.enabled: true
+      observability.ncclProfiles.enabled: true
+      observability.opentelemetry.metrics.enabled: false
+      observability.ncclProfiles.values.deleteAfterRead.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles
+    asserts:
+      - equal:
+          path: spec.values.command.extraArgs[0]
+          value: --feature-gates=filelog.allowFileDeletion
 
   - it: should use daemonset mode on worker nodes for node-local storage
     set:
@@ -397,9 +414,9 @@ tests:
       path: metadata.name
       value: RELEASE-NAME-otelcol-nccl-profiles-cm
     asserts:
-      - matchRegex:
+      - notMatchRegex:
           path: spec.values.resources[0].data.relay
-          pattern: 'delete_after_read: false'
+          pattern: 'delete_after_read'
       - notMatchRegex:
           path: spec.values.resources[0].data.relay
           pattern: 'delete_after_read_min_age'

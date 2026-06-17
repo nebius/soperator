@@ -77,8 +77,6 @@ spec:
               {{- if .Values.observability.ncclProfiles.values.deleteAfterRead.enabled }}
               delete_after_read: true
               delete_after_read_min_age: {{ .Values.observability.ncclProfiles.values.deleteAfterRead.minAge | default "1m" }}
-              {{- else }}
-              delete_after_read: false
               {{- end }}
               {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
               storage: file_storage
@@ -317,10 +315,17 @@ spec:
 
     useGOMEMLIMIT: {{ .Values.observability.ncclProfiles.values.useGoMemLimit | default true }}
 
+    {{- $featureGates := list }}
     {{- if .Values.observability.opentelemetry.metrics.enabled }}
+    {{- $featureGates = append $featureGates "-telemetry.UseLocalHostAsDefaultMetricsAddress" }}
+    {{- end }}
+    {{- if .Values.observability.ncclProfiles.values.deleteAfterRead.enabled }}
+    {{- $featureGates = append $featureGates "filelog.allowFileDeletion" }}
+    {{- end }}
+    {{- if $featureGates }}
     command:
       extraArgs:
-        - "--feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress"
+        - "--feature-gates={{ join "," $featureGates }}"
     {{- end }}
 
     ports:
