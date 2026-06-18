@@ -273,6 +273,98 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 	}
 }
 
+func TestRenderNodeSetStatefulSet_HostJournalMount(t *testing.T) {
+	nodeSet := &values.SlurmNodeSet{
+		Name: "test-nodeset",
+		ParentalCluster: client.ObjectKey{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
+		},
+		ContainerSlurmd: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image:           "test-image",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory:           resource.MustParse("1Gi"),
+					corev1.ResourceCPU:              resource.MustParse("100m"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+		ContainerMunge: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "munge-image",
+			},
+		},
+		VolumeSpool: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+		},
+		VolumeJail: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+		},
+		StatefulSet: values.StatefulSet{
+			Replicas: 1,
+		},
+		ServiceUmbrella:          values.Service{Name: "test-umbrella"},
+		SupervisorDConfigMapName: "supervisord-config",
+		SSHDConfigMapName:        "sshd-config",
+		GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+	}
+
+	result, err := worker.RenderNodeSetStatefulSet(
+		"test-cluster",
+		nodeSet,
+		&slurmv1.Secrets{},
+		consts.CGroupV2,
+		false,
+		false,
+		"",
+	)
+	assert.NoError(t, err)
+
+	var journalVolume *corev1.Volume
+	for i := range result.Spec.Template.Spec.Volumes {
+		volume := &result.Spec.Template.Spec.Volumes[i]
+		if volume.Name == consts.VolumeNameHostLogJournal {
+			journalVolume = volume
+			break
+		}
+	}
+	if assert.NotNil(t, journalVolume, "worker pod should have host journal volume") &&
+		assert.NotNil(t, journalVolume.HostPath, "host journal volume should be HostPath") {
+		assert.Equal(t, consts.VolumeHostPathJournal, journalVolume.HostPath.Path)
+		if assert.NotNil(t, journalVolume.HostPath.Type) {
+			assert.Empty(t, *journalVolume.HostPath.Type)
+		}
+	}
+
+	var slurmdContainer *corev1.Container
+	for i := range result.Spec.Template.Spec.Containers {
+		container := &result.Spec.Template.Spec.Containers[i]
+		if container.Name == consts.ContainerNameSlurmd {
+			slurmdContainer = container
+			break
+		}
+	}
+	if !assert.NotNil(t, slurmdContainer, "worker pod should have slurmd container") {
+		return
+	}
+
+	var journalMount *corev1.VolumeMount
+	for i := range slurmdContainer.VolumeMounts {
+		mount := &slurmdContainer.VolumeMounts[i]
+		if mount.Name == consts.VolumeNameHostLogJournal {
+			journalMount = mount
+			break
+		}
+	}
+	if assert.NotNil(t, journalMount, "slurmd container should mount host journal") {
+		assert.Equal(t, consts.VolumeMountPathHostLogJournal, journalMount.MountPath)
+		assert.Equal(t, consts.VolumeMountPathJailUpper+"/var/hostlog/journal", journalMount.MountPath)
+		assert.True(t, journalMount.ReadOnly)
+	}
+}
+
 func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 	createNodeSet := func(ephemeralNodes *bool, waitTimeout int32) *values.SlurmNodeSet {
 		return &values.SlurmNodeSet{
