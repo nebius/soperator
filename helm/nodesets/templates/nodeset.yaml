@@ -275,6 +275,10 @@ spec:
   enableHostUserNamespace: {{ . }}
   {{- end }}
 
+  {{- if hasKey . "workerInitRandomDelaySeconds" }}
+  workerInitRandomDelaySeconds: {{ .workerInitRandomDelaySeconds }}
+  {{- end }}
+
   {{- with (.priorityClass | default "") }}
   priorityClass: {{ . | quote }}
   {{- end }}

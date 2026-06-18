@@ -68,6 +68,7 @@ func RenderNodeSetStatefulSet(
 			topologyTimeOut,
 			topologyPlugin,
 			nodeSet.TopologyFabric,
+			nodeSet.WorkerInitRandomDelaySeconds,
 		),
 	)
 

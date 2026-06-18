@@ -245,6 +245,12 @@ nodesets:
     # Whether the worker pod containers can use the host user namespace
     # Optional, defaults to false
     enableHostUserNamespace: false
+    # Upper bound (in seconds) of a random delay the worker-init container sleeps before
+    # running its readiness checks. The actual delay is picked uniformly from
+    # [0, workerInitRandomDelaySeconds]. Spreads slurmd registrations across workers to avoid
+    # overloading the Slurm controller when many worker pods start at once.
+    # Optional, 0 disables the delay, defaults to 0
+    workerInitRandomDelaySeconds: 30
     # PriorityClass to be used for worker pod
     # Optional
     priorityClass: *priorityClassHigh
@@ -266,6 +272,12 @@ nodesets:
       - key: nvidia.com/gpu
         operator: Exists
         effect: NoSchedule
+      # Keep worker pods on a node that became unreachable for up to tolerationSeconds
+      # (3 minutes) before they are evicted.
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
     # Additional annotations to be added to the worker pods
     # Optional, defaults to empty dict
     workerAnnotations:

@@ -48,6 +48,7 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			300,
 			consts.SlurmTopologyBlock,
 			"fab-test",
+			0,
 		)
 
 		assert.Equal(t, consts.ContainerNameWorkerInit, result.Name)
@@ -81,6 +82,7 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			0,
 			"",
 			"",
+			0,
 		)
 
 		assert.Equal(t, consts.ContainerNameWorkerInit, result.Name)
@@ -112,6 +114,39 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 				"SLURM_TOPOLOGY_FABRIC",
 			}, envVar.Name,
 				"topology env var %s should not be present when topology is disabled", envVar.Name)
+		}
+	})
+
+	t.Run("random delay env present when positive", func(t *testing.T) {
+		result := worker.RenderContainerWorkerInit(
+			"test-cluster",
+			container,
+			false,
+			false,
+			0,
+			"",
+			"",
+			120,
+		)
+
+		assertEnvValue(t, result.Env, "WORKER_INIT_RANDOM_DELAY_SECONDS", "120")
+	})
+
+	t.Run("random delay env absent when zero", func(t *testing.T) {
+		result := worker.RenderContainerWorkerInit(
+			"test-cluster",
+			container,
+			false,
+			false,
+			0,
+			"",
+			"",
+			0,
+		)
+
+		for _, envVar := range result.Env {
+			assert.NotEqual(t, "WORKER_INIT_RANDOM_DELAY_SECONDS", envVar.Name,
+				"random delay env var should not be present when delay is 0")
 		}
 	})
 }
@@ -175,6 +210,7 @@ func Test_RenderContainerWorkerInit_K8SServiceName(t *testing.T) {
 				0,
 				"",
 				"",
+				0,
 			)
 
 			env, found := findEnv(result.Env, "K8S_SERVICE_NAME")

@@ -53,9 +53,10 @@ type SlurmNodeSet struct {
 	SharedMemorySize                     *resource.Quantity
 	PersistentVolumeClaimRetentionPolicy *kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy
 
-	Maintenance             *consts.MaintenanceMode
-	NodeExtra               string
-	EnableHostUserNamespace bool
+	Maintenance                  *consts.MaintenanceMode
+	NodeExtra                    string
+	EnableHostUserNamespace      bool
+	WorkerInitRandomDelaySeconds int32
 
 	EphemeralNodes               *bool
 	EphemeralTopologyWaitTimeout int32
@@ -136,9 +137,10 @@ func BuildSlurmNodeSetFrom(
 			nsSpec.Slurmd.Volumes.PersistentVolumeClaimRetentionPolicy,
 		),
 		//
-		Maintenance:             maintenance,
-		NodeExtra:               nsSpec.NodeConfig.Dynamic,
-		EnableHostUserNamespace: nsSpec.EnableHostUserNamespace,
+		Maintenance:                  maintenance,
+		NodeExtra:                    nsSpec.NodeConfig.Dynamic,
+		EnableHostUserNamespace:      nsSpec.EnableHostUserNamespace,
+		WorkerInitRandomDelaySeconds: nsSpec.WorkerInitRandomDelaySeconds,
 		//
 		EphemeralNodes:               nsSpec.EphemeralNodes,
 		EphemeralTopologyWaitTimeout: nsSpec.EphemeralTopologyWaitTimeout,
