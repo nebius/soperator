@@ -235,7 +235,7 @@ observability:
     crds:
       interval: 5m
       timeout: 5m
-      version: 0.0.3
+      version: 0.10.1
       install:
         crds: CreateReplace
         remediation:
@@ -249,7 +249,7 @@ observability:
         mode: warn
     interval: 5m
     timeout: 5m
-    version: 0.39.*
+    version: 0.80.*
     namespace: monitoring-system
     releaseName: metrics
     install:
@@ -335,7 +335,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 0.9.*
+    version: 0.13.*
     namespace: logs-system
     releaseName: vm-logs
     install:

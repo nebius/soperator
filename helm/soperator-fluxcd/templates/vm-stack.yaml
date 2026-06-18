@@ -65,7 +65,7 @@ spec:
         {{- end }}
         assertNoLeakedSecrets: false
         plugins:
-          - https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
+          - grafana-lokiexplore-app@1.0.14@https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip
           - victoriametrics-logs-datasource
         sidecar:
           dashboards:
