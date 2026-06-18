@@ -341,6 +341,9 @@ checks:
       scriptFile: "scripts/soperator-outputs-logs-cleaner.sh"
       jobContainer:
         appArmorProfile: unconfined
+        env:
+          - name: "SNCCLPRECON_DUMP_DIR"
+            value: "/opt/soperator-outputs/nccl_profiles"
   manage-jail-state:
     enabled: true
     checkType: "k8sJob"
