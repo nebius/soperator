@@ -189,6 +189,19 @@ type NodeSetSpec struct {
 	// +kubebuilder:default=false
 	EnableHostUserNamespace bool `json:"enableHostUserNamespace,omitempty"`
 
+	// WorkerInitRandomDelaySeconds is the upper bound (in seconds) of a random delay the
+	// worker-init container sleeps before running its readiness checks. The actual delay is
+	// picked uniformly from [0, WorkerInitRandomDelaySeconds]. It spreads slurmd registrations
+	// across workers to avoid overloading the Slurm controller (thundering herd) when many
+	// worker pods start at once, e.g. after a cluster-wide restart.
+	// Set to 0 to disable the delay.
+	// Defaults to 0.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	WorkerInitRandomDelaySeconds int32 `json:"workerInitRandomDelaySeconds,omitempty"`
+
 	// Slurmd defines the Slurm worker daemon configuration.
 	//
 	// +kubebuilder:validation:Required

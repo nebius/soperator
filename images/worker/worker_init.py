@@ -6,6 +6,12 @@ Supports two modes:
   wait-controller  - Wait for Slurm controller (slurmctld) to be ready
   wait-topology    - Wait for topology data from ConfigMap (for ephemeral nodes)
 
+Environment Variables (all modes):
+    WORKER_INIT_RANDOM_DELAY_SECONDS: Upper bound of a random startup delay applied before
+        running any command. The actual delay is picked uniformly from
+        [0, WORKER_INIT_RANDOM_DELAY_SECONDS]. Spreads slurmd registrations across workers to
+        avoid overloading the controller. Unset or 0 disables the delay (default: 0).
+
 Environment Variables (wait-controller):
     CONTROLLER_MAX_ATTEMPTS: Max ping attempts (default: 60)
     CONTROLLER_POLL_INTERVAL: Seconds between attempts (default: 5)
@@ -22,6 +28,7 @@ import argparse
 import json
 import logging
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -49,6 +56,32 @@ TOPOLOGY_PLUGIN_BLOCK: str = "topology/block"
 
 
 # region Common env functions
+
+
+def apply_random_startup_delay() -> None:
+    """Sleep a random duration before running commands to spread out worker startup.
+
+    The upper bound is read from WORKER_INIT_RANDOM_DELAY_SECONDS; the actual delay is picked
+    uniformly from [0, upper_bound]. A non-positive or unparsable value disables the delay.
+    """
+    raw_value: str = os.environ.get("WORKER_INIT_RANDOM_DELAY_SECONDS", "0").strip()
+    try:
+        max_delay: int = int(raw_value)
+    except ValueError:
+        logger.warning(
+            "Invalid WORKER_INIT_RANDOM_DELAY_SECONDS=%r, skipping startup delay",
+            raw_value,
+        )
+        return
+
+    if max_delay <= 0:
+        return
+
+    delay: int = random.randint(0, max_delay)
+    logger.info(
+        "Sleeping %ds (random, max %ds) before starting worker init", delay, max_delay
+    )
+    time.sleep(delay)
 
 
 def get_from_env_required(name: str) -> str:
@@ -778,6 +811,8 @@ def main():
     )
 
     args: argparse.Namespace = parser.parse_args()
+
+    apply_random_startup_delay()
 
     # Ensure wait-controller always runs first
     commands: list[str] = sorted(

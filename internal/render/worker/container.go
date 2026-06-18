@@ -28,6 +28,7 @@ func RenderContainerWorkerInit(
 	waitTimeoutSeconds int32,
 	topologyPlugin string,
 	topologyFabric string,
+	randomDelaySeconds int32,
 ) corev1.Container {
 	command := []string{
 		"python3",
@@ -90,6 +91,13 @@ func RenderContainerWorkerInit(
 			Name:  "K8S_SERVICE_NAME",
 			Value: naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName),
 		},
+	}
+
+	if randomDelaySeconds > 0 {
+		env = append(env, corev1.EnvVar{
+			Name:  "WORKER_INIT_RANDOM_DELAY_SECONDS",
+			Value: strconv.Itoa(int(randomDelaySeconds)),
+		})
 	}
 
 	if gpuEnabled {
