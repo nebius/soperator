@@ -39,12 +39,6 @@ func RenderService(namespace, clusterName, svcName string, controller *values.Sl
 					Port:       controller.ContainerSlurmctld.Port,
 					TargetPort: intstr.FromString(controller.ContainerSlurmctld.Name),
 				},
-				{
-					Name:       consts.ContainerPortNameSlurmControllerProxy,
-					Protocol:   corev1.ProtocolTCP,
-					Port:       consts.ContainerPortSlurmControllerProxy,
-					TargetPort: intstr.FromString(consts.ContainerPortNameSlurmControllerProxy),
-				},
 			},
 		},
 	}

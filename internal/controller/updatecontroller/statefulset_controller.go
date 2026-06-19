@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -40,7 +41,6 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/slurmapi"
-	"nebius.ai/slurm-operator/internal/slurmproxy"
 )
 
 const (
@@ -49,26 +49,24 @@ const (
 
 const (
 	defaultSTSReplicasCount = int32(1)
+	defaultRebootReason     = "soperator rolling update"
 )
 
 type RollingUpdateReconciler struct {
 	*reconciler.Reconciler
 
-	slurmAPIClients   *slurmapi.ClientSet
-	slurmProxyClients *slurmproxy.ClientSet
+	slurmAPIClients *slurmapi.ClientSet
 }
 
 func NewRollingUpdateReconciler(
 	client client.Client, scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
-	slurmProxyClients *slurmproxy.ClientSet,
 ) *RollingUpdateReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	return &RollingUpdateReconciler{
-		Reconciler:        r,
-		slurmAPIClients:   slurmAPIClients,
-		slurmProxyClients: slurmProxyClients,
+		Reconciler:      r,
+		slurmAPIClients: slurmAPIClients,
 	}
 }
 
@@ -205,18 +203,6 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 		return fmt.Errorf("no slurm api client for %s/%s", sts.Namespace, clusterName)
 	}
 
-	if r.slurmProxyClients == nil {
-		return fmt.Errorf("slurm controller proxy client set is not configured")
-	}
-	slurmProxyClient, ok := r.slurmProxyClients.GetClient(types.NamespacedName{
-		Namespace: sts.Namespace,
-		Name:      clusterName,
-	})
-	if !ok {
-		logger.Info("no slurm controller proxy client", "namespace", sts.Namespace, "clusterName", clusterName)
-		return fmt.Errorf("no slurm controller proxy client for %s/%s", sts.Namespace, clusterName)
-	}
-
 	type rebootCandidate struct {
 		pod       corev1.Pod
 		slurmNode slurmapi.Node
@@ -279,14 +265,14 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 		return nil
 	}
 
-	if err := slurmProxyClient.RebootNodes(ctx, slurmproxy.RebootNodesRequest{
-		Nodes:  slurmNodesToReboot,
-		Reason: slurmproxy.DefaultReason,
+	if err := slurmClient.RebootNodes(ctx, slurmapi.RebootNodesRequest{
+		NodeList: strings.Join(slurmNodesToReboot, ","),
+		Reason:   defaultRebootReason,
 	}); err != nil {
-		return fmt.Errorf("schedule slurm reboot through controller proxy: %w", err)
+		return fmt.Errorf("schedule slurm reboot through rest api: %w", err)
 	}
 
-	logger.Info("scheduled slurm reboot through controller proxy", "nodes", slurmNodesToReboot)
+	logger.Info("scheduled slurm reboot through rest api", "nodes", slurmNodesToReboot)
 
 	return nil
 }

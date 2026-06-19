@@ -59,7 +59,6 @@ import (
 	"nebius.ai/slurm-operator/internal/controllersenabled"
 	metricsopts "nebius.ai/slurm-operator/internal/metrics"
 	"nebius.ai/slurm-operator/internal/slurmapi"
-	"nebius.ai/slurm-operator/internal/slurmproxy"
 	webhookv1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	webhookv1alpha1 "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -313,7 +312,6 @@ func main() {
 	// endregion Reconciler/NodeSet
 
 	slurmAPIClients := slurmapi.NewClientSet(context.Background())
-	slurmProxyClients := slurmproxy.NewClientSet()
 
 	if controllersSet.Enabled("rollingupdate") {
 		if err = soperatorchecks.NewSlurmAPIClientsController(
@@ -321,7 +319,6 @@ func main() {
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
 			slurmAPIClients,
-			slurmProxyClients,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
 		}
@@ -331,7 +328,6 @@ func main() {
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(updatecontroller.RollingUpdateControllerName),
 			slurmAPIClients,
-			slurmProxyClients,
 		).
 			SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create controller", "controller", updatecontroller.RollingUpdateControllerName)

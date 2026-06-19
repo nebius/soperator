@@ -69,7 +69,6 @@ func RenderStatefulSet(
 	if controller.ContainerSSSD != nil {
 		slurmctldContainer = renderContainerSlurmctldWithSSSD(&controller.ContainerSlurmctld, controller.CustomVolumeMounts)
 	}
-	slurmControllerProxyContainer := renderContainerSlurmControllerProxy(&controller.ContainerSlurmctld)
 
 	return kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -117,7 +116,7 @@ func RenderStatefulSet(
 					NodeSelector:                  nodeFilter.NodeSelector,
 					Tolerations:                   nodeFilter.Tolerations,
 					InitContainers:                initContainers,
-					Containers:                    []corev1.Container{slurmctldContainer, slurmControllerProxyContainer},
+					Containers:                    []corev1.Container{slurmctldContainer},
 					Volumes:                       volumes,
 					RestartPolicy:                 corev1.RestartPolicyAlways,
 					TerminationGracePeriodSeconds: ptr.To(common.DefaultPodTerminationGracePeriodSeconds),

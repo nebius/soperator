@@ -10,6 +10,7 @@ type Client interface {
 	api.ClientWithResponsesInterface
 	ListNodes(ctx context.Context) ([]Node, error)
 	GetNode(ctx context.Context, nodeName string) (Node, error)
+	RebootNodes(ctx context.Context, request RebootNodesRequest) error
 	GetJobsByIDFromAccounting(ctx context.Context, jobID string) ([]Job, error)
 	ListJobs(ctx context.Context) ([]Job, error)
 	ListJobsWithParams(ctx context.Context, params ListJobsParams) ([]Job, error)
