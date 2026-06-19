@@ -110,6 +110,26 @@ func TestBuildTopologyBlocks_RenderMergesWorkerNodes(t *testing.T) {
 	}, lines)
 }
 
+// Regression (SCHED-1971): a block name (external tier-0 label) ending in an overflowing decimal
+// run must be terminated so Slurm's hostlist parser does not rewrite it; the worker list stays
+// verbatim.
+func TestBuildTopologyBlocks_SanitizesBlockName(t *testing.T) {
+	labelsByNode := map[string]tc.NodeTopologyLabels{
+		"node1": {"tier-0": "6f84b74219aa22869602735141708147"},
+	}
+	gpuPodsByNode := map[string][]string{
+		"node1": {"worker-0"},
+	}
+	allNodeNames := []string{"worker-0"}
+
+	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames, nil)
+	lines := blocks.RenderConfigLines()
+
+	require.Equal(t, []string{
+		"BlockName=6f84b74219aa22869602735141708147_ Nodes=worker-0",
+	}, lines)
+}
+
 func TestBuildTopologyBlocks_RenderEmpty(t *testing.T) {
 	blocks := tc.BuildTopologyBlocks(context.Background(), map[string]tc.NodeTopologyLabels{}, map[string][]string{}, nil, nil)
 	require.Nil(t, blocks.RenderConfigLines())

@@ -94,9 +94,16 @@ func (g TopologyGraph) RenderConfigLines() []string {
 		}
 		slices.Sort(children)
 		if hasGrandChildren {
-			lines = append(lines, fmt.Sprintf("SwitchName=%s Switches=%s", parent, slurmpattern.Merge(children)))
+			// Children are switches: sanitize each so Slurm's hostlist parser cannot overflow a
+			// long trailing decimal run and break the parent/child reference.
+			safeChildren := make([]string, len(children))
+			for i, child := range children {
+				safeChildren[i] = slurmSafeSwitchName(child)
+			}
+			lines = append(lines, fmt.Sprintf("SwitchName=%s Switches=%s", slurmSafeSwitchName(parent), slurmpattern.Merge(safeChildren)))
 		} else {
-			lines = append(lines, fmt.Sprintf("SwitchName=%s Nodes=%s", parent, strings.Join(children, ",")))
+			// Children are worker nodes: their names must match real Slurm node names verbatim.
+			lines = append(lines, fmt.Sprintf("SwitchName=%s Nodes=%s", slurmSafeSwitchName(parent), strings.Join(children, ",")))
 		}
 	}
 	slices.Sort(lines)
