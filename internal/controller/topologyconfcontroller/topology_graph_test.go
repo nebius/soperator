@@ -446,6 +446,28 @@ func TestRenderTopologyConfig(t *testing.T) {
 			},
 		},
 		{
+			// Regression: a switch ID whose trailing decimal run exceeds the uint64 range
+			// (here a 20-digit tail) must be terminated identically wherever it appears, so the
+			// parent's Switches= reference still matches the child's SwitchName= line and Slurm
+			// does not overflow it to UINT64_MAX (SCHED-1971).
+			name: "Switch ID with overflowing decimal tail is sanitized consistently",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {
+					"tier-1": "6f84b74219aa22869602735141708147",
+					"tier-2": "66b2be03e8b30ab5bcf8c9fd57d6c293",
+				},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"worker-0"},
+			},
+			allNodeNames: []string{"worker-0"},
+			expected: []string{
+				"SwitchName=root Switches=66b2be03e8b30ab5bcf8c9fd57d6c293",
+				"SwitchName=66b2be03e8b30ab5bcf8c9fd57d6c293 Switches=6f84b74219aa22869602735141708147_",
+				"SwitchName=6f84b74219aa22869602735141708147_ Nodes=worker-0",
+			},
+		},
+		{
 			name: "Running node with tiers but no fabric stays under root",
 			labelsByNode: map[string]tc.NodeTopologyLabels{
 				"node1": {"tier-1": "switch1", "tier-2": "spine1"},

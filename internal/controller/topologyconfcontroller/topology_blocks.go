@@ -45,7 +45,9 @@ func (b TopologyBlocks) RenderConfigLines() []string {
 			lines,
 			fmt.Sprintf(
 				"BlockName=%s Nodes=%s",
-				blockName,
+				// Block names are external tier-0 labels; sanitize them like switch names. The
+				// worker list must stay verbatim to match real Slurm node names.
+				slurmSafeSwitchName(blockName),
 				slurmpattern.Merge(workers),
 			),
 		)
