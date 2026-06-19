@@ -267,6 +267,7 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 
 	if err := slurmClient.RebootNodes(ctx, slurmapi.RebootNodesRequest{
 		NodeList: strings.Join(slurmNodesToReboot, ","),
+		ASAP:     true,
 		Reason:   defaultRebootReason,
 	}); err != nil {
 		return fmt.Errorf("schedule slurm reboot through rest api: %w", err)
