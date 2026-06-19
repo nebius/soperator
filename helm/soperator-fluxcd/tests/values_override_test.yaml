@@ -282,6 +282,15 @@ tests:
           path: spec.values.configMap.existingName
           value: opentelemetry-collector-nccl-profiles-agent
       - equal:
+          path: spec.values.extraVolumes[0].hostPath.path
+          value: /mnt/jail
+      - equal:
+          path: spec.values.extraVolumes[0].hostPath.type
+          value: Directory
+      - equal:
+          path: spec.values.initContainers[0].name
+          value: init-nccl-profiles-dir
+      - equal:
           path: spec.values.command.extraArgs[0]
           value: --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress,filelog.allowFileDeletion
 
@@ -327,7 +336,7 @@ tests:
     set:
       observability.enabled: true
       observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.values.dumpDir: /custom/nccl
+      observability.ncclProfiles.values.dumpDir: /mnt/jail/custom/nccl
       observability.ncclProfiles.values.enableFileStorage: false
       observability.ncclProfiles.values.resources:
         requests:
@@ -341,10 +350,19 @@ tests:
     asserts:
       - equal:
           path: spec.values.extraVolumes[0].hostPath.path
-          value: /custom/nccl
+          value: /mnt/jail
       - equal:
-          path: spec.values.initContainers
-          value: []
+          path: spec.values.extraVolumes[0].hostPath.type
+          value: Directory
+      - equal:
+          path: spec.values.initContainers[0].name
+          value: init-nccl-profiles-dir
+      - equal:
+          path: spec.values.initContainers[0].volumeMounts[0].name
+          value: jail
+      - matchRegex:
+          path: spec.values.initContainers[0].command[2]
+          pattern: '/mnt/jail/custom/nccl'
       - equal:
           path: spec.values.resources.requests
           value:
