@@ -1,28 +1,9 @@
 controllerManager:
-  kubeRbacProxy:
-    args:
-      - --secure-listen-address=0.0.0.0:8443
-      - --upstream=http://127.0.0.1:8080/
-      - --logtostderr=true
-      - --v=0
-    containerSecurityContext:
-      allowPrivilegeEscalation: false
-      capabilities:
-        drop:
-          - ALL
-    image:
-      repository: registry.k8s.io/kubebuilder/kube-rbac-proxy
-      tag: v0.15.0
-    resources:
-      limits:
-        memory: 128Mi
-      requests:
-        cpu: 50m
-        memory: 64Mi
   manager:
     args:
       - --health-probe-bind-address=:8081
-      - --metrics-bind-address=127.0.0.1:8080
+      - --metrics-bind-address=:8443
+      - --metrics-secure=true
       - --leader-elect
     controllersEnabled:
       cluster: true
