@@ -5,3 +5,4 @@ resources:
 - slurm.nebius.ai_nodesets.yaml
 - slurm.nebius.ai_slurmclusters.yaml
 - slurm.nebius.ai_jailedconfigs.yaml
+- slurm.nebius.ai_resourcepatchpolicies.yaml

@@ -53,6 +53,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
 	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
+	"nebius.ai/slurm-operator/internal/controller/resourcepatchpolicy"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 	"nebius.ai/slurm-operator/internal/controllersenabled"
 	webhookv1 "nebius.ai/slurm-operator/internal/webhook/v1"
@@ -180,7 +181,7 @@ func main() {
 		controllersSpec = controllersFlag
 		controllersSource = "flag"
 	}
-	availableControllers := []string{"cluster", "nodeconfigurator", "nodeset", "topology"}
+	availableControllers := []string{"cluster", "nodeconfigurator", "nodeset", "topology", "resourcepatchpolicy"}
 	controllersSet, err := controllersenabled.New(
 		controllersSpec,
 		availableControllers,
@@ -188,6 +189,10 @@ func main() {
 	if err != nil {
 		cli.Fail(setupLog, err, "unable to parse SLURM_OPERATOR_CONTROLLERS")
 	}
+	// The experimental ResourcePatchPolicy feature is toggled like a controller.
+	// It both registers the policy status controller and enables in-memory
+	// patching inside the cluster, nodeset and nodeconfigurator reconcilers.
+	enableResourcePatchPolicy := controllersSet.Enabled("resourcepatchpolicy")
 	if controllersSpec != "" {
 		for _, name := range availableControllers {
 			if !controllersSet.Enabled(name) {
@@ -261,6 +266,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(consts.SlurmCluster+"-controller"),
+			enableResourcePatchPolicy,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create controller", "controller", slurmClusterName)
 		}
@@ -279,8 +285,9 @@ func main() {
 	// region Reconciler/NodeConfigurator
 	if controllersSet.Enabled("nodeconfigurator") {
 		if err = (&nodeconfigurator.NodeConfiguratorReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
+			Client:                    mgr.GetClient(),
+			Scheme:                    mgr.GetScheme(),
+			EnableResourcePatchPolicy: enableResourcePatchPolicy,
 		}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create controller", "controller", "NodeConfigurator")
 		}
@@ -296,6 +303,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(nodeSetNameLower+"-controller"),
+			enableResourcePatchPolicy,
 		).
 			SetupWithManager(mgr, nodeSetNameLower, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create controller", "controller", nodeSetName)
@@ -338,6 +346,17 @@ func main() {
 		}
 	}
 	// endregion Reconciler/Topology
+
+	// region Reconciler/ResourcePatchPolicy
+	if enableResourcePatchPolicy {
+		if err = (&resourcepatchpolicy.ResourcePatchPolicyReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create controller", "controller", resourcepatchpolicy.ControllerName)
+		}
+	}
+	// endregion Reconciler/ResourcePatchPolicy
 
 	//+kubebuilder:scaffold:builder
 

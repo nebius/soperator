@@ -42,6 +42,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
+	"nebius.ai/slurm-operator/internal/resourcepatch"
 )
 
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets,verbs=get;list;watch;create;update;patch;delete
@@ -71,8 +72,9 @@ type NodeSetReconciler struct {
 	NodeSetPowerState   *reconciler.NodeSetPowerStateReconciler
 }
 
-func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *NodeSetReconciler {
+func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder, enableResourcePatchPolicy bool) *NodeSetReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
+	r.EnableResourcePatchPolicy = enableResourcePatchPolicy
 	return &NodeSetReconciler{
 		Reconciler:          r,
 		AdvancedStatefulSet: reconciler.NewAdvancedStatefulSetReconciler(r),
@@ -116,6 +118,13 @@ func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, name string, maxC
 		handler.EnqueueRequestsFromMapFunc(r.findNodeSetForPowerState),
 		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 	)
+
+	if r.EnableResourcePatchPolicy {
+		controllerBuilder.Watches(
+			&slurmv1alpha1.ResourcePatchPolicy{},
+			handler.EnqueueRequestsFromMapFunc(resourcepatch.MapPolicyToTarget(slurmv1alpha1.KindNodeSet)),
+		)
+	}
 
 	resourceChecks := r.createResourceChecks(controllercommon.CreateServiceAccountPredicate())
 	for _, resourceCheck := range resourceChecks {

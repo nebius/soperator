@@ -33,6 +33,10 @@ type (
 
 		Scheme   *runtime.Scheme
 		Recorder record.EventRecorder
+
+		// EnableResourcePatchPolicy gates the experimental ResourcePatchPolicy
+		// feature. When false, ApplyResourcePatchPolicies is a no-op.
+		EnableResourcePatchPolicy bool
 	}
 	patchFunc func(existing, desired client.Object) (client.Patch, error)
 	patcher   interface {
@@ -219,6 +223,10 @@ func (r Reconciler) reconcile(
 				return fmt.Errorf("unimplemented resolver for resource type %T", desired)
 			}
 		}
+
+		// Apply user-defined ResourcePatchPolicy patches to the in-memory
+		// desired object before it is submitted to the API server.
+		r.ApplyResourcePatchPolicies(ctx, owner, desired)
 
 		err := r.EnsureDeployed(ctx, owner, existing, desired, deps...)
 		if err != nil {

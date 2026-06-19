@@ -53,7 +53,7 @@ Create the name of the service account to use
 {{- end }}
 
 {{- define "soperator.controllersAvailable" -}}
-cluster,nodeconfigurator,nodeset,topology
+cluster,nodeconfigurator,nodeset,topology,resourcepatchpolicy
 {{- end }}
 
 {{- define "soperator.controllersSpec" -}}
@@ -66,18 +66,21 @@ cluster,nodeconfigurator,nodeset,topology
 {{- fail (printf "unknown controller %q in controllerManager.manager.controllersEnabled, available controllers: %q" $name $available) -}}
 {{- end -}}
 {{- end -}}
-{{- /* generate comma spearated list */}}
+{{- /* Generate a positive allowlist: enabled controllers are listed by name,
+       disabled ones (explicit false) are simply omitted. Controllers absent
+       from the values map default to enabled. */}}
 {{- $spec := list -}}
 {{- range $available -}}
 {{- if hasKey $controllers . -}}
 {{- if (get $controllers .) -}}
 {{- $spec = append $spec . -}}
-{{- else -}}
-{{- $spec = append $spec (printf "-%s" .) -}}
 {{- end -}}
 {{- else -}}
 {{- $spec = append $spec . -}}
 {{- end -}}
+{{- end -}}
+{{- if not $spec -}}
+{{- fail "controllerManager.manager.controllersEnabled disables every controller; enable at least one" -}}
 {{- end -}}
 {{- join "," $spec -}}
 {{- end -}}
