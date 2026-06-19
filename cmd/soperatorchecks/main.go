@@ -40,7 +40,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -49,6 +48,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/controllersenabled"
+	metricsopts "nebius.ai/slurm-operator/internal/metrics"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -239,12 +239,8 @@ func main() {
 	})
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
-		Metrics: metricsserver.Options{
-			BindAddress:   metricsAddr,
-			SecureServing: secureMetrics,
-			TLSOpts:       tlsOpts,
-		},
+		Scheme:                 scheme,
+		Metrics:                metricsopts.ServerOptions(metricsAddr, secureMetrics, tlsOpts),
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
