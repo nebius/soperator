@@ -295,7 +295,7 @@ observability:
           externalLabels: {}
           remoteWriteSettings: {}
           remoteWrite:
-            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
+            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8428/api/v1/write
           resources:
             requests:
               memory: 10Gi
@@ -420,7 +420,7 @@ observability:
           memory: 1Gi
       nebiusO11yAgentVersion: 2.0.10
       useGoMemLimit: true
-      metricsEndpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8429/opentelemetry/v1/metrics
+      metricsEndpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics
       metricsExporterTimeout: 15s
       metricsExporterSendingQueueSize: 2000
       metricsExporterNumConsumers: 4
