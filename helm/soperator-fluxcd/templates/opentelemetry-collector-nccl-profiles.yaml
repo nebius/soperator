@@ -50,7 +50,7 @@ spec:
             otlp_http/victoriametrics:
               compression: gzip
               encoding: proto
-              metrics_endpoint: {{ .Values.observability.ncclProfiles.values.metricsEndpoint | default "http://vmsingle-metrics-victoria-metrics-k8s-stack:8429/opentelemetry/v1/metrics" }}
+              metrics_endpoint: {{ .Values.observability.ncclProfiles.values.metricsEndpoint | default "http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics" }}
               timeout: {{ .Values.observability.ncclProfiles.values.metricsExporterTimeout | default "15s" }}
               retry_on_failure:
                 enabled: true
