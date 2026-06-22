@@ -24,6 +24,12 @@ if [ -z "$jaildir" ] || [ -z "$upperdir" ]; then
     usage
 fi
 
+# Default optional variables so `set -u` doesn't abort: `worker` is only set via -w (unset on
+# login nodes), and the GPU env vars may be absent depending on the cluster/nodeset.
+worker="${worker:-}"
+NODESET_GPU_ENABLED="${NODESET_GPU_ENABLED:-}"
+SLURM_CLUSTER_WITH_GPU="${SLURM_CLUSTER_WITH_GPU:-}"
+
 ALT_ARCH="$(uname -m)"
 log "🔧 Using ALT_ARCH = ${ALT_ARCH}"
 
