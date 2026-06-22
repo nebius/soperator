@@ -481,10 +481,12 @@ func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 					return false
 				}
 
-				_, newHasLabel := newNode.Labels[r.tierOneLabel()]
-				_, oldHasLabel := oldNode.Labels[r.tierOneLabel()]
+				newLabel, newHasLabel := newNode.Labels[r.tierOneLabel()]
+				oldLabel, oldHasLabel := oldNode.Labels[r.tierOneLabel()]
 
-				return newHasLabel || (oldHasLabel && oldNode.Labels[r.tierOneLabel()] != newNode.Labels[r.tierOneLabel()])
+				return (newHasLabel && !oldHasLabel) ||
+					(!newHasLabel && oldHasLabel) ||
+					(newHasLabel && oldHasLabel && newLabel != oldLabel)
 			},
 			DeleteFunc: func(e event.DeleteEvent) bool {
 				node, ok := e.Object.(*corev1.Node)
