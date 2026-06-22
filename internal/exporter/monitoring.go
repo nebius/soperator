@@ -9,6 +9,7 @@ type MonitoringMetrics struct {
 	collectionDuration prometheus.Gauge
 	collectionAttempts prometheus.Counter
 	collectionFailures prometheus.Counter
+	collectorErrors    *prometheus.CounterVec
 	metricsRequests    prometheus.Counter
 	metricsExported    prometheus.Gauge
 }
@@ -28,6 +29,10 @@ func NewMonitoringMetrics() *MonitoringMetrics {
 			Name: "slurm_exporter_collection_failures_total",
 			Help: "Total number of failed metrics collection attempts",
 		}),
+		collectorErrors: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "slurm_exporter_collector_errors_total",
+			Help: "Total number of errors per sub-collector during metrics collection, labeled by collector",
+		}, []string{"collector"}),
 		metricsRequests: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "slurm_exporter_metrics_requests_total",
 			Help: "Total number of requests to /metrics endpoint",
@@ -45,6 +50,7 @@ func (m *MonitoringMetrics) Register(registry *prometheus.Registry) error {
 		m.collectionDuration,
 		m.collectionAttempts,
 		m.collectionFailures,
+		m.collectorErrors,
 		m.metricsRequests,
 		m.metricsExported,
 	}
@@ -65,6 +71,11 @@ func (m *MonitoringMetrics) RecordCollection(duration float64, err error) {
 	if err != nil {
 		m.collectionFailures.Inc()
 	}
+}
+
+// RecordCollectorError increments the error counter for the named sub-collector
+func (m *MonitoringMetrics) RecordCollectorError(collector string) {
+	m.collectorErrors.WithLabelValues(collector).Inc()
 }
 
 // RecordMetricsRequest increments the metrics request counter
