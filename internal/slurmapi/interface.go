@@ -6,6 +6,7 @@ import (
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
 )
 
+// nolint:interfacebloat
 type Client interface {
 	api.ClientWithResponsesInterface
 	ListNodes(ctx context.Context) ([]Node, error)
