@@ -43,10 +43,6 @@ type SlurmExporter struct {
 	// JobSource selects the Slurm API used for job collection ("controller" or "accounting").
 	JobSource string
 
-	// AccountingJobStates is a CSV-rendered list of Slurm job-state strings forwarded
-	// to the accounting API's "state" filter. Empty = no filter.
-	AccountingJobStates []string
-
 	// AccountingJobsLookback is the time window queried from the accounting API.
 	AccountingJobsLookback prometheusv1.Duration
 
@@ -81,7 +77,6 @@ func buildSlurmExporterFrom(namePrefix string, maintenance *consts.MaintenanceMo
 		Container:              *exporter.ExporterContainer.DeepCopy(),
 		CollectionInterval:     exporter.CollectionInterval,
 		JobSource:              exporter.JobSource,
-		AccountingJobStates:    append([]string(nil), exporter.AccountingJobStates...),
 		AccountingJobsLookback: exporter.AccountingJobsLookback,
 		ServiceAccountName:     exporter.ServiceAccountName,
 		Deployment:             buildDeploymentFrom(deploymentName),

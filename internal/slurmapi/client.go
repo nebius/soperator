@@ -26,25 +26,6 @@ import (
 // rows. If a deployment has many genuinely long-pending jobs, this is the knob to revisit.
 const stalePendingMaxAge = 30 * 24 * time.Hour
 
-// withRepeatedStateFilter returns a request editor that appends one `state=X` query parameter
-// per element of states. slurmrestd v0.0.41's data parser rejects a CSV value (treats `RUNNING,PENDING`
-// as a single unknown flag name); the parser does accept multi-valued query parameters, so the
-// fix is to send `state=RUNNING&state=PENDING` instead. Returns a no-op editor when states is empty.
-func withRepeatedStateFilter(states []string) api.RequestEditorFn {
-	return func(_ context.Context, req *http.Request) error {
-		if len(states) == 0 {
-			return nil
-		}
-		q := req.URL.Query()
-		q.Del("state")
-		for _, s := range states {
-			q.Add("state", s)
-		}
-		req.URL.RawQuery = q.Encode()
-		return nil
-	}
-}
-
 // summarizeSlurmRESTBody extracts the descriptions/errors from a Slurm REST API JSON envelope,
 // which all error responses follow ({"errors": [{"description": "...", "error": "..."}], ...}).
 // Returns "errors=[...]" when the envelope parses, otherwise the raw body. Used to keep error
@@ -338,9 +319,7 @@ func (c *client) listAccountingJobs(ctx context.Context, params ListJobsParams) 
 		Cluster:   clusterFilter,
 		StartTime: &startTime,
 		EndTime:   &endTime,
-		// State is intentionally nil: the SDK would serialize it as a single `state=A,B` CSV
-		// value, but slurmrestd v0.0.41 rejects that as an unknown flag name. We add one
-		// `state=X` query param per state via withRepeatedStateFilter below instead.
+		// State is intentionally nil: the query returns jobs in any state during the window.
 		State: nil,
 		// Without this, slurmdbd clamps each job's reported start/end times to the query window
 		// (matching `sacct --truncate`). Downstream metrics like slurm_job_duration_seconds rely
@@ -350,7 +329,7 @@ func (c *client) listAccountingJobs(ctx context.Context, params ListJobsParams) 
 		// Per-step payloads are not used in downstream; skipping them keeps slurmdbd from
 		// returning batch/extern/application step entries that would otherwise inflate every scrape on busy clusters.
 		SkipSteps: ptr.To("true"),
-	}, withRepeatedStateFilter(params.cleanedAccountingStates()))
+	})
 	if err != nil {
 		return nil, fmt.Errorf("list jobs from accounting API: %w", err)
 	}

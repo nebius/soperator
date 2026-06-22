@@ -1,7 +1,6 @@
 package slurmapi
 
 import (
-	"strings"
 	"time"
 )
 
@@ -22,15 +21,6 @@ type ListJobsParams struct {
 	// Source selects which Slurm API to query.
 	Source JobSource
 
-	// AccountingJobStates is a list of Slurm job-state strings forwarded verbatim to the accounting API's "state"
-	// CSV query parameter (e.g. "RUNNING", "PENDING"). Empty/nil means no state filter.
-	//
-	// Important: slurmdbd applies this filter to the *historical* states a job held during the query
-	// window [now - AccountingLookback, now + accountingEndTimeSkew] — sacct --state semantics. It is
-	// NOT a filter on the current job state. A job that was RUNNING during the window and has since
-	// completed will still be returned, with its current state field set to e.g. COMPLETED.
-	AccountingJobStates []string
-
 	// AccountingLookback sets the size of the time window queried from the accounting API:
 	// [now - AccountingLookback, now + accountingEndTimeSkew].
 	// Sacct overlap semantics mean a job is returned when its lifetime overlaps the window — long-running jobs
@@ -42,18 +32,4 @@ type ListJobsParams struct {
 	// stores more than one cluster (federated setups), otherwise the query returns sibling
 	// clusters' jobs as well. Empty means no scoping. Only applied when Source is "accounting".
 	AccountingCluster string
-}
-
-// cleanedAccountingStates returns AccountingJobStates trimmed and with empty entries removed.
-// Use this rather than the raw slice; the cleaned form is what gets serialized into the
-// accounting API's `state` query (one repeated parameter per state — slurmrestd v0.0.41 rejects
-// CSV values as a single unknown flag, so we send `state=A&state=B&...` instead).
-func (p ListJobsParams) cleanedAccountingStates() []string {
-	cleaned := make([]string, 0, len(p.AccountingJobStates))
-	for _, s := range p.AccountingJobStates {
-		if s = strings.TrimSpace(s); s != "" {
-			cleaned = append(cleaned, s)
-		}
-	}
-	return cleaned
 }
