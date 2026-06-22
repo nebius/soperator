@@ -281,6 +281,32 @@ tests:
       - equal:
           path: spec.values.configMap.existingName
           value: opentelemetry-collector-nccl-profiles-agent
+      - equal:
+          path: spec.values.extraVolumes[0].hostPath.path
+          value: /mnt/jail
+      - equal:
+          path: spec.values.extraVolumes[0].hostPath.type
+          value: Directory
+      - equal:
+          path: spec.values.initContainers[0].name
+          value: init-nccl-profiles-dir
+      - equal:
+          path: spec.values.command.extraArgs[0]
+          value: --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress,filelog.allowFileDeletion
+
+  - it: should enable file deletion feature gate when delete after read is enabled
+    set:
+      observability.enabled: true
+      observability.ncclProfiles.enabled: true
+      observability.opentelemetry.metrics.enabled: false
+      observability.ncclProfiles.values.deleteAfterRead.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles
+    asserts:
+      - equal:
+          path: spec.values.command.extraArgs[0]
+          value: --feature-gates=filelog.allowFileDeletion
 
   - it: should use daemonset mode on worker nodes for node-local storage
     set:
@@ -310,7 +336,7 @@ tests:
     set:
       observability.enabled: true
       observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.values.dumpDir: /custom/nccl
+      observability.ncclProfiles.values.dumpDir: /mnt/jail/custom/nccl
       observability.ncclProfiles.values.enableFileStorage: false
       observability.ncclProfiles.values.resources:
         requests:
@@ -324,10 +350,19 @@ tests:
     asserts:
       - equal:
           path: spec.values.extraVolumes[0].hostPath.path
-          value: /custom/nccl
+          value: /mnt/jail
       - equal:
-          path: spec.values.initContainers
-          value: []
+          path: spec.values.extraVolumes[0].hostPath.type
+          value: Directory
+      - equal:
+          path: spec.values.initContainers[0].name
+          value: init-nccl-profiles-dir
+      - equal:
+          path: spec.values.initContainers[0].volumeMounts[0].name
+          value: jail
+      - matchRegex:
+          path: spec.values.initContainers[0].command[2]
+          pattern: '/mnt/jail/custom/nccl'
       - equal:
           path: spec.values.resources.requests
           value:
@@ -397,9 +432,9 @@ tests:
       path: metadata.name
       value: RELEASE-NAME-otelcol-nccl-profiles-cm
     asserts:
-      - matchRegex:
+      - notMatchRegex:
           path: spec.values.resources[0].data.relay
-          pattern: 'delete_after_read: false'
+          pattern: 'delete_after_read'
       - notMatchRegex:
           path: spec.values.resources[0].data.relay
           pattern: 'delete_after_read_min_age'

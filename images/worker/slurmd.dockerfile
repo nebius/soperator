@@ -63,10 +63,12 @@ RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
 
 # Install NCCL Inspector PreConf SPANK plugin
-COPY images/common/scripts/install_spank_nccl_inspector_preconf.sh /opt/bin/
-RUN chmod +x /opt/bin/install_spank_nccl_inspector_preconf.sh && \
-    /opt/bin/install_spank_nccl_inspector_preconf.sh && \
-    rm /opt/bin/install_spank_nccl_inspector_preconf.sh
+COPY ansible/spank-nccl-inspector-preconf.yml /opt/ansible/spank-nccl-inspector-preconf.yml
+COPY ansible/roles/spank-nccl-inspector-preconf /opt/ansible/roles/spank-nccl-inspector-preconf
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local \
+      -e spank_nccl_inspector_preconf_dump_dir_create=false \
+      spank-nccl-inspector-preconf.yml
 
 # Install enroot
 COPY images/common/scripts/install_enroot.sh /opt/bin/

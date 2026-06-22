@@ -77,8 +77,6 @@ spec:
               {{- if .Values.observability.ncclProfiles.values.deleteAfterRead.enabled }}
               delete_after_read: true
               delete_after_read_min_age: {{ .Values.observability.ncclProfiles.values.deleteAfterRead.minAge | default "1m" }}
-              {{- else }}
-              delete_after_read: false
               {{- end }}
               {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
               storage: file_storage
@@ -264,9 +262,9 @@ spec:
     {{- end }}{{- end }}
 
     extraVolumes:
-      - name: nccl-profiles
+      - name: jail
         hostPath:
-          path: {{ .Values.observability.ncclProfiles.values.dumpDir }}
+          path: /mnt/jail
           type: Directory
 
       {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
@@ -277,8 +275,8 @@ spec:
       {{- end }}
 
     extraVolumeMounts:
-      - name: nccl-profiles
-        mountPath: /mnt/jail/opt/soperator-outputs/nccl_profiles/
+      - name: jail
+        mountPath: /mnt/jail
         readOnly: true
 
       {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
@@ -294,8 +292,35 @@ spec:
     serviceAccount:
       create: true
 
-    {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
     initContainers:
+      - command:
+          - sh
+          - "-c"
+          - |
+            set -eu
+            dump_dir="{{ .Values.observability.ncclProfiles.values.dumpDir }}"
+            case "$dump_dir" in
+              /mnt/jail/*) ;;
+              *)
+                echo "observability.ncclProfiles.values.dumpDir must be under /mnt/jail"
+                exit 1
+                ;;
+            esac
+            until [ -f /mnt/jail/etc/soperator-jail-populated ]; do
+              echo "Waiting for /mnt/jail to be populated"
+              sleep 5
+            done
+            install -d -m 0777 "$dump_dir"
+        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        name: init-nccl-profiles-dir
+        securityContext:
+          runAsGroup: 0
+          runAsUser: 0
+        volumeMounts:
+          - name: jail
+            mountPath: /mnt/jail
+
+      {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
       - command:
           - sh
           - "-c"
@@ -308,19 +333,24 @@ spec:
         volumeMounts:
           - name: varlibotelcol
             mountPath: /var/lib/otelcol
-    {{- else }}
-    initContainers: []
-    {{- end }}
+      {{- end }}
 
     resources:
       {{- toYaml .Values.observability.ncclProfiles.values.resources | nindent 6 }}
 
     useGOMEMLIMIT: {{ .Values.observability.ncclProfiles.values.useGoMemLimit | default true }}
 
+    {{- $featureGates := list }}
     {{- if .Values.observability.opentelemetry.metrics.enabled }}
+    {{- $featureGates = append $featureGates "-telemetry.UseLocalHostAsDefaultMetricsAddress" }}
+    {{- end }}
+    {{- if .Values.observability.ncclProfiles.values.deleteAfterRead.enabled }}
+    {{- $featureGates = append $featureGates "filelog.allowFileDeletion" }}
+    {{- end }}
+    {{- if $featureGates }}
     command:
       extraArgs:
-        - "--feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress"
+        - "--feature-gates={{ join "," $featureGates }}"
     {{- end }}
 
     ports:
