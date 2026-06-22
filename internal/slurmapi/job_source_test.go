@@ -3,7 +3,6 @@ package slurmapi
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -42,58 +41,6 @@ func newTestClient(stub *sdkStub) *client {
 	return &client{ClientWithResponsesInterface: stub}
 }
 
-func TestListJobsParamsCleanedAccountingStates(t *testing.T) {
-	tests := []struct {
-		name   string
-		states []string
-		want   []string
-	}{
-		{name: "nil → empty", states: nil, want: []string{}},
-		{name: "empty slice → empty", states: []string{}, want: []string{}},
-		{name: "all-blank → empty", states: []string{" ", ""}, want: []string{}},
-		{name: "single state", states: []string{"PENDING"}, want: []string{"PENDING"}},
-		{name: "trims whitespace, drops blanks", states: []string{" PENDING ", "", "RUNNING"}, want: []string{"PENDING", "RUNNING"}},
-		{name: "multi state", states: []string{"COMPLETED", "FAILED", "TIMEOUT"}, want: []string{"COMPLETED", "FAILED", "TIMEOUT"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := ListJobsParams{AccountingJobStates: tt.states}.cleanedAccountingStates()
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestWithRepeatedStateFilter(t *testing.T) {
-	t.Run("appends one state= per element", func(t *testing.T) {
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example/jobs/?other=keep", nil)
-		require.NoError(t, err)
-
-		require.NoError(t, withRepeatedStateFilter([]string{"RUNNING", "PENDING"})(context.Background(), req))
-
-		assert.Equal(t, []string{"RUNNING", "PENDING"}, req.URL.Query()["state"])
-		assert.Equal(t, "keep", req.URL.Query().Get("other"))
-	})
-
-	t.Run("removes any pre-existing state= and replaces", func(t *testing.T) {
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example/jobs/?state=OLD", nil)
-		require.NoError(t, err)
-
-		require.NoError(t, withRepeatedStateFilter([]string{"RUNNING"})(context.Background(), req))
-
-		assert.Equal(t, []string{"RUNNING"}, req.URL.Query()["state"])
-	})
-
-	t.Run("empty slice is a no-op", func(t *testing.T) {
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example/jobs/?other=keep", nil)
-		require.NoError(t, err)
-
-		require.NoError(t, withRepeatedStateFilter(nil)(context.Background(), req))
-
-		assert.Empty(t, req.URL.Query()["state"])
-		assert.Equal(t, "keep", req.URL.Query().Get("other"))
-	})
-}
-
 func TestListJobsWithParams_ControllerSource(t *testing.T) {
 	stub := &sdkStub{}
 	c := newTestClient(stub)
@@ -117,19 +64,16 @@ func TestListJobsWithParams_DefaultSourceIsController(t *testing.T) {
 	assert.Equal(t, 0, stub.accountingCalls)
 }
 
-func TestListJobsWithParams_AccountingSource_StateAndWindow(t *testing.T) {
+func TestListJobsWithParams_AccountingSource_Window(t *testing.T) {
 	tests := []struct {
 		name        string
-		states      []string
 		lookback    time.Duration
 		cluster     string
 		wantCluster *string
 	}{
-		{name: "no state filter, no cluster", states: nil, lookback: time.Hour, cluster: "", wantCluster: nil},
-		{name: "blank trimmed → no filter", states: []string{" ", ""}, lookback: time.Hour, cluster: "", wantCluster: nil},
-		{name: "single state", states: []string{"RUNNING"}, lookback: 30 * time.Minute, cluster: "", wantCluster: nil},
-		{name: "multi state, trimmed", states: []string{" RUNNING ", "PENDING"}, lookback: time.Hour, cluster: "", wantCluster: nil},
-		{name: "with cluster filter", states: nil, lookback: time.Hour, cluster: "soperator", wantCluster: ptr.To("soperator")},
+		{name: "no cluster", lookback: time.Hour, cluster: "", wantCluster: nil},
+		{name: "custom lookback", lookback: 30 * time.Minute, cluster: "", wantCluster: nil},
+		{name: "with cluster filter", lookback: time.Hour, cluster: "soperator", wantCluster: ptr.To("soperator")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -140,10 +84,9 @@ func TestListJobsWithParams_AccountingSource_StateAndWindow(t *testing.T) {
 				now := time.Now()
 
 				_, err := c.ListJobsWithParams(context.Background(), ListJobsParams{
-					Source:              JobSourceAccounting,
-					AccountingJobStates: tt.states,
-					AccountingLookback:  tt.lookback,
-					AccountingCluster:   tt.cluster,
+					Source:             JobSourceAccounting,
+					AccountingLookback: tt.lookback,
+					AccountingCluster:  tt.cluster,
 				})
 				require.NoError(t, err)
 				assert.Equal(t, 0, stub.controllerCalls)
@@ -152,9 +95,8 @@ func TestListJobsWithParams_AccountingSource_StateAndWindow(t *testing.T) {
 				got := stub.lastAccountingParams
 				require.NotNil(t, got)
 
-				// State on the typed params is intentionally unset; the actual filter is added as
-				// repeated `state=X` query params via withRepeatedStateFilter, covered by
-				// TestWithRepeatedStateFilter and TestListJobsParamsCleanedAccountingStates.
+				// State on the typed params is intentionally unset: the accounting query returns
+				// jobs in any state during the window.
 				assert.Nil(t, got.State)
 
 				if tt.wantCluster == nil {

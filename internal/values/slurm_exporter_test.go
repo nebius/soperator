@@ -19,7 +19,6 @@ func Test_BuildSlurmExporterFrom(t *testing.T) {
 			Image: "testImage",
 		},
 		JobSource:              "accounting",
-		AccountingJobStates:    []string{"RUNNING", "PENDING"},
 		AccountingJobsLookback: prometheusv1.Duration("30m"),
 	}
 
@@ -29,7 +28,6 @@ func Test_BuildSlurmExporterFrom(t *testing.T) {
 	assert.NotNil(t, result.SlurmNode)
 	assert.NotNil(t, result.ContainerMunge)
 	assert.Equal(t, "accounting", result.JobSource)
-	assert.Equal(t, []string{"RUNNING", "PENDING"}, result.AccountingJobStates)
 	assert.Equal(t, prometheusv1.Duration("30m"), result.AccountingJobsLookback)
 }
 

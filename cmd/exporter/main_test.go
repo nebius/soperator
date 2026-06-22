@@ -64,16 +64,14 @@ func TestBuildJobListParams(t *testing.T) {
 			wantErr: "--accounting-jobs-lookback is required when --job-source=accounting",
 		},
 		{
-			name: "accounting with states and custom lookback",
+			name: "accounting source is trimmed and case-normalized",
 			flags: Flags{
 				jobSource:              " Accounting ",
-				accountingJobStates:    " RUNNING, PENDING ,, ",
 				accountingJobsLookback: "30m",
 			},
 			want: slurmapi.ListJobsParams{
-				Source:              slurmapi.JobSourceAccounting,
-				AccountingJobStates: []string{"RUNNING", "PENDING"},
-				AccountingLookback:  30 * time.Minute,
+				Source:             slurmapi.JobSourceAccounting,
+				AccountingLookback: 30 * time.Minute,
 			},
 		},
 		{
@@ -131,18 +129,6 @@ func TestBuildJobListParams(t *testing.T) {
 			want: slurmapi.ListJobsParams{
 				Source:             slurmapi.JobSourceAccounting,
 				AccountingLookback: 2*time.Hour + 45*time.Minute + 30*time.Second + 500*time.Millisecond,
-			},
-		},
-		{
-			name: "accounting empty states means no filter",
-			flags: Flags{
-				jobSource:              "accounting",
-				accountingJobStates:    "",
-				accountingJobsLookback: "1h",
-			},
-			want: slurmapi.ListJobsParams{
-				Source:             slurmapi.JobSourceAccounting,
-				AccountingLookback: time.Hour,
 			},
 		},
 		{

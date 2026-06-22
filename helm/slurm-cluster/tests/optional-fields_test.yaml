@@ -125,9 +125,6 @@ tests:
           size: 1
           k8sNodeFilterName: "no-gpu"
           jobSource: "accounting"
-          accountingJobStates:
-            - "RUNNING"
-            - "PENDING"
           accountingJobsLookback: "30m"
           volumes:
             jail:
@@ -158,11 +155,6 @@ tests:
       - equal:
           path: spec.slurmNodes.exporter.jobSource
           value: "accounting"
-      - equal:
-          path: spec.slurmNodes.exporter.accountingJobStates
-          value:
-            - "RUNNING"
-            - "PENDING"
       - equal:
           path: spec.slurmNodes.exporter.accountingJobsLookback
           value: "30m"
