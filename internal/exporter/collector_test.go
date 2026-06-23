@@ -253,36 +253,133 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 	})
 }
 
-func TestMetricsCollector_Collect_APIError(t *testing.T) {
+// TestMetricsCollector_CollectorIsolation verifies that a failure in one sub-collector
+// (nodes, jobs, or diag) neither aborts the others nor drops their metrics, and that the
+// failure is counted in slurm_exporter_collector_errors_total{collector="..."}.
+func TestMetricsCollector_CollectorIsolation(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	mockClient := &fake.MockClient{}
-	collector := newTestMetricsCollector(mockClient)
+	const (
+		nodeMarker = "slurm_node_info"
+		jobMarker  = "slurm_job_info"
+		diagMarker = "slurm_controller_server_thread_count"
+	)
 
-	// Mock failed ListNodes response - with early return, other APIs won't be called
-	mockClient.EXPECT().ListNodes(mock.Anything).Return(nil, assert.AnError)
-
-	// Test that updateState fails early when critical APIs fail
-	ctx := context.Background()
-	err := collector.updateState(ctx)
-	assert.Error(t, err) // Should error - ListNodes is critical
-
-	// Collect should return no node metrics since ListNodes failed, but might have job metrics
-	ch := make(chan prometheus.Metric, 10)
-	go func() {
-		collector.Collect(ch)
-		close(ch)
-	}()
-
-	var metrics []prometheus.Metric
-	for metric := range ch {
-		metrics = append(metrics, metric)
+	healthyNodes := []slurmapi.Node{
+		{
+			Name:       "iso-node",
+			InstanceID: "iso-instance",
+			States:     map[api.V0041NodeState]struct{}{api.V0041NodeStateIDLE: {}},
+			Tres:       "cpu=4,mem=8000M,gres/gpu=0",
+			Address:    "10.0.0.1",
+		},
+	}
+	healthyJobs := []slurmapi.Job{
+		{ID: 555, Name: "iso-job", State: "RUNNING", Partition: "gpu"},
+	}
+	serverThreadCount := int32(7)
+	healthyDiag := &api.V0041OpenapiDiagResp{
+		Statistics: api.V0041StatsMsg{ServerThreadCount: &serverThreadCount},
 	}
 
-	// Should have no metrics when state is empty/initial
-	assert.Equal(t, 0, len(metrics))
+	tests := []struct {
+		name           string
+		failCollector  string
+		setupMocks     func(*fake.MockClient)
+		absentMarker   string
+		presentMarkers []string
+	}{
+		{
+			name:          "nodes fails",
+			failCollector: "nodes",
+			setupMocks: func(m *fake.MockClient) {
+				m.EXPECT().ListNodes(mock.Anything).Return(nil, assert.AnError).Once()
+				m.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return(healthyJobs, nil).Once()
+				m.EXPECT().GetDiag(mock.Anything).Return(healthyDiag, nil).Once()
+			},
+			absentMarker:   nodeMarker,
+			presentMarkers: []string{jobMarker, diagMarker},
+		},
+		{
+			name:          "jobs fails",
+			failCollector: "jobs",
+			setupMocks: func(m *fake.MockClient) {
+				m.EXPECT().ListNodes(mock.Anything).Return(healthyNodes, nil).Once()
+				m.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return(nil, assert.AnError).Once()
+				m.EXPECT().GetDiag(mock.Anything).Return(healthyDiag, nil).Once()
+			},
+			absentMarker:   jobMarker,
+			presentMarkers: []string{nodeMarker, diagMarker},
+		},
+		{
+			name:          "diag fails",
+			failCollector: "diag",
+			setupMocks: func(m *fake.MockClient) {
+				m.EXPECT().ListNodes(mock.Anything).Return(healthyNodes, nil).Once()
+				m.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return(healthyJobs, nil).Once()
+				m.EXPECT().GetDiag(mock.Anything).Return(nil, assert.AnError).Once()
+			},
+			absentMarker:   diagMarker,
+			presentMarkers: []string{nodeMarker, jobMarker},
+		},
+	}
 
-	mockClient.AssertExpectations(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := &fake.MockClient{}
+			collector := newTestMetricsCollector(mockClient)
+			tt.setupMocks(mockClient)
+
+			registry := prometheus.NewRegistry()
+			require.NoError(t, collector.Monitoring.Register(registry))
+
+			ctx := context.Background()
+			err := collector.updateState(ctx)
+			assert.Error(t, err, "updateState should report the failed collector")
+
+			ch := make(chan prometheus.Metric, 50)
+			go func() {
+				collector.Collect(ch)
+				close(ch)
+			}()
+
+			var metricsText []string
+			for metric := range ch {
+				metricsText = append(metricsText, toPrometheusLikeString(t, metric))
+			}
+			joined := strings.Join(metricsText, "\n")
+
+			assert.NotContains(t, joined, tt.absentMarker, "failed collector's metrics must be absent")
+			for _, marker := range tt.presentMarkers {
+				assert.Contains(t, joined, marker, "healthy collectors' metrics must still be present")
+			}
+
+			families, err := registry.Gather()
+			require.NoError(t, err)
+			assert.Equal(t, float64(1), collectorErrorValue(families, tt.failCollector),
+				"failed collector's error counter must be incremented once")
+
+			mockClient.AssertExpectations(t)
+		})
+	}
+}
+
+// collectorErrorValue returns the value of slurm_exporter_collector_errors_total for the
+// given collector label, or 0 if the series is absent.
+func collectorErrorValue(families []*dto.MetricFamily, collector string) float64 {
+	for _, mf := range families {
+		if mf.GetName() != "slurm_exporter_collector_errors_total" {
+			continue
+		}
+		for _, m := range mf.GetMetric() {
+			for _, lp := range m.GetLabel() {
+				if lp.GetName() == "collector" && lp.GetValue() == collector {
+					return m.GetCounter().GetValue()
+				}
+			}
+		}
+	}
+	return 0
 }
 
 func TestMetricsCollector_NodeFails(t *testing.T) {
@@ -995,10 +1092,13 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 		err := collector.updateState(ctx)
 		assert.NoError(t, err)
 
-		// Test failed collection - create a new mock client to avoid call conflicts
+		// Test failed collection - create a new mock client to avoid call conflicts.
+		// Only ListNodes fails; jobs and diag still run because collectors are isolated.
 		mockClientFail := &fake.MockClient{}
 		collector.slurmAPIClient = mockClientFail
 		mockClientFail.EXPECT().ListNodes(mock.Anything).Return(nil, errors.New("API error"))
+		mockClientFail.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return([]slurmapi.Job{}, nil)
+		mockClientFail.EXPECT().GetDiag(mock.Anything).Return(nil, nil)
 		err = collector.updateState(ctx)
 		assert.Error(t, err)
 

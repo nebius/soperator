@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"maps"
@@ -354,6 +355,36 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 		c.state.Store(newState)
 	}()
 
+	// Each sub-collector is isolated: a failure in one neither aborts the others nor drops
+	// their metrics. The failing collector's metrics simply gap for this cycle; the error
+	// is logged and counted via slurm_exporter_collector_errors_total{collector="..."}.
+	collectors := []struct {
+		name string
+		run  func() error
+	}{
+		{"nodes", func() error { return c.collectNodes(ctx, previousState, newState) }},
+		{"jobs", func() error { return c.collectJobs(ctx, newState) }},
+		{"diag", func() error { return c.collectDiag(ctx, newState) }},
+	}
+
+	var errs []error
+	for _, col := range collectors {
+		if cerr := col.run(); cerr != nil {
+			logger.Error(cerr, "Sub-collector failed", "collector", col.name)
+			c.Monitoring.RecordCollectorError(col.name)
+			errs = append(errs, fmt.Errorf("%s: %w", col.name, cerr))
+		}
+	}
+
+	logger.Info("Collected metrics", "elapsed_seconds", time.Since(startTime).Seconds())
+
+	return errors.Join(errs...)
+}
+
+// collectNodes fetches nodes and updates node-derived metrics on the new state.
+func (c *MetricsCollector) collectNodes(ctx context.Context, previousState, newState *metricsCollectorState) error {
+	logger := log.FromContext(ctx).WithName(ControllerName)
+
 	nodesStart := time.Now()
 	nodes, err := c.slurmAPIClient.ListNodes(ctx)
 	if err != nil {
@@ -365,6 +396,13 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	c.updateNodeFailureMetrics(nodes, previousState.nodes)
 	c.updateNodeStateMetrics(nodes, previousState, newState, time.Now())
 	newState.lastGPUSecondsUpdate = c.updateGPUSecondsMetrics(ctx, nodes, previousState.lastGPUSecondsUpdate, time.Now())
+
+	return nil
+}
+
+// collectJobs fetches jobs and stores them on the new state.
+func (c *MetricsCollector) collectJobs(ctx context.Context, newState *metricsCollectorState) error {
+	logger := log.FromContext(ctx).WithName(ControllerName)
 
 	jobsStart := time.Now()
 	jobs, err := c.slurmAPIClient.ListJobsWithParams(ctx, c.jobListParams)
@@ -378,6 +416,13 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	)
 	newState.jobs = jobs
 
+	return nil
+}
+
+// collectDiag fetches controller diagnostics and stores them on the new state.
+func (c *MetricsCollector) collectDiag(ctx context.Context, newState *metricsCollectorState) error {
+	logger := log.FromContext(ctx).WithName(ControllerName)
+
 	diagStart := time.Now()
 	diag, err := c.slurmAPIClient.GetDiag(ctx)
 	if err != nil {
@@ -385,8 +430,6 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	}
 	logger.Info("Fetched controller diag", "elapsed_seconds", time.Since(diagStart).Seconds())
 	newState.diag = diag
-
-	logger.Info("Collected metrics", "elapsed_seconds", time.Since(startTime).Seconds())
 
 	return nil
 }

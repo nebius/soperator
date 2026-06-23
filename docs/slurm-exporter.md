@@ -134,6 +134,7 @@ The exporter provides self-monitoring metrics to track its own health and perfor
 | **slurm_exporter_collection_duration_seconds**<br>*Gauge* | Duration of the most recent metrics collection from SLURM APIs<br><br>**Labels:** None |
 | **slurm_exporter_collection_attempts_total**<br>*Counter* | Total number of metrics collection attempts<br><br>**Labels:** None |
 | **slurm_exporter_collection_failures_total**<br>*Counter* | Total number of failed metrics collection attempts<br><br>**Labels:** None |
+| **slurm_exporter_collector_errors_total**<br>*Counter* | Total number of errors per sub-collector during metrics collection. Sub-collectors are isolated, so a failure in one does not drop the others' metrics for that cycle; the failed collector's metrics simply gap until it recovers.<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`) |
 | **slurm_exporter_metrics_requests_total**<br>*Counter* | Total number of requests to the `/metrics` endpoint<br><br>**Labels:** None |
 | **slurm_exporter_metrics_exported**<br>*Gauge* | Number of metrics exported in the last scrape<br><br>**Labels:** None |
 
