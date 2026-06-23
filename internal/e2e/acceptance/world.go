@@ -59,7 +59,7 @@ func (w *world) Local() framework.ArgsScope {
 func (w *world) Controller() framework.CommandScope {
 	return commandScope{
 		run: func(ctx context.Context, command string) (string, error) {
-			return w.Kubectl().Run(ctx, "exec", "-n", soperatorNamespace, w.state.SlurmClusterName+"-controller-0", "--", "bash", "-lc", command)
+			return w.Kubectl().Run(ctx, "exec", "-n", soperatorNamespace, w.state.PodName("controller-0"), "--", "bash", "-lc", command)
 		},
 	}
 }
@@ -67,7 +67,7 @@ func (w *world) Controller() framework.CommandScope {
 func (w *world) Jail() framework.CommandScope {
 	return commandScope{
 		run: func(ctx context.Context, command string) (string, error) {
-			return w.Kubectl().Run(ctx, "exec", "-n", soperatorNamespace, w.state.SlurmClusterName+"-login-0", "--", "chroot", "/mnt/jail", "bash", "-lc", command)
+			return w.Kubectl().Run(ctx, "exec", "-n", soperatorNamespace, w.state.PodName("login-0"), "--", "chroot", "/mnt/jail", "bash", "-lc", command)
 		},
 	}
 }

@@ -62,9 +62,6 @@ func parseOptions(args []string) (options, error) {
 		return options{}, fmt.Errorf("--kubectl-context is required")
 	}
 	opts.SlurmClusterName = strings.TrimSpace(opts.SlurmClusterName)
-	if opts.SlurmClusterName == "" {
-		return options{}, fmt.Errorf("--slurm-cluster-name must not be empty")
-	}
 	opts.ReportDir = strings.TrimSpace(opts.ReportDir)
 
 	return opts, nil
