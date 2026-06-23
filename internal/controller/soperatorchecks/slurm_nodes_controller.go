@@ -233,6 +233,15 @@ func (c *SlurmNodesController) processSetUnhealthy(
 		return nil
 	}
 
+	slurmNodesAreFullyDrained, err := c.slurmNodesFullyDrained(ctx, k8sNode.Name)
+	if err != nil {
+		return fmt.Errorf("check that nodes are fully drained before setting unhealthy: %w", err)
+	}
+	if !slurmNodesAreFullyDrained {
+		logger.V(1).Info("Skipping unhealthy condition until slurm nodes are fully drained")
+		return nil
+	}
+
 	cond := newNodeCondition(
 		consts.HardwareIssuesSuspected,
 		corev1.ConditionTrue,
