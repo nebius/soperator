@@ -33,6 +33,13 @@ spec:
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
   {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
+  {{- $eventsValues := .Values.observability.opentelemetry.events.values | default dict }}
+  {{- $eventsUseGoMemLimit := true }}
+  {{- if hasKey $eventsValues "useGOMEMLIMIT" }}
+  {{- $eventsUseGoMemLimit = $eventsValues.useGOMEMLIMIT }}
+  {{- else if hasKey $eventsValues "useGoMemLimit" }}
+  {{- $eventsUseGoMemLimit = $eventsValues.useGoMemLimit }}
+  {{- end }}
   {{- if .Values.observability.opentelemetry.events.overrideValues }}
     {{- toYaml .Values.observability.opentelemetry.events.overrideValues | nindent 4 }}
   {{- else }}
@@ -196,8 +203,7 @@ spec:
     - name: CLUSTER_ID
       value: {{ .Values.observability.clusterId | quote }}
     {{- end }}
-    - name: GOMAXPROCS
-      value: "1"
+    {{- include "soperator-fluxcd.otelCollectorGoEnv" (dict "resources" $eventsValues.resources "useGoMemLimit" $eventsUseGoMemLimit) | nindent 4 }}
     image:
       pullPolicy: IfNotPresent
       repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
@@ -213,7 +219,7 @@ spec:
     serviceAccount:
       create: true
     tolerations: []
-    useGOMEMLIMIT: {{ .Values.observability.opentelemetry.events.values.useGOMEMLIMIT | default true }}
+    useGOMEMLIMIT: {{ $eventsUseGoMemLimit }}
     {{- if and .Values.observability.opentelemetry.events.values
     .Values.observability.opentelemetry.events.values.resources }}
     resources:

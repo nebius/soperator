@@ -33,6 +33,13 @@ spec:
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
   {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
+  {{- $logsValues := .Values.observability.opentelemetry.logs.values | default dict }}
+  {{- $logsUseGoMemLimit := true }}
+  {{- if hasKey $logsValues "useGOMEMLIMIT" }}
+  {{- $logsUseGoMemLimit = $logsValues.useGOMEMLIMIT }}
+  {{- else if hasKey $logsValues "useGoMemLimit" }}
+  {{- $logsUseGoMemLimit = $logsValues.useGoMemLimit }}
+  {{- end }}
   {{- if .Values.observability.opentelemetry.logs.overrideValues }}
     {{- toYaml .Values.observability.opentelemetry.logs.overrideValues | nindent 4 }}
   {{- else }}
@@ -364,8 +371,7 @@ spec:
     - name: CLUSTER_ID
       value: {{ .Values.observability.clusterId | quote }}
     {{- end }}
-    - name: GOMAXPROCS
-      value: "1"
+    {{- include "soperator-fluxcd.otelCollectorGoEnv" (dict "resources" $logsValues.resources "useGoMemLimit" $logsUseGoMemLimit) | nindent 4 }}
     extraVolumeMounts:
     {{- if $hasPublicEndpoint }}
     - mountPath: /o11ytoken
@@ -474,7 +480,7 @@ spec:
     - effect: NoSchedule
       key: node.cilium.io/agent-not-ready
       operator: Exists
-    useGOMEMLIMIT: {{ .Values.observability.opentelemetry.logs.values.useGOMEMLIMIT | default true }}
+    useGOMEMLIMIT: {{ $logsUseGoMemLimit }}
     {{- if and .Values.observability.opentelemetry.logs.values .Values.observability.opentelemetry.logs.values.resources }}
     resources: {{- toYaml .Values.observability.opentelemetry.logs.values.resources | nindent 6 }}
     {{- end }}

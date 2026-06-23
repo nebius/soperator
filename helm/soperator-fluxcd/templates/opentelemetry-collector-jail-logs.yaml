@@ -39,6 +39,14 @@ spec:
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
   {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
+  {{- $logsValues := .Values.observability.opentelemetry.logs.values | default dict }}
+  {{- $jailLogsValues := $logsValues.jailLogs | default dict }}
+  {{- $logsUseGoMemLimit := true }}
+  {{- if hasKey $logsValues "useGOMEMLIMIT" }}
+  {{- $logsUseGoMemLimit = $logsValues.useGOMEMLIMIT }}
+  {{- else if hasKey $logsValues "useGoMemLimit" }}
+  {{- $logsUseGoMemLimit = $logsValues.useGoMemLimit }}
+  {{- end }}
   {{- if .Values.observability.opentelemetry.logs.overrideValues }}
     {{- toYaml .Values.observability.opentelemetry.logs.overrideValues | nindent 4 }}
   {{- else }}
@@ -331,8 +339,7 @@ spec:
           metrics: null
           traces: null
     extraEnvs:
-    - name: GOMAXPROCS
-      value: "1"
+    {{- include "soperator-fluxcd.otelCollectorGoEnv" (dict "resources" $jailLogsValues.resources "useGoMemLimit" $logsUseGoMemLimit) | nindent 4 }}
     {{- if .Values.observability.clusterId }}
     - name: CLUSTER_ID
       value: {{ .Values.observability.clusterId | quote }}
@@ -436,7 +443,7 @@ spec:
       enabled: false
     serviceAccount:
       create: true
-    useGOMEMLIMIT: {{ .Values.observability.opentelemetry.logs.values.useGOMEMLIMIT | default true }}
+    useGOMEMLIMIT: {{ $logsUseGoMemLimit }}
     {{- if .Values.observability.opentelemetry.logs.values.jailLogs.resources }}
     resources: {{- toYaml .Values.observability.opentelemetry.logs.values.jailLogs.resources | nindent 6 }}
     {{- end }}

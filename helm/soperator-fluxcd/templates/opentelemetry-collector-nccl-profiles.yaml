@@ -200,6 +200,13 @@ spec:
   targetNamespace: {{ .Values.observability.vmStack.namespace }}
 
   values:
+  {{- $ncclValues := .Values.observability.ncclProfiles.values | default dict }}
+  {{- $ncclUseGoMemLimit := true }}
+  {{- if hasKey $ncclValues "useGoMemLimit" }}
+  {{- $ncclUseGoMemLimit = $ncclValues.useGoMemLimit }}
+  {{- else if hasKey $ncclValues "useGOMEMLIMIT" }}
+  {{- $ncclUseGoMemLimit = $ncclValues.useGOMEMLIMIT }}
+  {{- end }}
   {{- if .Values.observability.ncclProfiles.collectorOverrideValues }}
     {{- toYaml .Values.observability.ncclProfiles.collectorOverrideValues | nindent 4 }}
   {{- else }}
@@ -292,6 +299,9 @@ spec:
     serviceAccount:
       create: true
 
+    extraEnvs:
+      {{- include "soperator-fluxcd.otelCollectorGoEnv" (dict "resources" $ncclValues.resources "useGoMemLimit" $ncclUseGoMemLimit) | nindent 6 }}
+
     initContainers:
       - command:
           - sh
@@ -338,7 +348,7 @@ spec:
     resources:
       {{- toYaml .Values.observability.ncclProfiles.values.resources | nindent 6 }}
 
-    useGOMEMLIMIT: {{ .Values.observability.ncclProfiles.values.useGoMemLimit | default true }}
+    useGOMEMLIMIT: {{ $ncclUseGoMemLimit }}
 
     {{- $featureGates := list }}
     {{- if .Values.observability.opentelemetry.metrics.enabled }}
