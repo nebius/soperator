@@ -457,7 +457,7 @@ checks:
           - -e
           - ansible_python_interpreter=/usr/bin/python3
           - -e
-          - "nc_health_checker_version=1.1.8-a3dae386"
+          - "nc_health_checker_version=1.1.15-b3af5269"
           - nc-health-checker.yml
           - --diff
   wait-for-topology:

@@ -27,6 +27,7 @@ func renderVolumesAndClaimTemplateSpecsForNodeSet(
 		common.RenderVolumeInMemory(nodeSet.ContainerSlurmd.Resources.Memory()),
 		common.RenderVolumeTmpDisk(),
 		renderVolumeBoot(),
+		renderVolumeHostLogJournal(),
 		renderVolumeSharedMemory(nodeSet.SharedMemorySize),
 		renderVolumeSysctl(nodeSet.ParentalCluster.Name),
 		renderSupervisordConfigMap(nodeSet.SupervisorDConfigMapName),
@@ -111,6 +112,18 @@ func renderVolumeRuntime() corev1.Volume {
 	}
 }
 
+func renderVolumeHostLogJournal() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameHostLogJournal,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: consts.VolumeHostPathJournal,
+				Type: ptr.To(corev1.HostPathType("")),
+			},
+		},
+	}
+}
+
 // endregion Volumes & claims
 
 // region Nvidia
@@ -160,6 +173,14 @@ func renderVolumeMountBoot() corev1.VolumeMount {
 		Name:             consts.VolumeNameBoot,
 		MountPath:        consts.VolumeMountPathBoot,
 		MountPropagation: ptr.To(corev1.MountPropagationHostToContainer),
+	}
+}
+
+func renderVolumeMountHostLogJournal() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameHostLogJournal,
+		MountPath: consts.VolumeMountPathHostLogJournal,
+		ReadOnly:  true,
 	}
 }
 

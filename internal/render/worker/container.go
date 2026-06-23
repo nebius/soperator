@@ -174,6 +174,7 @@ func renderContainerNodeSetSlurmd(
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
 		renderVolumeMountBoot(),
+		renderVolumeMountHostLogJournal(),
 		renderVolumeMountSharedMemory(),
 		renderVolumeMountSysctl(),
 		renderVolumeMountSupervisordConfigMap(),
