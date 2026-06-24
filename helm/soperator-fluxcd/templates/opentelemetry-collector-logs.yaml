@@ -33,7 +33,16 @@ spec:
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
   {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
+  {{- $sendingQueue := .Values.observability.opentelemetry.sendingQueue | default dict }}
   {{- $logsValues := .Values.observability.opentelemetry.logs.values | default dict }}
+  {{- $logsEnableFileStorage := true }}
+  {{- if hasKey $logsValues "enableFileStorage" }}
+  {{- $logsEnableFileStorage = $logsValues.enableFileStorage }}
+  {{- end }}
+  {{- $logsQueueStorage := "" }}
+  {{- if $logsEnableFileStorage }}
+  {{- $logsQueueStorage = "file_storage" }}
+  {{- end }}
   {{- $logsUseGoMemLimit := true }}
   {{- if hasKey $logsValues "useGOMEMLIMIT" }}
   {{- $logsUseGoMemLimit = $logsValues.useGOMEMLIMIT }}
@@ -62,16 +71,22 @@ spec:
           encoding: proto
           logs_endpoint: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
           retry_on_failure:
+            enabled: true
             initial_interval: 200ms
+            max_elapsed_time: 0
           timeout: 5s
+{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $batch "queue" $sendingQueue "storage" $logsQueueStorage) | indent 10 }}
         {{- if $hasPublicEndpoint }}
         otlp:
           endpoint: {{ .Values.observability.opentelemetry.publicEndpoint }}
           balancer_name: round_robin
           compression: snappy
           retry_on_failure:
+            enabled: true
             initial_interval: 200ms
+            max_elapsed_time: 0
           timeout: 5s
+{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $batch "queue" $sendingQueue "storage" $logsQueueStorage) | indent 10 }}
           headers:
             iam-container: {{ .Values.observability.logsProjectId }}
             {{- $extraHeaders := .Values.observability.opentelemetry.extraHeaders }}
@@ -82,8 +97,10 @@ spec:
             authenticator: bearertokenauth
         {{- end }}
       extensions:
+        {{- if $logsEnableFileStorage }}
         file_storage:
           directory: /var/lib/otelcol
+        {{- end }}
         health_check:
           endpoint: 0.0.0.0:13133
         {{- if $hasPublicEndpoint }}
@@ -95,10 +112,6 @@ spec:
         {{- end }}
         {{- end }}
       processors:
-        batch:
-          timeout: {{ $batch.timeout | default "1s" }}
-          send_batch_size: {{ $batch.sendBatchSize | default 2000 }}
-          send_batch_max_size: {{ $batch.sendBatchMaxSize | default 5000 }}
         k8s_attributes:
           extract:
             labels:
@@ -214,6 +227,9 @@ spec:
               type: move
               from: attributes["logtype"]
               to: resource["app.kubernetes.io/name"]
+          {{- if $logsEnableFileStorage }}
+          storage: file_storage
+          {{- end }}
         {{- end }}
         filelog/pods:
           exclude:
@@ -321,8 +337,11 @@ spec:
             type: json_parser
           retry_on_failure:
             enabled: true
+            max_elapsed_time: 0
           start_at: end
+          {{- if $logsEnableFileStorage }}
           storage: file_storage
+          {{- end }}
         zipkin: null
       service:
         {{- if .Values.observability.opentelemetry.metrics.enabled }}
@@ -337,7 +356,9 @@ spec:
         {{- end }}
         extensions:
         - health_check
+        {{- if $logsEnableFileStorage }}
         - file_storage
+        {{- end }}
         {{- if $hasPublicEndpoint }}
         - bearertokenauth
         {{- end }}
@@ -352,7 +373,6 @@ spec:
             - k8s_attributes
             - transform
             - memory_limiter
-            - batch
             receivers:
             - filelog/pods
             {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
@@ -384,8 +404,10 @@ spec:
     - mountPath: /var/lib/docker/containers
       name: varlibdockercontainers
       readOnly: true
+    {{- if $logsEnableFileStorage }}
     - mountPath: /var/lib/otelcol
       name: varlibotelcol
+    {{- end }}
     {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
     - name: node-logs
       mountPath: /var/nodelogs
@@ -412,10 +434,12 @@ spec:
         type: Directory
       name: node-logs
     {{- end }}
+    {{- if $logsEnableFileStorage }}
     - hostPath:
         path: /var/lib/otelcol
         type: DirectoryOrCreate
       name: varlibotelcol
+    {{- end }}
     - hostPath:
         path: /var/lib/docker/containers
       name: varlibdockercontainers
@@ -423,14 +447,17 @@ spec:
       pullPolicy: IfNotPresent
       repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
       tag: 2.0.10
+    {{- if or $logsEnableFileStorage .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
     initContainers:
     - command:
       - sh
       - -c
-      {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
+      {{- if and $logsEnableFileStorage .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
       - 'chown -R 10001: /var/lib/otelcol /var/nodelogs'
-      {{- else }}
+      {{- else if $logsEnableFileStorage }}
       - 'chown -R 10001: /var/lib/otelcol'
+      {{- else }}
+      - 'chown -R 10001: /var/nodelogs'
       {{- end }}
       image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
       name: init-fs
@@ -438,12 +465,15 @@ spec:
         runAsGroup: 0
         runAsUser: 0
       volumeMounts:
+      {{- if $logsEnableFileStorage }}
       - mountPath: /var/lib/otelcol
         name: varlibotelcol
+      {{- end }}
       {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
       - name: node-logs
         mountPath: /var/nodelogs
       {{- end }}
+    {{- end }}
     mode: daemonset
     rollout:
       rollingUpdate:

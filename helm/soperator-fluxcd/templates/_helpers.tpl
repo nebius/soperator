@@ -152,3 +152,29 @@ Render Go runtime env vars for opentelemetry-collector from container resources.
   value: {{ include "soperator-fluxcd.memoryQuantityPercentGoMemLimit" (dict "quantity" $memory "percent" 85) | quote }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Render exporter sending_queue settings with exporter-side batching.
+*/}}
+{{- define "soperator-fluxcd.otelExporterSendingQueue" -}}
+{{- $batch := .batch | default dict -}}
+{{- $queue := .queue | default dict -}}
+{{- $timeout := get $batch "timeout" | default "1s" -}}
+{{- $minSize := get $batch "sendBatchSize" | default 2000 | int -}}
+{{- $maxSize := get $batch "sendBatchMaxSize" | default 5000 | int -}}
+{{- $queueSize := get $queue "queueSize" | default 30000 | int -}}
+{{- $numConsumers := get $queue "numConsumers" | default 10 | int -}}
+sending_queue:
+  enabled: true
+  sizer: items
+  queue_size: {{ max $queueSize $minSize }}
+  num_consumers: {{ $numConsumers }}
+  {{- if .storage }}
+  storage: {{ .storage }}
+  {{- end }}
+  batch:
+    sizer: items
+    flush_timeout: {{ $timeout }}
+    min_size: {{ $minSize }}
+    max_size: {{ $maxSize }}
+{{- end -}}

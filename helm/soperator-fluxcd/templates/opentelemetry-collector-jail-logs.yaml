@@ -39,8 +39,22 @@ spec:
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
   {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
+  {{- $sendingQueue := .Values.observability.opentelemetry.sendingQueue | default dict }}
   {{- $logsValues := .Values.observability.opentelemetry.logs.values | default dict }}
   {{- $jailLogsValues := $logsValues.jailLogs | default dict }}
+  {{- $jailEnableFileStorage := true }}
+  {{- if hasKey $jailLogsValues "enableFileStorage" }}
+  {{- $jailEnableFileStorage = $jailLogsValues.enableFileStorage }}
+  {{- end }}
+  {{- $jailQueueStorage := "" }}
+  {{- if $jailEnableFileStorage }}
+  {{- $jailQueueStorage = "file_storage" }}
+  {{- end }}
+  {{- $jailDeleteAfterRead := $jailLogsValues.deleteAfterRead | default dict }}
+  {{- $jailDeleteAfterReadEnabled := false }}
+  {{- if hasKey $jailDeleteAfterRead "enabled" }}
+  {{- $jailDeleteAfterReadEnabled = $jailDeleteAfterRead.enabled }}
+  {{- end }}
   {{- $logsUseGoMemLimit := true }}
   {{- if hasKey $logsValues "useGOMEMLIMIT" }}
   {{- $logsUseGoMemLimit = $logsValues.useGOMEMLIMIT }}
@@ -177,8 +191,17 @@ spec:
               if: attributes.hc_json != nil
           retry_on_failure:
             enabled: true
+            max_elapsed_time: 0
+          {{- if $jailDeleteAfterReadEnabled }}
+          start_at: beginning
+          delete_after_read: true
+          delete_after_read_min_age: {{ $jailDeleteAfterRead.minAge | default "1m" }}
+          {{- else }}
           start_at: end  # Start reading from the end of the file on startup.
+          {{- end }}
+          {{- if $jailEnableFileStorage }}
           storage: file_storage  # Storage for the state (file offsets).
+          {{- end }}
         filelog/health_checker:
           include:
             - "/mnt/jail/opt/soperator-outputs/health_checker_cmd_stdout/*.out"
@@ -214,18 +237,23 @@ spec:
 
           retry_on_failure:
             enabled: true
+            max_elapsed_time: 0
+          {{- if $jailDeleteAfterReadEnabled }}
+          start_at: beginning
+          delete_after_read: true
+          delete_after_read_min_age: {{ $jailDeleteAfterRead.minAge | default "1m" }}
+          {{- else }}
           start_at: end  # Start reading from the end of the file on startup.
+          {{- end }}
+          {{- if $jailEnableFileStorage }}
           storage: file_storage  # Storage for the state (file offsets).
+          {{- end }}
         # Disable irrelevant receivers that might be added by valuesFrom ConfigMap:
         zipkin: null
         jaeger: null
         otlp: null
         prometheus: null
       processors:
-        batch:
-          timeout: {{ $batch.timeout | default "1s" }}
-          send_batch_size: {{ $batch.sendBatchSize | default 2000 }}
-          send_batch_max_size: {{ $batch.sendBatchMaxSize | default 5000 }}
         k8s_attributes:
           pod_association:
           - sources:
@@ -272,16 +300,22 @@ spec:
           encoding: proto
           logs_endpoint: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
           retry_on_failure:
+            enabled: true
             initial_interval: 200ms
+            max_elapsed_time: 0
           timeout: 5s
+{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $batch "queue" $sendingQueue "storage" $jailQueueStorage) | indent 10 }}
         {{- if $hasPublicEndpoint }}
         otlp:
           endpoint: {{ .Values.observability.opentelemetry.publicEndpoint }}
           balancer_name: round_robin
           compression: snappy
           retry_on_failure:
+            enabled: true
             initial_interval: 200ms
+            max_elapsed_time: 0
           timeout: 5s
+{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $batch "queue" $sendingQueue "storage" $jailQueueStorage) | indent 10 }}
           headers:
             iam-container: {{ .Values.observability.logsProjectId }}
             {{- $extraHeaders := .Values.observability.opentelemetry.extraHeaders }}
@@ -292,8 +326,10 @@ spec:
             authenticator: bearertokenauth
         {{- end }}
       extensions:
+        {{- if $jailEnableFileStorage }}
         file_storage:
           directory: /var/lib/otelcol-jail
+        {{- end }}
         health_check:
           endpoint: 0.0.0.0:13133
         {{- if $hasPublicEndpoint }}
@@ -317,7 +353,9 @@ spec:
         {{- end }}
         extensions:
         - health_check
+        {{- if $jailEnableFileStorage }}
         - file_storage
+        {{- end }}
         {{- if $hasPublicEndpoint }}
         - bearertokenauth
         {{- end }}
@@ -330,7 +368,6 @@ spec:
             - k8s_attributes
             - transform
             - memory_limiter
-            - batch
             exporters:
             - otlp_http/victorialogs
             {{- if $hasPublicEndpoint }}
@@ -350,8 +387,10 @@ spec:
       name: o11ytoken
       readOnly: true
     {{- end }}
+    {{- if $jailEnableFileStorage }}
     - mountPath: /var/lib/otelcol-jail
       name: varlibotelcol
+    {{- end }}
     - mountPath: /mnt/jail
       name: jail
       readOnly: true
@@ -371,15 +410,18 @@ spec:
       hostPath:
         path: /mnt/jail
         type: Directory
+    {{- if $jailEnableFileStorage }}
     - hostPath:
         path: /var/lib/otelcol-jail
         type: DirectoryOrCreate
       name: varlibotelcol
+    {{- end }}
     image:
       pullPolicy: IfNotPresent
       repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
       tag: 2.0.10
     initContainers:
+    {{- if $jailEnableFileStorage }}
     - command:
       - sh
       - -c
@@ -392,6 +434,7 @@ spec:
       volumeMounts:
       - mountPath: /var/lib/otelcol-jail
         name: varlibotelcol
+    {{- end }}
     # /mnt/jail/opt/soperator-outputs is created by complement_jail.sh on first
     # worker/login startup; we mount the jail NFS root and gate on this directory here
     # so the HelmRelease does not get marked Stalled before workers come up.
@@ -447,10 +490,19 @@ spec:
     {{- if .Values.observability.opentelemetry.logs.values.jailLogs.resources }}
     resources: {{- toYaml .Values.observability.opentelemetry.logs.values.jailLogs.resources | nindent 6 }}
     {{- end }}
+    {{- $featureGates := list }}
     {{- if .Values.observability.opentelemetry.metrics.enabled }}
+    {{- $featureGates = append $featureGates "-telemetry.UseLocalHostAsDefaultMetricsAddress" }}
+    {{- end }}
+    {{- if $jailDeleteAfterReadEnabled }}
+    {{- $featureGates = append $featureGates "filelog.allowFileDeletion" }}
+    {{- end }}
+    {{- if $featureGates }}
     command:
       extraArgs:
-        - --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress
+        - "--feature-gates={{ join "," $featureGates }}"
+    {{- end }}
+    {{- if .Values.observability.opentelemetry.metrics.enabled }}
     podMonitor:
       enabled: true
       metricsEndpoints:

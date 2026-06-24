@@ -2,7 +2,7 @@ suite: test opentelemetry collector logs config
 templates:
   - templates/opentelemetry-collector-logs.yaml
 tests:
-  - it: should use eu-north public endpoint regardless of observability region and render default batch settings
+  - it: should use eu-north public endpoint regardless of observability region and render default queue batch settings
     set:
       observability.region: eu-west1
     asserts:
@@ -11,14 +11,34 @@ tests:
       - equal:
           path: spec.values.config.exporters.otlp.endpoint
           value: dns:///write.logging.eu-north1.nebius.cloud.:443
+      - notExists:
+          path: spec.values.config.processors.batch
       - equal:
-          path: spec.values.config.processors.batch.timeout
+          path: spec.values.config.exporters.otlp.sending_queue.sizer
+          value: items
+      - equal:
+          path: spec.values.config.exporters.otlp.sending_queue.queue_size
+          value: 30000
+      - equal:
+          path: spec.values.config.exporters.otlp.sending_queue.num_consumers
+          value: 10
+      - equal:
+          path: spec.values.config.exporters.otlp.sending_queue.storage
+          value: file_storage
+      - equal:
+          path: spec.values.config.receivers["filelog/pods"].storage
+          value: file_storage
+      - equal:
+          path: spec.values.config.receivers["filelog/nodelogs"].storage
+          value: file_storage
+      - equal:
+          path: spec.values.config.exporters.otlp.sending_queue.batch.flush_timeout
           value: 1s
       - equal:
-          path: spec.values.config.processors.batch.send_batch_size
+          path: spec.values.config.exporters.otlp.sending_queue.batch.min_size
           value: 2000
       - equal:
-          path: spec.values.config.processors.batch.send_batch_max_size
+          path: spec.values.config.exporters.otlp.sending_queue.batch.max_size
           value: 5000
 
   - it: should prefer explicit public endpoint override
@@ -38,43 +58,126 @@ tests:
     asserts:
       - hasDocuments:
           count: 1
+      - notExists:
+          path: spec.values.config.processors.batch
       - equal:
-          path: spec.values.config.processors.batch.timeout
+          path: spec.values.config.exporters.otlp.sending_queue.batch.flush_timeout
           value: 1s
       - equal:
-          path: spec.values.config.processors.batch.send_batch_size
+          path: spec.values.config.exporters.otlp.sending_queue.batch.min_size
           value: 2000
       - equal:
-          path: spec.values.config.processors.batch.send_batch_max_size
+          path: spec.values.config.exporters.otlp.sending_queue.batch.max_size
           value: 5000
+
+  - it: should omit file storage when log file storage is disabled
+    set:
+      observability.opentelemetry.logs.values.enableFileStorage: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.values.config.extensions.file_storage
+      - notContains:
+          path: spec.values.config.service.extensions
+          content: file_storage
+      - notExists:
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.storage
+      - notExists:
+          path: spec.values.config.exporters.otlp.sending_queue.storage
+      - notExists:
+          path: spec.values.config.receivers["filelog/pods"].storage
+      - notExists:
+          path: spec.values.config.receivers["filelog/nodelogs"].storage
+      - notContains:
+          path: spec.values.extraVolumeMounts
+          content:
+            mountPath: /var/lib/otelcol
+            name: varlibotelcol
+      - notContains:
+          path: spec.values.extraVolumes
+          content:
+            hostPath:
+              path: /var/lib/otelcol
+              type: DirectoryOrCreate
+            name: varlibotelcol
+      - notContains:
+          path: spec.values.initContainers[0].volumeMounts
+          content:
+            mountPath: /var/lib/otelcol
+            name: varlibotelcol
+
 ---
 suite: test opentelemetry collector events config
 templates:
   - templates/opentelemetry-collector-events.yaml
 tests:
-  - it: should render configured batch settings
+  - it: should render configured queue batch settings
     set:
       observability.opentelemetry.batch.timeout: 2s
       observability.opentelemetry.batch.sendBatchSize: 3000
       observability.opentelemetry.batch.sendBatchMaxSize: 7000
+      observability.opentelemetry.sendingQueue.queueSize: 9000
+      observability.opentelemetry.sendingQueue.numConsumers: 3
     asserts:
       - hasDocuments:
           count: 1
+      - notExists:
+          path: spec.values.config.processors.batch
       - equal:
-          path: spec.values.config.processors.batch.timeout
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.queue_size
+          value: 9000
+      - equal:
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.num_consumers
+          value: 3
+      - equal:
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.storage
+          value: file_storage
+      - equal:
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.batch.flush_timeout
           value: 2s
       - equal:
-          path: spec.values.config.processors.batch.send_batch_size
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.batch.min_size
           value: 3000
       - equal:
-          path: spec.values.config.processors.batch.send_batch_max_size
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.batch.max_size
           value: 7000
+
+  - it: should omit file storage when events file storage is disabled
+    set:
+      observability.opentelemetry.events.values.enableFileStorage: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.values.config.extensions.file_storage
+      - notContains:
+          path: spec.values.config.service.extensions
+          content: file_storage
+      - notExists:
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.storage
+      - notExists:
+          path: spec.values.config.exporters.otlp.sending_queue.storage
+      - notExists:
+          path: spec.values.initContainers
+      - notContains:
+          path: spec.values.extraVolumeMounts
+          content:
+            mountPath: /var/lib/otelcol-events
+            name: varlibotelcol
+      - notContains:
+          path: spec.values.extraVolumes
+          content:
+            hostPath:
+              path: /var/lib/otelcol-events
+              type: DirectoryOrCreate
+            name: varlibotelcol
 ---
 suite: test opentelemetry collector jail logs config
 templates:
   - templates/opentelemetry-collector-jail-logs.yaml
 tests:
-  - it: should use eu-north public endpoint regardless of observability region and render default batch settings
+  - it: should use eu-north public endpoint regardless of observability region and render default queue batch settings
     set:
       observability.region: me-west1
     asserts:
@@ -83,12 +186,82 @@ tests:
       - equal:
           path: spec.values.config.exporters.otlp.endpoint
           value: dns:///write.logging.eu-north1.nebius.cloud.:443
+      - notExists:
+          path: spec.values.config.processors.batch
       - equal:
-          path: spec.values.config.processors.batch.timeout
+          path: spec.values.config.exporters.otlp.sending_queue.sizer
+          value: items
+      - equal:
+          path: spec.values.config.exporters.otlp.sending_queue.queue_size
+          value: 30000
+      - equal:
+          path: spec.values.config.exporters.otlp.sending_queue.storage
+          value: file_storage
+      - equal:
+          path: spec.values.config.exporters.otlp.sending_queue.batch.flush_timeout
           value: 1s
       - equal:
-          path: spec.values.config.processors.batch.send_batch_size
+          path: spec.values.config.exporters.otlp.sending_queue.batch.min_size
           value: 2000
       - equal:
-          path: spec.values.config.processors.batch.send_batch_max_size
+          path: spec.values.config.exporters.otlp.sending_queue.batch.max_size
           value: 5000
+
+  - it: should omit file storage when jail log file storage is disabled
+    set:
+      observability.opentelemetry.logs.values.jailLogs.enableFileStorage: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.values.config.extensions.file_storage
+      - notContains:
+          path: spec.values.config.service.extensions
+          content: file_storage
+      - notExists:
+          path: spec.values.config.exporters.otlp.sending_queue.storage
+      - notExists:
+          path: spec.values.config.receivers.filelog.storage
+      - notExists:
+          path: spec.values.config.receivers["filelog/health_checker"].storage
+      - notContains:
+          path: spec.values.extraVolumeMounts
+          content:
+            mountPath: /var/lib/otelcol-jail
+            name: varlibotelcol
+      - notContains:
+          path: spec.values.extraVolumes
+          content:
+            hostPath:
+              path: /var/lib/otelcol-jail
+              type: DirectoryOrCreate
+            name: varlibotelcol
+
+  - it: should render delete_after_read when jail log deletion is enabled
+    set:
+      observability.opentelemetry.logs.values.jailLogs.deleteAfterRead.enabled: true
+      observability.opentelemetry.logs.values.jailLogs.deleteAfterRead.minAge: 30m
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.config.receivers.filelog.start_at
+          value: beginning
+      - equal:
+          path: spec.values.config.receivers.filelog.delete_after_read
+          value: true
+      - equal:
+          path: spec.values.config.receivers.filelog.delete_after_read_min_age
+          value: 30m
+      - equal:
+          path: spec.values.config.receivers["filelog/health_checker"].start_at
+          value: beginning
+      - equal:
+          path: spec.values.config.receivers["filelog/health_checker"].delete_after_read
+          value: true
+      - equal:
+          path: spec.values.config.receivers["filelog/health_checker"].delete_after_read_min_age
+          value: 30m
+      - equal:
+          path: spec.values.command.extraArgs[0]
+          value: --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress,filelog.allowFileDeletion

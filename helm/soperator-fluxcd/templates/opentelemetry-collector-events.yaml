@@ -33,7 +33,16 @@ spec:
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
   {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
+  {{- $sendingQueue := .Values.observability.opentelemetry.sendingQueue | default dict }}
   {{- $eventsValues := .Values.observability.opentelemetry.events.values | default dict }}
+  {{- $eventsEnableFileStorage := true }}
+  {{- if hasKey $eventsValues "enableFileStorage" }}
+  {{- $eventsEnableFileStorage = $eventsValues.enableFileStorage }}
+  {{- end }}
+  {{- $eventsQueueStorage := "" }}
+  {{- if $eventsEnableFileStorage }}
+  {{- $eventsQueueStorage = "file_storage" }}
+  {{- end }}
   {{- $eventsUseGoMemLimit := true }}
   {{- if hasKey $eventsValues "useGOMEMLIMIT" }}
   {{- $eventsUseGoMemLimit = $eventsValues.useGOMEMLIMIT }}
@@ -69,16 +78,22 @@ spec:
           encoding: proto
           logs_endpoint: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
           retry_on_failure:
+            enabled: true
             initial_interval: 200ms
+            max_elapsed_time: 0
           timeout: 5s
+{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $batch "queue" $sendingQueue "storage" $eventsQueueStorage) | indent 10 }}
         {{- if $hasPublicEndpoint }}
         otlp:
           endpoint: {{ .Values.observability.opentelemetry.publicEndpoint }}
           balancer_name: round_robin
           compression: snappy
           retry_on_failure:
+            enabled: true
             initial_interval: 200ms
+            max_elapsed_time: 0
           timeout: 5s
+{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $batch "queue" $sendingQueue "storage" $eventsQueueStorage) | indent 10 }}
           headers:
             iam-container: {{ .Values.observability.logsProjectId }}
             {{- $extraHeaders := .Values.observability.opentelemetry.extraHeaders }}
@@ -89,6 +104,10 @@ spec:
             authenticator: bearertokenauth
         {{- end }}
       extensions:
+        {{- if $eventsEnableFileStorage }}
+        file_storage:
+          directory: /var/lib/otelcol-events
+        {{- end }}
         health_check:
           endpoint: 0.0.0.0:13133
         {{- if $hasPublicEndpoint }}
@@ -100,10 +119,6 @@ spec:
         {{- end }}
         {{- end }}
       processors:
-        batch:
-          timeout: {{ $batch.timeout | default "1s" }}
-          send_batch_size: {{ $batch.sendBatchSize | default 2000 }}
-          send_batch_max_size: {{ $batch.sendBatchMaxSize | default 5000 }}
         k8s_attributes:
           extract:
             labels:
@@ -173,6 +188,9 @@ spec:
         {{- end }}
         extensions:
         - health_check
+        {{- if $eventsEnableFileStorage }}
+        - file_storage
+        {{- end }}
         {{- if $hasPublicEndpoint }}
         - bearertokenauth
         {{- end }}
@@ -187,7 +205,6 @@ spec:
             - k8s_attributes
             - transform
             - memory_limiter
-            - batch
             receivers:
             - k8sobjects
           metrics: null
@@ -218,6 +235,21 @@ spec:
       runAsUser: 10001
     serviceAccount:
       create: true
+    {{- if $eventsEnableFileStorage }}
+    initContainers:
+    - command:
+      - sh
+      - -c
+      - 'chown -R 10001: /var/lib/otelcol-events'
+      image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+      name: init-fs
+      securityContext:
+        runAsGroup: 0
+        runAsUser: 0
+      volumeMounts:
+      - mountPath: /var/lib/otelcol-events
+        name: varlibotelcol
+    {{- end }}
     tolerations: []
     useGOMEMLIMIT: {{ $eventsUseGoMemLimit }}
     {{- if and .Values.observability.opentelemetry.events.values
@@ -225,8 +257,15 @@ spec:
     resources:
     {{- toYaml .Values.observability.opentelemetry.events.values.resources | nindent 6 }}
     {{- end }}
-    {{- if $hasPublicEndpoint }}
+    {{- if or $eventsEnableFileStorage $hasPublicEndpoint }}
     extraVolumes:
+      {{- if $eventsEnableFileStorage }}
+      - hostPath:
+          path: /var/lib/otelcol-events
+          type: DirectoryOrCreate
+        name: varlibotelcol
+      {{- end }}
+    {{- if $hasPublicEndpoint }}
       - name: o11ytoken
         {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
         secret:
@@ -236,10 +275,19 @@ spec:
           path: /mnt/cloud-metadata
           type: Directory
         {{- end }}
+    {{- end }}
+    {{- end }}
+    {{- if or $eventsEnableFileStorage $hasPublicEndpoint }}
     extraVolumeMounts:
+      {{- if $eventsEnableFileStorage }}
+      - mountPath: /var/lib/otelcol-events
+        name: varlibotelcol
+      {{- end }}
+    {{- if $hasPublicEndpoint }}
       - mountPath: /o11ytoken
         name: o11ytoken
         readOnly: true
+    {{- end }}
     {{- end }}
     {{- if .Values.observability.opentelemetry.metrics.enabled }}
     command:

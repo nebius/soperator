@@ -37,7 +37,28 @@ spec:
   {{- if .Values.observability.ncclProfiles.configMapOverrideValues }}
     {{- toYaml .Values.observability.ncclProfiles.configMapOverrideValues | nindent 4 }}
   {{- else }}
-  {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
+  {{- $values := .Values.observability.ncclProfiles.values | default dict }}
+  {{- $batch := $values.batch | default dict }}
+  {{- $sendingQueue := $values.sendingQueue | default dict }}
+  {{- $metrics := $values.metrics | default dict }}
+  {{- $metricsEnabled := true }}
+  {{- if hasKey $metrics "enabled" }}
+  {{- $metricsEnabled = $metrics.enabled }}
+  {{- end }}
+  {{- $enableFileStorage := true }}
+  {{- if hasKey $values "enableFileStorage" }}
+  {{- $enableFileStorage = $values.enableFileStorage }}
+  {{- end }}
+  {{- $queueStorage := "" }}
+  {{- if $enableFileStorage }}
+  {{- $queueStorage = "file_storage" }}
+  {{- end }}
+  {{- $deleteAfterRead := $values.deleteAfterRead | default dict }}
+  {{- $deleteAfterReadEnabled := false }}
+  {{- if hasKey $deleteAfterRead "enabled" }}
+  {{- $deleteAfterReadEnabled = $deleteAfterRead.enabled }}
+  {{- end }}
+  {{- $exportLabels := $values.exportLabels | default dict }}
     resources:
     - apiVersion: v1
       kind: ConfigMap
@@ -50,35 +71,30 @@ spec:
             otlp_http/victoriametrics:
               compression: gzip
               encoding: proto
-              metrics_endpoint: {{ .Values.observability.ncclProfiles.values.metricsEndpoint | default "http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics" }}
-              timeout: {{ .Values.observability.ncclProfiles.values.metricsExporterTimeout | default "15s" }}
+              metrics_endpoint: {{ $values.metricsEndpoint | default "http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics" }}
+              timeout: {{ $values.metricsExporterTimeout | default "15s" }}
               retry_on_failure:
                 enabled: true
                 initial_interval: 1s
                 max_interval: 10s
-                max_elapsed_time: 5m
-              sending_queue:
-                enabled: true
-                queue_size: {{ .Values.observability.ncclProfiles.values.metricsExporterSendingQueueSize | default 2000 }}
-                num_consumers: {{ .Values.observability.ncclProfiles.values.metricsExporterNumConsumers | default 4 }}
-                {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
-                storage: file_storage
-                {{- end }}
+                max_elapsed_time: 0
+{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $batch "queue" $sendingQueue "storage" $queueStorage) | indent 14 }}
 
           receivers:
             filelog/nccl_metrics:
               include:
-                - {{ .Values.observability.ncclProfiles.values.dumpDir }}/*/*/*.log
-              poll_interval: {{ .Values.observability.ncclProfiles.values.pollInterval | default "30s" }}
+                - {{ $values.dumpDir }}/*/*/*.log
+              poll_interval: {{ $values.pollInterval | default "30s" }}
               retry_on_failure:
                 enabled: true
+                max_elapsed_time: 0
               include_file_path: true
               start_at: beginning
-              {{- if .Values.observability.ncclProfiles.values.deleteAfterRead.enabled }}
+              {{- if $deleteAfterReadEnabled }}
               delete_after_read: true
-              delete_after_read_min_age: {{ .Values.observability.ncclProfiles.values.deleteAfterRead.minAge | default "1m" }}
+              delete_after_read_min_age: {{ $deleteAfterRead.minAge | default "1m" }}
               {{- end }}
-              {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+              {{- if $enableFileStorage }}
               storage: file_storage
               {{- end }}
 
@@ -91,29 +107,23 @@ spec:
                 - if: attributes["job_id"] != nil
                   type: copy
                   from: attributes.job_id
-                  to: resource["{{ .Values.observability.ncclProfiles.values.exportLabels.slurmJobId | default "slurm_job_id" }}"]
+                  to: resource["{{ $exportLabels.slurmJobId | default "slurm_job_id" }}"]
 
                 - if: attributes["step_id"] != nil
                   type: copy
                   from: attributes.step_id
-                  to: resource["{{ .Values.observability.ncclProfiles.values.exportLabels.slurmStepId | default "slurm_step_id" }}"]
+                  to: resource["{{ $exportLabels.slurmStepId | default "slurm_step_id" }}"]
 
                 - if: attributes["hostname_pid"] != nil
                   type: copy
                   from: attributes.hostname_pid
-                  to: resource["{{ .Values.observability.ncclProfiles.values.exportLabels.hostnamePid | default "hostname_pid" }}"]
+                  to: resource["{{ $exportLabels.hostnamePid | default "hostname_pid" }}"]
 
           connectors:
             ncclmetrics:
 
-          processors:
-            batch:
-              timeout: {{ $batch.timeout | default "5s" }}
-              send_batch_size: {{ $batch.sendBatchSize | default 2000 }}
-              send_batch_max_size: {{ $batch.sendBatchMaxSize | default 5000 }}
-
           service:
-            {{- if .Values.observability.opentelemetry.metrics.enabled }}
+            {{- if $metricsEnabled }}
             telemetry:
               metrics:
                 readers:
@@ -125,7 +135,7 @@ spec:
             {{- end }}
             extensions:
               - health_check
-              {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+              {{- if $enableFileStorage }}
               - file_storage
               {{- end }}
             pipelines:
@@ -138,15 +148,13 @@ spec:
               metrics/nccl_metrics:
                 receivers:
                   - ncclmetrics
-                processors:
-                  - batch
                 exporters:
                   - otlp_http/victoriametrics
 
           extensions:
-            {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+            {{- if $enableFileStorage }}
             file_storage:
-              directory: /var/lib/otelcol
+              directory: /var/lib/otelcol-nccl-profiles
             {{- end }}
             health_check:
               endpoint: 0.0.0.0:13133
@@ -200,12 +208,27 @@ spec:
   targetNamespace: {{ .Values.observability.vmStack.namespace }}
 
   values:
-  {{- $ncclValues := .Values.observability.ncclProfiles.values | default dict }}
-  {{- $ncclUseGoMemLimit := true }}
-  {{- if hasKey $ncclValues "useGoMemLimit" }}
-  {{- $ncclUseGoMemLimit = $ncclValues.useGoMemLimit }}
-  {{- else if hasKey $ncclValues "useGOMEMLIMIT" }}
-  {{- $ncclUseGoMemLimit = $ncclValues.useGOMEMLIMIT }}
+  {{- $values := .Values.observability.ncclProfiles.values | default dict }}
+  {{- $metrics := $values.metrics | default dict }}
+  {{- $metricsEnabled := true }}
+  {{- if hasKey $metrics "enabled" }}
+  {{- $metricsEnabled = $metrics.enabled }}
+  {{- end }}
+  {{- $mode := $values.mode | default "shared" }}
+  {{- $enableFileStorage := true }}
+  {{- if hasKey $values "enableFileStorage" }}
+  {{- $enableFileStorage = $values.enableFileStorage }}
+  {{- end }}
+  {{- $deleteAfterRead := $values.deleteAfterRead | default dict }}
+  {{- $deleteAfterReadEnabled := false }}
+  {{- if hasKey $deleteAfterRead "enabled" }}
+  {{- $deleteAfterReadEnabled = $deleteAfterRead.enabled }}
+  {{- end }}
+  {{- $useGoMemLimit := true }}
+  {{- if hasKey $values "useGoMemLimit" }}
+  {{- $useGoMemLimit = $values.useGoMemLimit }}
+  {{- else if hasKey $values "useGOMEMLIMIT" }}
+  {{- $useGoMemLimit = $values.useGOMEMLIMIT }}
   {{- end }}
   {{- if .Values.observability.ncclProfiles.collectorOverrideValues }}
     {{- toYaml .Values.observability.ncclProfiles.collectorOverrideValues | nindent 4 }}
@@ -226,9 +249,9 @@ spec:
     image:
       pullPolicy: IfNotPresent
       repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
-      tag: {{ .Values.observability.ncclProfiles.values.nebiusO11yAgentVersion | default "2.0.10" }}
+      tag: {{ $values.nebiusO11yAgentVersion | default "2.0.10" }}
 
-    {{- if eq (.Values.observability.ncclProfiles.values.mode | default "shared") "shared" }}
+    {{- if eq $mode "shared" }}
     mode: deployment
     replicaCount: 1   # Only one replica to avoid file lock conflicts on shared storage and prevent log duplication
 
@@ -244,7 +267,7 @@ spec:
                   operator: In
                   values:
                     - "system"
-    {{- else }}{{- if eq (.Values.observability.ncclProfiles.values.mode | default "shared") "nodeLocal" }}
+    {{- else }}{{- if eq $mode "nodeLocal" }}
     mode: daemonset
 
     rollout:
@@ -274,10 +297,10 @@ spec:
           path: /mnt/jail
           type: Directory
 
-      {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+      {{- if $enableFileStorage }}
       - name: varlibotelcol
         hostPath:
-          path: /var/lib/otelcol
+          path: /var/lib/otelcol-nccl-profiles
           type: DirectoryOrCreate
       {{- end }}
 
@@ -286,9 +309,9 @@ spec:
         mountPath: /mnt/jail
         readOnly: true
 
-      {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+      {{- if $enableFileStorage }}
       - name: varlibotelcol
-        mountPath: /var/lib/otelcol
+        mountPath: /var/lib/otelcol-nccl-profiles
       {{- end }}
 
     securityContext:
@@ -300,7 +323,7 @@ spec:
       create: true
 
     extraEnvs:
-      {{- include "soperator-fluxcd.otelCollectorGoEnv" (dict "resources" $ncclValues.resources "useGoMemLimit" $ncclUseGoMemLimit) | nindent 6 }}
+      {{- include "soperator-fluxcd.otelCollectorGoEnv" (dict "resources" $values.resources "useGoMemLimit" $useGoMemLimit) | nindent 6 }}
 
     initContainers:
       - command:
@@ -308,7 +331,7 @@ spec:
           - "-c"
           - |
             set -eu
-            dump_dir="{{ .Values.observability.ncclProfiles.values.dumpDir }}"
+            dump_dir="{{ $values.dumpDir }}"
             case "$dump_dir" in
               /mnt/jail/*) ;;
               *)
@@ -330,11 +353,11 @@ spec:
           - name: jail
             mountPath: /mnt/jail
 
-      {{- if .Values.observability.ncclProfiles.values.enableFileStorage }}
+      {{- if $enableFileStorage }}
       - command:
           - sh
           - "-c"
-          - 'chown -R 10001: /var/lib/otelcol'
+          - 'chown -R 10001: /var/lib/otelcol-nccl-profiles'
         image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
         name: init-fs
         securityContext:
@@ -342,19 +365,19 @@ spec:
           runAsUser: 0
         volumeMounts:
           - name: varlibotelcol
-            mountPath: /var/lib/otelcol
+            mountPath: /var/lib/otelcol-nccl-profiles
       {{- end }}
 
     resources:
-      {{- toYaml .Values.observability.ncclProfiles.values.resources | nindent 6 }}
+      {{- toYaml $values.resources | nindent 6 }}
 
-    useGOMEMLIMIT: {{ $ncclUseGoMemLimit }}
+    useGOMEMLIMIT: {{ $useGoMemLimit }}
 
     {{- $featureGates := list }}
-    {{- if .Values.observability.opentelemetry.metrics.enabled }}
+    {{- if $metricsEnabled }}
     {{- $featureGates = append $featureGates "-telemetry.UseLocalHostAsDefaultMetricsAddress" }}
     {{- end }}
-    {{- if .Values.observability.ncclProfiles.values.deleteAfterRead.enabled }}
+    {{- if $deleteAfterReadEnabled }}
     {{- $featureGates = append $featureGates "filelog.allowFileDeletion" }}
     {{- end }}
     {{- if $featureGates }}
@@ -371,7 +394,7 @@ spec:
       jaeger-thrift:
         enabled: false
       metrics:
-        {{- if .Values.observability.opentelemetry.metrics.enabled }}
+        {{- if $metricsEnabled }}
         enabled: true
         containerPort: 8889
         servicePort: 8889
@@ -386,12 +409,12 @@ spec:
         enabled: false
 
     podMonitor:
-      {{- if .Values.observability.opentelemetry.metrics.enabled }}
+      {{- if $metricsEnabled }}
       enabled: true
       metricsEndpoints:
         - port: metrics
-          interval: {{ .Values.observability.opentelemetry.metrics.interval | default "30s" }}
-          scrapeTimeout: {{ .Values.observability.opentelemetry.metrics.scrapeTimeout | default "10s" }}
+          interval: {{ $metrics.interval | default "30s" }}
+          scrapeTimeout: {{ $metrics.scrapeTimeout | default "10s" }}
           relabelings:
             - sourceLabels: [ __meta_kubernetes_pod_name ]
               targetLabel: pod

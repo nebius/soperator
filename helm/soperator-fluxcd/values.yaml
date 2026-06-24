@@ -155,10 +155,19 @@ observability:
     publicEndpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
     namespace: logs-system
     extraHeaders: {}
+    # These values are rendered as exporter sending_queue.batch settings.
+    # The chart intentionally does not use the batch processor for collector pipelines.
+    # https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/44845#issuecomment-3877056774
     batch:
       timeout: 1s
       sendBatchSize: 2000
       sendBatchMaxSize: 5000
+    # Exporter queue sizing shared by logs, events, and jail logs collectors.
+    # queueSize is measured in telemetry items because exporter queues use sizer: items
+    # (log records for logs/events), and it applies separately to each exporter.
+    sendingQueue:
+      queueSize: 30000
+      numConsumers: 10
     metrics:
       enabled: true
       interval: 30s
@@ -175,9 +184,16 @@ observability:
           retries: 6
           remediateLastFailure: true
       values:
+        enableFileStorage: true
         jailLogs:
           enabled: true
           pollInterval: 30s
+          enableFileStorage: true
+          deleteAfterRead:
+            enabled: false
+            # Nebius O11y agent fork option; not part of upstream filelogreceiver.
+            # Files are deleted only after they have not been modified for at least this duration.
+            minAge: 15m
           resources:
             requests:
               memory: 200Mi
@@ -213,6 +229,7 @@ observability:
           retries: 3
           remediateLastFailure: true
       values:
+        enableFileStorage: true
         resources:
           requests:
             memory: 128Mi
@@ -422,8 +439,20 @@ observability:
       useGoMemLimit: true
       metricsEndpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics
       metricsExporterTimeout: 15s
-      metricsExporterSendingQueueSize: 2000
-      metricsExporterNumConsumers: 4
+      # These values are rendered as exporter sending_queue.batch settings.
+      # The chart intentionally does not use the batch processor for collector pipelines.
+      batch:
+        timeout: 1s
+        sendBatchSize: 2000
+        sendBatchMaxSize: 5000
+      # Measured in metric data points because the exporter queue uses sizer: items.
+      sendingQueue:
+        queueSize: 30000
+        numConsumers: 10
+      metrics:
+        enabled: true
+        interval: 30s
+        scrapeTimeout: 10s
       dumpDir: /mnt/jail/opt/soperator-outputs/nccl_profiles
       pollInterval: 30s
       exportLabels:
@@ -433,6 +462,8 @@ observability:
       enableFileStorage: true
       deleteAfterRead:
         enabled: true
+        # Nebius O11y agent fork option; not part of upstream filelogreceiver.
+        # Files are deleted only after they have not been modified for at least this duration.
         minAge: 15m
 securityProfilesOperator:
   enabled: true
