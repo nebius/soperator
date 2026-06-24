@@ -651,7 +651,12 @@ def _format_tier_topology(parts: dict[str, str], fabric: str = "root") -> str:
 
 
 def apply_node_topology(hostname: str, topology: str) -> None:
-    """Apply topology to a node via scontrol update."""
+    """Apply topology and clear manual drain state for a resumed worker.
+
+    Users may drain POWERED_DOWN workers to prevent Slurm from automatically
+    powering them up for queued jobs. When this worker is actually resumed,
+    clear that drain marker so it can schedule jobs again.
+    """
     try:
         node_addr: str = get_node_addr()
         cmd = [
