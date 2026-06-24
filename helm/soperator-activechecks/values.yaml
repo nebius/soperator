@@ -45,9 +45,9 @@ images:
   sansible: "cr.eu-north1.nebius.cloud/soperator/sansible:4.0.2-slurm25.11.5"
   activeCheckImageRepository: "cr.eu-north1.nebius.cloud#ml-containers/training_diag"
   activeCheckImageTags:
-    # Image training_diag from PR https://github.com/nebius/ml-containers/pull/84
-    "12.9.0": "12.9.0-ubuntu24.04-20260610131231"
-    "13.0.2": "13.0.2-ubuntu24.04-20260610131231"
+    # Image training_diag from PR https://github.com/nebius/ml-containers/pull/90
+    "12.9.0": "12.9.0-ubuntu24.04-20260624090429"
+    "13.0.2": "13.0.2-ubuntu24.04-20260624090429"
 # Optional override in Pyxis ("reg#repo:tag") format.
 activeCheckImage: ""
 checks:
@@ -391,6 +391,10 @@ checks:
           - run.yml
           - -t
           - run-all-upgrade
+          - -e
+          - "common_packages_force_reinstall=true"
+          - -e
+          - "python_packages_force_reinstall=true"
           - -e
           - "cuda_force_upgrade=true"
           - -e

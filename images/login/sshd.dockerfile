@@ -2,8 +2,8 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/81
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260421092341 AS login_sshd
+# https://github.com/nebius/ml-containers/pull/90
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260624085500 AS login_sshd
 
 # Install OpenSSH server
 # Create root .ssh directory
