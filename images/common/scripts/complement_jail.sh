@@ -121,6 +121,7 @@ pushd "${jaildir}"
             --no-pivot \
             configure \
             --no-cgroups \
+            --cuda-compat-mode=disabled \
             --ldconfig=$FAKE_LDCONFIG \
             --device=all \
             "${cap_args[@]}" \
