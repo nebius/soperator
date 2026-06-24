@@ -116,10 +116,10 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	if _, err := w.Kubectl().RunWithDefaultRetry(ctx, "get", "pods", "-n", soperatorNamespace); err != nil {
 		return err
 	}
-	if err := verifyPodReady(ctx, w, soperatorNamespace, state.SlurmClusterName+"-login-0"); err != nil {
+	if err := verifyPodReady(ctx, w, soperatorNamespace, state.PodName("login-0")); err != nil {
 		return fmt.Errorf("verify login pod: %w", err)
 	}
-	if err := verifyPodReady(ctx, w, soperatorNamespace, state.SlurmClusterName+"-controller-0"); err != nil {
+	if err := verifyPodReady(ctx, w, soperatorNamespace, state.PodName("controller-0")); err != nil {
 		return fmt.Errorf("verify controller pod: %w", err)
 	}
 	if _, err := w.Controller().RunWithDefaultRetry(ctx, "true"); err != nil {

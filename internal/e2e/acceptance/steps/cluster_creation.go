@@ -316,7 +316,7 @@ func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 
 func (s *ClusterCreation) checkWelcomeOutput(ctx context.Context) error {
 	output, err := s.exec.Kubectl().RunWithDefaultRetry(ctx,
-		"exec", "-n", clusterCreationNamespace, s.state.SlurmClusterName+"-login-0", "--", "sh", "-lc",
+		"exec", "-n", clusterCreationNamespace, s.state.PodName("login-0"), "--", "sh", "-lc",
 		"/etc/update-motd.d/00-welcome && /etc/update-motd.d/20-slurm-stats")
 	if err != nil {
 		return fmt.Errorf("render welcome output: %w", err)

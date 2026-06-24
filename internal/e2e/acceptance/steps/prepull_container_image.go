@@ -18,7 +18,7 @@ var containerImageRegex = regexp.MustCompile(`--container-image=(\S+)`)
 // prepull-container-image ActiveCheck's sbatch script
 // (e.g. "cr.eu-north1.nebius.cloud#ml-containers/training_diag:<tag>").
 func PrepullContainerImagePyxis(ctx context.Context, exec framework.Exec, clusterName string) (string, error) {
-	checkName := clusterName + "-" + prepullActiveCheckBaseName
+	checkName := framework.ClusterPrefixedName(clusterName, prepullActiveCheckBaseName)
 	var checks slurmv1alpha1.ActiveCheckList
 	if err := kubectlJSON(ctx, exec, &checks, "get", "activechecks", "-A", "-o", "json"); err != nil {
 		return "", fmt.Errorf("list ActiveChecks: %w", err)

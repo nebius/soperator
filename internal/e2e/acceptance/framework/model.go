@@ -19,6 +19,10 @@ type ClusterState struct {
 	DiscoveredNodeSets []DiscoveredNodeSet
 }
 
+func (s *ClusterState) PodName(podName string) string {
+	return ClusterPrefixedName(s.SlurmClusterName, podName)
+}
+
 func (s *ClusterState) DesiredWorkerCount() int {
 	total := 0
 	for _, nodeSet := range s.DiscoveredNodeSets {
