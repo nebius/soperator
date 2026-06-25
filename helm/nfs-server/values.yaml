@@ -95,7 +95,7 @@ monitoring:
     port: metrics
   nodeExporter:
     image:
-      repository: prom/node-exporter
+      repository: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter
       tag: v1.10.2
       pullPolicy: IfNotPresent
     # Enable NFS collector

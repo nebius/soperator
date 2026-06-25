@@ -1,0 +1,331 @@
+suite: test login sssd helm rendering
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should not render login sssd by default
+    set:
+      clusterName: test-cluster
+      k8sNodeFilters:
+        - name: gpu
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "test-node-group"
+        - name: no-gpu
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "test-node-group"
+        - name: system
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "test-node-group"
+      volumeSources:
+        - name: controller-spool
+          persistentVolumeClaim:
+            claimName: "controller-spool-pvc"
+        - name: jail
+          persistentVolumeClaim:
+            claimName: "jail-pvc"
+      populateJail:
+        k8sNodeFilterName: "gpu"
+      slurmNodes:
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+          slurmdbd:
+            resources:
+              cpu: "1000m"
+              memory: "3Gi"
+              ephemeralStorage: "10Gi"
+          munge:
+            resources:
+              cpu: "1000m"
+              memory: "1Gi"
+              ephemeralStorage: "5Gi"
+        controller:
+          k8sNodeFilterName: "no-gpu"
+          slurmctld:
+            resources:
+              cpu: "1000m"
+              memory: "3Gi"
+              ephemeralStorage: "20Gi"
+          munge:
+            resources:
+              cpu: "1000m"
+              memory: "1Gi"
+              ephemeralStorage: "5Gi"
+          volumes:
+            spool:
+              volumeClaimTemplateSpec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 50Gi
+            jail:
+              volumeSourceName: "jail"
+        login:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+          sshd:
+            resources:
+              cpu: "3000m"
+              memory: "9Gi"
+              ephemeralStorage: "30Gi"
+          munge:
+            resources:
+              cpu: "500m"
+              memory: "500Mi"
+              ephemeralStorage: "5Gi"
+          sshRootPublicKeys:
+            - "ssh-ed25519 test-key"
+          sshdServiceType: "LoadBalancer"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        exporter:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          exporter:
+            resources:
+              cpu: "250m"
+              memory: "256Mi"
+              ephemeralStorage: "500Mi"
+          munge:
+            resources:
+              cpu: "1000m"
+              memory: "1Gi"
+              ephemeralStorage: "5Gi"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        rest:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+          rest:
+            resources:
+              cpu: "2000m"
+              memory: "8Gi"
+              ephemeralStorage: "500Mi"
+      sConfigController:
+        node:
+          k8sNodeFilterName: "system"
+          size: 1
+        container:
+          resources:
+            cpu: "250m"
+            memory: "256Mi"
+            ephemeralStorage: "500Mi"
+      images:
+        slurmctld: "test-image"
+        slurmrestd: "test-image"
+        slurmd: "test-image"
+        sshd: "test-image"
+        munge: "test-image"
+        populateJail: "test-image"
+        slurmdbd: "test-image"
+        soperatorExporter: "test-image"
+        sConfigController: "test-image"
+        mariaDB: "test-image"
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.login.sssd
+
+  - it: should render login sssd with default image when enabled
+    set:
+      clusterName: test-cluster
+      k8sNodeFilters:
+        - name: gpu
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "test-node-group"
+        - name: no-gpu
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "test-node-group"
+        - name: system
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nebius.com/node-group-id"
+                        operator: In
+                        values:
+                          - "test-node-group"
+      volumeSources:
+        - name: controller-spool
+          persistentVolumeClaim:
+            claimName: "controller-spool-pvc"
+        - name: jail
+          persistentVolumeClaim:
+            claimName: "jail-pvc"
+      populateJail:
+        k8sNodeFilterName: "gpu"
+      slurmNodes:
+        sssd:
+          enabled: true
+          sssdDebugLevel: 2
+          sssdConfSecretRefName: "sssd-conf"
+          sssdLdapCAConfigMapRefName: "ldap-ca"
+        accounting:
+          k8sNodeFilterName: "no-gpu"
+          slurmdbd:
+            resources:
+              cpu: "1000m"
+              memory: "3Gi"
+              ephemeralStorage: "10Gi"
+          munge:
+            resources:
+              cpu: "1000m"
+              memory: "1Gi"
+              ephemeralStorage: "5Gi"
+        controller:
+          k8sNodeFilterName: "no-gpu"
+          slurmctld:
+            resources:
+              cpu: "1000m"
+              memory: "3Gi"
+              ephemeralStorage: "20Gi"
+          munge:
+            resources:
+              cpu: "1000m"
+              memory: "1Gi"
+              ephemeralStorage: "5Gi"
+          volumes:
+            spool:
+              volumeClaimTemplateSpec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 50Gi
+            jail:
+              volumeSourceName: "jail"
+        login:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+          sshd:
+            resources:
+              cpu: "3000m"
+              memory: "9Gi"
+              ephemeralStorage: "30Gi"
+          munge:
+            resources:
+              cpu: "500m"
+              memory: "500Mi"
+              ephemeralStorage: "5Gi"
+          sshRootPublicKeys:
+            - "ssh-ed25519 test-key"
+          sshdServiceType: "LoadBalancer"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        exporter:
+          size: 1
+          k8sNodeFilterName: "no-gpu"
+          exporter:
+            resources:
+              cpu: "250m"
+              memory: "256Mi"
+              ephemeralStorage: "500Mi"
+          munge:
+            resources:
+              cpu: "1000m"
+              memory: "1Gi"
+              ephemeralStorage: "5Gi"
+          volumes:
+            jail:
+              volumeSourceName: "jail"
+        rest:
+          size: 2
+          k8sNodeFilterName: "no-gpu"
+          rest:
+            resources:
+              cpu: "2000m"
+              memory: "8Gi"
+              ephemeralStorage: "500Mi"
+      sConfigController:
+        node:
+          k8sNodeFilterName: "system"
+          size: 1
+        container:
+          resources:
+            cpu: "250m"
+            memory: "256Mi"
+            ephemeralStorage: "500Mi"
+      images:
+        slurmctld: "test-image"
+        slurmrestd: "test-image"
+        slurmd: "test-image"
+        sshd: "test-image"
+        munge: "test-image"
+        sssd: "cr.eu-north1.nebius.cloud/soperator/sssd:2.9.4-1-63"
+        populateJail: "test-image"
+        slurmdbd: "test-image"
+        soperatorExporter: "test-image"
+        sConfigController: "test-image"
+        mariaDB: "test-image"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.controller.sssd.image
+          value: cr.eu-north1.nebius.cloud/soperator/sssd:2.9.4-1-63
+      - equal:
+          path: spec.slurmNodes.controller.sssdConfSecretRefName
+          value: sssd-conf
+      - equal:
+          path: spec.slurmNodes.controller.sssdLdapCAConfigMapRefName
+          value: ldap-ca
+      - equal:
+          path: spec.slurmNodes.controller.sssdDebugLevel
+          value: 2
+      - equal:
+          path: spec.slurmNodes.login.sssd.image
+          value: cr.eu-north1.nebius.cloud/soperator/sssd:2.9.4-1-63
+      - equal:
+          path: spec.slurmNodes.login.sssd.imagePullPolicy
+          value: IfNotPresent
+      - equal:
+          path: spec.slurmNodes.login.sssd.appArmorProfile
+          value: unconfined
+      - notExists:
+          path: spec.slurmNodes.login.sssd.command
+      - notExists:
+          path: spec.slurmNodes.login.sssd.args
+      - equal:
+          path: spec.slurmNodes.login.sssdConfSecretRefName
+          value: sssd-conf
+      - equal:
+          path: spec.slurmNodes.login.sssdLdapCAConfigMapRefName
+          value: ldap-ca
+      - equal:
+          path: spec.slurmNodes.login.sssdDebugLevel
+          value: 2

@@ -49,6 +49,17 @@ pushd "${jaildir}"
     echo "Bind-mount /etc/hosts"
     mount --bind /etc/hosts etc/hosts
 
+    echo "Bind mount sssd.conf if exists"
+    if [[ -f /etc/sssd/sssd.conf ]]; then
+      mount --bind /etc/sssd etc/sssd
+    fi
+
+    echo "Bind-mount SSSD sockets if they exist"
+    if [[ -d /var/lib/sss/pipes ]]; then
+      mkdir -p var/lib/sss/pipes
+      mount --bind /var/lib/sss/pipes var/lib/sss/pipes
+    fi
+
     echo "Bind-mount jail submounts from upper ${upperdir} into the actual ${jaildir}"
     submounts=$( \
         findmnt --output TARGET --submounts --target / --pairs | \
@@ -160,7 +171,7 @@ pushd "${jaildir}"
     mkdir -m 777 -p opt/soperator-outputs
 
     # For login nodes in GPU clusters and CPU workers in GPU clusters
-    if { [ -z "$worker" ] && [ "$SLURM_CLUSTER_TYPE" = "gpu" ]; } || { [ -n "$worker" ] && [ "$SLURM_CLUSTER_TYPE" = "gpu" ] && [ "$NODESET_GPU_ENABLED" != "true" ]; }; then
+    if { [ -z "$worker" ] && [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; } || { [ -n "$worker" ] && [ "$SLURM_CLUSTER_WITH_GPU" = "true" ] && [ "$NODESET_GPU_ENABLED" != "true" ]; }; then
         while [ ! -f "etc/gpu_libs_installed.flag" ]; do
             echo "Waiting for GPU libs to be propagated to the jail from a worker node"
             sleep 10

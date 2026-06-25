@@ -87,8 +87,6 @@ func RenderVolumeMountSlurmConfigs() corev1.VolumeMount {
 	}
 }
 
-// endregion Slurm configs
-
 // RenderVolumeProjectedSlurmConfigs renders [corev1.Volume] containing Slurm common configs
 func RenderVolumeProjectedSlurmConfigs(clusterName string, additionalProjections ...*corev1.VolumeProjection) corev1.Volume {
 	sources := []corev1.VolumeProjection{
@@ -114,6 +112,8 @@ func RenderVolumeProjectedSlurmConfigs(clusterName string, additionalProjections
 		},
 	}
 }
+
+// endregion Slurm configs
 
 // region Spool
 
@@ -530,3 +530,42 @@ func AddVolumeOrSpecVanilla(
 
 	return volumes, pvcTemplateSpecs, nil
 }
+
+// region SSSDVolumes
+
+func RenderVolumeSSSDSocket() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSSSDSocket,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+}
+
+func RenderVolumeSSSDConf(secretName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSSSDConf,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName:  secretName,
+				DefaultMode: ptr.To(consts.SecretSSSDConfFileMode),
+			},
+		},
+	}
+}
+
+func RenderVolumeSSSDLdapCA(configMapName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSSSDLdapCA,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: configMapName,
+				},
+				DefaultMode: ptr.To(DefaultFileMode),
+			},
+		},
+	}
+}
+
+// endregion SSSDVolumes

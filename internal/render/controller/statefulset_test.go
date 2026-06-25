@@ -3,6 +3,7 @@ package controller
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -210,6 +211,85 @@ func TestRenderStatefulSet(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRenderStatefulSet_SSSD(t *testing.T) {
+	sssdContainer := values.Container{
+		NodeContainer: slurmv1.NodeContainer{
+			Image: "sssd-image",
+			Resources: corev1.ResourceList{
+				corev1.ResourceCPU:              resource.MustParse("100m"),
+				corev1.ResourceMemory:           resource.MustParse("128Mi"),
+				corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+			},
+		},
+		Name: consts.ContainerNameSSSD,
+	}
+
+	controllerValues := &values.SlurmController{
+		K8sNodeFilterName: "test-filter",
+		StatefulSet: values.StatefulSet{
+			Name:           "test-controller-sts",
+			Replicas:       1,
+			MaxUnavailable: intstr.FromInt32(1),
+		},
+		Service: values.Service{Name: "test-controller-svc"},
+		ContainerSlurmctld: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "slurmctld-image",
+				Port:  6817,
+				Resources: corev1.ResourceList{
+					corev1.ResourceCPU:              resource.MustParse("500m"),
+					corev1.ResourceMemory:           resource.MustParse("1Gi"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+			Name: consts.ContainerNameSlurmctld,
+		},
+		ContainerMunge: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "munge-image",
+				Resources: corev1.ResourceList{
+					corev1.ResourceCPU:              resource.MustParse("100m"),
+					corev1.ResourceMemory:           resource.MustParse("256Mi"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+			Name: consts.ContainerNameMunge,
+		},
+		ContainerSSSD:      &sssdContainer,
+		SSSDConfSecretName: "controller-sssd-secret",
+		VolumeSpool:        slurmv1.NodeVolume{VolumeSourceName: ptr.To("test-volume")},
+		VolumeJail:         slurmv1.NodeVolume{VolumeSourceName: ptr.To("test-volume")},
+	}
+
+	result, err := RenderStatefulSet(
+		"test-namespace",
+		"test-cluster",
+		[]slurmv1.K8sNodeFilter{{Name: "test-filter"}},
+		[]slurmv1.VolumeSource{{Name: "test-volume", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
+		controllerValues,
+		false,
+	)
+	assert.NoError(t, err)
+
+	assert.Len(t, result.Spec.Template.Spec.InitContainers, 2)
+	assert.Equal(t, consts.ContainerNameSSSD, result.Spec.Template.Spec.InitContainers[1].Name)
+
+	var volumeNames []string
+	for _, volume := range result.Spec.Template.Spec.Volumes {
+		volumeNames = append(volumeNames, volume.Name)
+	}
+	assert.Contains(t, volumeNames, consts.VolumeNameSSSDConf)
+	assert.Contains(t, volumeNames, consts.VolumeNameSSSDSocket)
+
+	slurmctld := result.Spec.Template.Spec.Containers[0]
+	var mountNames []string
+	for _, mount := range slurmctld.VolumeMounts {
+		mountNames = append(mountNames, mount.Name)
+	}
+	assert.Contains(t, mountNames, consts.VolumeNameSSSDConf)
+	assert.Contains(t, mountNames, consts.VolumeNameSSSDSocket)
 }
 
 func TestRenderStatefulSetWithMaintenance(t *testing.T) {

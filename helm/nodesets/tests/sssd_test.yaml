@@ -1,0 +1,80 @@
+suite: test nodesets sssd helm rendering
+templates:
+  - templates/nodeset.yaml
+tests:
+  - it: should not render nodeset sssd by default
+    set:
+      nodesets:
+        - name: test-workers
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "1"
+              memory: "1Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    asserts:
+      - notExists:
+          path: spec.sssd
+
+  - it: should render nodeset sssd with default image when enabled
+    set:
+      nodesets:
+        - name: test-workers
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "1"
+              memory: "1Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+          sssd:
+            enabled: true
+            sssdDebugLevel: 2
+          sssdConfSecretRefName: "worker-sssd-conf"
+          sssdLdapCAConfigMapRefName: "worker-ldap-ca"
+      images:
+        sssd:
+          repository: "cr.eu-north1.nebius.cloud/soperator/sssd"
+          tag: "2.9.4-1-63"
+    asserts:
+      - equal:
+          path: spec.sssd.image.repository
+          value: cr.eu-north1.nebius.cloud/soperator/sssd
+      - equal:
+          path: spec.sssd.image.tag
+          value: 2.9.4-1-63
+      - equal:
+          path: spec.sssd.security.appArmorProfile
+          value: unconfined
+      - equal:
+          path: spec.sssdConfSecretRefName
+          value: worker-sssd-conf
+      - equal:
+          path: spec.sssdLdapCAConfigMapRefName
+          value: worker-ldap-ca
+      - equal:
+          path: spec.sssdDebugLevel
+          value: 2

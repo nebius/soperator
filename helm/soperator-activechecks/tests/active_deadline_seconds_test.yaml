@@ -1,0 +1,77 @@
+suite: test activeDeadlineSeconds rendering
+templates:
+  - templates/active-checks.yaml
+tests:
+  - it: should default activeDeadlineSeconds to 1800
+    documentSelector:
+      path: metadata.name
+      value: test-default-deadline
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+      checks:
+        test-default-deadline:
+          enabled: true
+          checkType: k8sJob
+          k8sJobSpec:
+            jobContainer:
+              command: ["echo", "test"]
+    asserts:
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 1800
+
+  - it: should override activeDeadlineSeconds for manage-jail-state
+    documentSelector:
+      path: metadata.name
+      value: manage-jail-state
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+        sansible: "sansible-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+    asserts:
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 3600
+
+  - it: should override activeDeadlineSeconds for manage-jail-state-force
+    documentSelector:
+      path: metadata.name
+      value: manage-jail-state-force
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+        sansible: "sansible-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+    asserts:
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 3600
+
+  - it: should override activeDeadlineSeconds for manage-jail-state-dry-run
+    documentSelector:
+      path: metadata.name
+      value: manage-jail-state-dry-run
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+        sansible: "sansible-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+    asserts:
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 3600

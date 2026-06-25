@@ -9,7 +9,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/populate_jail"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -36,7 +35,6 @@ func Test_RenderPopulateJailJob_PriorityClass(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			namespace := "test-namespace"
 			clusterName := "test-cluster"
-			clusterType := consts.ClusterTypeGPU
 
 			nodeFilters := []slurmv1.K8sNodeFilter{
 				{
@@ -79,7 +77,6 @@ func Test_RenderPopulateJailJob_PriorityClass(t *testing.T) {
 			result := populate_jail.RenderPopulateJailJob(
 				namespace,
 				clusterName,
-				clusterType,
 				nodeFilters,
 				volumeSources,
 				populateJail,

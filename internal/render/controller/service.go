@@ -33,6 +33,7 @@ func RenderService(namespace, clusterName, svcName string, controller *values.Sl
 			Type:     controller.Service.Type,
 			Selector: selector,
 			Ports: []corev1.ServicePort{{
+				Name:       controller.ContainerSlurmctld.Name,
 				Protocol:   controller.Service.Protocol,
 				Port:       controller.ContainerSlurmctld.Port,
 				TargetPort: intstr.FromString(controller.ContainerSlurmctld.Name),

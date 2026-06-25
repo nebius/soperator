@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -36,6 +37,41 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 			"Reconciliation of Slurm Controllers",
 			utils.MultiStepExecutionStrategyCollectErrors,
 
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Controller sssd.conf Secret",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					if clusterValues.NodeController.ContainerSSSD == nil {
+						stepLogger.V(1).Info("SSSD container is not configured, skipping")
+						return nil
+					}
+					if !clusterValues.NodeController.IsSSSDSecretDefault {
+						stepLogger.V(1).Info("Use SSSD Secret from reference")
+						stepLogger.V(1).Info("Reconciled")
+						return nil
+					}
+
+					desired := common.RenderSecretDefaultSSSDConf(
+						clusterValues.Namespace,
+						clusterValues.Name,
+						clusterValues.NodeController.SSSDConfSecretName,
+						consts.ComponentTypeController,
+					)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("SSSD Secret from reference does not exists, using default")
+					stepLogger.V(1).Info("Rendered")
+
+					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return fmt.Errorf("reconciling controller sssd Secret: %w", err)
+					}
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
 			utils.MultiStepExecutionStep{
 				Name: "Slurm Controller Security limits ConfigMap",
 				Func: func(stepCtx context.Context) error {
@@ -71,6 +107,38 @@ func (r SlurmClusterReconciler) ReconcileControllers(
 					}
 
 					stepLogger.V(1).Info("Reconciled controller service")
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Controller OpenMetrics ServiceMonitor",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					if !check.IsPrometheusOperatorCRDInstalled {
+						stepLogger.V(1).Info("Prometheus Operator CRD not installed, skipping")
+						return nil
+					}
+					om := clusterValues.NodeController.OpenMetrics
+					smName := controller.ServiceMonitorName(clusterValues.Name)
+					if om.Enabled == nil || *om.Enabled {
+						desired := controller.RenderServiceMonitor(
+							clusterValues.Namespace,
+							clusterValues.Name,
+							&clusterValues.NodeController,
+							om.ServiceMonitor,
+						)
+						stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+						stepLogger.V(1).Info("Rendered controller ServiceMonitor")
+						if err := r.ServiceMonitor.Reconcile(stepCtx, cluster, desired); err != nil {
+							return fmt.Errorf("reconciling controller ServiceMonitor: %w", err)
+						}
+						stepLogger.V(1).Info("Reconciled controller ServiceMonitor")
+						return nil
+					}
+					if err := r.ServiceMonitor.Cleanup(stepCtx, cluster, smName); err != nil {
+						return fmt.Errorf("cleanup controller ServiceMonitor: %w", err)
+					}
+					stepLogger.V(1).Info("OpenMetrics disabled, ensured ServiceMonitor is absent")
 					return nil
 				},
 			},

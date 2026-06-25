@@ -1,0 +1,32 @@
+---
+
+- name: Ensure sssd package is installed
+  ansible.builtin.apt:
+    name:
+      - sssd-common=2.9.4-1.1ubuntu6.3
+    state: present
+    update_cache: true
+  tags:
+    - sssd
+
+- name: Ensure /etc/nsswitch.conf has mode 0644
+  ansible.builtin.file:
+    path: /etc/nsswitch.conf
+    mode: "0644"
+  tags:
+    - sssd
+
+- name: Render /etc/pam.d/common-session
+  ansible.builtin.copy:
+    dest: /etc/pam.d/common-session
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      session required pam_limits.so
+      session required pam_unix.so
+      session optional pam_sss.so
+      session optional pam_umask.so
+      session optional pam_mkhomedir.so skel=/etc/skel umask=0022
+  tags:
+    - sssd

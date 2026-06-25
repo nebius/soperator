@@ -30,7 +30,6 @@ helm unittest -f 'tests/default-values_test.yaml' helm/slurm-cluster
 These tests verify the following kubebuilder default values:
 
 ### SlurmClusterSpec
-- `clusterType: "gpu"`
 - `maintenance: "none"`
 - `useDefaultAppArmorProfile: false`
 
@@ -52,7 +51,7 @@ These tests verify the following kubebuilder default values:
 
 ### PlugStackConfig
 - `pyxis.required: true`
-- `pyxis.containerImageSave: "/var/cache/enroot-container-images/"`
+- `pyxis.importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh"`
 - `ncclDebug.required: false`
 - `ncclDebug.enabled: false`
 - `ncclDebug.logLevel: "INFO"`
