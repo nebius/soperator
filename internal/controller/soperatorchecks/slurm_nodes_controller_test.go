@@ -19,6 +19,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -180,6 +181,83 @@ func TestToCamelCase(t *testing.T) {
 	}
 }
 
+func TestSlurmNodesController_processSetUnhealthy_waitsForFullyDrainedSlurmNode(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name               string
+		slurmNodeStates    map[api.V0041NodeState]struct{}
+		wantHardwareIssues bool
+	}{
+		{
+			name: "allocated drained node waits",
+			slurmNodeStates: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateALLOCATED: {},
+				api.V0041NodeStateDRAIN:     {},
+			},
+			wantHardwareIssues: false,
+		},
+		{
+			name: "mixed drained node waits",
+			slurmNodeStates: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateMIXED: {},
+				api.V0041NodeStateDRAIN: {},
+			},
+			wantHardwareIssues: false,
+		},
+		{
+			name: "completing idle drained node waits",
+			slurmNodeStates: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE:       {},
+				api.V0041NodeStateDRAIN:      {},
+				api.V0041NodeStateCOMPLETING: {},
+			},
+			wantHardwareIssues: false,
+		},
+		{
+			name: "idle drained node is marked unhealthy",
+			slurmNodeStates: map[api.V0041NodeState]struct{}{
+				api.V0041NodeStateIDLE:  {},
+				api.V0041NodeStateDRAIN: {},
+			},
+			wantHardwareIssues: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			controller, k8sClient, slurmClusterName, k8sNode, slurmNode := newSlurmNodesControllerForUnhealthyTest(
+				t,
+				ctx,
+				tt.slurmNodeStates,
+				true,
+			)
+
+			err := controller.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmNode)
+			require.NoError(t, err)
+
+			require.Equal(t, tt.wantHardwareIssues, hasHardwareIssuesSuspected(t, ctx, k8sClient, k8sNode.Name))
+		})
+	}
+}
+
+func TestSlurmNodesController_processHealthCheckFailed_withoutExtensiveCheckWaitsForFullyDrainedSlurmNode(t *testing.T) {
+	ctx := context.Background()
+	controller, k8sClient, slurmClusterName, k8sNode, slurmNode := newSlurmNodesControllerForUnhealthyTest(
+		t,
+		ctx,
+		map[api.V0041NodeState]struct{}{
+			api.V0041NodeStateALLOCATED: {},
+			api.V0041NodeStateDRAIN:     {},
+		},
+		false,
+	)
+
+	err := controller.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, slurmNode, slurmNode.Reason)
+	require.NoError(t, err)
+	require.False(t, hasHardwareIssuesSuspected(t, ctx, k8sClient, k8sNode.Name))
+}
+
 func TestSlurmNodesController_processSetUnhealthy_reassignedInstanceUndrains(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
@@ -266,66 +344,21 @@ func TestSlurmNodesController_processSetUnhealthy_reassignedInstanceUndrains(t *
 
 func TestSlurmNodesController_processSetUnhealthy_setsHardwareConditionWhenAssignmentPredatesDrain(t *testing.T) {
 	ctx := context.Background()
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-
-	slurmClusterName := types.NamespacedName{Namespace: "test-ns", Name: "test-cluster"}
-	drainTime := time.Date(2026, time.April, 7, 10, 0, 0, 0, time.UTC)
-	assignmentTime := drainTime.Add(-time.Minute)
-
-	k8sNode := &corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: "instance-old"},
-	}
-	workerPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: slurmClusterName.Namespace,
-			Name:      "worker-0",
+	controller, k8sClient, slurmClusterName, k8sNode, slurmNode := newSlurmNodesControllerForUnhealthyTest(
+		t,
+		ctx,
+		map[api.V0041NodeState]struct{}{
+			api.V0041NodeStateIDLE:  {},
+			api.V0041NodeStateDRAIN: {},
 		},
-		Status: corev1.PodStatus{
-			Conditions: []corev1.PodCondition{
-				{
-					Type:               corev1.PodScheduled,
-					Status:             corev1.ConditionTrue,
-					LastTransitionTime: metav1.NewTime(assignmentTime),
-				},
-			},
-		},
-	}
-
-	client := fake.NewClientBuilder().
-		WithScheme(scheme).
-		WithObjects(k8sNode).
-		WithStatusSubresource(k8sNode).
-		Build()
-	apiReader := fake.NewClientBuilder().
-		WithScheme(scheme).
-		WithObjects(workerPod).
-		Build()
-
-	controller := NewSlurmNodesController(
-		client,
-		scheme,
-		record.NewFakeRecorder(10),
-		slurmapi.NewClientSet(),
-		time.Minute,
 		true,
-		true,
-		apiReader,
-		"",
 	)
 
-	err := controller.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmapi.Node{
-		Name:       "worker-0",
-		InstanceID: k8sNode.Name,
-		Comment:    "gpu health check failed",
-		Reason: ptr.To(slurmapi.NodeReason{
-			ChangedAt: drainTime,
-		}),
-	})
+	err := controller.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmNode)
 	require.NoError(t, err)
 
 	var updatedNode corev1.Node
-	require.NoError(t, client.Get(ctx, types.NamespacedName{Name: k8sNode.Name}, &updatedNode))
+	require.NoError(t, k8sClient.Get(ctx, types.NamespacedName{Name: k8sNode.Name}, &updatedNode))
 	require.Len(t, updatedNode.Status.Conditions, 1)
 	require.Equal(t, consts.HardwareIssuesSuspected, updatedNode.Status.Conditions[0].Type)
 	require.Equal(t, corev1.ConditionTrue, updatedNode.Status.Conditions[0].Status)
@@ -352,6 +385,10 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodFallsBackToSet
 		WithScheme(scheme).
 		WithObjects(k8sNode).
 		WithStatusSubresource(k8sNode).
+		WithIndex(&corev1.Pod{}, "spec.nodeName", func(obj ctrlclient.Object) []string {
+			pod := obj.(*corev1.Pod)
+			return []string{pod.Spec.NodeName}
+		}).
 		Build()
 	apiReader := fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -453,4 +490,99 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodUndrainsWhenCu
 	var updatedNode corev1.Node
 	require.NoError(t, client.Get(ctx, types.NamespacedName{Name: k8sNode.Name}, &updatedNode))
 	require.Empty(t, updatedNode.Status.Conditions)
+}
+
+func newSlurmNodesControllerForUnhealthyTest(
+	t *testing.T,
+	ctx context.Context,
+	slurmNodeStates map[api.V0041NodeState]struct{},
+	enableExtensiveCheck bool,
+) (*SlurmNodesController, ctrlclient.Client, types.NamespacedName, *corev1.Node, slurmapi.Node) {
+	t.Helper()
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	slurmClusterName := types.NamespacedName{Namespace: "test-ns", Name: "test-cluster"}
+	drainTime := time.Date(2026, time.April, 7, 10, 0, 0, 0, time.UTC)
+	k8sNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "test-k8s-node",
+			CreationTimestamp: metav1.NewTime(drainTime.Add(-time.Minute)),
+		},
+	}
+	workerPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: slurmClusterName.Namespace,
+			Name:      "worker-0",
+			Labels: map[string]string{
+				consts.LabelInstanceKey: slurmClusterName.Name,
+				consts.LabelWorkerKey:   consts.LabelWorkerValue,
+			},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: k8sNode.Name,
+		},
+		Status: corev1.PodStatus{
+			Conditions: []corev1.PodCondition{
+				{
+					Type:               corev1.PodScheduled,
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: metav1.NewTime(drainTime.Add(-time.Minute)),
+				},
+			},
+		},
+	}
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(k8sNode, workerPod).
+		WithStatusSubresource(k8sNode).
+		WithIndex(&corev1.Pod{}, "spec.nodeName", func(obj ctrlclient.Object) []string {
+			pod := obj.(*corev1.Pod)
+			return []string{pod.Spec.NodeName}
+		}).
+		Build()
+
+	apiClient := slurmapifake.NewMockClient(t)
+	apiClient.On("GetNode", ctx, workerPod.Name).Return(slurmapi.Node{
+		Name:   workerPod.Name,
+		States: slurmNodeStates,
+	}, nil).Once()
+
+	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients.AddClient(slurmClusterName, apiClient)
+
+	controller := NewSlurmNodesController(
+		k8sClient,
+		scheme,
+		record.NewFakeRecorder(10),
+		slurmAPIClients,
+		time.Minute,
+		true,
+		enableExtensiveCheck,
+		k8sClient,
+		"",
+	)
+
+	return controller, k8sClient, slurmClusterName, k8sNode, slurmapi.Node{
+		Name:       workerPod.Name,
+		InstanceID: k8sNode.Name,
+		Comment:    "gpu health check failed",
+		Reason: ptr.To(slurmapi.NodeReason{
+			ChangedAt: drainTime,
+		}),
+	}
+}
+
+func hasHardwareIssuesSuspected(t *testing.T, ctx context.Context, k8sClient ctrlclient.Client, nodeName string) bool {
+	t.Helper()
+
+	var node corev1.Node
+	require.NoError(t, k8sClient.Get(ctx, types.NamespacedName{Name: nodeName}, &node))
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == consts.HardwareIssuesSuspected {
+			return cond.Status == corev1.ConditionTrue
+		}
+	}
+	return false
 }
