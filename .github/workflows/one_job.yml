@@ -197,7 +197,12 @@ jobs:
       # unnoticed on a merge to main without an explicit build check.
       - name: go build e2e commands
         shell: bash
-        run: go build ./cmd/e2e ./cmd/acceptance
+        run: |
+          packages=(./cmd/e2e)
+          if [[ -d cmd/acceptance ]]; then
+            packages+=(./cmd/acceptance)
+          fi
+          go build "${packages[@]}"
 
   build-soperator-images:
     needs:
