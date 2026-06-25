@@ -47,6 +47,7 @@ func renderContainerSlurmctld(container *values.Container, customMounts []slurmv
 			Requests: container.Resources,
 		},
 		LivenessProbe:            container.LivenessProbe,
+		ReadinessProbe:           container.ReadinessProbe,
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}
