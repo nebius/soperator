@@ -72,7 +72,7 @@ func generateDefaultSupervisordConfig() renderutils.ConfigFile {
 	res.AddLine("command=/opt/bin/slurm/slurmd_entrypoint.sh")
 	res.AddLine("autostart=true")
 	res.AddLine("autorestart=true")
-	res.AddLine("startsecs=0")
+	res.AddLine("startsecs=10")
 	res.AddLine("stopasgroup=true ; Send SIGTERM to all child processes of supervisord")
 	res.AddLine("killasgroup=true ; Send SIGKILL to all child processes of supervisord")
 	res.AddLine("stopsignal=SIGTERM ; Signal to send to the program to stop it")
@@ -93,6 +93,10 @@ func generateDefaultSupervisordConfig() renderutils.ConfigFile {
 	res.AddLine("killasgroup=true ; Send SIGKILL to all child processes of supervisord")
 	res.AddLine("stopsignal=SIGTERM ; Signal to send to the program to stop it")
 	res.AddLine("stopwaitsecs=10 ; Wait for the process to stop before sending a SIGKILL")
+	res.AddLine("")
+	res.AddLine("[eventlistener:quit_on_failure]")
+	res.AddLine("events=PROCESS_STATE_FATAL")
+	res.AddLine("command=sh -c 'echo \"READY\"; while read -r line; do echo \"$line\"; supervisorctl shutdown; done'")
 
 	return res
 }
