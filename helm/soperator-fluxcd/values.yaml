@@ -166,13 +166,13 @@ observability:
     logs:
       version: 0.149.*
       interval: 15m
-      timeout: 15m
+      timeout: 30m
       install:
         remediation:
-          retries: 3
+          retries: 6
       upgrade:
         remediation:
-          retries: 3
+          retries: 6
           remediateLastFailure: true
       values:
         jailLogs:
@@ -248,18 +248,18 @@ observability:
       driftDetection:
         mode: warn
     interval: 5m
-    timeout: 5m
+    timeout: 30m
     version: 0.80.*
     namespace: monitoring-system
     releaseName: metrics
     install:
       crds: Skip
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       crds: Skip
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     tsaTokenSidecar:
       enabled: true
@@ -364,18 +364,18 @@ observability:
   dcgmExporter:
     enabled: true
     interval: 5m
-    timeout: 5m
+    timeout: 30m
     version: 4.0.2
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     install:
       crds: CreateReplace
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       crds: CreateReplace
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     values:
       hpcJobMapDir: /var/run/nebius/slurm
@@ -437,18 +437,18 @@ observability:
 securityProfilesOperator:
   enabled: true
   interval: 5m
-  timeout: 5m
+  timeout: 30m
   version: 0.8.5-soperator
   releaseName: security-profiles-operator
   namespace: security-profiles-operator-system
   install:
     crds: CreateReplace
     remediation:
-      retries: 3
+      retries: 6
   upgrade:
     crds: CreateReplace
     remediation:
-      retries: 3
+      retries: 6
       remediateLastFailure: true
   values:
     daemon:
@@ -490,15 +490,15 @@ slurmCluster:
     enabled: true
     releaseName: slurm-cluster-storage
     interval: 5m
-    timeout: 5m
+    timeout: 30m
     values: null
     overrideValues: null
     install:
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     driftDetection:
       mode: warn
@@ -574,17 +574,17 @@ soperator:
   kruise:
     enabled: true
     interval: 5m
-    timeout: 5m
+    timeout: 30m
     version: 1.8.3-custom
     releaseName: soperator-kruise
     install:
       crds: CreateReplace
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       crds: CreateReplace
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     overrideValues:
       crds:
@@ -626,16 +626,16 @@ soperator:
   nodeConfigurator:
     enabled: true
     interval: 5m
-    timeout: 5m
+    timeout: 30m
     releaseName: soperator-node-configurator
     install:
       crds: Skip
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       crds: Skip
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     values:
       rebooter:
@@ -689,7 +689,7 @@ notifier:
     mode: warn
 csiDriverNfs:
   interval: 5m
-  timeout: 5m
+  timeout: 20m
   version: 4.11.0
   namespace: nfs-system
   releaseName: csi-driver-nfs
@@ -698,11 +698,11 @@ csiDriverNfs:
   install:
     crds: Skip
     remediation:
-      retries: 3
+      retries: 6
   upgrade:
     crds: Skip
     remediation:
-      retries: 3
+      retries: 6
       remediateLastFailure: true
   driftDetection:
     mode: warn
