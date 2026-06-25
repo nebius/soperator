@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	api "github.com/SlinkyProject/slurm-client/api/v0041"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -25,6 +27,7 @@ import (
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/slurmapi"
+	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
 )
 
 func createTestPodEphemeralStorageCheck(t *testing.T, objects ...client.Object) *PodEphemeralStorageCheck {
@@ -49,6 +52,7 @@ func createTestPodEphemeralStorageCheck(t *testing.T, objects ...client.Object) 
 		&rest.Config{},
 		time.Minute,
 		80.0,
+		75.0,
 		slurmAPIClients,
 	)
 	require.NoError(t, err)
@@ -546,6 +550,7 @@ func TestGetEphemeralStorageStatsFromNode(t *testing.T) {
 		clientset:        fakeClientset,
 		restConfig:       restConfig,
 		usageThreshold:   80.0,
+		resumeThreshold:  75.0,
 		reconcileTimeout: time.Minute,
 	}
 
@@ -1541,3 +1546,197 @@ func TestCreateEphemeralStorageEvent(t *testing.T) {
 		})
 	}
 }
+
+func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
+	controller := createTestPodEphemeralStorageCheck(t)
+
+	tests := []struct {
+		name     string
+		node     slurmapi.Node
+		expected bool
+	}{
+		{
+			name: "drained by ephemeral storage check",
+			node: slurmapi.Node{
+				States: map[api.V0041NodeState]struct{}{
+					api.V0041NodeStateDRAIN: {},
+				},
+				Reason: &slurmapi.NodeReason{
+					Reason: consts.SlurmUserReasonHC + " pod_ephemeral_storage 90.00% of ephemeral storage is used.",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "drained by different reason",
+			node: slurmapi.Node{
+				States: map[api.V0041NodeState]struct{}{
+					api.V0041NodeStateDRAIN: {},
+				},
+				Reason: &slurmapi.NodeReason{
+					Reason: consts.SlurmUserReasonHC + " gpu_check some GPU failure",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "drained with no reason",
+			node: slurmapi.Node{
+				States: map[api.V0041NodeState]struct{}{
+					api.V0041NodeStateDRAIN: {},
+				},
+				Reason: nil,
+			},
+			expected: false,
+		},
+		{
+			name: "not drained but reason matches prefix",
+			node: slurmapi.Node{
+				States: map[api.V0041NodeState]struct{}{
+					api.V0041NodeStateIDLE: {},
+				},
+				Reason: &slurmapi.NodeReason{
+					Reason: consts.SlurmUserReasonHC + " pod_ephemeral_storage 90.00%",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "drain+idle with matching reason",
+			node: slurmapi.Node{
+				States: map[api.V0041NodeState]struct{}{
+					api.V0041NodeStateDRAIN: {},
+					api.V0041NodeStateIDLE:  {},
+				},
+				Reason: &slurmapi.NodeReason{
+					Reason: consts.SlurmUserReasonHC + " pod_ephemeral_storage 85.50% of ephemeral storage is used.",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "drained manually by user",
+			node: slurmapi.Node{
+				States: map[api.V0041NodeState]struct{}{
+					api.V0041NodeStateDRAIN: {},
+				},
+				Reason: &slurmapi.NodeReason{
+					Reason: "manual maintenance",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "reason is exact prefix with no trailing content",
+			node: slurmapi.Node{
+				States: map[api.V0041NodeState]struct{}{
+					api.V0041NodeStateDRAIN: {},
+				},
+				Reason: &slurmapi.NodeReason{
+					Reason: consts.SlurmUserReasonHC + " pod_ephemeral_storage",
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := controller.isDrainedByEphemeralStorageCheck(tt.node)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestUndrainSlurmNode(t *testing.T) {
+	clusterName := types.NamespacedName{Name: "test-cluster", Namespace: "test-ns"}
+	nodeName := "worker-0"
+
+	tests := []struct {
+		name         string
+		setupMock    func(*slurmapifake.MockClient)
+		expectError  bool
+		expectResume bool
+	}{
+		{
+			name: "successful undrain",
+			setupMock: func(m *slurmapifake.MockClient) {
+				m.EXPECT().
+					SlurmV0041PostNodeWithResponse(mock.Anything, nodeName, mock.MatchedBy(func(body api.V0041UpdateNodeMsg) bool {
+						return body.State != nil &&
+							len(*body.State) == 1 &&
+							(*body.State)[0] == api.V0041UpdateNodeMsgStateRESUME
+					})).
+					Return(&api.SlurmV0041PostNodeResponse{
+						JSON200: &api.V0041OpenapiResp{},
+					}, nil)
+			},
+			expectError:  false,
+			expectResume: true,
+		},
+		{
+			name: "API returns error",
+			setupMock: func(m *slurmapifake.MockClient) {
+				m.EXPECT().
+					SlurmV0041PostNodeWithResponse(mock.Anything, nodeName, mock.Anything).
+					Return(nil, fmt.Errorf("connection refused"))
+			},
+			expectError: true,
+		},
+		{
+			name: "API returns response with errors",
+			setupMock: func(m *slurmapifake.MockClient) {
+				errs := api.V0041OpenapiErrors{
+					{Description: strPtr("node not found"), ErrorNumber: int32Ptr(404)},
+				}
+				m.EXPECT().
+					SlurmV0041PostNodeWithResponse(mock.Anything, nodeName, mock.Anything).
+					Return(&api.SlurmV0041PostNodeResponse{
+						JSON200: &api.V0041OpenapiResp{
+							Errors: &errs,
+						},
+					}, nil)
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := slurmapifake.NewMockClient(t)
+			tt.setupMock(mockClient)
+
+			slurmAPIClients := slurmapi.NewClientSet()
+			slurmAPIClients.AddClient(clusterName, mockClient)
+
+			controller := createTestPodEphemeralStorageCheck(t)
+			controller.slurmAPIClients = slurmAPIClients
+
+			err := controller.undrainSlurmNode(context.Background(), clusterName, nodeName)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestUndrainSlurmNode_ClusterNotFound(t *testing.T) {
+	slurmAPIClients := slurmapi.NewClientSet()
+	// Don't add any client — the cluster won't be found.
+
+	controller := createTestPodEphemeralStorageCheck(t)
+	controller.slurmAPIClients = slurmAPIClients
+
+	err := controller.undrainSlurmNode(
+		context.Background(),
+		types.NamespacedName{Name: "nonexistent", Namespace: "ns"},
+		"worker-0",
+	)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func strPtr(s string) *string { return &s }
+func int32Ptr(i int32) *int32 { return &i }

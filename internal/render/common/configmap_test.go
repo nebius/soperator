@@ -357,6 +357,47 @@ func TestRenderSlurmConfigMapWithLargeSuspendTime(t *testing.T) {
 	assert.NotContains(t, slurmConfig, "SuspendTime=INFINITE")
 }
 
+func TestRenderSlurmConfig_MetricsType(t *testing.T) {
+	tests := []struct {
+		name        string
+		openMetrics slurmv1.OpenMetrics
+		expectLine  bool
+	}{
+		{
+			name:        "default (Enabled nil) renders MetricsType",
+			openMetrics: slurmv1.OpenMetrics{},
+			expectLine:  true,
+		},
+		{
+			name:        "Enabled=true renders MetricsType",
+			openMetrics: slurmv1.OpenMetrics{Enabled: ptr.To(true)},
+			expectLine:  true,
+		},
+		{
+			name:        "Enabled=false omits MetricsType",
+			openMetrics: slurmv1.OpenMetrics{Enabled: ptr.To(false)},
+			expectLine:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &values.SlurmCluster{
+				NodeController: values.SlurmController{
+					OpenMetrics: tt.openMetrics,
+				},
+			}
+			result := RenderConfigMapSlurmConfigs(cluster)
+			conf := result.Data[consts.ConfigMapKeySlurmConfig]
+			if tt.expectLine {
+				assert.Contains(t, conf, "MetricsType=metrics/openmetrics")
+			} else {
+				assert.NotContains(t, conf, "MetricsType=")
+			}
+		})
+	}
+}
+
 func TestRenderPlugstack(t *testing.T) {
 	t.Run("Pyxis no options", func(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
@@ -365,20 +406,20 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "optional spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 container_image_save=")
+		assert.Contains(t, result, "optional spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 importer=")
 	})
 
 	t.Run("Pyxis options", func(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
 			PlugStackConfig: slurmv1.PlugStackConfig{
 				Pyxis: slurmv1.PluginConfigPyxis{
-					Required:           ptr.To(true),
-					ContainerImageSave: "/tmp/",
+					Required:     ptr.To(true),
+					ImporterPath: "/opt/importer.sh",
 				},
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 container_image_save=/tmp/")
+		assert.Contains(t, result, "required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 importer=/opt/importer.sh")
 	})
 
 	t.Run("NCCL no options", func(t *testing.T) {

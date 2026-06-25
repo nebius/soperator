@@ -44,7 +44,7 @@ spec:
     enableSelinux: false
     replicaCount: 2
     spoImage:
-      registry: gcr.io
+      registry: cr.eu-north1.nebius.cloud/soperator-proxy-gcr-io
       repository: k8s-staging-sp-operator/security-profiles-operator
       tag: v0.8.4
     tolerations: []

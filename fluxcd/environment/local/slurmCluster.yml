@@ -2,12 +2,11 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 3.0.7
+  version: 4.0.2
   namespace: soperator
   releaseName: soperator
   overrideValues:
     clusterName: soperator
-    clusterType: gpu
     useDefaultAppArmorProfile: true
     maintenance: none
     k8sNodeFilters:

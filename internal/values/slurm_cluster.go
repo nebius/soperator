@@ -9,14 +9,13 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmav1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/consts"
 )
 
 type SlurmCluster struct {
 	types.NamespacedName
 
 	CRVersion              string
-	ClusterType            consts.ClusterType
+	ClusterWithGPU         bool
 	PartitionConfiguration PartitionConfiguration
 	HealthCheckConfig      *HealthCheckConfig
 
@@ -48,19 +47,12 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 	logger := log.FromContext(ctx)
 	logger.V(1).Info(fmt.Sprintf("%+v", cluster.Spec.SConfigController))
 
-	clusterType, err := consts.StringToClusterType(cluster.Spec.ClusterType)
-	if err != nil {
-		logger.Error(err, "Failed to get cluster type")
-		return nil, fmt.Errorf("getting cluster type: %w", err)
-	}
-
 	res := &SlurmCluster{
 		NamespacedName: types.NamespacedName{
 			Namespace: cluster.Namespace,
 			Name:      cluster.Name,
 		},
 		CRVersion:              buildCRVersionFrom(ctx, cluster.Spec.CRVersion),
-		ClusterType:            clusterType,
 		PartitionConfiguration: buildPartitionConfiguration(&cluster.Spec.PartitionConfiguration),
 		HealthCheckConfig:      buildHealthCheckConfig(cluster.Spec.HealthCheckConfig),
 		PopulateJail:           buildSlurmPopulateJailFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.PopulateJail),
@@ -70,14 +62,17 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 		NodeController:         buildSlurmControllerFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Controller),
 		NodeAccounting:         buildAccountingFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Accounting),
 		NodeRest:               buildRestFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Rest),
-		NodeLogin:              buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
-		SlurmExporter:          buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
-		SlurmConfig:            cluster.Spec.SlurmConfig,
-		CustomSlurmConfig:      cluster.Spec.CustomSlurmConfig,
-		CustomCgroupConfig:     cluster.Spec.CustomCgroupConfig,
-		CgroupVersion:          cluster.Spec.CgroupVersion,
-		MPIConfig:              cluster.Spec.MPIConfig,
-		PlugStackConfig:        cluster.Spec.PlugStackConfig,
+		NodeLogin: buildSlurmLoginFrom(
+			cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login,
+			cluster.Spec.UseDefaultAppArmorProfile,
+		),
+		SlurmExporter:      buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
+		SlurmConfig:        cluster.Spec.SlurmConfig,
+		CustomSlurmConfig:  cluster.Spec.CustomSlurmConfig,
+		CustomCgroupConfig: cluster.Spec.CustomCgroupConfig,
+		CgroupVersion:      cluster.Spec.CgroupVersion,
+		MPIConfig:          cluster.Spec.MPIConfig,
+		PlugStackConfig:    cluster.Spec.PlugStackConfig,
 		SConfigController: buildSConfigControllerFrom(
 			cluster.Spec.SConfigController.Node,
 			cluster.Spec.SConfigController.Container,
@@ -99,14 +94,14 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 	return res, nil
 }
 
-func BuildClusterTypeFromNodeSets(nodeSets []slurmav1alpha1.NodeSet) consts.ClusterType {
+func BuildClusterWithGPUFromNodeSets(nodeSets []slurmav1alpha1.NodeSet) bool {
 	for _, nodeSet := range nodeSets {
 		if nodeSet.Spec.GPU.Enabled {
-			return consts.ClusterTypeGPU
+			return true
 		}
 	}
 
-	return consts.ClusterTypeCPU
+	return false
 }
 
 // HasEphemeralNodes returns true if any NodeSet in the cluster has ephemeral nodes enabled

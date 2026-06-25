@@ -16,18 +16,24 @@ type SlurmController struct {
 
 	ContainerSlurmctld Container
 	ContainerMunge     Container
+	ContainerSSSD      *Container
 
 	Service     Service
 	StatefulSet StatefulSet
 	DaemonSet   DaemonSet
 
-	VolumeSpool        slurmv1.NodeVolume
-	VolumeJail         slurmv1.NodeVolume
-	CustomVolumeMounts []slurmv1.NodeVolumeMount
-	Maintenance        *consts.MaintenanceMode
-	PriorityClass      string
+	VolumeSpool             slurmv1.NodeVolume
+	VolumeJail              slurmv1.NodeVolume
+	CustomVolumeMounts      []slurmv1.NodeVolumeMount
+	Maintenance             *consts.MaintenanceMode
+	PriorityClass           string
+	IsSSSDSecretDefault     bool
+	SSSDConfSecretName      string
+	SSSDLdapCAConfigMapName string
 
 	ServiceAccountName string
+
+	OpenMetrics slurmv1.OpenMetrics
 }
 
 func buildSlurmControllerFrom(clusterName string, maintenance *consts.MaintenanceMode, controller *slurmv1.SlurmNodeController) SlurmController {
@@ -42,6 +48,12 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 		naming.BuildDaemonSetName(consts.ComponentTypeController),
 	)
 
+	sssdConfSecretName := controller.SSSDConfSecretRefName
+	isSSSDSecretDefault := sssdConfSecretName == ""
+	if isSSSDSecretDefault {
+		sssdConfSecretName = naming.BuildSecretSSSDConfName(clusterName)
+	}
+
 	res := SlurmController{
 		K8sNodeFilterName:    controller.K8sNodeFilterName,
 		CustomInitContainers: controller.CustomInitContainers,
@@ -54,14 +66,27 @@ func buildSlurmControllerFrom(clusterName string, maintenance *consts.Maintenanc
 			controller.Munge,
 			consts.ContainerNameMunge,
 		),
-		Service:            buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
-		StatefulSet:        statefulSet,
-		DaemonSet:          daemonSet,
-		VolumeSpool:        *controller.Volumes.Spool.DeepCopy(),
-		VolumeJail:         *controller.Volumes.Jail.DeepCopy(),
-		Maintenance:        maintenance,
-		PriorityClass:      controller.PriorityClass,
-		ServiceAccountName: controller.ServiceAccountName,
+		SSSDConfSecretName:      sssdConfSecretName,
+		SSSDLdapCAConfigMapName: controller.SSSDLdapCAConfigMapRefName,
+		IsSSSDSecretDefault:     isSSSDSecretDefault,
+		Service:                 buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeController, clusterName)),
+		StatefulSet:             statefulSet,
+		DaemonSet:               daemonSet,
+		VolumeSpool:             *controller.Volumes.Spool.DeepCopy(),
+		VolumeJail:              *controller.Volumes.Jail.DeepCopy(),
+		Maintenance:             maintenance,
+		PriorityClass:           controller.PriorityClass,
+		ServiceAccountName:      controller.ServiceAccountName,
+		OpenMetrics:             controller.OpenMetrics,
+	}
+
+	if controller.Sssd != nil {
+		containerSSSD := buildContainerFrom(
+			*controller.Sssd,
+			consts.ContainerNameSSSD,
+		)
+		containerSSSD.SSSDDebugLevel = controller.SSSDDebugLevel
+		res.ContainerSSSD = &containerSSSD
 	}
 
 	for _, customVolumeMount := range controller.Volumes.CustomMounts {

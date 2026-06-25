@@ -10,7 +10,7 @@ ns:
 soperator:
   enabled: true
   namespace: soperator-system
-  version: "3.0.7"
+  version: "4.0.2"
   interval: 5m
   timeout: 5m
   releaseName: soperator-controller
@@ -57,12 +57,11 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 3.0.7
+  version: 4.0.2
   namespace: soperator
   releaseName: soperator
   overrideValues:
     clusterName: soperator
-    clusterType: cpu
     useDefaultAppArmorProfile: false
     maintenance: downscale
     k8sNodeFilters:
@@ -277,10 +276,10 @@ backup:
 # NFS Server - disabled for local dev
 nfsServer:
   enabled: false
-  version: 3.0.7
+  version: 4.0.2
   overrideValues:
     image:
-      tag: 3.0.7
+      tag: 4.0.2
 # Notifier - disabled for local dev
 notifier:
   enabled: false

@@ -102,7 +102,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		logger.Error(err, fmt.Sprintf("Failed to list %s", slurmv1alpha1.KindNodeSet))
 		return ctrl.Result{}, fmt.Errorf("listing node sets: %w", err)
 	}
-	clusterType := values.BuildClusterTypeFromNodeSets(nodeSets)
+	clusterWithGPU := values.BuildClusterWithGPUFromNodeSets(nodeSets)
 
 	// region Ephemeral nodes power state
 	if nodeSetValues.EphemeralNodes != nil && *nodeSetValues.EphemeralNodes {
@@ -115,7 +115,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	}
 	// endregion Ephemeral nodes power state
 
-	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster, clusterType); err != nil {
+	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster, clusterWithGPU); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -252,7 +252,7 @@ func (r NodeSetReconciler) executeReconciliation(
 	nodeSet *slurmv1alpha1.NodeSet,
 	nodeSetValues *values.SlurmNodeSet,
 	cluster *slurmv1.SlurmCluster,
-	clusterType consts.ClusterType,
+	clusterWithGPU bool,
 ) error {
 	steps := []utils.MultiStepExecutionStep{
 		{
@@ -304,6 +304,39 @@ func (r NodeSetReconciler) executeReconciliation(
 				}
 
 				stepLogger.V(1).Info("Reconciled")
+				return nil
+			},
+		},
+		{
+			Name: "Worker sssd.conf Secret",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				if nodeSetValues.ContainerSSSD == nil {
+					stepLogger.V(1).Info("SSSD container is not configured, skipping")
+					return nil
+				}
+				if !nodeSetValues.IsSSSDSecretDefault {
+					stepLogger.V(1).Info("Use SSSD Secret from reference")
+					return nil
+				}
+
+				desired := common.RenderSecretDefaultSSSDConf(
+					nodeSet.Namespace,
+					cluster.Name,
+					nodeSetValues.SSSDConfSecretName,
+					consts.ComponentTypeNodeSet,
+				)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.Secret.Reconcile(stepCtx, nodeSet, &desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling worker sssd Secret: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
 				return nil
 			},
 		},
@@ -368,7 +401,7 @@ func (r NodeSetReconciler) executeReconciliation(
 					nodeSetValues,
 					&secrets,
 					cluster.Spec.CgroupVersion,
-					clusterType,
+					clusterWithGPU,
 					topologyPluginEnabled,
 				)
 				if err != nil {
@@ -585,8 +618,8 @@ func (r *NodeSetReconciler) reconcileNodeSetPowerState(
 
 	if apierrors.IsNotFound(err) {
 		logger.V(1).Info("NodeSetPowerState not found, it will be created")
-		activeNodes := make([]int32, nodeSet.Spec.Replicas)
-		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
+		activeNodes := make([]int32, nodeSet.Spec.InitialNumberEphemeralNodes)
+		for i := int32(0); i < nodeSet.Spec.InitialNumberEphemeralNodes; i++ {
 			activeNodes[i] = i
 		}
 		desired.Spec.ActiveNodes = activeNodes

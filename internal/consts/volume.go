@@ -13,6 +13,8 @@ const (
 	nvidia = "nvidia"
 	boot   = "boot"
 
+	SssdConfig = "sssd.conf"
+
 	sshConfigs             = "ssh-configs"
 	sshConfigsLogin        = "ssh-configs"
 	sshConfigsWorker       = "ssh-configs-worker"
@@ -46,6 +48,9 @@ const (
 	VolumeNameSSHDConfigsWorker        = sshConfigsWorker
 	VolumeNameSSHRootKeys              = sshRootKeys
 	VolumeNameSSHDKeys                 = "sshd-keys"
+	VolumeNameSSSDConf                 = "sssd-conf"
+	VolumeNameSSSDLdapCA               = "sssd-ldap-ca"
+	VolumeNameSSSDSocket               = "sssd-socket"
 	VolumeMountPathSSHDKeys            = "/etc/ssh/sshd_keys"
 	VolumeNameSecurityLimits           = securityLimits
 	VolumeNameSharedMemory             = "dev-shm"
@@ -64,6 +69,9 @@ const (
 	VolumeMountPathJailUpper                = "/mnt/" + jail + ".upper"
 	VolumeMountPathMungeSocket              = "/run/" + Munge
 	VolumeMountPathMungeKey                 = "/mnt/" + mungeKey
+	VolumeMountPathSSSDConf                 = "/etc/sssd"
+	VolumeMountPathSSSDLdapCA               = "/mnt/ldapCA"
+	VolumeMountPathSSSDSocket               = "/var/lib/sss/pipes"
 	VolumeMountPathRESTJWTKey               = "/mnt/" + RESTJWTKey
 	VolumeMountPathNvidia                   = "/run/" + nvidia
 	VolumeMountPathBoot                     = "/" + boot
