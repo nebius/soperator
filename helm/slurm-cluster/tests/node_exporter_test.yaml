@@ -1,0 +1,99 @@
+suite: test node-exporter sidecar rendering
+templates:
+  - templates/slurm-cluster-cr.yaml
+  - templates/node-exporter-podmonitor.yaml
+
+tests:
+  - it: should add controller node-exporter custom init container by default
+    template: templates/slurm-cluster-cr.yaml
+    asserts:
+      - equal:
+          path: spec.slurmNodes.controller.customInitContainers[0].name
+          value: pod-node-exporter
+      - equal:
+          path: spec.slurmNodes.controller.customInitContainers[0].restartPolicy
+          value: Always
+      - contains:
+          path: spec.slurmNodes.controller.customInitContainers[0].args
+          content: --collector.netdev
+      - contains:
+          path: spec.slurmNodes.controller.customInitContainers[0].args
+          content: --web.listen-address=:9100
+      - equal:
+          path: spec.slurmNodes.login.customInitContainers
+          value: []
+
+  - it: should render PodMonitor selecting only controller by default
+    template: templates/node-exporter-podmonitor.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PodMonitor
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: slurm1
+      - equal:
+          path: spec.selector.matchExpressions[0].values
+          value:
+            - controller
+      - equal:
+          path: spec.podMetricsEndpoints[0].port
+          value: node-exporter
+
+  - it: should not select disabled accounting and rest components
+    template: templates/node-exporter-podmonitor.yaml
+    set:
+      slurmNodes:
+        accounting:
+          nodeExporter:
+            enabled: true
+        rest:
+          nodeExporter:
+            enabled: true
+    asserts:
+      - equal:
+          path: spec.selector.matchExpressions[0].values
+          value:
+            - controller
+
+  - it: should select enabled optional components
+    template: templates/node-exporter-podmonitor.yaml
+    set:
+      slurmNodes:
+        accounting:
+          enabled: true
+          externalDB:
+            enabled: true
+            host: db.example.org
+            passwordSecretKeyRef:
+              name: db-password
+              key: password
+          nodeExporter:
+            enabled: true
+        login:
+          nodeExporter:
+            enabled: true
+        rest:
+          enabled: true
+          nodeExporter:
+            enabled: true
+      sConfigController:
+        nodeExporter:
+          enabled: true
+    asserts:
+      - contains:
+          path: spec.selector.matchExpressions[0].values
+          content: accounting
+      - contains:
+          path: spec.selector.matchExpressions[0].values
+          content: controller
+      - contains:
+          path: spec.selector.matchExpressions[0].values
+          content: login
+      - contains:
+          path: spec.selector.matchExpressions[0].values
+          content: rest
+      - contains:
+          path: spec.selector.matchExpressions[0].values
+          content: sconfigcontroller

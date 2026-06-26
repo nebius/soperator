@@ -13,6 +13,13 @@ useDefaultAppArmorProfile: false
 maintenance: "none"
 # CUDA version used for populate-jail image selection.
 cudaVersion: 12.9.0
+nodeExporter:
+  podMonitor:
+    enabled: true
+    interval: "30s"
+    scrapeTimeout: "10s"
+    metricRelabelings: []
+    relabelings: []
 # partitionConfiguration define partition configuration of slurm worker nodes
 # https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION
 partitionConfiguration:
@@ -295,6 +302,8 @@ slurmNodes:
         memory: "1Gi"
         ephemeralStorage: "5Gi"
     customInitContainers: []
+    nodeExporter:
+      enabled: false
     externalDB:
       enabled: false
       # host: ""
@@ -444,6 +453,10 @@ slurmNodes:
         memory: "1Gi"
         ephemeralStorage: "5Gi"
     customInitContainers: []
+    # Node-exporter sidecar for controller pods.
+    # Enabled by default only for controller pods.
+    nodeExporter:
+      enabled: true
     volumes:
       spool:
         volumeClaimTemplateSpec:
@@ -545,6 +558,8 @@ slurmNodes:
         memory: "500Mi"
         ephemeralStorage: "5Gi"
     customInitContainers: []
+    nodeExporter:
+      enabled: false
     volumes:
       jail:
         volumeSourceName: "jail"
@@ -641,12 +656,15 @@ slurmNodes:
         memory: "8Gi"
         ephemeralStorage: "500Mi"
     customInitContainers: []
+    nodeExporter:
+      enabled: false
 sConfigController:
   # Controls if the pod containers can use the host user namespace
   # hostUsers: false
   node:
     k8sNodeFilterName: "system"
     size: 1
+    customInitContainers: []
   container:
     imagePullPolicy: "IfNotPresent"
     # livenessProbe: {}
@@ -665,6 +683,8 @@ sConfigController:
     jobLabel: "sconfigcontroller"
     interval: "30s"
     scrapeTimeout: "28s"
+  nodeExporter:
+    enabled: false
   # RBAC settings for sconfigcontroller
   rbac:
     # Specifies whether RBAC resources should be created
@@ -690,6 +710,7 @@ images:
   slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:4.0.2-slurm25.11.5"
   soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:4.0.2-slurm25.11.5"
   sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:4.0.2"
+  nodeExporter: "cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter:v1.10.2"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:12.1.2"
 # Configuration for slurm scripts.
 slurmScripts:

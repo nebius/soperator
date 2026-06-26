@@ -33,6 +33,16 @@ images:
   slurmd:
     repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
     tag: "4.0.2-slurm25.11.5"
+  nodeExporter:
+    repository: "cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter"
+    tag: "v1.10.2"
+nodeExporter:
+  podMonitor:
+    enabled: true
+    interval: "30s"
+    scrapeTimeout: "10s"
+    metricRelabelings: []
+    relabelings: []
 # NodeSets configuration
 # Each NodeSet defines a group of worker nodes with specific characteristics
 nodesets:
@@ -290,6 +300,9 @@ nodesets:
       - name: say-hi
         image: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/busybox
         command: ["echo", "Hi!"]
+    # Optional node-exporter sidecar for worker pods.
+    nodeExporter:
+      enabled: false
   - name: worker-cpu
     replicas: 6
     nodeConfig:

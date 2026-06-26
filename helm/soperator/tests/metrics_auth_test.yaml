@@ -5,6 +5,7 @@ release:
 templates:
   - templates/deployment.yaml
   - templates/metrics-auth-rbac.yaml
+  - templates/node-exporter-podmonitor.yaml
 
 tests:
   - it: should expose secure metrics from the manager without a sidecar
@@ -66,3 +67,48 @@ tests:
           path: subjects[0].name
           value: test-soperator-manager
         documentIndex: 1
+
+  - it: should add node-exporter sidecar when enabled
+    template: templates/deployment.yaml
+    set:
+      nodeExporter:
+        enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 1
+      - equal:
+          path: spec.template.metadata.labels["slurm.nebius.ai/pod-node-exporter"]
+          value: "true"
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: pod-node-exporter
+      - equal:
+          path: spec.template.spec.initContainers[0].restartPolicy
+          value: Always
+      - contains:
+          path: spec.template.spec.initContainers[0].args
+          content: --collector.netdev
+      - contains:
+          path: spec.template.spec.initContainers[0].args
+          content: --web.listen-address=:9100
+
+  - it: should render node-exporter PodMonitor when enabled
+    template: templates/node-exporter-podmonitor.yaml
+    set:
+      nodeExporter:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PodMonitor
+      - equal:
+          path: spec.selector.matchLabels["slurm.nebius.ai/pod-node-exporter"]
+          value: "true"
+      - equal:
+          path: spec.podMetricsEndpoints[0].port
+          value: node-exporter

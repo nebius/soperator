@@ -18,6 +18,9 @@ spec:
     metadata:
       labels:
         control-plane: controller-manager
+        {{- if .Values.nodeExporter.enabled }}
+        slurm.nebius.ai/pod-node-exporter: "true"
+        {{- end }}
       {{- include "soperator.selectorLabels" . | nindent 8 }}
       annotations:
         kubectl.kubernetes.io/default-container: manager
@@ -83,6 +86,28 @@ spec:
         {{- end }}
       securityContext:
         runAsNonRoot: true
+      {{- if .Values.nodeExporter.enabled }}
+      initContainers:
+      - name: pod-node-exporter
+        image: {{ .Values.nodeExporter.image.repository }}:{{ .Values.nodeExporter.image.tag }}
+        imagePullPolicy: {{ .Values.nodeExporter.image.pullPolicy }}
+        restartPolicy: Always
+        args:
+        {{- range .Values.nodeExporter.args }}
+        - {{ . | quote }}
+        {{- end }}
+        - --web.listen-address=:{{ .Values.nodeExporter.port }}
+        ports:
+        - containerPort: {{ .Values.nodeExporter.port }}
+          name: node-exporter
+          protocol: TCP
+        resources: {{- toYaml .Values.nodeExporter.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- end }}
       serviceAccountName: {{ include "soperator.fullname" . }}-manager
       terminationGracePeriodSeconds: 10
       {{- if .Values.certManager.enabled }}

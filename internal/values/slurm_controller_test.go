@@ -61,4 +61,5 @@ func TestBuildSlurmControllerFrom_SSSD(t *testing.T) {
 		assert.Equal(t, naming.BuildSecretSSSDConfName("test-cluster"), result.SSSDConfSecretName)
 		assert.True(t, result.IsSSSDSecretDefault)
 	})
+
 }

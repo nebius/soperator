@@ -303,9 +303,6 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 
-  {{- with (.customInitContainers | default list) }}
-  customInitContainers:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+  {{- include "nodesets.customInitContainers" (dict "root" $ "customInitContainers" .customInitContainers "nodeExporter" .nodeExporter) | nindent 2 }}
 {{- end }}
 {{- end }}

@@ -1,0 +1,59 @@
+{{- $components := list -}}
+{{- if and .Values.slurmNodes.accounting.enabled .Values.slurmNodes.accounting.nodeExporter.enabled }}
+{{- $components = append $components "accounting" -}}
+{{- end }}
+{{- if .Values.slurmNodes.controller.nodeExporter.enabled }}
+{{- $components = append $components "controller" -}}
+{{- end }}
+{{- if .Values.slurmNodes.login.nodeExporter.enabled }}
+{{- $components = append $components "login" -}}
+{{- end }}
+{{- if and .Values.slurmNodes.rest.enabled .Values.slurmNodes.rest.nodeExporter.enabled }}
+{{- $components = append $components "rest" -}}
+{{- end }}
+{{- if .Values.sConfigController.nodeExporter.enabled }}
+{{- $components = append $components "sconfigcontroller" -}}
+{{- end }}
+{{- $podMonitor := .Values.nodeExporter.podMonitor | default dict -}}
+{{- $podMonitorEnabled := true -}}
+{{- if hasKey $podMonitor "enabled" -}}
+{{- $podMonitorEnabled = $podMonitor.enabled -}}
+{{- end -}}
+{{- if and $podMonitorEnabled (gt (len $components) 0) }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "slurm-cluster.name" . }}-node-exporter
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "slurm-cluster.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ include "slurm-cluster.name" . | quote }}
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values:
+          {{- range $components }}
+          - {{ . | quote }}
+          {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace | quote }}
+  jobLabel: app.kubernetes.io/component
+  podMetricsEndpoints:
+    - port: node-exporter
+      path: /metrics
+      scheme: http
+      interval: {{ default "30s" $podMonitor.interval }}
+      scrapeTimeout: {{ default "10s" $podMonitor.scrapeTimeout }}
+      {{- if $podMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml $podMonitor.metricRelabelings | nindent 8 }}
+      {{- end }}
+      {{- if $podMonitor.relabelings }}
+      relabelings:
+        {{- toYaml $podMonitor.relabelings | nindent 8 }}
+      {{- end }}
+{{- end }}

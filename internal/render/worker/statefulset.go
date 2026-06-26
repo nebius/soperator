@@ -155,7 +155,7 @@ func RenderNodeSetStatefulSet(
 		}
 	}
 
-	return kruisev1b1.StatefulSet{
+	res := kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        nodeSet.StatefulSet.Name,
 			Namespace:   nodeSet.ParentalCluster.Namespace,
@@ -200,7 +200,9 @@ func RenderNodeSetStatefulSet(
 			},
 			PersistentVolumeClaimRetentionPolicy: pvcRetentionPolicy,
 		},
-	}, nil
+	}
+
+	return res, nil
 }
 
 func renderNodeSetAnnotations(nodeSet *values.SlurmNodeSet) map[string]string {
