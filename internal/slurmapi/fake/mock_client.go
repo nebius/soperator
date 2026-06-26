@@ -480,6 +480,53 @@ func (_c *MockClient_PostMaintenanceReservation_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// RebootNodes provides a mock function with given fields: ctx, request
+func (_m *MockClient) RebootNodes(ctx context.Context, request slurmapi.RebootNodesRequest) error {
+	ret := _m.Called(ctx, request)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RebootNodes")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, slurmapi.RebootNodesRequest) error); ok {
+		r0 = rf(ctx, request)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClient_RebootNodes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RebootNodes'
+type MockClient_RebootNodes_Call struct {
+	*mock.Call
+}
+
+// RebootNodes is a helper method to define mock.On call
+//   - ctx context.Context
+//   - request slurmapi.RebootNodesRequest
+func (_e *MockClient_Expecter) RebootNodes(ctx interface{}, request interface{}) *MockClient_RebootNodes_Call {
+	return &MockClient_RebootNodes_Call{Call: _e.mock.On("RebootNodes", ctx, request)}
+}
+
+func (_c *MockClient_RebootNodes_Call) Run(run func(ctx context.Context, request slurmapi.RebootNodesRequest)) *MockClient_RebootNodes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(slurmapi.RebootNodesRequest))
+	})
+	return _c
+}
+
+func (_c *MockClient_RebootNodes_Call) Return(_a0 error) *MockClient_RebootNodes_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClient_RebootNodes_Call) RunAndReturn(run func(context.Context, slurmapi.RebootNodesRequest) error) *MockClient_RebootNodes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SlurmV0041DeleteJobWithResponse provides a mock function with given fields: ctx, jobId, params, reqEditors
 func (_m *MockClient) SlurmV0041DeleteJobWithResponse(ctx context.Context, jobId string, params *v0041.SlurmV0041DeleteJobParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteJobResponse, error) {
 	_va := make([]interface{}, len(reqEditors))

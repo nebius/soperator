@@ -1,29 +1,57 @@
-package worker
+package worker_test
 
 import (
 	"testing"
 
-	"nebius.ai/slurm-operator/internal/naming"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
+
+	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/render/worker"
+	"nebius.ai/slurm-operator/internal/values"
 )
 
-func Test_RenderRole(t *testing.T) {
-	namespace := "test-namespace"
-	clusterName := "test-cluster"
-
-	role := RenderRole(namespace, clusterName)
-
-	// Check the name
-	if role.Name != naming.BuildRoleWorkerName(clusterName) {
-		t.Errorf("Unexpected name: got %v, want %v", role.Name, naming.BuildRoleWorkerName(clusterName))
+func TestRenderRole_ResourceNames(t *testing.T) {
+	tests := []struct {
+		name         string
+		nodeSet      *values.SlurmNodeSet
+		expectedPods []string
+	}{
+		{
+			name: "regular nodeset ordinals",
+			nodeSet: &values.SlurmNodeSet{
+				Name: "workers",
+				StatefulSet: values.StatefulSet{
+					Replicas: 3,
+				},
+			},
+			expectedPods: []string{"workers-0", "workers-1", "workers-2"},
+		},
+		{
+			name: "ephemeral sparse active ordinals",
+			nodeSet: &values.SlurmNodeSet{
+				Name:           "workers",
+				EphemeralNodes: ptr.To(true),
+				ActiveNodes:    []int32{0, 3, 12},
+				StatefulSet: values.StatefulSet{
+					Replicas:             3,
+					MaxUnavailable:       intstr.FromInt32(1),
+					MaxConcurrentStartup: intstr.FromInt32(1),
+				},
+			},
+			expectedPods: []string{"workers-0", "workers-3", "workers-12"},
+		},
 	}
 
-	// Check the namespace
-	if role.Namespace != namespace {
-		t.Errorf("Unexpected namespace: got %v, want %v", role.Namespace, namespace)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			role := worker.RenderRole("default", "soperator", tt.nodeSet)
 
-	// Check the rules
-	if len(role.Rules) != 1 || role.Rules[0].APIGroups[0] != "" || role.Rules[0].Resources[0] != "events" || role.Rules[0].Verbs[0] != "create" {
-		t.Errorf("Unexpected rules: got %v, want one rule with apiGroups=[\"\"], resources=[\"events\"], and verbs=[\"create\"]", role.Rules)
+			assert.Len(t, role.Rules, 1)
+			assert.Equal(t, []string{"get", "patch"}, role.Rules[0].Verbs)
+			assert.Equal(t, tt.expectedPods, role.Rules[0].ResourceNames)
+			assert.Equal(t, consts.ComponentTypeNodeSet.String(), role.Labels[consts.LabelComponentKey])
+		})
 	}
 }

@@ -1,6 +1,7 @@
 package slurmapi
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"strings"
 	"time"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0041"
@@ -61,6 +63,8 @@ const (
 	headerApplicationJson = "application/json"
 
 	SlurmUserSoperatorchecks = "soperatorchecks"
+
+	slurmV0044RebootNodesPath = "/slurm/v0.0.44/nodes/reboot"
 )
 
 func DefaultHTTPClient() *http.Client {
@@ -94,6 +98,9 @@ type client struct {
 
 	client0043 api0043.ClientWithResponsesInterface
 
+	server     string
+	httpClient *http.Client
+
 	tokenIssuer tokenIssuer
 }
 
@@ -110,6 +117,8 @@ func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) 
 	}
 
 	apiClient := &client{
+		server:      strings.TrimRight(server, "/"),
+		httpClient:  httpClient,
 		tokenIssuer: normalizeIssuer(tokenIssuer),
 	}
 
@@ -136,6 +145,13 @@ func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) 
 	apiClient.client0043 = c0043
 
 	return apiClient, nil
+}
+
+type RebootNodesRequest struct {
+	NodeList  string `json:"nodes"`
+	ASAP      bool   `json:"asap,omitempty"`
+	NextState string `json:"next_state,omitempty"`
+	Reason    string `json:"reason,omitempty"`
 }
 
 // normalizeIssuer converts a typed-nil inside an interface to a real nil.
@@ -169,6 +185,52 @@ func (c *client) setHeaders(ctx context.Context, req *http.Request) error {
 
 	req.Header.Set(headerSlurmUserToken, token)
 	return nil
+}
+
+func (c *client) RebootNodes(ctx context.Context, request RebootNodesRequest) error {
+	if request.NodeList == "" {
+		return fmt.Errorf("reboot nodes: nodes field is required")
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("marshal reboot nodes request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.server+slurmV0044RebootNodesPath, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create reboot nodes request: %w", err)
+	}
+	if err := c.setHeaders(ctx, httpReq); err != nil {
+		return fmt.Errorf("set reboot nodes request headers: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("post reboot nodes request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read reboot nodes response: %w", err)
+	}
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("reboot nodes request failed: status=%d %s", resp.StatusCode, summarizeSlurmRESTBody(responseBody))
+	}
+	if slurmRESTBodyHasErrors(responseBody) {
+		return fmt.Errorf("reboot nodes responded with errors: %s", summarizeSlurmRESTBody(responseBody))
+	}
+
+	return nil
+}
+
+func slurmRESTBodyHasErrors(body []byte) bool {
+	var parsed struct {
+		Errors []struct{} `json:"errors"`
+	}
+	return json.Unmarshal(body, &parsed) == nil && len(parsed.Errors) > 0
 }
 
 func (c *client) ListNodes(ctx context.Context) ([]Node, error) {

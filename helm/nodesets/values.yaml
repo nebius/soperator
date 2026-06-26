@@ -50,6 +50,10 @@ nodesets:
     # Could be a count (number) or percent (string)
     # Optional, defaults to 20%
     maxUnavailable: 1
+    # Update strategy for the worker StatefulSet.
+    # Valid values: rollingUpdate, onDelete.
+    # Optional, defaults to rollingUpdate
+    updateStrategy: rollingUpdate
     # Maximum number of worker pods that can be created in parallel during
     # initial scale-out, to avoid overloading the Slurm controller with
     # simultaneous slurmd registrations.

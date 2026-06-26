@@ -665,9 +665,6 @@ def apply_node_topology(hostname: str, topology: str) -> None:
             f"nodename={hostname}",
             f"{node_addr}",
             f"{topology}",
-            "state=UNDRAIN",
-            "reason=",
-            "comment=",
         ]
         logger.info("Running: %s", " ".join(cmd))
         result: subprocess.CompletedProcess[str] = subprocess.run(
