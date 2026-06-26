@@ -1,4 +1,7 @@
 suite: test controller-runtime protected metrics
+capabilities:
+  apiVersions:
+    - monitoring.coreos.com/v1/PodMonitor
 release:
   name: test-soperator
   namespace: soperator-system

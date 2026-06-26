@@ -15,7 +15,7 @@
 {{- if hasKey $podMonitor "enabled" -}}
 {{- $podMonitorEnabled = $podMonitor.enabled -}}
 {{- end -}}
-{{- if and $podMonitorEnabled $clusterName (gt (len $enabledNodeSets) 0) }}
+{{- if and $podMonitorEnabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/PodMonitor") $clusterName (gt (len $enabledNodeSets) 0) }}
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:

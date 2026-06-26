@@ -1,4 +1,4 @@
-{{- if .Values.nodeExporter.enabled }}
+{{- if and .Values.nodeExporter.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/PodMonitor") }}
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:

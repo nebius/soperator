@@ -1,4 +1,7 @@
 suite: test node-exporter sidecar rendering
+capabilities:
+  apiVersions:
+    - monitoring.coreos.com/v1/PodMonitor
 templates:
   - templates/slurm-cluster-cr.yaml
   - templates/node-exporter-podmonitor.yaml

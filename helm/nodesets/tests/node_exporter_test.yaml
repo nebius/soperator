@@ -1,4 +1,7 @@
 suite: test nodesets node-exporter rendering
+capabilities:
+  apiVersions:
+    - monitoring.coreos.com/v1/PodMonitor
 templates:
   - templates/nodeset.yaml
   - templates/node-exporter-podmonitor.yaml
