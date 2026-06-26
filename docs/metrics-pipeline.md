@@ -133,6 +133,19 @@ curl -k -H "Authorization: Bearer ${TOKEN}" https://localhost:8443/metrics
 
 Note: Production scraping requires a ServiceMonitor with proper RBAC authentication.
 
+#### 7. NCCL Profiles Collector
+- Purpose: Reads NCCL profile files from the jail filesystem and exports metrics through an OpenTelemetry collector
+- Deployment: Single deployment on system nodes by default, or DaemonSet on worker nodes with `observability.ncclProfiles.values.mode: nodeLocal`
+- Storage: Uses file storage under `/var/lib/otelcol` when `observability.ncclProfiles.values.enableFileStorage` is enabled
+- Runtime limits: Sets `GOMAXPROCS` and, when `useGoMemLimit` is enabled, `GOMEMLIMIT` from `observability.ncclProfiles.values.resources`
+
+The NCCL profiles collector follows the same Go runtime sizing rules as the log collectors:
+
+- CPU limits are preferred over CPU requests; values are rounded up to at least one process (`500m` -> `1`, `2` -> `2`).
+- Memory limits are preferred over memory requests.
+- `GOMEMLIMIT` targets about 85% of selected memory and rounds up to whole Go units (`200Mi` -> `170MiB`, `500Gi` -> `425GiB`).
+- When `spec.values.useGOMEMLIMIT` is false, no `GOMEMLIMIT` environment variable is configured by Soperator.
+
 ### Metrics Processing & Storage
 
 #### VictoriaMetrics Agent (VMAgent)
