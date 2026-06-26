@@ -30,6 +30,8 @@ func Init(ctx context.Context, cfg Config) (tf *tfexec.Terraform, varFilePath st
 		return nil, "", nil, fmt.Errorf("select workspace: %w", err)
 	}
 
+	healNebiusProviderMismatch(ctx, tf, cfg.PathToInstallation)
+
 	logState(ctx, tf)
 	return tf, varFilePath, cleanup, nil
 }
