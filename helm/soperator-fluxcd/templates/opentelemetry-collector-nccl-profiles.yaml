@@ -1,11 +1,16 @@
-{{- if and .Values.observability.enabled .Values.observability.vmStack.enabled .Values.observability.ncclProfiles.enabled -}}
+{{- if
+  and
+    .Values.observability.enabled
+    .Values.observability.vmStack.enabled
+    .Values.observability.ncclProfiles.enabled
+-}}
 
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: {{ include "soperator-fluxcd.fullname" . }}-otelcol-nccl-profiles-cm
   labels:
-  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
   {{- with .Values.observability.ncclProfiles.driftDetection }}
   driftDetection:
@@ -67,19 +72,6 @@ spec:
         name: {{ .Values.observability.ncclProfiles.releaseName }}-agent
       data:
         relay: |
-          exporters:
-            otlp_http/victoriametrics:
-              compression: gzip
-              encoding: proto
-              metrics_endpoint: {{ $values.metricsEndpoint | default "http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics" }}
-              timeout: {{ $values.metricsExporterTimeout | default "15s" }}
-              retry_on_failure:
-                enabled: true
-                initial_interval: 1s
-                max_interval: 10s
-                max_elapsed_time: 0
-{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $batch "queue" $sendingQueue "storage" $queueStorage) | indent 14 }}
-
           receivers:
             filelog/nccl_metrics:
               include:
@@ -90,10 +82,12 @@ spec:
                 max_elapsed_time: 0
               include_file_path: true
               start_at: beginning
+
               {{- if $deleteAfterReadEnabled }}
               delete_after_read: true
               delete_after_read_min_age: {{ $deleteAfterRead.minAge | default "1m" }}
               {{- end }}
+
               {{- if $enableFileStorage }}
               storage: file_storage
               {{- end }}
@@ -119,8 +113,30 @@ spec:
                   from: attributes.hostname_pid
                   to: resource["{{ $exportLabels.hostnamePid | default "hostname_pid" }}"]
 
+          exporters:
+            otlp_http/victoriametrics:
+              compression: gzip
+              encoding: proto
+              metrics_endpoint: {{ $values.metricsEndpoint | default "http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics" }}
+              timeout: {{ $values.metricsExporterTimeout | default "15s" }}
+              retry_on_failure:
+                enabled: true
+                initial_interval: 1s
+                max_interval: 10s
+                max_elapsed_time: 0
+{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $batch "queue" $sendingQueue "storage" $queueStorage) | indent 14 }}
+
           connectors:
             ncclmetrics:
+
+          extensions:
+            {{- if $enableFileStorage }}
+            file_storage:
+              directory: /var/lib/otelcol-nccl-profiles
+            {{- end }}
+
+            health_check:
+              endpoint: 0.0.0.0:13133
 
           service:
             {{- if $metricsEnabled }}
@@ -133,11 +149,14 @@ spec:
                           host: 0.0.0.0
                           port: 8889
             {{- end }}
+
             extensions:
               - health_check
+
               {{- if $enableFileStorage }}
               - file_storage
               {{- end }}
+
             pipelines:
               logs/nccl_metrics:
                 receivers:
@@ -150,14 +169,6 @@ spec:
                   - ncclmetrics
                 exporters:
                   - otlp_http/victoriametrics
-
-          extensions:
-            {{- if $enableFileStorage }}
-            file_storage:
-              directory: /var/lib/otelcol-nccl-profiles
-            {{- end }}
-            health_check:
-              endpoint: 0.0.0.0:13133
   {{- end }}
 
   valuesFrom:
@@ -177,7 +188,7 @@ kind: HelmRelease
 metadata:
   name: {{ include "soperator-fluxcd.fullname" . }}-otelcol-nccl-profiles
   labels:
-  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
   {{- with .Values.observability.ncclProfiles.driftDetection }}
   driftDetection:
@@ -228,6 +239,7 @@ spec:
   {{- if hasKey $values "useGoMemLimit" }}
   {{- $useGoMemLimit = $values.useGoMemLimit }}
   {{- end }}
+
   {{- if .Values.observability.ncclProfiles.collectorOverrideValues }}
     {{- toYaml .Values.observability.ncclProfiles.collectorOverrideValues | nindent 4 }}
   {{- else }}
@@ -324,7 +336,33 @@ spec:
       {{- include "soperator-fluxcd.otelCollectorGoEnv" (dict "resources" $values.resources "useGoMemLimit" $useGoMemLimit) | nindent 6 }}
 
     initContainers:
-      - command:
+      - name: wait-jail-populated
+        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        volumeMounts:
+          - name: jail
+            mountPath: /mnt/jail
+        securityContext:
+          runAsGroup: 0
+          runAsUser: 0
+        command:
+          - sh
+          - "-c"
+          - |
+            set -eu
+            until [ -f /mnt/jail/etc/soperator-jail-populated ]; do
+              echo "Waiting for /mnt/jail to be populated"
+              sleep 5
+            done
+
+      - name: init-nccl-profiles-dump-dir
+        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        volumeMounts:
+          - name: jail
+            mountPath: /mnt/jail
+        securityContext:
+          runAsGroup: 0
+          runAsUser: 0
+        command:
           - sh
           - "-c"
           - |
@@ -337,33 +375,21 @@ spec:
                 exit 1
                 ;;
             esac
-            until [ -f /mnt/jail/etc/soperator-jail-populated ]; do
-              echo "Waiting for /mnt/jail to be populated"
-              sleep 5
-            done
             install -d -m 0777 "$dump_dir"
-        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
-        name: init-nccl-profiles-dir
-        securityContext:
-          runAsGroup: 0
-          runAsUser: 0
-        volumeMounts:
-          - name: jail
-            mountPath: /mnt/jail
 
       {{- if $enableFileStorage }}
-      - command:
-          - sh
-          - "-c"
-          - 'chown -R 10001: /var/lib/otelcol-nccl-profiles'
+      - name: init-fs
         image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
-        name: init-fs
-        securityContext:
-          runAsGroup: 0
-          runAsUser: 0
         volumeMounts:
           - name: varlibotelcol
             mountPath: /var/lib/otelcol-nccl-profiles
+        securityContext:
+          runAsGroup: 0
+          runAsUser: 0
+        command:
+          - sh
+          - "-c"
+          - 'chown -R 10001: /var/lib/otelcol-nccl-profiles'
       {{- end }}
 
     resources:
