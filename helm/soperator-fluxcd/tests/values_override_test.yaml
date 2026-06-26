@@ -288,6 +288,9 @@ tests:
           path: spec.values.extraVolumes[0].hostPath.type
           value: Directory
       - equal:
+          path: spec.values.extraVolumeMounts[0].readOnly
+          value: false
+      - equal:
           path: spec.values.initContainers[1].name
           value: init-nccl-profiles-dump-dir
       - equal:
@@ -307,6 +310,9 @@ tests:
       - equal:
           path: spec.values.command.extraArgs[0]
           value: --feature-gates=filelog.allowFileDeletion
+      - equal:
+          path: spec.values.extraVolumeMounts[0].readOnly
+          value: false
 
   - it: should use daemonset mode on worker nodes for node-local storage
     set:
@@ -338,6 +344,7 @@ tests:
       observability.ncclProfiles.enabled: true
       observability.ncclProfiles.values.dumpDir: /mnt/jail/custom/nccl
       observability.ncclProfiles.values.enableFileStorage: false
+      observability.ncclProfiles.values.deleteAfterRead.enabled: false
       observability.ncclProfiles.values.resources:
         requests:
           cpu: 250m
@@ -360,6 +367,9 @@ tests:
       - equal:
           path: spec.values.initContainers[1].volumeMounts[0].name
           value: jail
+      - equal:
+          path: spec.values.extraVolumeMounts[0].readOnly
+          value: true
       - matchRegex:
           path: spec.values.initContainers[1].command[2]
           pattern: '/mnt/jail/custom/nccl'

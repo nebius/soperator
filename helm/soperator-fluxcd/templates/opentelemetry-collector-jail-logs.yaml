@@ -133,7 +133,7 @@ spec:
     extraVolumeMounts:
       - name: jail
         mountPath: /mnt/jail
-        readOnly: true
+        readOnly: {{ not $jailDeleteAfterReadEnabled }}
 
     {{- if $jailEnableFileStorage }}
       - name: varlibotelcol
