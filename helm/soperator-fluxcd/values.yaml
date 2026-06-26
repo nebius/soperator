@@ -185,10 +185,12 @@ observability:
           remediateLastFailure: true
       values:
         enableFileStorage: true
+        useGoMemLimit: true
         jailLogs:
           enabled: true
           pollInterval: 30s
           enableFileStorage: true
+          useGoMemLimit: true
           deleteAfterRead:
             enabled: false
             # Nebius O11y agent fork option; not part of upstream filelogreceiver.
@@ -230,6 +232,7 @@ observability:
           remediateLastFailure: true
       values:
         enableFileStorage: true
+        useGoMemLimit: true
         resources:
           requests:
             memory: 128Mi
@@ -435,8 +438,8 @@ observability:
           cpu: 500m
         limits:
           memory: 1Gi
-      nebiusO11yAgentVersion: 2.0.10
       useGoMemLimit: true
+      nebiusO11yAgentVersion: 2.0.10
       metricsEndpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics
       metricsExporterTimeout: 15s
       # These values are rendered as exporter sending_queue.batch settings.

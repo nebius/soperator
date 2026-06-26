@@ -44,9 +44,7 @@ spec:
   {{- $logsQueueStorage = "file_storage" }}
   {{- end }}
   {{- $logsUseGoMemLimit := true }}
-  {{- if hasKey $logsValues "useGOMEMLIMIT" }}
-  {{- $logsUseGoMemLimit = $logsValues.useGOMEMLIMIT }}
-  {{- else if hasKey $logsValues "useGoMemLimit" }}
+  {{- if hasKey $logsValues "useGoMemLimit" }}
   {{- $logsUseGoMemLimit = $logsValues.useGoMemLimit }}
   {{- end }}
   {{- if .Values.observability.opentelemetry.logs.overrideValues }}

@@ -227,8 +227,6 @@ spec:
   {{- $useGoMemLimit := true }}
   {{- if hasKey $values "useGoMemLimit" }}
   {{- $useGoMemLimit = $values.useGoMemLimit }}
-  {{- else if hasKey $values "useGOMEMLIMIT" }}
-  {{- $useGoMemLimit = $values.useGOMEMLIMIT }}
   {{- end }}
   {{- if .Values.observability.ncclProfiles.collectorOverrideValues }}
     {{- toYaml .Values.observability.ncclProfiles.collectorOverrideValues | nindent 4 }}

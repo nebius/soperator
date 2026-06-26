@@ -44,9 +44,7 @@ spec:
   {{- $eventsQueueStorage = "file_storage" }}
   {{- end }}
   {{- $eventsUseGoMemLimit := true }}
-  {{- if hasKey $eventsValues "useGOMEMLIMIT" }}
-  {{- $eventsUseGoMemLimit = $eventsValues.useGOMEMLIMIT }}
-  {{- else if hasKey $eventsValues "useGoMemLimit" }}
+  {{- if hasKey $eventsValues "useGoMemLimit" }}
   {{- $eventsUseGoMemLimit = $eventsValues.useGoMemLimit }}
   {{- end }}
   {{- if .Values.observability.opentelemetry.events.overrideValues }}

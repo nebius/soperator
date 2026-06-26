@@ -55,11 +55,9 @@ spec:
   {{- if hasKey $jailDeleteAfterRead "enabled" }}
   {{- $jailDeleteAfterReadEnabled = $jailDeleteAfterRead.enabled }}
   {{- end }}
-  {{- $logsUseGoMemLimit := true }}
-  {{- if hasKey $logsValues "useGOMEMLIMIT" }}
-  {{- $logsUseGoMemLimit = $logsValues.useGOMEMLIMIT }}
-  {{- else if hasKey $logsValues "useGoMemLimit" }}
-  {{- $logsUseGoMemLimit = $logsValues.useGoMemLimit }}
+  {{- $jailLogsUseGoMemLimit := true }}
+  {{- if hasKey $jailLogsValues "useGoMemLimit" }}
+  {{- $jailLogsUseGoMemLimit = $jailLogsValues.useGoMemLimit }}
   {{- end }}
   {{- if .Values.observability.opentelemetry.logs.overrideValues }}
     {{- toYaml .Values.observability.opentelemetry.logs.overrideValues | nindent 4 }}

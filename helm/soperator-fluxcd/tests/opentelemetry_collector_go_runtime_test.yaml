@@ -24,6 +24,18 @@ tests:
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: true
+
+  - it: should omit GOMEMLIMIT when useGoMemLimit is false
+    set:
+      observability.opentelemetry.logs.values.useGoMemLimit: false
+    asserts:
+      - notContains:
+          path: spec.values.extraEnvs
+          content:
+            name: GOMEMLIMIT
+      - equal:
+          path: spec.values.useGOMEMLIMIT
+          value: false
 ---
 suite: test opentelemetry collector events Go runtime env
 templates:
@@ -70,9 +82,9 @@ tests:
           path: spec.values.useGOMEMLIMIT
           value: true
 
-  - it: should omit GOMEMLIMIT when useGOMEMLIMIT is false
+  - it: should omit GOMEMLIMIT when useGoMemLimit is false
     set:
-      observability.opentelemetry.events.values.useGOMEMLIMIT: false
+      observability.opentelemetry.events.values.useGoMemLimit: false
       observability.opentelemetry.events.values.resources:
         requests:
           cpu: 100m
@@ -120,6 +132,18 @@ tests:
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: true
+
+  - it: should omit GOMEMLIMIT when jailLogs.useGoMemLimit is false
+    set:
+      observability.opentelemetry.logs.values.jailLogs.useGoMemLimit: false
+    asserts:
+      - notContains:
+          path: spec.values.extraEnvs
+          content:
+            name: GOMEMLIMIT
+      - equal:
+          path: spec.values.useGOMEMLIMIT
+          value: false
 ---
 suite: test opentelemetry collector NCCL profiles Go runtime env
 templates:
