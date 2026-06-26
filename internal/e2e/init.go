@@ -20,7 +20,7 @@ func Init(ctx context.Context, cfg Config) (tf *tfexec.Terraform, varFilePath st
 		return nil, "", nil, fmt.Errorf("setup terraform: %w", err)
 	}
 
-	if err := tf.Init(ctx); err != nil {
+	if err := tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
 		cleanup()
 		return nil, "", nil, fmt.Errorf("terraform init: %w", err)
 	}
