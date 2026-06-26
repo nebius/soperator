@@ -90,8 +90,8 @@ spec:
       processors:
         batch:
           timeout: {{ $batch.timeout | default "1s" }}
-          send_batch_size: {{ $batch.sendBatchSize | default 250 }}
-          send_batch_max_size: {{ $batch.sendBatchMaxSize | default 700 }}
+          send_batch_size: {{ $batch.sendBatchSize | default 2000 }}
+          send_batch_max_size: {{ $batch.sendBatchMaxSize | default 5000 }}
         k8s_attributes:
           extract:
             labels:

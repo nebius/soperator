@@ -24,6 +24,11 @@
     {{- include "slurm-cluster.selectorLabels" . | trim | nindent 0 }}
 {{- end }}
 
+{{/* Name of the slurm-scripts ConfigMap */}}
+{{- define "slurm-cluster.slurmScriptsCMName" -}}
+{{- printf "%s-slurm-scripts" (include "slurm-cluster.name" .) -}}
+{{- end -}}
+
 {{- define "validateAccountingConfig" -}}
 {{- if .Values.slurmNodes.accounting.enabled -}}
   {{- if not (or .Values.slurmNodes.accounting.externalDB.enabled .Values.slurmNodes.accounting.mariadbOperator.enabled) -}}
@@ -62,7 +67,7 @@ Create the name of the service account to use for exporter
 */}}
 {{- define "slurm-cluster.exporter.serviceAccountName" -}}
 {{- if .Values.slurmNodes.exporter.serviceAccount.create -}}
-    {{- default "slurm-exporter-sa" .Values.slurmNodes.exporter.serviceAccount.name }}
+    {{- default (printf "%s-exporter-sa" (include "slurm-cluster.name" .)) .Values.slurmNodes.exporter.serviceAccount.name }}
 {{- else -}}
     {{- default "default" .Values.slurmNodes.exporter.serviceAccount.name }}
 {{- end -}}

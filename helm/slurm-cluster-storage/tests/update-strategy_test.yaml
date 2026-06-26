@@ -1,0 +1,80 @@
+suite: test mount DaemonSet updateStrategy
+templates:
+  - templates/jail-mount-daemonset.yaml
+  - templates/accounting-mount-daemonset.yaml
+  - templates/controller-spool-mount-daemonset.yaml
+  - templates/jail-submounts-mount-daemonset.yaml
+tests:
+  - it: should render default RollingUpdate strategy on the jail mount DaemonSet
+    template: templates/jail-mount-daemonset.yaml
+    asserts:
+      - equal:
+          path: spec.updateStrategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.maxUnavailable
+          value: 20%
+
+  - it: should override the jail mount update strategy
+    template: templates/jail-mount-daemonset.yaml
+    set:
+      storage:
+        jail:
+          updateStrategy:
+            type: OnDelete
+    asserts:
+      - equal:
+          path: spec.updateStrategy.type
+          value: OnDelete
+
+  - it: should omit updateStrategy when unset
+    template: templates/jail-mount-daemonset.yaml
+    set:
+      storage:
+        jail:
+          updateStrategy: null
+    asserts:
+      - isNull:
+          path: spec.updateStrategy
+
+  - it: should render the strategy on the accounting mount DaemonSet
+    template: templates/accounting-mount-daemonset.yaml
+    set:
+      volume:
+        accounting:
+          enabled: true
+      storage:
+        accounting:
+          updateStrategy:
+            type: OnDelete
+    asserts:
+      - equal:
+          path: spec.updateStrategy.type
+          value: OnDelete
+
+  - it: should render the default strategy on the controller-spool mount DaemonSet
+    template: templates/controller-spool-mount-daemonset.yaml
+    asserts:
+      - equal:
+          path: spec.updateStrategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.maxUnavailable
+          value: 20%
+
+  - it: should render the jail strategy on jail-submount DaemonSets
+    template: templates/jail-submounts-mount-daemonset.yaml
+    set:
+      volume:
+        jailSubMounts:
+          - name: mlperf-sd
+            size: 1500Gi
+            filestoreDeviceName: mlperf-sd
+      storage:
+        jail:
+          updateStrategy:
+            type: OnDelete
+    asserts:
+      - equal:
+          path: spec.updateStrategy.type
+          value: OnDelete

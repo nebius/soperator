@@ -85,7 +85,7 @@ spec:
             - id: extract_directory
               type: regex_parser
               parse_from: attributes["log.file.path"]
-              regex: ^.*/(?P<log_directory>nccl_logs|slurm_jobs|slurm_scripts)/.*$
+              regex: ^.*/(?P<log_directory>nccl_logs|slurm_jobs|slurm_scripts|task_prolog)/.*$
             - type: move
               from: attributes.log_directory
               to: resource["log_type"]
@@ -102,6 +102,23 @@ spec:
               from: attributes.job_step_id
               to: resource["job_step_id"]
               if: resource["log_type"] == "nccl_logs" and attributes["job_step_id"] != nil
+            - id: parse_task_prolog_base_name
+              type: regex_parser
+              parse_from: attributes.base_name
+              regex: ^(?P<job_id>\d+)\.(?P<job_step_id>\d+)?\.(?P<job_array_id>\d+)?$
+              if: resource["log_type"] == "task_prolog"
+            - type: move
+              from: attributes.job_id
+              to: resource["job_id"]
+              if: resource["log_type"] == "task_prolog" and attributes["job_id"] != nil
+            - type: move
+              from: attributes.job_step_id
+              to: resource["job_step_id"]
+              if: resource["log_type"] == "task_prolog" and attributes["job_step_id"] != nil
+            - type: move
+              from: attributes.job_array_id
+              to: resource["job_array_id"]
+              if: resource["log_type"] == "task_prolog" and attributes["job_array_id"] != nil
             - id: parse_slurm_job_log_base_name
               type: regex_parser
               parse_from: attributes.base_name
@@ -199,8 +216,8 @@ spec:
       processors:
         batch:
           timeout: {{ $batch.timeout | default "1s" }}
-          send_batch_size: {{ $batch.sendBatchSize | default 250 }}
-          send_batch_max_size: {{ $batch.sendBatchMaxSize | default 700 }}
+          send_batch_size: {{ $batch.sendBatchSize | default 2000 }}
+          send_batch_max_size: {{ $batch.sendBatchMaxSize | default 5000 }}
         k8s_attributes:
           pod_association:
           - sources:

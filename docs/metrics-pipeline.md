@@ -104,7 +104,8 @@ Key Metrics:
   - 8081 - Telemetry endpoint (self-monitoring)
 - Metrics: Pod state metrics (filtered subset)
 - Deployment: Single replica deployment in `monitoring-system` namespace
-- Configuration: `--resources=pods` with metric allowlist filtering
+- Configuration: pod/node collectors with metric allowlist filtering
+- Scrape size: inherits the global vmagent scrape size by default; `observability.vmStack.values.kubeStateMetrics.maxScrapeSize` can raise the main `http` endpoint limit for large clusters
 
 Connection Example:
 ```bash
@@ -117,17 +118,17 @@ Note: Port 8080 provides Kubernetes object metrics, while port 8081 provides sel
 
 #### 6. Soperator Controller Metrics
 - Purpose: Exports controller runtime metrics
-- Port: 8443 (through kube-rbac-proxy)
+- Port: 8443 (controller-runtime secure metrics)
 - Metrics: Reconciliation metrics, controller health
 - Deployment: Runs on system nodes with the controller manager
 - Namespace: `soperator-system`
-- Access: Protected by RBAC proxy, requires proper authentication
+- Access: Protected by controller-runtime authn/authz, requires proper authentication
 
 Connection Example:
 ```bash
-# Port-forward to controller (bypasses RBAC)
-kubectl port-forward -n soperator-system deployment/soperator-controller-manager 8080:8080
-curl http://localhost:8080/metrics
+# Port-forward to controller metrics and authenticate with a token allowed to get /metrics
+kubectl port-forward -n soperator-system deployment/soperator-controller-manager 8443:8443
+curl -k -H "Authorization: Bearer ${TOKEN}" https://localhost:8443/metrics
 ```
 
 Note: Production scraping requires a ServiceMonitor with proper RBAC authentication.

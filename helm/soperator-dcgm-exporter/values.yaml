@@ -34,6 +34,28 @@ serviceMonitor:
       regex: feature_node_kubernetes_io_.*|kubernetes_io_.*|nvidia_com_gpu.*
     - action: labeldrop
       regex: UUID|DCGM_FI_PROCESS_NAME|DCGM_FI_DEV_SERIAL|DCGM_FI_DEV_NAME|job|pci_bus_id|prometheus
+  relabelings:
+    - action: replace
+      regex: nvidia-dcgm-exporter
+      replacement: dcgm-exporter
+      sourceLabels:
+      - __meta_kubernetes_pod_label_app
+      targetLabel: app_kubernetes_io_name
+    - action: replace
+      regex: (.+)
+      sourceLabels:
+        - __meta_kubernetes_node_label_nebius_com_nvlink_instance_group
+      targetLabel: nvlink_instance_group
+    - action: replace
+      regex: (.+)
+      sourceLabels:
+        - __meta_kubernetes_node_label_slurm_nebius_ai_nodeset
+      targetLabel: slurm_nodeset
+    - action: replace
+      regex: (.+)
+      sourceLabels:
+        - __meta_kubernetes_node_label_slurm_nebius_ai_nodeset_name
+      targetLabel: slurm_nodeset_name
 
 serviceAccount:
   annotations: {}

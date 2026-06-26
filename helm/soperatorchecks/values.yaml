@@ -1,31 +1,16 @@
 checks:
-  kubeRbacProxy:
-    args:
-      - --secure-listen-address=0.0.0.0:8443
-      - --upstream=http://127.0.0.1:8080/
-      - --logtostderr=true
-      - --v=0
-    containerSecurityContext:
-      allowPrivilegeEscalation: false
-      capabilities:
-        drop:
-          - ALL
-    image:
-      repository: registry.k8s.io/kubebuilder/kube-rbac-proxy
-      tag: v0.15.0
-    resources:
-      limits:
-        memory: 128Mi
-      requests:
-        cpu: 50m
-        memory: 64Mi
   manager:
     enableNodeReplacement: false
     enableExtensiveCheck: false
     args:
+      - --metrics-bind-address=:8443
+      - --metrics-secure=true
       - --log-format=json
       - --log-level=info
-      - --reconcile-timeout=3m
+      - --requeue-after-slurm-nodes=3m
+      - --requeue-after-activecheck=10s
+      - --requeue-after-activecheckjob=1m
+      - --requeue-after-pod-ephemeral-storage-check=1m
       - --max-concurrent-reconciles=1
       - --cache-sync-timeout=2m
       - --not-ready-timeout=15m
@@ -51,7 +36,7 @@ checks:
       maintenanceIgnoreNodeLabels: "slurm.nebius.ai/nodeset=nfs"
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
-      tag: 4.1.0
+      tag: 4.0.2
     imagePullPolicy: Always
     resources:
       limits:

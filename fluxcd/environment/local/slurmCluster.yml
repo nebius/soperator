@@ -2,7 +2,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.1.0
+  version: 4.0.2
   namespace: soperator
   releaseName: soperator
   overrideValues:
@@ -134,7 +134,7 @@ slurmCluster:
               name: motd-nebius-o11y
               volumeSourceName: motd-nebius-o11y
             - name: data
-              mountPath: /mnt/data
+              mountPath: /data
               volumeSourceName: jail-submount-data
           customMounts:
             - name: sys-host

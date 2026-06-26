@@ -39,15 +39,15 @@ jobContainer:
       persistentVolumeClaim:
         claimName: "jail-pvc"
 images:
-  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:4.1.0-slurm25.11.3"
-  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:4.1.0-slurm25.11.3"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:4.1.0-slurm25.11.3"
-  sansible: "cr.eu-north1.nebius.cloud/soperator/sansible:4.1.0-slurm25.11.3"
+  slurmJob: "cr.eu-north1.nebius.cloud/soperator/slurm_check_job:4.0.2-slurm25.11.5"
+  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:4.0.2-slurm25.11.5"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:4.0.2-slurm25.11.5"
+  sansible: "cr.eu-north1.nebius.cloud/soperator/sansible:4.0.2-slurm25.11.5"
   activeCheckImageRepository: "cr.eu-north1.nebius.cloud#ml-containers/training_diag"
   activeCheckImageTags:
-    # Image training_diag from PR https://github.com/nebius/ml-containers/pull/88
-    "12.9.0": "12.9.0-ubuntu24.04-20260605082528"
-    "13.0.2": "13.0.2-ubuntu24.04-20260605082528"
+    # Image training_diag from PR https://github.com/nebius/ml-containers/pull/90
+    "12.9.0": "12.9.0-ubuntu24.04-20260624090429"
+    "13.0.2": "13.0.2-ubuntu24.04-20260624090429"
 # Optional override in Pyxis ("reg#repo:tag") format.
 activeCheckImage: ""
 checks:
@@ -118,6 +118,19 @@ checks:
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
+  docker-memory-limit-oomkilled:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+      - "prepull-container-image"
+    suspend: true
+    runAfterCreation: true
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/docker-memory-limit-oomkilled.sh"
+      eachWorkerJobs: true
   dcgmi-diag-r2:
     enabled: true
     checkType: "slurmJob"
@@ -158,6 +171,7 @@ checks:
       - "all-reduce-perf-nccl-with-ib"
       - "all-reduce-perf-nccl-without-ib"
       - "cuda-samples"
+      - "docker-memory-limit-oomkilled"
       - "dcgmi-diag-r2"
       - "dcgmi-diag-r3"
       - "gpu-fryer"
@@ -327,6 +341,9 @@ checks:
       scriptFile: "scripts/soperator-outputs-logs-cleaner.sh"
       jobContainer:
         appArmorProfile: unconfined
+        env:
+          - name: "SNCCLPRECON_DUMP_DIR"
+            value: "/opt/soperator-outputs/nccl_profiles"
   manage-jail-state:
     enabled: true
     checkType: "k8sJob"
@@ -374,6 +391,10 @@ checks:
           - run.yml
           - -t
           - run-all-upgrade
+          - -e
+          - "common_packages_force_reinstall=true"
+          - -e
+          - "python_packages_force_reinstall=true"
           - -e
           - "cuda_force_upgrade=true"
           - -e
@@ -440,7 +461,7 @@ checks:
           - -e
           - ansible_python_interpreter=/usr/bin/python3
           - -e
-          - "nc_health_checker_version=1.1.8-a3dae386"
+          - "nc_health_checker_version=1.1.15-b3af5269"
           - nc-health-checker.yml
           - --diff
   wait-for-topology:

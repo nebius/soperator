@@ -67,6 +67,8 @@ func RenderNodeSetStatefulSet(
 			nodeSet.GPU.Enabled,
 			topologyTimeOut,
 			topologyPlugin,
+			nodeSet.TopologyFabric,
+			nodeSet.WorkerInitRandomDelaySeconds,
 		),
 	)
 
@@ -90,6 +92,7 @@ func RenderNodeSetStatefulSet(
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}
+	dockerProxyContainer := renderContainerNodeSetDockerProxy(nodeSet)
 
 	replicas := &nodeSet.StatefulSet.Replicas
 	var reserveOrdinals []intstr.IntOrString
@@ -118,6 +121,7 @@ func RenderNodeSetStatefulSet(
 		InitContainers:     initContainers,
 		Containers: []corev1.Container{
 			slurmdContainer,
+			dockerProxyContainer,
 		},
 		Volumes:   volumes,
 		Subdomain: nodeSet.ServiceUmbrella.Name,
@@ -163,6 +167,9 @@ func RenderNodeSetStatefulSet(
 			ServiceName:         nodeSet.ServiceUmbrella.Name,
 			Replicas:            replicas,
 			ReserveOrdinals:     reserveOrdinals,
+			ScaleStrategy: &kruisev1b1.StatefulSetScaleStrategy{
+				MaxUnavailable: &nodeSet.StatefulSet.MaxConcurrentStartup,
+			},
 			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
