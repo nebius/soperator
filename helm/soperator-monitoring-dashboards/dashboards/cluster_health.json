@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 22,
+  "id": 20,
   "links": [
     {
       "asDropdown": false,
@@ -64,8 +64,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
-                "value": null
+                "color": "text"
               }
             ]
           }
@@ -95,7 +94,7 @@
         "textMode": "name",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -104,7 +103,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "group(\n    kube_customresource_slurmcluster_info{\n        cr_version!=\"\"\n    }\n) by(cr_version)\n",
+          "expr": "group(\n    label_replace(\n        container_processes{\n            \n            image=~\".*slurm-operator:.*\",\n            container=\"manager\"\n        }\n    , \"version\", \"$1\", \"image\", \".*:(.+)\"\n    )\n) by(version)\n",
           "instant": true,
           "legendFormat": "{{version}}",
           "range": false,
@@ -128,12 +127,80 @@
             "mode": "thresholds"
           },
           "mappings": [],
+          "noValue": "-",
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-blue",
-                "value": null
+                "color": "green"
+              }
+            ]
+          },
+          "unit": "dateTimeFromNow"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "id": 2,
+      "maxPerRow": 6,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": false
+      },
+      "pluginVersion": "11.6.14",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "VictoriaMetrics"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "(\n  tlast_change_over_time(\n    (\n      group(\n        label_replace(\n          container_processes{\n            \n            image=~\".*slurm-operator:.*\",\n            container=\"manager\"\n          },\n          \"version\",\n          \"$1\",\n          \"image\",\n          \".*:(.+)\"\n        )\n      ) by(version)\n    )[180d]\n  )\n    *\n  1000\n)\n  and on(version)\ngroup(\n  label_replace(\n    container_processes{\n      \n      image=~\".*slurm-operator:.*\",\n      container=\"manager\"\n    },\n    \"version\",\n    \"$1\",\n    \"image\",\n    \".*:(.+)\"\n  )\n) by(version)",
+          "instant": true,
+          "legendFormat": "{{version}}",
+          "range": false,
+          "refId": "A",
+          "useCustomValues": false,
+          "useDashValues": false
+        }
+      ],
+      "title": "Last Soperator upgrade",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "super-light-blue"
               }
             ]
           }
@@ -142,8 +209,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 8,
-        "x": 4,
+        "w": 4,
+        "x": 8,
         "y": 1
       },
       "id": 35,
@@ -163,7 +230,7 @@
         "textMode": "name",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -172,7 +239,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  cadvisor_version_info{}\n) by(iam_project_id)",
+          "expr": "count(\n  cadvisor_version_info{}\n) by(container_id)",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -200,8 +267,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-blue",
-                "value": null
+                "color": "super-light-blue"
               }
             ]
           }
@@ -231,7 +297,7 @@
         "textMode": "name",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -240,7 +306,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "group(\n    kube_node_labels{label_nebius_com_gpu_name!=\"\"}\n) by (label_nebius_com_gpu_name)",
+          "expr": "group(\n    label_transform(\n        DCGM_FI_DEV_COUNT{\n            \n            modelName!=\"\",\n        },\n        \"modelName\", \"NVIDIA (.*)\", \"$1\"\n    )\n) by (modelName)",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -257,7 +323,7 @@
         "type": "prometheus",
         "uid": "VictoriaMetrics"
       },
-      "description": "For GB platform only",
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -268,8 +334,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-purple",
-                "value": null
+                "color": "super-light-purple"
               }
             ]
           }
@@ -282,7 +347,7 @@
         "x": 16,
         "y": 1
       },
-      "id": 100,
+      "id": 9,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -298,12 +363,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  count by (label_slurm_nebius_ai_nodeset_name) (\n    kube_node_labels{\n      label_nebius_com_gpu_name=~\"GB.*\",\n      label_slurm_nebius_ai_nodeset_name!=\"\"\n    }\n  )\n)",
+          "expr": "count(\n  DCGM_FI_DEV_GPU_UTIL{\n    \n  }\n) by()",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -311,7 +376,7 @@
           "useDashValues": false
         }
       ],
-      "title": "Racks",
+      "title": "GPUs",
       "type": "stat"
     },
     {
@@ -330,8 +395,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-purple",
-                "value": null
+                "color": "super-light-purple"
               }
             ]
           }
@@ -360,7 +424,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "editorMode": "code",
@@ -377,274 +441,12 @@
       "type": "stat"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "noValue": "-",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "dateTimeFromNow"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 0,
-        "y": 4
-      },
-      "id": 2,
-      "maxPerRow": 6,
-      "options": {
-        "colorMode": "none",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "value",
-        "wideLayout": false
-      },
-      "pluginVersion": "11.5.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "(\n  tlast_change_over_time(\n    (\n      group(\n        kube_customresource_slurmcluster_info{\n          cr_version!=\"\"\n        }\n      ) by(cr_version)\n    )[180d]\n  )\n    *\n  1000\n)\nand on(cr_version)\ngroup(\n  kube_customresource_slurmcluster_info{\n    cr_version!=\"\"\n  }\n) by(cr_version)",
-          "instant": true,
-          "legendFormat": "{{version}}",
-          "range": false,
-          "refId": "A",
-          "useCustomValues": false,
-          "useDashValues": false
-        }
-      ],
-      "title": "Last Soperator upgrade",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "super-light-blue",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 8,
-        "x": 4,
-        "y": 4
-      },
-      "id": 101,
-      "maxPerRow": 6,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "name",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.5.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "count(\n  cadvisor_version_info{}\n) by(mk8s_cluster_id)",
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "A",
-          "useCustomValues": false,
-          "useDashValues": false
-        }
-      ],
-      "title": "mk8s ID",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "super-light-purple",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 12,
-        "y": 4
-      },
-      "id": 9,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.5.1",
-      "targets": [
-        {
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "count(\n  DCGM_FI_DEV_GPU_UTIL{\n    \n  }\n) by()",
-          "instant": true,
-          "range": false,
-          "refId": "A",
-          "useCustomValues": true,
-          "useDashValues": false
-        }
-      ],
-      "title": "GPUs",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "For GB platform only",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "super-light-purple",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 16,
-        "y": 4
-      },
-      "id": 102,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.5.1",
-      "targets": [
-        {
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "count(\n  count by (label_nebius_com_nvlink_instance_group) (\n    kube_node_labels{\n      label_nebius_com_gpu_name=~\"GB.*\",\n      label_nebius_com_nvlink_instance_group!=\"\"\n    }\n  )\n)",
-          "instant": true,
-          "range": false,
-          "refId": "A",
-          "useCustomValues": true,
-          "useDashValues": false
-        }
-      ],
-      "title": "NVLink Groups",
-      "type": "stat"
-    },
-    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 7
+        "y": 4
       },
       "id": 11,
       "panels": [],
@@ -668,8 +470,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "light-orange",
-                "value": null
+                "color": "light-orange"
               }
             ]
           },
@@ -681,7 +482,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 8
+        "y": 5
       },
       "id": 5,
       "options": {
@@ -699,7 +500,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "editorMode": "code",
@@ -734,8 +535,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -751,7 +551,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 8
+        "y": 5
       },
       "id": 16,
       "options": {
@@ -769,7 +569,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -809,8 +609,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -822,7 +621,7 @@
         "h": 3,
         "w": 4,
         "x": 8,
-        "y": 8
+        "y": 5
       },
       "id": 13,
       "options": {
@@ -840,7 +639,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -877,8 +676,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -889,7 +687,7 @@
         "h": 3,
         "w": 4,
         "x": 12,
-        "y": 8
+        "y": 5
       },
       "id": 26,
       "options": {
@@ -907,7 +705,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "editorMode": "code",
@@ -940,8 +738,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -953,7 +750,7 @@
         "h": 3,
         "w": 4,
         "x": 16,
-        "y": 8
+        "y": 5
       },
       "id": 21,
       "options": {
@@ -971,7 +768,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "editorMode": "code",
@@ -1006,8 +803,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1019,7 +815,7 @@
         "h": 3,
         "w": 4,
         "x": 20,
-        "y": 8
+        "y": 5
       },
       "id": 29,
       "options": {
@@ -1040,7 +836,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -1076,8 +872,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "light-orange",
-                "value": null
+                "color": "light-orange"
               }
             ]
           },
@@ -1089,7 +884,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 11
+        "y": 8
       },
       "id": 6,
       "options": {
@@ -1107,7 +902,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "editorMode": "code",
@@ -1142,8 +937,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1159,7 +953,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 11
+        "y": 8
       },
       "id": 17,
       "options": {
@@ -1177,7 +971,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -1216,8 +1010,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-purple",
-                "value": null
+                "color": "super-light-purple"
               }
             ]
           },
@@ -1229,7 +1022,7 @@
         "h": 3,
         "w": 4,
         "x": 8,
-        "y": 11
+        "y": 8
       },
       "id": 97,
       "options": {
@@ -1247,7 +1040,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "editorMode": "code",
@@ -1280,8 +1073,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "light-orange",
@@ -1300,7 +1092,7 @@
         "h": 3,
         "w": 4,
         "x": 12,
-        "y": 11
+        "y": 8
       },
       "id": 27,
       "options": {
@@ -1318,7 +1110,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "editorMode": "code",
@@ -1352,8 +1144,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "light-orange",
@@ -1373,7 +1164,7 @@
         "h": 3,
         "w": 4,
         "x": 16,
-        "y": 11
+        "y": 8
       },
       "id": 23,
       "options": {
@@ -1394,7 +1185,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -1433,8 +1224,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1446,7 +1236,7 @@
         "h": 3,
         "w": 4,
         "x": 20,
-        "y": 11
+        "y": 8
       },
       "id": 30,
       "options": {
@@ -1467,7 +1257,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -1503,8 +1293,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-purple",
-                "value": null
+                "color": "super-light-purple"
               }
             ]
           },
@@ -1516,7 +1305,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 14
+        "y": 11
       },
       "id": 98,
       "options": {
@@ -1534,7 +1323,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "editorMode": "code",
@@ -1567,8 +1356,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-purple",
-                "value": null
+                "color": "super-light-purple"
               }
             ]
           }
@@ -1579,7 +1367,7 @@
         "h": 3,
         "w": 4,
         "x": 8,
-        "y": 14
+        "y": 11
       },
       "id": 96,
       "options": {
@@ -1597,7 +1385,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "editorMode": "code",
@@ -1629,8 +1417,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1642,7 +1429,7 @@
         "h": 3,
         "w": 4,
         "x": 16,
-        "y": 14
+        "y": 11
       },
       "id": 22,
       "options": {
@@ -1663,7 +1450,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -1690,7 +1477,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 14
       },
       "id": 12,
       "panels": [],
@@ -1749,8 +1536,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "light-orange",
-                "value": null
+                "color": "light-orange"
               }
             ]
           }
@@ -1761,7 +1547,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 18
+        "y": 15
       },
       "id": 8,
       "options": {
@@ -1777,7 +1563,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -1846,8 +1632,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1859,7 +1644,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 15
       },
       "id": 24,
       "options": {
@@ -1875,7 +1660,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -1947,8 +1732,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2015,7 +1799,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 25
+        "y": 22
       },
       "id": 15,
       "options": {
@@ -2031,7 +1815,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -2131,8 +1915,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2144,7 +1927,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 25
+        "y": 22
       },
       "id": 78,
       "interval": "30s",
@@ -2161,7 +1944,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "editorMode": "code",
@@ -2229,8 +2012,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2297,7 +2079,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 32
+        "y": 29
       },
       "id": 99,
       "options": {
@@ -2313,7 +2095,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
@@ -2367,303 +2149,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 39
-      },
-      "id": 103,
-      "panels": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "description": "Proportion of GPUs with at least 10% utilization to total for selected racks",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "fixedColor": "light-orange",
-                "mode": "shades"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "barWidthFactor": 0.6,
-                "drawStyle": "line",
-                "fillOpacity": 20,
-                "gradientMode": "opacity",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "smooth",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "max": 100,
-              "min": 0,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "light-orange",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 12,
-            "x": 0,
-            "y": 40
-          },
-          "id": 104,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": false
-            },
-            "tooltip": {
-              "hideZeros": false,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "11.5.1",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "VictoriaMetrics"
-              },
-              "editorMode": "code",
-              "expr": "(\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$rack\"\n    }\n      >=\n    10\n  ) by(cluster)\n    /\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$rack\"\n    }\n  ) by(cluster)\n)\n  *\n100",
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "A",
-              "useCustomValues": true,
-              "useDashValues": false
-            }
-          ],
-          "title": "Rack Utilization",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "description": "Only for GPUs with at least 10% utilization for selected racks",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "fixedColor": "green",
-                "mode": "fixed"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "barWidthFactor": 0.6,
-                "drawStyle": "line",
-                "fillOpacity": 50,
-                "gradientMode": "opacity",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "smooth",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "min": 0,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "watt"
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "max"
-                },
-                "properties": [
-                  {
-                    "id": "custom.fillBelowTo",
-                    "value": "min"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "avg"
-                },
-                "properties": [
-                  {
-                    "id": "custom.lineStyle",
-                    "value": {
-                      "dash": [10, 10],
-                      "fill": "dash"
-                    }
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "super-light-green",
-                      "mode": "fixed"
-                    }
-                  },
-                  {
-                    "id": "custom.fillOpacity",
-                    "value": 0
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "min"
-                },
-                "properties": [
-                  {
-                    "id": "custom.fillOpacity",
-                    "value": 0
-                  }
-                ]
-              }
-            ]
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 12,
-            "x": 12,
-            "y": 40
-          },
-          "id": 105,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": false
-            },
-            "tooltip": {
-              "hideZeros": false,
-              "mode": "multi",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "11.5.1",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "VictoriaMetrics"
-              },
-              "editorMode": "code",
-              "expr": "max(\n  DCGM_FI_DEV_POWER_USAGE{\n      slurm_nodeset_name=~\"$rack\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$rack\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
-              "hide": false,
-              "legendFormat": "max",
-              "range": true,
-              "refId": "C",
-              "useCustomValues": true,
-              "useDashValues": false
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "VictoriaMetrics"
-              },
-              "editorMode": "code",
-              "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{\n    slurm_nodeset_name=~\"$rack\"\n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$rack\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
-              "hide": false,
-              "legendFormat": "avg",
-              "range": true,
-              "refId": "B",
-              "useCustomValues": true,
-              "useDashValues": false
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "VictoriaMetrics"
-              },
-              "editorMode": "code",
-              "expr": "min(\n  DCGM_FI_DEV_POWER_USAGE{\n    slurm_nodeset_name=~\"$rack\"\n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$rack\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
-              "hide": false,
-              "legendFormat": "min",
-              "range": true,
-              "refId": "A",
-              "useCustomValues": true,
-              "useDashValues": false
-            }
-          ],
-          "title": "Cluster Power usage",
-          "type": "timeseries"
-        }
-      ],
-      "title": "Racks",
-      "type": "row"
-    },
-    {
-      "collapsed": true,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 40
+        "y": 36
       },
       "id": 79,
       "panels": [
@@ -2717,8 +2203,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2840,7 +2325,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 48
+            "y": 37
           },
           "id": 82,
           "options": {
@@ -2856,7 +2341,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -2972,6 +2457,7 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisPlacement": "auto",
                 "fillOpacity": 70,
                 "hideFrom": {
                   "legend": false,
@@ -3013,8 +2499,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -3026,7 +2511,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 48
+            "y": 37
           },
           "id": 83,
           "options": {
@@ -3045,7 +2530,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -3131,8 +2616,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -3191,7 +2675,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 141
+            "y": 45
           },
           "id": 31,
           "options": {
@@ -3207,7 +2691,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -3307,8 +2791,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -3367,7 +2850,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 141
+            "y": 45
           },
           "id": 73,
           "options": {
@@ -3383,7 +2866,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -3456,8 +2939,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3615,7 +3097,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 148
+            "y": 52
           },
           "id": 84,
           "options": {
@@ -3631,7 +3113,7 @@
             "showHeader": true,
             "sortBy": []
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -3816,7 +3298,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 37
       },
       "id": 80,
       "panels": [
@@ -3846,8 +3328,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -3969,8 +3450,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "green",
-                          "value": null
+                          "color": "green"
                         },
                         {
                           "color": "#EAB839",
@@ -4023,8 +3503,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "red",
-                          "value": null
+                          "color": "red"
                         },
                         {
                           "color": "orange",
@@ -4087,8 +3566,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "light-blue",
-                          "value": null
+                          "color": "light-blue"
                         }
                       ]
                     }
@@ -4101,7 +3579,7 @@
             "h": 12,
             "w": 24,
             "x": 0,
-            "y": 49
+            "y": 167
           },
           "id": 92,
           "options": {
@@ -4117,7 +3595,7 @@
             "showHeader": true,
             "sortBy": []
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -4372,8 +3850,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -4389,7 +3866,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 61
+            "y": 179
           },
           "id": 19,
           "options": {
@@ -4405,7 +3882,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -4476,8 +3953,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -4540,7 +4016,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 61
+            "y": 179
           },
           "id": 10,
           "options": {
@@ -4556,7 +4032,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -4655,8 +4131,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -4719,7 +4194,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 68
+            "y": 186
           },
           "id": 74,
           "options": {
@@ -4735,7 +4210,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -4813,8 +4288,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -4829,7 +4303,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 68
+            "y": 186
           },
           "id": 77,
           "options": {
@@ -4847,7 +4321,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "editorMode": "code",
@@ -4878,6 +4352,7 @@
                 "mode": "palette-classic-by-name"
               },
               "custom": {
+                "axisPlacement": "auto",
                 "fillOpacity": 70,
                 "hideFrom": {
                   "legend": false,
@@ -4907,8 +4382,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -4920,7 +4394,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 75
+            "y": 193
           },
           "id": 72,
           "options": {
@@ -4939,7 +4413,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -4978,6 +4452,7 @@
                 "mode": "palette-classic-by-name"
               },
               "custom": {
+                "axisPlacement": "auto",
                 "fillOpacity": 75,
                 "hideFrom": {
                   "legend": false,
@@ -5104,8 +4579,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5120,7 +4594,7 @@
             "h": 22,
             "w": 12,
             "x": 12,
-            "y": 76
+            "y": 194
           },
           "id": 90,
           "options": {
@@ -5140,7 +4614,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -5210,8 +4684,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5227,7 +4700,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 82
+            "y": 200
           },
           "id": 87,
           "options": {
@@ -5243,7 +4716,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -5313,8 +4786,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5330,7 +4802,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 90
+            "y": 208
           },
           "id": 88,
           "options": {
@@ -5346,7 +4818,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -5392,8 +4864,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -5590,7 +5061,7 @@
             "h": 12,
             "w": 24,
             "x": 0,
-            "y": 98
+            "y": 216
           },
           "id": 91,
           "options": {
@@ -5606,7 +5077,7 @@
             "showHeader": true,
             "sortBy": []
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -5829,7 +5300,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 38
       },
       "id": 93,
       "panels": [
@@ -5882,8 +5353,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5899,7 +5369,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 50
+            "y": 168
           },
           "id": 85,
           "options": {
@@ -5915,7 +5385,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -5985,8 +5455,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -6002,7 +5471,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 50
+            "y": 168
           },
           "id": 86,
           "options": {
@@ -6018,7 +5487,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -6089,8 +5558,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -6102,7 +5570,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 58
+            "y": 176
           },
           "id": 94,
           "options": {
@@ -6118,7 +5586,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "datasource": {
@@ -6190,8 +5658,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -6233,7 +5700,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 58
+            "y": 176
           },
           "id": 75,
           "options": {
@@ -6249,7 +5716,7 @@
               "sort": "none"
             }
           },
-          "pluginVersion": "11.5.1",
+          "pluginVersion": "11.6.14",
           "targets": [
             {
               "editorMode": "code",
@@ -6326,7 +5793,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 66
+            "y": 184
           },
           "id": 95,
           "options": {
@@ -6369,43 +5836,22 @@
     }
   ],
   "preload": false,
-  "schemaVersion": 40,
+  "schemaVersion": 41,
   "tags": ["nebius", "soperator", "overview", "cluster"],
   "templating": {
     "list": [
       {
+        "allValue": ".*",
         "allowCustomValue": false,
         "current": {
           "text": ["All"],
-          "value": ["$__all"]
-        },
-        "definition": "label_values(kube_node_labels{label_nebius_com_gpu_name=~\"GB.*\"},label_slurm_nebius_ai_nodeset_name)",
-        "description": "For GB platforms",
-        "includeAll": true,
-        "label": "Rack",
-        "multi": true,
-        "name": "rack",
-        "options": [],
-        "query": {
-          "qryType": 1,
-          "query": "label_values(kube_node_labels{label_nebius_com_gpu_name=~\"GB.*\"},label_slurm_nebius_ai_nodeset_name)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
-      },
-      {
-        "allowCustomValue": false,
-        "current": {
-          "text": "All",
           "value": ["$__all"]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "VictoriaMetrics"
         },
-        "definition": "label_values(slurm_node_info{node_name=~\"$rack-.*\"}, node_name)",
+        "definition": "label_values(slurm_node_info, node_name)",
         "description": "",
         "includeAll": true,
         "label": "Worker Node",
@@ -6414,7 +5860,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(slurm_node_info{node_name=~\"$rack-.*\"}, node_name)",
+          "query": "label_values(slurm_node_info, node_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -6426,7 +5872,7 @@
         "allValue": ".*",
         "allowCustomValue": false,
         "current": {
-          "text": "All",
+          "text": ["All"],
           "value": ["$__all"]
         },
         "datasource": {

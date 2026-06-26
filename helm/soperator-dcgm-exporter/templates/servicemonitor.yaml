@@ -13,10 +13,13 @@ spec:
     metricRelabelings:
     {{- toYaml .Values.serviceMonitor.metricRelabelings | nindent 4 }}
     relabelings:
-    {{- toYaml .Values.serviceMonitor.relabelings | nindent 4 }}
+    - action: replace
+      regex: nvidia-dcgm-exporter
+      replacement: dcgm-exporter
+      sourceLabels:
+      - __meta_kubernetes_pod_label_app
+      targetLabel: app_kubernetes_io_name
   jobLabel: app
-  attachMetadata:
-    node: true
   namespaceSelector:
     matchNames:
     - soperator
