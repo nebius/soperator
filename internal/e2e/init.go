@@ -30,9 +30,9 @@ func Init(ctx context.Context, cfg Config) (tf *tfexec.Terraform, varFilePath st
 		return nil, "", nil, fmt.Errorf("select workspace: %w", err)
 	}
 
-	// Drop leftover helm_releases first: it lets terraform operate on the state
-	// again (`terraform show`), which healNebiusProviderMismatch relies on.
-	removeHelmReleasesFromState(ctx, tf)
+	// Prune unreconcilable leftover resources first: it lets terraform operate on
+	// the state again (`terraform show`), which healNebiusProviderMismatch relies on.
+	pruneLeftoverStateForDestroy(ctx, tf)
 	healNebiusProviderMismatch(ctx, tf, cfg.PathToInstallation)
 
 	logState(ctx, tf)

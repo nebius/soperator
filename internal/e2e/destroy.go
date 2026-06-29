@@ -62,7 +62,7 @@ func destroyWithK8sRecovery(ctx context.Context, tf *tfexec.Terraform, varFilePa
 		return err
 	}
 	log.Print("K8s cluster is confirmed gone, removing helm releases from state and retrying destroy")
-	removeHelmReleasesFromState(ctx, tf)
+	pruneLeftoverStateForDestroy(ctx, tf)
 	logState(ctx, tf)
 	if retryErr := tf.Destroy(ctx, tfexec.VarFile(varFilePath)); retryErr != nil {
 		return fmt.Errorf("destroy after helm release state cleanup: %w", retryErr)
