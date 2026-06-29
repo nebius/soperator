@@ -71,23 +71,6 @@ func destroyWithK8sRecovery(ctx context.Context, tf *tfexec.Terraform, varFilePa
 	return nil
 }
 
-func removeHelmReleasesFromState(ctx context.Context, tf *tfexec.Terraform) {
-	state, err := tf.Show(ctx)
-	if err != nil {
-		log.Printf("terraform show failed during helm release removal: %v", err)
-		return
-	}
-	for _, addr := range collectResourceAddresses(state) {
-		if !strings.Contains(addr, "helm_release") {
-			continue
-		}
-		log.Printf("Removing %s from terraform state", addr)
-		if err := tf.StateRm(ctx, addr); err != nil {
-			log.Printf("terraform state rm %s failed: %v", addr, err)
-		}
-	}
-}
-
 func isMK8SClusterGone(ctx context.Context, nebiusProjectID string) bool {
 	if nebiusProjectID == "" {
 		log.Print("nebius project ID is empty, cannot verify cluster existence")
