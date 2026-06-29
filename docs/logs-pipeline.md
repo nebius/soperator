@@ -64,6 +64,18 @@ The public logging endpoint defaults to `dns:///write.logging.eu-north1.nebius.c
 - Purpose: Collects Kubernetes events
 - Deployment: Single pod deployment
 
+### Collector Runtime Limits
+
+The log collectors set Go runtime limits from their configured pod resources:
+
+- `GOMAXPROCS` is derived from CPU limits when present, otherwise CPU requests.
+- CPU quantities are rounded up to a positive whole number: `500m` becomes `1`, `2` stays `2`.
+- When `useGOMEMLIMIT` or `useGoMemLimit` is enabled, `GOMEMLIMIT` is derived from memory limits when present, otherwise memory requests.
+- `GOMEMLIMIT` targets about 85% of the selected memory value and rounds up to a whole Go memory unit. For example, `200Mi` becomes `170MiB`, `128Mi` becomes `109MiB`, and `500Gi` becomes `425GiB`.
+- When `spec.values.useGOMEMLIMIT` is false, no `GOMEMLIMIT` environment variable is configured by Soperator.
+
+This applies to the system logs, jail logs, and events collectors. Override values that replace the collector chart values are responsible for setting their own runtime environment.
+
 ### Log Storage
 
 #### VictoriaLogs
