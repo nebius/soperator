@@ -344,6 +344,23 @@ jobs:
           bin/e2e check-capacity 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Cleanup previous Terraform state
+        timeout-minutes: 30
+        run: |
+          cd ${{ env.PATH_TO_INSTALLATION }}
+          source .envrc
+          cd -
+
+          aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+          aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+          aws configure set region $NEBIUS_REGION
+          aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
+
+          # Destroy any leftover resources from a previous run using the saved terraform bundle
+          # (the exact code that created the state), falling back to the current checkout.
+          # Runs before init so the new run starts from a clean, empty state.
+          bin/e2e cleanup-previous
+
       - name: Terraform Init
         timeout-minutes: 30
         run: |

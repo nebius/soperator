@@ -19,7 +19,7 @@ func main() {
 	log.SetFlags(0)
 
 	if len(os.Args) < 2 {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage: e2e <init|apply|destroy|check-capacity|acceptance>\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: e2e <check-capacity|cleanup-previous|init|apply|destroy|acceptance>\n")
 		os.Exit(2)
 	}
 
@@ -34,6 +34,9 @@ func main() {
 	switch os.Args[1] {
 	case "check-capacity":
 		err = runCheckCapacity(ctx, profile)
+	case "cleanup-previous":
+		cfg := loadFullConfig(profile)
+		err = e2e.RunCleanupPrevious(ctx, cfg)
 	case "init":
 		cfg := loadFullConfig(profile)
 		err = e2e.RunInit(ctx, cfg)
@@ -47,7 +50,7 @@ func main() {
 		cfg := loadFullConfig(profile)
 		err = e2e.RunAcceptance(ctx, cfg)
 	default:
-		_, _ = fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: e2e <init|apply|destroy|check-capacity|acceptance>\n", os.Args[1])
+		_, _ = fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: e2e <check-capacity|cleanup-previous|init|apply|destroy|acceptance>\n", os.Args[1])
 		os.Exit(2)
 	}
 	if err != nil {

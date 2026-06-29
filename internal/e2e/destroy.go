@@ -32,7 +32,13 @@ func Destroy(ctx context.Context, cfg Config) error {
 
 	enableTFDestroyLogging(tf)
 
-	return destroyWithK8sRecovery(ctx, tf, varFilePath, cfg.Profile.NebiusProjectID)
+	if err := destroyWithK8sRecovery(ctx, tf, varFilePath, cfg.Profile.NebiusProjectID); err != nil {
+		return err
+	}
+
+	// State is now empty; drop the saved bundle so the next fresh run has nothing to clean up.
+	deleteBundle(ctx)
+	return nil
 }
 
 func enableTFDestroyLogging(tf *tfexec.Terraform) {
