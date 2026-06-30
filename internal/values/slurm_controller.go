@@ -36,16 +36,17 @@ type SlurmController struct {
 	OpenMetrics slurmv1.OpenMetrics
 }
 
-func buildSlurmControllerFrom(clusterName string, maintenance *consts.MaintenanceMode, controller *slurmv1.SlurmNodeController) SlurmController {
+func buildSlurmControllerFrom(clusterName, namePrefix string, maintenance *consts.MaintenanceMode, controller *slurmv1.SlurmNodeController) SlurmController {
 	// Controller always has 1 replica
 	statefulSet := buildStatefulSetWithMaxUnavailableFrom(
-		naming.BuildStatefulSetName(consts.ComponentTypeController),
+		naming.BuildStatefulSetName(consts.ComponentTypeController, namePrefix),
 		consts.SingleReplicas,
+		nil,
 		nil,
 	)
 
 	daemonSet := buildDaemonSetFrom(
-		naming.BuildDaemonSetName(consts.ComponentTypeController),
+		naming.BuildDaemonSetName(consts.ComponentTypeController, namePrefix),
 	)
 
 	sssdConfSecretName := controller.SSSDConfSecretRefName

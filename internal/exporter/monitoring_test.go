@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -73,6 +72,23 @@ func TestMonitoringMetrics_RecordCollection(t *testing.T) {
 	assert.Equal(t, float64(0.5), durationValue, "Expected duration to be set to the last collection (0.5s)")
 }
 
+func TestMonitoringMetrics_RecordCollectorError(t *testing.T) {
+	metrics := NewMonitoringMetrics()
+	registry := prometheus.NewRegistry()
+	require.NoError(t, metrics.Register(registry))
+
+	metrics.RecordCollectorError("diag")
+	metrics.RecordCollectorError("diag")
+	metrics.RecordCollectorError("nodes")
+
+	metricFamilies, err := registry.Gather()
+	require.NoError(t, err)
+
+	assert.Equal(t, float64(2), collectorErrorValue(metricFamilies, "diag"), "Expected 2 diag collector errors")
+	assert.Equal(t, float64(1), collectorErrorValue(metricFamilies, "nodes"), "Expected 1 nodes collector error")
+	assert.Equal(t, float64(0), collectorErrorValue(metricFamilies, "jobs"), "Expected no jobs collector errors")
+}
+
 func TestMonitoringMetrics_RecordMetricsRequest(t *testing.T) {
 	metrics := NewMonitoringMetrics()
 	registry := prometheus.NewRegistry()
@@ -120,19 +136,4 @@ func TestMonitoringMetrics_RecordMetricsExported(t *testing.T) {
 	}
 
 	assert.Equal(t, float64(200), exportedCount, "Expected 200 exported metrics")
-}
-
-func getMetricValue(families []*dto.MetricFamily, name string, metricType string) float64 {
-	for _, mf := range families {
-		if *mf.Name == name && len(mf.Metric) > 0 {
-			metric := mf.Metric[0]
-			switch metricType {
-			case "counter":
-				return *metric.Counter.Value
-			case "gauge":
-				return *metric.Gauge.Value
-			}
-		}
-	}
-	return 0
 }
