@@ -744,6 +744,10 @@ slurmScripts:
       enabled: true
       customContent: null
       customConfig: null
+    check_nvidia_libraries.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
     chmod_enroot_layers.sh:
       enabled: true
       customContent: null
