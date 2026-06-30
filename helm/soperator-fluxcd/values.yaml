@@ -257,6 +257,40 @@ observability:
       remediation:
         retries: 3
         remediateLastFailure: true
+    # Source of the o11y remote-write bearer token, consumed per `observability.publicEndpointTokenKind`:
+    #   secret   - vmagent references the token via remoteWrite[].bearerTokenSecret (operator-managed),
+    #              so extra remote-write destinations can carry their own auth without conflict
+    #   hostPath - the token file is mounted from the host and passed via -remoteWrite.bearerTokenFile,
+    #              scoped to the o11y endpoint only
+    tsaToken:
+      secretName: o11y-writer-sa-token
+      secretKey: accessToken
+      hostPath: /mnt/cloud-metadata
+      mountPath: /o11ytoken
+      hostPathFilename: tsa-token
+      writer:
+        enabled: true
+        interval: 5m
+        version: 2.0.0
+        driftDetection:
+          mode: warn
+        # Token source: `imds` (fetch from IMDS_BASE_URL, may be a proxy) or
+        # `file` (read a host-provided token file mounted from `hostPath`).
+        source: file
+        # Namespaces to maintain the Secret in. Empty means the vmStack namespace.
+        namespaces: []
+        image:
+          repository: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/alpine/curl
+          tag: "8.19.0"
+          pullPolicy: IfNotPresent
+        imdsBaseUrl: http://169.254.169.254
+        # hostNetwork is needed only to reach link-local IMDS directly; set false
+        # when IMDS_BASE_URL points at a routable proxy.
+        hostNetwork: true
+        tokenExpiryFile: ""
+        refreshSafetyMarginSeconds: 900
+        pollIntervalSeconds: 300
+        resources: {}
     values:
       dashboardNamespaces:
         - soperator
