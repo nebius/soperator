@@ -2,8 +2,8 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/79
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS worker_slurmd
+# https://github.com/nebius/ml-containers/pull/90
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260624085500 AS worker_slurmd
 
 # Install useful packages
 RUN apt-get update && \
@@ -14,7 +14,9 @@ RUN apt-get update && \
         kmod \
         libncurses5-dev \
         supervisor \
-        openssh-server && \
+        openssh-server \
+        nginx-extras \
+        libnginx-mod-http-js && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -53,12 +55,20 @@ RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
-# Install NCCL debug plugin
+# Install NCCL Debug SPANK plugin
 COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
 COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
+
+# Install NCCL Inspector PreConf SPANK plugin
+COPY ansible/spank-nccl-inspector-preconf.yml /opt/ansible/spank-nccl-inspector-preconf.yml
+COPY ansible/roles/spank-nccl-inspector-preconf /opt/ansible/roles/spank-nccl-inspector-preconf
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local \
+      -e spank_nccl_inspector_preconf_dump_dir_create=false \
+      spank-nccl-inspector-preconf.yml
 
 # Install enroot
 COPY images/common/scripts/install_enroot.sh /opt/bin/
@@ -76,7 +86,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
 
 # Install slurm pyxis plugin
 ARG SLURM_VERSION
-ARG PYXIS_VERSION=0.23.0
+ARG PYXIS_VERSION=0.24.0
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \
@@ -95,6 +105,8 @@ RUN apt-get update && \
 
 # Copy Docker daemon config
 COPY images/worker/docker/daemon.json /etc/docker/daemon.json
+COPY images/worker/nginx/soperator-docker-proxy.conf /etc/nginx/soperator-docker-proxy.conf
+COPY images/worker/nginx/docker_proxy.js /etc/nginx/njs/docker_proxy.js
 
 # Copy script for complementing jail filesystem in runtime
 COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
@@ -141,10 +153,12 @@ COPY images/worker/worker_init.py /opt/bin/slurm/
 
 # Copy supervisord entrypoint script
 COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
+COPY images/worker/docker_proxy_nginx_entrypoint.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
-    chmod +x /opt/bin/slurm/worker_init.py
+    chmod +x /opt/bin/slurm/worker_init.py && \
+    chmod +x /opt/bin/slurm/docker_proxy_nginx_entrypoint.sh
 
 # Start supervisord that manages both slurmd and sshd as child processes
 ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]

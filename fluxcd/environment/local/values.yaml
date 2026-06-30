@@ -214,10 +214,11 @@ slurmCluster:
                 - soperator-dev-worker
 nodesets:
   enabled: true
+  clusterName: soperator
   overrideValues:
     priorityClasses: []
     nodesets:
-      - name: worker
+      - name: soperator-worker
         replicas: 1
         slurmd:
           resources:

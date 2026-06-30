@@ -111,6 +111,7 @@ func (r *NodeConfiguratorReconciler) patch(existing, desired client.Object) clie
 	patchImpl := func(dst, src *appsv1.DaemonSet) client.Patch {
 		res := client.MergeFrom(dst.DeepCopy())
 
+		dst.Spec.UpdateStrategy = src.Spec.UpdateStrategy
 		dst.Spec.Template.Spec = src.Spec.Template.Spec
 
 		return res
