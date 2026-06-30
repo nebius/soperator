@@ -52,7 +52,6 @@ images:
 activeCheckImage: ""
 slurmJob:
   # Slurm consumes this as SBATCH_GPUS_PER_NODE for GPU ActiveChecks.
-  # Set to "4" for 4xGB300 nodes.
   gpusPerNode: "8"
 checks:
   all-reduce-perf-nccl-in-docker:
