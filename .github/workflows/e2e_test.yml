@@ -23,6 +23,11 @@ on:
         required: false
         default: "false"
         type: string
+      skip_destroy:
+        description: "Skip Terraform Destroy to leave leftover state (for testing cleanup-previous)"
+        required: false
+        default: "false"
+        type: string
 
 permissions:
   contents: read
@@ -598,7 +603,7 @@ jobs:
           retention-days: 7
 
       - name: Terraform Destroy
-        if: always()
+        if: always() && inputs.skip_destroy != 'true'
         timeout-minutes: 30
         env:
           # Opt in to terraform DEBUG logging only for the destroy flow.
@@ -620,6 +625,16 @@ jobs:
 
           bin/e2e destroy
 
+      - name: Skip Terraform Destroy (leftover-state simulation)
+        if: always() && inputs.skip_destroy == 'true'
+        shell: bash
+        run: |
+          {
+            echo "### Terraform Destroy skipped"
+            echo "\`skip_destroy=true\` — leaving the cluster, terraform state, and the saved bundle in place."
+            echo "The next run on this project will exercise \`cleanup-previous\` against this leftover state."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload Terraform Destroy debug log
         if: always()
         uses: actions/upload-artifact@v6
@@ -633,7 +648,7 @@ jobs:
           compression-level: 9
 
       - name: Force cleanup compute instances on failure
-        if: failure()
+        if: failure() && inputs.skip_destroy != 'true'
         shell: bash
         run: |
           echo "=== Node groups state before cleanup ==="
