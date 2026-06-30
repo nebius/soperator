@@ -405,7 +405,6 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			naming.BuildServiceName(consts.ComponentTypeAccounting, cluster.Name),
 			cluster.Namespace,
 		))
-		res.AddProperty("AccountingStorageUser", consts.HostnameAccounting)
 		res.AddProperty("AccountingStoragePort", consts.DefaultAccountingPort)
 		res.AddProperty("JobCompType", "jobcomp/none")
 
