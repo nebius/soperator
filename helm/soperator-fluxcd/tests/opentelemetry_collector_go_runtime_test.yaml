@@ -2,7 +2,7 @@ suite: test opentelemetry collector Go runtime env
 templates:
   - templates/opentelemetry-collector-logs.yaml
 tests:
-  - it: should derive GOMAXPROCS and GOMEMLIMIT from logs resources
+  - it: should derive GOMAXPROCS and enable upstream GOMEMLIMIT for logs
     set:
       observability.opentelemetry.logs.values.resources:
         requests:
@@ -16,23 +16,14 @@ tests:
           content:
             name: GOMAXPROCS
             value: "1"
-      - contains:
-          path: spec.values.extraEnvs
-          content:
-            name: GOMEMLIMIT
-            value: "170MiB"
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: true
 
-  - it: should omit GOMEMLIMIT when useGoMemLimit is false
+  - it: should disable upstream GOMEMLIMIT when useGoMemLimit is false
     set:
       observability.opentelemetry.logs.values.useGoMemLimit: false
     asserts:
-      - notContains:
-          path: spec.values.extraEnvs
-          content:
-            name: GOMEMLIMIT
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: false
@@ -41,7 +32,7 @@ suite: test opentelemetry collector events Go runtime env
 templates:
   - templates/opentelemetry-collector-events.yaml
 tests:
-  - it: should support whole-core CPU and large binary memory quantities
+  - it: should support whole-core CPU and enable upstream GOMEMLIMIT for events
     set:
       observability.opentelemetry.events.values.resources:
         requests:
@@ -55,16 +46,11 @@ tests:
           content:
             name: GOMAXPROCS
             value: "2"
-      - contains:
-          path: spec.values.extraEnvs
-          content:
-            name: GOMEMLIMIT
-            value: "425GiB"
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: true
 
-  - it: should round fractional GOMEMLIMIT values up to MiB
+  - it: should enable upstream GOMEMLIMIT when enabled
     set:
       observability.opentelemetry.events.values.resources:
         requests:
@@ -73,16 +59,11 @@ tests:
         limits:
           memory: null
     asserts:
-      - contains:
-          path: spec.values.extraEnvs
-          content:
-            name: GOMEMLIMIT
-            value: "109MiB"
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: true
 
-  - it: should omit GOMEMLIMIT when useGoMemLimit is false
+  - it: should disable upstream GOMEMLIMIT when useGoMemLimit is false
     set:
       observability.opentelemetry.events.values.useGoMemLimit: false
       observability.opentelemetry.events.values.resources:
@@ -92,10 +73,6 @@ tests:
         limits:
           memory: null
     asserts:
-      - notContains:
-          path: spec.values.extraEnvs
-          content:
-            name: GOMEMLIMIT
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: false
@@ -104,7 +81,7 @@ suite: test opentelemetry collector jail logs Go runtime env
 templates:
   - templates/opentelemetry-collector-jail-logs.yaml
 tests:
-  - it: should use jail logs resources for Go runtime env
+  - it: should use jail logs resources for GOMAXPROCS and enable upstream GOMEMLIMIT
     set:
       observability.opentelemetry.logs.values.resources:
         requests:
@@ -124,23 +101,14 @@ tests:
           content:
             name: GOMAXPROCS
             value: "1"
-      - contains:
-          path: spec.values.extraEnvs
-          content:
-            name: GOMEMLIMIT
-            value: "170MiB"
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: true
 
-  - it: should omit GOMEMLIMIT when jailLogs.useGoMemLimit is false
+  - it: should disable upstream GOMEMLIMIT when jailLogs.useGoMemLimit is false
     set:
       observability.opentelemetry.logs.values.jailLogs.useGoMemLimit: false
     asserts:
-      - notContains:
-          path: spec.values.extraEnvs
-          content:
-            name: GOMEMLIMIT
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: false
@@ -149,7 +117,7 @@ suite: test opentelemetry collector NCCL profiles Go runtime env
 templates:
   - templates/opentelemetry-collector-nccl-profiles.yaml
 tests:
-  - it: should derive Go runtime env from NCCL collector resources
+  - it: should derive GOMAXPROCS and enable upstream GOMEMLIMIT for NCCL collector
     set:
       observability.enabled: true
       observability.ncclProfiles.enabled: true
@@ -168,16 +136,11 @@ tests:
           content:
             name: GOMAXPROCS
             value: "2"
-      - contains:
-          path: spec.values.extraEnvs
-          content:
-            name: GOMEMLIMIT
-            value: "425GiB"
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: true
 
-  - it: should omit GOMEMLIMIT when useGoMemLimit is false
+  - it: should disable upstream GOMEMLIMIT when useGoMemLimit is false
     set:
       observability.enabled: true
       observability.ncclProfiles.enabled: true
@@ -191,10 +154,6 @@ tests:
           content:
             name: GOMAXPROCS
             value: "1"
-      - notContains:
-          path: spec.values.extraEnvs
-          content:
-            name: GOMEMLIMIT
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: false
