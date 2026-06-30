@@ -137,14 +137,14 @@ Note: Production scraping requires a ServiceMonitor with proper RBAC authenticat
 - Purpose: Reads NCCL profile files from the jail filesystem and exports metrics through an OpenTelemetry collector
 - Deployment: Single deployment on system nodes by default, or DaemonSet on worker nodes with `observability.ncclProfiles.values.mode: nodeLocal`
 - Storage: Uses file storage under `/var/lib/otelcol` when `observability.ncclProfiles.values.enableFileStorage` is enabled
-- Runtime limits: Sets `GOMAXPROCS` and, when `useGoMemLimit` is enabled, `GOMEMLIMIT` from `observability.ncclProfiles.values.resources`
+- Runtime limits: Sets `GOMAXPROCS` from `observability.ncclProfiles.values.resources`; passes `useGoMemLimit` through to upstream `useGOMEMLIMIT`
 
 The NCCL profiles collector follows the same Go runtime sizing rules as the log collectors:
 
 - CPU limits are preferred over CPU requests; values are rounded up to at least one process (`500m` -> `1`, `2` -> `2`).
-- Memory limits are preferred over memory requests.
-- `GOMEMLIMIT` targets about 85% of selected memory and rounds up to whole Go units (`200Mi` -> `170MiB`, `500Gi` -> `425GiB`).
-- When `spec.values.useGOMEMLIMIT` is false, no `GOMEMLIMIT` environment variable is configured by Soperator.
+- When `useGoMemLimit` is enabled, the upstream OpenTelemetry collector chart derives `GOMEMLIMIT` from `resources.limits.memory`.
+- Upstream `GOMEMLIMIT` targets about 80% of the memory limit and does not fall back to memory requests.
+- When `spec.values.useGOMEMLIMIT` is false, the upstream chart does not inject a `GOMEMLIMIT` environment variable.
 
 ### Metrics Processing & Storage
 

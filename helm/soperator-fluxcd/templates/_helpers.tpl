@@ -80,77 +80,15 @@ Convert a Kubernetes CPU quantity to a positive GOMAXPROCS value.
 {{- end -}}
 
 {{/*
-Convert a Kubernetes memory quantity to bytes.
+Render GOMAXPROCS for opentelemetry-collector from container resources.
 */}}
-{{- define "soperator-fluxcd.memoryQuantityToBytes" -}}
-{{- $quantity := toString . | trim -}}
-{{- if not (regexMatch "^[0-9]+(\\.[0-9]+)?(Ki|Mi|Gi|Ti|Pi|Ei|[kKMGTP])?$" $quantity) -}}
-{{- fail (printf "unsupported memory quantity %q; use bytes, decimal units (500G), or binary units (500Gi)" $quantity) -}}
-{{- end -}}
-{{- $number := regexFind "^[0-9]+(\\.[0-9]+)?" $quantity -}}
-{{- $suffix := regexReplaceAll "^[0-9]+(\\.[0-9]+)?" $quantity "" -}}
-{{- $multiplier := 1 -}}
-{{- if eq $suffix "Ki" -}}
-{{- $multiplier = 1024 -}}
-{{- else if eq $suffix "Mi" -}}
-{{- $multiplier = 1048576 -}}
-{{- else if eq $suffix "Gi" -}}
-{{- $multiplier = 1073741824 -}}
-{{- else if eq $suffix "Ti" -}}
-{{- $multiplier = 1099511627776 -}}
-{{- else if or (eq $suffix "k") (eq $suffix "K") -}}
-{{- $multiplier = 1000 -}}
-{{- else if eq $suffix "M" -}}
-{{- $multiplier = 1000000 -}}
-{{- else if eq $suffix "G" -}}
-{{- $multiplier = 1000000000 -}}
-{{- else if eq $suffix "T" -}}
-{{- $multiplier = 1000000000000 -}}
-{{- end -}}
-{{- if regexMatch "^[0-9]+$" $number -}}
-{{- mul ($number | int) $multiplier -}}
-{{- else -}}
-{{- int (mulf ($number | float64) ($multiplier | float64)) -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Return N percent of a Kubernetes memory quantity as a GOMEMLIMIT value, rounded up to MiB.
-*/}}
-{{- define "soperator-fluxcd.memoryQuantityPercentGoMemLimit" -}}
-{{- $bytes := include "soperator-fluxcd.memoryQuantityToBytes" .quantity | int -}}
-{{- $percent := .percent | default 85 | int -}}
-{{- $mib := 1048576 -}}
-{{- $divisor := mul 100 $mib -}}
-{{- $whole := mul (div $bytes $divisor) $percent -}}
-{{- $remainder := mul (mod $bytes $divisor) $percent -}}
-{{- $roundedRemainder := div (add $remainder (sub $divisor 1)) $divisor -}}
-{{- $limitMiB := max 1 (add $whole $roundedRemainder) -}}
-{{- if eq (mod $limitMiB 1024) 0 -}}
-{{- printf "%dGiB" (div $limitMiB 1024) -}}
-{{- else -}}
-{{- printf "%dMiB" $limitMiB -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Render Go runtime env vars for opentelemetry-collector from container resources.
-*/}}
-{{- define "soperator-fluxcd.otelCollectorGoEnv" -}}
+{{- define "soperator-fluxcd.otelCollectorGoMaxProcsEnv" -}}
 {{- $resources := .resources | default dict -}}
 {{- $requests := get $resources "requests" | default dict -}}
 {{- $limits := get $resources "limits" | default dict -}}
 {{- $cpu := coalesce (get $limits "cpu") (get $requests "cpu") -}}
 - name: GOMAXPROCS
   value: {{ include "soperator-fluxcd.cpuQuantityToGOMAXPROCS" $cpu | quote }}
-{{- if .useGoMemLimit }}
-{{- $memory := coalesce (get $limits "memory") (get $requests "memory") -}}
-{{- if not $memory -}}
-{{- fail "GOMEMLIMIT is enabled but no resources.limits.memory or resources.requests.memory is configured" -}}
-{{- end }}
-- name: GOMEMLIMIT
-  value: {{ include "soperator-fluxcd.memoryQuantityPercentGoMemLimit" (dict "quantity" $memory "percent" 85) | quote }}
-{{- end -}}
 {{- end -}}
 
 {{/*

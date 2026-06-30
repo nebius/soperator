@@ -141,7 +141,7 @@ spec:
       create: true
 
     extraEnvs:
-      {{- include "soperator-fluxcd.otelCollectorGoEnv" (dict "resources" $eventsValues.resources "useGoMemLimit" $eventsUseGoMemLimit) | nindent 6 }}
+      {{- include "soperator-fluxcd.otelCollectorGoMaxProcsEnv" (dict "resources" $eventsValues.resources) | nindent 6 }}
 
       - name: K8S_NODE_NAME
         valueFrom:

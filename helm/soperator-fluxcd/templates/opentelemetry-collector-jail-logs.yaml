@@ -155,7 +155,7 @@ spec:
       create: true
 
     extraEnvs:
-      {{- include "soperator-fluxcd.otelCollectorGoEnv" (dict "resources" $jailLogsValues.resources "useGoMemLimit" $jailLogsUseGoMemLimit) | nindent 6 }}
+      {{- include "soperator-fluxcd.otelCollectorGoMaxProcsEnv" (dict "resources" $jailLogsValues.resources) | nindent 6 }}
 
       {{- if .Values.observability.clusterId }}
       - name: CLUSTER_ID
