@@ -63,4 +63,3 @@ RUN chmod 755 /opt/soperator/bin/power_resume.sh /opt/soperator/bin/power_suspen
 COPY images/controller/slurmctld_entrypoint.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/slurmctld_entrypoint.sh
 ENTRYPOINT ["/opt/bin/slurm/slurmctld_entrypoint.sh"]
-

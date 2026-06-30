@@ -59,7 +59,7 @@ NFS_IMAGE_TAG		= $(shell $(YQ) '.image.tag' helm/nfs-server/values.yaml)
 OPERATOR_IMAGE_TAG  = $(VERSION)
 
 ifeq ($(shell uname), Darwin)
-    SED_COMMAND = sed -i '' -e
+    SED_COMMAND = sed -i -e
 else
     SED_COMMAND = sed -i -e
 endif

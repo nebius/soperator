@@ -165,6 +165,16 @@ func (n *Node) IsInvalidState() bool {
 	return exists
 }
 
+func (n *Node) IsRebootIssuedState() bool {
+	_, exists := n.States[api.V0041NodeStateREBOOTISSUED]
+	return exists
+}
+
+func (n *Node) IsRebootRequestedState() bool {
+	_, exists := n.States[api.V0041NodeStateREBOOTREQUESTED]
+	return exists
+}
+
 // IsCloudState reports whether the node is a cloud node, i.e. one that is
 // provisioned and powered on or off dynamically via Slurm power saving.
 func (n *Node) IsCloudState() bool {
