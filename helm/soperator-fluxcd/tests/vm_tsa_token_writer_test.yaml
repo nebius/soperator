@@ -1,0 +1,188 @@
+suite: test vmagent tsa-token writer
+templates:
+  - templates/vm-tsa-token-writer.yaml
+
+tests:
+  - it: should render a HelmRelease using the bedag raw chart
+    set:
+      observability:
+        enabled: true
+        publicEndpointEnabled: true
+        publicEndpointTokenKind: secret
+        vmStack:
+          enabled: true
+          namespace: monitoring-system
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HelmRelease
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-tsa-token-writer
+      - equal:
+          path: spec.chart.spec.chart
+          value: raw
+      - equal:
+          path: spec.chart.spec.sourceRef.name
+          value: RELEASE-NAME-bedag
+      - equal:
+          path: spec.dependsOn[0].name
+          value: RELEASE-NAME-ns
+
+  - it: should maintain the token secret with imds source and host networking
+    set:
+      observability:
+        enabled: true
+        publicEndpointEnabled: true
+        publicEndpointTokenKind: secret
+        vmStack:
+          enabled: true
+          namespace: monitoring-system
+          tsaToken:
+            writer:
+              source: imds
+    asserts:
+      # resources: ServiceAccount + Role + RoleBinding + Deployment
+      - lengthEqual:
+          path: spec.values.resources
+          count: 4
+      - equal:
+          path: spec.values.resources[0].kind
+          value: ServiceAccount
+      - equal:
+          path: spec.values.resources[0].metadata.namespace
+          value: monitoring-system
+      - equal:
+          path: spec.values.resources[3].kind
+          value: Deployment
+      - equal:
+          path: spec.values.resources[3].spec.template.spec.hostNetwork
+          value: true
+      - equal:
+          path: spec.values.resources[3].spec.template.spec.containers[0].env[0].value
+          value: "imds"
+      - equal:
+          path: spec.values.resources[3].spec.template.spec.containers[0].env[3].value
+          value: "monitoring-system"
+
+  - it: should restrict secret access by resourceName but allow create
+    set:
+      observability:
+        enabled: true
+        publicEndpointEnabled: true
+        publicEndpointTokenKind: secret
+        vmStack:
+          enabled: true
+          namespace: monitoring-system
+    asserts:
+      - equal:
+          path: spec.values.resources[1].kind
+          value: Role
+      - equal:
+          path: spec.values.resources[1].rules[0].verbs
+          value: ["create"]
+      - equal:
+          path: spec.values.resources[1].rules[1].resourceNames
+          value: ["o11y-writer-sa-token"]
+      - equal:
+          path: spec.values.resources[1].rules[1].verbs
+          value: ["get", "patch", "update"]
+      - equal:
+          path: spec.values.resources[2].kind
+          value: RoleBinding
+      - equal:
+          path: spec.values.resources[2].subjects[0].namespace
+          value: monitoring-system
+
+  - it: should use file source without host networking and mount the host token
+    set:
+      observability:
+        enabled: true
+        publicEndpointEnabled: true
+        publicEndpointTokenKind: secret
+        vmStack:
+          enabled: true
+          namespace: monitoring-system
+          tsaToken:
+            writer:
+              source: file
+    asserts:
+      - notExists:
+          path: spec.values.resources[3].spec.template.spec.hostNetwork
+      - equal:
+          path: spec.values.resources[3].spec.template.spec.containers[0].env[0].value
+          value: "file"
+      - equal:
+          path: spec.values.resources[3].spec.template.spec.volumes[0].hostPath.path
+          value: "/mnt/cloud-metadata"
+      - equal:
+          path: spec.values.resources[3].spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: "/o11ytoken"
+
+  - it: should maintain the secret in every configured namespace
+    set:
+      observability:
+        enabled: true
+        publicEndpointEnabled: true
+        publicEndpointTokenKind: secret
+        vmStack:
+          enabled: true
+          namespace: monitoring-system
+          tsaToken:
+            writer:
+              namespaces:
+                - monitoring-system
+                - logs-system
+    asserts:
+      # SA + (Role + RoleBinding) x2 + Deployment
+      - lengthEqual:
+          path: spec.values.resources
+          count: 6
+      - equal:
+          path: spec.values.resources[3].metadata.namespace
+          value: logs-system
+      - equal:
+          path: spec.values.resources[5].kind
+          value: Deployment
+      - equal:
+          path: spec.values.resources[5].spec.template.spec.containers[0].env[3].value
+          value: "monitoring-system logs-system"
+
+  - it: should not render when publicEndpointEnabled is false
+    set:
+      observability:
+        enabled: true
+        publicEndpointEnabled: false
+        vmStack:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render for hostPath token kind
+    set:
+      observability:
+        enabled: true
+        publicEndpointEnabled: true
+        publicEndpointTokenKind: hostPath
+        vmStack:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when the writer is disabled
+    set:
+      observability:
+        enabled: true
+        publicEndpointEnabled: true
+        publicEndpointTokenKind: secret
+        vmStack:
+          enabled: true
+          tsaToken:
+            writer:
+              enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
