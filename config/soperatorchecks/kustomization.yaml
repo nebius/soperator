@@ -4,7 +4,7 @@ resources:
 images:
   - name: controller
     newName: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
-    newTag: 4.0.2
+    newTag: 4.1.1
 patches:
   # Serve protected metrics from the manager using controller-runtime authn/authz.
   - path: ./manager_metrics_patch.yaml
