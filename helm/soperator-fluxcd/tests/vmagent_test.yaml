@@ -103,23 +103,21 @@ tests:
       - equal:
           path: spec.values.vmagent.spec.extraEnvs[2].valueFrom.secretKeyRef.key
           value: "token"
+      # secret token kind (default) adds no token volume mount/volume to vmagent
       - lengthEqual:
           path: spec.values.vmagent.spec.volumeMounts
-          count: 3 # 2 custom + 1 tsa-token
+          count: 2
       - lengthEqual:
           path: spec.values.vmagent.spec.volumes
-          count: 3 # 2 custom + 1 tsa-token
+          count: 2
       - lengthEqual:
           path: spec.values.vmagent.spec.containers
-          count: 2 # 1 tsa-token refresher + 1 custom
+          count: 1
       - equal:
           path: spec.values.vmagent.spec.containers[0].name
-          value: "tsa-token-refresher"
-      - equal:
-          path: spec.values.vmagent.spec.containers[1].name
           value: "custom-sidecar"
 
-  - it: should override default extraArgs correctly
+  - it: should override default extraArgs without managing the bearer token
     set:
       observability:
         enabled: true
@@ -153,9 +151,9 @@ tests:
       - equal:
           path: spec.values.vmagent.spec.extraArgs["promscrape.streamParse"]
           value: "true"
-      - equal:
+      # secret token kind must not set a global bearerTokenFile arg
+      - notExists:
           path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
-          value: "/mnt/imds/tsa-token"
 
   - it: should handle special characters in projectId
     set:
@@ -175,7 +173,7 @@ tests:
           path: spec.values.vmagent.spec.remoteWrite[0].url
           pattern: "[.]*.test-project_123.dev.[.]*"
 
-  - it: should validate template conditionals structure
+  - it: should validate template conditionals structure for secret token kind
     set:
       observability:
         enabled: true
@@ -196,22 +194,27 @@ tests:
       - exists:
           path: spec.values.vmagent.spec.extraArgs
       - exists:
-          path: spec.values.vmagent.spec.volumeMounts
-      - exists:
-          path: spec.values.vmagent.spec.volumes
-      - exists:
-          path: spec.values.vmagent.spec.containers
-      - equal:
-          path: spec.values.vmagent.spec.hostNetwork
-          value: true
-      - equal:
-          path: spec.values.vmagent.spec.dnsPolicy
-          value: "ClusterFirstWithHostNet"
-      - exists:
           path: spec.values.vmagent.spec.resources
-      # Should not have these sections when not provided
+      # o11y endpoint authenticates through the operator-managed per-URL secret
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[0].bearerTokenSecret.name
+          value: "o11y-writer-sa-token"
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[0].bearerTokenSecret.key
+          value: "accessToken"
+      # No IMDS sidecar / host networking / token volumes in secret mode
       - notExists:
-          path: spec.values.vmagent.spec.extraEnv
+          path: spec.values.vmagent.spec.containers
+      - notExists:
+          path: spec.values.vmagent.spec.volumeMounts
+      - notExists:
+          path: spec.values.vmagent.spec.volumes
+      - notExists:
+          path: spec.values.vmagent.spec.hostNetwork
+      - notExists:
+          path: spec.values.vmagent.spec.dnsPolicy
+      - notExists:
+          path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
 
   - it: should handle boolean and numeric values in extraArgs
     set:
@@ -337,13 +340,126 @@ tests:
           path: spec.values.vmagent.spec.remoteWrite[2].writeRelabelConfigs[0].action
           value: "keep"
 
-  - it: should merge custom volumeMounts and volumes with defaults when publicEndpointEnabled is true
+  - it: should let an extra destination carry its own bearerTokenSecret alongside o11y
     set:
       observability:
         enabled: true
         vmStack:
           enabled: true
           publicEndpointEnabled: true
+          publicEndpointTokenKind: secret
+          values:
+            vmagent:
+              spec:
+                remoteWrite:
+                  - url: "http://vmsingle.monitoring-system.svc.cluster.local.:8429/api/v1/write"
+                  - url: "https://intake.some-cool-observability.com/api/v1/metrics"
+                    bearerTokenSecret:
+                      name: bfl-dashboard-credentials
+                      key: ingestion-key
+    asserts:
+      - hasDocuments:
+          count: 1
+      - lengthEqual:
+          path: spec.values.vmagent.spec.remoteWrite
+          count: 3
+      # o11y endpoint keeps its operator-managed secret
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[0].bearerTokenSecret.name
+          value: "o11y-writer-sa-token"
+      # extra destination keeps its own secret - no global bearerTokenFile to clobber it
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[2].bearerTokenSecret.name
+          value: "bfl-dashboard-credentials"
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[2].bearerTokenSecret.key
+          value: "ingestion-key"
+      - notExists:
+          path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
+
+  - it: should allow overriding the o11y token secret name and key
+    set:
+      observability:
+        enabled: true
+        vmStack:
+          enabled: true
+          publicEndpointEnabled: true
+          publicEndpointTokenKind: secret
+          tsaToken:
+            secretName: my-token-secret
+            secretKey: my-key
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[0].bearerTokenSecret.name
+          value: "my-token-secret"
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[0].bearerTokenSecret.key
+          value: "my-key"
+
+  - it: should mount the host token file and scope the bearer token to o11y for hostPath kind
+    set:
+      observability:
+        enabled: true
+        publicEndpointEnabled: true
+        publicEndpointTokenKind: hostPath
+        vmStack:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      # o11y endpoint must not use bearerTokenSecret in hostPath mode
+      - notExists:
+          path: spec.values.vmagent.spec.remoteWrite[0].bearerTokenSecret
+      # token file mounted from the host
+      - equal:
+          path: spec.values.vmagent.spec.volumeMounts[0].name
+          value: "o11ytoken"
+      - equal:
+          path: spec.values.vmagent.spec.volumeMounts[0].mountPath
+          value: "/o11ytoken"
+      - equal:
+          path: spec.values.vmagent.spec.volumes[0].hostPath.path
+          value: "/mnt/cloud-metadata"
+      # positional bearerTokenFile: token for o11y (index 0), empty for cluster-local (index 1)
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
+          value: '/o11ytoken/tsa-token,""'
+
+  - it: should pad the hostPath bearer token across all remote-write endpoints
+    set:
+      observability:
+        enabled: true
+        publicEndpointEnabled: true
+        publicEndpointTokenKind: hostPath
+        vmStack:
+          enabled: true
+          values:
+            vmagent:
+              spec:
+                remoteWrite:
+                  - url: "http://vmsingle.monitoring-system.svc.cluster.local.:8429/api/v1/write"
+                  - url: "https://intake.some-cool-observability.com/api/v1/metrics"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - lengthEqual:
+          path: spec.values.vmagent.spec.remoteWrite
+          count: 3
+      # 3 endpoints -> token only for index 0, two empty placeholders
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
+          value: '/o11ytoken/tsa-token,"",""'
+
+  - it: should merge custom volumeMounts and volumes for hostPath kind
+    set:
+      observability:
+        enabled: true
+        publicEndpointEnabled: true
+        publicEndpointTokenKind: hostPath
+        vmStack:
+          enabled: true
           values:
             vmagent:
               spec:
@@ -363,55 +479,30 @@ tests:
     asserts:
       - hasDocuments:
           count: 1
-      # Should have both default and custom volumeMounts
+      # Should have both default token mount and custom volumeMounts
       - lengthEqual:
           path: spec.values.vmagent.spec.volumeMounts
-          count: 3 # 1 default tsa-token + 2 custom
-      # Check default tsa-token mount
+          count: 3 # 1 default o11ytoken + 2 custom
       - equal:
           path: spec.values.vmagent.spec.volumeMounts[0].name
-          value: "cloud-metadata"
-      - equal:
-          path: spec.values.vmagent.spec.volumeMounts[0].mountPath
-          value: "/mnt/imds"
-      - equal:
-          path: spec.values.vmagent.spec.volumeMounts[0].readOnly
-          value: true
-      # Check custom mounts
+          value: "o11ytoken"
       - equal:
           path: spec.values.vmagent.spec.volumeMounts[1].name
           value: "custom-config"
       - equal:
-          path: spec.values.vmagent.spec.volumeMounts[1].mountPath
-          value: "/etc/custom-config"
-      - equal:
-          path: spec.values.vmagent.spec.volumeMounts[2].name
-          value: "data-volume"
-      - equal:
           path: spec.values.vmagent.spec.volumeMounts[2].mountPath
           value: "/data"
-      # Should have both default and custom volumes
       - lengthEqual:
           path: spec.values.vmagent.spec.volumes
-          count: 3 # 1 default tsa-token + 2 custom
-      # Check default tsa-token volume
+          count: 3 # 1 default o11ytoken + 2 custom
       - equal:
           path: spec.values.vmagent.spec.volumes[0].name
-          value: "cloud-metadata"
+          value: "o11ytoken"
       - exists:
-          path: spec.values.vmagent.spec.volumes[0].emptyDir
-      - notExists:
           path: spec.values.vmagent.spec.volumes[0].hostPath
-      # Check custom volumes
-      - equal:
-          path: spec.values.vmagent.spec.volumes[1].name
-          value: "custom-config"
       - equal:
           path: spec.values.vmagent.spec.volumes[1].configMap.name
           value: "vmagent-custom-config"
-      - equal:
-          path: spec.values.vmagent.spec.volumes[2].name
-          value: "data-volume"
       - equal:
           path: spec.values.vmagent.spec.volumes[2].persistentVolumeClaim.claimName
           value: "vmagent-data"
@@ -433,112 +524,25 @@ tests:
     asserts:
       - hasDocuments:
           count: 1
-      # Should still have defaults when custom arrays are empty
+      # Should still have the default o11y endpoint when custom arrays are empty
       - lengthEqual:
           path: spec.values.vmagent.spec.remoteWrite
           count: 1 # Only default
       - equal:
           path: spec.values.vmagent.spec.remoteWrite[0].url
           value: "https://write.monitoring.eu-north1.nebius.cloud/projects/default-project-id/buckets/soperator/prometheus"
-      # Should have default volumeMounts and volumes
-      - lengthEqual:
-          path: spec.values.vmagent.spec.volumeMounts
-          count: 1 # Only default tsa-token
       - equal:
-          path: spec.values.vmagent.spec.volumeMounts[0].name
-          value: "cloud-metadata"
-      - lengthEqual:
-          path: spec.values.vmagent.spec.volumes
-          count: 1 # Only default tsa-token
-      - equal:
-          path: spec.values.vmagent.spec.volumes[0].name
-          value: "cloud-metadata"
-      - exists:
-          path: spec.values.vmagent.spec.containers[0]
-      - equal:
-          path: spec.values.vmagent.spec.containers[0].name
-          value: "tsa-token-refresher"
-      - equal:
-          path: spec.values.vmagent.spec.containers[0].image
-          value: "cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/alpine/curl:8.19.0"
-      - lengthEqual:
-          path: spec.values.vmagent.spec.containers[0].env
-          count: 1
-      - equal:
-          path: spec.values.vmagent.spec.containers[0].env[0].name
-          value: "TSA_TOKEN_PATH"
-      # Should not have extraEnv when empty
+          path: spec.values.vmagent.spec.remoteWrite[0].bearerTokenSecret.name
+          value: "o11y-writer-sa-token"
+      # secret token kind adds no token volumes or sidecar
       - notExists:
-          path: spec.values.vmagent.spec.extraEnv
+          path: spec.values.vmagent.spec.volumeMounts
+      - notExists:
+          path: spec.values.vmagent.spec.volumes
+      - notExists:
+          path: spec.values.vmagent.spec.containers
 
-  - it: should render configurable tsa-token IMDS sidecar when publicEndpointEnabled is true
-    set:
-      observability:
-        enabled: true
-        publicEndpointEnabled: true
-        vmStack:
-          enabled: true
-          tsaTokenSidecar:
-            image:
-              repository: "example.com/metadata-token"
-              tag: "v2"
-              pullPolicy: Always
-            imdsBaseUrl: "http://metadata.test.internal"
-            tokenMountPath: "/var/run/cloud-metadata"
-            tokenFilePath: "/var/run/cloud-metadata/tsa-token"
-            expiryFilePath: "/var/run/cloud-metadata/tsa-token.expires_at"
-            refreshSafetyMarginSeconds: 1200
-            resources:
-              requests:
-                cpu: 10m
-                memory: 32Mi
-    asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
-          value: "/var/run/cloud-metadata/tsa-token"
-      - equal:
-          path: spec.values.vmagent.spec.volumeMounts[0].mountPath
-          value: "/var/run/cloud-metadata"
-      - equal:
-          path: spec.values.vmagent.spec.containers[0].image
-          value: "example.com/metadata-token:v2"
-      - equal:
-          path: spec.values.vmagent.spec.containers[0].imagePullPolicy
-          value: "Always"
-      - equal:
-          path: spec.values.vmagent.spec.containers[0].env[0].value
-          value: "/var/run/cloud-metadata/tsa-token"
-      - equal:
-          path: spec.values.vmagent.spec.containers[0].env[1].value
-          value: "/var/run/cloud-metadata/tsa-token.expires_at"
-      - equal:
-          path: spec.values.vmagent.spec.containers[0].env[2].value
-          value: "http://metadata.test.internal"
-      - equal:
-          path: spec.values.vmagent.spec.containers[0].env[3].value
-          value: "1200"
-      - equal:
-          path: spec.values.vmagent.spec.containers[0].env[3].name
-          value: "TSA_TOKEN_REFRESH_SAFETY_MARGIN_SECONDS"
-      - lengthEqual:
-          path: spec.values.vmagent.spec.containers[0].env
-          count: 4
-      - equal:
-          path: spec.values.vmagent.spec.containers[0].volumeMounts[0].mountPath
-          value: "/var/run/cloud-metadata"
-      - equal:
-          path: spec.values.vmagent.spec.containers[0].resources.requests.cpu
-          value: "10m"
-      - equal:
-          path: spec.values.vmagent.spec.hostNetwork
-          value: true
-      - equal:
-          path: spec.values.vmagent.spec.dnsPolicy
-          value: "ClusterFirstWithHostNet"
-
-  - it: should not render tsa-token sidecar when publicEndpointEnabled is false
+  - it: should not render token volumes or host networking when publicEndpointEnabled is false
     set:
       observability:
         enabled: true
@@ -552,27 +556,7 @@ tests:
           path: spec.values.vmagent.spec.containers
       - notExists:
           path: spec.values.vmagent.spec.hostNetwork
-
-  - it: should not set bearer token file when tsa-token sidecar is disabled
-    set:
-      observability:
-        enabled: true
-        publicEndpointEnabled: true
-        vmStack:
-          enabled: true
-          tsaTokenSidecar:
-            enabled: false
-    asserts:
-      - hasDocuments:
-          count: 1
       - notExists:
-          path: spec.values.vmagent.spec.containers
-      - notExists:
-          path: spec.values.vmagent.spec.volumeMounts[0]
-      - notExists:
-          path: spec.values.vmagent.spec.volumes[0]
+          path: spec.values.vmagent.spec.volumeMounts
       - notExists:
           path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
-      - equal:
-          path: spec.values.vmagent.spec.extraArgs["remoteWrite.flushInterval"]
-          value: "2s"

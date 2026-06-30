@@ -1,4 +1,7 @@
 {{- if and .Values.observability.enabled .Values.observability.vmStack.enabled }}
+{{- if .Values.observability.publicEndpointEnabled }}
+{{- include "soperator-fluxcd.validatePublicEndpointTokenKind" . -}}
+{{- end }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -390,31 +393,22 @@ spec:
       vmagent:
         spec:
           {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
+          {{- $tokenKind := .Values.observability.publicEndpointTokenKind }}
           {{- $hasVmagentSpec := .Values.observability.vmStack.values.vmagent.spec }}
-          {{- $tsaTokenSidecar := .Values.observability.vmStack.tsaTokenSidecar | default dict }}
-          {{- $tsaTokenSidecarEnabled := true }}
-          {{- if hasKey $tsaTokenSidecar "enabled" }}
-          {{- $tsaTokenSidecarEnabled = $tsaTokenSidecar.enabled }}
-          {{- end }}
-          {{- $tsaTokenImage := $tsaTokenSidecar.image | default dict }}
-          {{- $tsaTokenImageRepository := required "observability.vmStack.tsaTokenSidecar.image.repository is required" $tsaTokenImage.repository }}
-          {{- $tsaTokenImageTag := required "observability.vmStack.tsaTokenSidecar.image.tag is required" $tsaTokenImage.tag }}
-          {{- $tsaTokenImagePullPolicy := required "observability.vmStack.tsaTokenSidecar.image.pullPolicy is required" $tsaTokenImage.pullPolicy }}
-          {{- $tsaTokenMountPath := required "observability.vmStack.tsaTokenSidecar.tokenMountPath is required" $tsaTokenSidecar.tokenMountPath }}
-          {{- $tsaTokenFilePath := required "observability.vmStack.tsaTokenSidecar.tokenFilePath is required" $tsaTokenSidecar.tokenFilePath }}
+          {{- $tsaToken := .Values.observability.vmStack.tsaToken | default dict }}
+          {{- $tokenSecretName := $tsaToken.secretName | default "o11y-writer-sa-token" }}
+          {{- $tokenSecretKey := $tsaToken.secretKey | default "accessToken" }}
+          {{- $tokenHostPath := $tsaToken.hostPath | default "/mnt/cloud-metadata" }}
+          {{- $tokenMountPath := $tsaToken.mountPath | default "/o11ytoken" }}
+          {{- $tokenHostPathFilename := $tsaToken.hostPathFilename | default "tsa-token" }}
+          {{- $useHostPathToken := and $hasPublicEndpoint (eq $tokenKind "hostPath") }}
           {{- $hasHostNetwork := and $hasVmagentSpec (hasKey $hasVmagentSpec "hostNetwork") }}
           {{- $hasDnsPolicy := and $hasVmagentSpec (hasKey $hasVmagentSpec "dnsPolicy") }}
-
-          {{- if and $hasPublicEndpoint $tsaTokenSidecarEnabled }}
-          hostNetwork: true
-          dnsPolicy: {{ default "ClusterFirstWithHostNet" $hasVmagentSpec.dnsPolicy }}
-          {{- else }}
           {{- if $hasHostNetwork }}
           hostNetwork: {{ $hasVmagentSpec.hostNetwork }}
           {{- end }}
           {{- if $hasDnsPolicy }}
           dnsPolicy: {{ $hasVmagentSpec.dnsPolicy }}
-          {{- end }}
           {{- end }}
 
           {{- $hasExternalLabels := and $hasVmagentSpec $hasVmagentSpec.externalLabels }}
@@ -445,6 +439,11 @@ spec:
           {{- $remoteWriteNotEmpty := and $hasRemoteWrite (gt (len $hasVmagentSpec.remoteWrite) 0) }}
           {{- if $hasPublicEndpoint }}
             - url: https://write.monitoring.{{ .Values.observability.region }}.nebius.cloud/projects/{{ .Values.observability.metricsProjectId }}/buckets/soperator/prometheus
+              {{- if eq $tokenKind "secret" }}
+              bearerTokenSecret:
+                name: {{ $tokenSecretName | quote }}
+                key: {{ $tokenSecretKey | quote }}
+              {{- end }}
               inlineUrlRelabelConfig:
                 - action: labeldrop
                   regex: feature_node_kubernetes_io_.*|kubernetes_io_.*|nvidia_com_gpu.*
@@ -459,70 +458,38 @@ spec:
 
           {{- $hasContainers := and $hasVmagentSpec $hasVmagentSpec.containers }}
           {{- $containersNotEmpty := and $hasContainers (gt (len $hasVmagentSpec.containers) 0) }}
-          {{- if or (and $hasPublicEndpoint $tsaTokenSidecarEnabled) $containersNotEmpty }}
-          containers:
-          {{- if and $hasPublicEndpoint $tsaTokenSidecarEnabled }}
-            - name: tsa-token-refresher
-              image: {{ printf "%s:%s" $tsaTokenImageRepository $tsaTokenImageTag | quote }}
-              imagePullPolicy: {{ $tsaTokenImagePullPolicy | quote }}
-              command:
-                - /bin/sh
-                - -ec
-                - |
-{{ .Files.Get "files/tsa-token-refresher.sh" | indent 18 }}
-              env:
-                - name: TSA_TOKEN_PATH
-                  value: {{ $tsaTokenFilePath | quote }}
-                {{- with $tsaTokenSidecar.expiryFilePath }}
-                - name: TSA_TOKEN_EXPIRY_PATH
-                  value: {{ . | quote }}
-                {{- end }}
-                {{- with $tsaTokenSidecar.imdsBaseUrl }}
-                - name: IMDS_BASE_URL
-                  value: {{ . | quote }}
-                {{- end }}
-                {{- with $tsaTokenSidecar.refreshSafetyMarginSeconds }}
-                - name: TSA_TOKEN_REFRESH_SAFETY_MARGIN_SECONDS
-                  value: {{ . | quote }}
-                {{- end }}
-              volumeMounts:
-                - name: cloud-metadata
-                  mountPath: {{ $tsaTokenMountPath | quote }}
-              {{- with $tsaTokenSidecar.resources }}
-              resources:
-                {{- toYaml . | nindent 16 }}
-              {{- end }}
-          {{- end }}
           {{- if $containersNotEmpty }}
+          containers:
           {{- toYaml $hasVmagentSpec.containers | nindent 12 }}
           {{- end }}
-          {{- end }}
 
-          volumeMounts:
           {{- $hasVolumeMounts := and $hasVmagentSpec $hasVmagentSpec.volumeMounts }}
           {{- $volumeMountsNotEmpty := and $hasVolumeMounts (gt (len $hasVmagentSpec.volumeMounts) 0) }}
-          {{- if and $hasPublicEndpoint $tsaTokenSidecarEnabled }}
-            - name: cloud-metadata
-              mountPath: {{ $tsaTokenMountPath | quote }}
+          {{- if or $useHostPathToken $volumeMountsNotEmpty }}
+          volumeMounts:
+          {{- if $useHostPathToken }}
+            - name: o11ytoken
+              mountPath: {{ $tokenMountPath | quote }}
               readOnly: true
+          {{- end }}
           {{- if $volumeMountsNotEmpty }}
           {{- toYaml $hasVmagentSpec.volumeMounts | nindent 12 }}
           {{- end }}
-          {{- else}}
-          {{- toYaml $hasVmagentSpec.volumeMounts | nindent 12 }}
           {{- end }}
 
-          volumes:
           {{- $hasVolumes := and $hasVmagentSpec $hasVmagentSpec.volumes }}
           {{- $volumesNotEmpty := and $hasVolumes (gt (len $hasVmagentSpec.volumes) 0) }}
-          {{- if and $hasPublicEndpoint $tsaTokenSidecarEnabled }}
-            - name: cloud-metadata
-              emptyDir: {}
+          {{- if or $useHostPathToken $volumesNotEmpty }}
+          volumes:
+          {{- if $useHostPathToken }}
+            - name: o11ytoken
+              hostPath:
+                path: {{ $tokenHostPath | quote }}
+                type: Directory
+          {{- end }}
           {{- if $volumesNotEmpty }}
           {{- toYaml $hasVmagentSpec.volumes | nindent 12 }}
           {{- end }}
-          {{- else}}
-          {{- toYaml $hasVmagentSpec.volumes | nindent 12 }}
           {{- end }}
 
           extraArgs:
@@ -530,10 +497,14 @@ spec:
           {{- $extraArgsNotEmpty := and $hasExtraArgs (gt (len $hasVmagentSpec.extraArgs) 0) }}
           {{- if $hasPublicEndpoint }}
             remoteWrite.flushInterval: 2s
-          {{- if $tsaTokenSidecarEnabled }}
-            remoteWrite.bearerTokenFile: {{ $tsaTokenFilePath | quote }}
-          {{- end }}
             remoteWrite.maxRowsPerBlock: "12000"
+          {{- if $useHostPathToken }}
+            {{- $rwCount := 1 }}
+            {{- if $remoteWriteNotEmpty }}
+            {{- $rwCount = add 1 (len $hasVmagentSpec.remoteWrite) }}
+            {{- end }}
+            remoteWrite.bearerTokenFile: {{ printf "%s/%s%s" $tokenMountPath $tokenHostPathFilename (repeat (int (sub $rwCount 1)) ",\"\"") | quote }}
+          {{- end }}
           {{- if $extraArgsNotEmpty }}
           {{- toYaml $hasVmagentSpec.extraArgs | nindent 12 }}
           {{- end }}
