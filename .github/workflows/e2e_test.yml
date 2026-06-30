@@ -23,6 +23,11 @@ on:
         required: false
         default: "false"
         type: string
+      skip_destroy:
+        description: "Skip Terraform Destroy to leave leftover state (for testing cleanup-previous)"
+        required: false
+        default: "false"
+        type: string
 
 permissions:
   contents: read
@@ -345,6 +350,23 @@ jobs:
           bin/e2e check-capacity 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Cleanup previous Terraform state
+        timeout-minutes: 30
+        run: |
+          cd ${{ env.PATH_TO_INSTALLATION }}
+          source .envrc
+          cd -
+
+          aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+          aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+          aws configure set region $NEBIUS_REGION
+          aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
+
+          # Destroy any leftover resources from a previous run using the saved terraform bundle
+          # (the exact code that created the state), falling back to the current checkout.
+          # Runs before init so the new run starts from a clean, empty state.
+          bin/e2e cleanup-previous
+
       - name: Terraform Init
         timeout-minutes: 30
         run: |
@@ -580,7 +602,7 @@ jobs:
           retention-days: 7
 
       - name: Terraform Destroy
-        if: always()
+        if: always() && inputs.skip_destroy != 'true'
         timeout-minutes: 30
         env:
           # Opt in to terraform DEBUG logging only for the destroy flow.
@@ -602,6 +624,16 @@ jobs:
 
           bin/e2e destroy
 
+      - name: Skip Terraform Destroy (leftover-state simulation)
+        if: always() && inputs.skip_destroy == 'true'
+        shell: bash
+        run: |
+          {
+            echo "### Terraform Destroy skipped"
+            echo "\`skip_destroy=true\` — leaving the cluster, terraform state, and the saved bundle in place."
+            echo "The next run on this project will exercise \`cleanup-previous\` against this leftover state."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload Terraform Destroy debug log
         if: always()
         uses: actions/upload-artifact@v7
@@ -615,7 +647,7 @@ jobs:
           compression-level: 9
 
       - name: Force cleanup compute instances on failure
-        if: failure()
+        if: failure() && inputs.skip_destroy != 'true'
         shell: bash
         run: |
           echo "=== Node groups state before cleanup ==="
