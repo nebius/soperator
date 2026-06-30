@@ -36,7 +36,7 @@ const (
 type SlurmNodesController struct {
 	*reconciler.Reconciler
 	slurmAPIClients          *slurmapi.ClientSet
-	reconcileTimeout         time.Duration
+	requeueAfter             time.Duration
 	enabledNodeReplacement   bool
 	enableExtensiveCheck     bool
 	apiReader                client.Reader // Direct API reader for pagination
@@ -48,7 +48,7 @@ func NewSlurmNodesController(
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
-	reconcileTimeout time.Duration,
+	requeueAfter time.Duration,
 	enabledNodeReplacement bool,
 	enableExtensiveCheck bool,
 	apiReader client.Reader,
@@ -63,7 +63,7 @@ func NewSlurmNodesController(
 	return &SlurmNodesController{
 		Reconciler:               r,
 		slurmAPIClients:          slurmAPIClients,
-		reconcileTimeout:         reconcileTimeout,
+		requeueAfter:             requeueAfter,
 		enabledNodeReplacement:   enabledNodeReplacement,
 		enableExtensiveCheck:     enableExtensiveCheck,
 		apiReader:                apiReader,
@@ -127,7 +127,7 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Set RequeueAfter so SlurmNodesController can perform periodical checks against
 	// slurm nodes to find degraded nodes and k8s nodes to find maintenance.
-	return ctrl.Result{RequeueAfter: c.reconcileTimeout}, nil
+	return ctrl.Result{RequeueAfter: c.requeueAfter}, nil
 }
 
 // TODO: filter slurmNodes by supported slurm clusters
@@ -368,6 +368,15 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 	}
 
 	logger.V(1).Info("Creating a slurm reservation for drained node with [HC] reason")
+
+	// TODO(SCHED-1417): on CPU-only clusters extensive-check is Skipped
+	// (requiresGpu: true), so a suspicious-node reservation added here would
+	// never be removed. Today this is unreachable — every failureReaction
+	// that drains with [node_problem] belongs to a GPU check that is itself
+	// Skipped on CPU-only, so nothing reaches this code path. If a non-GPU
+	// slurmJob check with drainSlurmNode.drainReasonPrefix=[node_problem] is
+	// ever added, this path must skip reservation creation when the cluster
+	// has no GPU workers (or extensive-check must be made CPU-capable).
 
 	// Create a maintenance reservation for this slurm node to prevent work from being scheduled on it.
 	err = c.createMaintenanceReservationForSlurmNode(ctx, slurmClusterName, slurmNode.Name)

@@ -24,19 +24,21 @@ const (
 )
 
 type DockerContainers struct {
-	exec    framework.Exec
-	slurm   *framework.SlurmClient
-	workers []string
-	job     framework.SbatchJob
+	exec        framework.Exec
+	slurm       *framework.SlurmClient
+	clusterName string
+	workers     []string
+	job         framework.SbatchJob
 
 	containerNamePrefix string
 	connectionWorker    string
 }
 
-func NewDockerContainers(exec framework.Exec, slurm *framework.SlurmClient) *DockerContainers {
+func NewDockerContainers(exec framework.Exec, slurm *framework.SlurmClient, clusterName string) *DockerContainers {
 	return &DockerContainers{
-		exec:  exec,
-		slurm: slurm,
+		exec:        exec,
+		slurm:       slurm,
+		clusterName: clusterName,
 	}
 }
 
@@ -71,7 +73,7 @@ func (s *DockerContainers) aLongRunningDockerNCCLJobIsSubmittedOnTwoGPUWorkers(c
 	s.workers = workers
 	s.connectionWorker = s.workers[0]
 
-	image, err := PrepullContainerImageDocker(ctx, s.exec)
+	image, err := PrepullContainerImageDocker(ctx, s.exec, s.clusterName)
 	if err != nil {
 		return err
 	}

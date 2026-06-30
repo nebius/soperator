@@ -1,28 +1,9 @@
 controllerManager:
-  kubeRbacProxy:
-    args:
-      - --secure-listen-address=0.0.0.0:8443
-      - --upstream=http://127.0.0.1:8080/
-      - --logtostderr=true
-      - --v=0
-    containerSecurityContext:
-      allowPrivilegeEscalation: false
-      capabilities:
-        drop:
-          - ALL
-    image:
-      repository: registry.k8s.io/kubebuilder/kube-rbac-proxy
-      tag: v0.15.0
-    resources:
-      limits:
-        memory: 128Mi
-      requests:
-        cpu: 50m
-        memory: 64Mi
   manager:
     args:
       - --health-probe-bind-address=:8081
-      - --metrics-bind-address=127.0.0.1:8080
+      - --metrics-bind-address=:8443
+      - --metrics-secure=true
       - --leader-elect
     controllersEnabled:
       cluster: true
@@ -43,7 +24,7 @@ controllerManager:
       topologyLabelPrefix: "topology.nebius.com"
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
-      tag: 4.1.0
+      tag: 4.0.2
     imagePullPolicy: Always
     resources:
       limits:
@@ -72,6 +53,30 @@ serviceMonitor:
   additionalLabels: {}
   metricRelabelings: []
   relabelings: []
+nodeExporter:
+  enabled: false
+  image:
+    repository: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter
+    tag: v1.10.2
+    pullPolicy: IfNotPresent
+  port: 9100
+  args:
+    - --collector.disable-defaults
+    - --collector.netdev
+    - --collector.netstat
+    - --collector.sockstat
+    - --collector.conntrack
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 64Mi
+  podMonitor:
+    interval: "30s"
+    scrapeTimeout: "10s"
+    metricRelabelings: []
+    relabelings: []
 certManager:
   enabled: true
 kruise:

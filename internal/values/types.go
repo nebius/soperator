@@ -64,9 +64,10 @@ func buildServiceFrom(
 // region StatefulSet
 
 type StatefulSet struct {
-	Name           string
-	Replicas       int32
-	MaxUnavailable intstr.IntOrString
+	Name                 string
+	Replicas             int32
+	MaxUnavailable       intstr.IntOrString
+	MaxConcurrentStartup intstr.IntOrString
 }
 
 func buildStatefulSetFrom(
@@ -84,6 +85,7 @@ func buildStatefulSetWithMaxUnavailableFrom(
 	name string,
 	size int32,
 	maxUnavailable *intstr.IntOrString,
+	maxConcurrentStartup *intstr.IntOrString,
 ) StatefulSet {
 	result := StatefulSet{
 		Name:     name,
@@ -92,6 +94,10 @@ func buildStatefulSetWithMaxUnavailableFrom(
 
 	if maxUnavailable != nil {
 		result.MaxUnavailable = *maxUnavailable
+	}
+
+	if maxConcurrentStartup != nil {
+		result.MaxConcurrentStartup = *maxConcurrentStartup
 	}
 
 	return result

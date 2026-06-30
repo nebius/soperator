@@ -16,15 +16,22 @@ type CommandScope interface {
 	RunWithDefaultRetry(ctx context.Context, command string) (string, error)
 }
 
+type ArgsScope interface {
+	Run(ctx context.Context, args ...string) (string, error)
+	RunWithRetry(ctx context.Context, attempts int, delay time.Duration, args ...string) (string, error)
+	RunWithDefaultRetry(ctx context.Context, args ...string) (string, error)
+}
+
 type Exec interface {
 	AvailableWorkers() []WorkerPodRef
 	AvailableGPUWorkers() []WorkerPodRef
+	Kubectl() ArgsScope
+	// Local returns a local process scope. Do not use it for kubectl commands;
+	// use Kubectl instead so the explicit Kubernetes context is applied.
+	Local() ArgsScope
 	Controller() CommandScope
 	Jail() CommandScope
 	Worker(worker string) CommandScope
-	Run(ctx context.Context, name string, args ...string) (string, error)
-	RunWithRetry(ctx context.Context, attempts int, delay time.Duration, name string, args ...string) (string, error)
-	RunWithDefaultRetry(ctx context.Context, name string, args ...string) (string, error)
 	WaitFor(ctx context.Context, description string, timeout, pollInterval time.Duration, condition func(context.Context) (bool, error)) error
 	Logf(format string, args ...any)
 }
