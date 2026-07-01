@@ -373,12 +373,6 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			return ctrl.Result{}, fmt.Errorf("failed to patch k8s Job: %w", err)
 		}
 
-		// Updating the ActiveCheck status is relevant for normal active checks
-		// where there is only one instance of the ActiveCheck running at any moment.
-		// For extensive-check, there will be many instances running at the same time.
-		// It doesn't really make sense to update the status of the active check.
-		// Leaving this logic as it is for now.
-
 		activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
 			LastRunId:                  firstJobId,
 			LastRunName:                jobName,
@@ -568,78 +562,5 @@ func executeReactions(ctx context.Context, slurmJob slurmapi.Job, activeCheckNam
 		}
 	}
 
-	if reactions.AddReservation != nil || reactions.RemoveReservation != nil {
-		err := processReservationReactions(ctx, *reactions, slurmJob, slurmAPIClient, logger)
-		if err != nil {
-			return fmt.Errorf("processing reservation reactions: %w", err)
-		}
-	}
-
 	return nil
-}
-
-func processReservationReactions(ctx context.Context, reactions slurmv1alpha1.Reactions, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
-	if reactions.AddReservation != nil && reactions.AddReservation.Prefix != "" {
-		err := processAddReservation(ctx, reactions.AddReservation.Prefix, slurmJob, slurmAPIClient, logger)
-		if err != nil {
-			return fmt.Errorf("adding reservation: %w", err)
-		}
-	}
-
-	if reactions.RemoveReservation != nil && reactions.RemoveReservation.Prefix != "" {
-		err := processRemoveReservation(ctx, reactions.RemoveReservation.Prefix, slurmJob, slurmAPIClient)
-		if err != nil {
-			return fmt.Errorf("removing reservation: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func processAddReservation(ctx context.Context, reservationPrefix string, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
-	nodes, err := slurmJob.GetNodeList()
-	if err != nil {
-		return fmt.Errorf("get node list: %w", err)
-	}
-	for _, node := range nodes {
-		err := addReservationForNode(ctx, reservationPrefix, node, slurmAPIClient, logger)
-		if err != nil {
-			return fmt.Errorf("post reservation: %w", err)
-		}
-	}
-	return nil
-}
-
-func getExtensiveCheckReservationName(prefix, node string) string {
-	return fmt.Sprintf("%s-%s", prefix, node)
-}
-
-func processRemoveReservation(ctx context.Context, reservationPrefix string, slurmJob slurmapi.Job, slurmAPIClient slurmapi.Client) error {
-	nodes, err := slurmJob.GetNodeList()
-	if err != nil {
-		return fmt.Errorf("get node list: %w", err)
-	}
-	for _, node := range nodes {
-		reservationName := getExtensiveCheckReservationName(reservationPrefix, node)
-		err := slurmAPIClient.StopReservation(ctx, reservationName)
-		if err != nil {
-			return fmt.Errorf("stop reservation: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func addReservationForNode(ctx context.Context, reservationPrefix string, nodeName string, slurmAPIClient slurmapi.Client, logger logr.Logger) error {
-	reservationName := getExtensiveCheckReservationName(reservationPrefix, nodeName)
-
-	_, err := slurmAPIClient.GetReservation(ctx, reservationName)
-	if err == nil {
-		// Reservation is found, don't create a new one
-		logger.Info("previous reservation was found. Not creating a new reservation", "name", reservationName)
-		return nil
-	}
-
-	logger.Info("adding reservation for node", "name", reservationName)
-	return slurmAPIClient.PostMaintenanceReservation(ctx, reservationName, []string{nodeName})
 }

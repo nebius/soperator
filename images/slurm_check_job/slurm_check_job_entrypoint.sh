@@ -62,27 +62,7 @@ if grep -qE '#SBATCH\s+.*(--gpus-per-node|--gpus\b|--gres=gpu|-G\s)' /opt/bin/sb
     fi
 fi
 
-if [[ -n "${RESERVATION_NAME:-}" ]]; then
-    echo "Submitting Slurm job on reservation $RESERVATION_NAME..."
-    OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.out'
-    # Here we use env variables instead of --output and --error because they do not support %N (node name) parameter.
-    SLURM_OUTPUT=$(
-      SBATCH_OUTPUT="$OUT_PATTERN" \
-      SBATCH_ERROR="$OUT_PATTERN" \
-      /usr/bin/sbatch --parsable \
-        --reservation="$RESERVATION_NAME" \
-        --job-name="$ACTIVE_CHECK_NAME" \
-        --chdir=/opt/soperator-home/soperatorchecks \
-        --uid=soperatorchecks \
-        --partition="$PARTITION" \
-        /opt/bin/sbatch.sh
-    )
-    if [[ -z "$SLURM_OUTPUT" ]]; then
-        echo "Failed to submit Slurm job"
-        exit 1
-    fi
-    SLURM_JOB_ID="$SLURM_OUTPUT"
-elif [[ "${EACH_WORKER_JOBS:-}" == "true" ]]; then
+if [[ "${EACH_WORKER_JOBS:-}" == "true" ]]; then
     echo "Submitting job using slurm_submit_jobs.sh..."
     SUBMIT_OUTPUT=$(/opt/bin/slurm/slurm_submit_jobs.sh)
     SCRIPT_STATUS=$?

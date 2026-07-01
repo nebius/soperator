@@ -1,7 +1,6 @@
 checks:
   manager:
     enableNodeReplacement: false
-    enableExtensiveCheck: false
     args:
       - --metrics-bind-address=:8443
       - --metrics-secure=true
