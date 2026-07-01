@@ -22,6 +22,48 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
+Create a Kubernetes resource name with a version suffix.
+*/}}
+{{- define "soperator-fluxcd.versionedName" -}}
+{{- $name := index . 0 -}}
+{{- $version := index . 1 -}}
+{{- printf "%s-%s" $name $version | lower | replace "+" "-" | replace "_" "-" | trunc 253 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Base name for the custom supervisord ConfigMap created by the custom-configmaps chart.
+*/}}
+{{- define "soperator-fluxcd.customSupervisordConfigMapBaseName" -}}
+{{- $name := .Values.customConfigmaps.supervisordConfigMapName | default "custom-supervisord-config" -}}
+{{- with .Values.customConfigmaps.values -}}
+{{- with .configMaps -}}
+{{- with .supervisord -}}
+{{- with .name -}}
+{{- $name = . -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- with .Values.customConfigmaps.overrideValues -}}
+{{- with .configMaps -}}
+{{- with .supervisord -}}
+{{- with .name -}}
+{{- $name = . -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- $name -}}
+{{- end }}
+
+{{/*
+Versioned name for the custom supervisord ConfigMap.
+*/}}
+{{- define "soperator-fluxcd.customSupervisordConfigMapName" -}}
+{{- include "soperator-fluxcd.versionedName" (list (include "soperator-fluxcd.customSupervisordConfigMapBaseName" .) .Values.customConfigmaps.version) -}}
+{{- end }}
+
+{{/*
 Common labels
 */}}
 {{- define "soperator-fluxcd.labels" -}}

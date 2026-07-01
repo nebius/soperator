@@ -1,0 +1,38 @@
+suite: test supervisord configmap
+templates:
+  - templates/configmap-supervisord.yaml
+tests:
+  - it: should render versioned and legacy supervisord ConfigMaps
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.name
+          value: custom-supervisord-config-4.0.2
+        documentIndex: 0
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+        documentIndex: 0
+      - equal:
+          path: metadata.annotations["slurm.nebius.ai/dependency-version"]
+          value: name
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: custom-supervisord-config
+        documentIndex: 1
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+        documentIndex: 1
+
+  - it: should skip legacy supervisord ConfigMap when disabled
+    set:
+      configMaps.supervisord.keepLegacy: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: custom-supervisord-config-4.0.2

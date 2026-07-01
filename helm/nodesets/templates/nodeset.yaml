@@ -265,7 +265,7 @@ spec:
   sssdLdapCAConfigMapRefName: {{ . | quote }}
   {{- end }}
 
-  {{- with (.configMapRefSupervisord | default "") }}
+  {{- with (.configMapRefSupervisord | default $.Values.configMapRefSupervisord | default "") }}
   configMapRefSupervisord: {{ . | quote }}
   {{- end }}
 

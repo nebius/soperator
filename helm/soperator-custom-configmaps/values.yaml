@@ -10,6 +10,7 @@ configMaps:
   supervisord:
     enabled: true
     name: custom-supervisord-config
+    keepLegacy: true
     files:
       - supervisord.conf
   motd:

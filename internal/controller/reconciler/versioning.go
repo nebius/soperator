@@ -34,10 +34,18 @@ func generateDependencyVersionMap(deps ...metav1.Object) map[string]string {
 	res := map[string]string{}
 
 	for _, d := range deps {
-		res[fmt.Sprintf("%s.%s", d.GetNamespace(), d.GetName())] = d.GetResourceVersion()
+		res[fmt.Sprintf("%s.%s", d.GetNamespace(), d.GetName())] = generateDependencyVersion(d)
 	}
 
 	return res
+}
+
+func generateDependencyVersion(dep metav1.Object) string {
+	if dep.GetAnnotations()[consts.AnnotationDependencyVersion] == consts.AnnotationDependencyVersionName {
+		return dep.GetName()
+	}
+
+	return dep.GetResourceVersion()
 }
 
 func getVersionsAnnotation(resource metav1.Object) (map[string]string, error) {

@@ -505,7 +505,7 @@ slurmCluster:
   driftDetection:
     mode: warn
 nodesets:
-  enabled: false
+  enabled: true
   clusterName: ""
   driftDetection:
     mode: warn
@@ -752,6 +752,7 @@ customConfigmaps:
   version: 4.0.2
   namespace: soperator
   releaseName: soperator-custom-configmaps
+  supervisordConfigMapName: custom-supervisord-config
   overrideValues: null
   values: null
   install:

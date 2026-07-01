@@ -20,6 +20,9 @@ spec:
       version: {{ .Values.customConfigmaps.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+{{- if .Values.soperator.enabled }}
+  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+{{- end }}
   install:
     {{- toYaml .Values.customConfigmaps.install | nindent 4 }}
   upgrade:
@@ -28,10 +31,18 @@ spec:
   timeout: {{ .Values.customConfigmaps.timeout }}
   releaseName: {{ .Values.customConfigmaps.releaseName }}
   targetNamespace: {{ .Values.customConfigmaps.namespace }}
-  values:
+  {{- $customConfigmapsValues := dict "configMaps" (dict "supervisord" (dict "name" (include "soperator-fluxcd.customSupervisordConfigMapBaseName" .))) }}
   {{- if .Values.customConfigmaps.overrideValues }}
-    {{- toYaml .Values.customConfigmaps.overrideValues | nindent 4 }}
+  {{- with .Values.customConfigmaps.overrideValues }}
+  {{- $customConfigmapsValues = mergeOverwrite $customConfigmapsValues (deepCopy .) }}
   {{- end }}
+  {{- else }}
+  {{- with .Values.customConfigmaps.values }}
+  {{- $customConfigmapsValues = mergeOverwrite $customConfigmapsValues (deepCopy .) }}
+  {{- end }}
+  {{- end }}
+  values:
+    {{- toYaml $customConfigmapsValues | nindent 4 }}
   valuesFrom:
   - kind: ConfigMap
     name: custom-configmaps

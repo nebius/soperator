@@ -24,6 +24,7 @@ import (
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -31,6 +32,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -108,7 +110,7 @@ func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, name string, maxC
 	controllerBuilder.Watches(
 		&corev1.ConfigMap{},
 		handler.EnqueueRequestsFromMapFunc(r.findObjectsForConfigMap),
-		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		builder.WithPredicates(configMapDataChangedPredicate()),
 	)
 
 	controllerBuilder.Watches(
@@ -133,6 +135,23 @@ func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, name string, maxC
 	}
 
 	return controllerBuilder.Complete(r)
+}
+
+func configMapDataChangedPredicate() predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(event.CreateEvent) bool { return true },
+		DeleteFunc: func(event.DeleteEvent) bool { return true },
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldConfigMap, okOld := e.ObjectOld.(*corev1.ConfigMap)
+			newConfigMap, okNew := e.ObjectNew.(*corev1.ConfigMap)
+			if !okOld || !okNew {
+				return true
+			}
+
+			return !equality.Semantic.DeepEqual(oldConfigMap.Data, newConfigMap.Data) ||
+				!equality.Semantic.DeepEqual(oldConfigMap.BinaryData, newConfigMap.BinaryData)
+		},
+	}
 }
 
 func (r *NodeSetReconciler) createResourceChecks(saPredicate predicate.Funcs) []controllercommon.ResourceCheck {

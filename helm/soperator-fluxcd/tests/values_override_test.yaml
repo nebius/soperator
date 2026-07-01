@@ -448,6 +448,7 @@ tests:
   - it: should use custom values when provided
     set:
       nodesets.enabled: true
+      customConfigmaps.version: 4.0.2
       nodesets.values:
         priorityClasses:
           - name: soperator-worker-high-priority
@@ -468,10 +469,14 @@ tests:
       - equal:
           path: spec.values.nodesets.test-nodeset.size
           value: 3
+      - equal:
+          path: spec.values.configMapRefSupervisord
+          value: custom-supervisord-config-4.0.2
 
   - it: should use override values when provided
     set:
       nodesets.enabled: true
+      customConfigmaps.version: 4.0.2
       nodesets.overrideValues:
         customConfig: true
         nodesets:
@@ -487,3 +492,6 @@ tests:
       - equal:
           path: spec.values.nodesets.gpu-nodeset.nodesetName
           value: "gpu-workers"
+      - equal:
+          path: spec.values.configMapRefSupervisord
+          value: custom-supervisord-config-4.0.2

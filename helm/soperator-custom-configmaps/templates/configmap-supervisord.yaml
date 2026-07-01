@@ -1,14 +1,60 @@
 {{- if .Values.configMaps.supervisord.enabled }}
+{{- $baseName := .Values.configMaps.supervisord.name }}
+{{- $versionedName := include "soperator-custom-configmaps.versionedName" (list $baseName .Chart.Version) }}
+{{- $keepLegacy := true }}
+{{- if hasKey .Values.configMaps.supervisord "keepLegacy" }}
+{{- $keepLegacy = .Values.configMaps.supervisord.keepLegacy }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Values.configMaps.supervisord.name }}
+  name: {{ $versionedName }}
   namespace: {{ .Values.namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+    slurm.nebius.ai/dependency-version: name
   labels:
     {{- include "soperator-custom-configmaps.labels" . | nindent 4 }}
 data:
   {{- range .Values.configMaps.supervisord.files }}
   {{ . }}: |
 {{ tpl ($.Files.Get (printf "config-files/%s" .)) $ | indent 4 }}
+{{- end }}
+{{- if and $keepLegacy (ne $baseName $versionedName) }}
+{{- $legacyConfigMap := lookup "v1" "ConfigMap" .Values.namespace $baseName }}
+{{- $legacyLabels := include "soperator-custom-configmaps.stableLabels" . | fromYaml }}
+{{- $legacyAnnotations := dict "helm.sh/resource-policy" "keep" }}
+{{- if $legacyConfigMap }}
+{{- with $legacyConfigMap.metadata.labels }}
+{{- $legacyLabels = deepCopy . }}
+{{- end }}
+{{- with $legacyConfigMap.metadata.annotations }}
+{{- $legacyAnnotations = mergeOverwrite (deepCopy .) $legacyAnnotations }}
+{{- end }}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $baseName }}
+  namespace: {{ .Values.namespace }}
+  annotations:
+    {{- toYaml $legacyAnnotations | nindent 4 }}
+  labels:
+    {{- toYaml $legacyLabels | nindent 4 }}
+{{- if and $legacyConfigMap $legacyConfigMap.data }}
+data:
+  {{- toYaml $legacyConfigMap.data | nindent 2 }}
+{{- else }}
+data:
+  {{- range .Values.configMaps.supervisord.files }}
+  {{ . }}: |
+{{ tpl ($.Files.Get (printf "config-files/%s" .)) $ | indent 4 }}
   {{- end }}
+{{- end }}
+{{- if and $legacyConfigMap $legacyConfigMap.binaryData }}
+binaryData:
+  {{- toYaml $legacyConfigMap.binaryData | nindent 2 }}
+{{- end }}
+{{- end }}
 {{- end }}

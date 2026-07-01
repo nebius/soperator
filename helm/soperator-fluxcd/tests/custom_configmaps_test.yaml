@@ -89,6 +89,20 @@ tests:
           path: spec.dependsOn
           content:
             name: RELEASE-NAME-ns
+      - contains:
+          path: spec.dependsOn
+          content:
+            name: RELEASE-NAME-soperator
+
+  - it: should pass the supervisord ConfigMap base name
+    set:
+      customConfigmaps:
+        enabled: true
+        supervisordConfigMapName: custom-supervisord-config
+    asserts:
+      - equal:
+          path: spec.values.configMaps.supervisord.name
+          value: custom-supervisord-config
 
   - it: should reference correct HelmRepository
     set:

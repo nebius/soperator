@@ -119,6 +119,7 @@ tests:
   - it: should have dependencies on namespace and soperator
     set:
       nodesets.enabled: true
+      customConfigmaps.enabled: false
     asserts:
       - contains:
           path: spec.dependsOn
@@ -128,6 +129,16 @@ tests:
           path: spec.dependsOn
           content:
             name: RELEASE-NAME-soperator
+
+  - it: should have dependency on custom configmaps when custom configmaps are enabled
+    set:
+      nodesets.enabled: true
+      customConfigmaps.enabled: true
+    asserts:
+      - contains:
+          path: spec.dependsOn
+          content:
+            name: RELEASE-NAME-custom-configmaps
 
   - it: should have dependency on slurm-cluster when slurm cluster is enabled
     set:

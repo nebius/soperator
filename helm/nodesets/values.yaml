@@ -6,6 +6,9 @@
 nameOverride: ""
 fullnameOverride: ""
 clusterName: ""
+# Default custom SupervisorD config ConfigMap for NodeSets.
+# Individual NodeSets can override this with nodesets[*].configMapRefSupervisord.
+configMapRefSupervisord: ""
 # Priority Classes configuration
 # Define priority classes that can be used by NodeSets
 priorityClasses:

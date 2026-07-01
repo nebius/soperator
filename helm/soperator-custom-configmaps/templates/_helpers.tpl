@@ -13,6 +13,15 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
+Create a ConfigMap name with a chart-version suffix.
+*/}}
+{{- define "soperator-custom-configmaps.versionedName" -}}
+{{- $name := index . 0 -}}
+{{- $version := index . 1 -}}
+{{- printf "%s-%s" $name $version | lower | replace "+" "-" | replace "_" "-" | trunc 253 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
 Common labels
 */}}
 {{- define "soperator-custom-configmaps.labels" -}}
@@ -21,6 +30,15 @@ helm.sh/chart: {{ include "soperator-custom-configmaps.chart" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
+Stable labels for legacy kept resources. These intentionally exclude chart/app
+version labels so chart upgrades do not keep patching the old ConfigMap.
+*/}}
+{{- define "soperator-custom-configmaps.stableLabels" -}}
+{{ include "soperator-custom-configmaps.selectorLabels" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
