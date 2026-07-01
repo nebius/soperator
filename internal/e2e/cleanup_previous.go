@@ -69,7 +69,7 @@ func cleanupFromBundle(ctx context.Context, cfg Config) error {
 
 	// -reconfigure: the bundle carries a .terraform backend cache; reconfigure against the current AWS creds
 	// (from the process env) without prompting for state migration.
-	if err := tf.Init(ctx, tfexec.Reconfigure(true)); err != nil {
+	if err := initWithRetry(ctx, tf, tfexec.Reconfigure(true)); err != nil {
 		return fmt.Errorf("terraform init (bundle): %w", err)
 	}
 	if err := workspaceSelectOrNew(ctx, tf, "e2e-test"); err != nil {
