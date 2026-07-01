@@ -28,6 +28,30 @@ spec:
   suspend: {{ default false $check.suspend }}
   activeDeadlineSeconds: {{ default 1800 $check.activeDeadlineSeconds }}
   runAfterCreation: {{ default false $check.runAfterCreation }}
+  {{- $nodeSelector := $root.Values.nodeSelector }}
+  {{- if hasKey $check "nodeSelector" }}
+    {{- $nodeSelector = $check.nodeSelector }}
+  {{- end }}
+  {{- with $nodeSelector }}
+  nodeSelector:
+{{ toYaml . | indent 4 }}
+  {{- end }}
+  {{- $affinity := $root.Values.affinity }}
+  {{- if hasKey $check "affinity" }}
+    {{- $affinity = $check.affinity }}
+  {{- end }}
+  {{- with $affinity }}
+  affinity:
+{{ toYaml . | indent 4 }}
+  {{- end }}
+  {{- $tolerations := $root.Values.tolerations }}
+  {{- if hasKey $check "tolerations" }}
+    {{- $tolerations = $check.tolerations }}
+  {{- end }}
+  {{- with $tolerations }}
+  tolerations:
+{{ toYaml . | indent 4 }}
+  {{- end }}
   {{- if eq $check.checkType "slurmJob" }}
   slurmJobSpec:
 {{ include "soperator-activechecks.slurmJobSpec" (dict "check" $check "ctx" $root) | indent 4 }}

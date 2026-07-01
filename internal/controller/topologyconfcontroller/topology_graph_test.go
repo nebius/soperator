@@ -376,3 +376,27 @@ func TestRenderTopologyConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderTopologyConfig_MergesSwitches(t *testing.T) {
+	labelsByNode := map[string]tc.NodeTopologyLabels{
+		"node1": {"tier-1": "leaf-0", "tier-2": "spine-0"},
+		"node2": {"tier-1": "leaf-1", "tier-2": "spine-0"},
+		"node3": {"tier-1": "leaf-cpu-0", "tier-2": "spine-0"},
+		"node4": {"tier-1": "leaf-cpu-2", "tier-2": "spine-0"},
+		"node5": {"tier-1": "leafkek1", "tier-2": "spine-0"},
+	}
+	podsByNode := map[string][]string{
+		"node1": {"worker-a"},
+		"node2": {"worker-b"},
+		"node3": {"worker-c"},
+		"node4": {"worker-d"},
+		"node5": {"worker-e"},
+	}
+
+	allNodeNames := []string{"worker-a", "worker-b", "worker-c", "worker-d", "worker-e"}
+
+	graph := tc.BuildTopologyGraph(context.Background(), labelsByNode, podsByNode, allNodeNames)
+	lines := graph.RenderConfigLines()
+
+	require.Contains(t, lines, "SwitchName=spine-0 Switches=leaf-[0-1],leaf-cpu-[0,2],leafkek1")
+}
