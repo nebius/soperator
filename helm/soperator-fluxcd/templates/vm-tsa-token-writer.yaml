@@ -1,0 +1,169 @@
+{{- if and .Values.observability.enabled .Values.observability.vmStack.enabled .Values.observability.publicEndpointEnabled }}
+{{- $tokenKind := .Values.observability.publicEndpointTokenKind }}
+{{- $tsaToken := .Values.observability.vmStack.tsaToken | default dict }}
+{{- $writer := $tsaToken.writer | default dict }}
+{{- $writerEnabled := true }}
+{{- if hasKey $writer "enabled" }}
+{{- $writerEnabled = $writer.enabled }}
+{{- end }}
+{{- if and $writerEnabled (eq $tokenKind "secret") }}
+{{- include "soperator-fluxcd.validatePublicEndpointTokenKind" . -}}
+{{- $ns := .Values.observability.vmStack.namespace }}
+{{- $secretName := $tsaToken.secretName | default "o11y-writer-sa-token" }}
+{{- $secretKey := $tsaToken.secretKey | default "accessToken" }}
+{{- $source := $writer.source | default "imds" }}
+{{- $namespaces := $writer.namespaces | default (list $ns) }}
+{{- $image := $writer.image | default dict }}
+{{- $repo := required "observability.vmStack.tsaToken.writer.image.repository is required" $image.repository }}
+{{- $tag := required "observability.vmStack.tsaToken.writer.image.tag is required" $image.tag }}
+{{- $pullPolicy := $image.pullPolicy | default "IfNotPresent" }}
+{{- $hostPath := $tsaToken.hostPath | default "/mnt/cloud-metadata" }}
+{{- $mountPath := $tsaToken.mountPath | default "/o11ytoken" }}
+{{- $tokenFilename := $tsaToken.hostPathFilename | default "tsa-token" }}
+{{- $hostNetwork := and (eq $source "imds") (ne (toString ($writer.hostNetwork | default true)) "false") }}
+{{- $name := printf "%s-tsa-token-writer" (include "soperator-fluxcd.fullname" .) }}
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+spec:
+  {{- with $writer.driftDetection }}
+  driftDetection:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  chart:
+    spec:
+      chart: raw
+      interval: {{ $writer.interval }}
+      sourceRef:
+        kind: HelmRepository
+        name: {{ include "soperator-fluxcd.fullname" . }}-bedag
+      version: {{ $writer.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  install:
+    remediation:
+      retries: 3
+  interval: {{ $writer.interval }}
+  targetNamespace: {{ .Values.observability.vmStack.namespace }}
+  releaseName: tsa-token-writer
+  values:
+    resources:
+    - apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: {{ $name }}
+        namespace: {{ $ns }}
+        labels:
+          {{- include "soperator-fluxcd.labels" . | nindent 10 }}
+    {{- range $namespaces }}
+    - apiVersion: rbac.authorization.k8s.io/v1
+      kind: Role
+      metadata:
+        name: {{ $name }}
+        namespace: {{ . }}
+        labels:
+          {{- include "soperator-fluxcd.labels" $ | nindent 10 }}
+      rules:
+        # resourceNames cannot restrict "create" (the object does not exist yet)
+        - apiGroups: [""]
+          resources: ["secrets"]
+          verbs: ["create"]
+        - apiGroups: [""]
+          resources: ["secrets"]
+          resourceNames: [{{ $secretName | quote }}]
+          verbs: ["get", "patch", "update"]
+    - apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: {{ $name }}
+        namespace: {{ . }}
+        labels:
+          {{- include "soperator-fluxcd.labels" $ | nindent 10 }}
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: Role
+        name: {{ $name }}
+      subjects:
+        - kind: ServiceAccount
+          name: {{ $name }}
+          namespace: {{ $ns }}
+    {{- end }}
+    - apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: {{ $name }}
+        namespace: {{ $ns }}
+        labels:
+          {{- include "soperator-fluxcd.labels" . | nindent 10 }}
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: {{ $name }}
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: {{ $name }}
+              app.kubernetes.io/instance: {{ .Release.Name }}
+          spec:
+            serviceAccountName: {{ $name }}
+            {{- if $hostNetwork }}
+            hostNetwork: true
+            dnsPolicy: ClusterFirstWithHostNet
+            {{- end }}
+            containers:
+              - name: tsa-token-writer
+                image: {{ printf "%s:%s" $repo $tag | quote }}
+                imagePullPolicy: {{ $pullPolicy | quote }}
+                command:
+                  - /bin/sh
+                  - -ec
+                  - |
+{{ $.Files.Get "files/tsa-token-writer.sh" | indent 20 }}
+                env:
+                  - name: TOKEN_SOURCE
+                    value: {{ $source | quote }}
+                  - name: SECRET_NAME
+                    value: {{ $secretName | quote }}
+                  - name: SECRET_KEY
+                    value: {{ $secretKey | quote }}
+                  - name: SECRET_NAMESPACES
+                    value: {{ join " " $namespaces | quote }}
+                  {{- if eq $source "imds" }}
+                  - name: IMDS_BASE_URL
+                    value: {{ $writer.imdsBaseUrl | default "http://169.254.169.254" | quote }}
+                  {{- end }}
+                  {{- if eq $source "file" }}
+                  - name: TOKEN_FILE
+                    value: {{ printf "%s/%s" $mountPath $tokenFilename | quote }}
+                  {{- with $writer.tokenExpiryFile }}
+                  - name: TOKEN_EXPIRY_FILE
+                    value: {{ . | quote }}
+                  {{- end }}
+                  {{- end }}
+                  - name: REFRESH_SAFETY_MARGIN_SECONDS
+                    value: {{ $writer.refreshSafetyMarginSeconds | default 900 | quote }}
+                  - name: POLL_INTERVAL_SECONDS
+                    value: {{ $writer.pollIntervalSeconds | default 300 | quote }}
+                {{- if eq $source "file" }}
+                volumeMounts:
+                  - name: o11ytoken
+                    mountPath: {{ $mountPath | quote }}
+                    readOnly: true
+                {{- end }}
+                {{- with $writer.resources }}
+                resources:
+                  {{- toYaml . | nindent 18 }}
+                {{- end }}
+            {{- if eq $source "file" }}
+            volumes:
+              - name: o11ytoken
+                hostPath:
+                  path: {{ $hostPath | quote }}
+                  type: Directory
+            {{- end }}
+{{- end }}
+{{- end }}
