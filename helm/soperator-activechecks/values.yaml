@@ -50,6 +50,9 @@ images:
     "13.0.2": "13.0.2-ubuntu24.04-20260605082528"
 # Optional override in Pyxis ("reg#repo:tag") format.
 activeCheckImage: ""
+slurmJob:
+  # Slurm consumes this as SBATCH_GPUS_PER_NODE for GPU ActiveChecks.
+  gpusPerNode: "8"
 checks:
   all-reduce-perf-nccl-in-docker:
     enabled: true
@@ -65,6 +68,10 @@ checks:
       sbatchScriptFile: "scripts/all-reduce-perf-nccl-in-docker.sh"
       eachWorkerJobs: true
       maxNumberOfJobs: 200
+      jobContainer:
+        extraEnv:
+          - name: "SBATCH_GPUS_PER_NODE"
+            value: "{{ .Values.slurmJob.gpusPerNode }}"
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -82,6 +89,10 @@ checks:
       sbatchScriptFile: "scripts/all-reduce-perf-nccl-with-ib.sh"
       eachWorkerJobs: true
       maxNumberOfJobs: 200
+      jobContainer:
+        extraEnv:
+          - name: "SBATCH_GPUS_PER_NODE"
+            value: "{{ .Values.slurmJob.gpusPerNode }}"
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -98,6 +109,10 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/all-reduce-perf-nccl-without-ib.sh"
       eachWorkerJobs: true
+      jobContainer:
+        extraEnv:
+          - name: "SBATCH_GPUS_PER_NODE"
+            value: "{{ .Values.slurmJob.gpusPerNode }}"
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -115,6 +130,10 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/cuda-samples.sh"
       eachWorkerJobs: true
+      jobContainer:
+        extraEnv:
+          - name: "SBATCH_GPUS_PER_NODE"
+            value: "{{ .Values.slurmJob.gpusPerNode }}"
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -131,6 +150,10 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/dcgmi-diag-r2.sh"
       eachWorkerJobs: true
+      jobContainer:
+        extraEnv:
+          - name: "SBATCH_GPUS_PER_NODE"
+            value: "{{ .Values.slurmJob.gpusPerNode }}"
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -146,6 +169,10 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/dcgmi-diag-r3.sh"
       eachWorkerJobs: true
+      jobContainer:
+        extraEnv:
+          - name: "SBATCH_GPUS_PER_NODE"
+            value: "{{ .Values.slurmJob.gpusPerNode }}"
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -188,6 +215,8 @@ checks:
         extraEnv:
           - name: "SLURM_EXTRA_COMMENT_JSON"
             value: ""
+          - name: "SBATCH_GPUS_PER_NODE"
+            value: "{{ .Values.slurmJob.gpusPerNode }}"
     successReactions:
       removeReservation:
         prefix: "suspicious-node"
@@ -210,6 +239,10 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/gpu-fryer.sh"
       eachWorkerJobs: true
+      jobContainer:
+        extraEnv:
+          - name: "SBATCH_GPUS_PER_NODE"
+            value: "{{ .Values.slurmJob.gpusPerNode }}"
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -228,6 +261,10 @@ checks:
       sbatchScriptFile: "scripts/ib-gpu-perf.sh"
       eachWorkerJobs: true
       maxNumberOfJobs: 200
+      jobContainer:
+        extraEnv:
+          - name: "SBATCH_GPUS_PER_NODE"
+            value: "{{ .Values.slurmJob.gpusPerNode }}"
     failureReactions:
       commentSlurmNode:
         commentPrefix: "[node_problem]"
@@ -245,6 +282,10 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/mem-perf.sh"
       eachWorkerJobs: true
+      jobContainer:
+        extraEnv:
+          - name: "SBATCH_GPUS_PER_NODE"
+            value: "{{ .Values.slurmJob.gpusPerNode }}"
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
@@ -317,6 +358,10 @@ checks:
     runAfterCreation: true
     slurmJobSpec:
       sbatchScriptFile: "scripts/prepull-container-image.sh"
+      jobContainer:
+        extraEnv:
+          - name: "SBATCH_GPUS_PER_NODE"
+            value: "{{ .Values.slurmJob.gpusPerNode }}"
   soperator-outputs-logs-cleaner:
     enabled: true
     checkType: "k8sJob"
