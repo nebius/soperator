@@ -184,6 +184,9 @@ pushd "${jaildir}"
 
     log "[outputs] Creating Soperator output directory"
     mkdir -m 777 -p opt/soperator-outputs
+    # The NCCL debug SPANK plugin writes per-job logs here; ensure it exists and is world-writable
+    # on every startup so all clusters have it (previously done by the ensure-dir-snccld-logs active check).
+    mkdir -m 777 -p opt/soperator-outputs/nccl_logs
 
     # For login nodes in GPU clusters and CPU workers in GPU clusters
     if { [ -z "$worker" ] && [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; } || { [ -n "$worker" ] && [ "$SLURM_CLUSTER_WITH_GPU" = "true" ] && [ "$NODESET_GPU_ENABLED" != "true" ]; }; then

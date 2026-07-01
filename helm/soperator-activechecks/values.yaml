@@ -279,18 +279,6 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/enroot-cleanup.sh"
       eachWorkerJobs: true
-  ensure-dir-snccld-logs:
-    enabled: true
-    checkType: "k8sJob"
-    schedule: "15 0 * * *"
-    suspend: false
-    runAfterCreation: true
-    k8sJobSpec:
-      scriptFile: "scripts/ensure-dir-snccld-logs.sh"
-      jobContainer:
-        env:
-          - name: "SNCCLD_LOG_DIR_PATH"
-            value: "/opt/soperator-outputs/nccl_logs"
   prepull-container-image:
     enabled: true
     checkType: "slurmJob"
