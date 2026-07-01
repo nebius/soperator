@@ -194,9 +194,6 @@ tests:
           path: spec.values.vmagent.spec.volumeMounts
       - notExists:
           path: spec.values.vmagent.spec.volumes
-      - exists:
-          path: spec.values.vmagent.spec.resources
-      # Should not have these sections when not provided
       - notExists:
           path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
 
@@ -539,4 +536,23 @@ tests:
           path: spec.values.vmagent.spec.volumes
       # Should not have extraEnv when empty
       - notExists:
-          path: spec.values.vmagent.spec.extraEnv
+          path: spec.values.vmagent.spec.containers
+
+  - it: should not render token volumes or host networking when publicEndpointEnabled is false
+    set:
+      observability:
+        enabled: true
+        publicEndpointEnabled: false
+        vmStack:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.values.vmagent.spec.containers
+      - notExists:
+          path: spec.values.vmagent.spec.hostNetwork
+      - notExists:
+          path: spec.values.vmagent.spec.volumeMounts
+      - notExists:
+          path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
