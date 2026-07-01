@@ -2,10 +2,6 @@
 
 set -euxo pipefail
 
-VERSION="0.2.1"
-
-echo "V$VERSION"
-
 fail_if_lib_dne () {
 	checklib=$1
 	if python -c "import ctypes; ctypes.CDLL('$checklib')"; then
