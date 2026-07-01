@@ -230,7 +230,6 @@ func TestSlurmNodesController_processSetUnhealthy_waitsForFullyDrainedSlurmNode(
 				t,
 				ctx,
 				tt.slurmNodeStates,
-				true,
 			)
 
 			err := controller.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmNode)
@@ -241,7 +240,7 @@ func TestSlurmNodesController_processSetUnhealthy_waitsForFullyDrainedSlurmNode(
 	}
 }
 
-func TestSlurmNodesController_processHealthCheckFailed_withoutExtensiveCheckWaitsForFullyDrainedSlurmNode(t *testing.T) {
+func TestSlurmNodesController_processHealthCheckFailed_waitsForFullyDrainedSlurmNode(t *testing.T) {
 	ctx := context.Background()
 	controller, k8sClient, slurmClusterName, k8sNode, slurmNode := newSlurmNodesControllerForUnhealthyTest(
 		t,
@@ -250,7 +249,6 @@ func TestSlurmNodesController_processHealthCheckFailed_withoutExtensiveCheckWait
 			api.V0041NodeStateALLOCATED: {},
 			api.V0041NodeStateDRAIN:     {},
 		},
-		false,
 	)
 
 	err := controller.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, slurmNode, slurmNode.Reason)
@@ -322,7 +320,6 @@ func TestSlurmNodesController_processSetUnhealthy_reassignedInstanceUndrains(t *
 		slurmAPIClients,
 		time.Minute,
 		true,
-		true,
 		apiReader,
 		"",
 	)
@@ -351,7 +348,6 @@ func TestSlurmNodesController_processSetUnhealthy_setsHardwareConditionWhenAssig
 			api.V0041NodeStateIDLE:  {},
 			api.V0041NodeStateDRAIN: {},
 		},
-		true,
 	)
 
 	err := controller.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmNode)
@@ -400,7 +396,6 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodFallsBackToSet
 		record.NewFakeRecorder(10),
 		slurmapi.NewClientSet(context.Background()),
 		time.Minute,
-		true,
 		true,
 		apiReader,
 		"",
@@ -472,7 +467,6 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodUndrainsWhenCu
 		slurmAPIClients,
 		time.Minute,
 		true,
-		true,
 		apiReader,
 		"",
 	)
@@ -496,7 +490,6 @@ func newSlurmNodesControllerForUnhealthyTest(
 	t *testing.T,
 	ctx context.Context,
 	slurmNodeStates map[api.V0041NodeState]struct{},
-	enableExtensiveCheck bool,
 ) (*SlurmNodesController, ctrlclient.Client, types.NamespacedName, *corev1.Node, slurmapi.Node) {
 	t.Helper()
 
@@ -559,7 +552,6 @@ func newSlurmNodesControllerForUnhealthyTest(
 		slurmAPIClients,
 		time.Minute,
 		true,
-		enableExtensiveCheck,
 		k8sClient,
 		"",
 	)
@@ -569,7 +561,8 @@ func newSlurmNodesControllerForUnhealthyTest(
 		InstanceID: k8sNode.Name,
 		Comment:    "gpu health check failed",
 		Reason: ptr.To(slurmapi.NodeReason{
-			ChangedAt: drainTime,
+			OriginalReason: "[node_problem] gpu health check failed: failed",
+			ChangedAt:      drainTime,
 		}),
 	}
 }

@@ -1022,13 +1022,6 @@ spec:
                 description: FailureReactions defines reaction on specific check when
                   it fails
                 properties:
-                  addReservation:
-                    description: AddReservation adds a slurm reservation with name
-                      "<prefix>-<nodeName>"
-                    properties:
-                      prefix:
-                        type: string
-                    type: object
                   commentSlurmNode:
                     description: CommentSlurmNode enabling slurm node commenting
                     properties:
@@ -1039,13 +1032,6 @@ spec:
                     description: DrainSlurmNode enabling slurm node draining
                     properties:
                       drainReasonPrefix:
-                        type: string
-                    type: object
-                  removeReservation:
-                    description: RemoveReservation removs slurm reservation with name
-                      "<prefix>-<nodeName>"
-                    properties:
-                      prefix:
                         type: string
                     type: object
                 type: object
@@ -9686,13 +9672,6 @@ spec:
                 description: SuccessReactions defines reaction on specific check when
                   it succeeds
                 properties:
-                  addReservation:
-                    description: AddReservation adds a slurm reservation with name
-                      "<prefix>-<nodeName>"
-                    properties:
-                      prefix:
-                        type: string
-                    type: object
                   commentSlurmNode:
                     description: CommentSlurmNode enabling slurm node commenting
                     properties:
@@ -9703,13 +9682,6 @@ spec:
                     description: DrainSlurmNode enabling slurm node draining
                     properties:
                       drainReasonPrefix:
-                        type: string
-                    type: object
-                  removeReservation:
-                    description: RemoveReservation removs slurm reservation with name
-                      "<prefix>-<nodeName>"
-                    properties:
-                      prefix:
                         type: string
                     type: object
                 type: object

@@ -181,35 +181,6 @@ checks:
     runAfterCreation: true
     slurmJobSpec:
       sbatchScriptFile: "scripts/ensure-healthy-nodes.sh"
-  extensive-check:
-    enabled: true
-    checkType: "slurmJob"
-    dependsOn:
-      - "manage-jail-state"
-      - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
-      - "prepull-container-image"
-    schedule: "0 0 1 1 *"
-    suspend: true
-    runAfterCreation: false
-    successfulJobsHistoryLimit: 3000
-    failedJobsHistoryLimit: 3000
-    reservationPrefix: "suspicious-node"
-    drainReasonPrefix: "[hardware_problem]"
-    slurmJobSpec:
-      sbatchScriptFile: "scripts/extensive-check.sh"
-      jobContainer:
-        extraEnv:
-          - name: "SLURM_EXTRA_COMMENT_JSON"
-            value: ""
-    successReactions:
-      removeReservation:
-        prefix: "suspicious-node"
-    failureReactions:
-      drainSlurmNode:
-        drainReasonPrefix: "[hardware_problem]"
-      removeReservation:
-        prefix: "suspicious-node"
   gpu-fryer:
     enabled: true
     checkType: "slurmJob"
