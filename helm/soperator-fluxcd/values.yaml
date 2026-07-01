@@ -192,7 +192,7 @@ observability:
           enableFileStorage: true
           useGoMemLimit: true
           deleteAfterRead:
-            enabled: false
+            enabled: true
             # Nebius O11y agent fork option; not part of upstream filelogreceiver.
             # Files are deleted only after they have not been modified for at least this duration.
             minAge: 15m

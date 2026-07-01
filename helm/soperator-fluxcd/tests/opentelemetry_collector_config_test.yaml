@@ -208,7 +208,7 @@ tests:
           value: 5000
       - equal:
           path: spec.values.extraVolumeMounts[0].readOnly
-          value: true
+          value: false
 
   - it: should omit file storage when jail log file storage is disabled
     set:
