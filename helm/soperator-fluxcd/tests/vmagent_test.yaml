@@ -466,14 +466,14 @@ tests:
       # Should have both default token mount and custom volumeMounts
       - lengthEqual:
           path: spec.values.vmagent.spec.volumeMounts
-          count: 3  # 1 default tsa-token + 2 custom
-      # Check default tsa-token mount
+          count: 3  # 1 default o11ytoken + 2 custom
+      # Check default o11ytoken mount
       - equal:
           path: spec.values.vmagent.spec.volumeMounts[0].name
-          value: "cloud-metadata"
+          value: "o11ytoken"
       - equal:
           path: spec.values.vmagent.spec.volumeMounts[0].mountPath
-          value: "/mnt/cloud-metadata"
+          value: "/o11ytoken"
       - equal:
           path: spec.values.vmagent.spec.volumeMounts[0].readOnly
           value: true
@@ -486,11 +486,11 @@ tests:
           value: "/data"
       - lengthEqual:
           path: spec.values.vmagent.spec.volumes
-          count: 3  # 1 default tsa-token + 2 custom
-      # Check default tsa-token volume
+          count: 3  # 1 default o11ytoken + 2 custom
+      # Check default o11ytoken volume
       - equal:
           path: spec.values.vmagent.spec.volumes[0].name
-          value: "cloud-metadata"
+          value: "o11ytoken"
       - equal:
           path: spec.values.vmagent.spec.volumes[0].hostPath.path
           value: "/mnt/cloud-metadata"
@@ -535,16 +535,8 @@ tests:
       # Should not have token volumeMounts or volumes for secret token kind
       - notExists:
           path: spec.values.vmagent.spec.volumeMounts
-          count: 1  # Only default tsa-token
-      - equal:
-          path: spec.values.vmagent.spec.volumeMounts[0].name
-          value: "cloud-metadata"
-      - lengthEqual:
+      - notExists:
           path: spec.values.vmagent.spec.volumes
-          count: 1  # Only default tsa-token
-      - equal:
-          path: spec.values.vmagent.spec.volumes[0].name
-          value: "cloud-metadata"
       # Should not have extraEnv when empty
       - notExists:
           path: spec.values.vmagent.spec.extraEnv
