@@ -37,6 +37,12 @@ echo "Create directory for slurm job outputs"
 echo "Set HOME to soperatorchecks' home directory"
 export HOME=~soperatorchecks
 
+# Auto-detect GPU requirement from the sbatch script's #SBATCH directives and
+# export it, so per-node submission in slurm_submit_jobs.sh targets GPU nodes only.
+if grep -qE '#SBATCH\s+.*(--gpus-per-node|--gpus\b|--gres=gpu|-G\s)' /opt/bin/sbatch.sh; then
+    export ACTIVE_CHECK_REQUIRES_GPU=true
+fi
+
 if [[ -n "${RESERVATION_NAME:-}" ]]; then
     echo "Submitting Slurm job on reservation $RESERVATION_NAME..."
     OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.out'
