@@ -23,7 +23,7 @@ func TestBuildSlurmLoginFrom_SSSD(t *testing.T) {
 			Volumes: slurmv1.SlurmNodeLoginVolumes{Jail: slurmv1.NodeVolume{}},
 		}
 
-		result := buildSlurmLoginFrom("test-cluster", nil, login, false)
+		result := buildSlurmLoginFrom("test-cluster", "", nil, login, false)
 
 		if assert.NotNil(t, result.ContainerSSSD) {
 			assert.Equal(t, "sssd-image", result.ContainerSSSD.Image)
@@ -44,7 +44,7 @@ func TestBuildSlurmLoginFrom_SSSD(t *testing.T) {
 			Volumes: slurmv1.SlurmNodeLoginVolumes{Jail: slurmv1.NodeVolume{}},
 		}
 
-		result := buildSlurmLoginFrom("test-cluster", nil, login, false)
+		result := buildSlurmLoginFrom("test-cluster", "", nil, login, false)
 
 		assert.False(t, result.IsSSSDSecretDefault)
 		assert.Equal(t, "custom-sssd-secret", result.SSSDConfSecretName)
@@ -57,7 +57,7 @@ func TestBuildSlurmLoginFrom_SSSD(t *testing.T) {
 			Volumes: slurmv1.SlurmNodeLoginVolumes{Jail: slurmv1.NodeVolume{}},
 		}
 
-		result := buildSlurmLoginFrom("test-cluster", nil, login, false)
+		result := buildSlurmLoginFrom("test-cluster", "", nil, login, false)
 
 		assert.Nil(t, result.ContainerSSSD)
 		assert.Equal(t, naming.BuildSecretSSSDConfName("test-cluster"), result.SSSDConfSecretName)
@@ -72,7 +72,7 @@ func TestBuildSlurmLoginFrom_PreservesSSSHDConfigDefault(t *testing.T) {
 		Volumes: slurmv1.SlurmNodeLoginVolumes{Jail: slurmv1.NodeVolume{}},
 	}
 
-	result := buildSlurmLoginFrom("test-cluster", nil, login, false)
+	result := buildSlurmLoginFrom("test-cluster", "", nil, login, false)
 
 	assert.Equal(t, naming.BuildConfigMapSSHDConfigsNameLogin("test-cluster"), result.SSHDConfigMapName)
 	assert.True(t, result.IsSSHDConfigMapDefault)

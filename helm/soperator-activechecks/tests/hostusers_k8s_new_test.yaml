@@ -8,7 +8,7 @@ tests:
   - it: should set hostUsers true on Kubernetes >= 1.33
     documentSelector:
       path: metadata.name
-      value: test-hostusers-new-k8s
+      value: test-cluster-test-hostusers-new-k8s
     set:
       slurmClusterRefName: test-cluster
       images:

@@ -134,7 +134,7 @@ slurmCluster:
               name: motd-nebius-o11y
               volumeSourceName: motd-nebius-o11y
             - name: data
-              mountPath: /mnt/data
+              mountPath: /data
               volumeSourceName: jail-submount-data
           customMounts:
             - name: sys-host

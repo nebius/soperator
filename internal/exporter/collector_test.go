@@ -25,10 +25,14 @@ import (
 	"nebius.ai/slurm-operator/internal/slurmapi/fake"
 )
 
+func newTestMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
+	return NewMetricsCollector(slurmAPIClient, slurmapi.ListJobsParams{})
+}
+
 // Helper function to setup mocks and collect state for tests
 func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *fake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *api.V0041OpenapiDiagResp) {
 	mockClient.EXPECT().ListNodes(mock.Anything).Return(nodes, nil).Once()
-	mockClient.EXPECT().ListJobs(mock.Anything).Return(jobs, nil).Once()
+	mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return(jobs, nil).Once()
 	mockClient.EXPECT().GetDiag(mock.Anything).Return(diag, nil).Once()
 
 	ctx := context.Background()
@@ -52,7 +56,7 @@ func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, moc
 
 func TestMetricsCollector_Describe(t *testing.T) {
 	mockClient := &fake.MockClient{}
-	collector := NewMetricsCollector(mockClient)
+	collector := newTestMetricsCollector(mockClient)
 
 	ch := make(chan *prometheus.Desc, 10)
 	go func() {
@@ -75,7 +79,7 @@ func TestMetricsCollector_Describe(t *testing.T) {
 	}
 
 	// Base metrics
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,state_is_completing,state_is_fail,state_is_planned,state_is_not_responding,state_is_invalid,is_unavailable,reservation_name,address,reason,comment}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,state_is_completing,state_is_fail,state_is_planned,state_is_not_responding,state_is_invalid,state_is_cloud,state_is_power_down,state_is_power_drain,state_is_powered_down,state_is_powering_down,state_is_powering_up,state_is_power_up,is_unavailable,reservation_name,address,reason,comment}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_total", help: "Total CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_allocated", help: "CPUs allocated on the node", constLabels: {}, variableLabels: {node_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_idle", help: "Idle CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
@@ -106,7 +110,7 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 
 	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		collector := newTestMetricsCollector(mockClient)
 
 		// Mock successful ListNodes response
 		longReservation := strings.Repeat("r", maxReservationNameLength+10)
@@ -249,36 +253,133 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 	})
 }
 
-func TestMetricsCollector_Collect_APIError(t *testing.T) {
+// TestMetricsCollector_CollectorIsolation verifies that a failure in one sub-collector
+// (nodes, jobs, or diag) neither aborts the others nor drops their metrics, and that the
+// failure is counted in slurm_exporter_collector_errors_total{collector="..."}.
+func TestMetricsCollector_CollectorIsolation(t *testing.T) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	mockClient := &fake.MockClient{}
-	collector := NewMetricsCollector(mockClient)
+	const (
+		nodeMarker = "slurm_node_info"
+		jobMarker  = "slurm_job_info"
+		diagMarker = "slurm_controller_server_thread_count"
+	)
 
-	// Mock failed ListNodes response - with early return, other APIs won't be called
-	mockClient.EXPECT().ListNodes(mock.Anything).Return(nil, assert.AnError)
-
-	// Test that updateState fails early when critical APIs fail
-	ctx := context.Background()
-	err := collector.updateState(ctx)
-	assert.Error(t, err) // Should error - ListNodes is critical
-
-	// Collect should return no node metrics since ListNodes failed, but might have job metrics
-	ch := make(chan prometheus.Metric, 10)
-	go func() {
-		collector.Collect(ch)
-		close(ch)
-	}()
-
-	var metrics []prometheus.Metric
-	for metric := range ch {
-		metrics = append(metrics, metric)
+	healthyNodes := []slurmapi.Node{
+		{
+			Name:       "iso-node",
+			InstanceID: "iso-instance",
+			States:     map[api.V0041NodeState]struct{}{api.V0041NodeStateIDLE: {}},
+			Tres:       "cpu=4,mem=8000M,gres/gpu=0",
+			Address:    "10.0.0.1",
+		},
+	}
+	healthyJobs := []slurmapi.Job{
+		{ID: 555, Name: "iso-job", State: "RUNNING", Partition: "gpu"},
+	}
+	serverThreadCount := int32(7)
+	healthyDiag := &api.V0041OpenapiDiagResp{
+		Statistics: api.V0041StatsMsg{ServerThreadCount: &serverThreadCount},
 	}
 
-	// Should have no metrics when state is empty/initial
-	assert.Equal(t, 0, len(metrics))
+	tests := []struct {
+		name           string
+		failCollector  string
+		setupMocks     func(*fake.MockClient)
+		absentMarker   string
+		presentMarkers []string
+	}{
+		{
+			name:          "nodes fails",
+			failCollector: "nodes",
+			setupMocks: func(m *fake.MockClient) {
+				m.EXPECT().ListNodes(mock.Anything).Return(nil, assert.AnError).Once()
+				m.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return(healthyJobs, nil).Once()
+				m.EXPECT().GetDiag(mock.Anything).Return(healthyDiag, nil).Once()
+			},
+			absentMarker:   nodeMarker,
+			presentMarkers: []string{jobMarker, diagMarker},
+		},
+		{
+			name:          "jobs fails",
+			failCollector: "jobs",
+			setupMocks: func(m *fake.MockClient) {
+				m.EXPECT().ListNodes(mock.Anything).Return(healthyNodes, nil).Once()
+				m.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return(nil, assert.AnError).Once()
+				m.EXPECT().GetDiag(mock.Anything).Return(healthyDiag, nil).Once()
+			},
+			absentMarker:   jobMarker,
+			presentMarkers: []string{nodeMarker, diagMarker},
+		},
+		{
+			name:          "diag fails",
+			failCollector: "diag",
+			setupMocks: func(m *fake.MockClient) {
+				m.EXPECT().ListNodes(mock.Anything).Return(healthyNodes, nil).Once()
+				m.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return(healthyJobs, nil).Once()
+				m.EXPECT().GetDiag(mock.Anything).Return(nil, assert.AnError).Once()
+			},
+			absentMarker:   diagMarker,
+			presentMarkers: []string{nodeMarker, jobMarker},
+		},
+	}
 
-	mockClient.AssertExpectations(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := &fake.MockClient{}
+			collector := newTestMetricsCollector(mockClient)
+			tt.setupMocks(mockClient)
+
+			registry := prometheus.NewRegistry()
+			require.NoError(t, collector.Monitoring.Register(registry))
+
+			ctx := context.Background()
+			err := collector.updateState(ctx)
+			assert.Error(t, err, "updateState should report the failed collector")
+
+			ch := make(chan prometheus.Metric, 50)
+			go func() {
+				collector.Collect(ch)
+				close(ch)
+			}()
+
+			var metricsText []string
+			for metric := range ch {
+				metricsText = append(metricsText, toPrometheusLikeString(t, metric))
+			}
+			joined := strings.Join(metricsText, "\n")
+
+			assert.NotContains(t, joined, tt.absentMarker, "failed collector's metrics must be absent")
+			for _, marker := range tt.presentMarkers {
+				assert.Contains(t, joined, marker, "healthy collectors' metrics must still be present")
+			}
+
+			families, err := registry.Gather()
+			require.NoError(t, err)
+			assert.Equal(t, float64(1), collectorErrorValue(families, tt.failCollector),
+				"failed collector's error counter must be incremented once")
+
+			mockClient.AssertExpectations(t)
+		})
+	}
+}
+
+// collectorErrorValue returns the value of slurm_exporter_collector_errors_total for the
+// given collector label, or 0 if the series is absent.
+func collectorErrorValue(families []*dto.MetricFamily, collector string) float64 {
+	for _, mf := range families {
+		if mf.GetName() != "slurm_exporter_collector_errors_total" {
+			continue
+		}
+		for _, m := range mf.GetMetric() {
+			for _, lp := range m.GetLabel() {
+				if lp.GetName() == "collector" && lp.GetValue() == collector {
+					return m.GetCounter().GetValue()
+				}
+			}
+		}
+	}
+	return 0
 }
 
 func TestMetricsCollector_NodeFails(t *testing.T) {
@@ -286,7 +387,7 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 
 	t.Run("NodeFails", func(t *testing.T) {
 		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		collector := newTestMetricsCollector(mockClient)
 
 		// Mock nodes with different states to test the node fails metric with new labels
 		testNodes := []slurmapi.Node{
@@ -380,12 +481,12 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		// Create a new mock for the second call to avoid mock state issues
 		mockClient = &fake.MockClient{}
 		mockClient.EXPECT().ListNodes(mock.Anything).Return(drainedNodes, nil)
-		mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil)
+		mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return([]slurmapi.Job{}, nil)
 		mockClient.EXPECT().GetDiag(mock.Anything).Return(testDiag, nil)
 
 		// Create a new collector with the new mock for the second test phase
 		oldState := collector.state.Load()
-		collector = NewMetricsCollector(mockClient)
+		collector = newTestMetricsCollector(mockClient)
 		// Copy the state from the previous collector to maintain continuity
 		collector.state.Store(oldState)
 
@@ -427,7 +528,7 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 
 	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		collector := newTestMetricsCollector(mockClient)
 
 		// Mock realistic RPC diagnostics data based on production output
 		serverThreadCount := int32(1)
@@ -519,7 +620,7 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 
 	t.Run("edge cases", func(t *testing.T) {
 		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		collector := newTestMetricsCollector(mockClient)
 
 		serverThreadCount := int32(0)
 		rpcsByMessageType := api.V0041StatsMsgRpcsByType{
@@ -613,7 +714,7 @@ func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 
 	t.Run("API error handling", func(t *testing.T) {
 		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		collector := newTestMetricsCollector(mockClient)
 
 		// Mock successful node and job calls
 		testNodes := []slurmapi.Node{
@@ -629,7 +730,7 @@ func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 		}
 
 		mockClient.EXPECT().ListNodes(mock.Anything).Return(testNodes, nil)
-		mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil)
+		mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return([]slurmapi.Job{}, nil)
 		mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, assert.AnError)
 
 		ctx := context.Background()
@@ -675,7 +776,7 @@ func TestMetricsCollector_GetDiag_NilFields(t *testing.T) {
 
 	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		collector := newTestMetricsCollector(mockClient)
 
 		// Mock GetDiag response with nil fields
 		testDiag := &api.V0041OpenapiDiagResp{
@@ -722,7 +823,7 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 
 	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		collector := newTestMetricsCollector(mockClient)
 
 		now := time.Now()
 		submitTime := metav1.NewTime(now.Add(-60 * time.Second)) // 1 minute ago
@@ -950,7 +1051,7 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 
 	synctest.Test(t, func(t *testing.T) {
 		mockClient := &fake.MockClient{}
-		collector := NewMetricsCollector(mockClient)
+		collector := newTestMetricsCollector(mockClient)
 
 		// Mock successful response
 		testNodes := []slurmapi.Node{
@@ -982,7 +1083,7 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 
 		// Setup mocks for successful collection
 		mockClient.EXPECT().ListNodes(mock.Anything).Return(testNodes, nil)
-		mockClient.EXPECT().ListJobs(mock.Anything).Return(testJobs, nil)
+		mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return(testJobs, nil)
 		mockClient.EXPECT().GetDiag(mock.Anything).Return(testDiag, nil)
 
 		ctx := context.Background()
@@ -991,10 +1092,13 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 		err := collector.updateState(ctx)
 		assert.NoError(t, err)
 
-		// Test failed collection - create a new mock client to avoid call conflicts
+		// Test failed collection - create a new mock client to avoid call conflicts.
+		// Only ListNodes fails; jobs and diag still run because collectors are isolated.
 		mockClientFail := &fake.MockClient{}
 		collector.slurmAPIClient = mockClientFail
 		mockClientFail.EXPECT().ListNodes(mock.Anything).Return(nil, errors.New("API error"))
+		mockClientFail.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return([]slurmapi.Job{}, nil)
+		mockClientFail.EXPECT().GetDiag(mock.Anything).Return(nil, nil)
 		err = collector.updateState(ctx)
 		assert.Error(t, err)
 
@@ -1048,7 +1152,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 	t.Run("track unavailability state transitions", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			mockClient := &fake.MockClient{}
-			collector := NewMetricsCollector(mockClient)
+			collector := newTestMetricsCollector(mockClient)
 
 			healthyNodes := []slurmapi.Node{
 				{
@@ -1078,7 +1182,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 			}
 
 			mockClient.EXPECT().ListNodes(mock.Anything).Return(outageNodes, nil).Once()
-			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return([]slurmapi.Job{}, nil).Once()
 			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
 
 			time.Sleep(100 * time.Millisecond)
@@ -1098,7 +1202,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 			}
 
 			mockClient.EXPECT().ListNodes(mock.Anything).Return(recoveredNodes, nil).Once()
-			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return([]slurmapi.Job{}, nil).Once()
 			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
 
 			time.Sleep(100 * time.Millisecond)
@@ -1144,7 +1248,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 	t.Run("track draining state transitions", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			mockClient := &fake.MockClient{}
-			collector := NewMetricsCollector(mockClient)
+			collector := newTestMetricsCollector(mockClient)
 
 			allocatedNodes := []slurmapi.Node{
 				{
@@ -1176,7 +1280,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 			}
 
 			mockClient.EXPECT().ListNodes(mock.Anything).Return(drainingNodes, nil).Once()
-			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return([]slurmapi.Job{}, nil).Once()
 			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
 
 			time.Sleep(100 * time.Millisecond)
@@ -1197,7 +1301,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 			}
 
 			mockClient.EXPECT().ListNodes(mock.Anything).Return(idleNodes, nil).Once()
-			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return([]slurmapi.Job{}, nil).Once()
 			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
 
 			// Simulate more time passing
@@ -1241,7 +1345,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 	t.Run("IDLE+DRAIN is considered unavailability", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			mockClient := &fake.MockClient{}
-			collector := NewMetricsCollector(mockClient)
+			collector := newTestMetricsCollector(mockClient)
 
 			healthyNodes := []slurmapi.Node{
 				{
@@ -1272,7 +1376,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 			}
 
 			mockClient.EXPECT().ListNodes(mock.Anything).Return(idleDrainNodes, nil).Once()
-			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return([]slurmapi.Job{}, nil).Once()
 			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
 
 			err := collector.updateState(context.Background())
@@ -1290,7 +1394,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 	t.Run("DRAIN+MIXED is considered draining", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			mockClient := &fake.MockClient{}
-			collector := NewMetricsCollector(mockClient)
+			collector := newTestMetricsCollector(mockClient)
 
 			mixedNodes := []slurmapi.Node{
 				{
@@ -1321,7 +1425,7 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 			}
 
 			mockClient.EXPECT().ListNodes(mock.Anything).Return(drainingMixedNodes, nil).Once()
-			mockClient.EXPECT().ListJobs(mock.Anything).Return([]slurmapi.Job{}, nil).Once()
+			mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return([]slurmapi.Job{}, nil).Once()
 			mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
 
 			err := collector.updateState(context.Background())
@@ -1418,5 +1522,82 @@ func TestNodeStateDetectionFunctions(t *testing.T) {
 			},
 		}
 		assert.False(t, isNodeDraining(downDrainNode))
+	})
+}
+
+func TestJobAllocatedResources_MemoryFallback(t *testing.T) {
+	logger := zap.New(zap.UseDevMode(true))
+
+	t.Run("MemoryPerNode with NodeCount → memory reported", func(t *testing.T) {
+		job := slurmapi.Job{
+			MemoryPerNode: ptr.To(int64(8192)),
+			NodeCount:     ptr.To(int32(4)),
+		}
+		_, _, mem, memOK := jobAllocatedResources(logger, job)
+		assert.True(t, memOK)
+		assert.Equal(t, mbToBytes(8192*4), mem)
+	})
+
+	t.Run("MemoryPerNode without NodeCount → memory omitted", func(t *testing.T) {
+		// Typical accounting-mode pending multi-node job: AllocationNodes=0 leaves NodeCount nil.
+		// Reporting MemoryPerNode×1 would silently undercount; better to omit the metric.
+		job := slurmapi.Job{
+			MemoryPerNode: ptr.To(int64(8192)),
+			NodeCount:     nil,
+		}
+		_, _, _, memOK := jobAllocatedResources(logger, job)
+		assert.False(t, memOK)
+	})
+
+	t.Run("TresAllocated with mem wins over MemoryPerNode fallback", func(t *testing.T) {
+		// For running jobs the TRES path takes precedence and the NodeCount fallback is irrelevant.
+		job := slurmapi.Job{
+			TresAllocated: "cpu=4,mem=16384M",
+			MemoryPerNode: ptr.To(int64(8192)),
+			NodeCount:     nil,
+		}
+		_, _, mem, memOK := jobAllocatedResources(logger, job)
+		assert.True(t, memOK)
+		assert.Equal(t, float64(16384*1024*1024), mem)
+	})
+
+	t.Run("TresRequested cpu used when TresAllocated empty", func(t *testing.T) {
+		// Bug scenario: pending/DEADLINE accounting jobs have no allocation; Required.CPUs is
+		// the per-task minimum (often 1). The requested-TRES fallback is what makes the metric
+		// reflect what the user actually requested.
+		job := slurmapi.Job{
+			TresRequested: "cpu=192,mem=64000M,gres/gpu=8",
+			CPUs:          ptr.To(int32(1)),
+		}
+		cpu, cpuOK, mem, memOK := jobAllocatedResources(logger, job)
+		assert.True(t, cpuOK)
+		assert.Equal(t, float64(192), cpu)
+		assert.True(t, memOK)
+		assert.Equal(t, float64(64000)*1024*1024, mem)
+	})
+
+	t.Run("TresAllocated wins over TresRequested", func(t *testing.T) {
+		job := slurmapi.Job{
+			TresAllocated: "cpu=4,mem=8192M",
+			TresRequested: "cpu=192,mem=64000M",
+		}
+		cpu, cpuOK, mem, memOK := jobAllocatedResources(logger, job)
+		assert.True(t, cpuOK)
+		assert.Equal(t, float64(4), cpu)
+		assert.True(t, memOK)
+		assert.Equal(t, float64(8192)*1024*1024, mem)
+	})
+
+	t.Run("TresRequested fills only the side that's missing", func(t *testing.T) {
+		// Allocated TRES has CPU but no memory; Requested fills only the memory side.
+		job := slurmapi.Job{
+			TresAllocated: "cpu=4",
+			TresRequested: "cpu=192,mem=8192M",
+		}
+		cpu, cpuOK, mem, memOK := jobAllocatedResources(logger, job)
+		assert.True(t, cpuOK)
+		assert.Equal(t, float64(4), cpu)
+		assert.True(t, memOK)
+		assert.Equal(t, float64(8192)*1024*1024, mem)
 	})
 }
