@@ -2,6 +2,6 @@ apiVersion: v2
 name: helm-soperator-crds
 description: A Helm chart for Kubernetes
 type: application
-version: 4.1.1
-appVersion: "4.1.1"
+version: 4.1.2
+appVersion: "4.1.2"
 kubeVersion: ">=1.29.0-0"
