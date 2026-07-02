@@ -1,7 +1,6 @@
 #!/bin/bash
 #SBATCH --deadline="now+12hours"
 #SBATCH --time=30:00
-#SBATCH --gpus-per-node=8
 #SBATCH --exclusive
 #SBATCH --mem=0
 
@@ -15,6 +14,8 @@ elif [[ "${gpus_on_node}" == *"8 NVIDIA B200"* ]]; then
   platform="8xB200"
 elif [[ "${gpus_on_node}" == *"8 NVIDIA B300"* ]]; then
   platform="8xB300"
+elif [[ "${gpus_on_node}" == *"4 NVIDIA GB300"* ]]; then
+  platform="4xGB300"
 else
   echo "Unsupported platform"
   exit 0
