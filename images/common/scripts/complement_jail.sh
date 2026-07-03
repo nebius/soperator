@@ -5,6 +5,9 @@
 set -x # Print actual command before executing it
 set -e # Exit immediately if any command returns a non-zero error code
 
+# Timestamp traced commands to correlate concurrent workers complementing the shared jail
+PS4='+ [$(date "+%H:%M:%S.%3N")] '
+
 usage() { echo "usage: ${0} -j <path_to_jail_dir> -u <path_to_upper_jail_dir> [-w] [-h]" >&2; exit 1; }
 
 while getopts j:u:wh flag
@@ -26,6 +29,74 @@ ALT_ARCH="$(uname -m)"
 echo "🔧 Using ALT_ARCH = ${ALT_ARCH}"
 
 SLURM_LIB_PATH="usr/lib/${ALT_ARCH}-linux-gnu/slurm"
+
+# SCHED-1041 diagnostics.
+# The NVIDIA soname symlinks (e.g. libnvidia-ml.so.1) are created only by the "chroot ldconfig" run below,
+# and sometimes the worker that wins the ldconfig flock has a stale view of the jail lib dir right after
+# its own nvidia-container-cli run, so its ldconfig creates no sonames and GPU containers fail on every node of the cluster.
+# How to read the output:
+# - path/chroot view has no libnvidia-ml at all -> stale dentry/readdir view of the shared
+#   jail, or the CLI mounted into another namespace (check the mountinfo counts below)
+# - 0-size versioned libs -> shared-FS placeholders visible, bind mounts detached
+# - bind mounts present in mountinfo while invisible by path -> stale dentries (virtiofs)
+# - bind mounts absent from mountinfo -> the CLI's mounts landed in another namespace
+# - "self" and "via jail proc" namespaces differ -> the CLI targeted a wrong namespace:
+#   it derives the target from ${jaildir}/proc/<its parent pid>/ns/mnt
+# Must be called with CWD = ${jaildir}. All output is prefixed with [nvml] for grepping.
+# shellcheck disable=SC2012 # ls is deliberate: the probe must exercise readdir on the live directory
+dump_nvml_state() {
+    echo "[nvml] === NVML jail state: ${1} ==="
+    echo "[nvml] --- path view:"
+    ls -lai "usr/lib/${ALT_ARCH}-linux-gnu/" 2>&1 | awk '/libnvidia-ml|libcuda\.so/ {print "[nvml]   " $0; n++} END {if (!n) print "[nvml]   no libnvidia-ml/libcuda entries visible by path"}'
+    echo "[nvml] --- chroot view (what ldconfig sees):"
+    chroot "${jaildir}" ls -lai "/usr/lib/${ALT_ARCH}-linux-gnu/" 2>&1 | awk '/libnvidia-ml|libcuda\.so/ {print "[nvml]   " $0; n++} END {if (!n) print "[nvml]   no libnvidia-ml/libcuda entries visible via chroot"}'
+    echo "[nvml] --- nvidia lib bind mounts in this namespace: $(grep -cF "${jaildir}/usr/lib/${ALT_ARCH}-linux-gnu/libnvidia" /proc/self/mountinfo) (libnvidia-ml: $(grep -cF "${jaildir}/usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml" /proc/self/mountinfo))"
+    echo "[nvml] --- mount namespace self: $(readlink "/proc/$$/ns/mnt") via jail proc: $(readlink "${jaildir}/proc/$$/ns/mnt" 2>&1)"
+    echo "[nvml] === end NVML jail state: ${1} ==="
+}
+
+# Verify the NVIDIA soname symlink exists after the ldconfig phase and log the SCHED-1041 anomaly otherwise.
+# ${1} says what happened on this worker:
+# - "ran" (ldconfig executed here),
+# - "lock-busy" (another worker holds the ldconfig lock),
+# - "skipped" (this worker decided not to run it), or
+# - "failed".
+# Kept generic so main's probe-based ldconfig block (PR #2621) can call it with the same statuses ("skipped" when
+# the probe reports the cache as up to date — an anomaly then means the probe was fooled by a broken view of the jail).
+# Must be called with CWD = ${jaildir}.
+verify_nvml_soname() {
+    local how=$1
+    local so1="usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1"
+    if [ "${how}" = "lock-busy" ] && [ ! -e "${so1}" ]; then
+        # The lock winner may still be running ldconfig; wait to see whether its run ever
+        # produces the soname symlink on the shared jail. If it never does, the winner ran
+        # against a broken view
+        for _ in 1 2 3 4 5 6; do
+            sleep 5
+            if [ -e "${so1}" ]; then
+                break
+            fi
+        done
+    fi
+    if [ -e "${so1}" ]; then
+        echo "[nvml] libnvidia-ml.so.1 present after ldconfig phase (${how})"
+    else
+        echo "[nvml] ANOMALY: libnvidia-ml.so.1 absent after ldconfig phase (${how}) (SCHED-1041)"
+        # If the symlink appears after a delay, it was created and only this view lagged;
+        # if it stays absent, whoever ran ldconfig saw no NVIDIA libs, or nobody ran it at all
+        local waited=0
+        for delay in 1 5; do
+            sleep "${delay}"
+            waited=$((waited + delay))
+            if [ -e "${so1}" ]; then
+                echo "[nvml] libnvidia-ml.so.1 appeared after ${waited}s"
+                break
+            fi
+            echo "[nvml] libnvidia-ml.so.1 still absent after ${waited}s"
+        done
+    fi
+    dump_nvml_state "after ldconfig phase (${how})"
+}
 
 pushd "${jaildir}"
     echo "Bind-mount virtual filesystems"
@@ -107,6 +178,8 @@ pushd "${jaildir}"
             esac
         done
 
+        echo "[nvml] Jail mount: $(findmnt --target . --output SOURCE,FSTYPE,OPTIONS --noheadings 2>&1)"
+
         nvidia-container-cli \
             --user \
             --debug=/dev/stderr \
@@ -118,11 +191,35 @@ pushd "${jaildir}"
             "${cap_args[@]}" \
             "${jaildir}"
 
-        echo "Checking NVIDIA lib state after nvidia-container-cli:"
-        echo "  /lib symlink: $(readlink lib 2>/dev/null || echo 'NOT a symlink')"
-        echo "  libnvidia-ml.so.1 exists: $(test -e usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1 && echo 'yes' || echo 'NO')"
-        echo "  libnvidia-ml.so.1 target: $(readlink usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1 2>/dev/null || echo 'MISSING')"
-        echo "  libnvidia-ml.so versioned file size: $(stat -c%s usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.*.* 2>/dev/null || echo 'NOT FOUND')"
+        echo "[nvml] /lib symlink: $(readlink lib 2>/dev/null || echo 'NOT a symlink')"
+        dump_nvml_state "after nvidia-container-cli"
+
+        # Local-coherence probe: a file created through this view must be immediately visible;
+        # if it is not, the whole directory view is incoherent, not just the freshly created bind mounts
+        probe="usr/lib/${ALT_ARCH}-linux-gnu/.soperator-jail-probe-$(hostname)-$$"
+        touch "${probe}" || echo "[nvml] probe touch FAILED"
+        if [ -e "${probe}" ]; then
+            echo "[nvml] probe file visible right after touch: yes"
+        else
+            echo "[nvml] probe file visible right after touch: NO (local writes invisible through this view)"
+        fi
+        rm -f "${probe}" || true
+
+        # If the versioned lib only appears after a delay, the staleness is transient and a retry-based fix is viable;
+        # if it never appears, the view stays broken
+        if ! compgen -G "usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.*.*" > /dev/null; then
+            waited=0
+            for delay in 1 5; do
+                sleep "${delay}"
+                waited=$((waited + delay))
+                if compgen -G "usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.*.*" > /dev/null; then
+                    echo "[nvml] versioned libnvidia-ml appeared after ${waited}s"
+                    break
+                fi
+                echo "[nvml] versioned libnvidia-ml still not visible after ${waited}s"
+            done
+            dump_nvml_state "after visibility wait"
+        fi
 
         touch "etc/gpu_libs_installed.flag"
     fi
@@ -192,8 +289,9 @@ pushd "${jaildir}"
         mount --bind /usr/sbin/slurmd usr/sbin/slurmd
         mount --bind /usr/sbin/slurmstepd usr/sbin/slurmstepd
         echo "Update linker cache inside the jail"
-        echo "  libnvidia-ml.so.1 exists before ldconfig: $(test -e usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1 && echo 'yes' || echo 'NO')"
-        echo "  libnvidia-ml versioned file size before ldconfig: $(stat -c%s usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.*.* 2>/dev/null || echo 'NOT FOUND')"
+        if [ "$NODESET_GPU_ENABLED" = "true" ]; then
+            dump_nvml_state "before ldconfig"
+        fi
         ldconfig_rc=0
         flock --nonblock etc/complement_jail_ldconfig.lock -c "chroot \"${jaildir}\" /usr/sbin/ldconfig" || ldconfig_rc=$?
         if [ "$ldconfig_rc" -eq 0 ]; then
@@ -203,6 +301,12 @@ pushd "${jaildir}"
         else
             echo "ldconfig FAILED with exit code ${ldconfig_rc}"
         fi
-        echo "  libnvidia-ml.so.1 exists after ldconfig: $(test -e usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1 && echo 'yes' || echo 'NO')"
+        if [ "$NODESET_GPU_ENABLED" = "true" ]; then
+            case "$ldconfig_rc" in
+                0) verify_nvml_soname "ran" ;;
+                1) verify_nvml_soname "lock-busy" ;;
+                *) verify_nvml_soname "failed" ;;
+            esac
+        fi
     fi
 popd
