@@ -365,11 +365,15 @@ spec:
             - type: remove
               field: attributes.base_name
 
+            # Files on the shared jail FS are truncated and rewritten in place by check_runner.py,
+            # so the reader can see partially flushed lines (zero-filled tails). Skip bodies with
+            # NUL bytes and send the entry unparsed instead of logging an error on any parse failure.
             - id: parse_json_body # parse json body to extract fields
               type: json_parser
               parse_from: body
               parse_to: attributes.hc_json
-              if: body matches "^\\s*\\{"
+              if: body matches "^\\s*\\{" and not (body matches "\\x00")
+              on_error: send_quiet
 
             - type: move
               from: attributes.hc_json.status
