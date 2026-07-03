@@ -165,6 +165,56 @@ func (n *Node) IsInvalidState() bool {
 	return exists
 }
 
+// IsCloudState reports whether the node is a cloud node, i.e. one that is
+// provisioned and powered on or off dynamically via Slurm power saving.
+func (n *Node) IsCloudState() bool {
+	_, exists := n.States[api.V0041NodeStateCLOUD]
+	return exists
+}
+
+func (n *Node) IsPowerDownState() bool {
+	_, exists := n.States[api.V0041NodeStatePOWERDOWN]
+	return exists
+}
+
+func (n *Node) IsPowerDrainState() bool {
+	_, exists := n.States[api.V0041NodeStatePOWERDRAIN]
+	return exists
+}
+
+func (n *Node) IsPoweredDownState() bool {
+	_, exists := n.States[api.V0041NodeStatePOWEREDDOWN]
+	return exists
+}
+
+func (n *Node) IsPoweringDownState() bool {
+	_, exists := n.States[api.V0041NodeStatePOWERINGDOWN]
+	return exists
+}
+
+func (n *Node) IsPoweringUpState() bool {
+	_, exists := n.States[api.V0041NodeStatePOWERINGUP]
+	return exists
+}
+
+func (n *Node) IsPowerUpState() bool {
+	_, exists := n.States[api.V0041NodeStatePOWERUP]
+	return exists
+}
+
+// IsPowerManaged reports whether the node is currently in a power-management
+// transition or already powered down. Such states are part of the normal cloud
+// lifecycle and must not be treated as failures or unavailability. The CLOUD
+// flag alone is excluded: an active cloud node going DOWN is still a real fault.
+func (n *Node) IsPowerManaged() bool {
+	return n.IsPowerDownState() ||
+		n.IsPowerDrainState() ||
+		n.IsPoweredDownState() ||
+		n.IsPoweringDownState() ||
+		n.IsPoweringUpState() ||
+		n.IsPowerUpState()
+}
+
 // baseStates defines the mutually exclusive base states of a Slurm node.
 // The node state is a 32-bit integer where the lowest 4 bits (0x0000000f) encode
 // exactly 6 mutually exclusive base states: IDLE, DOWN, ALLOCATED, ERROR, MIXED, UNKNOWN.

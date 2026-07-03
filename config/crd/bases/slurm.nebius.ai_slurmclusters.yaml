@@ -1226,6 +1226,7 @@ spec:
                   pyxis:
                     importerPath: /opt/slurm_scripts/pyxis_caching_importer.sh
                     required: true
+                    useSquashfuse: false
                 description: PlugStackConfig represents the Plugin stack configurations
                   in `plugstack.conf`.
                 properties:
@@ -1313,10 +1314,56 @@ spec:
                           Otherwise, 'optional'.
                         type: boolean
                     type: object
+                  ncclInspectorPreConf:
+                    default:
+                      dumpDir: /opt/soperator-outputs/nccl_profiles/%j/%s
+                      dumpThreadIntervalMicroseconds: 1000000
+                      dumpVerbose: false
+                      enabled: false
+                      profilerPlugin: /usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so
+                      required: false
+                    description: NcclInspectorPreConf represents the NCCL Inspector
+                      Pre-Configuration SPANK plugin configuration.
+                    properties:
+                      dumpDir:
+                        default: /opt/soperator-outputs/nccl_profiles/%j/%s
+                        description: |-
+                          DumpDir defines a directory path where NCCL profiles will be dumped into.
+
+                          If the path does not exist, it will be created by the plugin.
+                        type: string
+                      dumpThreadIntervalMicroseconds:
+                        default: 1000000
+                        description: DumpThreadIntervalMicroseconds defines an interval
+                          between NCCL Inspector dump thread runs in microseconds.
+                        format: int64
+                        type: integer
+                      dumpVerbose:
+                        default: false
+                        description: DumpVerbose defines if the NCCL profile dumps
+                          should be verbose.
+                        type: boolean
+                      enabled:
+                        default: true
+                        description: Enabled defines whether to enable the plugin.
+                        type: boolean
+                      profilerPlugin:
+                        default: /usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so
+                        description: ProfilerPlugin defines a file path to NCCL Inspector's
+                          SO file.
+                        type: string
+                      required:
+                        default: false
+                        description: |-
+                          Required defines if NCCL Inspector Pre-Configuration is 'required' for SLURM.
+                          Otherwise, 'optional'.
+                        type: boolean
+                    type: object
                   pyxis:
                     default:
                       importerPath: /opt/slurm_scripts/pyxis_caching_importer.sh
                       required: true
+                      useSquashfuse: false
                     description: Pyxis represents the 'Pyxis' SPANK plugin configuration.
                     properties:
                       containerImageSave:
@@ -1341,6 +1388,12 @@ spec:
                         description: |-
                           Required defines if Pyxis is 'required' for SLURM.
                           Otherwise, 'optional'.
+                        type: boolean
+                      useSquashfuse:
+                        default: false
+                        description: |-
+                          UseSquashfuse enables Pyxis to start importer-produced SquashFS images directly through squashfuse.
+                          When disabled, Pyxis still uses ImporterPath for image caching but lets Enroot create the runtime rootfs.
                         type: boolean
                     type: object
                 type: object
@@ -3753,8 +3806,9 @@ spec:
                   epilog: ""
                   maxJobCount: 20000
                   messageTimeout: 60
-                  minJobAge: 28800
+                  minJobAge: 3600
                   prolog: ""
+                  taskProlog: ""
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
                 properties:
@@ -3793,7 +3847,7 @@ spec:
                     format: int32
                     type: integer
                   minJobAge:
-                    default: 28800
+                    default: 3600
                     description: Don't remove jobs from controller memory after some
                       time
                     format: int32
@@ -3815,6 +3869,11 @@ spec:
                   taskPluginParam:
                     default: ""
                     description: Additional parameters for the task plugin
+                    type: string
+                  taskProlog:
+                    default: ""
+                    description: Defines specific file to run the task prolog when
+                      job starts. Default value is no task prolog
                     type: string
                   topologyParam:
                     default: SwitchAsNodeRank
@@ -12809,6 +12868,18 @@ spec:
                     description: |
                       Exporter represents the Slurm exporter node configuration
                     properties:
+                      accountingJobsLookback:
+                        default: 1h
+                        description: |-
+                          AccountingJobsLookback sets the size of the time window queried from the accounting API:
+                          [now − lookback, now + 5 min]. The +5 min skew tolerates clock drift between slurmrestd, slurmctld and slurmdbd.
+                          Long-running jobs that started before the window are still included (sacct overlap semantics).
+                          Only applied when JobSource is "accounting".
+                        pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
+                        type: string
+                        x-kubernetes-validations:
+                        - message: accountingJobsLookback must be greater than zero
+                          rule: self.matches('[1-9]')
                       collectionInterval:
                         default: 30s
                         description: CollectionInterval specifies how often to collect
@@ -15441,6 +15512,22 @@ spec:
                         description: HostUsers controls if the pod containers can
                           use the host user namespace
                         type: boolean
+                      jobSource:
+                        default: controller
+                        description: |-
+                          JobSource selects the Slurm API used for job collection.
+
+                          "controller" reads jobs from the Slurm controller API (default, current behavior).
+                          "accounting" reads jobs from the Slurm accounting API (slurmdbd) and is intended for clusters where
+                          the controller endpoint is overloaded.
+
+                          Note: the accounting source has known label-fidelity limitations (empty user_id, "None" job_state_reason
+                          for pending jobs, collapsed pending array tasks). See docs/slurm-exporter.md "Known limitations of
+                          the accounting source" for details.
+                        enum:
+                        - controller
+                        - accounting
+                        type: string
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.

@@ -6,7 +6,5 @@ images:
     newName: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
     newTag: 4.1.2
 patches:
-  # Protect the /metrics endpoint by putting it behind auth.
-  # If you want your controller-manager to expose the /metrics
-  # endpoint w/o any authn/z, please comment the following line.
-  - path: ./manager_auth_proxy_patch.yaml
+  # Serve protected metrics from the manager using controller-runtime authn/authz.
+  - path: ./manager_metrics_patch.yaml

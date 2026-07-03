@@ -73,7 +73,7 @@ spec:
   url: {{ .Values.helmRepository.mariadbOperator.url }}
   type: {{ .Values.helmRepository.mariadbOperator.type }}
 {{- end }}
-{{- if and .Values.observability.enabled .Values.observability.opentelemetry.enabled }}
+{{- if and .Values.observability.enabled (or .Values.observability.opentelemetry.enabled .Values.observability.ncclProfiles.enabled) }}
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository

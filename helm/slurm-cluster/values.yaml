@@ -13,6 +13,13 @@ useDefaultAppArmorProfile: false
 maintenance: "none"
 # CUDA version used for populate-jail image selection.
 cudaVersion: 12.9.0
+nodeExporter:
+  podMonitor:
+    enabled: true
+    interval: "30s"
+    scrapeTimeout: "10s"
+    metricRelabelings: []
+    relabelings: []
 # partitionConfiguration define partition configuration of slurm worker nodes
 # https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION
 partitionConfiguration:
@@ -142,10 +149,11 @@ slurmConfig:
   defCpuPerGPU: 4
   completeWait: 5
   prolog: /opt/slurm_scripts/prolog.sh
+  taskProlog: /opt/slurm_scripts/task_prolog.sh
   epilog: /opt/slurm_scripts/epilog.sh
   taskPluginParam: ""
   maxJobCount: 20000
-  minJobAge: 28800
+  minJobAge: 3600
   messageTimeout: 60
   topologyPlugin: "topology/tree"
   topologyParam: "SwitchAsNodeRank"
@@ -161,6 +169,8 @@ mpiConfig:
 plugStackConfig:
   pyxis:
     required: true
+    # Direct SquashFS startup is opt-in. It requires Pyxis >= 0.24.0 and squashfuse in the jail.
+    useSquashfuse: false
     importerPath: /opt/slurm_scripts/pyxis_caching_importer.sh
   ncclDebug:
     required: false
@@ -169,6 +179,13 @@ plugStackConfig:
     outputToFile: true
     outputToStdOut: false
     outputDirectory: "/opt/soperator-outputs/nccl_logs"
+  ncclInspectorPreConf:
+    required: false
+    enabled: false
+    profilerPlugin: "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so"
+    dumpDir: "/opt/soperator-outputs/nccl_profiles/%j/%s"
+    dumpVerbose: false
+    dumpThreadIntervalMicroseconds: 1000000
   customPlugins: []
 #  customPlugins:
 #    - required: true
@@ -285,6 +302,8 @@ slurmNodes:
         memory: "1Gi"
         ephemeralStorage: "5Gi"
     customInitContainers: []
+    nodeExporter:
+      enabled: false
     externalDB:
       enabled: false
       # host: ""
@@ -391,15 +410,14 @@ slurmNodes:
       command: []
       args: []
       livenessProbe:
-        exec:
-          command:
-            - scontrol
-            - ping
-        initialDelaySeconds: 25
-        timeoutSeconds: 1
-        periodSeconds: 10
+        httpGet:
+          path: /livez
+          port: 6817
+        initialDelaySeconds: 10
+        timeoutSeconds: 10
+        periodSeconds: 60
         successThreshold: 1
-        failureThreshold: 3
+        failureThreshold: 5
       port: 6817
       resources:
         cpu: "1000m"
@@ -435,6 +453,10 @@ slurmNodes:
         memory: "1Gi"
         ephemeralStorage: "5Gi"
     customInitContainers: []
+    # Node-exporter sidecar for controller pods.
+    # Enabled by default only for controller pods.
+    nodeExporter:
+      enabled: true
     volumes:
       spool:
         volumeClaimTemplateSpec:
@@ -448,7 +470,7 @@ slurmNodes:
         volumeSourceName: "jail"
       customMounts: []
     # Slurmctld native OpenMetrics endpoint (https://slurm.schedmd.com/metrics.html).
-    # When enabled (default), sets MetricsType=metrics/openmetrics in slurm.conf
+    # When enabled (default), sets MetricsType=metrics/openmetrics in slurm_base.conf.noedit
     # and renders a ServiceMonitor scraping /metrics/jobs, /metrics/jobs-users-accts,
     # /metrics/nodes, /metrics/partitions, /metrics/scheduler on the slurmctld port.
     # The endpoint is unauthenticated HTTP; it's only reachable in-cluster via
@@ -536,6 +558,8 @@ slurmNodes:
         memory: "500Mi"
         ephemeralStorage: "5Gi"
     customInitContainers: []
+    nodeExporter:
+      enabled: false
     volumes:
       jail:
         volumeSourceName: "jail"
@@ -568,6 +592,12 @@ slurmNodes:
       # - If empty and create is false, the "default" ServiceAccount will be used and you must ensure it has the required RBAC.
       name: ""
     collectionInterval: "30s"
+    # Slurm job source: controller (Slurm controller API) or accounting (Slurm accounting API / slurmdbd).
+    # Use "accounting" when the controller endpoint is overloaded on large clusters.
+    jobSource: "controller"
+    # when jobSource=accounting, the size of the time window queried from the accounting API
+    # ([now - lookback, now + 5m]). The +5m skew tolerates clock drift between slurmrestd, slurmctld and slurmdbd.
+    accountingJobsLookback: "1h"
     exporter:
       imagePullPolicy: "IfNotPresent"
       appArmorProfile: "unconfined"
@@ -626,12 +656,15 @@ slurmNodes:
         memory: "8Gi"
         ephemeralStorage: "500Mi"
     customInitContainers: []
+    nodeExporter:
+      enabled: false
 sConfigController:
   # Controls if the pod containers can use the host user namespace
   # hostUsers: false
   node:
     k8sNodeFilterName: "system"
     size: 1
+    customInitContainers: []
   container:
     imagePullPolicy: "IfNotPresent"
     # livenessProbe: {}
@@ -650,6 +683,8 @@ sConfigController:
     jobLabel: "sconfigcontroller"
     interval: "30s"
     scrapeTimeout: "28s"
+  nodeExporter:
+    enabled: false
   # RBAC settings for sconfigcontroller
   rbac:
     # Specifies whether RBAC resources should be created
@@ -663,17 +698,17 @@ sConfigController:
     # This field is required in the SlurmCluster CR - it will be automatically populated from this value
     name: ""
 images:
-  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:4.1.2-slurm25.11.3"
-  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:4.1.2-slurm25.11.3"
-  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:4.1.2-slurm25.11.3"
-  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:4.1.2-slurm25.11.3"
-  munge: "cr.eu-north1.nebius.cloud/soperator/munge:4.1.2-slurm25.11.3"
+  slurmctld: "cr.eu-north1.nebius.cloud/soperator/controller_slurmctld:4.1.2-slurm25.11.5"
+  slurmrestd: "cr.eu-north1.nebius.cloud/soperator/slurmrestd:4.1.2-slurm25.11.5"
+  slurmd: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd:4.1.2-slurm25.11.5"
+  sshd: "cr.eu-north1.nebius.cloud/soperator/login_sshd:4.1.2-slurm25.11.5"
+  munge: "cr.eu-north1.nebius.cloud/soperator/munge:4.1.2-slurm25.11.5"
   sssd: "cr.eu-north1.nebius.cloud/soperator/sssd:2.9.4-1-63"
   populateJail: ""
   populateJailRepository: "cr.eu-north1.nebius.cloud/soperator/populate_jail"
-  populateJailTag: "4.1.2-slurm25.11.3"
-  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:4.1.2-slurm25.11.3"
-  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:4.1.2-slurm25.11.3"
+  populateJailTag: "4.1.2-slurm25.11.5"
+  slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:4.1.2-slurm25.11.5"
+  soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:4.1.2-slurm25.11.5"
   sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:4.1.2"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:12.1.2"
 # Configuration for slurm scripts.
@@ -681,6 +716,7 @@ slurmScripts:
   # Base scripts content can be overridden here
   check_runner.py: null
   prolog.sh: null
+  task_prolog.sh: null
   epilog.sh: null
   hc_program.sh: null
   pyxis_caching_importer.sh: null

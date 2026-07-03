@@ -166,10 +166,11 @@ jobs:
       PROFILE_ENV_VAR: ${{ inputs.profile_env_var || vars.PROFILE_ENV_VAR }}
       E2E_PROFILE: ${{ vars[inputs.profile_env_var || vars.PROFILE_ENV_VAR] }}
       RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
+      SLURM_CLUSTER_NAME: "soperator"
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
@@ -319,7 +320,7 @@ jobs:
           echo "SOPERATOR_UNSTABLE=$SOPERATOR_UNSTABLE" >> $GITHUB_ENV
 
       - name: Checkout Terraform repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: ${{ env.TERRAFORM_REPO }}
           ref: ${{ env.TERRAFORM_REPO_REF }}
@@ -411,8 +412,6 @@ jobs:
 
       - name: Acceptance Tests
         timeout-minutes: 90
-        env:
-          E2E_REPORT_DIR: e2e-reports/acceptance
         run: |
           bin/e2e acceptance
 
@@ -542,11 +541,11 @@ jobs:
         if: always()
         shell: bash
         run: |
-          kubectl exec -n soperator controller-0 -- sinfo -N || true
-          kubectl exec -n soperator controller-0 -- squeue || true
-          kubectl exec -n soperator controller-0 -- sdiag || true
-          kubectl exec -n soperator controller-0 -- sacct --format=JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode -S now-6hours || true
-          kubectl exec -n soperator controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sinfo -N || true
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- squeue || true
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sdiag || true
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sacct --format=JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode -S now-6hours || true
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
 
       - name: Collect Full Kubernetes Cluster Info
         if: always()
@@ -622,7 +621,7 @@ jobs:
 
       - name: Upload Terraform Destroy debug log
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: tf-destroy-debug-log
           path: ${{ runner.temp }}/tf-destroy.log
