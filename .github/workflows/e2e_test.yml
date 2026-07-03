@@ -270,6 +270,10 @@ jobs:
           which go
           go version
 
+          echo "python:"
+          which python
+          python --version
+
       - name: Find latest successful build run on current branch
         id: find_build
         shell: bash
