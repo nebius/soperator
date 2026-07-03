@@ -201,7 +201,6 @@ jobs:
       - name: Install Nebius CLI
         shell: bash
         env:
-          NEBIUS_CLI_VERSION: "0.12.164"
           NEBIUS_INSTALL_FOLDER: "${{ github.workspace }}/bin"
         run: |
           echo "Installing Nebius CLI ${NEBIUS_CLI_VERSION}..."
