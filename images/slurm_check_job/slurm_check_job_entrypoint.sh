@@ -37,10 +37,16 @@ echo "Create directory for slurm job outputs"
 echo "Set HOME to soperatorchecks' home directory"
 export HOME=~soperatorchecks
 
-# Auto-detect GPU requirement from the sbatch script's #SBATCH directives.
-# If the script requests GPU resources but the cluster has no GPU workers,
-# skip the check. Missing Slurm base config is fail-open (surface the real problem).
+# Auto-detect GPU requirement from the sbatch script's #SBATCH directives and
+# export it, so downstream steps (the skip gate below and the per-node
+# submission in slurm_submit_jobs.sh) can target GPU nodes only.
 if grep -qE '#SBATCH\s+.*(--gpus-per-node|--gpus\b|--gres=gpu|-G\s)' /opt/bin/sbatch.sh; then
+    export ACTIVE_CHECK_REQUIRES_GPU=true
+fi
+
+# If the script requires GPU resources but the cluster has no GPU workers at all,
+# skip the check. Missing Slurm base config is fail-open (surface the real problem).
+if [[ "${ACTIVE_CHECK_REQUIRES_GPU:-}" == "true" ]]; then
     SLURM_BASE_CONFIG="/etc/slurm/slurm_base.conf.noedit"
     if [[ -f "$SLURM_BASE_CONFIG" ]] && ! grep -q '^[^#]*Gres=gpu' "$SLURM_BASE_CONFIG"; then
         SKIP_REASON="script requires GPU but no GPU nodes in slurm_base.conf.noedit"
