@@ -92,7 +92,11 @@ func RenderNodeSetStatefulSet(
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}
-	dockerProxyContainer := renderContainerNodeSetDockerProxy(nodeSet)
+
+	containers := []corev1.Container{slurmdContainer}
+	if nodeSet.DockerEnabled {
+		containers = append(containers, renderContainerNodeSetDockerProxy(nodeSet))
+	}
 
 	replicas := &nodeSet.StatefulSet.Replicas
 	var reserveOrdinals []intstr.IntOrString
@@ -119,13 +123,10 @@ func RenderNodeSetStatefulSet(
 		NodeSelector:       nodeSet.NodeSelector,
 		Tolerations:        nodeSet.Tolerations,
 		InitContainers:     initContainers,
-		Containers: []corev1.Container{
-			slurmdContainer,
-			dockerProxyContainer,
-		},
-		Volumes:   volumes,
-		Subdomain: nodeSet.ServiceUmbrella.Name,
-		DNSPolicy: corev1.DNSClusterFirst,
+		Containers:         containers,
+		Volumes:            volumes,
+		Subdomain:          nodeSet.ServiceUmbrella.Name,
+		DNSPolicy:          corev1.DNSClusterFirst,
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
 				naming.BuildServiceFQDN(nodeSet.ServiceUmbrella.Name, nodeSet.ParentalCluster.Namespace),

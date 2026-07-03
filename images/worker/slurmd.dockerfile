@@ -154,11 +154,13 @@ COPY images/worker/worker_init.py /opt/bin/slurm/
 # Copy supervisord entrypoint script
 COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
 COPY images/worker/docker_proxy_nginx_entrypoint.sh /opt/bin/slurm/
+COPY images/worker/dockerd_entrypoint.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
     chmod +x /opt/bin/slurm/worker_init.py && \
-    chmod +x /opt/bin/slurm/docker_proxy_nginx_entrypoint.sh
+    chmod +x /opt/bin/slurm/docker_proxy_nginx_entrypoint.sh && \
+    chmod +x /opt/bin/slurm/dockerd_entrypoint.sh
 
 # Start supervisord that manages both slurmd and sshd as child processes
 ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]

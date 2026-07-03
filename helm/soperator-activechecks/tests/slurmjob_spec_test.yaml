@@ -3,10 +3,10 @@ templates:
   - templates/active-checks.yaml
 
 tests:
-  - it: should render docker memory limit OOMKilled active check
+  - it: should render cuda-samples active check
     documentSelector:
       path: metadata.name
-      value: soperator-docker-memory-limit-oomkilled
+      value: soperator-cuda-samples
     asserts:
       - isKind:
           of: ActiveCheck
@@ -18,13 +18,13 @@ tests:
           value: true
       - equal:
           path: spec.suspend
-          value: true
+          value: false
       - contains:
           path: spec.dependsOn
           content: soperator-prepull-container-image
       - matchRegex:
           path: spec.slurmJobSpec.sbatchScript
-          pattern: 'srun --mem 100m docker run'
+          pattern: 'health-checker run'
       - matchRegex:
           path: spec.slurmJobSpec.sbatchScript
-          pattern: 'State.OOMKilled'
+          pattern: 'Running cuda samples check'
