@@ -68,12 +68,19 @@ verify_nvml_soname() {
     local how=$1
     local so1="usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1"
     if [ "${how}" = "lock-busy" ] && [ ! -e "${so1}" ]; then
-        # The lock winner may still be running ldconfig; wait to see whether its run ever
-        # produces the soname symlink on the shared jail. If it never does, the winner ran
-        # against a broken view
-        for _ in 1 2 3 4 5 6; do
-            sleep 5
+        # The lock holder is still running ldconfig; instead of polling with a guessed delay,
+        # wait for the lock to be released — that happens exactly when the holder's ldconfig exits
+        flock --wait 300 etc/complement_jail_ldconfig.lock -c true || echo "[nvml] timed out waiting for the ldconfig lock holder"
+    fi
+    if [ ! -e "${so1}" ]; then
+        # Grace re-checks before declaring the anomaly: if the symlink shows up here, it
+        # was created and only this view lagged
+        local waited=0
+        for delay in 1 5; do
+            sleep "${delay}"
+            waited=$((waited + delay))
             if [ -e "${so1}" ]; then
+                echo "[nvml] libnvidia-ml.so.1 appeared after ${waited}s extra wait (view lag)"
                 break
             fi
         done
@@ -82,18 +89,6 @@ verify_nvml_soname() {
         echo "[nvml] libnvidia-ml.so.1 present after ldconfig phase (${how})"
     else
         echo "[nvml] ANOMALY: libnvidia-ml.so.1 absent after ldconfig phase (${how}) (SCHED-1041)"
-        # If the symlink appears after a delay, it was created and only this view lagged;
-        # if it stays absent, whoever ran ldconfig saw no NVIDIA libs, or nobody ran it at all
-        local waited=0
-        for delay in 1 5; do
-            sleep "${delay}"
-            waited=$((waited + delay))
-            if [ -e "${so1}" ]; then
-                echo "[nvml] libnvidia-ml.so.1 appeared after ${waited}s"
-                break
-            fi
-            echo "[nvml] libnvidia-ml.so.1 still absent after ${waited}s"
-        done
     fi
     dump_nvml_state "after ldconfig phase (${how})"
 }
@@ -289,7 +284,10 @@ pushd "${jaildir}"
         mount --bind /usr/sbin/slurmd usr/sbin/slurmd
         mount --bind /usr/sbin/slurmstepd usr/sbin/slurmstepd
         echo "Update linker cache inside the jail"
-        if [ "$NODESET_GPU_ENABLED" = "true" ]; then
+        # Gate on the cluster-level flag, not NODESET_GPU_ENABLED: in a GPU cluster a
+        # CPU-nodeset worker can win the ldconfig flock too, and its run decides whether
+        # the shared soname symlinks get created — it must not stay silent
+        if [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; then
             dump_nvml_state "before ldconfig"
         fi
         ldconfig_rc=0
@@ -301,7 +299,7 @@ pushd "${jaildir}"
         else
             echo "ldconfig FAILED with exit code ${ldconfig_rc}"
         fi
-        if [ "$NODESET_GPU_ENABLED" = "true" ]; then
+        if [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; then
             case "$ldconfig_rc" in
                 0) verify_nvml_soname "ran" ;;
                 1) verify_nvml_soname "lock-busy" ;;
