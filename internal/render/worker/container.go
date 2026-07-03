@@ -27,6 +27,8 @@ func RenderContainerWorkerInit(
 	topologyEnabled, gpuEnabled bool,
 	waitTimeoutSeconds int32,
 	topologyPlugin string,
+	topologyFabric string,
+	randomDelaySeconds int32,
 ) corev1.Container {
 	command := []string{
 		"python3",
@@ -91,6 +93,13 @@ func RenderContainerWorkerInit(
 		},
 	}
 
+	if randomDelaySeconds > 0 {
+		env = append(env, corev1.EnvVar{
+			Name:  "WORKER_INIT_RANDOM_DELAY_SECONDS",
+			Value: strconv.Itoa(int(randomDelaySeconds)),
+		})
+	}
+
 	if gpuEnabled {
 		env = append(env,
 			corev1.EnvVar{
@@ -123,6 +132,16 @@ func RenderContainerWorkerInit(
 				},
 			)
 		}
+		fabric := topologyFabric
+		if fabric == "" {
+			fabric = consts.SlurmTopologyDefaultFabric
+		}
+		env = append(env,
+			corev1.EnvVar{
+				Name:  "SLURM_TOPOLOGY_FABRIC",
+				Value: fabric,
+			},
+		)
 	}
 
 	return corev1.Container{
@@ -145,6 +164,7 @@ func renderContainerNodeSetSlurmd(
 	clusterWithGPU bool,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
+		renderVolumeMountRuntime(),
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
@@ -154,6 +174,7 @@ func renderContainerNodeSetSlurmd(
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
 		renderVolumeMountBoot(),
+		renderVolumeMountHostLogJournal(),
 		renderVolumeMountSharedMemory(),
 		renderVolumeMountSysctl(),
 		renderVolumeMountSupervisordConfigMap(),
@@ -279,11 +300,32 @@ func renderContainerNodeSetSlurmd(
 	}, nil
 }
 
+func renderContainerNodeSetDockerProxy(nodeSet *values.SlurmNodeSet) corev1.Container {
+	return corev1.Container{
+		Name:            consts.ContainerNameDockerProxy,
+		Image:           nodeSet.ContainerSlurmd.Image,
+		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
+		Command:         []string{"/opt/bin/slurm/docker_proxy_nginx_entrypoint.sh"},
+		VolumeMounts: []corev1.VolumeMount{
+			renderVolumeMountRuntime(),
+		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+	}
+}
+
 func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameSupervisordConfigMap,
 		MountPath: consts.VolumeMountPathSupervisordConfig,
 		ReadOnly:  true,
+	}
+}
+
+func renderVolumeMountRuntime() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameRuntime,
+		MountPath: consts.VolumeMountPathRuntime,
 	}
 }
 

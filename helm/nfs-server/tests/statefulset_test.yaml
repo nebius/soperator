@@ -1,0 +1,53 @@
+suite: test nfs server statefulset
+templates:
+  - templates/statefulset.yaml
+  - templates/configmap.yaml
+tests:
+  - it: should use default replica count
+    template: templates/statefulset.yaml
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: should use configured zero replica count
+    template: templates/statefulset.yaml
+    set:
+      nfs.replicas: 0
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 0
+
+  - it: should use configured single replica count
+    template: templates/statefulset.yaml
+    set:
+      nfs.replicas: 1
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: should fail when replica count is greater than one
+    template: templates/statefulset.yaml
+    set:
+      nfs.replicas: 2
+    asserts:
+      - failedTemplate:
+          errorMessage: "nfs.replicas must be 0 or 1"
+
+  - it: should fail when replica count is negative
+    template: templates/statefulset.yaml
+    set:
+      nfs.replicas: -1
+    asserts:
+      - failedTemplate:
+          errorMessage: "nfs.replicas must be 0 or 1"
+
+  - it: should fail when replica count is not an integer
+    template: templates/statefulset.yaml
+    set:
+      nfs.replicas: abc
+    asserts:
+      - failedTemplate:
+          errorMessage: "nfs.replicas must be 0 or 1"

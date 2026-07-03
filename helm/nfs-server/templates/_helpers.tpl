@@ -92,6 +92,17 @@ Create the image name
 {{- end }}
 
 {{/*
+Create the number of NFS server replicas.
+*/}}
+{{- define "nfs-server.replicas" -}}
+{{- $replicas := toString .Values.nfs.replicas -}}
+{{- if not (regexMatch "^[01]$" $replicas) -}}
+{{- fail "nfs.replicas must be 0 or 1" -}}
+{{- end -}}
+{{- $replicas -}}
+{{- end }}
+
+{{/*
 Create the name of the exports configmap
 */}}
 {{- define "nfs-server.exportsConfigMapName" -}}

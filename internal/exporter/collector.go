@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"maps"
@@ -21,6 +22,7 @@ import (
 // MetricsCollector exposes SLURM metrics by implementing prometheus.Collector interface
 type MetricsCollector struct {
 	slurmAPIClient slurmapi.Client
+	jobListParams  slurmapi.ListJobsParams
 
 	nodeInfo                   *prometheus.Desc
 	nodeCPUTotal               *prometheus.Desc
@@ -76,7 +78,7 @@ var durationBuckets = []float64{
 }
 
 // NewMetricsCollector creates a new MetricsCollector
-func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
+func NewMetricsCollector(slurmAPIClient slurmapi.Client, jobListParams slurmapi.ListJobsParams) *MetricsCollector {
 	var nodeInfoLabels = []string{
 		"node_name",
 		"instance_id",
@@ -89,6 +91,13 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 		"state_is_planned",
 		"state_is_not_responding",
 		"state_is_invalid",
+		"state_is_cloud",
+		"state_is_power_down",
+		"state_is_power_drain",
+		"state_is_powered_down",
+		"state_is_powering_down",
+		"state_is_powering_up",
+		"state_is_power_up",
 		"is_unavailable",
 		"reservation_name",
 		"address",
@@ -115,6 +124,7 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	}
 	collector := &MetricsCollector{
 		slurmAPIClient: slurmAPIClient,
+		jobListParams:  jobListParams,
 		Monitoring:     NewMonitoringMetrics(),
 
 		nodeInfo:                 prometheus.NewDesc("slurm_node_info", "Slurm node info", nodeInfoLabels, nil),
@@ -166,7 +176,12 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 
 // isNodeUnavailable checks if a node is in unavailable state
 // Unavailable state: DOWN+* or IDLE+DRAIN+* or NOTRESPONDING or UNKNOWN or ERROR or FAIL or INVALID
+// Power-managed nodes (powering up/down or powered down) are part of the normal cloud
+// lifecycle and are never reported as unavailable.
 func isNodeUnavailable(node slurmapi.Node) bool {
+	if node.IsPowerManaged() {
+		return false
+	}
 	if node.IsDownState() {
 		return true
 	}
@@ -263,8 +278,10 @@ func (c *MetricsCollector) updateNodeFailureMetrics(currentNodes []slurmapi.Node
 
 	for _, node := range currentNodes {
 		if existingNode, exists := previousNodesMap[node.Name]; exists {
-			wasFailed := existingNode.IsDownState() || existingNode.IsDrainState()
-			isFailed := node.IsDownState() || node.IsDrainState()
+			// Power-managed nodes set DOWN/DRAIN as part of the normal cloud lifecycle,
+			// so they must not count as failures.
+			wasFailed := (existingNode.IsDownState() || existingNode.IsDrainState()) && !existingNode.IsPowerManaged()
+			isFailed := (node.IsDownState() || node.IsDrainState()) && !node.IsPowerManaged()
 			if !wasFailed && isFailed {
 				var reason string
 				if node.Reason != nil {
@@ -338,29 +355,81 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 		c.state.Store(newState)
 	}()
 
+	// Each sub-collector is isolated: a failure in one neither aborts the others nor drops
+	// their metrics. The failing collector's metrics simply gap for this cycle; the error
+	// is logged and counted via slurm_exporter_collector_errors_total{collector="..."}.
+	collectors := []struct {
+		name string
+		run  func() error
+	}{
+		{"nodes", func() error { return c.collectNodes(ctx, previousState, newState) }},
+		{"jobs", func() error { return c.collectJobs(ctx, newState) }},
+		{"diag", func() error { return c.collectDiag(ctx, newState) }},
+	}
+
+	var errs []error
+	for _, col := range collectors {
+		if cerr := col.run(); cerr != nil {
+			logger.Error(cerr, "Sub-collector failed", "collector", col.name)
+			c.Monitoring.RecordCollectorError(col.name)
+			errs = append(errs, fmt.Errorf("%s: %w", col.name, cerr))
+		}
+	}
+
+	logger.Info("Collected metrics", "elapsed_seconds", time.Since(startTime).Seconds())
+
+	return errors.Join(errs...)
+}
+
+// collectNodes fetches nodes and updates node-derived metrics on the new state.
+func (c *MetricsCollector) collectNodes(ctx context.Context, previousState, newState *metricsCollectorState) error {
+	logger := log.FromContext(ctx).WithName(ControllerName)
+
+	nodesStart := time.Now()
 	nodes, err := c.slurmAPIClient.ListNodes(ctx)
 	if err != nil {
 		return fmt.Errorf("get nodes from SLURM API: %w", err)
 	}
+	logger.Info("Fetched nodes", "count", len(nodes), "elapsed_seconds", time.Since(nodesStart).Seconds())
 	newState.nodes = nodes
 
 	c.updateNodeFailureMetrics(nodes, previousState.nodes)
 	c.updateNodeStateMetrics(nodes, previousState, newState, time.Now())
 	newState.lastGPUSecondsUpdate = c.updateGPUSecondsMetrics(ctx, nodes, previousState.lastGPUSecondsUpdate, time.Now())
 
-	jobs, err := c.slurmAPIClient.ListJobs(ctx)
+	return nil
+}
+
+// collectJobs fetches jobs and stores them on the new state.
+func (c *MetricsCollector) collectJobs(ctx context.Context, newState *metricsCollectorState) error {
+	logger := log.FromContext(ctx).WithName(ControllerName)
+
+	jobsStart := time.Now()
+	jobs, err := c.slurmAPIClient.ListJobsWithParams(ctx, c.jobListParams)
 	if err != nil {
 		return fmt.Errorf("get jobs from SLURM API: %w", err)
 	}
+	logger.Info("Fetched jobs",
+		"source", string(c.jobListParams.Source),
+		"count", len(jobs),
+		"elapsed_seconds", time.Since(jobsStart).Seconds(),
+	)
 	newState.jobs = jobs
 
+	return nil
+}
+
+// collectDiag fetches controller diagnostics and stores them on the new state.
+func (c *MetricsCollector) collectDiag(ctx context.Context, newState *metricsCollectorState) error {
+	logger := log.FromContext(ctx).WithName(ControllerName)
+
+	diagStart := time.Now()
 	diag, err := c.slurmAPIClient.GetDiag(ctx)
 	if err != nil {
 		return fmt.Errorf("get diag from SLURM API: %w", err)
 	}
+	logger.Info("Fetched controller diag", "elapsed_seconds", time.Since(diagStart).Seconds())
 	newState.diag = diag
-
-	logger.Info("Collected metrics", "elapsed_seconds", time.Since(startTime).Seconds())
 
 	return nil
 }
@@ -429,6 +498,13 @@ func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq
 				boolToLabelValue(node.IsPlannedState()),       // New flag: use empty string instead of "false"
 				boolToLabelValue(node.IsNotRespondingState()), // New flag: use empty string instead of "false"
 				boolToLabelValue(node.IsInvalidState()),       // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsCloudState()),         // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPowerDownState()),     // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPowerDrainState()),    // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPoweredDownState()),   // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPoweringDownState()),  // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPoweringUpState()),    // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPowerUpState()),       // New flag: use empty string instead of "false"
 				boolToLabelValue(isNodeUnavailable(node)),     // New flag: use empty string instead of "false"
 				trimReservationName(node.Reservation),
 				node.Address,
@@ -604,17 +680,38 @@ func jobAllocatedResources(logger logr.Logger, job slurmapi.Job) (cpu float64, c
 		}
 	}
 
+	// Fall back to the requested TRES when the allocated TRES doesn't carry the value. This is
+	// what saves the accounting-mode metrics for pending or DEADLINE-without-allocation jobs:
+	// slurmdbd's Required.CPUs is the per-task minimum (defaults to 1), so without this layer
+	// slurm_job_cpus would silently report 1 for jobs that requested 192. Allocated TRES still
+	// wins when present.
+	if (!cpuOK || !memOK) && job.TresRequested != "" {
+		tres, err := slurmapi.ParseTrackableResources(job.TresRequested)
+		if err != nil {
+			logger.Error(err, "Failed to parse job requested resources", "job_id", job.GetIDString(), "tres", job.TresRequested)
+		} else {
+			if !cpuOK && tres.CPUCount > 0 {
+				cpu = float64(tres.CPUCount)
+				cpuOK = true
+			}
+			if !memOK && tres.MemoryBytes > 0 {
+				mem = float64(tres.MemoryBytes)
+				memOK = true
+			}
+		}
+	}
+
 	if !cpuOK && job.CPUs != nil {
 		cpu = float64(*job.CPUs)
 		cpuOK = true
 	}
 
-	if !memOK && job.MemoryPerNode != nil {
-		nodeCount := int32(1)
-		if job.NodeCount != nil {
-			nodeCount = *job.NodeCount
-		}
-		mem = mbToBytes(*job.MemoryPerNode * int64(nodeCount))
+	// Fall back to MemoryPerNode × NodeCount only when the node count is known. If NodeCount is
+	// nil — the typical case for accounting-mode pending multi-node jobs, since slurmdbd doesn't
+	// expose the originally requested node count separately — emit no memory metric. Reporting
+	// MemoryPerNode × 1 would silently undercount queued multi-node jobs; omitting is safer.
+	if !memOK && job.MemoryPerNode != nil && job.NodeCount != nil {
+		mem = mbToBytes(*job.MemoryPerNode * int64(*job.NodeCount))
 		memOK = true
 	}
 
