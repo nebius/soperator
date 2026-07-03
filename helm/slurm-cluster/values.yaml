@@ -710,6 +710,7 @@ images:
   slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:4.1.2-slurm25.11.5"
   soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:4.1.2-slurm25.11.5"
   sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:4.1.2"
+  nodeExporter: "cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter:v1.10.2"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:12.1.2"
 # Configuration for slurm scripts.
 slurmScripts:
