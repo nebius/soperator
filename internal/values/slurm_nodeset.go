@@ -53,12 +53,18 @@ type SlurmNodeSet struct {
 	SharedMemorySize                     *resource.Quantity
 	PersistentVolumeClaimRetentionPolicy *kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy
 
-	Maintenance             *consts.MaintenanceMode
-	NodeExtra               string
-	EnableHostUserNamespace bool
+	Maintenance                  *consts.MaintenanceMode
+	NodeExtra                    string
+	EnableHostUserNamespace      bool
+	WorkerInitRandomDelaySeconds int32
 
 	EphemeralNodes               *bool
 	EphemeralTopologyWaitTimeout int32
+
+	// TopologyFabric is the IB fabric / top-of-tree switch name (spec.topology.fabric). It is
+	// passed to worker-init so the dynamic topology path it declares matches the operator's
+	// per-fabric root switch in topology.conf.
+	TopologyFabric string
 
 	ActiveNodes []int32
 }
@@ -119,6 +125,7 @@ func BuildSlurmNodeSetFrom(
 			naming.BuildNodeSetStatefulSetName(nodeSet.Name),
 			nsSpec.Replicas,
 			nsSpec.MaxUnavailable,
+			nsSpec.MaxConcurrentStartup,
 		),
 		Service:         buildServiceFrom(naming.BuildNodeSetServiceName(clusterName, nodeSet.Name)),
 		ServiceUmbrella: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName)),
@@ -130,12 +137,14 @@ func BuildSlurmNodeSetFrom(
 			nsSpec.Slurmd.Volumes.PersistentVolumeClaimRetentionPolicy,
 		),
 		//
-		Maintenance:             maintenance,
-		NodeExtra:               nsSpec.NodeConfig.Dynamic,
-		EnableHostUserNamespace: nsSpec.EnableHostUserNamespace,
+		Maintenance:                  maintenance,
+		NodeExtra:                    nsSpec.NodeConfig.Dynamic,
+		EnableHostUserNamespace:      nsSpec.EnableHostUserNamespace,
+		WorkerInitRandomDelaySeconds: nsSpec.WorkerInitRandomDelaySeconds,
 		//
 		EphemeralNodes:               nsSpec.EphemeralNodes,
 		EphemeralTopologyWaitTimeout: nsSpec.EphemeralTopologyWaitTimeout,
+		TopologyFabric:               nsSpec.Topology.Fabric,
 	}
 
 	// region Submounts

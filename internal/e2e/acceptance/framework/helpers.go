@@ -145,3 +145,10 @@ func AnnotateWithJobLog(ctx context.Context, exec Exec, slurm *SlurmClient, job 
 func singleLine(s string) string {
 	return strings.Join(strings.Fields(strings.ReplaceAll(s, "\n", " ")), " ")
 }
+
+func ClusterPrefixedName(clusterName, podName string) string {
+	if clusterName == "" {
+		return podName
+	}
+	return fmt.Sprintf("%s-%s", clusterName, podName)
+}

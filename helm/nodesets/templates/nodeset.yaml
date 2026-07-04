@@ -19,12 +19,20 @@ metadata:
     {{- end }}
 
 spec:
+  {{- with $.Values.clusterName }}
+  clusterName: {{ . | quote }}
+  {{- end }}
+
   {{- with (.replicas | default 1) }}
   replicas: {{ . }}
   {{- end }}
 
   {{- with (.maxUnavailable | default "20%") }}
   maxUnavailable: {{ . }}
+  {{- end }}
+
+  {{- with .maxConcurrentStartup }}
+  maxConcurrentStartup: {{ . }}
   {{- end }}
 
   {{- if .ephemeralNodes }}
@@ -47,6 +55,13 @@ spec:
     nvidia:
       gdrCopyEnabled: {{ .gdrCopyEnabled | default false }}
     {{- end }}
+  {{- end }}
+
+  {{- with (.topology | default dict) }}
+  {{- with .fabric }}
+  topology:
+    fabric: {{ . | quote }}
+  {{- end }}
   {{- end }}
 
   {{- with .nodeConfig }}
@@ -150,6 +165,7 @@ spec:
     security:
       limitsConfig: {{ get (.security | default dict) "limitsConfig" | quote }}
       appArmorProfile: {{ get (.security | default dict) "appArmorProfile" | default "unconfined" | quote }}
+      procMount: {{ get (.security | default dict) "procMount" | default "Default" | quote }}
   {{- end }}
 
   {{- with (required ".Values.nodesets[*].munge is required." .munge) }}
@@ -259,6 +275,10 @@ spec:
   enableHostUserNamespace: {{ . }}
   {{- end }}
 
+  {{- if hasKey . "workerInitRandomDelaySeconds" }}
+  workerInitRandomDelaySeconds: {{ .workerInitRandomDelaySeconds }}
+  {{- end }}
+
   {{- with (.priorityClass | default "") }}
   priorityClass: {{ . | quote }}
   {{- end }}
@@ -283,9 +303,6 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 
-  {{- with (.customInitContainers | default list) }}
-  customInitContainers:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+  {{- include "nodesets.customInitContainers" (dict "root" $ "customInitContainers" .customInitContainers "nodeExporter" .nodeExporter) | nindent 2 }}
 {{- end }}
 {{- end }}

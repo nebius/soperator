@@ -38,7 +38,6 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -46,6 +45,7 @@ import (
 	"nebius.ai/slurm-operator/internal/cli"
 	"nebius.ai/slurm-operator/internal/controller/sconfigcontroller"
 	"nebius.ai/slurm-operator/internal/jwt"
+	metricsopts "nebius.ai/slurm-operator/internal/metrics"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	//+kubebuilder:scaffold:imports
 )
@@ -167,16 +167,12 @@ func main() {
 	})
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
-		Metrics: metricsserver.Options{
-			BindAddress:   metricsAddr,
-			SecureServing: secureMetrics,
-			TLSOpts:       tlsOpts,
-		},
+		Scheme:                        scheme,
+		Metrics:                       metricsopts.ServerOptions(metricsAddr, secureMetrics, tlsOpts),
 		WebhookServer:                 webhookServer,
 		HealthProbeBindAddress:        probeAddr,
 		LeaderElection:                enableLeaderElection,
-		LeaderElectionID:              "vqeyz6ae.nebius.ai",
+		LeaderElectionID:              clusterName + ".vqeyz6ae.nebius.ai",
 		LeaderElectionReleaseOnCancel: true,
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{
@@ -215,6 +211,7 @@ func main() {
 	if err = (sconfigcontroller.NewJailedConfigReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
+		clusterName,
 		slurmAPIClient,
 		jailFs,
 		reconfigurePollInterval,
