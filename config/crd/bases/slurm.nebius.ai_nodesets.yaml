@@ -2511,6 +2511,18 @@ spec:
                   - name
                   type: object
                 type: array
+              docker:
+                description: Docker defines the settings related to Docker support
+                  for Slurm workers.
+                properties:
+                  enabled:
+                    default: true
+                    description: |-
+                      Enabled indicates whether Docker is available on the Nodes of the NodeSet.
+                      Docker requires dedicated image-storage disks for storing OCI data,
+                      so it must be disabled on clusters deployed without them.
+                    type: boolean
+                type: object
               enableHostUserNamespace:
                 default: false
                 description: |-

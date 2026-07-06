@@ -57,6 +57,11 @@ spec:
     {{- end }}
   {{- end }}
 
+  {{- if hasKey . "docker" }}
+  docker:
+    enabled: {{ .docker.enabled }}
+  {{- end }}
+
   {{- with (.topology | default dict) }}
   {{- with .fabric }}
   topology:

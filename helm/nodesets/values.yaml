@@ -91,6 +91,14 @@ nodesets:
         # Whether GDRCopy should be enabled
         # Optional, defaults to false
         gdrCopyEnabled: true
+    # Docker configuration
+    # Optional
+    docker:
+      # Whether Docker is available on NodeSet's workers.
+      # Docker requires dedicated image-storage disks for storing OCI data,
+      # so it must be disabled on clusters deployed without them.
+      # Optional, defaults to true
+      enabled: true
     # Network topology configuration
     # Optional
     topology:

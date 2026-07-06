@@ -32,6 +32,7 @@ fi
 worker="${worker:-}"
 NODESET_GPU_ENABLED="${NODESET_GPU_ENABLED:-}"
 SLURM_CLUSTER_WITH_GPU="${SLURM_CLUSTER_WITH_GPU:-}"
+SOPERATOR_DOCKER_ENABLED="${SOPERATOR_DOCKER_ENABLED:-true}"
 
 ALT_ARCH="$(uname -m)"
 log "🔧 Using ALT_ARCH = ${ALT_ARCH}"
@@ -303,10 +304,26 @@ pushd "${jaildir}"
         mount --bind /usr/sbin/slurmd usr/sbin/slurmd
         mount --bind /usr/sbin/slurmstepd usr/sbin/slurmstepd
 
-        log "[docker] Bind-mount dockerd stuff from container to the jail"
-        mkdir -p etc/docker
-        touch etc/docker/daemon.json
-        mount --bind "/etc/docker/daemon.json" "etc/docker/daemon.json"
+        if [ "$SOPERATOR_DOCKER_ENABLED" = "true" ]; then
+            log "[docker] Bind-mount dockerd stuff from container to the jail"
+            mkdir -p etc/docker
+            touch etc/docker/daemon.json
+            mount --bind "/etc/docker/daemon.json" "etc/docker/daemon.json"
+        else
+            log "[docker] Docker is disabled, masking docker binaries in the jail"
+            docker_disabled_stub=/opt/soperator-docker-disabled.sh
+            cat > "$docker_disabled_stub" << 'EOF'
+#!/bin/sh
+echo "docker is not available on this cluster: it was deployed without image-storage disks required for storing Docker data" >&2
+exit 1
+EOF
+            chmod 755 "$docker_disabled_stub"
+            for docker_bin in usr/bin/docker usr/bin/dockerd; do
+                if [ -f "$docker_bin" ]; then
+                    mount --bind "$docker_disabled_stub" "$docker_bin"
+                fi
+            done
+        fi
 
         # ld.so.cache lives in the shared jail root, so running ldconfig rewrites the cache
         # that every running job on every node depends on, briefly leaving it empty. To avoid

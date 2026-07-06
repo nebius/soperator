@@ -1,5 +1,11 @@
 namespace: soperator
 
+docker:
+  # Whether the Docker daemon is started on worker nodes.
+  # Docker requires dedicated image-storage disks for storing OCI data,
+  # so it must be disabled on clusters deployed without them.
+  enabled: true
+
 enroot:
   # Store Enroot cache/data/runtime under dedicated image storage disks.
   # When false, data/runtime use Enroot defaults and cache uses shared /var/cache;

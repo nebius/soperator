@@ -263,6 +263,7 @@ func renderContainerNodeSetSlurmd(
 				clusterWithGPU,
 				nodeSet.GPU.Enabled,
 				nodeSet.GPU.Nvidia.GDRCopyEnabled,
+				nodeSet.DockerEnabled,
 				nodeSet.NodeExtra,
 			),
 			nodeSet.ContainerSlurmd.CustomEnv...,
@@ -334,6 +335,7 @@ func renderNodeSetSlurmdEnv(
 	clusterWithGPU bool,
 	nodeSetGPUEnabled bool,
 	enableGDRCopy bool,
+	dockerEnabled bool,
 	slurmNodeExtra string,
 ) []corev1.EnvVar {
 	envVar := []corev1.EnvVar{
@@ -353,6 +355,10 @@ func renderNodeSetSlurmdEnv(
 		{
 			Name:  "NODESET_GPU_ENABLED",
 			Value: strconv.FormatBool(nodeSetGPUEnabled),
+		},
+		{
+			Name:  consts.EnvDockerEnabled,
+			Value: strconv.FormatBool(dockerEnabled),
 		},
 	}
 

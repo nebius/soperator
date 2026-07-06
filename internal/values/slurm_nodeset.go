@@ -42,6 +42,10 @@ type SlurmNodeSet struct {
 
 	GPU *slurmv1alpha1.GPUSpec
 
+	// DockerEnabled defines whether Docker components (dockerd, docker-proxy sidecar,
+	// docker CLI in jail) are enabled for the NodeSet workers.
+	DockerEnabled bool
+
 	StatefulSet     StatefulSet
 	Service         Service
 	ServiceUmbrella Service
@@ -120,6 +124,8 @@ func BuildSlurmNodeSetFrom(
 		AppArmorProfileUseDefault: useDefaultAppArmorProfile,
 		//
 		GPU: nsSpec.GPU.DeepCopy(),
+		//
+		DockerEnabled: nsSpec.Docker.Enabled == nil || *nsSpec.Docker.Enabled,
 		//
 		StatefulSet: buildStatefulSetWithMaxUnavailableFrom(
 			naming.BuildNodeSetStatefulSetName(nodeSet.Name),

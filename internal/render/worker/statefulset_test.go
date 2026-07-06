@@ -1,6 +1,7 @@
 package worker_test
 
 import (
+	"strconv"
 	"testing"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -437,6 +438,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			SupervisorDConfigMapName:     "supervisord-config",
 			SSHDConfigMapName:            "sshd-config",
 			GPU:                          &slurmv1alpha1.GPUSpec{Enabled: false},
+			DockerEnabled:                true,
 			EphemeralNodes:               ephemeralNodes,
 			EphemeralTopologyWaitTimeout: waitTimeout,
 		}
@@ -576,6 +578,88 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			}
 			assert.True(t, hasRuntimeVolume, "runtime volume should be present")
 			assert.True(t, hasDockerProxyContainer, "docker-proxy sidecar should be present")
+		})
+	}
+}
+
+func TestRenderNodeSetStatefulSet_DockerEnabled(t *testing.T) {
+	createNodeSet := func(dockerEnabled bool) *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           "test-image",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory:           resource.MustParse("1Gi"),
+						corev1.ResourceCPU:              resource.MustParse("100m"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image: "munge-image",
+				},
+			},
+			VolumeSpool: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+			},
+			VolumeJail: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+			},
+			StatefulSet: values.StatefulSet{
+				Replicas: 1,
+			},
+			SupervisorDConfigMapName: "supervisord-config",
+			SSHDConfigMapName:        "sshd-config",
+			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+			DockerEnabled:            dockerEnabled,
+		}
+	}
+
+	tests := []struct {
+		name          string
+		dockerEnabled bool
+	}{
+		{
+			name:          "docker enabled renders docker-proxy sidecar",
+			dockerEnabled: true,
+		},
+		{
+			name:          "docker disabled omits docker-proxy sidecar",
+			dockerEnabled: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := worker.RenderNodeSetStatefulSet(
+				"test-cluster",
+				createNodeSet(tt.dockerEnabled),
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				false,
+				false,
+				"",
+			)
+			assert.NoError(t, err)
+
+			var hasDockerProxyContainer bool
+			for _, container := range result.Spec.Template.Spec.Containers {
+				if container.Name == consts.ContainerNameDockerProxy {
+					hasDockerProxyContainer = true
+				}
+				if container.Name == consts.ContainerNameSlurmd {
+					assertEnvValue(t, container.Env, consts.EnvDockerEnabled, strconv.FormatBool(tt.dockerEnabled))
+				}
+			}
+			assert.Equal(t, tt.dockerEnabled, hasDockerProxyContainer,
+				"docker-proxy sidecar presence mismatch")
 		})
 	}
 }

@@ -243,6 +243,11 @@ type NodeSetSpec struct {
 	// +kubebuilder:validation:Optional
 	GPU GPUSpec `json:"gpu,omitempty"`
 
+	// Docker defines the settings related to Docker support for Slurm workers.
+	//
+	// +kubebuilder:validation:Optional
+	Docker DockerSpec `json:"docker,omitempty"`
+
 	// Topology defines network-topology settings for this NodeSet.
 	//
 	// +kubebuilder:validation:Optional
@@ -533,6 +538,17 @@ type NodeSetTopology struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="root"
 	Fabric string `json:"fabric,omitempty"`
+}
+
+// DockerSpec defines the settings related to Docker support
+type DockerSpec struct {
+	// Enabled indicates whether Docker is available on the Nodes of the NodeSet.
+	// Docker requires dedicated image-storage disks for storing OCI data,
+	// so it must be disabled on clusters deployed without them.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // GPUSpec defines the settings related to GPU support
