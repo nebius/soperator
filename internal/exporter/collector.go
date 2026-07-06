@@ -89,6 +89,13 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 		"state_is_planned",
 		"state_is_not_responding",
 		"state_is_invalid",
+		"state_is_cloud",
+		"state_is_power_down",
+		"state_is_power_drain",
+		"state_is_powered_down",
+		"state_is_powering_down",
+		"state_is_powering_up",
+		"state_is_power_up",
 		"is_unavailable",
 		"reservation_name",
 		"address",
@@ -166,7 +173,12 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 
 // isNodeUnavailable checks if a node is in unavailable state
 // Unavailable state: DOWN+* or IDLE+DRAIN+* or NOTRESPONDING or UNKNOWN or ERROR or FAIL or INVALID
+// Power-managed nodes (powering up/down or powered down) are part of the normal cloud
+// lifecycle and are never reported as unavailable.
 func isNodeUnavailable(node slurmapi.Node) bool {
+	if node.IsPowerManaged() {
+		return false
+	}
 	if node.IsDownState() {
 		return true
 	}
@@ -263,8 +275,10 @@ func (c *MetricsCollector) updateNodeFailureMetrics(currentNodes []slurmapi.Node
 
 	for _, node := range currentNodes {
 		if existingNode, exists := previousNodesMap[node.Name]; exists {
-			wasFailed := existingNode.IsDownState() || existingNode.IsDrainState()
-			isFailed := node.IsDownState() || node.IsDrainState()
+			// Power-managed nodes set DOWN/DRAIN as part of the normal cloud lifecycle,
+			// so they must not count as failures.
+			wasFailed := (existingNode.IsDownState() || existingNode.IsDrainState()) && !existingNode.IsPowerManaged()
+			isFailed := (node.IsDownState() || node.IsDrainState()) && !node.IsPowerManaged()
 			if !wasFailed && isFailed {
 				var reason string
 				if node.Reason != nil {
@@ -429,6 +443,13 @@ func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq
 				boolToLabelValue(node.IsPlannedState()),       // New flag: use empty string instead of "false"
 				boolToLabelValue(node.IsNotRespondingState()), // New flag: use empty string instead of "false"
 				boolToLabelValue(node.IsInvalidState()),       // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsCloudState()),         // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPowerDownState()),     // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPowerDrainState()),    // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPoweredDownState()),   // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPoweringDownState()),  // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPoweringUpState()),    // New flag: use empty string instead of "false"
+				boolToLabelValue(node.IsPowerUpState()),       // New flag: use empty string instead of "false"
 				boolToLabelValue(isNodeUnavailable(node)),     // New flag: use empty string instead of "false"
 				trimReservationName(node.Reservation),
 				node.Address,
