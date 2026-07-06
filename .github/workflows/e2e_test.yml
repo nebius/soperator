@@ -201,7 +201,6 @@ jobs:
       - name: Install Nebius CLI
         shell: bash
         env:
-          NEBIUS_CLI_VERSION: "0.12.164"
           NEBIUS_INSTALL_FOLDER: "${{ github.workspace }}/bin"
         run: |
           echo "Installing Nebius CLI ${NEBIUS_CLI_VERSION}..."
@@ -268,6 +267,10 @@ jobs:
           echo "go:"
           which go
           go version
+
+          echo "python:"
+          which python
+          python --version
 
       - name: Find latest successful build run on current branch
         id: find_build
