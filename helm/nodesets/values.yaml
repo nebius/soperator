@@ -26,13 +26,13 @@ priorityClasses:
 images:
   munge:
     repository: "cr.eu-north1.nebius.cloud/soperator/munge"
-    tag: "4.1.2-slurm25.11.5"
+    tag: "4.1.3-slurm25.11.5"
   sssd:
     repository: "cr.eu-north1.nebius.cloud/soperator/sssd"
     tag: "2.9.4-1-63"
   slurmd:
     repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-    tag: "4.1.2-slurm25.11.5"
+    tag: "4.1.3-slurm25.11.5"
   nodeExporter:
     repository: "cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter"
     tag: "v1.10.2"
@@ -130,7 +130,7 @@ nodesets:
       # Optional
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-        tag: "4.1.2-slurm25.11.5"
+        tag: "4.1.3-slurm25.11.5"
         pullPolicy: "IfNotPresent"
       customEnv:
         - name: "NVIDIA_DRIVER_CAPABILITIES"
@@ -220,7 +220,7 @@ nodesets:
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/munge"
         # Optional
-        tag: "4.1.2-slurm25.11.5"
+        tag: "4.1.3-slurm25.11.5"
         pullPolicy: "IfNotPresent"
       # Munge container resources
       resources:
