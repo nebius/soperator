@@ -400,7 +400,7 @@ def _slurm_numeric_range_contains(
         return False
 
     padded_width: int = 0
-    if start_value.startswith("0") or end_value.startswith("0"):
+    if _has_leading_zero_padding(start_value) or _has_leading_zero_padding(end_value):
         padded_width = max(len(start_value), len(end_value))
 
     if padded_width > 0:
@@ -428,6 +428,11 @@ def _slurm_numeric_range_contains(
             return True
 
     return False
+
+
+def _has_leading_zero_padding(value: str) -> bool:
+    """Return True when a numeric range endpoint uses explicit zero padding."""
+    return len(value) > 1 and value.startswith("0")
 
 
 def wait_for_hostname_in_topology_conf(

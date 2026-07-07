@@ -923,6 +923,25 @@ class TestTopologyConfContainsHostname(unittest.TestCase):
                 )
             )
 
+    def test_contains_single_digit_hostname_in_unpadded_range_ending_with_two_digits(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            topology_conf = Path(temp_dir) / "topology.conf"
+            with open(topology_conf, "w") as f:
+                f.write(
+                    "BlockName=computenvlinstancegroup-e00nd50be1dk3g89f3 "
+                    "Nodes=worker-rack1-[0-12]\n"
+                    "BlockSizes=13\n"
+                )
+
+            self.assertTrue(
+                worker_init.topology_conf_contains_hostname(
+                    topology_conf,
+                    "worker-rack1-8",
+                )
+            )
+
     def test_does_not_match_hostname_outside_slurm_range(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             topology_conf = Path(temp_dir) / "topology.conf"
