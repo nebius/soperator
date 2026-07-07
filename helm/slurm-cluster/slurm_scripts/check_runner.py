@@ -160,7 +160,7 @@ def main():
     try:
         with open(CHECKS_CONFIG, encoding="utf-8") as f:
             checks_data = json.load(f)
-        checks = [load_check(entry) for entry in checks_data]
+        checks = [Check(**entry) for entry in checks_data]
     except Exception as e:
         logging.error(f"Failed to open checks config {CHECKS_CONFIG}, exiting: {e}")
         sys.exit(0)
@@ -200,18 +200,6 @@ def filter_applicable_checks(checks: list[Check]) -> list[Check]:
     # Filter by node_state (needs node info)
     checks = filter_by_node_state(checks)
     return checks
-
-def load_check(entry: dict) -> Check:
-    entry = dict(entry)
-    skip_for_reservation_prefixes = entry.pop("skip_for_reservation_prefixes", [])
-    if skip_for_reservation_prefixes:
-        check_name = entry.get("name", "noname")
-        logging.warning(
-            f"Check {check_name} uses deprecated field skip_for_reservation_prefixes="
-            f"{json.dumps(skip_for_reservation_prefixes)}; it is ignored and "
-            "reservation-based skipping is no longer supported."
-        )
-    return Check(**entry)
 
 def filter_by_context(checks: list[Check]) -> list[Check]:
     # Skip if all checks don't care
