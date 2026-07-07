@@ -4,8 +4,8 @@ helmRepository:
     url: oci://cr.eu-north1.nebius.cloud/soperator
     type: oci
   kruise:
-    url: https://openkruise.github.io/charts/
-    type: default
+    url: oci://cr.eu-north1.nebius.cloud/soperator
+    type: oci
   certManager:
     url: https://charts.jetstack.io
     type: default
@@ -47,7 +47,7 @@ certManager:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: v1.19.*
+  version: v1.20.*
   namespace: cert-manager-system
   releaseName: cert-manager
   values: null
@@ -155,6 +155,19 @@ observability:
     publicEndpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
     namespace: logs-system
     extraHeaders: {}
+    # These values are rendered as exporter sending_queue.batch settings.
+    # The chart intentionally does not use the batch processor for collector pipelines.
+    # https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/44845#issuecomment-3877056774
+    batch:
+      timeout: 1s
+      sendBatchSize: 2000
+      sendBatchMaxSize: 5000
+    # Exporter queue sizing shared by logs, events, and jail logs collectors.
+    # queueSize is measured in telemetry items because exporter queues use sizer: items
+    # (log records for logs/events), and it applies separately to each exporter.
+    sendingQueue:
+      queueSize: 30000
+      numConsumers: 10
     metrics:
       enabled: true
       interval: 30s
@@ -162,18 +175,27 @@ observability:
     logs:
       version: 0.149.*
       interval: 15m
-      timeout: 15m
+      timeout: 30m
       install:
         remediation:
-          retries: 3
+          retries: 6
       upgrade:
         remediation:
-          retries: 3
+          retries: 6
           remediateLastFailure: true
       values:
+        enableFileStorage: true
+        useGoMemLimit: true
         jailLogs:
           enabled: true
           pollInterval: 30s
+          enableFileStorage: true
+          useGoMemLimit: true
+          deleteAfterRead:
+            enabled: true
+            # Nebius O11y agent fork option; not part of upstream filelogreceiver.
+            # Files are deleted only after they have not been modified for at least this duration.
+            minAge: 15m
           resources:
             requests:
               memory: 200Mi
@@ -209,6 +231,8 @@ observability:
           retries: 3
           remediateLastFailure: true
       values:
+        enableFileStorage: true
+        useGoMemLimit: true
         resources:
           requests:
             memory: 128Mi
@@ -231,7 +255,7 @@ observability:
     crds:
       interval: 5m
       timeout: 5m
-      version: 0.0.3
+      version: 0.10.1
       install:
         crds: CreateReplace
         remediation:
@@ -244,18 +268,18 @@ observability:
       driftDetection:
         mode: warn
     interval: 5m
-    timeout: 5m
-    version: 0.39.*
+    timeout: 30m
+    version: 0.80.*
     namespace: monitoring-system
     releaseName: metrics
     install:
       crds: Skip
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       crds: Skip
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     # Source of the o11y remote-write bearer token, consumed per `observability.publicEndpointTokenKind`:
     #   secret   - vmagent references the token via remoteWrite[].bearerTokenSecret (operator-managed),
@@ -316,7 +340,7 @@ observability:
           externalLabels: {}
           remoteWriteSettings: {}
           remoteWrite:
-            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
+            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8428/api/v1/write
           resources:
             requests:
               memory: 10Gi
@@ -356,7 +380,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 0.9.*
+    version: 0.13.*
     namespace: logs-system
     releaseName: vm-logs
     install:
@@ -385,18 +409,18 @@ observability:
   dcgmExporter:
     enabled: true
     interval: 5m
-    timeout: 5m
+    timeout: 30m
     version: 4.1.3
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     install:
       crds: CreateReplace
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       crds: CreateReplace
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     values:
       hpcJobMapDir: /var/run/nebius/slurm
@@ -409,21 +433,81 @@ observability:
           cpu: 100m
     driftDetection:
       mode: warn
+  ncclProfiles:
+    enabled: false
+    interval: 5m
+    timeout: 5m
+    version:
+      bedag: 2.0.0
+      opentelemetryCollector: 0.149.*
+    install:
+      crds: Skip
+      remediation:
+        retries: 3
+    upgrade:
+      crds: Skip
+      remediation:
+        retries: 3
+        remediateLastFailure: true
+    driftDetection:
+      mode: warn
+    releaseName: opentelemetry-collector-nccl-profiles
+    configMapOverrideValues: null
+    collectorOverrideValues: null
+    values:
+      # or nodeLocal
+      mode: shared
+      resources:
+        requests:
+          memory: 200Mi
+          cpu: 500m
+        limits:
+          memory: 1Gi
+      useGoMemLimit: true
+      nebiusO11yAgentVersion: 2.0.10
+      metricsEndpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics
+      metricsExporterTimeout: 15s
+      # These values are rendered as exporter sending_queue.batch settings.
+      # The chart intentionally does not use the batch processor for collector pipelines.
+      batch:
+        timeout: 1s
+        sendBatchSize: 2000
+        sendBatchMaxSize: 5000
+      # Measured in metric data points because the exporter queue uses sizer: items.
+      sendingQueue:
+        queueSize: 30000
+        numConsumers: 10
+      metrics:
+        enabled: true
+        interval: 30s
+        scrapeTimeout: 10s
+      dumpDir: /mnt/jail/opt/soperator-outputs/nccl_profiles
+      pollInterval: 30s
+      exportLabels:
+        slurmJobId: slurm_job_id
+        slurmStepId: slurm_step_id
+        hostnamePid: hostname_pid
+      enableFileStorage: true
+      deleteAfterRead:
+        enabled: true
+        # Nebius O11y agent fork option; not part of upstream filelogreceiver.
+        # Files are deleted only after they have not been modified for at least this duration.
+        minAge: 15m
 securityProfilesOperator:
   enabled: true
   interval: 5m
-  timeout: 5m
+  timeout: 30m
   version: 0.8.5-soperator
   releaseName: security-profiles-operator
   namespace: security-profiles-operator-system
   install:
     crds: CreateReplace
     remediation:
-      retries: 3
+      retries: 6
   upgrade:
     crds: CreateReplace
     remediation:
-      retries: 3
+      retries: 6
       remediateLastFailure: true
   values:
     daemon:
@@ -465,15 +549,15 @@ slurmCluster:
     enabled: true
     releaseName: slurm-cluster-storage
     interval: 5m
-    timeout: 5m
+    timeout: 30m
     values: null
     overrideValues: null
     install:
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     driftDetection:
       mode: warn
@@ -481,6 +565,7 @@ slurmCluster:
     mode: warn
 nodesets:
   enabled: false
+  clusterName: ""
   driftDetection:
     mode: warn
   interval: 5m
@@ -548,17 +633,17 @@ soperator:
   kruise:
     enabled: true
     interval: 5m
-    timeout: 5m
-    version: 1.8.0
+    timeout: 30m
+    version: 1.8.3-custom
     releaseName: soperator-kruise
     install:
       crds: CreateReplace
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       crds: CreateReplace
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     overrideValues:
       crds:
@@ -570,7 +655,6 @@ soperator:
           tag: v1.8.3
         resources:
           limits:
-            cpu: 1000m
             memory: 2Gi
           requests:
             cpu: 1000m
@@ -601,16 +685,16 @@ soperator:
   nodeConfigurator:
     enabled: true
     interval: 5m
-    timeout: 5m
+    timeout: 30m
     releaseName: soperator-node-configurator
     install:
       crds: Skip
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       crds: Skip
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     values:
       rebooter:
@@ -664,7 +748,7 @@ notifier:
     mode: warn
 csiDriverNfs:
   interval: 5m
-  timeout: 5m
+  timeout: 20m
   version: 4.11.0
   namespace: nfs-system
   releaseName: csi-driver-nfs
@@ -673,11 +757,11 @@ csiDriverNfs:
   install:
     crds: Skip
     remediation:
-      retries: 3
+      retries: 6
   upgrade:
     crds: Skip
     remediation:
-      retries: 3
+      retries: 6
       remediateLastFailure: true
   driftDetection:
     mode: warn

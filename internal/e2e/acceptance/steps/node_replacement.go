@@ -108,7 +108,7 @@ func (s *NodeReplacement) aMaintenanceEventIsTriggeredForThatNode(ctx context.Co
 	patch := fmt.Sprintf(
 		`{"status":{"conditions":[{"type":"NebiusMaintenanceScheduled","status":"True","reason":"AcceptanceTest","message":"Maintenance scheduled for node","lastTransitionTime":"%s"}]}}`,
 		time.Now().UTC().Format(time.RFC3339))
-	if _, err := s.exec.Run(ctx, "kubectl", "patch", "node", s.originalInstanceID,
+	if _, err := s.exec.Kubectl().Run(ctx, "patch", "node", s.originalInstanceID,
 		"--subresource=status", "--type=strategic", "-p", patch); err != nil {
 		return fmt.Errorf("patch maintenance condition: %w", err)
 	}
@@ -138,7 +138,7 @@ func (s *NodeReplacement) theTestJobIsCancelled(ctx context.Context) error {
 func (s *NodeReplacement) theOldInstanceIsRemoved(ctx context.Context) error {
 	originalInstanceID := s.originalInstanceID
 	return s.exec.WaitFor(ctx, "old instance removal", nodeReplacementRemoveTimeout, 30*time.Second, func(waitCtx context.Context) (bool, error) {
-		_, err := s.exec.Run(waitCtx, "nebius", "compute", "instance", "get", "--id", originalInstanceID, "--format", "json")
+		_, err := s.exec.Local().Run(waitCtx, "nebius", "compute", "instance", "get", "--id", originalInstanceID, "--format", "json")
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
 				return true, nil

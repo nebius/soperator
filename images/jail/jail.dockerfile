@@ -2,8 +2,8 @@
 
 ARG CUDA_VERSION
 ARG SLURM_VERSION
-# https://github.com/nebius/ml-containers/pull/88
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260605082538 AS jail
+# https://github.com/nebius/ml-containers/pull/90
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260624091523 AS jail
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
@@ -33,6 +33,11 @@ RUN apt update && \
         aptitude && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+COPY ansible/squashfuse.yml /opt/ansible/squashfuse.yml
+COPY ansible/roles/squashfuse /opt/ansible/roles/squashfuse
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local squashfuse.yml -t squashfuse
 
 COPY ansible/sssd.yml /opt/ansible/sssd.yml
 COPY ansible/roles/sssd /opt/ansible/roles/sssd
@@ -128,4 +133,3 @@ COPY --from=untaped /jail_restic /jail_restic
 COPY images/jail/populate_jail_entrypoint.sh /opt/bin/
 RUN chmod +x /opt/bin/populate_jail_entrypoint.sh
 ENTRYPOINT ["/opt/bin/populate_jail_entrypoint.sh"]
-

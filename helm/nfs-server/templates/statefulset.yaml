@@ -6,7 +6,7 @@ metadata:
     {{- include "nfs-server.labels" . | nindent 4 }}
 spec:
   serviceName: {{ include "nfs-server.fullname" . }}
-  replicas: 1  # we can't have more than one NFS server instance
+  replicas: {{ include "nfs-server.replicas" . }}
   updateStrategy:
     type: {{ .Values.updateStrategy.type }}
   selector:

@@ -1,0 +1,32 @@
+suite: test VictoriaMetrics stack chart version
+templates:
+  - templates/vm-stack.yaml
+
+tests:
+  - it: should use requested VictoriaMetrics stack chart version
+    asserts:
+      - equal:
+          path: spec.chart.spec.version
+          value: 0.80.*
+---
+suite: test VictoriaMetrics operator CRD chart version
+templates:
+  - templates/victoria-metrics-operator-crds.yaml
+
+tests:
+  - it: should use requested VictoriaMetrics operator CRD chart version
+    asserts:
+      - equal:
+          path: spec.chart.spec.version
+          value: 0.10.1
+---
+suite: test VictoriaLogs chart version
+templates:
+  - templates/vm-logs.yaml
+
+tests:
+  - it: should use requested VictoriaLogs chart version from values
+    asserts:
+      - equal:
+          path: spec.chart.spec.version
+          value: 0.13.*

@@ -6,6 +6,12 @@ Supports two modes:
   wait-controller  - Wait for Slurm controller (slurmctld) to be ready
   wait-topology    - Wait for topology data from ConfigMap (for ephemeral nodes)
 
+Environment Variables (all modes):
+    WORKER_INIT_RANDOM_DELAY_SECONDS: Upper bound of a random startup delay applied before
+        running any command. The actual delay is picked uniformly from
+        [0, WORKER_INIT_RANDOM_DELAY_SECONDS]. Spreads slurmd registrations across workers to
+        avoid overloading the controller. Unset or 0 disables the delay (default: 0).
+
 Environment Variables (wait-controller):
     CONTROLLER_MAX_ATTEMPTS: Max ping attempts (default: 60)
     CONTROLLER_POLL_INTERVAL: Seconds between attempts (default: 5)
@@ -15,13 +21,14 @@ Environment Variables (wait-topology):
     TOPOLOGY_CONFIGMAP_PATH: Path to mounted ConfigMap (default: /tmp/slurm/topology-node-labels)
     TOPOLOGY_WAIT_TIMEOUT: Max wait time in seconds (default: 180)
     TOPOLOGY_POLL_INTERVAL: Poll interval in seconds (default: 5)
-    SLURM_TOPOLOGY_PLUGIN: Slurm topology plugin override (default: read from slurm.conf)
+    SLURM_TOPOLOGY_PLUGIN: Optional override; unset reads slurm_base.conf.noedit.
 """
 
 import argparse
 import json
 import logging
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -41,7 +48,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 # Constants
 SLURM_CONFIG_LINK_SOURCE: Path = Path("/mnt/jail/etc/slurm")
 SLURM_CONFIG_LINK_TARGET: Path = Path("/etc/slurm")
-SLURM_CONFIG_PATH: Path = Path("/etc/slurm/slurm.conf")
+SLURM_CONFIG_PATH: Path = Path("/etc/slurm/slurm_base.conf.noedit")
 SLURM_TOPOLOGY_CONFIG_PATH: Path = Path("/etc/slurm/topology.conf")
 
 TOPOLOGY_PLUGIN_TREE: str = "topology/tree"
@@ -49,6 +56,32 @@ TOPOLOGY_PLUGIN_BLOCK: str = "topology/block"
 
 
 # region Common env functions
+
+
+def apply_random_startup_delay() -> None:
+    """Sleep a random duration before running commands to spread out worker startup.
+
+    The upper bound is read from WORKER_INIT_RANDOM_DELAY_SECONDS; the actual delay is picked
+    uniformly from [0, upper_bound]. A non-positive or unparsable value disables the delay.
+    """
+    raw_value: str = os.environ.get("WORKER_INIT_RANDOM_DELAY_SECONDS", "0").strip()
+    try:
+        max_delay: int = int(raw_value)
+    except ValueError:
+        logger.warning(
+            "Invalid WORKER_INIT_RANDOM_DELAY_SECONDS=%r, skipping startup delay",
+            raw_value,
+        )
+        return
+
+    if max_delay <= 0:
+        return
+
+    delay: int = random.randint(0, max_delay)
+    logger.info(
+        "Sleeping %ds (random, max %ds) before starting worker init", delay, max_delay
+    )
+    time.sleep(delay)
 
 
 def get_from_env_required(name: str) -> str:
@@ -200,15 +233,38 @@ def get_topology_poll_interval() -> int:
     return int(os.environ.get("TOPOLOGY_POLL_INTERVAL", "5"))
 
 
-def get_topology_plugin(slurm_conf_path: Path = SLURM_CONFIG_PATH) -> str:
+def get_topology_fabric() -> str:
+    """Get the IB fabric / top-of-tree switch name for this node's NodeSet.
+
+    Must match the operator's per-fabric root switch (spec.topology.fabric), which the operator
+    renders as the parentless switch in topology.conf. Defaults to "root" for NodeSets without an
+    explicit fabric, matching the operator's default single-root tree.
+    """
+    fabric: str = os.environ.get("SLURM_TOPOLOGY_FABRIC", "").strip()
+    return fabric or "root"
+
+
+def unknown_switch_name(fabric: str) -> str:
+    """Return the catch-all switch/block name for nodes of the given fabric without IB labels.
+
+    Must match the operator's unknownSwitchName: the default fabric keeps the legacy "unknown"
+    name; named fabrics use "<fabric>.unknown".
+    """
+    fabric = (fabric or "root").strip()
+    if fabric == "root":
+        return "unknown"
+    return f"{fabric}.unknown"
+
+
+def get_topology_plugin(slurm_config_path: Path = SLURM_CONFIG_PATH) -> str:
     """Get the configured Slurm topology plugin."""
     topology_plugin: str = os.environ.get("SLURM_TOPOLOGY_PLUGIN", "").strip()
     if topology_plugin:
         return topology_plugin.lower()
 
-    slurm_conf_path: Path = Path(slurm_conf_path)
+    slurm_config_path: Path = Path(slurm_config_path)
     try:
-        with slurm_conf_path.open("r") as f:
+        with slurm_config_path.open("r") as f:
             pattern: re.Pattern[str] = re.compile(
                 r"^TopologyPlugin\s*=\s*(\S+)", re.IGNORECASE
             )
@@ -218,7 +274,7 @@ def get_topology_plugin(slurm_conf_path: Path = SLURM_CONFIG_PATH) -> str:
                 if match:
                     return match.group(1).lower()
     except (IOError, OSError) as e:
-        logger.info("Failed to read topology plugin from %s: %s", slurm_conf_path, e)
+        logger.info("Failed to read topology plugin from %s: %s", slurm_config_path, e)
 
     return TOPOLOGY_PLUGIN_TREE
 
@@ -434,7 +490,7 @@ def read_topology_for_node(topology_path: Path, node_name: str) -> str:
 
 
 def format_slurm_topology(
-    topology: str, topology_plugin: str = TOPOLOGY_PLUGIN_TREE
+    topology: str, topology_plugin: str = TOPOLOGY_PLUGIN_TREE, fabric: str = "root"
 ) -> str:
     """
     Format topology string for Slurm --conf option.
@@ -470,6 +526,7 @@ def format_slurm_topology(
     topology: str = topology.strip()
     topology_plugin: str = (topology_plugin or TOPOLOGY_PLUGIN_TREE).strip().lower()
     block_topology: bool = topology_plugin == TOPOLOGY_PLUGIN_BLOCK
+    fabric: str = (fabric or "root").strip()
 
     if topology.startswith("{"):
         try:
@@ -478,7 +535,7 @@ def format_slurm_topology(
             if block_topology:
                 return _format_block_topology(parts)
 
-            return _format_tier_topology(parts)
+            return _format_tier_topology(parts, fabric)
         except json.JSONDecodeError:
             logger.warning("Failed to parse topology as JSON: %s", topology)
 
@@ -489,10 +546,10 @@ def format_slurm_topology(
 
         colon_parts: list[str] = topology.split(":")
 
-        # "name:leaf" -> add root: "topology=name:root:leaf"
+        # "name:leaf" -> add the fabric root: "topology=name:<fabric>:leaf"
         # "name:sw1:sw2:sw3" -> already has intermediates, keep as-is
         if len(colon_parts) == 2:
-            return f"topology={colon_parts[0]}:root:{colon_parts[1]}"
+            return f"topology={colon_parts[0]}:{fabric}:{colon_parts[1]}"
 
         return f"topology={topology}"
 
@@ -503,12 +560,12 @@ def format_slurm_topology(
         if block_topology:
             return _format_block_topology(parts)
 
-        return _format_tier_topology(parts)
+        return _format_tier_topology(parts, fabric)
 
     if block_topology:
         return f"topology=default:{topology}"
 
-    return f"topology=default:root:{topology}"
+    return f"topology=default:{fabric}:{topology}"
 
 
 def _parse_key_value_topology(topology: str) -> dict[str, str]:
@@ -544,12 +601,13 @@ def _format_block_topology(parts: dict[str, str]) -> str:
     return f"topology=default:{block_name}"
 
 
-def _format_tier_topology(parts: dict[str, str]) -> str:
+def _format_tier_topology(parts: dict[str, str], fabric: str = "root") -> str:
     """
     Format tier-based topology from a dictionary.
 
     Args:
         parts: Dictionary with tier keys like {"tier-1": "switch1", "tier-2": "rack1"}
+        fabric: IB fabric / top-of-tree switch name (the operator's per-fabric root).
 
     Returns:
         Formatted Slurm Topology string with the full switch hierarchy.
@@ -577,21 +635,28 @@ def _format_tier_topology(parts: dict[str, str]) -> str:
             except (ValueError, IndexError):
                 continue
 
+    fabric = (fabric or "root").strip()
+
     if tier_keys:
         # Sort descending: highest tier first (spine/root-side), lowest last (leaf)
         tier_keys.sort(key=lambda x: x[0], reverse=True)
         switches: list[str] = [parts[k] for _, k in tier_keys]
-        return f"topology=default:root:{':'.join(switches)}"
+        return f"topology=default:{fabric}:{':'.join(switches)}"
 
     if parts:
         first_value: str = next(iter(parts.values()))
-        return f"topology=default:root:{first_value}"
+        return f"topology=default:{fabric}:{first_value}"
 
     return ""
 
 
 def apply_node_topology(hostname: str, topology: str) -> None:
-    """Apply topology to a node via scontrol update."""
+    """Apply topology and clear manual drain state for a resumed worker.
+
+    Users may drain POWERED_DOWN workers to prevent Slurm from automatically
+    powering them up for queued jobs. When this worker is actually resumed,
+    clear that drain marker so it can schedule jobs again.
+    """
     try:
         node_addr: str = get_node_addr()
         cmd = [
@@ -653,9 +718,12 @@ def wait_for_topology() -> None:
     topology_plugin: str = get_topology_plugin()
 
     if not is_gpu_enabled():
-        topology: str = "topology=default:root:unknown"
+        fabric: str = get_topology_fabric()
+        unknown: str = unknown_switch_name(fabric)
         if topology_plugin == TOPOLOGY_PLUGIN_BLOCK:
-            topology = "topology=default:unknown"
+            topology: str = f"topology=default:{unknown}"
+        else:
+            topology = f"topology=default:{fabric}:{unknown}"
 
         logger.info(
             "NODESET_GPU_ENABLED is not set to 'true', "
@@ -721,7 +789,9 @@ def wait_for_topology() -> None:
         )
         time.sleep(poll_interval)
 
-    topology: str = format_slurm_topology(raw_topology, topology_plugin)
+    topology: str = format_slurm_topology(
+        raw_topology, topology_plugin, get_topology_fabric()
+    )
     if not topology:
         logger.error("Failed to format topology from raw data: %s", raw_topology)
         sys.exit(1)
@@ -746,6 +816,8 @@ def main():
     )
 
     args: argparse.Namespace = parser.parse_args()
+
+    apply_random_startup_delay()
 
     # Ensure wait-controller always runs first
     commands: list[str] = sorted(

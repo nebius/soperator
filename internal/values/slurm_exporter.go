@@ -7,6 +7,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 )
 
 type SlurmExporter struct {
@@ -39,15 +40,25 @@ type SlurmExporter struct {
 	// CollectionInterval specifies how often to collect metrics from SLURM APIs
 	CollectionInterval prometheusv1.Duration
 
+	// JobSource selects the Slurm API used for job collection ("controller" or "accounting").
+	JobSource string
+
+	// AccountingJobsLookback is the time window queried from the accounting API.
+	AccountingJobsLookback prometheusv1.Duration
+
 	// ServiceAccountName is the ServiceAccount to be used by exporter pods.
 	ServiceAccountName string
+
+	Deployment Deployment
 }
 
-func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurmv1.SlurmExporter) SlurmExporter {
+func buildSlurmExporterFrom(namePrefix string, maintenance *consts.MaintenanceMode, exporter *slurmv1.SlurmExporter) SlurmExporter {
 	enabled := false
 	if exporter.Enabled != nil {
 		enabled = *exporter.Enabled
 	}
+
+	deploymentName := resourcegetter.BuildPrefixedName(namePrefix, "slurm-exporter")
 
 	return SlurmExporter{
 		SlurmNode:         *exporter.SlurmNode.DeepCopy(),
@@ -62,9 +73,12 @@ func buildSlurmExporterFrom(maintenance *consts.MaintenanceMode, exporter *slurm
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),
 		},
-		Maintenance:        maintenance,
-		Container:          *exporter.ExporterContainer.DeepCopy(),
-		CollectionInterval: exporter.CollectionInterval,
-		ServiceAccountName: exporter.ServiceAccountName,
+		Maintenance:            maintenance,
+		Container:              *exporter.ExporterContainer.DeepCopy(),
+		CollectionInterval:     exporter.CollectionInterval,
+		JobSource:              exporter.JobSource,
+		AccountingJobsLookback: exporter.AccountingJobsLookback,
+		ServiceAccountName:     exporter.ServiceAccountName,
+		Deployment:             buildDeploymentFrom(deploymentName),
 	}
 }

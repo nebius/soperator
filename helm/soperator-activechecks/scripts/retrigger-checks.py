@@ -6,6 +6,7 @@ import json
 import datetime
 
 NS = os.environ["NAMESPACE"]
+SLURM_CLUSTER_REF_NAME = os.environ["SLURM_CLUSTER_REF_NAME"]
 
 logging.Formatter.converter = time.gmtime
 logging.basicConfig(
@@ -27,8 +28,8 @@ def get_active_checks():
     ]))
     active_checks = []
     for it in data.get("items", []):
-        rac = it.get("spec", {}).get("runAfterCreation")
-        if rac:
+        spec = it.get("spec", {})
+        if spec.get("runAfterCreation") and spec.get("slurmClusterRefName") == SLURM_CLUSTER_REF_NAME:
             active_checks.append(it["metadata"]["name"])
     return active_checks
 
