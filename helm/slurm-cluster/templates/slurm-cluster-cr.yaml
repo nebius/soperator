@@ -154,6 +154,9 @@ spec:
         args: {{- .Values.slurmNodes.accounting.slurmdbd.args | toYaml | nindent 8 }}
         {{- end }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.accounting.slurmdbd.imagePullPolicy | quote }}
+        {{- with .Values.slurmNodes.accounting.slurmdbd.imagePullSecrets }}
+        imagePullSecrets: {{- toYaml . | nindent 8 }}
+        {{- end }}
         appArmorProfile: {{ default "unconfined" .Values.slurmNodes.accounting.slurmdbd.appArmorProfile | quote }}
       {{- if .Values.slurmNodes.accounting.enabled }}
         port: {{ default 6819 .Values.slurmNodes.accounting.slurmdbd.port }}
@@ -196,6 +199,10 @@ spec:
         enabled: {{ default false .Values.slurmNodes.accounting.mariadbOperator.enabled }}
         protectedSecret: {{ .Values.slurmNodes.accounting.mariadbOperator.protectedSecret }}
         image: {{ required "mariadb image" .Values.images.mariaDB | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.accounting.mariadbOperator.imagePullPolicy | quote }}
+        {{- with .Values.slurmNodes.accounting.mariadbOperator.imagePullSecrets }}
+        imagePullSecrets: {{- toYaml . | nindent 8 }}
+        {{- end }}
         resources:
           cpu: {{ required ".Values.slurmNodes.accounting.mariadbOperator.resources.cpu must be provided." .Values.slurmNodes.accounting.mariadbOperator.resources.cpu | quote}}
           memory: {{ required ".Values.slurmNodes.accounting.mariadbOperator.resources.memory must be provided." .Values.slurmNodes.accounting.mariadbOperator.resources.memory | quote}}
@@ -240,6 +247,9 @@ spec:
       slurmctld:
         image: {{ required "slurmctld image" .Values.images.slurmctld | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.controller.slurmctld.imagePullPolicy | quote }}
+        {{- with .Values.slurmNodes.controller.slurmctld.imagePullSecrets }}
+        imagePullSecrets: {{- toYaml . | nindent 8 }}
+        {{- end }}
         appArmorProfile: {{ default "unconfined" .Values.slurmNodes.controller.slurmctld.appArmorProfile | quote }}
         {{- if .Values.slurmNodes.controller.slurmctld.command }}
         command: {{- .Values.slurmNodes.controller.slurmctld.command | toYaml | nindent 8 }}
@@ -342,6 +352,9 @@ spec:
       sshd:
         image: {{ required "sshd image" .Values.images.sshd | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.login.sshd.imagePullPolicy | quote }}
+        {{- with .Values.slurmNodes.login.sshd.imagePullSecrets }}
+        imagePullSecrets: {{- toYaml . | nindent 8 }}
+        {{- end }}
         appArmorProfile: {{ default "unconfined" .Values.slurmNodes.login.sshd.appArmorProfile | quote }}
         {{- if .Values.slurmNodes.login.sshd.command }}
         command: {{- .Values.slurmNodes.login.sshd.command | toYaml | nindent 8 }}
@@ -474,6 +487,9 @@ spec:
       exporterContainer:
         image: {{ required "soperator exporter image" .Values.images.soperatorExporter | quote }}
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.exporter.imagePullPolicy | quote }}
+        {{- with .Values.slurmNodes.exporter.imagePullSecrets }}
+        imagePullSecrets: {{- toYaml . | nindent 8 }}
+        {{- end }}
         appArmorProfile: {{ default "unconfined" .Values.slurmNodes.exporter.appArmorProfile | quote }}
         {{- with (default dict .Values.slurmNodes.exporter.exporterContainer) }}
         {{- with .resources }}
@@ -509,6 +525,10 @@ spec:
       {{- include "slurm-cluster.customInitContainers" (dict "root" . "customInitContainers" .Values.slurmNodes.rest.customInitContainers "nodeExporter" .Values.slurmNodes.rest.nodeExporter) | nindent 6 }}
       rest:
         image: {{ required "rest image" .Values.images.slurmrestd | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.rest.rest.imagePullPolicy | quote }}
+        {{- with .Values.slurmNodes.rest.rest.imagePullSecrets }}
+        imagePullSecrets: {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- if .Values.slurmNodes.rest.rest.command }}
         command: {{- .Values.slurmNodes.rest.rest.command | toYaml | nindent 8 }}
         {{- end }}
@@ -540,6 +560,9 @@ spec:
     container:
       image: {{ required "sConfigController image" .Values.images.sConfigController | quote }}
       imagePullPolicy: {{ default "IfNotPresent" .Values.sConfigController.container.imagePullPolicy | quote }}
+      {{- with .Values.sConfigController.container.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 6 }}
+      {{- end }}
       resources:
         cpu: {{ required ".Values.sConfigController.container.resources.cpu must be provided." .Values.sConfigController.container.resources.cpu | quote}}
         memory: {{ required ".Values.sConfigController.container.resources.memory must be provided." .Values.sConfigController.container.resources.memory | quote}}

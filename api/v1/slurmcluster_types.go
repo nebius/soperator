@@ -1242,6 +1242,11 @@ type NodeContainer struct {
 	// +kubebuilder:default="IfNotPresent"
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
+	// ImagePullSecrets is a list of secret names in the same namespace used for pulling the container's image.
+	//
+	// +kubebuilder:validation:Optional
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
 	// Port defines the port the container exposes
 	//
 	// +kubebuilder:validation:Optional

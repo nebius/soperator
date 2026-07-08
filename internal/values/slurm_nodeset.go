@@ -19,11 +19,12 @@ type SlurmNodeSet struct {
 	Name            string
 	ParentalCluster client.ObjectKey
 
-	NodeSelector  map[string]string
-	Affinity      *corev1.Affinity
-	Tolerations   []corev1.Toleration
-	PriorityClass string
-	Annotations   map[string]string
+	NodeSelector     map[string]string
+	Affinity         *corev1.Affinity
+	Tolerations      []corev1.Toleration
+	PriorityClass    string
+	Annotations      map[string]string
+	ImagePullSecrets []corev1.LocalObjectReference
 
 	ContainerSlurmd           Container
 	ContainerMunge            Container
@@ -87,11 +88,12 @@ func BuildSlurmNodeSetFrom(
 			Name:      clusterName,
 		},
 		//
-		NodeSelector:  maps.Clone(nsSpec.NodeSelector),
-		Affinity:      nsSpec.Affinity.DeepCopy(),
-		Tolerations:   slices.Clone(nsSpec.Tolerations),
-		PriorityClass: nsSpec.PriorityClass,
-		Annotations:   maps.Clone(nsSpec.WorkerAnnotations),
+		NodeSelector:     maps.Clone(nsSpec.NodeSelector),
+		Affinity:         nsSpec.Affinity.DeepCopy(),
+		Tolerations:      slices.Clone(nsSpec.Tolerations),
+		PriorityClass:    nsSpec.PriorityClass,
+		Annotations:      maps.Clone(nsSpec.WorkerAnnotations),
+		ImagePullSecrets: slices.Clone(nsSpec.ImagePullSecrets),
 		//
 		ContainerSlurmd: buildContainerFrom(
 			slurmv1.NodeContainer{

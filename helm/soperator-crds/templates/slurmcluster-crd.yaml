@@ -1220,6 +1220,34 @@ spec:
                         type: array
                       image:
                         type: string
+                      imagePullPolicy:
+                        default: IfNotPresent
+                        description: ImagePullPolicy defines the image pull policy
+                        enum:
+                        - Always
+                        - Never
+                        - IfNotPresent
+                        type: string
+                      imagePullSecrets:
+                        description: ImagePullSecrets is a list of secret names in
+                          the same namespace used for pulling the container's image.
+                        items:
+                          description: |-
+                            LocalObjectReference contains enough information to let you locate the
+                            referenced object inside the same namespace.
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        type: array
                       volumeMounts:
                         items:
                           description: VolumeMount describes a mounting of a Volume
@@ -3363,6 +3391,34 @@ spec:
                         type: array
                       image:
                         type: string
+                      imagePullPolicy:
+                        default: IfNotPresent
+                        description: ImagePullPolicy defines the image pull policy
+                        enum:
+                        - Always
+                        - Never
+                        - IfNotPresent
+                        type: string
+                      imagePullSecrets:
+                        description: ImagePullSecrets is a list of secret names in
+                          the same namespace used for pulling the container's image.
+                        items:
+                          description: |-
+                            LocalObjectReference contains enough information to let you locate the
+                            referenced object inside the same namespace.
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        type: array
                       volumeMounts:
                         items:
                           description: VolumeMount describes a mounting of a Volume
@@ -5546,6 +5602,34 @@ spec:
                         type: array
                       image:
                         type: string
+                      imagePullPolicy:
+                        default: IfNotPresent
+                        description: ImagePullPolicy defines the image pull policy
+                        enum:
+                        - Always
+                        - Never
+                        - IfNotPresent
+                        type: string
+                      imagePullSecrets:
+                        description: ImagePullSecrets is a list of secret names in
+                          the same namespace used for pulling the container's image.
+                        items:
+                          description: |-
+                            LocalObjectReference contains enough information to let you locate the
+                            referenced object inside the same namespace.
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        type: array
                       volumeMounts:
                         items:
                           description: VolumeMount describes a mounting of a Volume
@@ -7694,6 +7778,34 @@ spec:
                         type: array
                       image:
                         type: string
+                      imagePullPolicy:
+                        default: IfNotPresent
+                        description: ImagePullPolicy defines the image pull policy
+                        enum:
+                        - Always
+                        - Never
+                        - IfNotPresent
+                        type: string
+                      imagePullSecrets:
+                        description: ImagePullSecrets is a list of secret names in
+                          the same namespace used for pulling the container's image.
+                        items:
+                          description: |-
+                            LocalObjectReference contains enough information to let you locate the
+                            referenced object inside the same namespace.
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        type: array
                       volumeMounts:
                         items:
                           description: VolumeMount describes a mounting of a Volume
@@ -17634,6 +17746,26 @@ spec:
                         type: boolean
                     type: object
                 type: object
+              imagePullSecrets:
+                description: ImagePullSecrets is a list of secret names in the same
+                  namespace used for pulling worker pod images.
+                items:
+                  description: |-
+                    LocalObjectReference contains enough information to let you locate the
+                    referenced object inside the same namespace.
+                  properties:
+                    name:
+                      default: ""
+                      description: |-
+                        Name of the referent.
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
+                  type: object
+                  x-kubernetes-map-type: atomic
+                type: array
               initialNumberEphemeralNodes:
                 default: 1
                 description: |-
@@ -29126,6 +29258,26 @@ spec:
                         - Never
                         - IfNotPresent
                         type: string
+                      imagePullSecrets:
+                        description: ImagePullSecrets is a list of secret names in
+                          the same namespace used for pulling the container's image.
+                        items:
+                          description: |-
+                            LocalObjectReference contains enough information to let you locate the
+                            referenced object inside the same namespace.
+                          properties:
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        type: array
                       livenessProbe:
                         description: LivenessProbe defines the liveness probe for
                           the container.
@@ -32984,6 +33136,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.
@@ -35189,6 +35362,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.
@@ -35779,6 +35973,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.
@@ -37971,6 +38186,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.
@@ -38580,6 +38816,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.
@@ -39117,6 +39374,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.
@@ -41906,6 +42184,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.
@@ -42448,6 +42747,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.
@@ -43019,6 +43339,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.
@@ -45533,6 +45874,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.
@@ -46083,6 +46445,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.
@@ -46651,6 +47034,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.
@@ -49467,6 +49871,27 @@ spec:
                             - Never
                             - IfNotPresent
                             type: string
+                          imagePullSecrets:
+                            description: ImagePullSecrets is a list of secret names
+                              in the same namespace used for pulling the container's
+                              image.
+                            items:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  default: ""
+                                  description: |-
+                                    Name of the referent.
+                                    This field is effectively required, but due to backwards compatibility is
+                                    allowed to be empty. Instances of this type with an empty value here are
+                                    almost certainly wrong.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            type: array
                           livenessProbe:
                             description: LivenessProbe defines the liveness probe
                               for the container.

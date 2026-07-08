@@ -10,9 +10,14 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ include "soperator-activechecks.waitForChecksName" . }}
+      {{- with .Values.waitForChecks.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: wait-for-active-checks
           image: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/alpine/k8s:1.31.11
+          imagePullPolicy: {{ default "IfNotPresent" .Values.waitForChecks.imagePullPolicy | quote }}
           command:
             - /bin/sh
             - -c

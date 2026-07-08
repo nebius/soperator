@@ -64,4 +64,8 @@ spec:
       securityContext:
         runAsNonRoot: true
       serviceAccountName: {{ include "soperatorchecks.fullname" . }}-checks
+      {{- with .Values.checks.manager.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
       terminationGracePeriodSeconds: 10

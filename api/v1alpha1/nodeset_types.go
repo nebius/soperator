@@ -304,6 +304,11 @@ type NodeSetSpec struct {
 	// +kubebuilder:validation:Optional
 	CustomInitContainers []corev1.Container `json:"customInitContainers,omitempty"`
 
+	// ImagePullSecrets is a list of secret names in the same namespace used for pulling worker pod images.
+	//
+	// +kubebuilder:validation:Optional
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
 	// endregion Scheduling
 }
 

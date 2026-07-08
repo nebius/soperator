@@ -53,6 +53,7 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 		},
 		Spec: corev1.PodSpec{
 			HostUsers:             check.Spec.HostUsers,
+			ImagePullSecrets:      jobContainerImagePullSecrets(check),
 			Affinity:              check.Spec.Affinity,
 			NodeSelector:          check.Spec.NodeSelector,
 			Tolerations:           check.Spec.Tolerations,
@@ -64,6 +65,14 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 			ServiceAccountName:    naming.BuildServiceAccountActiveCheckName(check.Spec.SlurmClusterRefName),
 		},
 	}
+}
+
+// jobContainerImagePullSecrets returns the ImagePullSecrets of the check's main job container.
+func jobContainerImagePullSecrets(check *slurmv1alpha1.ActiveCheck) []corev1.LocalObjectReference {
+	if check.Spec.CheckType == "k8sJob" {
+		return check.Spec.K8sJobSpec.JobContainer.ImagePullSecrets
+	}
+	return check.Spec.SlurmJobSpec.JobContainer.ImagePullSecrets
 }
 
 func renderVolumes(check *slurmv1alpha1.ActiveCheck) []corev1.Volume {

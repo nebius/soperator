@@ -258,6 +258,7 @@ slurmNodes:
       purgeUsageAfter: "24month"
     slurmdbd:
       imagePullPolicy: "IfNotPresent"
+      imagePullSecrets: []
       appArmorProfile: "unconfined"
       command: []
       args: []
@@ -320,6 +321,8 @@ slurmNodes:
     mariadbOperator:
       enabled: false
       protectedSecret: false
+      imagePullPolicy: "IfNotPresent"
+      imagePullSecrets: []
       resources:
         cpu: "1000m"
         memory: "1Gi"
@@ -406,6 +409,7 @@ slurmNodes:
       name: ""
     slurmctld:
       imagePullPolicy: "IfNotPresent"
+      imagePullSecrets: []
       appArmorProfile: "unconfined"
       command: []
       args: []
@@ -497,6 +501,7 @@ slurmNodes:
     # hostUsers: false
     sshd:
       imagePullPolicy: "IfNotPresent"
+      imagePullSecrets: []
       appArmorProfile: "unconfined"
       readinessProbe:
         tcpSocket:
@@ -602,6 +607,7 @@ slurmNodes:
     accountingJobsLookback: "1h"
     exporter:
       imagePullPolicy: "IfNotPresent"
+      imagePullSecrets: []
       appArmorProfile: "unconfined"
       command: []
       args: []
@@ -646,6 +652,7 @@ slurmNodes:
     maxConnections: 10
     rest:
       imagePullPolicy: "IfNotPresent"
+      imagePullSecrets: []
       appArmorProfile: "unconfined"
       command: []
       args: []
@@ -673,6 +680,7 @@ sConfigController:
     customInitContainers: []
   container:
     imagePullPolicy: "IfNotPresent"
+    imagePullSecrets: []
     # livenessProbe: {}
     # readinessProbe: {}
     resources:

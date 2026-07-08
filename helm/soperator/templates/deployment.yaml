@@ -109,6 +109,10 @@ spec:
             - ALL
       {{- end }}
       serviceAccountName: {{ include "soperator.fullname" . }}-manager
+      {{- with .Values.controllerManager.manager.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
       terminationGracePeriodSeconds: 10
       {{- if .Values.certManager.enabled }}
       volumes:

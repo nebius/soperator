@@ -23,6 +23,11 @@ spec:
   clusterName: {{ . | quote }}
   {{- end }}
 
+  {{- with (.slurmd.image).imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
   {{- with (.replicas | default 1) }}
   replicas: {{ . }}
   {{- end }}
