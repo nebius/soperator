@@ -114,6 +114,22 @@ customInitContainers:
 {{- end }}
 {{- end -}}
 
+{{/* Name of the slurm-scripts ConfigMap. Matches slurm-cluster chart's naming convention. */}}
+{{- define "nodesets.slurmScriptsCMName" -}}
+{{- if $.Values.slurmScriptsConfigMapName -}}
+{{- $.Values.slurmScriptsConfigMapName -}}
+{{- else if $.Values.clusterName -}}
+{{- printf "%s-slurm-scripts" (default $.Chart.Name $.Values.clusterName | trunc 63 | trimSuffix "-") -}}
+{{- end -}}
+{{- end -}}
+
+{{/* True if list has an entry with the given name. Usage: include "nodesets.hasMountName" (dict "list" .jailSubMounts "name" "x") */}}
+{{- define "nodesets.hasMountName" -}}
+{{- $found := false -}}
+{{- range .list }}{{- if eq .name $.name }}{{ $found = true }}{{- end }}{{- end -}}
+{{- $found -}}
+{{- end -}}
+
 {{/* Construct container gpu resource from GPU spec ([0]) and GPU resource spec ([1]) */}}
 {{- define "nodesets.resource.gpuFrom" -}}
   {{- $gpuSpec := (index . 0) | default dict -}}
