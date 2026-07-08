@@ -721,6 +721,20 @@ slurmScripts:
   epilog.sh: null
   hc_program.sh: null
   pyxis_caching_importer.sh: null
+  scontrol: null
+  # Temporary dev-only audit wrapper for SCHED-1897 passive-check RPC analysis.
+  # When enabled, prolog/epilog/hc_program prepend /opt/slurm_scripts to PATH so
+  # passive checks call the bundled scontrol wrapper, which logs JSON lines and
+  # then execs the real scontrol binary. Keep disabled outside dev clusters.
+  scontrolAudit:
+    enabled: false
+    # Empty means auto-detect:
+    # - outside the jail: /mnt/jail/opt/soperator-outputs/slurm_scripts/scontrol_audit.jsonl
+    # - inside the jail:  /opt/soperator-outputs/slurm_scripts/scontrol_audit.jsonl
+    logPath: ""
+    # Optional absolute path to the real Slurm binary, for example /usr/bin/scontrol.
+    # Empty means search PATH excluding the audit wrapper.
+    realScontrolPath: ""
   # Built-in scripts can be overridden or disabled here
   # Keys must match file names in slurm_scripts/
   builtIn:

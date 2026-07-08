@@ -1,3 +1,4 @@
+import contextlib
 import functools
 import json
 import logging
@@ -139,6 +140,13 @@ except KeyError as ke:
     logging.error(f"Failed to get environment variable '{ke.args[0]}', exiting: {ke}")
     sys.exit(0)
 
+CHECKS_RUNNER_INVOCATION_ID = os.environ.get("CHECKS_RUNNER_INVOCATION_ID")
+if not CHECKS_RUNNER_INVOCATION_ID:
+    job_or_interval = SLURM_JOB_ID if SLURM_JOB_ID else "nojob"
+    CHECKS_RUNNER_INVOCATION_ID = f"{SLURMD_NODENAME}.{CHECKS_CONTEXT}.{job_or_interval}.{os.getpid()}.{int(time.time() * 1000)}"
+os.environ["CHECKS_RUNNER_INVOCATION_ID"] = CHECKS_RUNNER_INVOCATION_ID
+os.environ["CHECKS_RUNNER_PID"] = str(os.getpid())
+
 def main():
     start_time = time.perf_counter()
     logging.info("Started")
@@ -261,7 +269,8 @@ def filter_by_node_state(checks: list[Check]) -> list[Check]:
     # Skip if all checks don't care
     if all("any" in check.node_states for check in checks):
         return checks
-    node_info = get_node_info()
+    with scontrol_audit_scope(phase="filter_by_node_state"):
+        node_info = get_node_info()
     return [
         check for check in checks
         if (
@@ -272,69 +281,108 @@ def filter_by_node_state(checks: list[Check]) -> list[Check]:
 
 # Run a specific check
 def run_check(check: Check, in_jail=False):
-    # Export environment variables requested by this check
-    export_needed_env(check)
+    with scontrol_audit_scope(check=check, phase="run_check", in_jail=in_jail):
+        # Export environment variables requested by this check
+        export_needed_env(check)
 
-    # Print info about the running check
-    log_rel_path = string.Template(check.log).safe_substitute(
-        worker=SLURMD_NODENAME, context=CHECKS_CONTEXT, name=check.name
+        # Print info about the running check
+        log_rel_path = string.Template(check.log).safe_substitute(
+            worker=SLURMD_NODENAME, context=CHECKS_CONTEXT, name=check.name
+        )
+        log_abs_path = os.path.join(CHECKS_OUTPUTS_BASE_DIR, log_rel_path)
+        if not in_jail:
+            log_abs_path = "/mnt/jail" + log_abs_path
+        start_time = time.perf_counter()
+        logging.info(f"Running check {check.name} ({check.command}), logging to {log_abs_path}")
+        logging.info(f"Check spec: {json.dumps(check._asdict(), indent=2)}")
+
+        # Create parent dirs with full permissions
+        os.makedirs(os.path.dirname(log_abs_path), mode=0o777, exist_ok=True)
+
+        # Execute the check command
+        check_command = f"{check.command} 3>&1 1>\"{log_abs_path}\" 2>&1"
+        if scontrol_audit_enabled():
+            # bash -l may reset PATH via profile scripts; restore the audit wrapper first.
+            check_command = f"export PATH=\"/opt/slurm_scripts:$PATH\"; {check_command}"
+        cmd = ["bash", "-l", "-c", check_command]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        # Build the reason message
+        reason_base = string.Template(check.reason_base.rstrip()).safe_substitute(
+            context=CHECKS_CONTEXT, name=check.name
+        )
+        reason = reason_base
+        details = result.stdout.strip().encode('unicode_escape').decode()
+        if check.reason_append_details and details:
+            reason += f": {details}"
+        reason += f" [{CHECKS_CONTEXT}]"
+
+        # Log check running time
+        end_time = time.perf_counter()
+        logging.info(f"Completed check {check.name} in {end_time - start_time:.3f} seconds")
+
+        # React to the check result
+        if result.returncode != 0:
+            logging.info(f"Check {check.name}: FAIL ({details})")
+
+            # Drain / comment the Slurm node
+            if check.on_fail == "drain" and "DRAIN" not in get_node_info().state_flags:
+                drain_node(reason)
+            elif check.on_fail == "comment":
+                comment_node(reason)
+
+            # Exit, if the check failed
+            # In prolog context, restart the job and print a message to the job output
+            # (Slurm passes lines from Prolog stdout that start with "print " to job output)
+            if CHECKS_CONTEXT == "prolog":
+                print(f"print Slurm healthcheck failed on node {SLURMD_NODENAME}, trying to automatically requeue")
+                sys.exit(1)
+
+            sys.exit(0)
+
+        logging.info(f"Check {check.name}: OK")
+
+        # Undrain / uncomment the Slurm node, if it was marked with the same reason
+        if check.on_ok == "undrain" and "DRAIN" in get_node_info().state_flags:
+            if get_node_info().reason and get_node_info().reason.startswith(reason_base):
+                undrain_node()
+        elif check.on_ok == "uncomment":
+            if get_node_info().comment and get_node_info().comment.startswith(reason_base):
+                uncomment_node()
+
+def scontrol_audit_enabled() -> bool:
+    return os.environ.get("SCONTROL_AUDIT_ENABLED", "").lower() in ("1", "true", "yes", "on")
+
+@contextlib.contextmanager
+def scontrol_audit_scope(
+    check: typing.Optional[Check] = None,
+    phase: str = "",
+    in_jail: typing.Optional[bool] = None,
+):
+    keys = (
+        "CHECKS_CURRENT_CHECK_NAME",
+        "CHECKS_CURRENT_CHECK_COMMAND",
+        "CHECKS_CURRENT_CHECK_PHASE",
+        "CHECKS_CURRENT_CHECK_IN_JAIL",
     )
-    log_abs_path = os.path.join(CHECKS_OUTPUTS_BASE_DIR, log_rel_path)
-    if not in_jail:
-        log_abs_path = "/mnt/jail" + log_abs_path
-    start_time = time.perf_counter()
-    logging.info(f"Running check {check.name} ({check.command}), logging to {log_abs_path}")
-    logging.info(f"Check spec: {json.dumps(check._asdict(), indent=2)}")
+    old_values = {key: os.environ.get(key) for key in keys}
 
-    # Create parent dirs with full permissions
-    os.makedirs(os.path.dirname(log_abs_path), mode=0o777, exist_ok=True)
+    os.environ["CHECKS_CURRENT_CHECK_NAME"] = check.name if check else ""
+    os.environ["CHECKS_CURRENT_CHECK_COMMAND"] = check.command if check else ""
+    os.environ["CHECKS_CURRENT_CHECK_PHASE"] = phase
+    if in_jail is not None:
+        os.environ["CHECKS_CURRENT_CHECK_IN_JAIL"] = "1" if in_jail else "0"
+    else:
+        os.environ["CHECKS_CURRENT_CHECK_IN_JAIL"] = ""
 
-    # Execute the check command
-    cmd = ["bash", "-l", "-c", f"{check.command} 3>&1 1>\"{log_abs_path}\" 2>&1"]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-    # Build the reason message
-    reason_base = string.Template(check.reason_base.rstrip()).safe_substitute(
-        context=CHECKS_CONTEXT, name=check.name
-    )
-    reason = reason_base
-    details = result.stdout.strip().encode('unicode_escape').decode()
-    if check.reason_append_details and details:
-        reason += f": {details}"
-    reason += f" [{CHECKS_CONTEXT}]"
-
-    # Log check running time
-    end_time = time.perf_counter()
-    logging.info(f"Completed check {check.name} in {end_time - start_time:.3f} seconds")
-
-    # React to the check result
-    if result.returncode != 0:
-        logging.info(f"Check {check.name}: FAIL ({details})")
-
-        # Drain / comment the Slurm node
-        if check.on_fail == "drain" and "DRAIN" not in get_node_info().state_flags:
-            drain_node(reason)
-        elif check.on_fail == "comment":
-            comment_node(reason)
-
-        # Exit, if the check failed
-        # In prolog context, restart the job and print a message to the job output
-        # (Slurm passes lines from Prolog stdout that start with "print " to job output)
-        if CHECKS_CONTEXT == "prolog":
-            print(f"print Slurm healthcheck failed on node {SLURMD_NODENAME}, trying to automatically requeue")
-            sys.exit(1)
-
-        sys.exit(0)
-
-    logging.info(f"Check {check.name}: OK")
-
-    # Undrain / uncomment the Slurm node, if it was marked with the same reason
-    if check.on_ok == "undrain" and "DRAIN" in get_node_info().state_flags:
-        if get_node_info().reason and get_node_info().reason.startswith(reason_base):
-            undrain_node()
-    elif check.on_ok == "uncomment":
-        if get_node_info().comment and get_node_info().comment.startswith(reason_base):
-            uncomment_node()
+    try:
+        yield
+    finally:
+        for key, old_value in old_values.items():
+            if old_value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old_value
 
 # Export additional environment variables requested by the check
 # Their values are obtained from long-running commands, that's why they aren't exported by default

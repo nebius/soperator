@@ -1,0 +1,241 @@
+#!/bin/bash
+
+set -u
+
+audit_enabled() {
+    case "${SCONTROL_AUDIT_ENABLED:-}" in
+        1|true|TRUE|yes|YES|on|ON)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+realpath_or_raw() {
+    local path="${1:-}"
+    readlink -f "$path" 2>/dev/null || printf '%s\n' "$path"
+}
+
+find_real_scontrol() {
+    local configured="${SCONTROL_AUDIT_REAL_SCONTROL:-}"
+    local self
+    self="$(realpath_or_raw "$0")"
+
+    if [[ -n "$configured" && -x "$configured" ]]; then
+        local real_configured
+        real_configured="$(realpath_or_raw "$configured")"
+        if [[ "$real_configured" != "$self" ]]; then
+            printf '%s\n' "$configured"
+            return 0
+        fi
+    fi
+
+    local path_dir candidate real_candidate
+    local -a path_dirs
+    IFS=':' read -r -a path_dirs <<< "${PATH:-}"
+    for path_dir in "${path_dirs[@]}"; do
+        [[ -n "$path_dir" ]] || path_dir="."
+        candidate="$path_dir/scontrol"
+        [[ -x "$candidate" ]] || continue
+
+        real_candidate="$(realpath_or_raw "$candidate")"
+        if [[ "$real_candidate" != "$self" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    for candidate in /usr/bin/scontrol /usr/local/bin/scontrol /bin/scontrol; do
+        [[ -x "$candidate" ]] || continue
+
+        real_candidate="$(realpath_or_raw "$candidate")"
+        if [[ "$real_candidate" != "$self" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+json_escape() {
+    local s="${1:-}"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\b'/\\b}"
+    s="${s//$'\f'/\\f}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+json_array() {
+    local first=1
+    local arg
+
+    printf '['
+    for arg in "$@"; do
+        if [[ "$first" -eq 0 ]]; then
+            printf ','
+        fi
+        first=0
+        printf '"%s"' "$(json_escape "$arg")"
+    done
+    printf ']'
+}
+
+shell_argv() {
+    local out="scontrol"
+    local quoted
+    local arg
+
+    for arg in "$@"; do
+        printf -v quoted '%q' "$arg"
+        out+=" $quoted"
+    done
+    printf '%s' "$out"
+}
+
+classify_scontrol() {
+    local first="${1:-}"
+    local second="${2:-}"
+    local arg lower
+
+    case "$first" in
+        show)
+            case "$second" in
+                node|nodes)
+                    printf 'show node'
+                    ;;
+                job|jobs)
+                    printf 'show job'
+                    ;;
+                "")
+                    printf 'show'
+                    ;;
+                *)
+                    printf 'show %s' "$second"
+                    ;;
+            esac
+            ;;
+        listjobs)
+            printf 'listjobs'
+            ;;
+        update)
+            for arg in "$@"; do
+                lower="${arg,,}"
+                case "$lower" in
+                    state=drain|state=drained|state=down)
+                        printf 'update drain'
+                        return 0
+                        ;;
+                    state=resume|state=idle|state=undrain)
+                        printf 'update resume'
+                        return 0
+                        ;;
+                    comment=*)
+                        printf 'update comment'
+                        return 0
+                        ;;
+                esac
+            done
+            printf 'update'
+            ;;
+        "")
+            printf 'other'
+            ;;
+        *)
+            printf '%s' "$first"
+            ;;
+    esac
+}
+
+audit_log_path() {
+    if [[ -n "${SCONTROL_AUDIT_LOG:-}" ]]; then
+        printf '%s\n' "$SCONTROL_AUDIT_LOG"
+        return 0
+    fi
+
+    if [[ -n "${CHECKS_OUTPUTS_BASE_DIR:-}" ]]; then
+        local base="${CHECKS_OUTPUTS_BASE_DIR%/}"
+        if [[ -d /mnt/jail ]]; then
+            printf '/mnt/jail%s/slurm_scripts/scontrol_audit.jsonl\n' "$base"
+        else
+            printf '%s/slurm_scripts/scontrol_audit.jsonl\n' "$base"
+        fi
+        return 0
+    fi
+
+    printf '/tmp/scontrol_audit.jsonl\n'
+}
+
+proc_cmdline() {
+    local pid="${1:-}"
+    [[ -n "$pid" ]] || return 0
+    tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true
+}
+
+write_audit_log() {
+    audit_enabled || return 0
+
+    local real_scontrol="$1"
+    shift
+
+    local log_path log_dir
+    log_path="$(audit_log_path)" || return 0
+    log_dir="${log_path%/*}"
+    [[ "$log_dir" != "$log_path" ]] || log_dir="."
+
+    (umask 000; mkdir -p "$log_dir" 2>/dev/null; touch "$log_path" 2>/dev/null; chmod 0666 "$log_path" 2>/dev/null) || return 0
+
+    local timestamp command_class argv_json argv_text parent_pid caller_cmdline caller_exe cwd host
+    timestamp="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || true)"
+    command_class="$(classify_scontrol "$@")"
+    argv_json="$(json_array "$@")"
+    argv_text="$(shell_argv "$@")"
+    parent_pid="${PPID:-}"
+    caller_cmdline="$(proc_cmdline "$parent_pid")"
+    caller_exe="$(readlink -f "/proc/$parent_pid/exe" 2>/dev/null || true)"
+    cwd="$(pwd -P 2>/dev/null || true)"
+    host="$(hostname 2>/dev/null || true)"
+
+    local line
+    line="{"
+    line+="\"timestamp\":\"$(json_escape "$timestamp")\","
+    line+="\"context\":\"$(json_escape "${CHECKS_CONTEXT:-}")\","
+    line+="\"check_name\":\"$(json_escape "${CHECKS_CURRENT_CHECK_NAME:-}")\","
+    line+="\"check_command\":\"$(json_escape "${CHECKS_CURRENT_CHECK_COMMAND:-}")\","
+    line+="\"check_phase\":\"$(json_escape "${CHECKS_CURRENT_CHECK_PHASE:-}")\","
+    line+="\"check_in_jail\":\"$(json_escape "${CHECKS_CURRENT_CHECK_IN_JAIL:-}")\","
+    line+="\"runner_invocation_id\":\"$(json_escape "${CHECKS_RUNNER_INVOCATION_ID:-}")\","
+    line+="\"runner_pid\":\"$(json_escape "${CHECKS_RUNNER_PID:-}")\","
+    line+="\"node\":\"$(json_escape "${SLURMD_NODENAME:-}")\","
+    line+="\"job_id\":\"$(json_escape "${SLURM_JOB_ID:-}")\","
+    line+="\"job_gpus\":\"$(json_escape "${SLURM_JOB_GPUS:-}")\","
+    line+="\"command_class\":\"$(json_escape "$command_class")\","
+    line+="\"argv\":$argv_json,"
+    line+="\"argv_text\":\"$(json_escape "$argv_text")\","
+    line+="\"pid\":$$,"
+    line+="\"parent_pid\":\"$(json_escape "$parent_pid")\","
+    line+="\"caller_exe\":\"$(json_escape "$caller_exe")\","
+    line+="\"caller_cmdline\":\"$(json_escape "$caller_cmdline")\","
+    line+="\"cwd\":\"$(json_escape "$cwd")\","
+    line+="\"host\":\"$(json_escape "$host")\","
+    line+="\"real_scontrol\":\"$(json_escape "$real_scontrol")\""
+    line+="}"
+
+    printf '%s\n' "$line" >> "$log_path" 2>/dev/null || true
+}
+
+real_scontrol="$(find_real_scontrol || true)"
+write_audit_log "$real_scontrol" "$@"
+
+if [[ -z "$real_scontrol" ]]; then
+    echo "scontrol audit wrapper: unable to find real scontrol" >&2
+    exit 127
+fi
+
+exec "$real_scontrol" "$@"
