@@ -36,6 +36,12 @@ images:
   nodeExporter:
     repository: "cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter"
     tag: "v1.10.2"
+# Default image pull policy used for all NodeSet images (slurmd, munge, sssd, nodeExporter).
+# Can be overridden per NodeSet/container, e.g. nodesets[*].slurmd.image.pullPolicy.
+imagePullPolicy: "IfNotPresent"
+# Default image pull secrets used for all NodeSet worker pods.
+# Can be overridden per NodeSet, e.g. nodesets[*].slurmd.image.imagePullSecrets.
+imagePullSecrets: []
 nodeExporter:
   podMonitor:
     enabled: true
@@ -131,8 +137,8 @@ nodesets:
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
         tag: "4.1.5-slurm25.11.5"
-        pullPolicy: "IfNotPresent"
-        imagePullSecrets: []
+        # pullPolicy: "IfNotPresent"
+        # imagePullSecrets: []
       customEnv:
         - name: "NVIDIA_DRIVER_CAPABILITIES"
           value: "compute,utility,video"
@@ -222,8 +228,8 @@ nodesets:
         repository: "cr.eu-north1.nebius.cloud/soperator/munge"
         # Optional
         tag: "4.1.5-slurm25.11.5"
-        pullPolicy: "IfNotPresent"
-        imagePullSecrets: []
+        # pullPolicy: "IfNotPresent"
+        # imagePullSecrets: []
       # Munge container resources
       resources:
         cpu: "2000m"

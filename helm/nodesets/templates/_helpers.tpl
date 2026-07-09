@@ -63,7 +63,7 @@ Usage: include "nodesets.nodeExporterInitContainer" (dict "root" $ "nodeExporter
 {{- if $nodeExporter.enabled }}
 - name: pod-node-exporter
   image: {{ printf "%s:%s" (default $root.Values.images.nodeExporter.repository $nodeExporterImage.repository) (default $root.Values.images.nodeExporter.tag $nodeExporterImage.tag) | quote }}
-  imagePullPolicy: {{ default "IfNotPresent" $nodeExporterImage.pullPolicy | quote }}
+  imagePullPolicy: {{ default $root.Values.imagePullPolicy $nodeExporterImage.pullPolicy | quote }}
   restartPolicy: Always
   args:
     {{- range (default (list "--collector.disable-defaults" "--collector.netdev" "--collector.netstat" "--collector.sockstat" "--collector.conntrack") $nodeExporter.args) }}

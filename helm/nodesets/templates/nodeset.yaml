@@ -23,7 +23,7 @@ spec:
   clusterName: {{ . | quote }}
   {{- end }}
 
-  {{- with (.slurmd.image).imagePullSecrets }}
+  {{- with (default $.Values.imagePullSecrets (.slurmd.image).imagePullSecrets) }}
   imagePullSecrets:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -105,16 +105,14 @@ spec:
       {{- with .tag }}
       tag: {{ . | quote }}
       {{- end }}
-
-      {{- with .pullPolicy }}
-      pullPolicy: {{ . }}
-      {{- end }}
+      pullPolicy: {{ default $.Values.imagePullPolicy .pullPolicy | quote }}
     {{- end }}
     {{- else }}
       repository: {{ (required ".Values.images.slurmd.repository is required as the default image is used." $.Values.images.slurmd.repository) | quote }}
       {{- with $.Values.images.slurmd.tag }}
       tag: {{ . | quote }}
       {{- end }}
+      pullPolicy: {{ $.Values.imagePullPolicy | quote }}
     {{- end }}
 
     {{- if .customEnv }}
@@ -188,16 +186,14 @@ spec:
       {{- with .tag }}
       tag: {{ . | quote }}
       {{- end }}
-
-      {{- with .pullPolicy }}
-      pullPolicy: {{ . }}
-      {{- end }}
+      pullPolicy: {{ default $.Values.imagePullPolicy .pullPolicy | quote }}
     {{- end }}
     {{- else }}
       repository: {{ (required ".Values.images.munge.repository is required as the default image is used." $.Values.images.munge.repository) | quote }}
       {{- with $.Values.images.munge.tag }}
       tag: {{ . | quote }}
       {{- end }}
+      pullPolicy: {{ $.Values.imagePullPolicy | quote }}
     {{- end }}
 
     {{- with (required ".Values.nodesets[*].munge.resources is required" .resources) }}
@@ -233,16 +229,14 @@ spec:
       {{- with .tag }}
       tag: {{ . | quote }}
       {{- end }}
-
-      {{- with .pullPolicy }}
-      pullPolicy: {{ . }}
-      {{- end }}
+      pullPolicy: {{ default $.Values.imagePullPolicy .pullPolicy | quote }}
     {{- end }}
     {{- else }}
       repository: {{ (required ".Values.images.sssd.repository is required as the default image is used." $.Values.images.sssd.repository) | quote }}
       {{- with $.Values.images.sssd.tag }}
       tag: {{ . | quote }}
       {{- end }}
+      pullPolicy: {{ $.Values.imagePullPolicy | quote }}
     {{- end }}
 
     resources:
