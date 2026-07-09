@@ -11,6 +11,8 @@ type MonitoringMetrics struct {
 	collectionFailures prometheus.Counter
 	collectorDuration  *prometheus.GaugeVec
 	collectorErrors    *prometheus.CounterVec
+	collectorInflight  *prometheus.GaugeVec
+	collectorSkipped   *prometheus.CounterVec
 	metricsRequests    prometheus.Counter
 	metricsExported    prometheus.Gauge
 }
@@ -38,6 +40,14 @@ func NewMonitoringMetrics() *MonitoringMetrics {
 			Name: "slurm_exporter_collector_errors_total",
 			Help: "Total number of errors per sub-collector during metrics collection, labeled by collector",
 		}, []string{"collector"}),
+		collectorInflight: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "slurm_exporter_collector_inflight",
+			Help: "Whether a sub-collector run is currently in progress, labeled by collector",
+		}, []string{"collector"}),
+		collectorSkipped: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "slurm_exporter_collector_skipped_total",
+			Help: "Total number of skipped sub-collector runs because a previous run was still in progress, labeled by collector",
+		}, []string{"collector"}),
 		metricsRequests: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "slurm_exporter_metrics_requests_total",
 			Help: "Total number of requests to /metrics endpoint",
@@ -57,6 +67,8 @@ func (m *MonitoringMetrics) Register(registry *prometheus.Registry) error {
 		m.collectionFailures,
 		m.collectorDuration,
 		m.collectorErrors,
+		m.collectorInflight,
+		m.collectorSkipped,
 		m.metricsRequests,
 		m.metricsExported,
 	}
@@ -84,9 +96,22 @@ func (m *MonitoringMetrics) RecordCollectorDuration(collector string, duration f
 	m.collectorDuration.WithLabelValues(collector).Set(duration)
 }
 
+func (m *MonitoringMetrics) SetCollectorInflight(collector string, inflight bool) {
+	value := 0.0
+	if inflight {
+		value = 1.0
+	}
+	m.collectorInflight.WithLabelValues(collector).Set(value)
+}
+
 // RecordCollectorError increments the error counter for the named sub-collector
 func (m *MonitoringMetrics) RecordCollectorError(collector string) {
 	m.collectorErrors.WithLabelValues(collector).Inc()
+}
+
+// RecordCollectorSkipped increments the skip counter for the named sub-collector.
+func (m *MonitoringMetrics) RecordCollectorSkipped(collector string) {
+	m.collectorSkipped.WithLabelValues(collector).Inc()
 }
 
 // RecordMetricsRequest increments the metrics request counter

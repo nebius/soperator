@@ -107,6 +107,23 @@ func TestMonitoringMetrics_RecordCollectorDuration(t *testing.T) {
 	assert.Equal(t, float64(0), collectorGaugeValue(metricFamilies, "slurm_exporter_collector_duration_seconds", "diag"))
 }
 
+func TestMonitoringMetrics_RecordCollectorRuntimeState(t *testing.T) {
+	metrics := NewMonitoringMetrics()
+	registry := prometheus.NewRegistry()
+	require.NoError(t, metrics.Register(registry))
+
+	metrics.SetCollectorInflight("jobs", true)
+	metrics.SetCollectorInflight("jobs", false)
+	metrics.RecordCollectorSkipped("jobs")
+	metrics.RecordCollectorSkipped("jobs")
+
+	metricFamilies, err := registry.Gather()
+	require.NoError(t, err)
+
+	assert.Equal(t, float64(0), collectorGaugeValue(metricFamilies, "slurm_exporter_collector_inflight", "jobs"))
+	assert.Equal(t, float64(2), collectorCounterValue(metricFamilies, "slurm_exporter_collector_skipped_total", "jobs"))
+}
+
 func collectorGaugeValue(families []*dto.MetricFamily, metricName, collector string) float64 {
 	for _, mf := range families {
 		if mf.GetName() != metricName {
@@ -116,6 +133,22 @@ func collectorGaugeValue(families []*dto.MetricFamily, metricName, collector str
 			for _, lp := range m.GetLabel() {
 				if lp.GetName() == "collector" && lp.GetValue() == collector {
 					return m.GetGauge().GetValue()
+				}
+			}
+		}
+	}
+	return 0
+}
+
+func collectorCounterValue(families []*dto.MetricFamily, metricName, collector string) float64 {
+	for _, mf := range families {
+		if mf.GetName() != metricName {
+			continue
+		}
+		for _, m := range mf.GetMetric() {
+			for _, lp := range m.GetLabel() {
+				if lp.GetName() == "collector" && lp.GetValue() == collector {
+					return m.GetCounter().GetValue()
 				}
 			}
 		}

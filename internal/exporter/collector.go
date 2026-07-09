@@ -7,6 +7,7 @@ import (
 	"iter"
 	"maps"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -51,7 +52,8 @@ type MetricsCollector struct {
 	controllerServerThreadCount *prometheus.Desc
 
 	// Atomic pointer to the current state for lock-free reads
-	state atomic.Pointer[metricsCollectorState]
+	stateMu sync.Mutex
+	state   atomic.Pointer[metricsCollectorState]
 
 	// Monitoring contains self-monitoring metrics
 	Monitoring *MonitoringMetrics
@@ -333,6 +335,8 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 	startTime := time.Now()
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 
 	defer func() {
 		duration := time.Since(startTime).Seconds()
@@ -385,54 +389,144 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 
 // collectNodes fetches nodes and updates node-derived metrics on the new state.
 func (c *MetricsCollector) collectNodes(ctx context.Context, previousState, newState *metricsCollectorState) error {
+	nodes, err := c.listNodes(ctx)
+	if err != nil {
+		return err
+	}
+	c.applyNodes(ctx, nodes, previousState, newState)
+	return nil
+}
+
+func (c *MetricsCollector) listNodes(ctx context.Context) ([]slurmapi.Node, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 
 	nodesStart := time.Now()
 	nodes, err := c.slurmAPIClient.ListNodes(ctx)
 	if err != nil {
-		return fmt.Errorf("get nodes from SLURM API: %w", err)
+		return nil, fmt.Errorf("get nodes from SLURM API: %w", err)
 	}
 	logger.Info("Fetched nodes", "count", len(nodes), "elapsed_seconds", time.Since(nodesStart).Seconds())
-	newState.nodes = nodes
 
+	return nodes, nil
+}
+
+func (c *MetricsCollector) applyNodes(ctx context.Context, nodes []slurmapi.Node, previousState, newState *metricsCollectorState) {
+	newState.nodes = nodes
 	c.updateNodeFailureMetrics(nodes, previousState.nodes)
 	c.updateNodeStateMetrics(nodes, previousState, newState, time.Now())
 	newState.lastGPUSecondsUpdate = c.updateGPUSecondsMetrics(ctx, nodes, previousState.lastGPUSecondsUpdate, time.Now())
+}
 
+func cloneMetricsCollectorState(previousState *metricsCollectorState) *metricsCollectorState {
+	if previousState == nil {
+		previousState = newMetricsCollectorState()
+	}
+	newState := newMetricsCollectorState()
+	newState.lastGPUSecondsUpdate = previousState.lastGPUSecondsUpdate
+	newState.nodes = previousState.nodes
+	newState.jobs = previousState.jobs
+	newState.diag = previousState.diag
+	maps.Copy(newState.nodeUnavailabilityStartTimes, previousState.nodeUnavailabilityStartTimes)
+	maps.Copy(newState.nodeDrainingStartTimes, previousState.nodeDrainingStartTimes)
+	return newState
+}
+
+func (c *MetricsCollector) refreshNodes(ctx context.Context) error {
+	nodes, err := c.listNodes(ctx)
+	if err != nil {
+		return err
+	}
+
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+
+	previousState := c.state.Load()
+	if previousState == nil {
+		previousState = newMetricsCollectorState()
+	}
+	newState := cloneMetricsCollectorState(previousState)
+	c.applyNodes(ctx, nodes, previousState, newState)
+	c.state.Store(newState)
 	return nil
 }
 
 // collectJobs fetches jobs and stores them on the new state.
 func (c *MetricsCollector) collectJobs(ctx context.Context, newState *metricsCollectorState) error {
+	jobs, err := c.listJobs(ctx)
+	if err != nil {
+		return err
+	}
+	newState.jobs = jobs
+	return nil
+}
+
+func (c *MetricsCollector) listJobs(ctx context.Context) ([]slurmapi.Job, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 
 	jobsStart := time.Now()
 	jobs, err := c.slurmAPIClient.ListJobsWithParams(ctx, c.jobListParams)
 	if err != nil {
-		return fmt.Errorf("get jobs from SLURM API: %w", err)
+		return nil, fmt.Errorf("get jobs from SLURM API: %w", err)
 	}
 	logger.Info("Fetched jobs",
 		"source", string(c.jobListParams.Source),
 		"count", len(jobs),
 		"elapsed_seconds", time.Since(jobsStart).Seconds(),
 	)
-	newState.jobs = jobs
 
+	return jobs, nil
+}
+
+func (c *MetricsCollector) refreshJobs(ctx context.Context) error {
+	jobs, err := c.listJobs(ctx)
+	if err != nil {
+		return err
+	}
+
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+
+	newState := cloneMetricsCollectorState(c.state.Load())
+	newState.jobs = jobs
+	c.state.Store(newState)
 	return nil
 }
 
 // collectDiag fetches controller diagnostics and stores them on the new state.
 func (c *MetricsCollector) collectDiag(ctx context.Context, newState *metricsCollectorState) error {
+	diag, err := c.getDiag(ctx)
+	if err != nil {
+		return err
+	}
+	newState.diag = diag
+	return nil
+}
+
+func (c *MetricsCollector) getDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 
 	diagStart := time.Now()
 	diag, err := c.slurmAPIClient.GetDiag(ctx)
 	if err != nil {
-		return fmt.Errorf("get diag from SLURM API: %w", err)
+		return nil, fmt.Errorf("get diag from SLURM API: %w", err)
 	}
 	logger.Info("Fetched controller diag", "elapsed_seconds", time.Since(diagStart).Seconds())
-	newState.diag = diag
 
+	return diag, nil
+}
+
+func (c *MetricsCollector) refreshDiag(ctx context.Context) error {
+	diag, err := c.getDiag(ctx)
+	if err != nil {
+		return err
+	}
+
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+
+	newState := cloneMetricsCollectorState(c.state.Load())
+	newState.diag = diag
+	c.state.Store(newState)
 	return nil
 }
 

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -49,6 +51,12 @@ type Exporter struct {
 	monitoringMetrics *MonitoringMetrics
 	// monitoringServer is the HTTP server for the monitoring endpoint
 	monitoringServer *http.Server
+}
+
+type asyncSubCollector struct {
+	name    string
+	running atomic.Bool
+	run     func(context.Context) error
 }
 
 // NewClusterExporter creates a new SLURM cluster exporter
@@ -102,12 +110,66 @@ func (e *Exporter) collectionLoop(ctx context.Context) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 	logger.Info("Starting metrics collection loop", "interval", e.params.CollectionInterval)
 
+	loopCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	ticker := time.NewTicker(e.params.CollectionInterval)
 	defer ticker.Stop()
 
-	if err := e.collector.updateState(ctx); err != nil {
-		logger.Error(err, "Initial metrics collection failed")
+	collectors := []*asyncSubCollector{
+		{name: "nodes", run: e.collector.refreshNodes},
+		{name: "jobs", run: e.collector.refreshJobs},
+		{name: "diag", run: e.collector.refreshDiag},
 	}
+
+	startCollectors := func() {
+		start := time.Now()
+		var wg sync.WaitGroup
+		var failed atomic.Bool
+		started := false
+
+		for _, col := range collectors {
+			if !col.running.CompareAndSwap(false, true) {
+				e.monitoringMetrics.RecordCollectorSkipped(col.name)
+				logger.Info("Skipping sub-collector; previous run still in progress", "collector", col.name)
+				continue
+			}
+
+			started = true
+			wg.Add(1)
+			e.monitoringMetrics.SetCollectorInflight(col.name, true)
+			go func(col *asyncSubCollector) {
+				defer wg.Done()
+				defer col.running.Store(false)
+				defer e.monitoringMetrics.SetCollectorInflight(col.name, false)
+
+				start := time.Now()
+				if err := col.run(loopCtx); err != nil {
+					if loopCtx.Err() == nil {
+						logger.Error(err, "Sub-collector failed", "collector", col.name)
+						e.monitoringMetrics.RecordCollectorError(col.name)
+						failed.Store(true)
+					}
+				}
+				e.monitoringMetrics.RecordCollectorDuration(col.name, time.Since(start).Seconds())
+			}(col)
+		}
+
+		if !started {
+			e.monitoringMetrics.RecordCollection(0, nil)
+			return
+		}
+		go func() {
+			wg.Wait()
+			var err error
+			if failed.Load() {
+				err = errors.New("sub-collector failed")
+			}
+			e.monitoringMetrics.RecordCollection(time.Since(start).Seconds(), err)
+		}()
+	}
+
+	startCollectors()
 
 	for {
 		select {
@@ -118,9 +180,7 @@ func (e *Exporter) collectionLoop(ctx context.Context) {
 			logger.Info("Stopping metrics collection loop via stop channel")
 			return
 		case <-ticker.C:
-			if err := e.collector.updateState(ctx); err != nil {
-				logger.Error(err, "Metrics collection failed")
-			}
+			startCollectors()
 		}
 	}
 }
