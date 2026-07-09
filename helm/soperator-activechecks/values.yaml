@@ -55,6 +55,27 @@ slurmJob:
   # Slurm consumes this as SBATCH_GPUS_PER_NODE for GPU ActiveChecks.
   gpusPerNode: "8"
 checks:
+  gpu-checks:
+    enabled: true
+    checkType: "slurmJob"
+    dependsOn:
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
+    schedule: "25 5-23/6 * * *"
+    suspend: false
+    runAfterCreation: true
+    slurmJobSpec:
+      sbatchScriptFile: "scripts/gpu-checks.sh"
+      eachWorkerJobs: true
+      maxNumberOfJobs: 200
+      jobContainer:
+        extraEnv:
+          - name: "SBATCH_GPUS_PER_NODE"
+            value: "{{ .Values.slurmJob.gpusPerNode }}"
+    failureReactions:
+      drainSlurmNode:
+        drainReasonPrefix: "[node_problem]"
   all-reduce-perf-nccl-in-docker:
     enabled: true
     checkType: "slurmJob"
@@ -76,90 +97,8 @@ checks:
     failureReactions:
       drainSlurmNode:
         drainReasonPrefix: "[node_problem]"
-  all-reduce-perf-nccl-with-ib:
-    enabled: true
-    checkType: "slurmJob"
-    dependsOn:
-      - "manage-jail-state"
-      - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
-    schedule: "45 0-18/6 * * *"
-    suspend: false
-    runAfterCreation: true
-    slurmJobSpec:
-      sbatchScriptFile: "scripts/all-reduce-perf-nccl-with-ib.sh"
-      eachWorkerJobs: true
-      maxNumberOfJobs: 200
-      jobContainer:
-        extraEnv:
-          - name: "SBATCH_GPUS_PER_NODE"
-            value: "{{ .Values.slurmJob.gpusPerNode }}"
-    failureReactions:
-      drainSlurmNode:
-        drainReasonPrefix: "[node_problem]"
-  all-reduce-perf-nccl-without-ib:
-    enabled: true
-    checkType: "slurmJob"
-    dependsOn:
-      - "manage-jail-state"
-      - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
-    schedule: "25 5-23/6 * * *"
-    suspend: false
-    runAfterCreation: true
-    slurmJobSpec:
-      sbatchScriptFile: "scripts/all-reduce-perf-nccl-without-ib.sh"
-      eachWorkerJobs: true
-      jobContainer:
-        extraEnv:
-          - name: "SBATCH_GPUS_PER_NODE"
-            value: "{{ .Values.slurmJob.gpusPerNode }}"
-    failureReactions:
-      drainSlurmNode:
-        drainReasonPrefix: "[node_problem]"
-  cuda-samples:
-    enabled: true
-    checkType: "slurmJob"
-    dependsOn:
-      - "manage-jail-state"
-      - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
-      - "prepull-container-image"
-    schedule: "30 0-18/6 * * *"
-    suspend: false
-    runAfterCreation: true
-    slurmJobSpec:
-      sbatchScriptFile: "scripts/cuda-samples.sh"
-      eachWorkerJobs: true
-      jobContainer:
-        extraEnv:
-          - name: "SBATCH_GPUS_PER_NODE"
-            value: "{{ .Values.slurmJob.gpusPerNode }}"
-    failureReactions:
-      drainSlurmNode:
-        drainReasonPrefix: "[node_problem]"
-  dcgmi-diag-r2:
-    enabled: true
-    checkType: "slurmJob"
-    dependsOn:
-      - "manage-jail-state"
-      - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
-    schedule: "5 12 * * *"
-    suspend: true
-    runAfterCreation: false
-    slurmJobSpec:
-      sbatchScriptFile: "scripts/dcgmi-diag-r2.sh"
-      eachWorkerJobs: true
-      jobContainer:
-        extraEnv:
-          - name: "SBATCH_GPUS_PER_NODE"
-            value: "{{ .Values.slurmJob.gpusPerNode }}"
-    failureReactions:
-      drainSlurmNode:
-        drainReasonPrefix: "[node_problem]"
   dcgmi-diag-r3:
-    enabled: true
+    enabled: false
     checkType: "slurmJob"
     dependsOn:
       - "manage-jail-state"
@@ -181,41 +120,15 @@ checks:
     enabled: true
     checkType: "slurmJob"
     dependsOn:
-      - "manage-jail-state"
       - "all-reduce-perf-nccl-in-docker"
-      - "all-reduce-perf-nccl-with-ib"
-      - "all-reduce-perf-nccl-without-ib"
-      - "cuda-samples"
-      - "dcgmi-diag-r2"
-      - "dcgmi-diag-r3"
-      - "gpu-fryer"
-      - "ib-gpu-perf"
-      - "mem-perf"
+      - "gpu-checks"
+      - "manage-jail-state"
+      - "wait-for-soperatorchecks-srun-ready"
+      - "wait-for-topology"
     suspend: true
     runAfterCreation: true
     slurmJobSpec:
       sbatchScriptFile: "scripts/ensure-healthy-nodes.sh"
-  gpu-fryer:
-    enabled: true
-    checkType: "slurmJob"
-    dependsOn:
-      - "manage-jail-state"
-      - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
-      - "prepull-container-image"
-    schedule: "15 9-21/12 * * *"
-    suspend: false
-    runAfterCreation: true
-    slurmJobSpec:
-      sbatchScriptFile: "scripts/gpu-fryer.sh"
-      eachWorkerJobs: true
-      jobContainer:
-        extraEnv:
-          - name: "SBATCH_GPUS_PER_NODE"
-            value: "{{ .Values.slurmJob.gpusPerNode }}"
-    failureReactions:
-      drainSlurmNode:
-        drainReasonPrefix: "[node_problem]"
   ib-gpu-perf:
     enabled: true
     checkType: "slurmJob"
@@ -238,27 +151,6 @@ checks:
     failureReactions:
       commentSlurmNode:
         commentPrefix: "[node_problem]"
-  mem-perf:
-    enabled: true
-    checkType: "slurmJob"
-    dependsOn:
-      - "manage-jail-state"
-      - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
-      - "prepull-container-image"
-    schedule: "20 10-22/12 * * *"
-    suspend: false
-    runAfterCreation: true
-    slurmJobSpec:
-      sbatchScriptFile: "scripts/mem-perf.sh"
-      eachWorkerJobs: true
-      jobContainer:
-        extraEnv:
-          - name: "SBATCH_GPUS_PER_NODE"
-            value: "{{ .Values.slurmJob.gpusPerNode }}"
-    failureReactions:
-      drainSlurmNode:
-        drainReasonPrefix: "[node_problem]"
   ssh-check:
     enabled: true
     checkType: "k8sJob"
@@ -424,35 +316,6 @@ checks:
             value: "ansible.posix.jsonl"
           - name: "ANSIBLE_FORCE_COLOR"
             value: "0"
-  upgrade-health-checker:
-    enabled: true
-    checkType: "k8sJob"
-    dependsOn:
-      - "create-user-soperatorchecks"
-    suspend: true
-    runAfterCreation: false
-    k8sJobSpec:
-      jobContainer:
-        appArmorProfile: unconfined
-        workingDir: /opt/ansible
-        image: "{{ .Values.images.sansible }}"
-        command: ["/opt/bin/sansible_entrypoint.sh"]
-        args:
-          - ansible-playbook
-          - -i
-          - inventory/
-          - -c
-          - local
-          - -e
-          - ansible_connection=community.general.chroot
-          - -e
-          - ansible_host=/mnt/jail
-          - -e
-          - ansible_python_interpreter=/usr/bin/python3
-          - -e
-          - "nc_health_checker_version=1.1.15-b3af5269"
-          - nc-health-checker.yml
-          - --diff
   wait-for-topology:
     enabled: true
     checkType: "k8sJob"

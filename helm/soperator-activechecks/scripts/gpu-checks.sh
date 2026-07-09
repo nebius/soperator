@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --deadline="now+4hours"
-#SBATCH --time=30:00
+#SBATCH --deadline="now+1hours"
+#SBATCH --time=50:00
 #SBATCH --exclusive
 #SBATCH --mem=0
 
@@ -22,8 +22,8 @@ else
 fi
 
 echo "Platform found: $platform"
-echo "Running all_reduce_perf_nccl check on $(hostname)..."
-HC_OUTPUT=$(srun --cpu-bind=cores sudo bash -l -c "health-checker run -e soperator -p $platform -n all_reduce_with_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info")
+echo "Running GPU checks on $(hostname)..."
+HC_OUTPUT=$(srun sudo bash -l -c "health-checker run -e soperator_active_checks -p $platform -x '^ib_write_bw_gpu.*$,^ib_send_lat_gpu.*$,^ib_read_lat_gpu.*$' -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info")
 
 echo "Health checker output:"
 echo "$HC_OUTPUT"
