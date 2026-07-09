@@ -13,6 +13,12 @@ useDefaultAppArmorProfile: false
 maintenance: "none"
 # CUDA version used for populate-jail image selection.
 cudaVersion: 12.9.0
+# Default image pull policy used for all Slurm cluster images.
+# Can be overridden per component below (e.g. slurmNodes.controller.slurmctld.imagePullPolicy).
+imagePullPolicy: "IfNotPresent"
+# Default image pull secrets used for all Slurm cluster images.
+# Can be overridden per component below (e.g. slurmNodes.controller.slurmctld.imagePullSecrets).
+imagePullSecrets: []
 nodeExporter:
   podMonitor:
     enabled: true
@@ -133,7 +139,8 @@ secrets: {}
 # sshdKeysName: ""
 # Job performing initial jail file system population
 populateJail:
-  imagePullPolicy: "IfNotPresent"
+  # imagePullPolicy: "IfNotPresent"
+  # imagePullSecrets: []
   appArmorProfile: "unconfined"
   # Name of the k8s node filter
   k8sNodeFilterName: "gpu"
@@ -197,7 +204,8 @@ slurmNodes:
   sssd:
     enabled: false
     sssdDebugLevel: 0
-    imagePullPolicy: "IfNotPresent"
+    # imagePullPolicy: "IfNotPresent"
+    # imagePullSecrets: []
     appArmorProfile: "unconfined"
     command: []
     args: []
@@ -257,8 +265,8 @@ slurmNodes:
       purgeTXNAfter: "12month"
       purgeUsageAfter: "24month"
     slurmdbd:
-      imagePullPolicy: "IfNotPresent"
-      imagePullSecrets: []
+      # imagePullPolicy: "IfNotPresent"
+      # imagePullSecrets: []
       appArmorProfile: "unconfined"
       command: []
       args: []
@@ -276,7 +284,8 @@ slurmNodes:
         memory: "3Gi"
         ephemeralStorage: "10Gi"
     munge:
-      imagePullPolicy: "IfNotPresent"
+      # imagePullPolicy: "IfNotPresent"
+      # imagePullSecrets: []
       appArmorProfile: "unconfined"
       livenessProbe:
         exec:
@@ -321,8 +330,8 @@ slurmNodes:
     mariadbOperator:
       enabled: false
       protectedSecret: false
-      imagePullPolicy: "IfNotPresent"
-      imagePullSecrets: []
+      # imagePullPolicy: "IfNotPresent"
+      # imagePullSecrets: []
       resources:
         cpu: "1000m"
         memory: "1Gi"
@@ -408,8 +417,8 @@ slurmNodes:
       # If not set and create is true, a name is generated using the cluster name: <clusterName>-slurm-controller
       name: ""
     slurmctld:
-      imagePullPolicy: "IfNotPresent"
-      imagePullSecrets: []
+      # imagePullPolicy: "IfNotPresent"
+      # imagePullSecrets: []
       appArmorProfile: "unconfined"
       command: []
       args: []
@@ -428,7 +437,8 @@ slurmNodes:
         memory: "3Gi"
         ephemeralStorage: "20Gi"
     munge:
-      imagePullPolicy: "IfNotPresent"
+      # imagePullPolicy: "IfNotPresent"
+      # imagePullSecrets: []
       appArmorProfile: "unconfined"
       command: []
       args: []
@@ -500,8 +510,8 @@ slurmNodes:
     # Controls if the pod containers can use the host user namespace
     # hostUsers: false
     sshd:
-      imagePullPolicy: "IfNotPresent"
-      imagePullSecrets: []
+      # imagePullPolicy: "IfNotPresent"
+      # imagePullSecrets: []
       appArmorProfile: "unconfined"
       readinessProbe:
         tcpSocket:
@@ -534,7 +544,8 @@ slurmNodes:
     # Annotations to be configure on login service
     sshdServiceAnnotations: {}
     munge:
-      imagePullPolicy: "IfNotPresent"
+      # imagePullPolicy: "IfNotPresent"
+      # imagePullSecrets: []
       appArmorProfile: "unconfined"
       command: []
       args: []
@@ -605,9 +616,9 @@ slurmNodes:
     # when jobSource=accounting, the size of the time window queried from the accounting API
     # ([now - lookback, now + 5m]). The +5m skew tolerates clock drift between slurmrestd, slurmctld and slurmdbd.
     accountingJobsLookback: "1h"
+    # imagePullPolicy: "IfNotPresent"
+    # imagePullSecrets: []
     exporter:
-      imagePullPolicy: "IfNotPresent"
-      imagePullSecrets: []
       appArmorProfile: "unconfined"
       command: []
       args: []
@@ -651,8 +662,8 @@ slurmNodes:
     threadCount: 3
     maxConnections: 10
     rest:
-      imagePullPolicy: "IfNotPresent"
-      imagePullSecrets: []
+      # imagePullPolicy: "IfNotPresent"
+      # imagePullSecrets: []
       appArmorProfile: "unconfined"
       command: []
       args: []
@@ -679,8 +690,8 @@ sConfigController:
     size: 1
     customInitContainers: []
   container:
-    imagePullPolicy: "IfNotPresent"
-    imagePullSecrets: []
+    # imagePullPolicy: "IfNotPresent"
+    # imagePullSecrets: []
     # livenessProbe: {}
     # readinessProbe: {}
     resources:

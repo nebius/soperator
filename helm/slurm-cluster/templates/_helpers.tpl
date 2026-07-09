@@ -122,7 +122,7 @@ Usage: include "slurm-cluster.nodeExporterInitContainer" (dict "root" $ "nodeExp
 {{- if $nodeExporter.enabled }}
 - name: pod-node-exporter
   image: {{ default $root.Values.images.nodeExporter $nodeExporter.image | quote }}
-  imagePullPolicy: {{ default "IfNotPresent" $nodeExporter.imagePullPolicy | quote }}
+  imagePullPolicy: {{ default $root.Values.imagePullPolicy $nodeExporter.imagePullPolicy | quote }}
   restartPolicy: Always
   args:
     {{- range (default (list "--collector.disable-defaults" "--collector.netdev" "--collector.netstat" "--collector.sockstat" "--collector.conntrack") $nodeExporter.args) }}
