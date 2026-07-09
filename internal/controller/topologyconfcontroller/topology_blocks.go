@@ -3,6 +3,7 @@ package topologyconfcontroller
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -50,6 +51,7 @@ func (b TopologyBlocks) RenderConfigLines() []string {
 			),
 		)
 	}
+	sort.Strings(lines)
 
 	return lines
 }
