@@ -449,8 +449,6 @@ def get_platform_tags() -> list[str]:
 
 # Get info about the Slurm node from "scontrol show node"
 # Please note, this command can be executed from both jail or host rootfs
-# This function returns the cached value for subsequent calls
-@functools.lru_cache(maxsize=1)
 def get_node_info() -> NodeInfo:
     try:
         result = subprocess.run(
@@ -481,8 +479,6 @@ def get_node_info() -> NodeInfo:
 
 # Get info about the Slurm job from "scontrol show job"
 # Please note, this command can be executed from both jail or host rootfs
-# This function returns the cached value for subsequent calls
-@functools.lru_cache(maxsize=1)
 def get_job_info() -> JobInfo:
     try:
         if CHECKS_CONTEXT not in ("prolog", "epilog"):
@@ -551,8 +547,6 @@ def drain_node(reason):
             ["scontrol", "update", f"NodeName={SLURMD_NODENAME}", "State=drain", f"Reason=\"{reason}\""],
             check=False, stderr=subprocess.DEVNULL
         )
-        # Invalidate cache for the Slurm node info
-        get_node_info.cache_clear()
     except Exception as e:
         logging.warning(f"Failed to drain Slurm node {SLURMD_NODENAME}: {e}")
 
@@ -564,8 +558,6 @@ def undrain_node():
             ["scontrol", "update", f"NodeName={SLURMD_NODENAME}", "State=resume"],
             check=False, stderr=subprocess.DEVNULL
         )
-        # Invalidate cache for the Slurm node info
-        get_node_info.cache_clear()
     except Exception as e:
         logging.warning(f"Failed to undrain Slurm node {SLURMD_NODENAME}: {e}")
 
@@ -577,8 +569,6 @@ def comment_node(comment):
             ["scontrol", "update", f"NodeName={SLURMD_NODENAME}", f"Comment=\"{comment}\""],
             check=False, stderr=subprocess.DEVNULL
         )
-        # Invalidate cache for the Slurm node info
-        get_node_info.cache_clear()
     except Exception as e:
         logging.warning(f"Failed to comment Slurm node {SLURMD_NODENAME}: {e}")
 
@@ -590,8 +580,6 @@ def uncomment_node():
             ["scontrol", "update", f"NodeName={SLURMD_NODENAME}", "Comment=\"\""],
             check=False, stderr=subprocess.DEVNULL
         )
-        # Invalidate cache for the Slurm node info
-        get_node_info.cache_clear()
     except Exception as e:
         logging.warning(f"Failed to uncomment Slurm node {SLURMD_NODENAME}: {e}")
 
