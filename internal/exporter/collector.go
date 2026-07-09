@@ -369,11 +369,13 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 
 	var errs []error
 	for _, col := range collectors {
+		colStart := time.Now()
 		if cerr := col.run(); cerr != nil {
 			logger.Error(cerr, "Sub-collector failed", "collector", col.name)
 			c.Monitoring.RecordCollectorError(col.name)
 			errs = append(errs, fmt.Errorf("%s: %w", col.name, cerr))
 		}
+		c.Monitoring.RecordCollectorDuration(col.name, time.Since(colStart).Seconds())
 	}
 
 	logger.Info("Collected metrics", "elapsed_seconds", time.Since(startTime).Seconds())

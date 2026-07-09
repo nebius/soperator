@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,6 +88,39 @@ func TestMonitoringMetrics_RecordCollectorError(t *testing.T) {
 	assert.Equal(t, float64(2), collectorErrorValue(metricFamilies, "diag"), "Expected 2 diag collector errors")
 	assert.Equal(t, float64(1), collectorErrorValue(metricFamilies, "nodes"), "Expected 1 nodes collector error")
 	assert.Equal(t, float64(0), collectorErrorValue(metricFamilies, "jobs"), "Expected no jobs collector errors")
+}
+
+func TestMonitoringMetrics_RecordCollectorDuration(t *testing.T) {
+	metrics := NewMonitoringMetrics()
+	registry := prometheus.NewRegistry()
+	require.NoError(t, metrics.Register(registry))
+
+	metrics.RecordCollectorDuration("nodes", 1.5)
+	metrics.RecordCollectorDuration("jobs", 2.5)
+	metrics.RecordCollectorDuration("nodes", 0.5)
+
+	metricFamilies, err := registry.Gather()
+	require.NoError(t, err)
+
+	assert.Equal(t, float64(0.5), collectorGaugeValue(metricFamilies, "slurm_exporter_collector_duration_seconds", "nodes"))
+	assert.Equal(t, float64(2.5), collectorGaugeValue(metricFamilies, "slurm_exporter_collector_duration_seconds", "jobs"))
+	assert.Equal(t, float64(0), collectorGaugeValue(metricFamilies, "slurm_exporter_collector_duration_seconds", "diag"))
+}
+
+func collectorGaugeValue(families []*dto.MetricFamily, metricName, collector string) float64 {
+	for _, mf := range families {
+		if mf.GetName() != metricName {
+			continue
+		}
+		for _, m := range mf.GetMetric() {
+			for _, lp := range m.GetLabel() {
+				if lp.GetName() == "collector" && lp.GetValue() == collector {
+					return m.GetGauge().GetValue()
+				}
+			}
+		}
+	}
+	return 0
 }
 
 func TestMonitoringMetrics_RecordMetricsRequest(t *testing.T) {
