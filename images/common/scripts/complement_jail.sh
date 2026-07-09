@@ -194,40 +194,32 @@ readonly GPU_PLACEHOLDER_MARKER="soperator gpu placeholder"
 # per-arch constant /usr/lib/<arch>-linux-gnu because the jail contains /etc/debian_version
 # (nvc_container.c, common.h USR_LIB_MULTIARCH_DIR) — equivalent to this expression for our
 # Ubuntu jail on x86_64/aarch64, and it is the layout this whole script assumes everywhere.
-# realpath also resolves the jail's /lib -> usr/lib symlink; -m tolerates a missing tail.
 # Must be called with CWD = ${jaildir}.
 jail_mount_target() {
     local name
     name=$(basename "$1")
+    # realpath resolves the jail's /lib -> usr/lib symlink; -m tolerates a missing tail.
     case "${name}" in
         lib*.so*) realpath -m "./usr/lib/${ALT_ARCH}-linux-gnu/${name}" ;;
         *)        realpath -m ".$1" ;;
     esac
 }
 
-precreate_gpu_placeholders() {
-    local list_output jail_dev host_path jail_path probe created lockfd
+precreate_gpu_placeholders() (
+    # The () body runs the function in a subshell, so the umask change stays local to this call.
+    # 0022 makes mkdir -p create 0755 directories on every component — same as the host dirs
+    # and what the CLI's own make_ancestors produces (the CLI never compares directory modes)
+    umask 0022
+    local list_output host_path jail_path created lockfd
     local missing=()
     if ! list_output=$(nvidia-container-cli list); then
         echo "[nvml] nvidia-container-cli list failed, exiting so the container restarts"
         exit 1
     fi
-    # Device id of the shared jail FS — the reference for the per-path filter below
-    jail_dev=$(stat -c %d .)
-    # `list` prints host paths for ALL driver capabilities, while `configure` will mount only the
-    # files matching our cap_args and alive on the host. A placeholder for a file that never gets
-    # mounted is harmless — a small marker file nothing reads — so no need to filter by capability
     while IFS= read -r host_path; do
         [ -n "${host_path}" ] || continue
         jail_path=$(jail_mount_target "${host_path}")
         [ -e "${jail_path}" ] && continue
-        # Walk up to the nearest existing ancestor: it tells which filesystem a creation
-        # of this path would land on (the path itself may not exist yet, dirs included)
-        probe=${jail_path}
-        while [ ! -e "${probe}" ]; do probe=$(dirname "${probe}"); done
-        # Keep only paths on the shared jail FS: inside the jail, /dev and /run are node-local
-        # mounts by this point, and their device ids differ — no need to hardcode prefixes
-        [ "$(stat -c %d "${probe}")" = "${jail_dev}" ] || continue
         missing+=("${host_path}")
     done <<< "${list_output}"
 
@@ -248,9 +240,7 @@ precreate_gpu_placeholders() {
     for host_path in "${missing[@]}"; do
         jail_path=$(jail_mount_target "${host_path}")
         [ -e "${jail_path}" ] && continue  # created by a previous lock holder
-        # 0755 explicitly (umask-independent): matches both the host dirs and what the CLI's
-        # own make_ancestors would create; the CLI never compares directory modes
-        install -d -m 0755 "$(dirname "${jail_path}")"
+        mkdir -p "$(dirname "${jail_path}")"
         # The write can fail spuriously (a possible EEXIST from O_CREAT on a stale view of the
         # shared FS, or a transient network-FS error) — tolerated: only the file's existence
         # matters, and the mount verification and ensure_nvml_soname judge the end state later.
@@ -269,7 +259,7 @@ precreate_gpu_placeholders() {
         # shellcheck disable=SC2012 # human-readable log line, paths are known driver files
         ls -la "${created[@]}" | sed 's/^/[nvml]   /'
     fi
-}
+)
 
 pushd "${jaildir}"
     echo "Bind-mount virtual filesystems"
