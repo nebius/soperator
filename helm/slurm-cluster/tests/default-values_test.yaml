@@ -29,6 +29,9 @@ tests:
           path: spec.slurmConfig.prolog
           value: "/opt/slurm_scripts/prolog.sh"
       - equal:
+          path: spec.slurmConfig.taskProlog
+          value: "/opt/slurm_scripts/task_prolog.sh"
+      - equal:
           path: spec.slurmConfig.epilog
           value: "/opt/slurm_scripts/epilog.sh"
       - equal:
@@ -39,7 +42,7 @@ tests:
           value: 20000
       - equal:
           path: spec.slurmConfig.minJobAge
-          value: 28800
+          value: 3600
       - equal:
           path: spec.slurmConfig.messageTimeout
           value: 60
@@ -69,6 +72,9 @@ tests:
       - equal:
           path: spec.plugStackConfig.pyxis.required
           value: true
+      - equal:
+          path: spec.plugStackConfig.pyxis.useSquashfuse
+          value: false
       - equal:
           path: spec.plugStackConfig.pyxis.importerPath
           value: "/opt/slurm_scripts/pyxis_caching_importer.sh"
@@ -186,6 +192,12 @@ tests:
       - equal:
           path: spec.slurmNodes.exporter.collectionInterval
           value: "30s"
+      - equal:
+          path: spec.slurmNodes.exporter.jobSource
+          value: "controller"
+      - equal:
+          path: spec.slurmNodes.exporter.accountingJobsLookback
+          value: "1h"
       - equal:
           path: spec.slurmNodes.exporter.podMonitorConfig.jobLabel
           value: "slurm-exporter"
