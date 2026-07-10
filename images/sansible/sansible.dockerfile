@@ -1,6 +1,6 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/pull/88
+# https://github.com/nebius/ml-containers/pull/92
 FROM cr.eu-north1.nebius.cloud/ml-containers/ansible_roles:noble-20260709135925 AS sansible
 
 # Install common packages
