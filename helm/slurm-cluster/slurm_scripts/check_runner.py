@@ -132,6 +132,8 @@ try:
     SLURM_JOB_ID = os.environ.get("SLURM_JOB_ID", "") # Not available in the "hc_program" context
     SLURM_JOB_GPUS = os.environ.get("SLURM_JOB_GPUS", "") # Not available in the "hc_program context"
     SLURM_JOB_COMMENT = os.environ.get("SLURM_JOB_COMMENT", "") # Not available in the "hc_program context"
+    SLURM_MEM_PER_CPU = os.environ.get("SLURM_MEM_PER_CPU", "") # Not available in the "hc_program context"
+    SLURM_MEM_PER_NODE = os.environ.get("SLURM_MEM_PER_NODE", "") # Not available in the "hc_program context"
     CHECKS_OUTPUTS_BASE_DIR = os.environ["CHECKS_OUTPUTS_BASE_DIR"]
     CHECKS_CONTEXT = os.environ["CHECKS_CONTEXT"]
     CHECKS_CONFIG = os.environ["CHECKS_CONFIG"]
@@ -150,6 +152,9 @@ def main():
         path_var = key == "PATH"
         if slurm_var or check_runner_var or path_var:
             logging.info(f"Environment {key}=\"{value}\"")
+    for key in ("SLURM_MEM_PER_CPU", "SLURM_MEM_PER_NODE"):
+        if key not in os.environ:
+            logging.info(f"Environment {key}=\"\"")
 
     # Skip all checks if requested in the job comment
     if SLURM_JOB_COMMENT == "skip_checks":
@@ -556,6 +561,8 @@ def write_alloc_mem_cgroup_debug(scontrol_alloc_mem_bytes: int) -> None:
             "CHECKS_CONTEXT": CHECKS_CONTEXT,
             "SLURMD_NODENAME": SLURMD_NODENAME,
             "SLURM_JOB_ID": SLURM_JOB_ID,
+            "SLURM_MEM_PER_CPU": SLURM_MEM_PER_CPU,
+            "SLURM_MEM_PER_NODE": SLURM_MEM_PER_NODE,
             "scontrol_alloc_mem_bytes": scontrol_alloc_mem_bytes,
             "cgroup_alloc_mem_bytes": cgroup_alloc_mem_bytes,
             "match": scontrol_alloc_mem_bytes == cgroup_alloc_mem_bytes,
