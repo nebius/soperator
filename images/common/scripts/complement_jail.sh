@@ -30,68 +30,236 @@ echo "🔧 Using ALT_ARCH = ${ALT_ARCH}"
 
 SLURM_LIB_PATH="usr/lib/${ALT_ARCH}-linux-gnu/slurm"
 
-# SCHED-1041 diagnostics.
-# The NVIDIA soname symlinks (e.g. libnvidia-ml.so.1) are created only by the "chroot ldconfig" run below,
-# and sometimes the worker that wins the ldconfig flock has a stale view of the jail lib dir right after
-# its own nvidia-container-cli run, so its ldconfig creates no sonames and GPU containers fail on every node of the cluster.
-# How to read the output:
-# - path/chroot view has no libnvidia-ml at all -> stale dentry/readdir view of the shared
-#   jail, or the CLI mounted into another namespace (check the mountinfo counts below)
-# - 0-size versioned libs -> shared-FS placeholders visible, bind mounts detached
-# - bind mounts present in mountinfo while invisible by path -> stale dentries (virtiofs)
-# - bind mounts absent from mountinfo -> the CLI's mounts landed in another namespace
-# - "self" and "via jail proc" namespaces differ -> the CLI targeted a wrong namespace:
-#   it derives the target from ${jaildir}/proc/<its parent pid>/ns/mnt
-# Must be called with CWD = ${jaildir}. All output is prefixed with [nvml] for grepping.
+# NVML diagnostics dump, [nvml]-prefixed for grepping. Must be called with CWD = ${jaildir}.
+# The failure mechanism these dumps watch for: when one worker's nvidia-container-cli fails, its
+# cleanup unmounts and DELETES every 0-byte mount target it had mounted on the shared jail
+# (nvc_mount.c unmount() -> file_remove()), unlinking the placeholders under the other workers' live bind mounts;
+# their kernels then detach those mounts. precreate_gpu_placeholders below makes the placeholders non-empty
+# and thus immune; these dumps are the telemetry proving that.
 # shellcheck disable=SC2012 # ls is deliberate: the probe must exercise readdir on the live directory
 dump_nvml_state() {
     echo "[nvml] === NVML jail state: ${1} ==="
+
+    # No libnvidia-ml entries at all -> the placeholders were deleted (a neighbor's CLI failed and its cleanup ran);
+    # 0-size or marker-size versioned libs -> this worker's bind mounts are gone
     echo "[nvml] --- path view:"
     ls -lai "usr/lib/${ALT_ARCH}-linux-gnu/" 2>&1 | awk '/libnvidia-ml|libcuda\.so/ {print "[nvml]   " $0; n++} END {if (!n) print "[nvml]   no libnvidia-ml/libcuda entries visible by path"}'
+
+    # A difference from the path view means ldconfig resolves the jail through another view
     echo "[nvml] --- chroot view (what ldconfig sees):"
     chroot "${jaildir}" ls -lai "/usr/lib/${ALT_ARCH}-linux-gnu/" 2>&1 | awk '/libnvidia-ml|libcuda\.so/ {print "[nvml]   " $0; n++} END {if (!n) print "[nvml]   no libnvidia-ml/libcuda entries visible via chroot"}'
+
+    # 0 mounts while the libs above look healthy -> the CLI's mounts landed in another namespace
     echo "[nvml] --- nvidia lib bind mounts in this namespace: $(grep -cF "${jaildir}/usr/lib/${ALT_ARCH}-linux-gnu/libnvidia" /proc/self/mountinfo) (libnvidia-ml: $(grep -cF "${jaildir}/usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml" /proc/self/mountinfo))"
+
+    # Differing values -> the CLI targeted a wrong namespace: it derives the target
+    # from ${jaildir}/proc/<its parent pid>/ns/mnt
     echo "[nvml] --- mount namespace self: $(readlink "/proc/$$/ns/mnt") via jail proc: $(readlink "${jaildir}/proc/$$/ns/mnt" 2>&1)"
     echo "[nvml] === end NVML jail state: ${1} ==="
 }
 
-# Verify the NVIDIA soname symlink exists after the ldconfig phase and log the SCHED-1041 anomaly otherwise.
-# ${1} says what happened on this worker:
+# Placeholders are non-empty marker files now (see precreate_gpu_placeholders), so `-s` no longer tells
+# a real library from an unmounted placeholder — require real content instead.
+# Follows symlinks; a missing file or a dangling link counts as no content.
+lib_has_real_content() {
+    [ "$(stat -Lc %s "$1" 2>/dev/null || echo 0)" -gt 1024 ]
+}
+
+# Make sure the NVIDIA soname symlink exists AND points at real content after the ldconfig phase:
+# repair by running ldconfig here if not, and restart the container when the jail still has no
+# working NVML. ${1} says what happened on this worker:
 # - "ran" (ldconfig executed here),
 # - "lock-busy" (another worker holds the ldconfig lock),
 # - "skipped" (this worker decided not to run it), or
 # - "failed".
-# Kept generic so main's probe-based ldconfig block (PR #2621) can call it with the same statuses ("skipped" when
-# the probe reports the cache as up to date — an anomaly then means the probe was fooled by a broken view of the jail).
+# Kept generic so main's probe-based ldconfig block (PR #2621) can call it with the same statuses.
+# lib_has_real_content follows the symlink, so a dangling link or a placeholder target counts as broken.
 # Must be called with CWD = ${jaildir}.
-verify_nvml_soname() {
+ensure_nvml_soname() {
     local how=$1
     local so1="usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1"
-    if [ "${how}" = "lock-busy" ] && [ ! -e "${so1}" ]; then
+    # A GPU worker whose capability set excludes `utility` gets no NVML mounted by design, so no
+    # soname is expected (NVML consumers like the enroot hook are knowingly opted out with it).
+    # CPU workers in GPU clusters keep the check: they see the soname over their libdummy mounts.
+    if [ "$NODESET_GPU_ENABLED" = "true" ] && [ "$(grep -cF "${jaildir}/usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml" /proc/self/mountinfo)" -lt 1 ]; then
+        echo "[nvml] libnvidia-ml not mounted (capability set excludes utility), skipping the soname check"
+        return 0
+    fi
+    if [ "${how}" = "lock-busy" ] && ! lib_has_real_content "${so1}"; then
         # The lock holder is still running ldconfig; instead of polling with a guessed delay,
         # wait for the lock to be released — that happens exactly when the holder's ldconfig exits
-        flock --wait 300 etc/complement_jail_ldconfig.lock -c true || echo "[nvml] timed out waiting for the ldconfig lock holder"
+        flock --wait 60 etc/complement_jail_ldconfig.lock -c true || echo "[nvml] timed out waiting for the ldconfig lock holder"
     fi
-    if [ ! -e "${so1}" ]; then
-        # Grace re-checks before declaring the anomaly: if the symlink shows up here, it
-        # was created and only this view lagged
+    if ! lib_has_real_content "${so1}"; then
+        # Grace re-checks: if the symlink becomes usable here, it was created and only this view lagged
         local waited=0
         for delay in 1 5; do
             sleep "${delay}"
             waited=$((waited + delay))
-            if [ -e "${so1}" ]; then
-                echo "[nvml] libnvidia-ml.so.1 appeared after ${waited}s extra wait (view lag)"
+            if lib_has_real_content "${so1}"; then
+                echo "[nvml] libnvidia-ml.so.1 usable after ${waited}s extra wait (view lag)"
                 break
             fi
         done
     fi
-    if [ -e "${so1}" ]; then
-        echo "[nvml] libnvidia-ml.so.1 present after ldconfig phase (${how})"
+    if ! lib_has_real_content "${so1}"; then
+        # Repair: this worker's own view is verified healthy (mount_gpu_libs), so its ldconfig
+        # produces correct symlinks no matter what the previous runner saw
+        echo "[nvml] ANOMALY: libnvidia-ml.so.1 missing or empty after ldconfig phase (${how}), running ldconfig here"
+        dump_nvml_state "before repair ldconfig (${how})"
+        flock --wait 60 etc/complement_jail_ldconfig.lock -c "chroot \"${jaildir}\" /usr/sbin/ldconfig" || echo "[nvml] repair ldconfig failed with exit code $?"
+        if ! lib_has_real_content "${so1}"; then
+            echo "[nvml] libnvidia-ml.so.1 still missing or empty after repair, exiting so the container restarts"
+            dump_nvml_state "final state before exit (${how})"
+            exit 1
+        fi
+        echo "[nvml] libnvidia-ml.so.1 repaired by local ldconfig"
     else
-        echo "[nvml] ANOMALY: libnvidia-ml.so.1 absent after ldconfig phase (${how}) (SCHED-1041)"
+        echo "[nvml] libnvidia-ml.so.1 usable after ldconfig phase (${how})"
     fi
     dump_nvml_state "after ldconfig phase (${how})"
 }
+
+# Mount points under the jail in this mount namespace (mountinfo field 5 is the mount point),
+# as a sorted unique set ready for comm
+jail_mount_points() {
+    awk -v jail="${jaildir}/" 'index($5, jail) == 1 {print $5}' /proc/self/mountinfo | sort -u
+}
+
+# Run nvidia-container-cli once and verify its result. No retries by design: with the placeholders pre-created
+# (see precreate_gpu_placeholders) the CLI creates nothing on the shared jail, so the concurrent-creation crash cannot
+# happen, and if it still fails its cleanup cannot damage the other workers (it only deletes 0-byte mount targets).
+# Whatever fails here is unexpected — dump diagnostics and exit; the kubelet container restart is the retry.
+# Uses cap_args/FAKE_LDCONFIG set by the GPU section. Must be called with CWD = ${jaildir}.
+mount_gpu_libs() {
+    local mounts_before mounts_after mounted target
+    mounts_before=$(jail_mount_points)
+    if ! nvidia-container-cli \
+        --user \
+        --debug=/dev/stderr \
+        --no-pivot \
+        configure \
+        --no-cgroups \
+        --ldconfig=$FAKE_LDCONFIG \
+        --device=all \
+        "${cap_args[@]}" \
+        "${jaildir}"; then
+        echo "[nvml] nvidia-container-cli failed, exiting so the container restarts"
+        dump_nvml_state "after failed nvidia-container-cli"
+        exit 1
+    fi
+    # Capability-agnostic verification: whatever set of files the enabled capabilities selected,
+    # exactly the mounts the CLI just created must be attached and show real content by path
+    mounts_after=$(jail_mount_points)
+    mounted=$(comm -13 <(printf '%s\n' "${mounts_before}") <(printf '%s\n' "${mounts_after}"))
+    if [ -z "${mounted}" ]; then
+        echo "[nvml] ANOMALY: no new jail mounts after nvidia-container-cli, exiting so the container restarts"
+        dump_nvml_state "after nvidia-container-cli without mounts"
+        exit 1
+    fi
+    while IFS= read -r target; do
+        # Only regular files carry content: directory mounts (driver procfs, app profiles)
+        # and device/socket binds are attachment-only
+        [ -f "${target}" ] || continue
+        if ! lib_has_real_content "${target}"; then
+            echo "[nvml] ANOMALY: ${target} shows no real content right after mounting, exiting so the container restarts"
+            dump_nvml_state "after broken mount of ${target}"
+            exit 1
+        fi
+    done <<< "${mounted}"
+    echo "[nvml] GPU libs mounted, $(wc -l <<< "${mounted}" | tr -d ' ') new jail mounts verified"
+}
+
+# Pre-create a non-empty placeholder for every file nvidia-container-cli is going to bind-mount onto the shared jail.
+# This removes both halves of the confirmed failure mechanism:
+# - creation race: libnvidia-container's file_create() skips creation entirely (a single lstat, no create syscall)
+#   when the target already exists with the host file's exact st_mode, so concurrent workers no longer race to create
+#   the same files — the "file creation failed: ... file exists" CLI crash cannot happen;
+# - cleanup damage: a failing CLI unmounts and DELETES every mount target of size 0
+#   (nvc_mount.c unmount() -> file_remove()), unlinking the placeholders under the other
+#   workers' live bind mounts cluster-wide. file_remove() spares non-empty files, so these
+#   placeholders are immune no matter which worker's CLI fails, when, or why.
+# Directories are deliberately not protected: the only directory the CLI mounts on the shared
+# jail is etc/nvidia/nvidia-application-profiles-rc.d — an EGL-only profile dir shadowed by a
+# per-node tmpfs; we pass --device=all, so losing it to a failing neighbor's cleanup (rmdir
+# of an empty dir) is a no-op, and the next cold CLI run recreates it.
+# Must be called with CWD = ${jaildir}.
+readonly GPU_PLACEHOLDER_MARKER="soperator gpu placeholder"
+
+# Where nvidia-container-cli will mount the given host file inside the jail.
+# Libraries are flattened to the container's libs dir (nvc_mount.c mount_files: dst = libs_dir + basename)
+# — e.g. host .../x86_64-linux-gnu/vdpau/libvdpau_nvidia.so.* is mounted at the flat lib path.
+# Binaries are already flat and firmware keeps its full path, so both map 1:1.
+# The libs dir here is hardcoded, not computed like the CLI does it: the CLI uses its compile-time
+# per-arch constant /usr/lib/<arch>-linux-gnu because the jail contains /etc/debian_version
+# (nvc_container.c, common.h USR_LIB_MULTIARCH_DIR) — equivalent to this expression for our
+# Ubuntu jail on x86_64/aarch64, and it is the layout this whole script assumes everywhere.
+# Must be called with CWD = ${jaildir}.
+jail_mount_target() {
+    local name
+    name=$(basename "$1")
+    # realpath resolves the jail's /lib -> usr/lib symlink; -m tolerates a missing tail.
+    case "${name}" in
+        lib*.so*) realpath -m "./usr/lib/${ALT_ARCH}-linux-gnu/${name}" ;;
+        *)        realpath -m ".$1" ;;
+    esac
+}
+
+precreate_gpu_placeholders() (
+    # The () body runs the function in a subshell, so the umask change stays local to this call.
+    # 0022 makes mkdir -p create 0755 directories on every component — same as the host dirs
+    # and what the CLI's own make_ancestors produces (the CLI never compares directory modes)
+    umask 0022
+    local list_output host_path jail_path created lockfd
+    local missing=()
+    if ! list_output=$(nvidia-container-cli list); then
+        echo "[nvml] nvidia-container-cli list failed, exiting so the container restarts"
+        exit 1
+    fi
+    while IFS= read -r host_path; do
+        [ -n "${host_path}" ] || continue
+        jail_path=$(jail_mount_target "${host_path}")
+        [ -e "${jail_path}" ] && continue
+        missing+=("${host_path}")
+    done <<< "${list_output}"
+
+    if [ "${#missing[@]}" -eq 0 ]; then
+        echo "[nvml] all GPU placeholders already present in the jail"
+        return 0
+    fi
+
+    # Cold jail bring-up: create the missing placeholders under a cross-node lock so exactly one worker does it;
+    # the others re-check under the lock and find everything present.
+    echo "[nvml] ${#missing[@]} GPU placeholders missing, creating under lock"
+    exec {lockfd}>etc/complement_jail_gpu_placeholders.lock
+    if ! flock --wait 60 "${lockfd}"; then
+        echo "[nvml] timed out waiting for the GPU placeholder lock, exiting so the container restarts"
+        exit 1
+    fi
+    created=()
+    for host_path in "${missing[@]}"; do
+        jail_path=$(jail_mount_target "${host_path}")
+        [ -e "${jail_path}" ] && continue  # created by a previous lock holder
+        mkdir -p "$(dirname "${jail_path}")"
+        # The write can fail spuriously (a possible EEXIST from O_CREAT on a stale view of the
+        # shared FS, or a transient network-FS error) — tolerated: only the file's existence
+        # matters, and the mount verification and ensure_nvml_soname judge the end state later.
+        echo "${GPU_PLACEHOLDER_MARKER}" > "${jail_path}" || true
+        # Exact host st_mode: file_create() skips creation only on full mode equality, and
+        # the skip (a single lstat, no create syscall) is what removes the creation race
+        chmod --reference="${host_path}" "${jail_path}" || true
+        created+=("${jail_path}")
+    done
+    exec {lockfd}>&-  # releases the lock
+
+    # The listing shows the marker size and the copied host mode of every file just created;
+    # read-only, so done after releasing the lock to not keep the queued workers waiting
+    echo "[nvml] pre-created ${#created[@]} GPU placeholders:"
+    if [ "${#created[@]}" -gt 0 ]; then
+        # shellcheck disable=SC2012 # human-readable log line, paths are known driver files
+        ls -la "${created[@]}" | sed 's/^/[nvml]   /'
+    fi
+)
 
 pushd "${jaildir}"
     echo "Bind-mount virtual filesystems"
@@ -175,48 +343,14 @@ pushd "${jaildir}"
 
         echo "[nvml] Jail mount: $(findmnt --target . --output SOURCE,FSTYPE,OPTIONS --noheadings 2>&1)"
 
-        nvidia-container-cli \
-            --user \
-            --debug=/dev/stderr \
-            --no-pivot \
-            configure \
-            --no-cgroups \
-            --ldconfig=$FAKE_LDCONFIG \
-            --device=all \
-            "${cap_args[@]}" \
-            "${jaildir}"
+        # With the placeholders pre-created, running the CLI in parallel across
+        # workers on the shared jail is safe (see precreate_gpu_placeholders)
+        precreate_gpu_placeholders
+        mount_gpu_libs
+        touch "etc/gpu_libs_installed.flag"
 
         echo "[nvml] /lib symlink: $(readlink lib 2>/dev/null || echo 'NOT a symlink')"
         dump_nvml_state "after nvidia-container-cli"
-
-        # Local-coherence probe: a file created through this view must be immediately visible;
-        # if it is not, the whole directory view is incoherent, not just the freshly created bind mounts
-        probe="usr/lib/${ALT_ARCH}-linux-gnu/.soperator-jail-probe-$(hostname)-$$"
-        touch "${probe}" || echo "[nvml] probe touch FAILED"
-        if [ -e "${probe}" ]; then
-            echo "[nvml] probe file visible right after touch: yes"
-        else
-            echo "[nvml] probe file visible right after touch: NO (local writes invisible through this view)"
-        fi
-        rm -f "${probe}" || true
-
-        # If the versioned lib only appears after a delay, the staleness is transient and a retry-based fix is viable;
-        # if it never appears, the view stays broken
-        if ! compgen -G "usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.*.*" > /dev/null; then
-            waited=0
-            for delay in 1 5; do
-                sleep "${delay}"
-                waited=$((waited + delay))
-                if compgen -G "usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.*.*" > /dev/null; then
-                    echo "[nvml] versioned libnvidia-ml appeared after ${waited}s"
-                    break
-                fi
-                echo "[nvml] versioned libnvidia-ml still not visible after ${waited}s"
-            done
-            dump_nvml_state "after visibility wait"
-        fi
-
-        touch "etc/gpu_libs_installed.flag"
     fi
 
     echo "Bind-mount slurm client"
@@ -268,8 +402,12 @@ pushd "${jaildir}"
             echo "Waiting for GPU libs to be propagated to the jail from a worker node"
             sleep 10
         done
-        echo "Bind-mount all GPU-specific empty lib files into the host's libdummy"
-        find "${jaildir}/lib/${ALT_ARCH}-linux-gnu" -maxdepth 1 -type f ! -type l -empty -print0 | while IFS= read -r -d '' file; do
+        echo "Bind-mount all GPU-specific lib placeholder files into the host's libdummy"
+        # Placeholders are small marker files now (see precreate_gpu_placeholders), or 0-byte on
+        # jails from before that change — match both by size; no real library is this small.
+        # Only versioned lib names: the jail image ships other small files in this dir (glibc
+        # stub .a archives, ncurses .so linker scripts) that must not be covered by libdummy
+        find "${jaildir}/lib/${ALT_ARCH}-linux-gnu" -maxdepth 1 -type f ! -type l -size -64c -name 'lib*.so.*' -print0 | while IFS= read -r -d '' file; do
             mount --bind "/lib/${ALT_ARCH}-linux-gnu/libdummy.so" "$file"
         done
     fi
@@ -301,9 +439,9 @@ pushd "${jaildir}"
         fi
         if [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; then
             case "$ldconfig_rc" in
-                0) verify_nvml_soname "ran" ;;
-                1) verify_nvml_soname "lock-busy" ;;
-                *) verify_nvml_soname "failed" ;;
+                0) ensure_nvml_soname "ran" ;;
+                1) ensure_nvml_soname "lock-busy" ;;
+                *) ensure_nvml_soname "failed" ;;
             esac
         fi
     fi

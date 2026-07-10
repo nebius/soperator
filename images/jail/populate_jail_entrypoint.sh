@@ -33,13 +33,17 @@ remove_empty_lib_mount_targets() {
     echo "Removing the flag file that shows that GPU library bind-mount targets exist"
     rm -f "/mnt/jail/etc/gpu_libs_installed.flag"
 
-    echo "Removing empty library files that were used as bind-mount targets on the previous cluster"
+    echo "Removing placeholder library files that were used as bind-mount targets on the previous cluster"
+    # Placeholders are small marker files created by complement_jail.sh (or 0-byte on jails
+    # populated before that change) — match both by size; no real library is this small.
+    # Only versioned lib names: the jail image ships other small '*.so*' files in this dir
+    # (e.g. the ncurses .so linker scripts) that must not be deleted
     ARCH_LIST="x86_64 aarch64"
     for arch in $ARCH_LIST; do
         dir="/mnt/jail/lib/${arch}-linux-gnu"
         [ -d "$dir" ] || continue
         find "$dir" \
-            -maxdepth 1 -type f -empty -name '*.so*' -print |
+            -maxdepth 1 -type f -size -64c -name 'lib*.so.*' -print |
         while IFS= read -r file; do
             echo "Removing $file"
             rm -- "$file" || true
