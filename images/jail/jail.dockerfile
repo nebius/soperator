@@ -2,8 +2,8 @@
 
 ARG CUDA_VERSION
 ARG SLURM_VERSION
-# https://github.com/nebius/ml-containers/pull/88
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260605082538 AS jail
+# https://github.com/nebius/ml-containers/pull/92
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260709135942 AS jail
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
@@ -128,4 +128,3 @@ COPY --from=untaped /jail_restic /jail_restic
 COPY images/jail/populate_jail_entrypoint.sh /opt/bin/
 RUN chmod +x /opt/bin/populate_jail_entrypoint.sh
 ENTRYPOINT ["/opt/bin/populate_jail_entrypoint.sh"]
-
