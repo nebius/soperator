@@ -119,6 +119,17 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run tests.
 	go test ./...
 
+.PHONY: test-slurm-scripts
+test-slurm-scripts: ## Run Python unit tests for Slurm scripts.
+	@if find helm/slurm-cluster/slurm_scripts -type f -name '*_test.py' -print -quit | grep -q .; then \
+		python3 -m unittest discover \
+			-s helm/slurm-cluster/slurm_scripts \
+			-p '*_test.py' \
+			-v; \
+	else \
+		echo "No Slurm script unit tests found; skipping."; \
+	fi
+
 .PHONY: test-coverage
 test-coverage: manifests generate fmt vet envtest ## Run tests and generate test coverage.
 	go test ./... -coverprofile cover.out
