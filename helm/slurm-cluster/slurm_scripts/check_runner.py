@@ -353,7 +353,9 @@ def export_needed_env(check: Check):
         if env == "CHECKS_NODE_REAL_MEM_BYTES":
             os.environ["CHECKS_NODE_REAL_MEM_BYTES"] = str(get_node_info().real_memory_bytes)
         if env == "CHECKS_JOB_ALLOC_MEM_BYTES":
-            os.environ["CHECKS_JOB_ALLOC_MEM_BYTES"] = str(get_job_info().allocated_memory_bytes)
+            job_info = get_job_info()
+            os.environ["CHECKS_JOB_ALLOC_MEM_BYTES"] = str(job_info.allocated_memory_bytes)
+            write_alloc_mem_cgroup_debug(job_info.allocated_memory_bytes)
 
 # Get GPU platform tags, e.g. ["8xH200", "8xGPU] from "nvidia-smi"
 # Please note, this command can be executed from both jail or host rootfs
@@ -469,6 +471,102 @@ def get_job_info() -> JobInfo:
     except Exception as e:
         logging.warning(f"Failed to get info about Slurm job {SLURM_JOB_ID}: {e}")
         return JobInfo()
+
+def get_job_alloc_mem_bytes_from_cgroup() -> tuple[int, str]:
+    try:
+        if not SLURM_JOB_ID:
+            return 0, "SLURM_JOB_ID is empty"
+
+        cgroup_base = "/sys/fs/cgroup"
+        job_dir = f"job_{SLURM_JOB_ID}"
+        derived_debug_messages = []
+
+        try:
+            with open("/proc/self/cgroup", encoding="utf-8") as f:
+                for line in f:
+                    parts = line.rstrip().split(":", 2)
+                    if len(parts) != 3:
+                        continue
+
+                    cgroup_path_parts = [part for part in parts[2].split("/") if part]
+                    if job_dir not in cgroup_path_parts:
+                        continue
+
+                    job_index = cgroup_path_parts.index(job_dir)
+                    if job_index == 0 or cgroup_path_parts[job_index - 1] != "slurmstepd.scope":
+                        continue
+
+                    memory_max_path = os.path.join(cgroup_base, *cgroup_path_parts[:job_index + 1], "memory.max")
+                    if os.path.exists(memory_max_path):
+                        return read_cgroup_memory_max(memory_max_path, "derived from /proc/self/cgroup")
+
+                    derived_debug_messages.append(f"derived path not found: {memory_max_path}")
+        except Exception as e:
+            derived_debug_messages.append(f"failed to read /proc/self/cgroup: {e}")
+
+        walk_errors = []
+
+        def on_walk_error(error):
+            walk_errors.append(str(error))
+
+        for dirpath, dirnames, filenames in os.walk(cgroup_base, onerror=on_walk_error):
+            dirnames.sort()
+            if os.path.basename(dirpath) != job_dir:
+                continue
+            if os.path.basename(os.path.dirname(dirpath)) != "slurmstepd.scope":
+                continue
+            if "memory.max" not in filenames:
+                continue
+            memory_max_path = os.path.join(dirpath, "memory.max")
+            return read_cgroup_memory_max(memory_max_path, "found by searching /sys/fs/cgroup")
+
+        debug_parts = ["job cgroup memory.max not found"]
+        if derived_debug_messages:
+            debug_parts.extend(derived_debug_messages)
+        if walk_errors:
+            debug_parts.append(f"os.walk errors: {'; '.join(walk_errors[:5])}")
+        return 0, "; ".join(debug_parts)
+    except Exception as e:
+        return 0, f"failed to get cgroup memory.max: {e}"
+
+def read_cgroup_memory_max(memory_max_path: str, source: str) -> tuple[int, str]:
+    try:
+        with open(memory_max_path, encoding="utf-8") as f:
+            raw_memory_max = f.read().strip()
+    except Exception as e:
+        return 0, f"{source}: failed to read {memory_max_path}: {e}"
+
+    if raw_memory_max == "max":
+        return 0, f"{source}: {memory_max_path} is max"
+
+    try:
+        return int(raw_memory_max), f"{source}: {memory_max_path}={raw_memory_max}"
+    except ValueError:
+        return 0, f"{source}: failed to parse {memory_max_path} value {raw_memory_max!r}"
+
+def write_alloc_mem_cgroup_debug(scontrol_alloc_mem_bytes: int) -> None:
+    try:
+        cgroup_alloc_mem_bytes, cgroup_debug = get_job_alloc_mem_bytes_from_cgroup()
+        debug_path = (
+            f"/mnt/jail/opt/soperator-outputs/slurm_scripts/"
+            f"{SLURMD_NODENAME}.alloc_mem_cgroup_debug.{CHECKS_CONTEXT}.log"
+        )
+        entry = {
+            "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "CHECKS_CONTEXT": CHECKS_CONTEXT,
+            "SLURMD_NODENAME": SLURMD_NODENAME,
+            "SLURM_JOB_ID": SLURM_JOB_ID,
+            "scontrol_alloc_mem_bytes": scontrol_alloc_mem_bytes,
+            "cgroup_alloc_mem_bytes": cgroup_alloc_mem_bytes,
+            "match": scontrol_alloc_mem_bytes == cgroup_alloc_mem_bytes,
+            "cgroup_debug": cgroup_debug,
+            "source_of_truth": "scontrol",
+        }
+        os.makedirs(os.path.dirname(debug_path), mode=0o777, exist_ok=True)
+        with open(debug_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception as e:
+        logging.warning(f"Failed to write alloc mem cgroup debug: {e}")
 
 def job_related_run() -> bool:
     return CHECKS_CONTEXT in ("prolog", "epilog")
