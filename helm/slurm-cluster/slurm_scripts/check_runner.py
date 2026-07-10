@@ -567,6 +567,7 @@ def write_alloc_mem_cgroup_debug(scontrol_alloc_mem_bytes: int) -> None:
             "cgroup_alloc_mem_bytes": cgroup_alloc_mem_bytes,
             "match": scontrol_alloc_mem_bytes == cgroup_alloc_mem_bytes,
             "cgroup_debug": cgroup_debug,
+            "environment": dict(sorted(os.environ.items())),
             "source_of_truth": "scontrol",
         }
         os.makedirs(os.path.dirname(debug_path), mode=0o777, exist_ok=True)
