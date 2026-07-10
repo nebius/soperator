@@ -2,7 +2,7 @@
 
 set -eox
 
-SENTINEL="/mnt/jail/.populated"
+SENTINEL="/mnt/jail/etc/soperator-jail-populated"
 
 while ! mountpoint -q /mnt/jail; do
     echo "Waiting until /mnt/jail is mounted"
@@ -55,14 +55,23 @@ if [ "${OVERWRITE:-}" = "1" ]; then
     echo "Content overwriting is turned on, repopulating jail directory"
     populate_jail_rootfs
 elif [ -f "$SENTINEL" ]; then
+    echo "Jail directory is already populated (sentinel exists), removing empty libs and exiting"
     remove_empty_lib_mount_targets
-    echo "Jail directory is already populated (sentinel exists), exiting"
+    exit 0
+elif [ -f "/mnt/jail/.populated" ]; then
+    # Migration: jail was populated by an older version that created sentinel file in another location.
+    # Write it now so sconfigcontroller can proceed, and avoid unnecessary re-population.
+    # Also, delete the old sentinel file.
+    echo "Jail looks already populated (legacy, old sentinel), removing empty libs, migrating sentinel and exiting"
+    remove_empty_lib_mount_targets
+    date -Iseconds > "$SENTINEL"
+    rm -f "/mnt/jail/.populated"
     exit 0
 elif [ -d /mnt/jail/dev ] && [ -d /mnt/jail/usr ]; then
-    remove_empty_lib_mount_targets
     # Migration: jail was populated by an older version that didn't write the sentinel.
     # Write it now so sconfigcontroller can proceed, and avoid unnecessary re-population.
-    echo "Jail looks already populated (legacy, no sentinel), writing sentinel and exiting"
+    echo "Jail looks already populated (legacy, no sentinel), removing empty libs, writing sentinel and exiting"
+    remove_empty_lib_mount_targets
     date -Iseconds > "$SENTINEL"
     exit 0
 else

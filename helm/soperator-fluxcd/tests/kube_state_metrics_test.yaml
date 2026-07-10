@@ -1,0 +1,31 @@
+suite: test kube-state-metrics scrape config
+templates:
+  - templates/vm-stack.yaml
+tests:
+  - it: should not set kube-state-metrics scrape size by default
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.vmagent.spec.extraArgs["promscrape.maxScrapeSize"]
+          value: "33554432"
+      - equal:
+          path: spec.values.kube-state-metrics.vmServiceScrape.spec.endpoints[0].port
+          value: http
+      - notExists:
+          path: spec.values.kube-state-metrics.vmServiceScrape.spec.endpoints[0].max_scrape_size
+      - equal:
+          path: spec.values.kube-state-metrics.vmServiceScrape.spec.endpoints[1].port
+          value: metrics
+      - notExists:
+          path: spec.values.kube-state-metrics.vmServiceScrape.spec.endpoints[1].max_scrape_size
+
+  - it: should allow overriding kube-state-metrics scrape size
+    set:
+      observability.vmStack.values.kubeStateMetrics.maxScrapeSize: "150554432"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.kube-state-metrics.vmServiceScrape.spec.endpoints[0].max_scrape_size
+          value: "150554432"

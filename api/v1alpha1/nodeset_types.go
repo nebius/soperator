@@ -114,6 +114,12 @@ const (
 
 // NodeSetSpec defines the desired state of NodeSet
 type NodeSetSpec struct {
+	// ClusterName is the name of the SlurmCluster this NodeSet belongs to.
+	// Must be in the same namespace as the NodeSet.
+	//
+	// +kubebuilder:validation:Optional
+	ClusterName string `json:"clusterName,omitempty"`
+
 	// Replicas specifies the number of worker nodes in the NodeSet.
 	//
 	// Defaults to 1 if not specified.
@@ -131,6 +137,18 @@ type NodeSetSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="20%"
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+
+	// MaxConcurrentStartup caps the number of worker pods created in parallel
+	// during initial NodeSet scale-out (i.e. cluster creation or NodeSet growth).
+	// Value can be an absolute number (ex: 500) or a percentage of desired pods (ex: 10%).
+	// Maps to the underlying kruise AdvancedStatefulSet's scaleStrategy.maxUnavailable.
+	// Prevents overloading the Slurm controller with simultaneous slurmd registrations
+	// on large clusters.
+	// Defaults to 500.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=500
+	MaxConcurrentStartup *intstr.IntOrString `json:"maxConcurrentStartup,omitempty"`
 
 	// EphemeralNodes enables ephemeral node behavior for this NodeSet.
 	// When true, nodes will use dynamic topology injection instead of legacy topology.conf.
@@ -170,6 +188,19 @@ type NodeSetSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	EnableHostUserNamespace bool `json:"enableHostUserNamespace,omitempty"`
+
+	// WorkerInitRandomDelaySeconds is the upper bound (in seconds) of a random delay the
+	// worker-init container sleeps before running its readiness checks. The actual delay is
+	// picked uniformly from [0, WorkerInitRandomDelaySeconds]. It spreads slurmd registrations
+	// across workers to avoid overloading the Slurm controller (thundering herd) when many
+	// worker pods start at once, e.g. after a cluster-wide restart.
+	// Set to 0 to disable the delay.
+	// Defaults to 0.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	WorkerInitRandomDelaySeconds int32 `json:"workerInitRandomDelaySeconds,omitempty"`
 
 	// Slurmd defines the Slurm worker daemon configuration.
 	//
@@ -211,6 +242,16 @@ type NodeSetSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	GPU GPUSpec `json:"gpu,omitempty"`
+
+	// Docker defines the settings related to Docker support for Slurm workers.
+	//
+	// +kubebuilder:validation:Optional
+	Docker DockerSpec `json:"docker,omitempty"`
+
+	// Topology defines network-topology settings for this NodeSet.
+	//
+	// +kubebuilder:validation:Optional
+	Topology NodeSetTopology `json:"topology,omitempty"`
 
 	// ConfigMapRefSupervisord defines the config name of Supervisord for the slurmd container.
 	// Specifying a custom name allows providing custom config for the Supervisord.
@@ -485,6 +526,29 @@ type NodeConfig struct {
 	// GRESConfig provides a possibility to define node-scoped settings in gres.conf.
 	// Multiple lines can be passed. Each line will be prefixed with NodeName=<node-names-from-the-nodeset>.
 	GRESConfig []string `json:"gresConfig,omitempty"`
+}
+
+// NodeSetTopology defines network-topology settings for the NodeSet.
+type NodeSetTopology struct {
+	// Fabric is the IB fabric this NodeSet belongs to. Its workers are grouped under a
+	// per-fabric root switch (named after the fabric) so Slurm never schedules a job across
+	// fabrics. Powered-down / unscheduled nodes are placed under "<fabric>.unknown".
+	// Defaults to "root", which preserves the single-fabric behavior.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="root"
+	Fabric string `json:"fabric,omitempty"`
+}
+
+// DockerSpec defines the settings related to Docker support
+type DockerSpec struct {
+	// Enabled indicates whether Docker is available on the Nodes of the NodeSet.
+	// Docker requires dedicated image-storage disks for storing OCI data,
+	// so it must be disabled on clusters deployed without them.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // GPUSpec defines the settings related to GPU support

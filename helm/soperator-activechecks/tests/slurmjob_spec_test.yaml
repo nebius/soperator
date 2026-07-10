@@ -1,0 +1,30 @@
+suite: test slurmJobSpec structure
+templates:
+  - templates/active-checks.yaml
+
+tests:
+  - it: should render cuda-samples active check
+    documentSelector:
+      path: metadata.name
+      value: soperator-cuda-samples
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - equal:
+          path: spec.checkType
+          value: slurmJob
+      - equal:
+          path: spec.runAfterCreation
+          value: true
+      - equal:
+          path: spec.suspend
+          value: false
+      - contains:
+          path: spec.dependsOn
+          content: soperator-prepull-container-image
+      - matchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: 'health-checker run'
+      - matchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: 'Running cuda samples check'
