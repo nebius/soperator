@@ -1,17 +1,16 @@
 #!/bin/bash
 
-set -e # Exit immediately if any command returns a non-zero error code
+set -xe # Exit immediately if any command returns a non-zero error code
 
-OPENMPI_VERSION=4.1.7a1-1.2404066
-OPENMPI_VERSION_SHORT=4.1.7a1
-OFED_VERSION=24.04-0.7.0.0
+OPENMPI_VERSION=4.1.9a1-1.20250722.92f9fca4eb.2507097
+OPENMPI_VERSION_SHORT=4.1.9a1
 
-UCX_VERSION=1.17.0-1.2404066
+UCX_VERSION=1.19.0-1.20250722.13ae265cb.2507097
 
 ALT_ARCH="$(uname -m)"
 
 apt update
-apt install openmpi="$OPENMPI_VERSION" ucx="$UCX_VERSION"
+apt install -y openmpi="$OPENMPI_VERSION" ucx="$UCX_VERSION"
 apt clean
 rm -rf /var/lib/apt/lists/*
 
