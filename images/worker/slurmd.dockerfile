@@ -5,12 +5,22 @@ ARG SLURM_VERSION
 # https://github.com/nebius/ml-containers/pull/90
 FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260624085500 AS worker_slurmd
 
+ARG MELLANOX_REPO_URL=https://linux.mellanox.com/public/repo/doca/3.1.0
+
 # Install useful packages
-RUN apt-get update && \
+RUN DPKG_ARCH="$(dpkg --print-architecture)" && \
+    case "$DPKG_ARCH" in \
+      amd64) MLNX_ARCH=x86_64 ;; \
+      arm64) MLNX_ARCH=arm64 ;; \
+      *) echo "Unsupported architecture: $DPKG_ARCH" && exit 1 ;; \
+    esac && \
+    echo "deb ${MELLANOX_REPO_URL}/ubuntu24.04/${MLNX_ARCH} ./" > /etc/apt/sources.list.d/mellanox_doca.list && \
+    wget -qO - https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub | apt-key add - && \
+    apt-get update && \
     apt -y install \
         pciutils \
         iproute2 \
-        infiniband-diags \
+        infiniband-diags=2507mlnx58-1.2507097 \
         kmod \
         libncurses5-dev \
         supervisor \
@@ -21,7 +31,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install OpenMPI
-ARG OPENMPI_VERSION=4.1.7a1
+ARG OPENMPI_VERSION=4.1.9a1
 COPY images/common/scripts/install_openmpi.sh /opt/bin/
 RUN chmod +x /opt/bin/install_openmpi.sh && \
     /opt/bin/install_openmpi.sh && \
