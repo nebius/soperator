@@ -473,6 +473,10 @@ spec:
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.exporter.imagePullPolicy | quote }}
         appArmorProfile: {{ default "unconfined" .Values.slurmNodes.exporter.appArmorProfile | quote }}
         {{- with (default dict .Values.slurmNodes.exporter.exporterContainer) }}
+        {{- with .resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         {{- with .livenessProbe }}
         livenessProbe:
           {{- toYaml . | nindent 10 }}
