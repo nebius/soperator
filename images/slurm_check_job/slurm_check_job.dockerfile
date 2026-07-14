@@ -41,6 +41,13 @@ RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
 
+# Install allocated-memory diagnostic SPANK plugin
+COPY images/common/spank-alloc-mem-diagnostic/src /usr/src/soperator/spank/alloc-mem-diagnostic
+COPY images/common/scripts/install_alloc_mem_diagnostic_plugin.sh /opt/bin/
+RUN chmod +x /opt/bin/install_alloc_mem_diagnostic_plugin.sh && \
+    /opt/bin/install_alloc_mem_diagnostic_plugin.sh && \
+    rm /opt/bin/install_alloc_mem_diagnostic_plugin.sh
+
 # Install NCCL Inspector PreConf SPANK plugin
 COPY ansible/spank-nccl-inspector-preconf.yml /opt/ansible/spank-nccl-inspector-preconf.yml
 COPY ansible/roles/spank-nccl-inspector-preconf /opt/ansible/roles/spank-nccl-inspector-preconf
@@ -67,6 +74,7 @@ RUN ARCH="$(uname -m)" && \
     ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/chroot.so" /usr/lib/slurm/chroot.so && \
     ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spank_pyxis.so" /usr/lib/slurm/spank_pyxis.so && \
     ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spanknccldebug.so" /usr/lib/slurm/spanknccldebug.so && \
+    ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spank_alloc_mem_diagnostic.so" /usr/lib/slurm/spank_alloc_mem_diagnostic.so && \
     ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spank_nccl_inspector_preconf.so" /usr/lib/slurm/spank_nccl_inspector_preconf.so
 
 # Disable NCCL Debug SPANK plugin by default for Slurm jobs

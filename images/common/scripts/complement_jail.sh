@@ -376,6 +376,10 @@ pushd "${jaildir}"
     touch usr/lib/slurm/spanknccldebug.so
     mount --bind "/${SLURM_LIB_PATH}/spanknccldebug.so" "usr/lib/slurm/spanknccldebug.so"
 
+    log "[slurm] Bind-mount allocated-memory diagnostic SPANK plugin from container to the jail"
+    touch usr/lib/slurm/spank_alloc_mem_diagnostic.so
+    mount --bind "/${SLURM_LIB_PATH}/spank_alloc_mem_diagnostic.so" "usr/lib/slurm/spank_alloc_mem_diagnostic.so"
+
     log "[slurm] Bind-mount NCCL Inspector PreConf SPANK plugin from container to the jail"
     touch usr/lib/slurm/spank_nccl_inspector_preconf.so
     mount --bind "/${SLURM_LIB_PATH}/spank_nccl_inspector_preconf.so" "usr/lib/slurm/spank_nccl_inspector_preconf.so"

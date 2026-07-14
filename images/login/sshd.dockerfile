@@ -43,6 +43,13 @@ RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
 
+# Install allocated-memory diagnostic SPANK plugin
+COPY images/common/spank-alloc-mem-diagnostic/src /usr/src/soperator/spank/alloc-mem-diagnostic
+COPY images/common/scripts/install_alloc_mem_diagnostic_plugin.sh /opt/bin/
+RUN chmod +x /opt/bin/install_alloc_mem_diagnostic_plugin.sh && \
+    /opt/bin/install_alloc_mem_diagnostic_plugin.sh && \
+    rm /opt/bin/install_alloc_mem_diagnostic_plugin.sh
+
 # Install NCCL Inspector PreConf SPANK plugin
 COPY ansible/spank-nccl-inspector-preconf.yml /opt/ansible/spank-nccl-inspector-preconf.yml
 COPY ansible/roles/spank-nccl-inspector-preconf /opt/ansible/roles/spank-nccl-inspector-preconf
