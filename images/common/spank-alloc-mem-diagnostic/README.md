@@ -2,11 +2,12 @@
 
 This plugin records the values exposed to `slurm_spank_init()` by a remote
 `slurmstepd`. It is diagnostic only: it does not change the job environment,
-write files, drain nodes, or return an error. The only intentional delay is the
-optional `sleep=<seconds>` argument.
+drain nodes, or return an error. Its only outputs are an append-only diagnostic
+file and the optional delay requested with `sleep=<seconds>`.
 
 The plugin ignores every context except `S_CTX_REMOTE`. In remote context it
-logs one `event=init` record containing:
+appends one `event=init` record to the worker-local file
+`/var/log/spank_alloc_mem_diagnostic.log`. Each record contains:
 
 - an explicit UTC timestamp and PID;
 - the SPANK context;
@@ -15,9 +16,10 @@ logs one `event=init` record containing:
 - the numeric and textual return code from every `spank_get_item()` call; and
 - the configured sleep value.
 
-An unavailable item is logged as `unavailable`, alongside its non-success
+An unavailable item is recorded as `unavailable`, alongside its non-success
 return code. If sleep is enabled, a second `event=sleep_complete` record is
-written after the delay.
+written after the delay. File creation and write errors are ignored so
+diagnostic output can never fail a job.
 
 ## Build and enable
 
@@ -25,7 +27,9 @@ The worker, login, and Slurm check-job images build
 `spank_alloc_mem_diagnostic.so` using the same GNU99, PIC, LTO, optimization,
 Slurm include/library paths, and shared-library layout as the existing
 Soperator NCCL debug SPANK plugin. Rebuild and deploy those images before
-enabling the plugin.
+enabling the plugin. The image build pre-creates the output file as
+root-owned mode `0644`; remote initialization runs before Slurm drops
+privileges.
 
 Append the plugin to the SlurmCluster's custom SPANK plugins:
 
@@ -49,13 +53,17 @@ The shared library is installed under
 search location. It is also made available inside the Soperator jail so an
 `srun` launched from a job can load the same plugstack.
 
-To watch diagnostic records on a development cluster, use the worker pod logs
-(adjust the pod name if needed):
+The file is local to each worker pod. To watch diagnostic records on a
+development cluster, read it from the worker's `slurmd` container (adjust the
+pod name if needed):
 
 ```bash
-kubectl -n soperator logs worker-0 --all-containers=true -f |
-  grep --line-buffered alloc_mem_diagnostic
+kubectl -n soperator exec worker-0 -c slurmd -- \
+  tail -f /var/log/spank_alloc_mem_diagnostic.log
 ```
+
+For jobs that can run on multiple nodes, inspect the file on every participating
+worker and filter records using `job_id=<id>`.
 
 The important fields look like:
 
@@ -76,7 +84,8 @@ With the plugin enabled without a sleep argument, submit:
 sbatch --mem=4G --wrap='hostname; sleep 30'
 ```
 
-Find the `event=init` record for the returned job ID. Verify:
+Find the `event=init` record for the returned job ID in the participating
+worker's diagnostic file. Verify:
 
 1. `context=remote` proves the plugin ran in `slurmstepd`.
 2. `job_alloc_mem_rc=0(Success)` proves `S_JOB_ALLOC_MEM` was available.
@@ -85,7 +94,7 @@ Find the `event=init` record for the returned job ID. Verify:
    point in job launch.
 
 For a multi-node allocation, expect a record from every participating
-`slurmstepd`; compare `node_id` across worker logs.
+`slurmstepd`; compare `node_id` across worker files.
 
 ## Experiment 2: callback timing
 
@@ -113,8 +122,8 @@ Then submit:
 sbatch --mem=4G --wrap='date; hostname'
 ```
 
-Compare the plugin's `event=init` and `event=sleep_complete` timestamps with
-the timestamp in the job output. The two plugin timestamps should be about ten
+Compare the `event=init` and `event=sleep_complete` file records with the
+timestamp in the job output. The two plugin timestamps should be about ten
 seconds apart, and the payload should start roughly ten seconds after
 `event=init`, immediately after `event=sleep_complete`. Comparing these
 timestamps avoids confusing scheduler queue time with the plugin delay.
@@ -125,7 +134,7 @@ intentional.
 
 ## Experiment 3: multiple `srun` steps
 
-Submit a one-node script so one log line corresponds to one remote
+Submit a one-node script so one file record corresponds to one remote
 `slurmstepd` invocation:
 
 ```bash
@@ -142,7 +151,7 @@ EOF
 sbatch /tmp/spank-steps.sbatch
 ```
 
-Filter worker logs by the returned job ID. Count distinct PIDs and
+Filter worker diagnostic files by the returned job ID. Count distinct PIDs and
 `step_id` values. Record whether there is one callback for the batch step plus
 one for each `srun` step, and compare the numeric IDs with
 `SLURM_STEP_ID` printed by the two payloads. On a multi-node step, group by
@@ -160,11 +169,13 @@ srun --nodes=1 --ntasks=1 sh -c 'echo second interactive step: ${SLURM_STEP_ID};
 exit
 ```
 
-Compare these worker records with Experiment 3. In particular, note whether
+Compare these worker file records with Experiment 3. In particular, note whether
 creating the allocation itself produces a remote record and which records are
 produced by each `srun`. The plugin intentionally ignores the allocator and
 local contexts, so every diagnostic record should still say
 `context=remote`.
 
 When testing is complete, remove the custom plugin entry from
-`spec.plugStackConfig.customPlugins`.
+`spec.plugStackConfig.customPlugins`. Preserve the relevant records, then
+truncate the worker-local diagnostic files if the test data is no longer
+needed.

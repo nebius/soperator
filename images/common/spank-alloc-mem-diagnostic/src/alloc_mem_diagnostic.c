@@ -1,6 +1,8 @@
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -9,17 +11,23 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <slurm/slurm.h>
+#include <sys/file.h>
+
 #include <slurm/spank.h>
 
 SPANK_PLUGIN("alloc_mem_diagnostic", 1);
 
 #define PLUGIN_TAG "alloc_mem_diagnostic"
+#ifndef OUTPUT_FILE
+#define OUTPUT_FILE "/var/log/spank_alloc_mem_diagnostic.log"
+#endif
+#define RECORD_SIZE 2048
 #define TIMESTAMP_SIZE 32
 #define VALUE_SIZE 32
 
 struct sleep_config {
     bool         requested;
+    bool         valid;
     unsigned int seconds;
 };
 
@@ -83,8 +91,59 @@ static const char *error_name(spank_err_t rc) {
     return name == NULL ? "unknown" : name;
 }
 
+static void append_record(const char *format, ...) {
+    char    record[RECORD_SIZE];
+    va_list arguments;
+
+    va_start(arguments, format);
+    int formatted =
+        vsnprintf(record, sizeof(record) - 1, format, arguments);
+    va_end(arguments);
+
+    if (formatted < 0) {
+        return;
+    }
+
+    size_t length = (size_t)formatted;
+    if (length >= sizeof(record) - 1) {
+        length = sizeof(record) - 2;
+    }
+    record[length++] = '\n';
+    record[length]   = '\0';
+
+    int fd = open(
+        OUTPUT_FILE,
+        O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC | O_NOFOLLOW,
+        0644
+    );
+    if (fd < 0) {
+        return;
+    }
+
+    bool locked = flock(fd, LOCK_EX) == 0;
+    size_t offset = 0;
+    while (offset < length) {
+        ssize_t written = write(fd, record + offset, length - offset);
+        if (written > 0) {
+            offset += (size_t)written;
+            continue;
+        }
+        if (written < 0 && errno == EINTR) {
+            continue;
+        }
+        break;
+    }
+
+    if (locked) {
+        (void)flock(fd, LOCK_UN);
+    }
+    (void)close(fd);
+}
+
 static struct sleep_config parse_sleep_config(int argc, char **argv) {
-    struct sleep_config config = {0};
+    struct sleep_config config = {
+        .valid = true,
+    };
 
     for (int i = 0; i < argc; ++i) {
         char          *end = NULL;
@@ -100,22 +159,19 @@ static struct sleep_config parse_sleep_config(int argc, char **argv) {
         value            = strtoul(argv[i] + strlen("sleep="), &end, 10);
         if (errno != 0 || end == argv[i] + strlen("sleep=") || *end != '\0' ||
             value > UINT_MAX) {
-            slurm_error(
-                PLUGIN_TAG
-                " invalid argument '%s'; sleep disabled and plugin will continue",
-                argv[i]
-            );
             config.seconds = 0;
+            config.valid   = false;
             continue;
         }
 
         config.seconds = (unsigned int)value;
+        config.valid   = true;
     }
 
     return config;
 }
 
-static void sleep_without_failing(unsigned int seconds) {
+static int sleep_without_failing(unsigned int seconds) {
     struct timespec requested = {
         .tv_sec  = seconds,
         .tv_nsec = 0,
@@ -128,13 +184,10 @@ static void sleep_without_failing(unsigned int seconds) {
             continue;
         }
 
-        slurm_error(
-            PLUGIN_TAG " nanosleep failed: errno=%d (%s); plugin will continue",
-            errno,
-            strerror(errno)
-        );
-        return;
+        return errno;
     }
+
+    return 0;
 }
 
 int slurm_spank_init(spank_t spank, int argc, char **argv) {
@@ -184,7 +237,7 @@ int slurm_spank_init(spank_t spank, int argc, char **argv) {
 
     struct sleep_config sleep_config = parse_sleep_config(argc, argv);
 
-    slurm_info(
+    append_record(
         PLUGIN_TAG
         " event=init timestamp=%s pid=%ld context=%s context_id=%d "
         "job_id=%s job_id_rc=%d(%s) "
@@ -192,7 +245,7 @@ int slurm_spank_init(spank_t spank, int argc, char **argv) {
         "node_id=%s node_id_rc=%d(%s) "
         "job_alloc_mem_mb=%s job_alloc_mem_rc=%d(%s) "
         "step_alloc_mem_mb=%s step_alloc_mem_rc=%d(%s) "
-        "sleep_requested=%s sleep_seconds=%u",
+        "sleep_requested=%s sleep_valid=%s sleep_seconds=%u",
         timestamp,
         (long)getpid(),
         context_name(context),
@@ -213,23 +266,40 @@ int slurm_spank_init(spank_t spank, int argc, char **argv) {
         (int)step_mem_rc,
         error_name(step_mem_rc),
         sleep_config.requested ? "true" : "false",
+        sleep_config.valid ? "true" : "false",
         sleep_config.seconds
     );
 
     if (sleep_config.seconds > 0) {
-        sleep_without_failing(sleep_config.seconds);
+        int sleep_errno = sleep_without_failing(sleep_config.seconds);
         format_timestamp(timestamp, sizeof(timestamp));
-        slurm_info(
-            PLUGIN_TAG
-            " event=sleep_complete timestamp=%s pid=%ld context=%s "
-            "job_id=%s step_id=%s sleep_seconds=%u",
-            timestamp,
-            (long)getpid(),
-            context_name(context),
-            job_id_value,
-            step_id_value,
-            sleep_config.seconds
-        );
+        if (sleep_errno == 0) {
+            append_record(
+                PLUGIN_TAG
+                " event=sleep_complete timestamp=%s pid=%ld context=%s "
+                "job_id=%s step_id=%s sleep_seconds=%u",
+                timestamp,
+                (long)getpid(),
+                context_name(context),
+                job_id_value,
+                step_id_value,
+                sleep_config.seconds
+            );
+        } else {
+            append_record(
+                PLUGIN_TAG
+                " event=sleep_error timestamp=%s pid=%ld context=%s "
+                "job_id=%s step_id=%s sleep_seconds=%u errno=%d(%s)",
+                timestamp,
+                (long)getpid(),
+                context_name(context),
+                job_id_value,
+                step_id_value,
+                sleep_config.seconds,
+                sleep_errno,
+                strerror(sleep_errno)
+            );
+        }
     }
 
     return ESPANK_SUCCESS;
