@@ -1,0 +1,31 @@
+suite: test exporter container resources
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should not render exporter container resources by default
+    set:
+      clusterName: test-cluster
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.exporter.exporterContainer.resources
+
+  - it: should render exporter container resources when provided
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          exporterContainer:
+            resources:
+              cpu: "250m"
+              memory: "256Mi"
+              ephemeral-storage: "500Mi"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.exporter.exporterContainer.resources.cpu
+          value: 250m
+      - equal:
+          path: spec.slurmNodes.exporter.exporterContainer.resources.memory
+          value: 256Mi
+      - equal:
+          path: spec.slurmNodes.exporter.exporterContainer.resources["ephemeral-storage"]
+          value: 500Mi
