@@ -774,6 +774,12 @@ slurmScripts:
       enabled: true
       customContent: null
       customConfig: null
+    idle_mem_used.sh:
+      enabled: true
+      # Drain an idle node when MemTotal - MemAvailable exceeds 32 GB.
+      maxUsedGB: 32
+      customContent: null
+      customConfig: null
     job_tmpfs_delete.sh:
       enabled: true
       customContent: null
