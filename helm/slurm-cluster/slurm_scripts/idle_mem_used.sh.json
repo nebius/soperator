@@ -1,0 +1,16 @@
+{
+  "name": "idle_mem_used",
+  "command": "IDLE_MEM_USED_MAX_USED_GB={{ required `Idle memory maximum used GB must be provided.` (index .Values.slurmScripts.builtIn `idle_mem_used.sh`).maxUsedGB }} ./idle_mem_used.sh",
+  "platforms": ["any"],
+  "skip_for_cpu_jobs": false,
+  "skip_for_partial_gpu_jobs": false,
+  "contexts": ["hc_program"],
+  "node_states": ["any"],
+  "on_fail": "drain",
+  "on_ok": "none",
+  "reason_base": "[node_problem] $name",
+  "reason_append_details": true,
+  "run_in_jail": false,
+  "log": "slurm_scripts/$worker.$name.$context.out",
+  "need_env": ["CHECKS_NODE_STATE_FLAGS"]
+}
