@@ -193,6 +193,9 @@ tests:
           path: spec.slurmNodes.exporter.collectionInterval
           value: "30s"
       - equal:
+          path: spec.slurmNodes.exporter.maxCollectorInflight
+          value: 1
+      - equal:
           path: spec.slurmNodes.exporter.jobSource
           value: "controller"
       - equal:

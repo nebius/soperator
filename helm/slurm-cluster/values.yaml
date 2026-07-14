@@ -592,6 +592,8 @@ slurmNodes:
       # - If empty and create is false, the "default" ServiceAccount will be used and you must ensure it has the required RBAC.
       name: ""
     collectionInterval: "30s"
+    # Maximum in-flight runs per exporter sub-collector.
+    maxCollectorInflight: 1
     # Slurm job source: controller (Slurm controller API) or accounting (Slurm accounting API / slurmdbd).
     # Use "accounting" when the controller endpoint is overloaded on large clusters.
     jobSource: "controller"

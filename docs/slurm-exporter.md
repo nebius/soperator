@@ -36,6 +36,7 @@ All configuration options can be set via command-line flags or environment varia
 | `SLURM_EXPORTER_CLUSTER_NAMESPACE` | `--cluster-namespace` | The namespace of the SLURM cluster | `soperator` |
 | `SLURM_EXPORTER_SLURM_API_SERVER` | `--slurm-api-server` | The address of the SLURM REST API server | `http://localhost:6820` |
 | `SLURM_EXPORTER_COLLECTION_INTERVAL` | `--collection-interval` | How often to collect metrics from SLURM APIs | `30s` |
+| `SLURM_EXPORTER_MAX_COLLECTOR_INFLIGHT` | `--max-collector-inflight` | Maximum in-flight runs per sub-collector. Keep `1` to avoid overlapping requests for the same collector; increase only when testing overlap on large clusters. | `1` |
 | `SLURM_EXPORTER_METRICS_BIND_ADDRESS` | `--metrics-bind-address` | Address for the main metrics endpoint | `:8080` |
 | `SLURM_EXPORTER_MONITORING_BIND_ADDRESS` | `--monitoring-bind-address` | Address for the self-monitoring metrics endpoint | `:8081` |
 | `SLURM_EXPORTER_LOG_FORMAT` | `--log-format` | Log format: `plain` or `json` | `json` |
@@ -136,8 +137,8 @@ The exporter provides self-monitoring metrics to track its own health and perfor
 | **slurm_exporter_collection_failures_total**<br>*Counter* | Total number of failed metrics collection attempts<br><br>**Labels:** None |
 | **slurm_exporter_collector_duration_seconds**<br>*Gauge* | Duration of the most recent sub-collector run during metrics collection<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`) |
 | **slurm_exporter_collector_errors_total**<br>*Counter* | Total number of errors per sub-collector during metrics collection. Sub-collectors are isolated, so a failure in one does not drop the others' metrics for that cycle; the failed collector's metrics simply gap until it recovers.<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`) |
-| **slurm_exporter_collector_inflight**<br>*Gauge* | Whether a sub-collector run is currently in progress<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`) |
-| **slurm_exporter_collector_skipped_total**<br>*Counter* | Total number of skipped sub-collector runs because the previous run for the same collector was still in progress<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`) |
+| **slurm_exporter_collector_inflight**<br>*Gauge* | Number of sub-collector runs currently in progress<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`) |
+| **slurm_exporter_collector_skipped_total**<br>*Counter* | Total number of skipped sub-collector runs because the configured in-flight limit was reached<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`) |
 | **slurm_exporter_metrics_requests_total**<br>*Counter* | Total number of requests to the `/metrics` endpoint<br><br>**Labels:** None |
 | **slurm_exporter_metrics_exported**<br>*Gauge* | Number of metrics exported in the last scrape<br><br>**Labels:** None |
 

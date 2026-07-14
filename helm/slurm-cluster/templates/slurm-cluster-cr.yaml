@@ -458,6 +458,9 @@ spec:
       {{- if .Values.slurmNodes.exporter.collectionInterval }}
       collectionInterval: {{ .Values.slurmNodes.exporter.collectionInterval | quote }}
       {{- end }}
+      {{- if .Values.slurmNodes.exporter.maxCollectorInflight }}
+      maxCollectorInflight: {{ .Values.slurmNodes.exporter.maxCollectorInflight }}
+      {{- end }}
       {{- if .Values.slurmNodes.exporter.jobSource }}
       jobSource: {{ .Values.slurmNodes.exporter.jobSource | quote }}
       {{- end }}

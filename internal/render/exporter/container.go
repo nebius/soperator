@@ -12,11 +12,16 @@ import (
 )
 
 func renderContainerExporter(clusterValues *values.SlurmCluster) corev1.Container {
+	maxCollectorInflight := clusterValues.SlurmExporter.MaxCollectorInflight
+	if maxCollectorInflight < 1 {
+		maxCollectorInflight = 1
+	}
 	env := []corev1.EnvVar{
 		{Name: "SLURM_EXPORTER_CLUSTER_NAMESPACE", Value: clusterValues.Namespace},
 		{Name: "SLURM_EXPORTER_CLUSTER_NAME", Value: clusterValues.Name},
 		{Name: "SLURM_EXPORTER_SLURM_API_SERVER", Value: rest.GetServiceURL(clusterValues.Namespace, &clusterValues.NodeRest)},
 		{Name: "SLURM_EXPORTER_COLLECTION_INTERVAL", Value: string(clusterValues.SlurmExporter.CollectionInterval)},
+		{Name: "SLURM_EXPORTER_MAX_COLLECTOR_INFLIGHT", Value: fmt.Sprint(maxCollectorInflight)},
 	}
 	if clusterValues.SlurmExporter.JobSource != "" {
 		env = append(env, corev1.EnvVar{Name: "SLURM_EXPORTER_JOB_SOURCE", Value: clusterValues.SlurmExporter.JobSource})

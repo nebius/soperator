@@ -29,6 +29,23 @@ func newTestMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	return NewMetricsCollector(slurmAPIClient, slurmapi.ListJobsParams{})
 }
 
+func TestMetricsCollector_RefreshJobsDropsStaleSequence(t *testing.T) {
+	mockClient := &fake.MockClient{}
+	collector := newTestMetricsCollector(mockClient)
+
+	mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).
+		Return([]slurmapi.Job{{ID: 2, State: "RUNNING"}}, nil).Once()
+	mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).
+		Return([]slurmapi.Job{{ID: 1, State: "PENDING"}}, nil).Once()
+
+	require.NoError(t, collector.refreshJobs(context.Background(), 2))
+	require.NoError(t, collector.refreshJobs(context.Background(), 1))
+
+	state := collector.state.Load()
+	require.Len(t, state.jobs, 1)
+	assert.Equal(t, int32(2), state.jobs[0].ID)
+}
+
 // Helper function to setup mocks and collect state for tests
 func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *fake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *api.V0041OpenapiDiagResp) {
 	mockClient.EXPECT().ListNodes(mock.Anything).Return(nodes, nil).Once()

@@ -351,6 +351,9 @@ func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
 	newState := newMetricsCollectorState()
 	// Copy timestamps in case we fail to get nodes/jobs, so they will be preserved in the new state.
 	newState.lastGPUSecondsUpdate = previousState.lastGPUSecondsUpdate
+	newState.nodesCollectionSequence = previousState.nodesCollectionSequence
+	newState.jobsCollectionSequence = previousState.jobsCollectionSequence
+	newState.diagCollectionSequence = previousState.diagCollectionSequence
 	maps.Copy(newState.nodeUnavailabilityStartTimes, previousState.nodeUnavailabilityStartTimes)
 	maps.Copy(newState.nodeDrainingStartTimes, previousState.nodeDrainingStartTimes)
 
@@ -424,14 +427,17 @@ func cloneMetricsCollectorState(previousState *metricsCollectorState) *metricsCo
 	newState := newMetricsCollectorState()
 	newState.lastGPUSecondsUpdate = previousState.lastGPUSecondsUpdate
 	newState.nodes = previousState.nodes
+	newState.nodesCollectionSequence = previousState.nodesCollectionSequence
 	newState.jobs = previousState.jobs
+	newState.jobsCollectionSequence = previousState.jobsCollectionSequence
 	newState.diag = previousState.diag
+	newState.diagCollectionSequence = previousState.diagCollectionSequence
 	maps.Copy(newState.nodeUnavailabilityStartTimes, previousState.nodeUnavailabilityStartTimes)
 	maps.Copy(newState.nodeDrainingStartTimes, previousState.nodeDrainingStartTimes)
 	return newState
 }
 
-func (c *MetricsCollector) refreshNodes(ctx context.Context) error {
+func (c *MetricsCollector) refreshNodes(ctx context.Context, sequence uint64) error {
 	nodes, err := c.listNodes(ctx)
 	if err != nil {
 		return err
@@ -444,8 +450,12 @@ func (c *MetricsCollector) refreshNodes(ctx context.Context) error {
 	if previousState == nil {
 		previousState = newMetricsCollectorState()
 	}
+	if sequence != 0 && sequence <= previousState.nodesCollectionSequence {
+		return nil
+	}
 	newState := cloneMetricsCollectorState(previousState)
 	c.applyNodes(ctx, nodes, previousState, newState)
+	newState.nodesCollectionSequence = sequence
 	c.state.Store(newState)
 	return nil
 }
@@ -477,7 +487,7 @@ func (c *MetricsCollector) listJobs(ctx context.Context) ([]slurmapi.Job, error)
 	return jobs, nil
 }
 
-func (c *MetricsCollector) refreshJobs(ctx context.Context) error {
+func (c *MetricsCollector) refreshJobs(ctx context.Context, sequence uint64) error {
 	jobs, err := c.listJobs(ctx)
 	if err != nil {
 		return err
@@ -487,7 +497,11 @@ func (c *MetricsCollector) refreshJobs(ctx context.Context) error {
 	defer c.stateMu.Unlock()
 
 	newState := cloneMetricsCollectorState(c.state.Load())
+	if sequence != 0 && sequence <= newState.jobsCollectionSequence {
+		return nil
+	}
 	newState.jobs = jobs
+	newState.jobsCollectionSequence = sequence
 	c.state.Store(newState)
 	return nil
 }
@@ -515,7 +529,7 @@ func (c *MetricsCollector) getDiag(ctx context.Context) (*api.V0041OpenapiDiagRe
 	return diag, nil
 }
 
-func (c *MetricsCollector) refreshDiag(ctx context.Context) error {
+func (c *MetricsCollector) refreshDiag(ctx context.Context, sequence uint64) error {
 	diag, err := c.getDiag(ctx)
 	if err != nil {
 		return err
@@ -525,7 +539,11 @@ func (c *MetricsCollector) refreshDiag(ctx context.Context) error {
 	defer c.stateMu.Unlock()
 
 	newState := cloneMetricsCollectorState(c.state.Load())
+	if sequence != 0 && sequence <= newState.diagCollectionSequence {
+		return nil
+	}
 	newState.diag = diag
+	newState.diagCollectionSequence = sequence
 	c.state.Store(newState)
 	return nil
 }

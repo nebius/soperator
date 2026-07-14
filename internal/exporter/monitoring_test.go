@@ -112,8 +112,8 @@ func TestMonitoringMetrics_RecordCollectorRuntimeState(t *testing.T) {
 	registry := prometheus.NewRegistry()
 	require.NoError(t, metrics.Register(registry))
 
-	metrics.SetCollectorInflight("jobs", true)
-	metrics.SetCollectorInflight("jobs", false)
+	metrics.SetCollectorInflight("jobs", 2)
+	metrics.SetCollectorInflight("jobs", 0)
 	metrics.RecordCollectorSkipped("jobs")
 	metrics.RecordCollectorSkipped("jobs")
 

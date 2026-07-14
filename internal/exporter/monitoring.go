@@ -42,11 +42,11 @@ func NewMonitoringMetrics() *MonitoringMetrics {
 		}, []string{"collector"}),
 		collectorInflight: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "slurm_exporter_collector_inflight",
-			Help: "Whether a sub-collector run is currently in progress, labeled by collector",
+			Help: "Number of sub-collector runs currently in progress, labeled by collector",
 		}, []string{"collector"}),
 		collectorSkipped: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "slurm_exporter_collector_skipped_total",
-			Help: "Total number of skipped sub-collector runs because a previous run was still in progress, labeled by collector",
+			Help: "Total number of skipped sub-collector runs because the in-flight limit was reached, labeled by collector",
 		}, []string{"collector"}),
 		metricsRequests: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "slurm_exporter_metrics_requests_total",
@@ -96,12 +96,8 @@ func (m *MonitoringMetrics) RecordCollectorDuration(collector string, duration f
 	m.collectorDuration.WithLabelValues(collector).Set(duration)
 }
 
-func (m *MonitoringMetrics) SetCollectorInflight(collector string, inflight bool) {
-	value := 0.0
-	if inflight {
-		value = 1.0
-	}
-	m.collectorInflight.WithLabelValues(collector).Set(value)
+func (m *MonitoringMetrics) SetCollectorInflight(collector string, inflight int32) {
+	m.collectorInflight.WithLabelValues(collector).Set(float64(inflight))
 }
 
 // RecordCollectorError increments the error counter for the named sub-collector

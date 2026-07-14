@@ -199,3 +199,31 @@ func TestParseDuration(t *testing.T) {
 		})
 	}
 }
+
+func TestParseMaxCollectorInflight(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    int
+		wantErr bool
+	}{
+		{name: "one", input: "1", want: 1},
+		{name: "trimmed", input: " 3 ", want: 3},
+		{name: "zero", input: "0", wantErr: true},
+		{name: "negative", input: "-1", wantErr: true},
+		{name: "invalid", input: "many", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseMaxCollectorInflight(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

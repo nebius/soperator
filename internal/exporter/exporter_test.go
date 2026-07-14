@@ -84,3 +84,59 @@ func TestExporterCollectionLoopSkipsRunningSubCollector(t *testing.T) {
 		t.Fatal("collection loop did not stop")
 	}
 }
+
+func TestExporterCollectionLoopAllowsConfiguredOverlap(t *testing.T) {
+	log.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	mockClient := &fake.MockClient{}
+	var jobsCalls atomic.Int32
+	releaseJobs := make(chan struct{})
+
+	mockClient.EXPECT().ListNodes(mock.Anything).Return([]slurmapi.Node{}, nil).Maybe()
+	mockClient.EXPECT().GetDiag(mock.Anything).Return(&api.V0041OpenapiDiagResp{}, nil).Maybe()
+	mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).RunAndReturn(
+		func(ctx context.Context, _ slurmapi.ListJobsParams) ([]slurmapi.Job, error) {
+			jobsCalls.Add(1)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-releaseJobs:
+				return nil, nil
+			}
+		},
+	)
+
+	exporter := NewClusterExporter(mockClient, Params{
+		CollectionInterval:   5 * time.Millisecond,
+		MaxCollectorInflight: 2,
+	})
+	registry := prometheus.NewRegistry()
+	require.NoError(t, exporter.monitoringMetrics.Register(registry))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	loopDone := make(chan struct{})
+	go func() {
+		exporter.collectionLoop(ctx)
+		close(loopDone)
+	}()
+
+	require.Eventually(t, func() bool {
+		return jobsCalls.Load() == 2
+	}, time.Second, 10*time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		families, err := registry.Gather()
+		require.NoError(t, err)
+		return collectorCounterValue(families, "slurm_exporter_collector_skipped_total", "jobs") > 0
+	}, time.Second, 10*time.Millisecond)
+	assert.Equal(t, int32(2), jobsCalls.Load())
+
+	cancel()
+	close(releaseJobs)
+
+	select {
+	case <-loopDone:
+	case <-time.After(time.Second):
+		t.Fatal("collection loop did not stop")
+	}
+}

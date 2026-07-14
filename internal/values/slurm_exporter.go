@@ -40,6 +40,9 @@ type SlurmExporter struct {
 	// CollectionInterval specifies how often to collect metrics from SLURM APIs
 	CollectionInterval prometheusv1.Duration
 
+	// MaxCollectorInflight limits concurrent runs of the same exporter sub-collector.
+	MaxCollectorInflight int32
+
 	// JobSource selects the Slurm API used for job collection ("controller" or "accounting").
 	JobSource string
 
@@ -76,6 +79,7 @@ func buildSlurmExporterFrom(namePrefix string, maintenance *consts.MaintenanceMo
 		Maintenance:            maintenance,
 		Container:              *exporter.ExporterContainer.DeepCopy(),
 		CollectionInterval:     exporter.CollectionInterval,
+		MaxCollectorInflight:   exporter.MaxCollectorInflight,
 		JobSource:              exporter.JobSource,
 		AccountingJobsLookback: exporter.AccountingJobsLookback,
 		ServiceAccountName:     exporter.ServiceAccountName,

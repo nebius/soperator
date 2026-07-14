@@ -126,6 +126,7 @@ tests:
           k8sNodeFilterName: "no-gpu"
           jobSource: "accounting"
           accountingJobsLookback: "30m"
+          maxCollectorInflight: 3
           volumes:
             jail:
               volumeSourceName: "jail"
@@ -158,6 +159,9 @@ tests:
       - equal:
           path: spec.slurmNodes.exporter.accountingJobsLookback
           value: "30m"
+      - equal:
+          path: spec.slurmNodes.exporter.maxCollectorInflight
+          value: 3
 
   # Worker options are managed by NodeSet resources, not SlurmCluster CR
   - it: should not render worker maxUnavailable in slurm cluster CR

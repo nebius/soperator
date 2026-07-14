@@ -27,8 +27,9 @@ type Params struct {
 	// SlurmClusterID is the namespaced name of the SlurmCluster resource
 	SlurmClusterID types.NamespacedName
 	// CollectionInterval specifies how often to collect metrics from SLURM APIs
-	CollectionInterval time.Duration
-	JobListParams      slurmapi.ListJobsParams
+	CollectionInterval   time.Duration
+	MaxCollectorInflight int
+	JobListParams        slurmapi.ListJobsParams
 }
 
 // Exporter collects metrics from a SLURM cluster and exports them in Prometheus format
@@ -54,9 +55,26 @@ type Exporter struct {
 }
 
 type asyncSubCollector struct {
-	name    string
-	running atomic.Bool
-	run     func(context.Context) error
+	name     string
+	inflight atomic.Int32
+	sequence atomic.Uint64
+	run      func(context.Context, uint64) error
+}
+
+func (c *asyncSubCollector) tryStart(maxInflight int32) (uint64, int32, bool) {
+	for {
+		current := c.inflight.Load()
+		if current >= maxInflight {
+			return 0, current, false
+		}
+		if c.inflight.CompareAndSwap(current, current+1) {
+			return c.sequence.Add(1), current + 1, true
+		}
+	}
+}
+
+func (c *asyncSubCollector) finish() int32 {
+	return c.inflight.Add(-1)
 }
 
 // NewClusterExporter creates a new SLURM cluster exporter
@@ -108,7 +126,11 @@ func (e *Exporter) Start(ctx context.Context, addr string) error {
 // collectionLoop runs in the background and periodically collects metrics
 func (e *Exporter) collectionLoop(ctx context.Context) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
-	logger.Info("Starting metrics collection loop", "interval", e.params.CollectionInterval)
+	maxCollectorInflight := int32(e.params.MaxCollectorInflight)
+	if maxCollectorInflight < 1 {
+		maxCollectorInflight = 1
+	}
+	logger.Info("Starting metrics collection loop", "interval", e.params.CollectionInterval, "max_collector_inflight", maxCollectorInflight)
 
 	loopCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -129,22 +151,24 @@ func (e *Exporter) collectionLoop(ctx context.Context) {
 		started := false
 
 		for _, col := range collectors {
-			if !col.running.CompareAndSwap(false, true) {
+			sequence, inflight, startedCollector := col.tryStart(maxCollectorInflight)
+			if !startedCollector {
 				e.monitoringMetrics.RecordCollectorSkipped(col.name)
-				logger.Info("Skipping sub-collector; previous run still in progress", "collector", col.name)
+				logger.Info("Skipping sub-collector; too many runs in progress", "collector", col.name, "inflight", inflight, "max_inflight", maxCollectorInflight)
 				continue
 			}
 
 			started = true
 			wg.Add(1)
-			e.monitoringMetrics.SetCollectorInflight(col.name, true)
-			go func(col *asyncSubCollector) {
+			e.monitoringMetrics.SetCollectorInflight(col.name, inflight)
+			go func(col *asyncSubCollector, sequence uint64) {
 				defer wg.Done()
-				defer col.running.Store(false)
-				defer e.monitoringMetrics.SetCollectorInflight(col.name, false)
+				defer func() {
+					e.monitoringMetrics.SetCollectorInflight(col.name, col.finish())
+				}()
 
 				start := time.Now()
-				if err := col.run(loopCtx); err != nil {
+				if err := col.run(loopCtx, sequence); err != nil {
 					if loopCtx.Err() == nil {
 						logger.Error(err, "Sub-collector failed", "collector", col.name)
 						e.monitoringMetrics.RecordCollectorError(col.name)
@@ -152,7 +176,7 @@ func (e *Exporter) collectionLoop(ctx context.Context) {
 					}
 				}
 				e.monitoringMetrics.RecordCollectorDuration(col.name, time.Since(start).Seconds())
-			}(col)
+			}(col, sequence)
 		}
 
 		if !started {
