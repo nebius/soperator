@@ -4,26 +4,36 @@ set -euo pipefail
 
 max_used_gb="${IDLE_MEM_USED_MAX_USED_GB:-}"
 meminfo_path="${IDLE_MEM_USED_MEMINFO_PATH:-/proc/meminfo}"
-node_state_flags="${CHECKS_NODE_STATE_FLAGS:-}"
 node_name="${SLURMD_NODENAME:-unknown}"
 
 echo "[$(date)] Check memory usage when node ${node_name} is idle"
 echo "Configured maximum used memory: ${max_used_gb:-<unset>} GB"
-echo "Node state source: CHECKS_NODE_STATE_FLAGS, populated by check_runner.py from 'scontrol show node ${node_name} --json'"
-echo "Slurm node state flags: ${node_state_flags:-<unavailable>}"
+echo "Idle state source: local 'scontrol listjobs' (no controller RPC)"
+echo "Idle state rule: exit code 1 with \"No slurmstepd's found on this node\" means the node has no local jobs"
 
-node_is_idle=false
-IFS='+' read -r -a state_flags <<< "${node_state_flags}"
-for state_flag in "${state_flags[@]}"; do
-    if [[ "${state_flag}" == "IDLE" ]]; then
-        node_is_idle=true
-        break
-    fi
-done
+if listjobs_output="$(scontrol listjobs 2>&1)"; then
+    listjobs_rc=0
+else
+    listjobs_rc=$?
+fi
+
+echo "scontrol listjobs exit code: ${listjobs_rc}"
+echo "scontrol listjobs output: ${listjobs_output:-<empty>}"
+
+if (( listjobs_rc == 0 )); then
+    node_is_idle=false
+    echo "Local Slurm jobs are present; treating the node as non-idle"
+elif (( listjobs_rc == 1 )) && [[ "${listjobs_output}" == *"No slurmstepd's found on this node"* ]]; then
+    node_is_idle=true
+    echo "No local slurmstepd was found; treating the node as idle"
+else
+    echo "Could not determine whether the node is idle from 'scontrol listjobs'; skipping memory validation" >&2
+    exit 0
+fi
 
 echo "Node is idle: ${node_is_idle}"
 if [[ "${node_is_idle}" != "true" ]]; then
-    echo "Node is not IDLE; skipping memory validation"
+    echo "Node has local jobs; skipping memory validation"
     exit 0
 fi
 

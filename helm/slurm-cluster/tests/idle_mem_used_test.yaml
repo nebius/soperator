@@ -18,6 +18,9 @@ tests:
       - matchRegex:
           path: data["checks.json"]
           pattern: '"on_fail": "drain"'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"need_env": \[\s*\]'
 
   - it: should render a configured maximum used memory threshold
     set:

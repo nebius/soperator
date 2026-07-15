@@ -12,5 +12,5 @@
   "reason_append_details": true,
   "run_in_jail": false,
   "log": "slurm_scripts/$worker.$name.$context.out",
-  "need_env": ["CHECKS_NODE_STATE_FLAGS"]
+  "need_env": []
 }
