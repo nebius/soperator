@@ -2,12 +2,12 @@
 
 set -euo pipefail
 
-max_used_gb="${IDLE_MEM_USED_MAX_USED_GB:-}"
 meminfo_path="${IDLE_MEM_USED_MEMINFO_PATH:-/proc/meminfo}"
 node_name="${SLURMD_NODENAME:-unknown}"
+node_real_memory_bytes="${CHECKS_NODE_REAL_MEM_BYTES:-}"
 
 echo "[$(date)] Check memory usage when node ${node_name} is idle"
-echo "Configured maximum used memory: ${max_used_gb:-<unset>} GB"
+echo "Slurm RealMemory input: ${node_real_memory_bytes:-<unavailable>} bytes"
 echo "Idle state source: local 'scontrol listjobs' (no controller RPC)"
 echo "Idle state rule: exit code 1 with \"No slurmstepd's found on this node\" means the node has no local jobs"
 
@@ -37,12 +37,10 @@ if [[ "${node_is_idle}" != "true" ]]; then
     exit 0
 fi
 
-if ! [[ "${max_used_gb}" =~ ^[0-9]+$ ]] || [[ "${max_used_gb}" == "0" ]]; then
-    echo "Invalid idle memory threshold '${max_used_gb:-<unset>}'; expected a positive GB count, skipping memory validation" >&2
+if ! [[ "${node_real_memory_bytes}" =~ ^[0-9]+$ ]] || [[ "${node_real_memory_bytes}" == "0" ]]; then
+    echo "Invalid or unavailable Slurm RealMemory '${node_real_memory_bytes:-<unavailable>}'; expected a positive byte count, skipping memory validation" >&2
     exit 0
 fi
-
-max_used_bytes=$((max_used_gb * 1000000000))
 
 meminfo_values="$(
     awk '
@@ -64,18 +62,30 @@ mem_total_bytes=$((mem_total_kib * 1024))
 mem_available_bytes=$((mem_available_kib * 1024))
 mem_used_bytes=$((mem_total_bytes - mem_available_bytes))
 
+if (( node_real_memory_bytes > mem_total_bytes )); then
+    echo "Slurm RealMemory ${node_real_memory_bytes} bytes exceeds MemTotal ${mem_total_bytes} bytes; skipping memory validation" >&2
+    exit 0
+fi
+
+max_idle_used_bytes=$((mem_total_bytes - node_real_memory_bytes))
+
 mem_total_gb="$(awk -v bytes="${mem_total_bytes}" 'BEGIN { printf "%.2f", bytes / 1000000000 }')"
 mem_available_gb="$(awk -v bytes="${mem_available_bytes}" 'BEGIN { printf "%.2f", bytes / 1000000000 }')"
 mem_used_gb="$(awk -v bytes="${mem_used_bytes}" 'BEGIN { printf "%.2f", bytes / 1000000000 }')"
+node_real_memory_gb="$(awk -v bytes="${node_real_memory_bytes}" 'BEGIN { printf "%.2f", bytes / 1000000000 }')"
+max_idle_used_gb="$(awk -v bytes="${max_idle_used_bytes}" 'BEGIN { printf "%.2f", bytes / 1000000000 }')"
 
 echo "Memory source: ${meminfo_path}"
 echo "Memory measurements: total=${mem_total_gb} GB (${mem_total_bytes} bytes), available=${mem_available_gb} GB (${mem_available_bytes} bytes), used=total-available=${mem_used_gb} GB (${mem_used_bytes} bytes)"
-echo "Maximum allowed used memory: ${max_used_gb} GB (${max_used_bytes} bytes)"
+echo "Slurm RealMemory: ${node_real_memory_gb} GB (${node_real_memory_bytes} bytes)"
+echo "Derived maximum idle used memory: MemTotal-RealMemory=${max_idle_used_gb} GB (${max_idle_used_bytes} bytes)"
 
-if (( mem_used_bytes > max_used_bytes )); then
-    echo "Node ${node_name} is IDLE but uses ${mem_used_gb} GB of memory (threshold: ${max_used_gb} GB; MemTotal: ${mem_total_gb} GB; MemAvailable: ${mem_available_gb} GB). This may indicate leftover or spurious processes consuming memory." >&3
+if (( mem_available_bytes < node_real_memory_bytes )); then
+    memory_deficit_bytes=$((node_real_memory_bytes - mem_available_bytes))
+    memory_deficit_gb="$(awk -v bytes="${memory_deficit_bytes}" 'BEGIN { printf "%.2f", bytes / 1000000000 }')"
+    echo "Node ${node_name} is IDLE but has only ${mem_available_gb} GB of memory available, below Slurm RealMemory ${node_real_memory_gb} GB by ${memory_deficit_gb} GB (used: ${mem_used_gb} GB; derived maximum idle usage: ${max_idle_used_gb} GB; MemTotal: ${mem_total_gb} GB). This may indicate leftover or spurious processes consuming memory." >&3
     exit 1
 fi
 
-echo "Idle node memory usage is within the configured threshold"
+echo "Idle node leaves enough memory available for Slurm RealMemory"
 exit 0
