@@ -1,0 +1,36 @@
+suite: test idle memory health check
+templates:
+  - slurm-scripts-cm.yaml
+tests:
+  - it: should enable the idle memory check with node RealMemory
+    asserts:
+      - isNotNull:
+          path: data["idle_mem_used.sh"]
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"name": "idle_mem_used"'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"command": "./idle_mem_used.sh"'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"contexts": \[\s*"hc_program"\s*\]'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"on_fail": "drain"'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"need_env": \[\s*"CHECKS_NODE_REAL_MEM_BYTES"\s*\]'
+
+  - it: should allow the idle memory check to be disabled
+    set:
+      slurmScripts:
+        builtIn:
+          idle_mem_used.sh:
+            enabled: false
+    asserts:
+      - isNull:
+          path: data["idle_mem_used.sh"]
+      - notMatchRegex:
+          path: data["checks.json"]
+          pattern: '"name": "idle_mem_used"'
