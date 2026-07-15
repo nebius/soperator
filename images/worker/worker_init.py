@@ -595,7 +595,9 @@ def _format_tier_topology(parts: dict[str, str]) -> str:
     return ""
 
 
-def apply_node_topology(hostname: str, topology: str) -> None:
+def apply_node_topology(
+    hostname: str, topology: str, topology_plugin: str | None = None
+) -> None:
     """Apply topology to a node via scontrol update."""
     try:
         node_addr: str = get_node_addr()
@@ -604,11 +606,17 @@ def apply_node_topology(hostname: str, topology: str) -> None:
             "update",
             f"nodename={hostname}",
             f"{node_addr}",
-            f"{topology}",
-            "state=UNDRAIN",
-            "reason=",
-            "comment=",
         ]
+        topology_plugin = topology_plugin or get_topology_plugin()
+        if topology_plugin != TOPOLOGY_PLUGIN_BLOCK:
+            cmd.append(f"{topology}")
+        cmd.extend(
+            [
+                "state=UNDRAIN",
+                "reason=",
+                "comment=",
+            ]
+        )
         logger.info("Running: %s", " ".join(cmd))
         result: subprocess.CompletedProcess[str] = subprocess.run(
             cmd,
@@ -669,7 +677,7 @@ def wait_for_topology() -> None:
             topology,
         )
         wait_for_hostname_in_topology_conf(hostname, wait_timeout, poll_interval)
-        apply_node_topology(hostname, topology)
+        apply_node_topology(hostname, topology, topology_plugin)
         return
 
     node_name: str = get_node_name()
@@ -732,7 +740,7 @@ def wait_for_topology() -> None:
         sys.exit(1)
 
     wait_for_hostname_in_topology_conf(hostname, wait_timeout, poll_interval)
-    apply_node_topology(hostname, topology)
+    apply_node_topology(hostname, topology, topology_plugin)
 
 
 # endregion Topology functions

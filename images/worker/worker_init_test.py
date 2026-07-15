@@ -684,6 +684,71 @@ class TestWaitForController(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 2)
 
 
+class TestApplyNodeTopology(unittest.TestCase):
+    """Tests for apply_node_topology function."""
+
+    @mock.patch("worker_init.get_node_addr", return_value="nodeaddr=worker-0.svc")
+    @mock.patch("subprocess.run")
+    def test_scontrol_update_uses_topology_argument_for_tree_plugin(
+        self, mock_run, mock_get_node_addr
+    ):
+        """Computed topology is passed to scontrol update for tree topology."""
+        mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+
+        worker_init.apply_node_topology(
+            "worker-0",
+            "topology=default:root:leaf01",
+            worker_init.TOPOLOGY_PLUGIN_TREE,
+        )
+
+        mock_run.assert_called_once_with(
+            [
+                "scontrol",
+                "update",
+                "nodename=worker-0",
+                "nodeaddr=worker-0.svc",
+                "topology=default:root:leaf01",
+                "state=UNDRAIN",
+                "reason=",
+                "comment=",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        mock_get_node_addr.assert_called_once_with()
+
+    @mock.patch("worker_init.get_node_addr", return_value="nodeaddr=worker-0.svc")
+    @mock.patch("subprocess.run")
+    def test_scontrol_update_omits_topology_argument_for_block_plugin(
+        self, mock_run, mock_get_node_addr
+    ):
+        """Computed topology is omitted from scontrol update for block topology."""
+        mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+
+        worker_init.apply_node_topology(
+            "worker-0",
+            "topology=default:block1",
+            worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        )
+
+        mock_run.assert_called_once_with(
+            [
+                "scontrol",
+                "update",
+                "nodename=worker-0",
+                "nodeaddr=worker-0.svc",
+                "state=UNDRAIN",
+                "reason=",
+                "comment=",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        mock_get_node_addr.assert_called_once_with()
+
+
 class TestIsGpuEnabled(unittest.TestCase):
     """Tests for is_gpu_enabled function."""
 
@@ -728,7 +793,11 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
             worker_init.wait_for_topology()
 
         mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
-        mock_apply.assert_called_once_with("worker-0", "topology=default:root:unknown")
+        mock_apply.assert_called_once_with(
+            "worker-0",
+            "topology=default:root:unknown",
+            worker_init.TOPOLOGY_PLUGIN_TREE,
+        )
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
@@ -745,7 +814,11 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
             worker_init.wait_for_topology()
 
         mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
-        mock_apply.assert_called_once_with("worker-0", "topology=default:unknown")
+        mock_apply.assert_called_once_with(
+            "worker-0",
+            "topology=default:unknown",
+            worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        )
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
@@ -992,7 +1065,11 @@ class TestTopologyIntegration(unittest.TestCase):
             worker_init.wait_for_topology()
 
         mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
-        mock_apply.assert_called_once_with("worker-0", "topology=default:block1")
+        mock_apply.assert_called_once_with(
+            "worker-0",
+            "topology=default:block1",
+            worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        )
 
 
 class TestEdgeCases(unittest.TestCase):
