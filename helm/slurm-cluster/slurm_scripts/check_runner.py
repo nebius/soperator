@@ -328,6 +328,11 @@ def run_check(check: Check, in_jail=False):
 
     logging.info(f"Check {check.name}: OK")
 
+    # Please note that "undrain" and "uncomment" actions can be issues only from "hc_program" context.
+    if check.on_ok in ("undrain", "uncomment") and CHECKS_CONTEXT != "hc_program":
+        logging.info(f"Skipping on_ok={check.on_ok} in unsupported context {CHECKS_CONTEXT}")
+        return
+
     # Undrain / uncomment the Slurm node, if it was marked with the same reason
     if check.on_ok == "undrain" and "DRAIN" in get_node_info().state_flags:
         if get_node_info().reason and get_node_info().reason.startswith(reason_base):
