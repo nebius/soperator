@@ -243,6 +243,14 @@ func renderContainerNodeSetSlurmd(
 		return corev1.Container{}, fmt.Errorf("checking resource requests: %w", err)
 	}
 
+	for _, env := range nodeSet.ContainerSlurmd.CustomEnv {
+		if env.Name == consts.EnvNodeRealMemoryBytes {
+			return corev1.Container{}, fmt.Errorf("environment variable %q is managed by Soperator", consts.EnvNodeRealMemoryBytes)
+		}
+	}
+
+	realMemoryBytes := common.RenderRealMemorySlurmd(resources) * 1024 * 1024
+
 	appArmorProfile := nodeSet.ContainerSlurmd.AppArmorProfile
 	if nodeSet.AppArmorProfileUseDefault {
 		appArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(nodeSet.ParentalCluster.Name, nodeSet.ParentalCluster.Namespace))
@@ -265,6 +273,7 @@ func renderContainerNodeSetSlurmd(
 				nodeSet.GPU.Nvidia.GDRCopyEnabled,
 				nodeSet.DockerEnabled,
 				nodeSet.NodeExtra,
+				realMemoryBytes,
 			),
 			nodeSet.ContainerSlurmd.CustomEnv...,
 		),
@@ -337,6 +346,7 @@ func renderNodeSetSlurmdEnv(
 	enableGDRCopy bool,
 	dockerEnabled bool,
 	slurmNodeExtra string,
+	realMemoryBytes int64,
 ) []corev1.EnvVar {
 	envVar := []corev1.EnvVar{
 		{
@@ -359,6 +369,10 @@ func renderNodeSetSlurmdEnv(
 		{
 			Name:  consts.EnvDockerEnabled,
 			Value: strconv.FormatBool(dockerEnabled),
+		},
+		{
+			Name:  consts.EnvNodeRealMemoryBytes,
+			Value: strconv.FormatInt(realMemoryBytes, 10),
 		},
 	}
 
