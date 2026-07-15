@@ -2,7 +2,7 @@ suite: test idle memory health check
 templates:
   - slurm-scripts-cm.yaml
 tests:
-  - it: should enable the idle memory check with the default threshold
+  - it: should enable the idle memory check with node RealMemory
     asserts:
       - isNotNull:
           path: data["idle_mem_used.sh"]
@@ -11,7 +11,7 @@ tests:
           pattern: '"name": "idle_mem_used"'
       - matchRegex:
           path: data["checks.json"]
-          pattern: '"command": "IDLE_MEM_USED_MAX_USED_GB=32 ./idle_mem_used.sh"'
+          pattern: '"command": "./idle_mem_used.sh"'
       - matchRegex:
           path: data["checks.json"]
           pattern: '"contexts": \[\s*"hc_program"\s*\]'
@@ -20,18 +20,7 @@ tests:
           pattern: '"on_fail": "drain"'
       - matchRegex:
           path: data["checks.json"]
-          pattern: '"need_env": \[\s*\]'
-
-  - it: should render a configured maximum used memory threshold
-    set:
-      slurmScripts:
-        builtIn:
-          idle_mem_used.sh:
-            maxUsedGB: 16
-    asserts:
-      - matchRegex:
-          path: data["checks.json"]
-          pattern: '"command": "IDLE_MEM_USED_MAX_USED_GB=16 ./idle_mem_used.sh"'
+          pattern: '"need_env": \[\s*"CHECKS_NODE_REAL_MEM_BYTES"\s*\]'
 
   - it: should allow the idle memory check to be disabled
     set:
