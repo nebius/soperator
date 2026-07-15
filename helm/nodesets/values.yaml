@@ -5,6 +5,7 @@
 # Global settings
 nameOverride: ""
 fullnameOverride: ""
+clusterName: ""
 # Priority Classes configuration
 # Define priority classes that can be used by NodeSets
 priorityClasses:
@@ -25,13 +26,23 @@ priorityClasses:
 images:
   munge:
     repository: "cr.eu-north1.nebius.cloud/soperator/munge"
-    tag: "4.1.4-slurm25.11.3"
+    tag: "4.1.4-slurm25.11.5"
   sssd:
     repository: "cr.eu-north1.nebius.cloud/soperator/sssd"
     tag: "2.9.4-1-63"
   slurmd:
     repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-    tag: "4.1.4-slurm25.11.3"
+    tag: "4.1.4-slurm25.11.5"
+  nodeExporter:
+    repository: "cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter"
+    tag: "v1.10.2"
+nodeExporter:
+  podMonitor:
+    enabled: true
+    interval: "30s"
+    scrapeTimeout: "10s"
+    metricRelabelings: []
+    relabelings: []
 # NodeSets configuration
 # Each NodeSet defines a group of worker nodes with specific characteristics
 nodesets:
@@ -49,6 +60,12 @@ nodesets:
     # Could be a count (number) or percent (string)
     # Optional, defaults to 20%
     maxUnavailable: 1
+    # Maximum number of worker pods that can be created in parallel during
+    # initial scale-out, to avoid overloading the Slurm controller with
+    # simultaneous slurmd registrations.
+    # Could be a count (number) or percent (string).
+    # Optional, defaults to 500
+    maxConcurrentStartup: 500
     # Enable ephemeral node behavior for this NodeSet.
     # When true, nodes will use dynamic topology injection instead of legacy topology.conf.
     # Topology data is read from the topology-node-labels ConfigMap at runtime.
@@ -74,7 +91,22 @@ nodesets:
         # Whether GDRCopy should be enabled
         # Optional, defaults to false
         gdrCopyEnabled: true
-    # Node configuration values to be set in slurm.conf
+    # Docker configuration
+    # Optional
+    docker:
+      # Whether Docker is available on NodeSet's workers.
+      # Docker requires dedicated image-storage disks for storing OCI data,
+      # so it must be disabled on clusters deployed without them.
+      # Optional, defaults to true
+      enabled: true
+    # Network topology configuration
+    # Optional
+    topology:
+      # IB fabric this NodeSet belongs to. Its workers are grouped under a per-fabric
+      # root switch so Slurm never schedules a job across fabrics.
+      # Optional, defaults to "root" (single-fabric behavior)
+      fabric: "root"
+    # Node configuration values to be rendered into slurm_base.conf.noedit
     # Optional
     nodeConfig:
       # Slurm Node Features
@@ -98,7 +130,7 @@ nodesets:
       # Optional
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
-        tag: "4.1.4-slurm25.11.3"
+        tag: "4.1.4-slurm25.11.5"
         pullPolicy: "IfNotPresent"
       customEnv:
         - name: "NVIDIA_DRIVER_CAPABILITIES"
@@ -188,7 +220,7 @@ nodesets:
       image:
         repository: "cr.eu-north1.nebius.cloud/soperator/munge"
         # Optional
-        tag: "4.1.4-slurm25.11.3"
+        tag: "4.1.4-slurm25.11.5"
         pullPolicy: "IfNotPresent"
       # Munge container resources
       resources:
@@ -231,6 +263,12 @@ nodesets:
     # Whether the worker pod containers can use the host user namespace
     # Optional, defaults to false
     enableHostUserNamespace: false
+    # Upper bound (in seconds) of a random delay the worker-init container sleeps before
+    # running its readiness checks. The actual delay is picked uniformly from
+    # [0, workerInitRandomDelaySeconds]. Spreads slurmd registrations across workers to avoid
+    # overloading the Slurm controller when many worker pods start at once.
+    # Optional, 0 disables the delay, defaults to 0
+    workerInitRandomDelaySeconds: 30
     # PriorityClass to be used for worker pod
     # Optional
     priorityClass: *priorityClassHigh
@@ -252,6 +290,12 @@ nodesets:
       - key: nvidia.com/gpu
         operator: Exists
         effect: NoSchedule
+      # Keep worker pods on a node that became unreachable for up to tolerationSeconds
+      # (3 minutes) before they are evicted.
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
     # Additional annotations to be added to the worker pods
     # Optional, defaults to empty dict
     workerAnnotations:
@@ -264,6 +308,9 @@ nodesets:
       - name: say-hi
         image: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/busybox
         command: ["echo", "Hi!"]
+    # Optional node-exporter sidecar for worker pods.
+    nodeExporter:
+      enabled: false
   - name: worker-cpu
     replicas: 6
     nodeConfig:

@@ -66,7 +66,7 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 0, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", maxJobCount: 20000, minJobAge: 28800, messageTimeout: 60}
+	// +kubebuilder:default={defMemPerNode: 0, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", taskProlog: "", maxJobCount: 20000, minJobAge: 3600, messageTimeout: 60}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
 	// Topology contains topology-related parameters for Slurm.
@@ -106,7 +106,7 @@ type SlurmClusterSpec struct {
 	// PlugStackConfig represents the Plugin stack configurations in `plugstack.conf`.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ pyxis: { required: true, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
+	// +kubebuilder:default={ pyxis: { required: true, useSquashfuse: false, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
 	PlugStackConfig PlugStackConfig `json:"plugStackConfig,omitempty"`
 
 	// SConfigController defines the desired state of controller that watches after configs
@@ -152,6 +152,11 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=""
 	Prolog *string `json:"prolog,omitempty"`
+	// Defines specific file to run the task prolog when job starts. Default value is no task prolog
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	TaskProlog *string `json:"taskProlog,omitempty"`
 	// Additional parameters for the task plugin
 	//
 	// +kubebuilder:validation:Optional
@@ -165,7 +170,7 @@ type SlurmConfig struct {
 	// Don't remove jobs from controller memory after some time
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=28800
+	// +kubebuilder:default=3600
 	MinJobAge *int32 `json:"minJobAge,omitempty"`
 	// MessageTimeout specifies the permitted time for a round-trip communication to complete in seconds.
 	// See https://slurm.schedmd.com/slurm.conf.html#OPT_MessageTimeout.
@@ -217,7 +222,7 @@ type PlugStackConfig struct {
 	// Pyxis represents the 'Pyxis' SPANK plugin configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ required: true, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }
+	// +kubebuilder:default={ required: true, useSquashfuse: false, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }
 	Pyxis PluginConfigPyxis `json:"pyxis,omitempty"`
 
 	// NcclDebug represents the 'NCCL Debug' SPANK plugin configuration.
@@ -225,6 +230,12 @@ type PlugStackConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={ required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" }
 	NcclDebug PluginConfigNcclDebug `json:"ncclDebug,omitempty"`
+
+	// NcclInspectorPreConf represents the NCCL Inspector Pre-Configuration SPANK plugin configuration.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={ required: false, enabled: false, profilerPlugin: "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so", dumpDir: "/opt/soperator-outputs/nccl_profiles/%j/%s", dumpVerbose: false, dumpThreadIntervalMicroseconds: 1000000 }
+	NcclInspectorPreConf PluginConfigNcclInspectorPreConf `json:"ncclInspectorPreConf,omitempty"`
 
 	// PluginConfigCustom represents a configuration of custom SPANK plugins.
 	//
@@ -241,6 +252,13 @@ type PluginConfigPyxis struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
 	Required *bool `json:"required,omitempty"`
+
+	// UseSquashfuse enables Pyxis to start importer-produced SquashFS images directly through squashfuse.
+	// When disabled, Pyxis still uses ImporterPath for image caching but lets Enroot create the runtime rootfs.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	UseSquashfuse *bool `json:"useSquashfuse,omitempty"`
 
 	// Path to the executable for pyxis importer extension.
 	// File should be available to execute for every user in Slurm.
@@ -310,6 +328,50 @@ type PluginConfigNcclDebug struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="/opt/soperator-outputs/nccl_logs"
 	OutputDirectory string `json:"outputDirectory,omitempty"`
+}
+
+// PluginConfigNcclInspectorPreConf represents the NCCL Inspector Pre-Configuration SPANK plugin configuration.
+//
+// See: https://github.com/nebius/slurm-plugins/tree/main/spank/nccl-inspector-preconf
+type PluginConfigNcclInspectorPreConf struct {
+	// Required defines if NCCL Inspector Pre-Configuration is 'required' for SLURM.
+	// Otherwise, 'optional'.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Required *bool `json:"required,omitempty"`
+
+	// Enabled defines whether to enable the plugin.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// ProfilerPlugin defines a file path to NCCL Inspector's SO file.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so"
+	ProfilerPlugin string `json:"profilerPlugin,omitempty"`
+
+	// DumpDir defines a directory path where NCCL profiles will be dumped into.
+	//
+	// If the path does not exist, it will be created by the plugin.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/opt/soperator-outputs/nccl_profiles/%j/%s"
+	DumpDir string `json:"dumpDir,omitempty"`
+
+	// DumpVerbose defines if the NCCL profile dumps should be verbose.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	DumpVerbose *bool `json:"dumpVerbose,omitempty"`
+
+	// DumpThreadIntervalMicroseconds defines an interval between NCCL Inspector dump thread runs in microseconds.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=1000000
+	DumpThreadIntervalMicroseconds uint64 `json:"dumpThreadIntervalMicroseconds,omitempty"`
 }
 
 // PluginConfigCustom represents a custom SPANK plugin configuration.
@@ -1067,6 +1129,31 @@ type SlurmExporter struct {
 	// +kubebuilder:default="30s"
 	CollectionInterval prometheusv1.Duration `json:"collectionInterval,omitempty"`
 
+	// JobSource selects the Slurm API used for job collection.
+	//
+	// "controller" reads jobs from the Slurm controller API (default, current behavior).
+	// "accounting" reads jobs from the Slurm accounting API (slurmdbd) and is intended for clusters where
+	// the controller endpoint is overloaded.
+	//
+	// Note: the accounting source has known label-fidelity limitations (empty user_id, "None" job_state_reason
+	// for pending jobs, collapsed pending array tasks). See docs/slurm-exporter.md "Known limitations of
+	// the accounting source" for details.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=controller;accounting
+	// +kubebuilder:default="controller"
+	JobSource string `json:"jobSource,omitempty"`
+
+	// AccountingJobsLookback sets the size of the time window queried from the accounting API:
+	// [now − lookback, now + 5 min]. The +5 min skew tolerates clock drift between slurmrestd, slurmctld and slurmdbd.
+	// Long-running jobs that started before the window are still included (sacct overlap semantics).
+	// Only applied when JobSource is "accounting".
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="1h"
+	// +kubebuilder:validation:XValidation:rule="self.matches('[1-9]')",message="accountingJobsLookback must be greater than zero"
+	AccountingJobsLookback prometheusv1.Duration `json:"accountingJobsLookback,omitempty"`
+
 	// ServiceAccountName is the name of the ServiceAccount to use for exporter pods.
 	// +kubebuilder:validation:Optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
@@ -1410,6 +1497,9 @@ func (p *PluginConfigPyxis) SetDefaults() {
 	if p.Required == nil {
 		p.Required = ptr.To(true)
 	}
+	if p.UseSquashfuse == nil {
+		p.UseSquashfuse = ptr.To(false)
+	}
 }
 
 // SetDefaults sets default values for PluginConfigNcclDebug
@@ -1419,9 +1509,28 @@ func (p *PluginConfigNcclDebug) SetDefaults() {
 	}
 }
 
+// SetDefaults sets default values for PluginConfigNcclInspectorPreConf
+func (p *PluginConfigNcclInspectorPreConf) SetDefaults() {
+	if p.Required == nil {
+		p.Required = ptr.To(false)
+	}
+	if p.Enabled == nil {
+		p.Enabled = ptr.To(true)
+	}
+	if p.DumpVerbose == nil {
+		p.DumpVerbose = ptr.To(false)
+	}
+}
+
 // SetDefaults sets default values for SlurmExporter
 func (s *SlurmExporter) SetDefaults() {
 	if s.Enabled == nil {
 		s.Enabled = ptr.To(false)
+	}
+	if s.JobSource == "" {
+		s.JobSource = "controller"
+	}
+	if s.AccountingJobsLookback == "" {
+		s.AccountingJobsLookback = "1h"
 	}
 }

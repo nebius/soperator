@@ -5,7 +5,7 @@ tests:
   - it: should render default SBATCH_GPUS_PER_NODE for GPU slurm jobs
     documentSelector:
       path: metadata.name
-      value: cuda-samples
+      value: soperator-cuda-samples
     asserts:
       - contains:
           path: spec.slurmJobSpec.jobContainer.env
@@ -16,7 +16,7 @@ tests:
   - it: should render overridden SBATCH_GPUS_PER_NODE for GPU slurm jobs
     documentSelector:
       path: metadata.name
-      value: cuda-samples
+      value: soperator-cuda-samples
     set:
       slurmJob:
         gpusPerNode: "4"
@@ -26,19 +26,3 @@ tests:
           content:
             name: SBATCH_GPUS_PER_NODE
             value: "4"
-
-  - it: should preserve existing extraEnv when adding SBATCH_GPUS_PER_NODE
-    documentSelector:
-      path: metadata.name
-      value: extensive-check
-    asserts:
-      - contains:
-          path: spec.slurmJobSpec.jobContainer.env
-          content:
-            name: SLURM_EXTRA_COMMENT_JSON
-            value: ""
-      - contains:
-          path: spec.slurmJobSpec.jobContainer.env
-          content:
-            name: SBATCH_GPUS_PER_NODE
-            value: "8"

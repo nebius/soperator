@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -183,6 +184,48 @@ func TestAdvancedStatefulSetPatchCopiesPVCDeletionPolicy(t *testing.T) {
 		)
 	}
 }
+
+func TestAdvancedStatefulSetPatchCopiesScaleStrategy(t *testing.T) {
+	tests := []struct {
+		name     string
+		existing *kruisev1b1.StatefulSetScaleStrategy
+		desired  *kruisev1b1.StatefulSetScaleStrategy
+	}{
+		{
+			name:     "absolute MaxUnavailable is propagated",
+			existing: &kruisev1b1.StatefulSetScaleStrategy{MaxUnavailable: ptrIntOrString(intstr.FromInt32(100))},
+			desired:  &kruisev1b1.StatefulSetScaleStrategy{MaxUnavailable: ptrIntOrString(intstr.FromInt32(500))},
+		},
+		{
+			name:     "percentage MaxUnavailable is propagated",
+			existing: &kruisev1b1.StatefulSetScaleStrategy{MaxUnavailable: ptrIntOrString(intstr.FromString("5%"))},
+			desired:  &kruisev1b1.StatefulSetScaleStrategy{MaxUnavailable: ptrIntOrString(intstr.FromString("25%"))},
+		},
+		{
+			name:     "newly set ScaleStrategy is populated",
+			existing: nil,
+			desired:  &kruisev1b1.StatefulSetScaleStrategy{MaxUnavailable: ptrIntOrString(intstr.FromInt32(500))},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			existing := &kruisev1b1.StatefulSet{Spec: kruisev1b1.StatefulSetSpec{ScaleStrategy: tt.existing}}
+			desired := &kruisev1b1.StatefulSet{Spec: kruisev1b1.StatefulSetSpec{ScaleStrategy: tt.desired}}
+
+			r := &AdvancedStatefulSetReconciler{}
+			if _, err := r.patch(existing, desired); err != nil {
+				t.Fatalf("patch returned error: %v", err)
+			}
+
+			if !equality.Semantic.DeepEqual(existing.Spec.ScaleStrategy, tt.desired) {
+				t.Fatalf("expected ScaleStrategy=%+v, got %+v", tt.desired, existing.Spec.ScaleStrategy)
+			}
+		})
+	}
+}
+
+func ptrIntOrString(v intstr.IntOrString) *intstr.IntOrString { return &v }
 
 func TestStatefulSetPatchCopiesPVCDeletionPolicy(t *testing.T) {
 	existing := &appsv1.StatefulSet{
