@@ -475,7 +475,9 @@ spec:
         {{- with (default dict .Values.slurmNodes.exporter.exporterContainer) }}
         {{- with .resources }}
         resources:
-          {{- toYaml . | nindent 10 }}
+          cpu: {{ required ".Values.slurmNodes.exporter.exporterContainer.resources.cpu must be provided." .cpu | quote }}
+          memory: {{ required ".Values.slurmNodes.exporter.exporterContainer.resources.memory must be provided." .memory | quote }}
+          ephemeral-storage: {{ required ".Values.slurmNodes.exporter.exporterContainer.resources.ephemeralStorage must be provided." .ephemeralStorage | quote }}
         {{- end }}
         {{- with .livenessProbe }}
         livenessProbe:

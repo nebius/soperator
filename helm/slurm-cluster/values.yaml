@@ -609,11 +609,10 @@ slurmNodes:
         memory: "256Mi"
         ephemeralStorage: "500Mi"
     exporterContainer:
-    # Rendered into the CR verbatim: use k8s resource names (ephemeral-storage, not ephemeralStorage).
     # resources:
     #   cpu: "250m"
     #   memory: "256Mi"
-    #   ephemeral-storage: "500Mi"
+    #   ephemeralStorage: "500Mi"
     # livenessProbe:
     #   httpGet:
     #     path: /healthz
