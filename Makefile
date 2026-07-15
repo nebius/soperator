@@ -121,12 +121,18 @@ test: manifests generate fmt vet envtest ## Run tests.
 
 .PHONY: test-slurm-scripts
 test-slurm-scripts: ## Run Python unit tests for Slurm scripts.
-	@if find helm/slurm-cluster/slurm_scripts -type f -name '*_test.py' -print -quit | grep -q .; then \
-		python3 -m unittest discover \
-			-s helm/slurm-cluster/slurm_scripts \
-			-p '*_test.py' \
-			-v; \
-	else \
+	@found=false; \
+	for test_dir in helm/slurm-cluster/slurm_scripts images/worker; do \
+		if find "$$test_dir" -type f -name '*_test.py' -print -quit | grep -q .; then \
+			found=true; \
+			echo "Running Python unit tests in $$test_dir"; \
+			python3 -m unittest discover \
+				-s "$$test_dir" \
+				-p '*_test.py' \
+				-v || exit $$?; \
+		fi; \
+	done; \
+	if [ "$$found" = false ]; then \
 		echo "No Slurm script unit tests found; skipping."; \
 	fi
 
