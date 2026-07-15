@@ -17,7 +17,7 @@ class IdleMemUsedTest(unittest.TestCase):
         listjobs_output: str,
         total_bytes: int | None,
         available_bytes: int | None,
-        max_used_gb: int = 32,
+        node_real_memory_bytes: int | None = 56 * GIB,
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmpdir:
             scontrol_path = Path(tmpdir) / "scontrol"
@@ -38,11 +38,14 @@ class IdleMemUsedTest(unittest.TestCase):
                 )
 
             env = os.environ.copy()
+            if node_real_memory_bytes is None:
+                env.pop("CHECKS_NODE_REAL_MEM_BYTES", None)
+            else:
+                env["CHECKS_NODE_REAL_MEM_BYTES"] = str(node_real_memory_bytes)
             env.update(
                 {
                     "PATH": f"{tmpdir}:{env['PATH']}",
                     "SLURMD_NODENAME": "worker-1",
-                    "IDLE_MEM_USED_MAX_USED_GB": str(max_used_gb),
                     "IDLE_MEM_USED_MEMINFO_PATH": str(meminfo_path),
                     "MOCK_SCONTROL_LISTJOBS_RC": str(listjobs_rc),
                     "MOCK_SCONTROL_LISTJOBS_OUTPUT": listjobs_output,
@@ -78,7 +81,7 @@ class IdleMemUsedTest(unittest.TestCase):
         self.assertIn("Node has local jobs; skipping memory validation", result.stdout)
         self.assertNotIn("Memory measurements:", result.stdout)
 
-    def test_idle_node_below_threshold_passes(self):
+    def test_idle_node_with_enough_available_memory_passes(self):
         result = self.run_check(
             listjobs_rc=1,
             listjobs_output="No slurmstepd's found on this node",
@@ -90,9 +93,15 @@ class IdleMemUsedTest(unittest.TestCase):
         self.assertIn("Node is idle: true", result.stdout)
         self.assertIn("No local slurmstepd was found", result.stdout)
         self.assertIn(f"used=total-available=4.29 GB ({4 * GIB} bytes)", result.stdout)
-        self.assertIn("Maximum allowed used memory: 32 GB (32000000000 bytes)", result.stdout)
+        self.assertIn(
+            f"Slurm RealMemory: 60.13 GB ({56 * GIB} bytes)", result.stdout
+        )
+        self.assertIn(
+            f"Derived maximum idle used memory: MemTotal-RealMemory=8.59 GB ({8 * GIB} bytes)",
+            result.stdout,
+        )
 
-    def test_idle_node_above_threshold_fails_with_actionable_reason(self):
+    def test_idle_node_with_insufficient_available_memory_fails(self):
         result = self.run_check(
             listjobs_rc=1,
             listjobs_output="No slurmstepd's found on this node",
@@ -102,9 +111,9 @@ class IdleMemUsedTest(unittest.TestCase):
 
         self.assertEqual(1, result.returncode)
         self.assertIn("Node is idle: true", result.stdout)
-        self.assertIn("Node worker-1 is IDLE but uses", result.stdout)
-        self.assertIn("45.10 GB", result.stdout)
-        self.assertIn("threshold: 32 GB", result.stdout)
+        self.assertIn("Node worker-1 is IDLE but has only 23.62 GB", result.stdout)
+        self.assertIn("below Slurm RealMemory 60.13 GB by 36.51 GB", result.stdout)
+        self.assertIn("derived maximum idle usage: 8.59 GB", result.stdout)
         self.assertIn("leftover or spurious processes", result.stdout)
 
     def test_unavailable_memory_data_does_not_drain_node(self):
@@ -117,6 +126,32 @@ class IdleMemUsedTest(unittest.TestCase):
 
         self.assertEqual(0, result.returncode)
         self.assertIn("Could not determine valid MemTotal and MemAvailable", result.stderr)
+
+    def test_unavailable_real_memory_does_not_drain_node(self):
+        result = self.run_check(
+            listjobs_rc=1,
+            listjobs_output="No slurmstepd's found on this node",
+            total_bytes=None,
+            available_bytes=None,
+            node_real_memory_bytes=None,
+        )
+
+        self.assertEqual(0, result.returncode)
+        self.assertIn("Invalid or unavailable Slurm RealMemory", result.stderr)
+        self.assertNotIn("Memory measurements:", result.stdout)
+
+    def test_real_memory_larger_than_memtotal_does_not_drain_node(self):
+        result = self.run_check(
+            listjobs_rc=1,
+            listjobs_output="No slurmstepd's found on this node",
+            total_bytes=64 * GIB,
+            available_bytes=60 * GIB,
+            node_real_memory_bytes=72 * GIB,
+        )
+
+        self.assertEqual(0, result.returncode)
+        self.assertIn("exceeds MemTotal", result.stderr)
+        self.assertNotIn("Derived maximum idle used memory", result.stdout)
 
     def test_unexpected_listjobs_failure_does_not_validate_memory(self):
         result = self.run_check(
