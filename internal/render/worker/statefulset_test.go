@@ -664,6 +664,81 @@ func TestRenderNodeSetStatefulSet_DockerEnabled(t *testing.T) {
 	}
 }
 
+func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
+	createNodeSet := func() *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image: "test-image",
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("1G"),
+						corev1.ResourceCPU:    resource.MustParse("1"),
+					},
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{Image: "munge-image"},
+			},
+			VolumeSpool: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+			},
+			VolumeJail: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+			},
+			StatefulSet:              values.StatefulSet{Replicas: 1},
+			SupervisorDConfigMapName: "supervisord-config",
+			SSHDConfigMapName:        "sshd-config",
+			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+		}
+	}
+
+	t.Run("exports the rendered Slurm RealMemory in bytes", func(t *testing.T) {
+		result, err := worker.RenderNodeSetStatefulSet(
+			"test-cluster",
+			createNodeSet(),
+			&slurmv1.Secrets{},
+			consts.CGroupV2,
+			false,
+			false,
+			"",
+		)
+		assert.NoError(t, err)
+
+		for _, container := range result.Spec.Template.Spec.Containers {
+			if container.Name == consts.ContainerNameSlurmd {
+				// Slurm RealMemory is expressed in whole MiB: 1G becomes 953 MiB.
+				assertEnvValue(t, container.Env, consts.EnvNodeRealMemoryBytes, "999292928")
+				return
+			}
+		}
+		t.Fatal("slurmd container not found")
+	})
+
+	t.Run("rejects a custom override of Soperator metadata", func(t *testing.T) {
+		nodeSet := createNodeSet()
+		nodeSet.ContainerSlurmd.CustomEnv = []corev1.EnvVar{{
+			Name:  consts.EnvNodeRealMemoryBytes,
+			Value: "1",
+		}}
+
+		_, err := worker.RenderNodeSetStatefulSet(
+			"test-cluster",
+			nodeSet,
+			&slurmv1.Secrets{},
+			consts.CGroupV2,
+			false,
+			false,
+			"",
+		)
+		assert.ErrorContains(t, err, "is managed by Soperator")
+	})
+}
+
 func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testing.T) {
 	createNodeSet := func(ephemeralNodes *bool, jailSubMounts []slurmv1alpha1.NodeVolumeMount, customVolumeMounts []slurmv1alpha1.NodeVolumeMount) *values.SlurmNodeSet {
 		return &values.SlurmNodeSet{
