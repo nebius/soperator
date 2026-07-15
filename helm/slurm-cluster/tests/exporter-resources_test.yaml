@@ -18,7 +18,7 @@ tests:
             resources:
               cpu: "250m"
               memory: "256Mi"
-              ephemeral-storage: "500Mi"
+              ephemeralStorage: "500Mi"
     asserts:
       - equal:
           path: spec.slurmNodes.exporter.exporterContainer.resources.cpu
