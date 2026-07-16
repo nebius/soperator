@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --deadline="now+1hours"
+#SBATCH --deadline="now+4hours"
 #SBATCH --time=50:00
 #SBATCH --exclusive
 #SBATCH --mem=0

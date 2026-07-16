@@ -62,7 +62,7 @@ checks:
       - "manage-jail-state"
       - "wait-for-soperatorchecks-srun-ready"
       - "wait-for-topology"
-    schedule: "25 5-23/6 * * *"
+    schedule: "0 0,12 * * *"
     suspend: false
     runAfterCreation: true
     slurmJobSpec:
