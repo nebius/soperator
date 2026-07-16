@@ -204,6 +204,20 @@ jobs:
           fi
           go build "${packages[@]}"
 
+  test-python:
+    needs: [changes, authorize]
+    if: needs.changes.outputs.should_build == 'true'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Test Python
+        run: make test-python
+
   build-soperator-images:
     needs:
       - changes
@@ -846,6 +860,7 @@ jobs:
       - pre-build
       - lint
       - build-e2e
+      - test-python
       - build-slurm-images
       - build-soperator-images
       - manifest-populate-jail
