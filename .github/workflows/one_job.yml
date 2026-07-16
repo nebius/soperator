@@ -96,7 +96,7 @@ jobs:
           fetch-depth: 0 # Fetch git history for the VERSION file changes detection
 
       - name: Install GO
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: false
@@ -148,7 +148,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: false
@@ -188,7 +188,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: false
@@ -237,7 +237,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: false
@@ -354,7 +354,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: false
@@ -493,7 +493,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: false
@@ -737,7 +737,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install GO
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: false
@@ -782,7 +782,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: "go.mod"
           cache: true
