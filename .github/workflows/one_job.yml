@@ -204,7 +204,7 @@ jobs:
           fi
           go build "${packages[@]}"
 
-  test-slurm-scripts:
+  test-python:
     needs: [changes, authorize]
     if: needs.changes.outputs.should_build == 'true'
     runs-on: ubuntu-24.04
@@ -215,8 +215,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Test Slurm scripts
-        run: make test-slurm-scripts
+      - name: Test Python
+        run: make test-python
 
   build-soperator-images:
     needs:
@@ -860,7 +860,7 @@ jobs:
       - pre-build
       - lint
       - build-e2e
-      - test-slurm-scripts
+      - test-python
       - build-slurm-images
       - build-soperator-images
       - manifest-populate-jail
