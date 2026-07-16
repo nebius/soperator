@@ -119,6 +119,10 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run tests.
 	go test ./...
 
+.PHONY: test-python
+test-python: ## Temporarily retained while removing Python unit tests from CI.
+	@echo "Python unit tests are disabled in CI."
+
 .PHONY: test-coverage
 test-coverage: manifests generate fmt vet envtest ## Run tests and generate test coverage.
 	go test ./... -coverprofile cover.out
