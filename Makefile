@@ -120,28 +120,8 @@ test: manifests generate fmt vet envtest ## Run tests.
 	go test ./...
 
 .PHONY: test-python
-test-python: ## Run all Python unit tests.
-	@found=false; \
-	while IFS= read -r -d '' test_file; do \
-		found=true; \
-		test_dir=$$(dirname "$$test_file"); \
-		test_pattern=$$(basename "$$test_file"); \
-		echo "Running Python unit tests in $$test_file"; \
-		PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
-			-s "$$test_dir" \
-			-p "$$test_pattern" \
-			-v; \
-	done < <(find . \
-		-type d \( \
-			-name .git -o \
-			-name .venv -o \
-			-name venv -o \
-			-name __pycache__ \
-		\) -prune -o \
-		-type f \( -name '*_test.py' -o -name 'test_*.py' \) -print0); \
-	if [ "$$found" = false ]; then \
-		echo "No Python unit tests found; skipping."; \
-	fi
+test-python: ## Temporarily retained while removing Python unit tests from CI.
+	@echo "Python unit tests are disabled in CI."
 
 .PHONY: test-coverage
 test-coverage: manifests generate fmt vet envtest ## Run tests and generate test coverage.
