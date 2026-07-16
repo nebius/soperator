@@ -31,9 +31,8 @@ const (
 	LabelSConfigControllerSourceValue = "true"
 
 	// Controller type labels
-	LabelControllerType            = K8sGroupNameSoperator + "/controller-type"
-	LabelControllerTypeMain        = "main"
-	LabelControllerTypePlaceholder = "placeholder"
+	LabelControllerType     = K8sGroupNameSoperator + "/controller-type"
+	LabelControllerTypeMain = "main"
 
 	DefaultTopologyLabelPrefix = "topology.nebius.com"
 	TierZeroSuffix             = "/tier-0"

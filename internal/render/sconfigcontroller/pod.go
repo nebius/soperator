@@ -41,7 +41,7 @@ func BasePodTemplateSpec(
 		}
 	}
 
-	return &corev1.PodTemplateSpec{
+	res := &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: matchLabels,
 			Annotations: map[string]string{
@@ -72,5 +72,7 @@ func BasePodTemplateSpec(
 			ServiceAccountName: sConfigController.ServiceAccountName,
 			SecurityContext:    securityContext,
 		},
-	}, nil
+	}
+
+	return res, nil
 }

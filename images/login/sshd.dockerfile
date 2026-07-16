@@ -2,8 +2,8 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/79
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS login_sshd
+# https://github.com/nebius/ml-containers/pull/90
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260624085500 AS login_sshd
 
 # Install OpenSSH server
 # Create root .ssh directory
@@ -36,12 +36,20 @@ RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
-# Install NCCL debug plugin
+# Install NCCL Debug SPANK plugin
 COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
 COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
+
+# Install NCCL Inspector PreConf SPANK plugin
+COPY ansible/spank-nccl-inspector-preconf.yml /opt/ansible/spank-nccl-inspector-preconf.yml
+COPY ansible/roles/spank-nccl-inspector-preconf /opt/ansible/roles/spank-nccl-inspector-preconf
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local \
+      -e spank_nccl_inspector_preconf_dump_dir_create=false \
+      spank-nccl-inspector-preconf.yml
 
 # Install enroot
 COPY images/common/scripts/install_enroot.sh /opt/bin/
@@ -58,7 +66,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
     chmod 644 /etc/enroot/enroot.conf.d/custom-dirs.conf
 
 ARG SLURM_VERSION
-ARG PYXIS_VERSION=0.23.0
+ARG PYXIS_VERSION=0.24.0
 # Install slurm pyxis plugin
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \

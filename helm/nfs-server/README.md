@@ -4,7 +4,7 @@ A Helm chart for deploying an NFS server on Kubernetes with built-in monitoring 
 
 ## Features
 
-- **StatefulSet**: Single instance NFS server with persistent storage via separate PVC
+- **StatefulSet**: NFS server can be enabled or scaled to zero with persistent storage via separate PVC
 - **Storage Class**: Automatic NFS storage class creation for CSI driver
 - **ConfigMap-based Exports**: NFS exports configuration managed by Helm templates
 - **Multi-subnet Support**: Support for multiple client networks with individual export entries
@@ -27,6 +27,7 @@ A Helm chart for deploying an NFS server on Kubernetes with built-in monitoring 
 | `nfs.graceTime` | NFS grace period (seconds) | `10` |
 | `nfs.leaseTime` | NFS lease time (seconds) | `10` |
 | `nfs.threads` | Number of NFS daemon threads | `8` |
+| `nfs.replicas` | Number of NFS server replicas. Must be `0` or `1` | `1` |
 
 ### Storage Configuration
 
@@ -40,6 +41,8 @@ The chart creates a dedicated PersistentVolumeClaim (PVC) for storage, which pro
 | `storage.existingClaim` | Name of existing PVC to use instead of creating new one | `""` |
 
 **Note**: When `storage.existingClaim` is not specified, the chart creates a PVC named `<release-name>-storage`. When `storage.existingClaim` is provided, that PVC is used instead and no new PVC is created.
+
+**Note**: This chart supports either one active NFS server replica or zero replicas for scale-down/maintenance. Multiple NFS server replicas are not supported.
 
 ### Service Configuration
 
