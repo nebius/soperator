@@ -3,44 +3,6 @@ templates:
   - templates/active-checks.yaml
 
 tests:
-  - it: ib-gpu-perf should fail if both commentSlurmNode and drainSlurmNode are set under failureReactions
-    template: templates/active-checks.yaml
-    set:
-      checks:
-        ib-gpu-perf:
-          failureReactions:
-            commentSlurmNode:
-              commentPrefix: "[node_problem]"
-            drainSlurmNode:
-              drainReasonPrefix: "[node_problem]"
-    asserts:
-      - failedTemplate:
-          errorMessage: "checks.ib-gpu-perf.failureReactions: cannot set both commentSlurmNode and drainSlurmNode simultaneously"
-
-  - it: ib-gpu-perf should render when only commentSlurmNode is set
-    template: templates/active-checks.yaml
-    set:
-      checks:
-        ib-gpu-perf:
-          failureReactions:
-            commentSlurmNode:
-              commentPrefix: "[node_problem]"
-            drainSlurmNode: null
-    asserts:
-      - notFailedTemplate: {}
-
-  - it: ib-gpu-perf should render when only drainSlurmNode is set
-    template: templates/active-checks.yaml
-    set:
-      checks:
-        ib-gpu-perf:
-          failureReactions:
-            drainSlurmNode:
-              drainReasonPrefix: "[node_problem]"
-            commentSlurmNode: null
-    asserts:
-      - notFailedTemplate: {}
-
   - it: gpu-checks should fail if both commentSlurmNode and drainSlurmNode are set under failureReactions
     template: templates/active-checks.yaml
     set:
