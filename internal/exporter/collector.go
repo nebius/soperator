@@ -401,7 +401,9 @@ func (c *MetricsCollector) refreshNodes(ctx context.Context, sequence uint64) (e
 	}
 	newState := cloneMetricsCollectorState(previousState)
 	c.applyNodes(ctx, nodes, previousState, newState)
-	newState.nodesCollectionSequence = sequence
+	if sequence != 0 {
+		newState.nodesCollectionSequence = sequence
+	}
 	c.state.Store(newState)
 	return nil
 }
@@ -437,12 +439,18 @@ func (c *MetricsCollector) refreshJobs(ctx context.Context, sequence uint64) (er
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 
-	newState := cloneMetricsCollectorState(c.state.Load())
-	if sequence != 0 && sequence <= newState.jobsCollectionSequence {
+	previousState := c.state.Load()
+	if previousState == nil {
+		previousState = newMetricsCollectorState()
+	}
+	if sequence != 0 && sequence <= previousState.jobsCollectionSequence {
 		return nil
 	}
+	newState := cloneMetricsCollectorState(previousState)
 	newState.jobs = jobs
-	newState.jobsCollectionSequence = sequence
+	if sequence != 0 {
+		newState.jobsCollectionSequence = sequence
+	}
 	c.state.Store(newState)
 	return nil
 }
@@ -474,12 +482,18 @@ func (c *MetricsCollector) refreshDiag(ctx context.Context, sequence uint64) (er
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 
-	newState := cloneMetricsCollectorState(c.state.Load())
-	if sequence != 0 && sequence <= newState.diagCollectionSequence {
+	previousState := c.state.Load()
+	if previousState == nil {
+		previousState = newMetricsCollectorState()
+	}
+	if sequence != 0 && sequence <= previousState.diagCollectionSequence {
 		return nil
 	}
+	newState := cloneMetricsCollectorState(previousState)
 	newState.diag = diag
-	newState.diagCollectionSequence = sequence
+	if sequence != 0 {
+		newState.diagCollectionSequence = sequence
+	}
 	c.state.Store(newState)
 	return nil
 }

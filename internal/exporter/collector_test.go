@@ -28,6 +28,16 @@ func newTestMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	return NewMetricsCollector(slurmAPIClient, slurmapi.ListJobsParams{})
 }
 
+func testNode(name string) slurmapi.Node {
+	return slurmapi.Node{
+		Name:       name,
+		InstanceID: name + "-instance",
+		States:     map[api.V0041NodeState]struct{}{api.V0041NodeStateIDLE: {}},
+		Tres:       "cpu=4,mem=8000M,gres/gpu=1",
+		Address:    "10.0.0.1",
+	}
+}
+
 func TestMetricsCollector_RefreshJobsDropsStaleSequence(t *testing.T) {
 	mockClient := &fake.MockClient{}
 	collector := newTestMetricsCollector(mockClient)
@@ -43,6 +53,43 @@ func TestMetricsCollector_RefreshJobsDropsStaleSequence(t *testing.T) {
 	state := collector.state.Load()
 	require.Len(t, state.jobs, 1)
 	assert.Equal(t, int32(2), state.jobs[0].ID)
+}
+
+func TestMetricsCollector_RefreshNodesDropsStaleSequence(t *testing.T) {
+	mockClient := &fake.MockClient{}
+	collector := newTestMetricsCollector(mockClient)
+
+	mockClient.EXPECT().ListNodes(mock.Anything).
+		Return([]slurmapi.Node{testNode("node-2")}, nil).Once()
+	mockClient.EXPECT().ListNodes(mock.Anything).
+		Return([]slurmapi.Node{testNode("node-1")}, nil).Once()
+
+	require.NoError(t, collector.refreshNodes(context.Background(), 2))
+	require.NoError(t, collector.refreshNodes(context.Background(), 1))
+
+	state := collector.state.Load()
+	require.Len(t, state.nodes, 1)
+	assert.Equal(t, "node-2", state.nodes[0].Name)
+}
+
+func TestMetricsCollector_RefreshDiagDropsStaleSequence(t *testing.T) {
+	mockClient := &fake.MockClient{}
+	collector := newTestMetricsCollector(mockClient)
+	serverThreadCount2 := int32(2)
+	serverThreadCount1 := int32(1)
+
+	mockClient.EXPECT().GetDiag(mock.Anything).
+		Return(&api.V0041OpenapiDiagResp{Statistics: api.V0041StatsMsg{ServerThreadCount: &serverThreadCount2}}, nil).Once()
+	mockClient.EXPECT().GetDiag(mock.Anything).
+		Return(&api.V0041OpenapiDiagResp{Statistics: api.V0041StatsMsg{ServerThreadCount: &serverThreadCount1}}, nil).Once()
+
+	require.NoError(t, collector.refreshDiag(context.Background(), 2))
+	require.NoError(t, collector.refreshDiag(context.Background(), 1))
+
+	state := collector.state.Load()
+	require.NotNil(t, state.diag)
+	require.NotNil(t, state.diag.Statistics.ServerThreadCount)
+	assert.Equal(t, int32(2), *state.diag.Statistics.ServerThreadCount)
 }
 
 // Helper function to setup mocks and collect state for tests
