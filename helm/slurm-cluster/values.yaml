@@ -234,7 +234,7 @@ slurmNodes:
     # hostUsers: false
     slurmConfig:
       accountingStorageTRES: "CPU,Mem,Node,VMem,Gres/gpu"
-      jobAcctGatherType: "jobacct_gather/cgroup"
+      jobAcctGatherType: "jobacct_gather/none"
       jobAcctGatherFrequency: 0
       priorityWeightAge: 0
       priorityWeightFairshare: 0

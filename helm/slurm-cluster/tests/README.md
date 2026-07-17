@@ -80,7 +80,7 @@ These tests verify the following kubebuilder default values:
 ### Accounting
 - `enabled: false`
 - `slurmConfig.accountingStorageTRES: "CPU,Mem,Node,VMem,Gres/gpu"`
-- `slurmConfig.jobAcctGatherType: "jobacct_gather/cgroup"`
+- `slurmConfig.jobAcctGatherType: "jobacct_gather/none"`
 - `slurmConfig.jobAcctGatherFrequency: 30`
 - `slurmConfig.priorityWeightAge: 0`
 - `slurmConfig.priorityWeightFairshare: 0`

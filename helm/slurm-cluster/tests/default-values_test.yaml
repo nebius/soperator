@@ -146,7 +146,7 @@ tests:
           value: "CPU,Mem,Node,VMem,Gres/gpu"
       - equal:
           path: spec.slurmNodes.accounting.slurmConfig.jobAcctGatherType
-          value: "jobacct_gather/cgroup"
+          value: "jobacct_gather/none"
       - equal:
           path: spec.slurmNodes.accounting.slurmConfig.jobAcctGatherFrequency
           value: 0

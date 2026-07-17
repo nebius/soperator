@@ -884,7 +884,7 @@ type AccountingSlurmConf struct {
 	AcctGatherProfileType *string `json:"acctGatherProfileType,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum="jobacct_gather/linux";"jobacct_gather/cgroup";"jobacct_gather/none"
-	// +kubebuilder:default="jobacct_gather/cgroup"
+	// +kubebuilder:default="jobacct_gather/none"
 	JobAcctGatherType *string `json:"jobAcctGatherType,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=0

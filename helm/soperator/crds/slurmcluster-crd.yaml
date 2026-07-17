@@ -35567,7 +35567,7 @@ spec:
                             - DisableGPUAcct
                             type: string
                           jobAcctGatherType:
-                            default: jobacct_gather/cgroup
+                            default: jobacct_gather/none
                             enum:
                             - jobacct_gather/linux
                             - jobacct_gather/cgroup
