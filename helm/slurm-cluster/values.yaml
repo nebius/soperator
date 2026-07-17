@@ -1,4 +1,15 @@
 clusterName: "slurm1"
+# Cluster initialization operations owned by the slurm-cluster Helm release.
+clusterInitialization:
+  # Name of the volume source containing the Slurm jail.
+  jailVolumeSourceName: "jail"
+  # Controls whether initialization pods share the host user namespace.
+  # When unset, this follows the compatibility behavior used by ActiveChecks.
+  hostUsers: null
+  createUserSoperatorchecks:
+    enabled: false
+    activeDeadlineSeconds: 1800
+    imagePullPolicy: "IfNotPresent"
 # Additional annotations for the cluster
 annotations: {}
 # Add appArmor profile to the cluster
@@ -716,6 +727,7 @@ images:
   slurmdbd: "cr.eu-north1.nebius.cloud/soperator/controller_slurmdbd:4.1.5-slurm25.11.5"
   soperatorExporter: "cr.eu-north1.nebius.cloud/soperator/soperator-exporter:4.1.5-slurm25.11.5"
   sConfigController: "cr.eu-north1.nebius.cloud/soperator/sconfigcontroller:4.1.5"
+  k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:4.1.5-slurm25.11.5"
   nodeExporter: "cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter:v1.10.2"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:12.1.2"
 # Configuration for slurm scripts.

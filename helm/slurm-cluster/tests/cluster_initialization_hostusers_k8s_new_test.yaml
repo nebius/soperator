@@ -1,0 +1,14 @@
+suite: test cluster initialization hostUsers on Kubernetes >= 1.33
+capabilities:
+  majorVersion: "1"
+  minorVersion: "33"
+templates:
+  - templates/create-user-soperatorchecks-job.yaml
+tests:
+  - it: should set hostUsers true on Kubernetes >= 1.33
+    set:
+      clusterInitialization.createUserSoperatorchecks.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.hostUsers
+          value: true
