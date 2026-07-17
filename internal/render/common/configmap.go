@@ -344,17 +344,20 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	{
 		connMax := max(int32(1024), nextPow2(total*2))
 		slurmCtldParams := []string{
-			fmt.Sprintf("conmgr_max_connections=%d", connMax),
-			"conmgr_threads=32",
+			fmt.Sprintf("conmgr_max_connections=%d", connMax), // maximum number of connections to be processed at any given time
+			"conmgr_threads=32",            // number of threads in thread pool used for connections on the listening sockets
+			"validate_nodeaddr_threads=32", // permit concurrent node address validation during startup
+			"enable_stepmgr",               // enable job steps to be managed by a single extern job-associated slurmstepd
 		}
 		if cluster.HasEphemeralNodes() {
 			slurmCtldParams = append(slurmCtldParams, []string{
-				"cloud_dns",
-				"idle_on_node_suspend",
+				"cloud_dns",            // avoid informing ip addresses of cloud nodes to client commands
+				"idle_on_node_suspend", // allow suspended nodes to be resumed by marking them idle
 			}...)
 		}
 		res.AddProperty("SlurmctldParameters", strings.Join(slurmCtldParams, ","))
 	}
+	res.AddProperty("PrologFlags", "contain") // use ProcTrack for creating a job container on all allocated workers during job allocation
 	res.AddComment("")
 
 	res.AddProperty("RebootProgram", "/opt/bin/slurm/reboot.sh")
