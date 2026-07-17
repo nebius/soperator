@@ -2,7 +2,6 @@ package exporter
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"iter"
 	"maps"
@@ -176,8 +175,10 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client, jobListParams slurmapi.
 	return collector
 }
 
-// isNodeUnavailable checks if a node is in unavailable state
-// Unavailable state: DOWN+* or IDLE+DRAIN+* or NOTRESPONDING or UNKNOWN or ERROR or FAIL or INVALID
+// isNodeUnavailable checks if a node is in unavailable state:
+//
+// DOWN+* or IDLE+DRAIN+* or NOTRESPONDING or UNKNOWN or ERROR or FAIL or INVALID
+//
 // Power-managed nodes (powering up/down or powered down) are part of the normal cloud
 // lifecycle and are never reported as unavailable.
 func isNodeUnavailable(node slurmapi.Node) bool {
@@ -331,75 +332,6 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.controllerServerThreadCount
 }
 
-// updateState fetches data from SLURM APIs and atomically updates the collector state
-func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
-	logger := log.FromContext(ctx).WithName(ControllerName)
-	startTime := time.Now()
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-
-	defer func() {
-		duration := time.Since(startTime).Seconds()
-		c.Monitoring.RecordCollection(duration, err)
-	}()
-
-	previousState := c.state.Load()
-	if previousState == nil {
-		previousState = newMetricsCollectorState()
-	}
-
-	newState := newMetricsCollectorState()
-	// Copy timestamps in case we fail to get nodes/jobs, so they will be preserved in the new state.
-	newState.lastGPUSecondsUpdate = previousState.lastGPUSecondsUpdate
-	newState.nodesCollectionSequence = previousState.nodesCollectionSequence
-	newState.jobsCollectionSequence = previousState.jobsCollectionSequence
-	newState.diagCollectionSequence = previousState.diagCollectionSequence
-	maps.Copy(newState.nodeUnavailabilityStartTimes, previousState.nodeUnavailabilityStartTimes)
-	maps.Copy(newState.nodeDrainingStartTimes, previousState.nodeDrainingStartTimes)
-
-	// Always update state with whatever data we successfully collect (even if partial)
-	defer func() {
-		c.state.Store(newState)
-	}()
-
-	// Each sub-collector is isolated: a failure in one neither aborts the others nor drops
-	// their metrics. The failing collector's metrics simply gap for this cycle; the error
-	// is logged and counted via slurm_exporter_collector_errors_total{collector="..."}.
-	collectors := []struct {
-		name string
-		run  func() error
-	}{
-		{"nodes", func() error { return c.collectNodes(ctx, previousState, newState) }},
-		{"jobs", func() error { return c.collectJobs(ctx, newState) }},
-		{"diag", func() error { return c.collectDiag(ctx, newState) }},
-	}
-
-	var errs []error
-	for _, col := range collectors {
-		colStart := time.Now()
-		if cerr := col.run(); cerr != nil {
-			logger.Error(cerr, "Sub-collector failed", "collector", col.name)
-			c.Monitoring.RecordCollectorError(col.name)
-			errs = append(errs, fmt.Errorf("%s: %w", col.name, cerr))
-		}
-		c.Monitoring.RecordCollectorDuration(col.name, time.Since(colStart).Seconds())
-	}
-
-	logger.Info("Collected metrics", "elapsed_seconds", time.Since(startTime).Seconds())
-
-	return errors.Join(errs...)
-}
-
-// collectNodes fetches nodes and updates node-derived metrics on the new state.
-func (c *MetricsCollector) collectNodes(ctx context.Context, previousState, newState *metricsCollectorState) error {
-	nodes, err := c.listNodes(ctx)
-	if err != nil {
-		return err
-	}
-	c.applyNodes(ctx, nodes, previousState, newState)
-	return nil
-}
-
 func (c *MetricsCollector) listNodes(ctx context.Context) ([]slurmapi.Node, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 
@@ -460,16 +392,6 @@ func (c *MetricsCollector) refreshNodes(ctx context.Context, sequence uint64) er
 	return nil
 }
 
-// collectJobs fetches jobs and stores them on the new state.
-func (c *MetricsCollector) collectJobs(ctx context.Context, newState *metricsCollectorState) error {
-	jobs, err := c.listJobs(ctx)
-	if err != nil {
-		return err
-	}
-	newState.jobs = jobs
-	return nil
-}
-
 func (c *MetricsCollector) listJobs(ctx context.Context) ([]slurmapi.Job, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 
@@ -503,16 +425,6 @@ func (c *MetricsCollector) refreshJobs(ctx context.Context, sequence uint64) err
 	newState.jobs = jobs
 	newState.jobsCollectionSequence = sequence
 	c.state.Store(newState)
-	return nil
-}
-
-// collectDiag fetches controller diagnostics and stores them on the new state.
-func (c *MetricsCollector) collectDiag(ctx context.Context, newState *metricsCollectorState) error {
-	diag, err := c.getDiag(ctx)
-	if err != nil {
-		return err
-	}
-	newState.diag = diag
 	return nil
 }
 
