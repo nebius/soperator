@@ -345,6 +345,15 @@ func (c *MetricsCollector) listNodes(ctx context.Context) ([]slurmapi.Node, erro
 	return nodes, nil
 }
 
+// Failed refreshes keep exporting the last successful data for that collector
+// until a later refresh succeeds.
+func (c *MetricsCollector) recordCollectorRun(ctx context.Context, name string, start time.Time, err error) {
+	if err != nil && ctx.Err() == nil {
+		c.Monitoring.RecordCollectorError(name)
+	}
+	c.Monitoring.RecordCollectorDuration(name, time.Since(start).Seconds())
+}
+
 func (c *MetricsCollector) applyNodes(ctx context.Context, nodes []slurmapi.Node, previousState, newState *metricsCollectorState) {
 	newState.nodes = nodes
 	c.updateNodeFailureMetrics(nodes, previousState.nodes)
@@ -369,7 +378,12 @@ func cloneMetricsCollectorState(previousState *metricsCollectorState) *metricsCo
 	return newState
 }
 
-func (c *MetricsCollector) refreshNodes(ctx context.Context, sequence uint64) error {
+func (c *MetricsCollector) refreshNodes(ctx context.Context, sequence uint64) (err error) {
+	start := time.Now()
+	defer func() {
+		c.recordCollectorRun(ctx, "nodes", start, err)
+	}()
+
 	nodes, err := c.listNodes(ctx)
 	if err != nil {
 		return err
@@ -409,7 +423,12 @@ func (c *MetricsCollector) listJobs(ctx context.Context) ([]slurmapi.Job, error)
 	return jobs, nil
 }
 
-func (c *MetricsCollector) refreshJobs(ctx context.Context, sequence uint64) error {
+func (c *MetricsCollector) refreshJobs(ctx context.Context, sequence uint64) (err error) {
+	start := time.Now()
+	defer func() {
+		c.recordCollectorRun(ctx, "jobs", start, err)
+	}()
+
 	jobs, err := c.listJobs(ctx)
 	if err != nil {
 		return err
@@ -441,7 +460,12 @@ func (c *MetricsCollector) getDiag(ctx context.Context) (*api.V0041OpenapiDiagRe
 	return diag, nil
 }
 
-func (c *MetricsCollector) refreshDiag(ctx context.Context, sequence uint64) error {
+func (c *MetricsCollector) refreshDiag(ctx context.Context, sequence uint64) (err error) {
+	start := time.Now()
+	defer func() {
+		c.recordCollectorRun(ctx, "diag", start, err)
+	}()
+
 	diag, err := c.getDiag(ctx)
 	if err != nil {
 		return err

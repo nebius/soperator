@@ -167,15 +167,12 @@ func (e *Exporter) collectionLoop(ctx context.Context) {
 					e.monitoringMetrics.SetCollectorInflight(col.name, col.finish())
 				}()
 
-				start := time.Now()
 				if err := col.run(loopCtx, sequence); err != nil {
 					if loopCtx.Err() == nil {
 						logger.Error(err, "Sub-collector failed", "collector", col.name)
-						e.monitoringMetrics.RecordCollectorError(col.name)
 						failed.Store(true)
 					}
 				}
-				e.monitoringMetrics.RecordCollectorDuration(col.name, time.Since(start).Seconds())
 			}(col, sequence)
 		}
 

@@ -1001,13 +1001,17 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 		mockClient.EXPECT().GetDiag(mock.Anything).Return(testDiag, nil)
 
 		ctx := context.Background()
+		registry := prometheus.NewRegistry()
+		require.NoError(t, collector.Monitoring.Register(registry))
+
 		require.NoError(t, collector.refreshNodes(ctx, nextNodesSequence(collector)))
 		require.NoError(t, collector.refreshJobs(ctx, nextJobsSequence(collector)))
 		require.NoError(t, collector.refreshDiag(ctx, nextDiagSequence(collector)))
 
-		// Create registry to check monitoring metrics
-		registry := prometheus.NewRegistry()
-		require.NoError(t, collector.Monitoring.Register(registry))
+		mockClientFail := &fake.MockClient{}
+		collector.slurmAPIClient = mockClientFail
+		mockClientFail.EXPECT().ListNodes(mock.Anything).Return(nil, assert.AnError).Once()
+		require.Error(t, collector.refreshNodes(ctx, nextNodesSequence(collector)))
 
 		// Collect metrics to trigger metric counting
 		metricsChan := make(chan prometheus.Metric, 100)
@@ -1038,6 +1042,7 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 		}
 
 		t.Logf("Monitoring metrics: exported=%f, collected=%d", exportedCount, metricsCount)
+		assert.Equal(t, float64(1), collectorErrorValue(metricFamilies, "nodes"))
 		assert.Greater(t, exportedCount, float64(0), "Expected some metrics to be exported")
 		assert.Greater(t, metricsCount, 0, "Expected some metrics to be collected")
 	})
