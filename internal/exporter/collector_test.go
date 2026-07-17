@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -26,6 +27,14 @@ import (
 
 func newTestMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	return NewMetricsCollector(slurmAPIClient, slurmapi.ListJobsParams{})
+}
+
+func collectOnce(ctx context.Context, collector *MetricsCollector) error {
+	return errors.Join(
+		collector.refreshNodes(ctx, 0),
+		collector.refreshJobs(ctx, 0),
+		collector.refreshDiag(ctx, 0),
+	)
 }
 
 func testNode(name string) slurmapi.Node {
@@ -107,9 +116,7 @@ func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, moc
 	}
 	preservedTime := initialState.lastGPUSecondsUpdate
 
-	require.NoError(t, collector.refreshNodes(ctx, nextNodesSequence(collector)))
-	require.NoError(t, collector.refreshJobs(ctx, nextJobsSequence(collector)))
-	require.NoError(t, collector.refreshDiag(ctx, nextDiagSequence(collector)))
+	require.NoError(t, collectOnce(ctx, collector))
 
 	// Restore the preserved time for GPU seconds calculations
 	currentState := collector.state.Load()
