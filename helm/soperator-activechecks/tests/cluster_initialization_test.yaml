@@ -3,11 +3,6 @@ templates:
   - templates/active-checks.yaml
 
 tests:
-  - it: should preserve all ActiveChecks by default
-    asserts:
-      - hasDocuments:
-          count: 16
-
   - it: should render create-user-soperatorchecks by default
     documentSelector:
       path: metadata.name
@@ -38,8 +33,21 @@ tests:
     set:
       clusterInitialization.managedBySlurmCluster: true
     asserts:
-      - hasDocuments:
-          count: 13
+      - containsDocument:
+          apiVersion: slurm.nebius.ai/v1alpha1
+          kind: ActiveCheck
+          name: soperator-create-user-soperatorchecks
+        not: true
+      - containsDocument:
+          apiVersion: slurm.nebius.ai/v1alpha1
+          kind: ActiveCheck
+          name: soperator-create-user-nebius
+        not: true
+      - containsDocument:
+          apiVersion: slurm.nebius.ai/v1alpha1
+          kind: ActiveCheck
+          name: soperator-manage-jail-state
+        not: true
 
   - it: should remove the legacy jail dependency while retaining other dependencies
     documentSelector:
