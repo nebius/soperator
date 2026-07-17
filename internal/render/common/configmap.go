@@ -312,8 +312,6 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("PropagateResourceLimits", "NONE") // Don't propagate ulimits from the login node by default
 	res.AddComment("")
-	res.AddProperty("SchedulerParameters", "nohold_on_prolog_fail,extra_constraints,pack_serial_at_end,salloc_wait_nodes,sbatch_wait_nodes")
-	res.AddComment("")
 
 	if cluster.HealthCheckConfig != nil {
 		res.AddComment("HEALTH CHECKS")
@@ -378,6 +376,23 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	res.AddComment("SCHEDULING")
 	res.AddProperty("SchedulerType", "sched/backfill")
+	res.AddProperty("SchedulerParameters",
+		strings.Join([]string{
+			"nohold_on_prolog_fail", // allows jobs to be dispatched to another hosts during requeue
+			"extra_constraints",     // enables filtering nodes with the --extra option
+			"pack_serial_at_end",    // reduces resource fragmentation for some workloads with select/cons_tres plugin
+			"salloc_wait_nodes",     // wait until all allocated nodes are ready for use in salloc
+			"sbatch_wait_nodes",     // wait until all allocated nodes are ready for use in sbatch
+			"defer_batch",           // avoid attempting to schedule each batch job individually at job submit time
+			"max_rpc_cnt=100",       // maximum number of threads before deferring job scheduling
+			// sched/backfill
+			"bf_continue",            // resume mid-cycle instead of restarting from the top after releasing the lock
+			"bf_max_time=60",         // maximum time the backfill scheduler can spend before discontinuing (s)
+			"bf_max_job_test=1000",   // maximum number of jobs to attempt scheduling for
+			"bf_max_job_part=300",    // maximum number of jobs per partition to attempt starting with the scheduler
+			"bf_running_job_reserve", // creates backfill reservations for jobs running on whole nodes
+		}, ","),
+	)
 	res.AddProperty("SelectType", "select/cons_tres")
 	res.AddProperty("SelectTypeParameters", "CR_Core_Memory,CR_CORE_DEFAULT_DIST_BLOCK")
 	res.AddComment("")
