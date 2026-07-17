@@ -42817,6 +42817,15 @@ spec:
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
                           Must correspond to the name of one of [K8sNodeFilter]
                         type: string
+                      maxCollectorInflight:
+                        default: 1
+                        description: |-
+                          MaxCollectorInflight limits concurrent runs of the same exporter sub-collector.
+                          A value greater than 1 allows overlapping runs for clusters loaded with jobs and nodes to avoid missing metrics,
+                          while 1 keeps the safer default of one in-flight run per collector.
+                        format: int32
+                        minimum: 1
+                        type: integer
                       munge:
                         description: Munge represents the Slurm munge configuration
                         properties:

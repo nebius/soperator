@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -52,6 +53,7 @@ type Flags struct {
 	clusterNamespace       string
 	clusterName            string
 	collectionInterval     string
+	maxCollectorInflight   string
 	jobSource              string
 	accountingJobsLookback string
 
@@ -114,6 +116,7 @@ func parseFlags() Flags {
 		{"cluster-namespace", "SLURM_EXPORTER_CLUSTER_NAMESPACE", "soperator", "The namespace of the Slurm cluster", &flags.clusterNamespace},
 		{"cluster-name", "SLURM_EXPORTER_CLUSTER_NAME", "", "The name of the Slurm cluster (required)", &flags.clusterName},
 		{"collection-interval", "SLURM_EXPORTER_COLLECTION_INTERVAL", "30s", "How often to collect metrics from SLURM APIs", &flags.collectionInterval},
+		{"max-collector-inflight", "SLURM_EXPORTER_MAX_COLLECTOR_INFLIGHT", "1", "Maximum in-flight runs per exporter sub-collector", &flags.maxCollectorInflight},
 		{"job-source", "SLURM_EXPORTER_JOB_SOURCE", "controller", "SLURM job source: controller (Slurm controller API) or accounting (Slurm accounting API)", &flags.jobSource},
 		{"accounting-jobs-lookback", "SLURM_EXPORTER_ACCOUNTING_JOBS_LOOKBACK", "1h", "when --job-source=accounting, the size of the time window queried from the accounting API ([now - lookback, now + 5m]).", &flags.accountingJobsLookback},
 		{"scontrol-path", "SLURM_EXPORTER_SCONTROL_PATH", "scontrol", "Path to scontrol command for standalone mode", &flags.scontrolPath},
@@ -168,6 +171,17 @@ func parseDuration(s string) (time.Duration, error) {
 		return gd, nil
 	}
 	return 0, promErr
+}
+
+func parseMaxCollectorInflight(s string) (int, error) {
+	value, err := strconv.Atoi(strings.TrimSpace(s))
+	if err != nil {
+		return 0, err
+	}
+	if value < 1 {
+		return 0, fmt.Errorf("must be > 0")
+	}
+	return value, nil
 }
 
 func buildJobListParams(flags Flags) (slurmapi.ListJobsParams, error) {
@@ -291,6 +305,10 @@ func main() {
 	if err != nil {
 		cli.Fail(log, err, "Failed to parse collection interval")
 	}
+	maxCollectorInflight, err := parseMaxCollectorInflight(flags.maxCollectorInflight)
+	if err != nil {
+		cli.Fail(log, err, "Failed to parse max collector inflight")
+	}
 
 	jobListParams, err := buildJobListParams(flags)
 	if err != nil {
@@ -300,10 +318,11 @@ func main() {
 	clusterExporter := exporter.NewClusterExporter(
 		slurmAPIClient,
 		exporter.Params{
-			SlurmAPIServer:     flags.slurmAPIServer,
-			SlurmClusterID:     slurmClusterID,
-			CollectionInterval: interval,
-			JobListParams:      jobListParams,
+			SlurmAPIServer:       flags.slurmAPIServer,
+			SlurmClusterID:       slurmClusterID,
+			CollectionInterval:   interval,
+			MaxCollectorInflight: maxCollectorInflight,
+			JobListParams:        jobListParams,
 		},
 	)
 

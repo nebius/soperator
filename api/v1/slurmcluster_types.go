@@ -1129,6 +1129,15 @@ type SlurmExporter struct {
 	// +kubebuilder:default="30s"
 	CollectionInterval prometheusv1.Duration `json:"collectionInterval,omitempty"`
 
+	// MaxCollectorInflight limits concurrent runs of the same exporter sub-collector.
+	// A value greater than 1 allows overlapping runs for clusters loaded with jobs and nodes to avoid missing metrics,
+	// while 1 keeps the safer default of one in-flight run per collector.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	MaxCollectorInflight int32 `json:"maxCollectorInflight,omitempty"`
+
 	// JobSource selects the Slurm API used for job collection.
 	//
 	// "controller" reads jobs from the Slurm controller API (default, current behavior).
@@ -1529,6 +1538,9 @@ func (s *SlurmExporter) SetDefaults() {
 	}
 	if s.JobSource == "" {
 		s.JobSource = "controller"
+	}
+	if s.MaxCollectorInflight == 0 {
+		s.MaxCollectorInflight = 1
 	}
 	if s.AccountingJobsLookback == "" {
 		s.AccountingJobsLookback = "1h"
