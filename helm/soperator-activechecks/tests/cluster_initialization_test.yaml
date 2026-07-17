@@ -1,0 +1,99 @@
+suite: test cluster initialization ownership
+templates:
+  - templates/active-checks.yaml
+
+tests:
+  - it: should preserve all ActiveChecks by default
+    asserts:
+      - hasDocuments:
+          count: 16
+
+  - it: should render create-user-soperatorchecks by default
+    documentSelector:
+      path: metadata.name
+      value: soperator-create-user-soperatorchecks
+    asserts:
+      - isKind:
+          of: ActiveCheck
+
+  - it: should render create-user-nebius by default
+    documentSelector:
+      path: metadata.name
+      value: soperator-create-user-nebius
+    asserts:
+      - contains:
+          path: spec.dependsOn
+          content: soperator-create-user-soperatorchecks
+
+  - it: should render manage-jail-state by default
+    documentSelector:
+      path: metadata.name
+      value: soperator-manage-jail-state
+    asserts:
+      - contains:
+          path: spec.dependsOn
+          content: soperator-create-user-soperatorchecks
+
+  - it: should suppress the three legacy initialization ActiveChecks in the new mode
+    set:
+      clusterInitialization.managedBySlurmCluster: true
+    asserts:
+      - hasDocuments:
+          count: 13
+
+  - it: should remove the legacy jail dependency while retaining other dependencies
+    documentSelector:
+      path: metadata.name
+      value: soperator-prepull-container-image
+    set:
+      clusterInitialization.managedBySlurmCluster: true
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - soperator-wait-for-soperatorchecks-srun-ready
+            - soperator-wait-for-topology
+
+  - it: should remove an only dependency on a legacy initialization check
+    documentSelector:
+      path: metadata.name
+      value: soperator-ssh-check
+    set:
+      clusterInitialization.managedBySlurmCluster: true
+    asserts:
+      - notExists:
+          path: spec.dependsOn
+
+  - it: should keep the force jail maintenance check without its legacy dependency
+    documentSelector:
+      path: metadata.name
+      value: soperator-manage-jail-state-force
+    set:
+      clusterInitialization.managedBySlurmCluster: true
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - notExists:
+          path: spec.dependsOn
+
+  - it: should keep the dry-run jail maintenance check without its legacy dependency
+    documentSelector:
+      path: metadata.name
+      value: soperator-manage-jail-state-dry-run
+    set:
+      clusterInitialization.managedBySlurmCluster: true
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - notExists:
+          path: spec.dependsOn
+
+  - it: should remove all legacy dependencies from the srun readiness check
+    documentSelector:
+      path: metadata.name
+      value: soperator-wait-for-soperatorchecks-srun-ready
+    set:
+      clusterInitialization.managedBySlurmCluster: true
+    asserts:
+      - notExists:
+          path: spec.dependsOn

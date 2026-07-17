@@ -1,4 +1,8 @@
 slurmClusterRefName: "soperator"
+clusterInitialization:
+  # Set to true once cluster initialization is handled by the slurm-cluster chart.
+  # This suppresses the legacy initialization ActiveChecks and their dependencies.
+  managedBySlurmCluster: false
 nodeSelector: {}
 affinity: {}
 tolerations: []

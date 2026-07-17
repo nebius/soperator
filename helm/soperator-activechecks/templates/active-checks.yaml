@@ -1,6 +1,9 @@
 {{- $root := . -}}
+{{- $managedBySlurmCluster := .Values.clusterInitialization.managedBySlurmCluster -}}
+{{- $legacyInitializationChecks := list "create-user-soperatorchecks" "create-user-nebius" "manage-jail-state" -}}
 {{- range $name, $check := .Values.checks }}
-{{- if $check.enabled }}
+{{- $legacyInitializationCheck := has $name $legacyInitializationChecks -}}
+{{- if and $check.enabled (not (and $managedBySlurmCluster $legacyInitializationCheck)) }}
 {{- include "soperator-activechecks.checkReactionsConflict" (dict "name" $name "vals" $root.Values) -}}
 ---
 apiVersion: slurm.nebius.ai/v1alpha1
@@ -10,7 +13,13 @@ metadata:
 spec:
   checkType: {{ $check.checkType | quote }}
   name: {{ printf "%s-%s" $root.Values.slurmClusterRefName $name | quote }}
-  {{- with $check.dependsOn }}
+  {{- $dependsOn := list -}}
+  {{- range $dependency := $check.dependsOn -}}
+    {{- if not (and $managedBySlurmCluster (has $dependency $legacyInitializationChecks)) -}}
+      {{- $dependsOn = append $dependsOn $dependency -}}
+    {{- end -}}
+  {{- end -}}
+  {{- with $dependsOn }}
   dependsOn:
     {{- range . }}
     - {{ printf "%s-%s" $root.Values.slurmClusterRefName . | quote }}
