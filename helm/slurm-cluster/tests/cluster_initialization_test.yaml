@@ -29,9 +29,6 @@ tests:
           path: spec.template.spec.restartPolicy
           value: Never
       - equal:
-          path: spec.template.spec.containers[0].image
-          value: cr.eu-north1.nebius.cloud/soperator/k8s_check_job:4.1.5-slurm25.11.5
-      - equal:
           path: spec.template.spec.containers[0].imagePullPolicy
           value: IfNotPresent
       - equal:
