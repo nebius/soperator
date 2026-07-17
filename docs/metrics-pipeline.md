@@ -104,7 +104,8 @@ Key Metrics:
   - 8081 - Telemetry endpoint (self-monitoring)
 - Metrics: Pod state metrics (filtered subset)
 - Deployment: Single replica deployment in `monitoring-system` namespace
-- Configuration: `--resources=pods` with metric allowlist filtering
+- Configuration: pod/node collectors with metric allowlist filtering
+- Scrape size: inherits the global vmagent scrape size by default; `observability.vmStack.values.kubeStateMetrics.maxScrapeSize` can raise the main `http` endpoint limit for large clusters
 
 Connection Example:
 ```bash
@@ -117,20 +118,33 @@ Note: Port 8080 provides Kubernetes object metrics, while port 8081 provides sel
 
 #### 6. Soperator Controller Metrics
 - Purpose: Exports controller runtime metrics
-- Port: 8443 (through kube-rbac-proxy)
+- Port: 8443 (controller-runtime secure metrics)
 - Metrics: Reconciliation metrics, controller health
 - Deployment: Runs on system nodes with the controller manager
 - Namespace: `soperator-system`
-- Access: Protected by RBAC proxy, requires proper authentication
+- Access: Protected by controller-runtime authn/authz, requires proper authentication
 
 Connection Example:
 ```bash
-# Port-forward to controller (bypasses RBAC)
-kubectl port-forward -n soperator-system deployment/soperator-controller-manager 8080:8080
-curl http://localhost:8080/metrics
+# Port-forward to controller metrics and authenticate with a token allowed to get /metrics
+kubectl port-forward -n soperator-system deployment/soperator-controller-manager 8443:8443
+curl -k -H "Authorization: Bearer ${TOKEN}" https://localhost:8443/metrics
 ```
 
 Note: Production scraping requires a ServiceMonitor with proper RBAC authentication.
+
+#### 7. NCCL Profiles Collector
+- Purpose: Reads NCCL profile files from the jail filesystem and exports metrics through an OpenTelemetry collector
+- Deployment: Single deployment on system nodes by default, or DaemonSet on worker nodes with `observability.ncclProfiles.values.mode: nodeLocal`
+- Storage: Uses file storage under `/var/lib/otelcol` when `observability.ncclProfiles.values.enableFileStorage` is enabled
+- Runtime limits: Sets `GOMAXPROCS` from `observability.ncclProfiles.values.resources`; passes `useGoMemLimit` through to upstream `useGOMEMLIMIT`
+
+The NCCL profiles collector follows the same Go runtime sizing rules as the log collectors:
+
+- CPU limits are preferred over CPU requests; values are rounded up to at least one process (`500m` -> `1`, `2` -> `2`).
+- When `useGoMemLimit` is enabled, the upstream OpenTelemetry collector chart derives `GOMEMLIMIT` from `resources.limits.memory`.
+- Upstream `GOMEMLIMIT` targets about 80% of the memory limit and does not fall back to memory requests.
+- When `spec.values.useGOMEMLIMIT` is false, the upstream chart does not inject a `GOMEMLIMIT` environment variable.
 
 ### Metrics Processing & Storage
 

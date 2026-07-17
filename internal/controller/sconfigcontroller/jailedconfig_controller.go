@@ -62,6 +62,7 @@ type JailedConfigReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
+	clusterName             string
 	slurmAPIClient          slurmapi.Client
 	clock                   Clock
 	fs                      Fs
@@ -188,6 +189,10 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig) (ctrl.Result, error) {
 	logger := logf.FromContext(ctx)
+
+	if jailedConfig.Labels[consts.LabelInstanceKey] != r.clusterName {
+		return ctrl.Result{}, nil
+	}
 
 	err := r.shouldInitializeConditions(ctx, jailedConfig)
 	if err != nil {
@@ -327,11 +332,14 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig, aggregationKey string) (ctrl.Result, error) {
 	logger := logf.FromContext(ctx)
 
-	// Get all JailedConfigs with the same aggregation key in the same namespace
+	// Get all JailedConfigs with the same aggregation key and cluster name
 	jailedConfigs := &slurmv1alpha1.JailedConfigList{}
 	err := r.Client.List(ctx, jailedConfigs,
 		client.InNamespace(jailedConfig.Namespace),
-		client.MatchingLabels{consts.LabelJailedAggregationKey: aggregationKey},
+		client.MatchingLabels{
+			consts.LabelJailedAggregationKey: aggregationKey,
+			consts.LabelInstanceKey:          r.clusterName,
+		},
 	)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("listing JailedConfigs with aggregation key %q: %w", aggregationKey, err)
@@ -557,6 +565,7 @@ func (r *JailedConfigReconciler) shouldInitializeConditions(ctx context.Context,
 func NewJailedConfigReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
+	clusterName string,
 	slurmAPIClient slurmapi.Client,
 	fs Fs,
 	reconfigurePollInterval time.Duration,
@@ -571,6 +580,7 @@ func NewJailedConfigReconciler(
 	return &JailedConfigReconciler{
 		Client:                  client,
 		Scheme:                  scheme,
+		clusterName:             clusterName,
 		slurmAPIClient:          slurmAPIClient,
 		fs:                      fs,
 		reconfigurePollInterval: reconfigurePollInterval,
