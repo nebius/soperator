@@ -3,10 +3,10 @@ templates:
   - templates/active-checks.yaml
 
 tests:
-  - it: should render cuda-samples active check
+  - it: should render gpu-checks active check
     documentSelector:
       path: metadata.name
-      value: soperator-cuda-samples
+      value: soperator-gpu-checks
     asserts:
       - isKind:
           of: ActiveCheck
@@ -21,10 +21,10 @@ tests:
           value: false
       - contains:
           path: spec.dependsOn
-          content: soperator-prepull-container-image
+          content: soperator-manage-jail-state
       - matchRegex:
           path: spec.slurmJobSpec.sbatchScript
           pattern: 'health-checker run'
       - matchRegex:
           path: spec.slurmJobSpec.sbatchScript
-          pattern: 'Running cuda samples check'
+          pattern: 'Running GPU checks'

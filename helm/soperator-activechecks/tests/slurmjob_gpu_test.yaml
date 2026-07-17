@@ -5,7 +5,7 @@ tests:
   - it: should render default SBATCH_GPUS_PER_NODE for GPU slurm jobs
     documentSelector:
       path: metadata.name
-      value: soperator-cuda-samples
+      value: soperator-gpu-checks
     asserts:
       - contains:
           path: spec.slurmJobSpec.jobContainer.env
@@ -16,7 +16,7 @@ tests:
   - it: should render overridden SBATCH_GPUS_PER_NODE for GPU slurm jobs
     documentSelector:
       path: metadata.name
-      value: soperator-cuda-samples
+      value: soperator-gpu-checks
     set:
       slurmJob:
         gpusPerNode: "4"
