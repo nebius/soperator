@@ -101,6 +101,42 @@ func TestMetricsCollector_RefreshDiagDropsStaleSequence(t *testing.T) {
 	assert.Equal(t, int32(2), *state.diag.Statistics.ServerThreadCount)
 }
 
+func TestMetricsCollector_PreservesLastSuccessfulJobsOnRefreshFailure(t *testing.T) {
+	mockClient := &fake.MockClient{}
+	collector := newTestMetricsCollector(mockClient)
+	registry := prometheus.NewRegistry()
+	require.NoError(t, collector.Monitoring.Register(registry))
+
+	mockClient.EXPECT().ListNodes(mock.Anything).Return([]slurmapi.Node{}, nil).Once()
+	mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).
+		Return([]slurmapi.Job{{ID: 123, Name: "last-good-job", State: "RUNNING"}}, nil).Once()
+	mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
+	require.NoError(t, collectOnce(context.Background(), collector))
+
+	mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return(nil, assert.AnError).Once()
+	require.Error(t, collector.refreshJobs(context.Background(), 0))
+
+	state := collector.state.Load()
+	require.Len(t, state.jobs, 1)
+	assert.Equal(t, int32(123), state.jobs[0].ID)
+
+	ch := make(chan prometheus.Metric, 20)
+	go func() {
+		collector.Collect(ch)
+		close(ch)
+	}()
+
+	var metricsText []string
+	for metric := range ch {
+		metricsText = append(metricsText, toPrometheusLikeString(t, metric))
+	}
+	assert.Contains(t, strings.Join(metricsText, "\n"), `job_id="123"`)
+
+	families, err := registry.Gather()
+	require.NoError(t, err)
+	assert.Equal(t, float64(1), collectorErrorValue(families, "jobs"))
+}
+
 // Helper function to setup mocks and collect state for tests
 func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *fake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *api.V0041OpenapiDiagResp) {
 	mockClient.EXPECT().ListNodes(mock.Anything).Return(nodes, nil).Once()
