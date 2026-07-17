@@ -262,11 +262,12 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		controllerHostname := cluster.NodeController.StatefulSet.Name + "-0"
 		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", controllerHostname, svcName))
 	}
-
 	res.AddComment("")
+
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
 	res.AddProperty("CredType", "cred/"+consts.Munge)
 	res.AddComment("")
+
 	res.AddComment("SlurmConfig Spec")
 	addSlurmConfigProperties(res, cluster.SlurmConfig)
 	res.AddComment("")
@@ -281,14 +282,18 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("ProctrackType", "proctrack/cgroup")
 	res.AddProperty("ReturnToService", 2)
 	res.AddComment("")
+
 	res.AddProperty("SlurmctldPidFile", "/var/run/"+consts.SlurmctldName+".pid")
 	res.AddProperty("SlurmctldPort", cluster.NodeController.ContainerSlurmctld.Port)
+	res.AddComment("")
+
 	// Slurm silently disables the metrics plugin if PrivateData is set in
 	// the generated Slurm config. Don't add a PrivateData property anywhere in this file.
 	if om := cluster.NodeController.OpenMetrics; om.Enabled == nil || *om.Enabled {
 		res.AddProperty("MetricsType", "metrics/openmetrics")
+		res.AddComment("")
 	}
-	res.AddComment("")
+
 	res.AddProperty("SlurmdPidFile", "/var/run/"+consts.SlurmdName+".pid")
 	res.AddComment("")
 	res.AddProperty("SlurmdSpoolDir", naming.BuildVolumeMountSpoolPath(consts.SlurmdName))
@@ -309,21 +314,23 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("SchedulerParameters", "nohold_on_prolog_fail,extra_constraints,pack_serial_at_end,salloc_wait_nodes,sbatch_wait_nodes")
 	res.AddComment("")
-	res.AddComment("HEALTH CHECKS")
-	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
 
 	if cluster.HealthCheckConfig != nil {
+		res.AddComment("HEALTH CHECKS")
+		res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
+
 		res.AddProperty("HealthCheckInterval", cluster.HealthCheckConfig.HealthCheckInterval)
 		res.AddProperty("HealthCheckProgram", cluster.HealthCheckConfig.HealthCheckProgram)
 
-		var states []string
-		for _, state := range cluster.HealthCheckConfig.HealthCheckNodeState {
-			states = append(states, state.State)
+		states := make([]string, len(cluster.HealthCheckConfig.HealthCheckNodeState))
+		for i, state := range cluster.HealthCheckConfig.HealthCheckNodeState {
+			states[i] = state.State
 		}
 		res.AddProperty("HealthCheckNodeState", strings.Join(states, ","))
+
+		res.AddComment("")
 	}
 
-	res.AddComment("")
 	res.AddProperty("InactiveLimit", 0)
 	res.AddProperty("KillOnBadExit", 1)
 	res.AddProperty("KillWait", 180)
@@ -332,19 +339,31 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SlurmdTimeout", 180)
 	res.AddProperty("TCPTimeout", 15)
 	res.AddProperty("WaitTime", 0)
+	res.AddComment("")
+
 	total := totalWorkerNodes(cluster)
-	connMax := max(int32(1024), nextPow2(total*2))
-	if cluster.HasEphemeralNodes() {
-		res.AddProperty("SlurmctldParameters", fmt.Sprintf("conmgr_max_connections=%d,conmgr_threads=32,cloud_dns,idle_on_node_suspend", connMax))
-	} else {
-		res.AddProperty("SlurmctldParameters", fmt.Sprintf("conmgr_max_connections=%d,conmgr_threads=32", connMax))
+
+	{
+		connMax := max(int32(1024), nextPow2(total*2))
+		slurmCtldParams := []string{
+			fmt.Sprintf("conmgr_max_connections=%d", connMax),
+			"conmgr_threads=32",
+		}
+		if cluster.HasEphemeralNodes() {
+			slurmCtldParams = append(slurmCtldParams, []string{
+				"cloud_dns",
+				"idle_on_node_suspend",
+			}...)
+		}
+		res.AddProperty("SlurmctldParameters", strings.Join(slurmCtldParams, ","))
 	}
+	res.AddComment("")
 
 	res.AddProperty("RebootProgram", "/opt/bin/slurm/reboot.sh")
 	res.AddProperty("ResumeTimeout", 1800)
+	res.AddComment("")
 
 	// Power management for ephemeral nodes
-	res.AddComment("")
 	res.AddComment("POWER MANAGEMENT (ephemeral nodes)")
 	res.AddProperty("ResumeProgram", "/opt/soperator/bin/power_resume.sh")
 	res.AddProperty("SuspendProgram", "/opt/soperator/bin/power_suspend.sh")
@@ -355,13 +374,14 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	if suspendExcNodes := buildSuspendExcNodes(cluster); suspendExcNodes != "" {
 		res.AddProperty("SuspendExcNodes", suspendExcNodes)
 	}
-
 	res.AddComment("")
+
 	res.AddComment("SCHEDULING")
 	res.AddProperty("SchedulerType", "sched/backfill")
 	res.AddProperty("SelectType", "select/cons_tres")
 	res.AddProperty("SelectTypeParameters", "CR_Core_Memory,CR_CORE_DEFAULT_DIST_BLOCK")
 	res.AddComment("")
+
 	res.AddComment("LOGGING")
 	res.AddProperty("SlurmctldDebug", consts.SlurmDefaultDebugLevel)
 	res.AddProperty("SlurmctldLogFile", consts.SlurmLogFile)
@@ -369,6 +389,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SlurmdLogFile", consts.SlurmLogFile)
 	res.AddProperty("DebugFlags", "Script,Power")
 	res.AddComment("")
+
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
 	res.AddProperty("MaxNodeCount", max(int32(1024), nextPow2(total*2)))
@@ -376,8 +397,8 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("JobRequeue", 1)
 	res.AddProperty("PreemptMode", "REQUEUE")
 	res.AddProperty("PreemptType", "preempt/partition_prio")
-	res.AddComment("Partition Configuration")
 
+	res.AddComment("Partition Configuration")
 	switch cluster.PartitionConfiguration.ConfigType {
 	case slurmv1.PartitionConfigTypeCustom:
 		for _, l := range cluster.PartitionConfiguration.RawConfig {
@@ -387,6 +408,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 				res.AddProperty("PartitionName", clearLine)
 			}
 		}
+
 	case slurmv1.PartitionConfigTypeStructured:
 		AddNodesToSlurmConfig(res, cluster)
 		AddPartitionsToSlurmConfig(res, cluster)
@@ -396,9 +418,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP OverSubscribe=YES")
 		res.AddProperty("PartitionName", "hidden Nodes=ALL Default=NO PriorityTier=10 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
 	}
+	res.AddComment("")
 
 	if cluster.NodeAccounting.Enabled {
-		res.AddComment("")
 		res.AddComment("ACCOUNTING")
 		res.AddProperty("AccountingStorageType", "accounting_storage/slurmdbd")
 		res.AddProperty("AccountingStorageHost", naming.BuildServiceFQDN(
