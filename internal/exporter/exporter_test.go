@@ -131,8 +131,15 @@ func TestExporterCollectionLoopAllowsConfiguredOverlap(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 	assert.Equal(t, int32(2), jobsCalls.Load())
 
-	cancel()
 	close(releaseJobs)
+
+	require.Eventually(t, func() bool {
+		families, err := registry.Gather()
+		require.NoError(t, err)
+		return counterValue(families, "slurm_exporter_collection_attempts_total") >= 1
+	}, time.Second, 10*time.Millisecond)
+
+	cancel()
 
 	select {
 	case <-loopDone:

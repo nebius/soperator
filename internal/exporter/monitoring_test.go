@@ -156,6 +156,16 @@ func collectorCounterValue(families []*dto.MetricFamily, metricName, collector s
 	return 0
 }
 
+func counterValue(families []*dto.MetricFamily, metricName string) float64 {
+	for _, mf := range families {
+		if mf.GetName() != metricName || len(mf.GetMetric()) == 0 {
+			continue
+		}
+		return mf.GetMetric()[0].GetCounter().GetValue()
+	}
+	return 0
+}
+
 func TestMonitoringMetrics_RecordMetricsRequest(t *testing.T) {
 	metrics := NewMonitoringMetrics()
 	registry := prometheus.NewRegistry()

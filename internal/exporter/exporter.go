@@ -177,7 +177,6 @@ func (e *Exporter) collectionLoop(ctx context.Context) {
 		}
 
 		if !started {
-			e.monitoringMetrics.RecordCollection(0, nil)
 			return
 		}
 		go func() {
