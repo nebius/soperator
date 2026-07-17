@@ -133,28 +133,6 @@ checks:
     runAfterCreation: true
     slurmJobSpec:
       sbatchScriptFile: "scripts/ensure-healthy-nodes.sh"
-  ib-gpu-perf:
-    enabled: true
-    checkType: "slurmJob"
-    dependsOn:
-      - "manage-jail-state"
-      - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
-      - "prepull-container-image"
-    schedule: "55 1-21/4 * * *"
-    suspend: false
-    runAfterCreation: true
-    slurmJobSpec:
-      sbatchScriptFile: "scripts/ib-gpu-perf.sh"
-      eachWorkerJobs: true
-      maxNumberOfJobs: 200
-      jobContainer:
-        extraEnv:
-          - name: "SBATCH_GPUS_PER_NODE"
-            value: "{{ .Values.slurmJob.gpusPerNode }}"
-    failureReactions:
-      commentSlurmNode:
-        commentPrefix: "[node_problem]"
   ssh-check:
     enabled: true
     checkType: "k8sJob"
