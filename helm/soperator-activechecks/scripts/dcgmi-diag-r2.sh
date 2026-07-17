@@ -23,7 +23,7 @@ fi
 
 echo "Platform found: $platform"
 echo "Running dcgmi_diag_r2 check on $(hostname)..."
-HC_OUTPUT=$(srun --cpu-bind=cores sudo bash -l -c "health-checker run -e soperator -p $platform -n dcgmi_diag_r2 -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout")
+HC_OUTPUT=$(srun sudo bash -l -c "health-checker run -e soperator -p $platform -n dcgmi_diag_r2 -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info")
 
 echo "Health checker output:"
 echo "$HC_OUTPUT"
