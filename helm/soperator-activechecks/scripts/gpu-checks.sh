@@ -23,7 +23,7 @@ fi
 
 echo "Platform found: $platform"
 echo "Running GPU checks on $(hostname)..."
-HC_OUTPUT=$(srun sudo bash -l -c "health-checker run -e soperator_active_checks -p $platform -x '^ib_write_bw_gpu.*$,^ib_send_lat_gpu.*$,^ib_read_lat_gpu.*$' -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info")
+HC_OUTPUT=$(srun sudo bash -l -c "health-checker run -e soperator_active_checks -p $platform -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info")
 
 echo "Health checker output:"
 echo "$HC_OUTPUT"
