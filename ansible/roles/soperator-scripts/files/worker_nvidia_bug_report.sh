@@ -6,7 +6,7 @@ usage() {
     echo "Get NVIDIA bug report from a worker node." >&2
     echo "" >&2
     echo "usage: ${0} [-w worker_name] [-i instance_id] [-h]" >&2
-    echo "       (either -w or -i must be set)"
+    echo "       (either -w or -i must be set)" >&2
     exit 1
 }
 

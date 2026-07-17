@@ -3,7 +3,7 @@ fullnameOverride: ""
 image:
   repository: cr.eu-north1.nebius.cloud/soperator/nfs-server
   pullPolicy: IfNotPresent
-  tag: "1.2.0"
+  tag: "1.2.1"
 imagePullSecrets: []
 # NFS Server Configuration
 nfs:
@@ -19,6 +19,8 @@ nfs:
   graceTime: 10
   leaseTime: 10
   threads: 8
+  # Replicas must be 0 or 1, we can't have more than one NFS server instance
+  replicas: 1
 # Storage configuration for the backing volume
 storage:
   # Create a new volume with volumeClaimTemplates

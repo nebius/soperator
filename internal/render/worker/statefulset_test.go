@@ -1,12 +1,14 @@
 package worker_test
 
 import (
+	"strconv"
 	"testing"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -46,15 +48,18 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			true,
 			300,
 			consts.SlurmTopologyBlock,
+			"fab-test",
+			0,
 		)
 
 		assert.Equal(t, consts.ContainerNameWorkerInit, result.Name)
 		assert.Equal(t, container.Image, result.Image)
 		assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller", "wait-topology"}, result.Command)
-		assert.Equal(t, 11, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 4 topology
+		assert.Equal(t, 12, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 5 topology
 		assert.Equal(t, 3, len(result.VolumeMounts))
 		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
+		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_FABRIC", "fab-test")
 
 		expectedMounts := map[string]string{
 			consts.VolumeNameJail:               consts.VolumeMountPathJail,
@@ -77,6 +82,8 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			false,
 			0,
 			"",
+			"",
+			0,
 		)
 
 		assert.Equal(t, consts.ContainerNameWorkerInit, result.Name)
@@ -105,8 +112,42 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 				"TOPOLOGY_WAIT_TIMEOUT",
 				"TOPOLOGY_POLL_INTERVAL",
 				"SLURM_TOPOLOGY_PLUGIN",
+				"SLURM_TOPOLOGY_FABRIC",
 			}, envVar.Name,
 				"topology env var %s should not be present when topology is disabled", envVar.Name)
+		}
+	})
+
+	t.Run("random delay env present when positive", func(t *testing.T) {
+		result := worker.RenderContainerWorkerInit(
+			"test-cluster",
+			container,
+			false,
+			false,
+			0,
+			"",
+			"",
+			120,
+		)
+
+		assertEnvValue(t, result.Env, "WORKER_INIT_RANDOM_DELAY_SECONDS", "120")
+	})
+
+	t.Run("random delay env absent when zero", func(t *testing.T) {
+		result := worker.RenderContainerWorkerInit(
+			"test-cluster",
+			container,
+			false,
+			false,
+			0,
+			"",
+			"",
+			0,
+		)
+
+		for _, envVar := range result.Env {
+			assert.NotEqual(t, "WORKER_INIT_RANDOM_DELAY_SECONDS", envVar.Name,
+				"random delay env var should not be present when delay is 0")
 		}
 	})
 }
@@ -169,6 +210,8 @@ func Test_RenderContainerWorkerInit_K8SServiceName(t *testing.T) {
 				tt.gpuEnabled,
 				0,
 				"",
+				"",
+				0,
 			)
 
 			env, found := findEnv(result.Env, "K8S_SERVICE_NAME")
@@ -267,6 +310,98 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 	}
 }
 
+func TestRenderNodeSetStatefulSet_HostJournalMount(t *testing.T) {
+	nodeSet := &values.SlurmNodeSet{
+		Name: "test-nodeset",
+		ParentalCluster: client.ObjectKey{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
+		},
+		ContainerSlurmd: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image:           "test-image",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory:           resource.MustParse("1Gi"),
+					corev1.ResourceCPU:              resource.MustParse("100m"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+		ContainerMunge: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "munge-image",
+			},
+		},
+		VolumeSpool: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+		},
+		VolumeJail: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+		},
+		StatefulSet: values.StatefulSet{
+			Replicas: 1,
+		},
+		ServiceUmbrella:          values.Service{Name: "test-umbrella"},
+		SupervisorDConfigMapName: "supervisord-config",
+		SSHDConfigMapName:        "sshd-config",
+		GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+	}
+
+	result, err := worker.RenderNodeSetStatefulSet(
+		"test-cluster",
+		nodeSet,
+		&slurmv1.Secrets{},
+		consts.CGroupV2,
+		false,
+		false,
+		"",
+	)
+	assert.NoError(t, err)
+
+	var journalVolume *corev1.Volume
+	for i := range result.Spec.Template.Spec.Volumes {
+		volume := &result.Spec.Template.Spec.Volumes[i]
+		if volume.Name == consts.VolumeNameHostLogJournal {
+			journalVolume = volume
+			break
+		}
+	}
+	if assert.NotNil(t, journalVolume, "worker pod should have host journal volume") &&
+		assert.NotNil(t, journalVolume.HostPath, "host journal volume should be HostPath") {
+		assert.Equal(t, consts.VolumeHostPathJournal, journalVolume.HostPath.Path)
+		if assert.NotNil(t, journalVolume.HostPath.Type) {
+			assert.Empty(t, *journalVolume.HostPath.Type)
+		}
+	}
+
+	var slurmdContainer *corev1.Container
+	for i := range result.Spec.Template.Spec.Containers {
+		container := &result.Spec.Template.Spec.Containers[i]
+		if container.Name == consts.ContainerNameSlurmd {
+			slurmdContainer = container
+			break
+		}
+	}
+	if !assert.NotNil(t, slurmdContainer, "worker pod should have slurmd container") {
+		return
+	}
+
+	var journalMount *corev1.VolumeMount
+	for i := range slurmdContainer.VolumeMounts {
+		mount := &slurmdContainer.VolumeMounts[i]
+		if mount.Name == consts.VolumeNameHostLogJournal {
+			journalMount = mount
+			break
+		}
+	}
+	if assert.NotNil(t, journalMount, "slurmd container should mount host journal") {
+		assert.Equal(t, consts.VolumeMountPathHostLogJournal, journalMount.MountPath)
+		assert.Equal(t, consts.VolumeMountPathJailUpper+"/var/hostlog/journal", journalMount.MountPath)
+		assert.True(t, journalMount.ReadOnly)
+	}
+}
+
 func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 	createNodeSet := func(ephemeralNodes *bool, waitTimeout int32) *values.SlurmNodeSet {
 		return &values.SlurmNodeSet{
@@ -303,6 +438,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			SupervisorDConfigMapName:     "supervisord-config",
 			SSHDConfigMapName:            "sshd-config",
 			GPU:                          &slurmv1alpha1.GPUSpec{Enabled: false},
+			DockerEnabled:                true,
 			EphemeralNodes:               ephemeralNodes,
 			EphemeralTopologyWaitTimeout: waitTimeout,
 		}
@@ -373,6 +509,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			// Verify init container count
 			assert.Len(t, result.Spec.Template.Spec.InitContainers, tt.expectedInitContainerCount,
 				"expected %d init containers", tt.expectedInitContainerCount)
+			assert.Len(t, result.Spec.Template.Spec.Containers, 2, "expected slurmd and docker-proxy containers")
 
 			// Verify worker-init container has topology command when topology plugin is enabled
 			var hasWaitForTopology bool
@@ -410,6 +547,119 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			}
 			assert.Equal(t, tt.expectTopologyVolumes, hasTopologyNodeLabelsVolume,
 				"topology-node-labels volume presence mismatch")
+
+			var hasRuntimeVolume bool
+			var hasDockerProxyContainer bool
+			for _, volume := range result.Spec.Template.Spec.Volumes {
+				if volume.Name == consts.VolumeNameRuntime {
+					hasRuntimeVolume = true
+					assert.NotNil(t, volume.EmptyDir, "runtime volume should be EmptyDir")
+				}
+			}
+			for _, container := range result.Spec.Template.Spec.Containers {
+				if container.Name == consts.ContainerNameDockerProxy {
+					hasDockerProxyContainer = true
+					assert.Equal(t, nodeSet.ContainerSlurmd.Image, container.Image)
+					assert.Equal(t, []string{"/opt/bin/slurm/docker_proxy_nginx_entrypoint.sh"}, container.Command)
+					assert.Len(t, container.VolumeMounts, 1)
+					assert.Equal(t, consts.VolumeNameRuntime, container.VolumeMounts[0].Name)
+					assert.Equal(t, consts.VolumeMountPathRuntime, container.VolumeMounts[0].MountPath)
+				}
+				if container.Name == consts.ContainerNameSlurmd {
+					var hasRuntimeMount bool
+					for _, mount := range container.VolumeMounts {
+						if mount.Name == consts.VolumeNameRuntime && mount.MountPath == consts.VolumeMountPathRuntime {
+							hasRuntimeMount = true
+							break
+						}
+					}
+					assert.True(t, hasRuntimeMount, "slurmd container should mount shared runtime volume")
+				}
+			}
+			assert.True(t, hasRuntimeVolume, "runtime volume should be present")
+			assert.True(t, hasDockerProxyContainer, "docker-proxy sidecar should be present")
+		})
+	}
+}
+
+func TestRenderNodeSetStatefulSet_DockerEnabled(t *testing.T) {
+	createNodeSet := func(dockerEnabled bool) *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           "test-image",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory:           resource.MustParse("1Gi"),
+						corev1.ResourceCPU:              resource.MustParse("100m"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image: "munge-image",
+				},
+			},
+			VolumeSpool: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+			},
+			VolumeJail: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+			},
+			StatefulSet: values.StatefulSet{
+				Replicas: 1,
+			},
+			SupervisorDConfigMapName: "supervisord-config",
+			SSHDConfigMapName:        "sshd-config",
+			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+			DockerEnabled:            dockerEnabled,
+		}
+	}
+
+	tests := []struct {
+		name          string
+		dockerEnabled bool
+	}{
+		{
+			name:          "docker enabled renders docker-proxy sidecar",
+			dockerEnabled: true,
+		},
+		{
+			name:          "docker disabled omits docker-proxy sidecar",
+			dockerEnabled: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := worker.RenderNodeSetStatefulSet(
+				"test-cluster",
+				createNodeSet(tt.dockerEnabled),
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				false,
+				false,
+				"",
+			)
+			assert.NoError(t, err)
+
+			var hasDockerProxyContainer bool
+			for _, container := range result.Spec.Template.Spec.Containers {
+				if container.Name == consts.ContainerNameDockerProxy {
+					hasDockerProxyContainer = true
+				}
+				if container.Name == consts.ContainerNameSlurmd {
+					assertEnvValue(t, container.Env, consts.EnvDockerEnabled, strconv.FormatBool(tt.dockerEnabled))
+				}
+			}
+			assert.Equal(t, tt.dockerEnabled, hasDockerProxyContainer,
+				"docker-proxy sidecar presence mismatch")
 		})
 	}
 }
@@ -517,6 +767,92 @@ func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testin
 			if assert.NotNil(t, result.Spec.PersistentVolumeClaimRetentionPolicy) {
 				assert.Equal(t, tt.expectedWhenDeleted, result.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted)
 				assert.Equal(t, tt.expectedWhenScaled, result.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled)
+			}
+		})
+	}
+}
+
+func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
+	makeNodeSet := func(maxConcurrentStartup, maxUnavailable intstr.IntOrString) *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           "test-image",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory:           resource.MustParse("1Gi"),
+						corev1.ResourceCPU:              resource.MustParse("100m"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{Image: "munge-image"},
+			},
+			VolumeSpool: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"}},
+			VolumeJail:  corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"}},
+			StatefulSet: values.StatefulSet{
+				Replicas:             1,
+				MaxUnavailable:       maxUnavailable,
+				MaxConcurrentStartup: maxConcurrentStartup,
+			},
+			SupervisorDConfigMapName: "supervisord-config",
+			SSHDConfigMapName:        "sshd-config",
+			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+		}
+	}
+
+	tests := []struct {
+		name                       string
+		maxConcurrentStartup       intstr.IntOrString
+		maxUnavailable             intstr.IntOrString
+		expectedMaxConcurrentStart intstr.IntOrString
+		expectedMaxUnavailable     intstr.IntOrString
+	}{
+		{
+			name:                       "absolute MaxConcurrentStartup is propagated to ScaleStrategy",
+			maxConcurrentStartup:       intstr.FromInt32(500),
+			maxUnavailable:             intstr.FromString("20%"),
+			expectedMaxConcurrentStart: intstr.FromInt32(500),
+			expectedMaxUnavailable:     intstr.FromString("20%"),
+		},
+		{
+			name:                       "percentage MaxConcurrentStartup is propagated to ScaleStrategy",
+			maxConcurrentStartup:       intstr.FromString("10%"),
+			maxUnavailable:             intstr.FromInt32(1),
+			expectedMaxConcurrentStart: intstr.FromString("10%"),
+			expectedMaxUnavailable:     intstr.FromInt32(1),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := worker.RenderNodeSetStatefulSet(
+				"test-cluster",
+				makeNodeSet(tt.maxConcurrentStartup, tt.maxUnavailable),
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				true,
+				false,
+				"",
+			)
+			assert.NoError(t, err)
+
+			if assert.NotNil(t, result.Spec.ScaleStrategy) &&
+				assert.NotNil(t, result.Spec.ScaleStrategy.MaxUnavailable) {
+				assert.Equal(t, tt.expectedMaxConcurrentStart, *result.Spec.ScaleStrategy.MaxUnavailable,
+					"ScaleStrategy.MaxUnavailable should mirror StatefulSet.MaxConcurrentStartup")
+			}
+
+			if assert.NotNil(t, result.Spec.UpdateStrategy.RollingUpdate) &&
+				assert.NotNil(t, result.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable) {
+				assert.Equal(t, tt.expectedMaxUnavailable, *result.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
+					"UpdateStrategy.RollingUpdate.MaxUnavailable governs the update path and must not be affected")
 			}
 		})
 	}

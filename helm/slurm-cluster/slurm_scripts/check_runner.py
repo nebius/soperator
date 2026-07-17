@@ -53,10 +53,6 @@ class Check(typing.NamedTuple):
     # CPU-only jobs are not considered "partial GPU"
     skip_for_partial_gpu_jobs: bool = False
 
-    # Whether to skip this checks for nodes reserved with specific prefixes.
-    # Empty list means don't skip for any reservation.
-    skip_for_reservation_prefixes: list[str] = []
-
     # What contexts this check should run in.
     # Supported values:
     # - "any" - any context
@@ -125,7 +121,6 @@ class NodeInfo(typing.NamedTuple):
     state_flags: list[str] = []
     reason: str = ""
     comment: str = ""
-    reservation: str = ""
     real_memory_bytes: int = 0
 
 class JobInfo(typing.NamedTuple):
@@ -204,8 +199,6 @@ def filter_applicable_checks(checks: list[Check]) -> list[Check]:
     checks = filter_by_skip_for_partial_gpu_jobs(checks)
     # Filter by node_state (needs node info)
     checks = filter_by_node_state(checks)
-    # Filter by skip_for_reservation_prefixes (needs node info)
-    checks = filter_by_skip_for_reservation_prefixes(checks)
     return checks
 
 def filter_by_context(checks: list[Check]) -> list[Check]:
@@ -277,19 +270,6 @@ def filter_by_node_state(checks: list[Check]) -> list[Check]:
         )
     ]
 
-def filter_by_skip_for_reservation_prefixes(checks: list[Check]) -> list[Check]:
-    # Skip if all checks don't care
-    if all(len(check.skip_for_reservation_prefixes) == 0 for check in checks):
-        return checks
-    node_info = get_node_info()
-    return [
-        check for check in checks
-        if (
-            len(check.skip_for_reservation_prefixes) == 0 or
-            not node_info.reservation.startswith(tuple(check.skip_for_reservation_prefixes))
-        )
-    ]
-
 # Run a specific check
 def run_check(check: Check, in_jail=False):
     # Export environment variables requested by this check
@@ -347,6 +327,11 @@ def run_check(check: Check, in_jail=False):
         sys.exit(0)
 
     logging.info(f"Check {check.name}: OK")
+
+    # Please note that "undrain" and "uncomment" actions can be issues only from "hc_program" context.
+    if check.on_ok in ("undrain", "uncomment") and CHECKS_CONTEXT != "hc_program":
+        logging.info(f"Skipping on_ok={check.on_ok} in unsupported context {CHECKS_CONTEXT}")
+        return
 
     # Undrain / uncomment the Slurm node, if it was marked with the same reason
     if check.on_ok == "undrain" and "DRAIN" in get_node_info().state_flags:
@@ -443,7 +428,6 @@ def get_node_info() -> NodeInfo:
             state_flags=node.get("state", []),
             reason=node.get("reason", ""),
             comment=node.get("comment", ""),
-            reservation=node.get("reservation", ""),
             real_memory_bytes=(real_memory_mib * 1024 * 1024)
         )
         logging.info(f"Slurm node info: {json.dumps(info._asdict(), indent=2)}")

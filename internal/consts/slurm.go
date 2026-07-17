@@ -38,4 +38,8 @@ const (
 	SlurmConfigRawStrategyOverride = "override"
 	SlurmTopologyTree              = "topology/tree"
 	SlurmTopologyBlock             = "topology/block"
+
+	// SlurmTopologyDefaultFabric is the default IB fabric / top-of-tree switch name used for
+	// NodeSets without an explicit spec.topology.fabric. It preserves the legacy single-root tree.
+	SlurmTopologyDefaultFabric = "root"
 )

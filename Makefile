@@ -37,7 +37,7 @@ CHART_FLUXCD_BOOTSTRAP_PATH					= $(CHART_PATH)/soperator-fluxcd-bootstrap
 CHART_STORAGECLASSES						= $(CHART_PATH)/storageclasses
 CHART_BACKUP_CONFIG							= $(CHART_PATH)/soperator-backup-config
 
-SLURM_VERSION		= 25.11.3
+SLURM_VERSION		= 25.11.5
 NFS_VERSION_BASE	= $(shell cat VERSION_NFS)
 VERSION_BASE		= $(shell cat VERSION)
 
@@ -119,6 +119,10 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run tests.
 	go test ./...
 
+.PHONY: test-python
+test-python: ## Temporarily retained while removing Python unit tests from CI.
+	@echo "Python unit tests are disabled in CI."
+
 .PHONY: test-coverage
 test-coverage: manifests generate fmt vet envtest ## Run tests and generate test coverage.
 	go test ./... -coverprofile cover.out
@@ -156,6 +160,8 @@ helm: generate manifests kustomize helmify ## Update soperator Helm chart
 		in_metadata && /^  name:/ {print; if (!done) {print "  {{- if .Values.certManager.enabled }}"; print "  annotations:"; print "    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include \"soperator.fullname\" . }}-serving-cert"; print "  {{- end }}"; done=1}; next} \
 		in_metadata && /^  annotations:/ {next} \
 		in_metadata && /^    cert-manager/ {next} \
+		in_metadata && /^  \{\{- if .Values.certManager.enabled \}\}/ {next} \
+		in_metadata && /^  \{\{- end \}\}/ {next} \
 		in_metadata && /^  labels:/ {in_metadata=0} \
 		{print}' \
 		$(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml > $(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml.tmp && \
@@ -167,6 +173,8 @@ helm: generate manifests kustomize helmify ## Update soperator Helm chart
 		in_metadata && /^  name:/ {print; if (!done) {print "  {{- if .Values.certManager.enabled }}"; print "  annotations:"; print "    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include \"soperator.fullname\" . }}-serving-cert"; print "  {{- end }}"; done=1}; next} \
 		in_metadata && /^  annotations:/ {next} \
 		in_metadata && /^    cert-manager/ {next} \
+		in_metadata && /^  \{\{- if .Values.certManager.enabled \}\}/ {next} \
+		in_metadata && /^  \{\{- end \}\}/ {next} \
 		in_metadata && /^  labels:/ {in_metadata=0} \
 		{print}' \
 		$(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml > $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml.tmp && \

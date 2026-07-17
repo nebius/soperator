@@ -41,6 +41,7 @@ spec:
   {{- if .Values.observability.vmStack.overrideValues }}
     {{- toYaml .Values.observability.vmStack.overrideValues | nindent 4 }}
   {{- else }}
+  {{- $kubeStateMetrics := .Values.observability.vmStack.values.kubeStateMetrics | default dict }}
       alertmanager:
         enabled: false
       crds:
@@ -67,7 +68,7 @@ spec:
         {{- end }}
         assertNoLeakedSecrets: false
         plugins:
-          - https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
+          - grafana-lokiexplore-app@1.0.14@https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip
           - victoriametrics-logs-datasource
         sidecar:
           dashboards:
@@ -211,6 +212,9 @@ spec:
           spec:
             endpoints:
               - honorLabels: true
+                {{- if $kubeStateMetrics.maxScrapeSize }}
+                max_scrape_size: {{ $kubeStateMetrics.maxScrapeSize | quote }}
+                {{- end }}
                 metricRelabelConfigs:
                   - action: labeldrop
                     regex: (uid|container_id|image_id)

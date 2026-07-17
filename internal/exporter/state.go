@@ -12,8 +12,11 @@ import (
 type metricsCollectorState struct {
 	lastGPUSecondsUpdate         time.Time
 	nodes                        []slurmapi.Node
+	nodesCollectionSequence      uint64
 	jobs                         []slurmapi.Job
+	jobsCollectionSequence       uint64
 	diag                         *api.V0041OpenapiDiagResp
+	diagCollectionSequence       uint64
 	nodeUnavailabilityStartTimes map[string]time.Time
 	nodeDrainingStartTimes       map[string]time.Time
 }

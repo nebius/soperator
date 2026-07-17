@@ -1022,13 +1022,6 @@ spec:
                 description: FailureReactions defines reaction on specific check when
                   it fails
                 properties:
-                  addReservation:
-                    description: AddReservation adds a slurm reservation with name
-                      "<prefix>-<nodeName>"
-                    properties:
-                      prefix:
-                        type: string
-                    type: object
                   commentSlurmNode:
                     description: CommentSlurmNode enabling slurm node commenting
                     properties:
@@ -1039,13 +1032,6 @@ spec:
                     description: DrainSlurmNode enabling slurm node draining
                     properties:
                       drainReasonPrefix:
-                        type: string
-                    type: object
-                  removeReservation:
-                    description: RemoveReservation removs slurm reservation with name
-                      "<prefix>-<nodeName>"
-                    properties:
-                      prefix:
                         type: string
                     type: object
                 type: object
@@ -9686,13 +9672,6 @@ spec:
                 description: SuccessReactions defines reaction on specific check when
                   it succeeds
                 properties:
-                  addReservation:
-                    description: AddReservation adds a slurm reservation with name
-                      "<prefix>-<nodeName>"
-                    properties:
-                      prefix:
-                        type: string
-                    type: object
                   commentSlurmNode:
                     description: CommentSlurmNode enabling slurm node commenting
                     properties:
@@ -9703,13 +9682,6 @@ spec:
                     description: DrainSlurmNode enabling slurm node draining
                     properties:
                       drainReasonPrefix:
-                        type: string
-                    type: object
-                  removeReservation:
-                    description: RemoveReservation removs slurm reservation with name
-                      "<prefix>-<nodeName>"
-                    properties:
-                      prefix:
                         type: string
                     type: object
                 type: object
@@ -16064,6 +16036,11 @@ spec:
                         x-kubernetes-list-type: atomic
                     type: object
                 type: object
+              clusterName:
+                description: |-
+                  ClusterName is the name of the SlurmCluster this NodeSet belongs to.
+                  Must be in the same namespace as the NodeSet.
+                type: string
               configMapRefSshd:
                 description: |-
                   ConfigMapRefSSHD defines the config name of Slurm SSHD.
@@ -17600,6 +17577,18 @@ spec:
                   - name
                   type: object
                 type: array
+              docker:
+                description: Docker defines the settings related to Docker support
+                  for Slurm workers.
+                properties:
+                  enabled:
+                    default: true
+                    description: |-
+                      Enabled indicates whether Docker is available on the Nodes of the NodeSet.
+                      Docker requires dedicated image-storage disks for storing OCI data,
+                      so it must be disabled on clusters deployed without them.
+                    type: boolean
+                type: object
               enableHostUserNamespace:
                 default: false
                 description: |-
@@ -17656,6 +17645,20 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              maxConcurrentStartup:
+                anyOf:
+                - type: integer
+                - type: string
+                default: 500
+                description: |-
+                  MaxConcurrentStartup caps the number of worker pods created in parallel
+                  during initial NodeSet scale-out (i.e. cluster creation or NodeSet growth).
+                  Value can be an absolute number (ex: 500) or a percentage of desired pods (ex: 10%).
+                  Maps to the underlying kruise AdvancedStatefulSet's scaleStrategy.maxUnavailable.
+                  Prevents overloading the Slurm controller with simultaneous slurmd registrations
+                  on large clusters.
+                  Defaults to 500.
+                x-kubernetes-int-or-string: true
               maxUnavailable:
                 anyOf:
                 - type: integer
@@ -27146,12 +27149,37 @@ spec:
                       type: string
                   type: object
                 type: array
+              topology:
+                description: Topology defines network-topology settings for this NodeSet.
+                properties:
+                  fabric:
+                    default: root
+                    description: |-
+                      Fabric is the IB fabric this NodeSet belongs to. Its workers are grouped under a
+                      per-fabric root switch (named after the fabric) so Slurm never schedules a job across
+                      fabrics. Powered-down / unscheduled nodes are placed under "<fabric>.unknown".
+                      Defaults to "root", which preserves the single-fabric behavior.
+                    type: string
+                type: object
               workerAnnotations:
                 additionalProperties:
                   type: string
                 description: WorkerAnnotations represent K8S annotations that should
                   be added to the worker pods.
                 type: object
+              workerInitRandomDelaySeconds:
+                default: 0
+                description: |-
+                  WorkerInitRandomDelaySeconds is the upper bound (in seconds) of a random delay the
+                  worker-init container sleeps before running its readiness checks. The actual delay is
+                  picked uniformly from [0, WorkerInitRandomDelaySeconds]. It spreads slurmd registrations
+                  across workers to avoid overloading the Slurm controller (thundering herd) when many
+                  worker pods start at once, e.g. after a cluster-wide restart.
+                  Set to 0 to disable the delay.
+                  Defaults to 0.
+                format: int32
+                minimum: 0
+                type: integer
             required:
             - munge
             - slurmd
@@ -28482,6 +28510,7 @@ spec:
                   pyxis:
                     importerPath: /opt/slurm_scripts/pyxis_caching_importer.sh
                     required: true
+                    useSquashfuse: false
                 description: PlugStackConfig represents the Plugin stack configurations
                   in `plugstack.conf`.
                 properties:
@@ -28569,10 +28598,56 @@ spec:
                           Otherwise, 'optional'.
                         type: boolean
                     type: object
+                  ncclInspectorPreConf:
+                    default:
+                      dumpDir: /opt/soperator-outputs/nccl_profiles/%j/%s
+                      dumpThreadIntervalMicroseconds: 1000000
+                      dumpVerbose: false
+                      enabled: false
+                      profilerPlugin: /usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so
+                      required: false
+                    description: NcclInspectorPreConf represents the NCCL Inspector
+                      Pre-Configuration SPANK plugin configuration.
+                    properties:
+                      dumpDir:
+                        default: /opt/soperator-outputs/nccl_profiles/%j/%s
+                        description: |-
+                          DumpDir defines a directory path where NCCL profiles will be dumped into.
+
+                          If the path does not exist, it will be created by the plugin.
+                        type: string
+                      dumpThreadIntervalMicroseconds:
+                        default: 1000000
+                        description: DumpThreadIntervalMicroseconds defines an interval
+                          between NCCL Inspector dump thread runs in microseconds.
+                        format: int64
+                        type: integer
+                      dumpVerbose:
+                        default: false
+                        description: DumpVerbose defines if the NCCL profile dumps
+                          should be verbose.
+                        type: boolean
+                      enabled:
+                        default: true
+                        description: Enabled defines whether to enable the plugin.
+                        type: boolean
+                      profilerPlugin:
+                        default: /usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so
+                        description: ProfilerPlugin defines a file path to NCCL Inspector's
+                          SO file.
+                        type: string
+                      required:
+                        default: false
+                        description: |-
+                          Required defines if NCCL Inspector Pre-Configuration is 'required' for SLURM.
+                          Otherwise, 'optional'.
+                        type: boolean
+                    type: object
                   pyxis:
                     default:
                       importerPath: /opt/slurm_scripts/pyxis_caching_importer.sh
                       required: true
+                      useSquashfuse: false
                     description: Pyxis represents the 'Pyxis' SPANK plugin configuration.
                     properties:
                       containerImageSave:
@@ -28597,6 +28672,12 @@ spec:
                         description: |-
                           Required defines if Pyxis is 'required' for SLURM.
                           Otherwise, 'optional'.
+                        type: boolean
+                      useSquashfuse:
+                        default: false
+                        description: |-
+                          UseSquashfuse enables Pyxis to start importer-produced SquashFS images directly through squashfuse.
+                          When disabled, Pyxis still uses ImporterPath for image caching but lets Enroot create the runtime rootfs.
                         type: boolean
                     type: object
                 type: object
@@ -31009,8 +31090,9 @@ spec:
                   epilog: ""
                   maxJobCount: 20000
                   messageTimeout: 60
-                  minJobAge: 28800
+                  minJobAge: 3600
                   prolog: ""
+                  taskProlog: ""
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
                 properties:
@@ -31049,7 +31131,7 @@ spec:
                     format: int32
                     type: integer
                   minJobAge:
-                    default: 28800
+                    default: 3600
                     description: Don't remove jobs from controller memory after some
                       time
                     format: int32
@@ -31071,6 +31153,11 @@ spec:
                   taskPluginParam:
                     default: ""
                     description: Additional parameters for the task plugin
+                    type: string
+                  taskProlog:
+                    default: ""
+                    description: Defines specific file to run the task prolog when
+                      job starts. Default value is no task prolog
                     type: string
                   topologyParam:
                     default: SwitchAsNodeRank
@@ -40065,6 +40152,18 @@ spec:
                     description: |
                       Exporter represents the Slurm exporter node configuration
                     properties:
+                      accountingJobsLookback:
+                        default: 1h
+                        description: |-
+                          AccountingJobsLookback sets the size of the time window queried from the accounting API:
+                          [now − lookback, now + 5 min]. The +5 min skew tolerates clock drift between slurmrestd, slurmctld and slurmdbd.
+                          Long-running jobs that started before the window are still included (sacct overlap semantics).
+                          Only applied when JobSource is "accounting".
+                        pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
+                        type: string
+                        x-kubernetes-validations:
+                        - message: accountingJobsLookback must be greater than zero
+                          rule: self.matches('[1-9]')
                       collectionInterval:
                         default: 30s
                         description: CollectionInterval specifies how often to collect
@@ -42697,11 +42796,36 @@ spec:
                         description: HostUsers controls if the pod containers can
                           use the host user namespace
                         type: boolean
+                      jobSource:
+                        default: controller
+                        description: |-
+                          JobSource selects the Slurm API used for job collection.
+
+                          "controller" reads jobs from the Slurm controller API (default, current behavior).
+                          "accounting" reads jobs from the Slurm accounting API (slurmdbd) and is intended for clusters where
+                          the controller endpoint is overloaded.
+
+                          Note: the accounting source has known label-fidelity limitations (empty user_id, "None" job_state_reason
+                          for pending jobs, collapsed pending array tasks). See docs/slurm-exporter.md "Known limitations of
+                          the accounting source" for details.
+                        enum:
+                        - controller
+                        - accounting
+                        type: string
                       k8sNodeFilterName:
                         description: |-
                           K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
                           Must correspond to the name of one of [K8sNodeFilter]
                         type: string
+                      maxCollectorInflight:
+                        default: 1
+                        description: |-
+                          MaxCollectorInflight limits concurrent runs of the same exporter sub-collector.
+                          A value greater than 1 allows overlapping runs for clusters loaded with jobs and nodes to avoid missing metrics,
+                          while 1 keeps the safer default of one in-flight run per collector.
+                        format: int32
+                        minimum: 1
+                        type: integer
                       munge:
                         description: Munge represents the Slurm munge configuration
                         properties:
