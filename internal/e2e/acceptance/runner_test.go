@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
 )
 
 func TestParseOptionsDefaults(t *testing.T) {
@@ -87,6 +88,73 @@ func TestDiscoveredNodeSetsFromLiveList(t *testing.T) {
 	assert.Equal(t, "worker-gpu", discovered[1].Name)
 	assert.Equal(t, 2, discovered[1].Size)
 	assert.True(t, discovered[1].HasGPU)
+}
+
+func TestDiscoveredNodeSetsFromLiveListDoesNotFilterWhenClusterNameIsEmpty(t *testing.T) {
+	nodeSets := slurmv1alpha1.NodeSetList{
+		Items: []slurmv1alpha1.NodeSet{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "worker-gpu"},
+				Spec: slurmv1alpha1.NodeSetSpec{
+					ClusterName: "soperator",
+					Replicas:    2,
+					GPU:         slurmv1alpha1.GPUSpec{Enabled: true},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "worker-cpu"},
+				Spec: slurmv1alpha1.NodeSetSpec{
+					ClusterName: "soperator",
+					Replicas:    3,
+				},
+			},
+		},
+	}
+
+	discovered := discoveredNodeSetsFromLiveList(nodeSets, "")
+	require.Len(t, discovered, 2)
+
+	assert.Equal(t, "worker-cpu", discovered[0].Name)
+	assert.Equal(t, "worker-gpu", discovered[1].Name)
+}
+
+func TestClassifyWorkersSeparatesCPUAndGPU(t *testing.T) {
+	state := &framework.ClusterState{
+		Workers: []framework.WorkerPodRef{
+			{Name: "worker-gpu-0"},
+			{Name: "worker-cpu-0"},
+			{Name: "worker-gpu-1"},
+		},
+		DiscoveredNodeSets: []framework.DiscoveredNodeSet{
+			{Name: "worker-gpu", Size: 2, HasGPU: true},
+			{Name: "worker-cpu", Size: 1, HasGPU: false},
+		},
+	}
+
+	classifyWorkers(state)
+
+	assert.ElementsMatch(t, []framework.WorkerPodRef{{Name: "worker-cpu-0"}}, state.CPUWorkers)
+	assert.ElementsMatch(t, []framework.WorkerPodRef{{Name: "worker-gpu-0"}, {Name: "worker-gpu-1"}}, state.GPUWorkers)
+	assert.ElementsMatch(t, []framework.WorkerPodRef{{Name: "worker-cpu-0"}}, state.WorkersByNodeSet["worker-cpu"])
+	assert.ElementsMatch(t, []framework.WorkerPodRef{{Name: "worker-gpu-0"}, {Name: "worker-gpu-1"}}, state.WorkersByNodeSet["worker-gpu"])
+	assert.True(t, state.HasHeterogeneousWorkers())
+}
+
+func TestTagFilterExcludesHeterogeneousScenariosWithoutCPUAndGPUWorkers(t *testing.T) {
+	runner := NewRunner(&framework.ClusterState{
+		GPUWorkers: []framework.WorkerPodRef{{Name: "worker-gpu-0"}},
+	}, true, "dev-context", "")
+
+	assert.Equal(t, "~@heterogeneous", runner.tagFilter())
+}
+
+func TestTagFilterAllowsHeterogeneousScenariosWithCPUAndGPUWorkers(t *testing.T) {
+	runner := NewRunner(&framework.ClusterState{
+		CPUWorkers: []framework.WorkerPodRef{{Name: "worker-cpu-0"}},
+		GPUWorkers: []framework.WorkerPodRef{{Name: "worker-gpu-0"}},
+	}, true, "dev-context", "")
+
+	assert.Empty(t, runner.tagFilter())
 }
 
 func TestReportFormat(t *testing.T) {

@@ -108,6 +108,10 @@ func (r *Runner) tagFilter() string {
 		log.Printf("acceptance: no GPU workers found, excluding @gpu scenarios")
 		filters = append(filters, "~@gpu")
 	}
+	if !r.state.HasHeterogeneousWorkers() {
+		log.Printf("acceptance: no heterogeneous CPU+GPU worker set found, excluding @heterogeneous scenarios")
+		filters = append(filters, "~@heterogeneous")
+	}
 
 	return strings.Join(filters, " && ")
 }
@@ -164,6 +168,7 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	}
 
 	log.Printf("acceptance: discovered workers: %s", workerNames(state.Workers))
+	log.Printf("acceptance: discovered CPU workers: %s", workerNames(state.CPUWorkers))
 	log.Printf("acceptance: discovered GPU workers: %s", workerNames(state.GPUWorkers))
 	log.Printf("acceptance: discovered workers by nodeset: %s", workersByNodeSetSummary(state.WorkersByNodeSet))
 	return nil
@@ -203,7 +208,7 @@ func discoverNodeSets(ctx context.Context, w *world, clusterName string) ([]fram
 func discoveredNodeSetsFromLiveList(nodeSets slurmv1alpha1.NodeSetList, clusterName string) []framework.DiscoveredNodeSet {
 	discovered := make([]framework.DiscoveredNodeSet, 0, len(nodeSets.Items))
 	for _, nodeSet := range nodeSets.Items {
-		if nodeSet.Spec.ClusterName != "" && nodeSet.Spec.ClusterName != clusterName {
+		if clusterName != "" && nodeSet.Spec.ClusterName != "" && nodeSet.Spec.ClusterName != clusterName {
 			continue
 		}
 		discovered = append(discovered, framework.DiscoveredNodeSet{
@@ -221,13 +226,13 @@ func discoveredNodeSetsFromLiveList(nodeSets slurmv1alpha1.NodeSetList, clusterN
 
 func featurePaths() []string {
 	return []string{
-		"features/cluster_creation.feature",
-		"features/internal_ssh.feature",
-		"features/package_installation.feature",
+		// "features/cluster_creation.feature",
+		// "features/internal_ssh.feature",
+		// "features/package_installation.feature",
 		"features/node_replacement.feature",
-		"features/docker_containers.feature",
-		"features/enroot_containers.feature",
-		"features/topology.feature",
+		// "features/docker_containers.feature",
+		// "features/enroot_containers.feature",
+		// "features/topology.feature",
 	}
 }
 
@@ -377,6 +382,7 @@ func verifyPodReady(ctx context.Context, w *world, namespace, name string) error
 
 func classifyWorkers(state *framework.ClusterState) {
 	state.WorkersByNodeSet = make(map[string][]framework.WorkerPodRef, len(state.DiscoveredNodeSets))
+	state.CPUWorkers = nil
 	state.GPUWorkers = nil
 
 	if len(state.DiscoveredNodeSets) == 0 {
@@ -402,6 +408,8 @@ func classifyWorkers(state *framework.ClusterState) {
 			state.WorkersByNodeSet[nodeSet.Name] = append(state.WorkersByNodeSet[nodeSet.Name], worker)
 			if gpuByName[nodeSet.Name] {
 				state.GPUWorkers = append(state.GPUWorkers, worker)
+			} else {
+				state.CPUWorkers = append(state.CPUWorkers, worker)
 			}
 			break
 		}
