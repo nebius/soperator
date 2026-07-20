@@ -24,6 +24,7 @@ type ArgsScope interface {
 
 type Exec interface {
 	AvailableWorkers() []WorkerPodRef
+	AvailableCPUWorkers() []WorkerPodRef
 	AvailableGPUWorkers() []WorkerPodRef
 	Kubectl() ArgsScope
 	// Local returns a local process scope. Do not use it for kubectl commands;

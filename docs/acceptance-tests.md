@@ -36,4 +36,7 @@ All flags:
 GPU scenarios are selected automatically. If no GPU workers are discovered,
 scenarios tagged `@gpu` are excluded.
 
+Heterogeneous scenarios are selected automatically. If both CPU and GPU workers
+are not discovered, scenarios tagged `@heterogeneous` are excluded.
+
 Note: The node replacement scenario uses the local `nebius` CLI to check instance removal.
