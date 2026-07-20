@@ -153,7 +153,7 @@ slurmConfig:
   epilog: /opt/slurm_scripts/epilog.sh
   taskPluginParam: ""
   maxJobCount: 20000
-  minJobAge: 3600
+  minJobAge: 1800
   messageTimeout: 60
   topologyPlugin: "topology/tree"
   topologyParam: "SwitchAsNodeRank"
@@ -234,7 +234,7 @@ slurmNodes:
     # hostUsers: false
     slurmConfig:
       accountingStorageTRES: "CPU,Mem,Node,VMem,Gres/gpu"
-      jobAcctGatherType: "jobacct_gather/cgroup"
+      jobAcctGatherType: "jobacct_gather/none"
       jobAcctGatherFrequency: 0
       priorityWeightAge: 0
       priorityWeightFairshare: 0

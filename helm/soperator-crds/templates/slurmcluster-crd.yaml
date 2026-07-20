@@ -31090,7 +31090,7 @@ spec:
                   epilog: ""
                   maxJobCount: 20000
                   messageTimeout: 60
-                  minJobAge: 3600
+                  minJobAge: 1800
                   prolog: ""
                   taskProlog: ""
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
@@ -31131,7 +31131,7 @@ spec:
                     format: int32
                     type: integer
                   minJobAge:
-                    default: 3600
+                    default: 1800
                     description: Don't remove jobs from controller memory after some
                       time
                     format: int32
@@ -35567,7 +35567,7 @@ spec:
                             - DisableGPUAcct
                             type: string
                           jobAcctGatherType:
-                            default: jobacct_gather/cgroup
+                            default: jobacct_gather/none
                             enum:
                             - jobacct_gather/linux
                             - jobacct_gather/cgroup
