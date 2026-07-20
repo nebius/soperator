@@ -208,7 +208,10 @@ spec:
         collectors:
           - pods
           - nodes
-        vmServiceScrape:
+        # The victoria-metrics-k8s-stack chart reads this scrape config from the `vmScrape` key,
+        # see https://github.com/VictoriaMetrics/helm-charts/blob/victoria-metrics-k8s-stack-0.80.0/charts/victoria-metrics-k8s-stack/templates/servicemonitors.yaml
+        # Endpoints here fully replace the chart's default list.
+        vmScrape:
           spec:
             endpoints:
               - honorLabels: true
