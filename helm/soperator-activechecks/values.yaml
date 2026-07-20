@@ -10,12 +10,11 @@ tolerations: []
 #   >= 1.33 → true  (share the host user namespace)
 # hostUsers: null
 # CUDA version used for active check image selection and for managing jail state
-cudaVersion: 12.9.0
+cudaVersion: 13.0.2
 # Flat override: if non-empty, takes precedence over ncclTestsVersions map.
 ncclTestsVersion: ""
 # Per-CUDA default NCCL tests versions.
 # Source of truth: https://github.com/nebius/ml-containers/blob/main/ansible/roles/nccl-tests/defaults/main.yml
-# Update this map together with activeCheckImageTags when adding new CUDA versions.
 ncclTestsVersions:
   "12.9.0": "2.17.9"
   "13.0.2": "2.17.9"
@@ -43,14 +42,6 @@ images:
   k8sJob: "cr.eu-north1.nebius.cloud/soperator/k8s_check_job:4.1.5-slurm25.11.5"
   munge: "cr.eu-north1.nebius.cloud/soperator/munge:4.1.5-slurm25.11.5"
   sansible: "cr.eu-north1.nebius.cloud/soperator/sansible:4.1.5-slurm25.11.5"
-  activeCheckImageRepository: "cr.eu-north1.nebius.cloud#ml-containers/training_diag"
-  activeCheckImageTags:
-    # Image training_diag from PR https://github.com/nebius/ml-containers/pull/90
-    "12.9.0": "12.9.0-ubuntu24.04-20260624090429"
-    # Image training_diag from PR https://github.com/nebius/ml-containers/pull/92
-    "13.0.2": "13.0.2-ubuntu24.04-20260709140028"
-# Optional override in Pyxis ("reg#repo:tag") format.
-activeCheckImage: ""
 slurmJob:
   # Slurm consumes this as SBATCH_GPUS_PER_NODE for GPU ActiveChecks.
   gpusPerNode: "8"
@@ -67,27 +58,6 @@ checks:
     runAfterCreation: true
     slurmJobSpec:
       sbatchScriptFile: "scripts/gpu-checks.sh"
-      eachWorkerJobs: true
-      maxNumberOfJobs: 200
-      jobContainer:
-        extraEnv:
-          - name: "SBATCH_GPUS_PER_NODE"
-            value: "{{ .Values.slurmJob.gpusPerNode }}"
-    failureReactions:
-      drainSlurmNode:
-        drainReasonPrefix: "[node_problem]"
-  all-reduce-perf-nccl-in-docker:
-    enabled: true
-    checkType: "slurmJob"
-    dependsOn:
-      - "manage-jail-state"
-      - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
-      - "prepull-container-image"
-    suspend: true
-    runAfterCreation: true
-    slurmJobSpec:
-      sbatchScriptFile: "scripts/all-reduce-perf-nccl-in-docker.sh"
       eachWorkerJobs: true
       maxNumberOfJobs: 200
       jobContainer:
@@ -120,7 +90,6 @@ checks:
     enabled: true
     checkType: "slurmJob"
     dependsOn:
-      - "all-reduce-perf-nccl-in-docker"
       - "gpu-checks"
       - "manage-jail-state"
       - "wait-for-soperatorchecks-srun-ready"
@@ -175,21 +144,6 @@ checks:
     slurmJobSpec:
       sbatchScriptFile: "scripts/enroot-cleanup.sh"
       eachWorkerJobs: true
-  prepull-container-image:
-    enabled: true
-    checkType: "slurmJob"
-    dependsOn:
-      - "manage-jail-state"
-      - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
-    suspend: true
-    runAfterCreation: true
-    slurmJobSpec:
-      sbatchScriptFile: "scripts/prepull-container-image.sh"
-      jobContainer:
-        extraEnv:
-          - name: "SBATCH_GPUS_PER_NODE"
-            value: "{{ .Values.slurmJob.gpusPerNode }}"
   soperator-outputs-logs-cleaner:
     enabled: true
     checkType: "k8sJob"

@@ -203,9 +203,6 @@ tests:
       images:
         k8sJob: "test-image:latest"
         sansible: "sansible-image:latest"
-        activeCheckImageRepository: "cr.eu-north1.nebius.cloud#ml-containers/training_diag"
-        activeCheckImageTags:
-          "13.0.2": "13.0.2-ubuntu24.04-20260501143019"
       jobContainer:
         volumeMounts:
           - mountPath: /mnt/jail
@@ -329,9 +326,6 @@ tests:
       images:
         k8sJob: "test-image:latest"
         sansible: "sansible-image:latest"
-        activeCheckImageRepository: "cr.eu-north1.nebius.cloud#ml-containers/training_diag"
-        activeCheckImageTags:
-          "99.0.0": "99.0.0-ubuntu24.04-20260206170007"
       jobContainer:
         volumeMounts:
           - mountPath: /mnt/jail

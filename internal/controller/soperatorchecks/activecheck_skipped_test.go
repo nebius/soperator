@@ -225,9 +225,9 @@ func TestActiveCheckReconciler_DependsOn_SkippedAsSuccess(t *testing.T) {
 
 	runAfterCreation := true
 	prerequisite := &slurmv1alpha1.ActiveCheck{
-		ObjectMeta: metav1.ObjectMeta{Name: "prepull-container-image", Namespace: ns},
+		ObjectMeta: metav1.ObjectMeta{Name: "prerequisite-check", Namespace: ns},
 		Spec: slurmv1alpha1.ActiveCheckSpec{
-			Name:             "prepull-container-image",
+			Name:             "prerequisite-check",
 			CheckType:        "slurmJob",
 			RunAfterCreation: &runAfterCreation,
 		},
@@ -243,7 +243,7 @@ func TestActiveCheckReconciler_DependsOn_SkippedAsSuccess(t *testing.T) {
 		Spec: slurmv1alpha1.ActiveCheckSpec{
 			Name:      "cuda-samples",
 			CheckType: "slurmJob",
-			DependsOn: []string{"prepull-container-image"},
+			DependsOn: []string{"prerequisite-check"},
 		},
 	}
 

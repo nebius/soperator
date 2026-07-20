@@ -241,8 +241,8 @@ func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
 	steps.NewInternalSSH(w, slurm).Register(sc)
 	steps.NewPackageInstallation(w, slurm).Register(sc)
 	steps.NewNodeReplacement(w, slurm).Register(sc)
-	steps.NewDockerContainers(w, slurm, r.state.SlurmClusterName).Register(sc)
-	steps.NewEnrootContainers(w, slurm, r.state.SlurmClusterName).Register(sc)
+	steps.NewDockerContainers(w, slurm).Register(sc)
+	steps.NewEnrootContainers(w, slurm).Register(sc)
 	steps.NewTopology(r.state, w).Register(sc)
 
 	registerSkipHook(sc)

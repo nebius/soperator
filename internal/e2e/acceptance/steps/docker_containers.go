@@ -24,21 +24,19 @@ const (
 )
 
 type DockerContainers struct {
-	exec        framework.Exec
-	slurm       *framework.SlurmClient
-	clusterName string
-	workers     []string
-	job         framework.SbatchJob
+	exec    framework.Exec
+	slurm   *framework.SlurmClient
+	workers []string
+	job     framework.SbatchJob
 
 	containerNamePrefix string
 	connectionWorker    string
 }
 
-func NewDockerContainers(exec framework.Exec, slurm *framework.SlurmClient, clusterName string) *DockerContainers {
+func NewDockerContainers(exec framework.Exec, slurm *framework.SlurmClient) *DockerContainers {
 	return &DockerContainers{
-		exec:        exec,
-		slurm:       slurm,
-		clusterName: clusterName,
+		exec:  exec,
+		slurm: slurm,
 	}
 }
 
@@ -73,13 +71,8 @@ func (s *DockerContainers) aLongRunningDockerNCCLJobIsSubmittedOnTwoGPUWorkers(c
 	s.workers = workers
 	s.connectionWorker = s.workers[0]
 
-	image, err := PrepullContainerImageDocker(ctx, s.exec, s.clusterName)
-	if err != nil {
-		return err
-	}
-
 	wrap := fmt.Sprintf("srun docker run --rm --name e2e-docker-${SLURM_JOB_ID}-${SLURM_NODEID} --gpus=all --device=/dev/infiniband %s bash -lc %s",
-		framework.ShellQuote(image),
+		framework.ShellQuote(e2eNCCLContainerImageDocker),
 		framework.ShellQuote(dockerARP),
 	)
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{

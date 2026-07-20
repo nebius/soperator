@@ -51,36 +51,6 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-
-{{/*
-Pyxis format for active check image.
-*/}}
-{{- define "activecheck.image.pyxis" -}}
-{{- include "activecheck.image.resolve" . -}}
-{{- .Values.activeCheckImage -}}
-{{- end -}}
-
-{{/*
-Resolve active check image when not explicitly set.
-*/}}
-{{- define "activecheck.image.resolve" -}}
-{{- if not .Values.activeCheckImage -}}
-{{- $cudaVersion := default "12.9.0" .Values.cudaVersion -}}
-{{- $tag := required "activeCheck image tag for the selected CUDA version must be provided." (index .Values.images.activeCheckImageTags (printf "%v" $cudaVersion)) -}}
-{{- $repo := required "activeCheck image repository must be provided." .Values.images.activeCheckImageRepository -}}
-{{- $_ := set .Values "activeCheckImage" (printf "%s:%s" $repo $tag) -}}
-{{- end -}}
-{{- end -}}
-
-
-{{/*
-Docker format for active check image.
-Converts from format "reg#repo:tag" to format "reg/repo:tag".
-*/}}
-{{- define "activecheck.image.docker" -}}
-{{- include "activecheck.image.pyxis" . | replace "#" "/" -}}
-{{- end -}}
-
 {{/*
 Resolve NCCL tests version from cudaVersion.
 If .Values.ncclTestsVersion is non-empty, use it (flat override).
