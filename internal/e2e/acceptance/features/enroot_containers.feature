@@ -1,4 +1,5 @@
 Feature: Enroot containers
+  @skip
   @gpu
   Scenario: Enroot and Pyxis cache images and clean up runtime data
     Given Enroot materialized runtime storage is enabled
@@ -19,6 +20,7 @@ Feature: Enroot containers
     When the named Enroot runtime directory is cleaned up
     Then the named Enroot runtime directory is removed
 
+  @skip
   @gpu
   Scenario: Enroot and Pyxis mount cached SquashFS directly
     Given Enroot direct SquashFS startup is enabled

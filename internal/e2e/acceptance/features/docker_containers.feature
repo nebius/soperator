@@ -1,5 +1,5 @@
 Feature: Docker containers
-  # Skipped: Docker NCCL job hangs even after the prepull-image fix (SCHED-1562); needs deeper triage.
+  # Skipped: Docker NCCL job hangs in this scenario (SCHED-1562); needs deeper triage.
   @skip
   @gpu
   Scenario: A long-running Docker NCCL job uses local storage and cleans up containers

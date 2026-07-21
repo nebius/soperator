@@ -32,9 +32,8 @@ const (
 )
 
 type EnrootContainers struct {
-	exec        framework.Exec
-	slurm       *framework.SlurmClient
-	clusterName string
+	exec  framework.Exec
+	slurm *framework.SlurmClient
 
 	workers          []string
 	connectionWorker string
@@ -46,11 +45,10 @@ type EnrootContainers struct {
 	directSquashFS *bool
 }
 
-func NewEnrootContainers(exec framework.Exec, slurm *framework.SlurmClient, clusterName string) *EnrootContainers {
+func NewEnrootContainers(exec framework.Exec, slurm *framework.SlurmClient) *EnrootContainers {
 	return &EnrootContainers{
-		exec:        exec,
-		slurm:       slurm,
-		clusterName: clusterName,
+		exec:  exec,
+		slurm: slurm,
 	}
 }
 
@@ -460,23 +458,18 @@ func (s *EnrootContainers) submitEnrootJob(ctx context.Context, containerName, j
 		s.connectionWorker = s.workers[0]
 	}
 
-	image, err := PrepullContainerImageEnroot(ctx, s.exec, s.clusterName)
-	if err != nil {
-		return err
-	}
-
 	// Wrap the NCCL body in `bash -lc` so env assignments (NCCL_*=…) are
 	// shell‑parsed inside the container instead of being passed as positional
 	// args to srun / pyxis, where execve() treats them as the program name and
 	// fails with "No such file or directory". Mirrors docker_containers.go.
 	wrap := fmt.Sprintf("srun --mpi=pmix --container-image=%s --container-mounts=%s bash -lc %s",
-		framework.ShellQuote(image),
+		framework.ShellQuote(e2eNCCLContainerImageEnroot),
 		framework.ShellQuote(enrootDockerMount),
 		framework.ShellQuote(enrootARP),
 	)
 	if containerName != "" {
 		wrap = fmt.Sprintf("srun --mpi=pmix --container-image=%s --container-name=%s --container-mounts=%s bash -lc %s",
-			framework.ShellQuote(image),
+			framework.ShellQuote(e2eNCCLContainerImageEnroot),
 			framework.ShellQuote(containerName),
 			framework.ShellQuote(enrootDockerMount),
 			framework.ShellQuote(enrootARP),
