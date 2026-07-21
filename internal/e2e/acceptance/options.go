@@ -17,6 +17,7 @@ type options struct {
 	KubectlContext   string
 	SlurmClusterName string
 	RunUnstableTests bool
+	SelectedOnly     bool
 	ReportDir        string
 }
 
@@ -34,7 +35,7 @@ func Run(ctx context.Context, args []string) error {
 		WorkersByNodeSet: make(map[string][]framework.WorkerPodRef),
 	}
 
-	runner := NewRunner(state, opts.RunUnstableTests, opts.KubectlContext, opts.ReportDir)
+	runner := NewRunner(state, opts.RunUnstableTests, opts.SelectedOnly, opts.KubectlContext, opts.ReportDir)
 	return runner.Run(ctx)
 }
 
@@ -48,6 +49,7 @@ func parseOptions(args []string) (options, error) {
 	fs.StringVar(&opts.KubectlContext, "kubectl-context", "", "kubectl context to use for acceptance tests")
 	fs.StringVar(&opts.SlurmClusterName, "slurm-cluster-name", opts.SlurmClusterName, "SlurmCluster resource name")
 	fs.BoolVar(&opts.RunUnstableTests, "run-unstable", false, "run scenarios tagged @unstable")
+	fs.BoolVar(&opts.SelectedOnly, "selected", false, "run only scenarios tagged @selected")
 	fs.StringVar(&opts.ReportDir, "report-dir", "", "optional directory for Cucumber and JUnit reports")
 
 	if err := fs.Parse(args); err != nil {
