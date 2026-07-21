@@ -34,11 +34,12 @@ const (
 type Runner struct {
 	state            *framework.ClusterState
 	runUnstableTests bool
+	selectedOnly     bool
 	kubectlContext   string
 	reportDir        string
 }
 
-func NewRunner(state *framework.ClusterState, runUnstableTests bool, kubectlContext, reportDir string) *Runner {
+func NewRunner(state *framework.ClusterState, runUnstableTests, selectedOnly bool, kubectlContext, reportDir string) *Runner {
 	if state == nil {
 		state = &framework.ClusterState{
 			WorkersByNodeSet: make(map[string][]framework.WorkerPodRef),
@@ -50,6 +51,7 @@ func NewRunner(state *framework.ClusterState, runUnstableTests bool, kubectlCont
 	return &Runner{
 		state:            state,
 		runUnstableTests: runUnstableTests,
+		selectedOnly:     selectedOnly,
 		kubectlContext:   kubectlContext,
 		reportDir:        reportDir,
 	}
@@ -100,6 +102,10 @@ func (r *Runner) Run(ctx context.Context) error {
 func (r *Runner) tagFilter() string {
 	var filters []string
 
+	if r.selectedOnly {
+		log.Printf("acceptance: selected=true, running only @selected scenarios")
+		filters = append(filters, "@selected")
+	}
 	if !r.runUnstableTests {
 		log.Printf("acceptance: run-unstable=false, excluding @unstable scenarios")
 		filters = append(filters, "~@unstable")
