@@ -34,12 +34,12 @@ const (
 type Runner struct {
 	state            *framework.ClusterState
 	runUnstableTests bool
-	selectedOnly     bool
+	scenarioPaths    []string
 	kubectlContext   string
 	reportDir        string
 }
 
-func NewRunner(state *framework.ClusterState, runUnstableTests, selectedOnly bool, kubectlContext, reportDir string) *Runner {
+func NewRunner(state *framework.ClusterState, runUnstableTests bool, scenarioPaths []string, kubectlContext, reportDir string) *Runner {
 	if state == nil {
 		state = &framework.ClusterState{
 			WorkersByNodeSet: make(map[string][]framework.WorkerPodRef),
@@ -51,7 +51,7 @@ func NewRunner(state *framework.ClusterState, runUnstableTests, selectedOnly boo
 	return &Runner{
 		state:            state,
 		runUnstableTests: runUnstableTests,
-		selectedOnly:     selectedOnly,
+		scenarioPaths:    slices.Clone(scenarioPaths),
 		kubectlContext:   kubectlContext,
 		reportDir:        reportDir,
 	}
@@ -63,7 +63,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		return fmt.Errorf("discover cluster before suite: %w", err)
 	}
 
-	features := featurePaths()
+	features := r.featurePaths()
 	if len(features) == 0 {
 		return fmt.Errorf("no acceptance feature files configured")
 	}
@@ -102,10 +102,6 @@ func (r *Runner) Run(ctx context.Context) error {
 func (r *Runner) tagFilter() string {
 	var filters []string
 
-	if r.selectedOnly {
-		log.Printf("acceptance: selected=true, running only @selected scenarios")
-		filters = append(filters, "@selected")
-	}
 	if !r.runUnstableTests {
 		log.Printf("acceptance: run-unstable=false, excluding @unstable scenarios")
 		filters = append(filters, "~@unstable")
@@ -116,6 +112,14 @@ func (r *Runner) tagFilter() string {
 	}
 
 	return strings.Join(filters, " && ")
+}
+
+func (r *Runner) featurePaths() []string {
+	if len(r.scenarioPaths) > 0 {
+		log.Printf("acceptance: running selected scenarios: %s", strings.Join(r.scenarioPaths, ", "))
+		return slices.Clone(r.scenarioPaths)
+	}
+	return featurePaths()
 }
 
 func discoverCluster(ctx context.Context, w *world, state *framework.ClusterState) error {

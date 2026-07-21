@@ -19,7 +19,7 @@ func TestParseOptionsDefaults(t *testing.T) {
 	assert.Equal(t, "dev-context", opts.KubectlContext)
 	assert.Equal(t, "soperator", opts.SlurmClusterName)
 	assert.False(t, opts.RunUnstableTests)
-	assert.False(t, opts.SelectedOnly)
+	assert.Empty(t, opts.ScenarioPaths)
 	assert.Empty(t, opts.ReportDir)
 }
 
@@ -28,7 +28,8 @@ func TestParseOptionsExplicitValues(t *testing.T) {
 		"--kubectl-context", "dev-context",
 		"--slurm-cluster-name", "custom",
 		"--run-unstable=true",
-		"--selected=true",
+		"--scenario", "features/internal_ssh.feature:2",
+		"--scenario=features/topology.feature:3",
 		"--report-dir", "reports",
 	})
 	require.NoError(t, err)
@@ -36,7 +37,7 @@ func TestParseOptionsExplicitValues(t *testing.T) {
 	assert.Equal(t, "dev-context", opts.KubectlContext)
 	assert.Equal(t, "custom", opts.SlurmClusterName)
 	assert.True(t, opts.RunUnstableTests)
-	assert.True(t, opts.SelectedOnly)
+	assert.Equal(t, []string{"features/internal_ssh.feature:2", "features/topology.feature:3"}, opts.ScenarioPaths)
 	assert.Equal(t, "reports", opts.ReportDir)
 }
 
@@ -50,7 +51,6 @@ func TestRunnerTagFilter(t *testing.T) {
 		name             string
 		state            *framework.ClusterState
 		runUnstableTests bool
-		selectedOnly     bool
 		want             string
 	}{
 		{
@@ -59,32 +59,33 @@ func TestRunnerTagFilter(t *testing.T) {
 			want:  "~@unstable",
 		},
 		{
-			name:         "selected includes selected tag and excludes unstable",
-			state:        gpuState,
-			selectedOnly: true,
-			want:         "@selected && ~@unstable",
-		},
-		{
-			name:             "selected and unstable only includes selected tag",
+			name:             "run unstable has no tag filter when GPU workers exist",
 			state:            gpuState,
 			runUnstableTests: true,
-			selectedOnly:     true,
-			want:             "@selected",
+			want:             "",
 		},
 		{
-			name:         "selected without GPU workers also excludes GPU",
-			state:        noGPUState,
-			selectedOnly: true,
-			want:         "@selected && ~@unstable && ~@gpu",
+			name:  "without GPU workers also excludes GPU",
+			state: noGPUState,
+			want:  "~@unstable && ~@gpu",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			runner := NewRunner(tt.state, tt.runUnstableTests, tt.selectedOnly, "", "")
+			runner := NewRunner(tt.state, tt.runUnstableTests, nil, "", "")
 			assert.Equal(t, tt.want, runner.tagFilter())
 		})
 	}
+}
+
+func TestRunnerFeaturePaths(t *testing.T) {
+	runner := NewRunner(&framework.ClusterState{}, false, nil, "", "")
+	assert.Equal(t, featurePaths(), runner.featurePaths())
+
+	scenarios := []string{"features/internal_ssh.feature:2", "features/topology.feature:3"}
+	runner = NewRunner(&framework.ClusterState{}, false, scenarios, "", "")
+	assert.Equal(t, scenarios, runner.featurePaths())
 }
 
 func TestParseOptionsRequiresKubectlContext(t *testing.T) {
@@ -97,6 +98,12 @@ func TestParseOptionsRejectsExtraArgs(t *testing.T) {
 	_, err := parseOptions([]string{"--kubectl-context", "dev-context", "extra"})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "unexpected acceptance arguments")
+}
+
+func TestParseOptionsRejectsEmptyScenario(t *testing.T) {
+	_, err := parseOptions([]string{"--kubectl-context", "dev-context", "--scenario", " "})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "--scenario value cannot be empty")
 }
 
 func TestDiscoveredNodeSetsFromLiveList(t *testing.T) {
