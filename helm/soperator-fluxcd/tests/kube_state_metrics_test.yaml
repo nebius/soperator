@@ -10,15 +10,15 @@ tests:
           path: spec.values.vmagent.spec.extraArgs["promscrape.maxScrapeSize"]
           value: "33554432"
       - equal:
-          path: spec.values.kube-state-metrics.vmServiceScrape.spec.endpoints[0].port
+          path: spec.values.kube-state-metrics.vmScrape.spec.endpoints[0].port
           value: http
       - notExists:
-          path: spec.values.kube-state-metrics.vmServiceScrape.spec.endpoints[0].max_scrape_size
+          path: spec.values.kube-state-metrics.vmScrape.spec.endpoints[0].max_scrape_size
       - equal:
-          path: spec.values.kube-state-metrics.vmServiceScrape.spec.endpoints[1].port
+          path: spec.values.kube-state-metrics.vmScrape.spec.endpoints[1].port
           value: metrics
       - notExists:
-          path: spec.values.kube-state-metrics.vmServiceScrape.spec.endpoints[1].max_scrape_size
+          path: spec.values.kube-state-metrics.vmScrape.spec.endpoints[1].max_scrape_size
 
   - it: should allow overriding kube-state-metrics scrape size
     set:
@@ -27,5 +27,5 @@ tests:
       - hasDocuments:
           count: 1
       - equal:
-          path: spec.values.kube-state-metrics.vmServiceScrape.spec.endpoints[0].max_scrape_size
+          path: spec.values.kube-state-metrics.vmScrape.spec.endpoints[0].max_scrape_size
           value: "150554432"

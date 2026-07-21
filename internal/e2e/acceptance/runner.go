@@ -228,6 +228,7 @@ func discoveredNodeSetsFromLiveList(nodeSets slurmv1alpha1.NodeSetList, clusterN
 func featurePaths() []string {
 	return []string{
 		"features/cluster_creation.feature",
+		"features/observability.feature",
 		"features/internal_ssh.feature",
 		"features/package_installation.feature",
 		"features/node_replacement.feature",
@@ -250,6 +251,7 @@ func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
 	steps.NewDockerContainers(w, slurm, r.state.SlurmClusterName).Register(sc)
 	steps.NewEnrootContainers(w, slurm, r.state.SlurmClusterName).Register(sc)
 	steps.NewTopology(r.state, w).Register(sc)
+	steps.NewObservability(w).Register(sc)
 
 	registerSkipHook(sc)
 }
