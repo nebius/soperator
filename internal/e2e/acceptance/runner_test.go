@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
 )
 
 func TestParseOptionsDefaults(t *testing.T) {
@@ -18,6 +19,7 @@ func TestParseOptionsDefaults(t *testing.T) {
 	assert.Equal(t, "dev-context", opts.KubectlContext)
 	assert.Equal(t, "soperator", opts.SlurmClusterName)
 	assert.False(t, opts.RunUnstableTests)
+	assert.False(t, opts.SelectedOnly)
 	assert.Empty(t, opts.ReportDir)
 }
 
@@ -26,6 +28,7 @@ func TestParseOptionsExplicitValues(t *testing.T) {
 		"--kubectl-context", "dev-context",
 		"--slurm-cluster-name", "custom",
 		"--run-unstable=true",
+		"--selected=true",
 		"--report-dir", "reports",
 	})
 	require.NoError(t, err)
@@ -33,7 +36,55 @@ func TestParseOptionsExplicitValues(t *testing.T) {
 	assert.Equal(t, "dev-context", opts.KubectlContext)
 	assert.Equal(t, "custom", opts.SlurmClusterName)
 	assert.True(t, opts.RunUnstableTests)
+	assert.True(t, opts.SelectedOnly)
 	assert.Equal(t, "reports", opts.ReportDir)
+}
+
+func TestRunnerTagFilter(t *testing.T) {
+	gpuState := &framework.ClusterState{
+		GPUWorkers: []framework.WorkerPodRef{{Name: "worker-gpu-0"}},
+	}
+	noGPUState := &framework.ClusterState{}
+
+	tests := []struct {
+		name             string
+		state            *framework.ClusterState
+		runUnstableTests bool
+		selectedOnly     bool
+		want             string
+	}{
+		{
+			name:  "default excludes unstable",
+			state: gpuState,
+			want:  "~@unstable",
+		},
+		{
+			name:         "selected includes selected tag and excludes unstable",
+			state:        gpuState,
+			selectedOnly: true,
+			want:         "@selected && ~@unstable",
+		},
+		{
+			name:             "selected and unstable only includes selected tag",
+			state:            gpuState,
+			runUnstableTests: true,
+			selectedOnly:     true,
+			want:             "@selected",
+		},
+		{
+			name:         "selected without GPU workers also excludes GPU",
+			state:        noGPUState,
+			selectedOnly: true,
+			want:         "@selected && ~@unstable && ~@gpu",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner := NewRunner(tt.state, tt.runUnstableTests, tt.selectedOnly, "", "")
+			assert.Equal(t, tt.want, runner.tagFilter())
+		})
+	}
 }
 
 func TestParseOptionsRequiresKubectlContext(t *testing.T) {
