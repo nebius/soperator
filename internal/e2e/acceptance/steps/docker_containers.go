@@ -19,8 +19,7 @@ const (
 	dockerLifecycleImage   = "cr.eu-north1.nebius.cloud/soperator/busybox"
 	dockerLifecycleCommand = "echo ready; sleep 3600"
 
-	// Cluster-supported GPU diagnostic image; includes nvidia-smi for container GPU visibility.
-	dockerGPUImage = "cr.eu-north1.nebius.cloud/ml-containers/training_diag:13.0.2-ubuntu24.04-20260709140028"
+	dockerLocalStorageRoot = "/mnt/image-storage/docker"
 
 	dockerJobStartTimeout      = 20 * time.Minute
 	dockerProbeTimeout         = 10 * time.Minute
@@ -112,10 +111,48 @@ func (s *DockerContainers) theDockerContainerJobIsRunning(ctx context.Context) e
 }
 
 func (s *DockerContainers) dockerImageAndRuntimeStorageIsPopulatedOnAWorker(ctx context.Context) error {
-	if err := framework.WaitForTreeEntriesOnWorker(ctx, s.exec, s.connectionWorker, "/mnt/image-storage/docker/overlay2/", "Docker overlay2 storage", dockerProbeTimeout); err != nil {
-		return err
+	if s.connectionWorker == "" {
+		return fmt.Errorf("Docker connection worker is not selected")
 	}
-	return framework.WaitForTreeEntriesOnWorker(ctx, s.exec, s.connectionWorker, "/mnt/image-storage/docker/containerd/daemon/io.containerd.content.v1.content/blobs/sha256/", "Docker container content blobs", dockerProbeTimeout)
+
+	err := framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "Docker image and runtime storage on local disk",
+		dockerProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+			rootDir, err := s.dockerRootDir(waitCtx, s.connectionWorker)
+			if err != nil {
+				return false, err
+			}
+			if !pathIsUnder(rootDir, dockerLocalStorageRoot) {
+				return false, fmt.Errorf("expected Docker root dir under %s, got %q", dockerLocalStorageRoot, rootDir)
+			}
+
+			imageID, err := s.dockerImageID(waitCtx, s.connectionWorker, dockerLifecycleImage)
+			if err != nil {
+				return false, err
+			}
+			if imageID == "" {
+				return false, nil
+			}
+
+			containerIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, s.connectionWorker)
+			if err != nil {
+				return false, err
+			}
+			for containerID := range containerIDs {
+				paths, err := s.dockerContainerGraphDriverPaths(waitCtx, s.connectionWorker, containerID)
+				if err != nil {
+					return false, err
+				}
+				if paths == "" {
+					return false, nil
+				}
+				if !graphDriverPathsUnder(paths, dockerLocalStorageRoot) {
+					return false, fmt.Errorf("expected Docker graph-driver paths under %s, got:\n%s", dockerLocalStorageRoot, paths)
+				}
+				return true, nil
+			}
+			return false, nil
+		})
+	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
 }
 
 func (s *DockerContainers) dockerContainersFromTheJobAreRunningOnSelectedWorkers(ctx context.Context) error {
@@ -140,16 +177,6 @@ func (s *DockerContainers) theDockerContainerJobIsCancelled(ctx context.Context)
 }
 
 func (s *DockerContainers) dockerContainersFromTheJobAreStoppedExplicitly(ctx context.Context) error {
-	running, err := s.trackedDockerContainerCount(ctx)
-	if err != nil {
-		return err
-	}
-	if running == 0 {
-		s.exec.Logf("Docker containers: no matching containers found after scancel; explicit stop was a no-op")
-		return nil
-	}
-
-	s.exec.Logf("Docker containers: %d matching container(s) still running after scancel; stopping explicitly", running)
 	s.stopContainersByNamePrefix(ctx)
 	return nil
 }
@@ -172,7 +199,7 @@ func (s *DockerContainers) aDockerGPUSmokeJobIsSubmittedOnOneGPUWorker(ctx conte
 	s.connectionWorker = workers[0]
 
 	wrap := fmt.Sprintf("srun docker run --name e2e-docker-gpu-${SLURM_JOB_ID}-${SLURM_NODEID} --gpus=all -e NVIDIA_DRIVER_CAPABILITIES=utility %s nvidia-smi -L",
-		framework.ShellQuote(dockerGPUImage),
+		framework.ShellQuote(gpuSmokeDockerImage),
 	)
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      "e2e-docker-gpu-smoke",
@@ -255,22 +282,6 @@ func (s *DockerContainers) waitForCurrentJobGone(ctx context.Context) error {
 	return nil
 }
 
-func (s *DockerContainers) trackedDockerContainerCount(ctx context.Context) (int, error) {
-	if len(s.workers) == 0 {
-		return 0, fmt.Errorf("Docker workers are not selected")
-	}
-
-	count := 0
-	for _, worker := range s.workers {
-		currentIDs, err := s.dockerContainerIDsByNamePrefix(ctx, worker)
-		if err != nil {
-			return 0, err
-		}
-		count += len(currentIDs)
-	}
-	return count, nil
-}
-
 func (s *DockerContainers) dockerContainerIDsByNamePrefix(ctx context.Context, worker string) (map[string]struct{}, error) {
 	if s.containerNamePrefix == "" {
 		return nil, fmt.Errorf("Docker container name prefix is empty")
@@ -282,6 +293,32 @@ func (s *DockerContainers) dockerContainerIDsByNamePrefix(ctx context.Context, w
 		return nil, err
 	}
 	return parseIDSet(out), nil
+}
+
+func (s *DockerContainers) dockerRootDir(ctx context.Context, worker string) (string, error) {
+	out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx, "sudo docker info --format '{{.DockerRootDir}}'")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+func (s *DockerContainers) dockerImageID(ctx context.Context, worker, image string) (string, error) {
+	out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx,
+		fmt.Sprintf("sudo docker image inspect --format '{{.Id}}' %s", framework.ShellQuote(image)))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+func (s *DockerContainers) dockerContainerGraphDriverPaths(ctx context.Context, worker, containerID string) (string, error) {
+	out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx,
+		fmt.Sprintf("sudo docker inspect --format '{{range $key, $value := .GraphDriver.Data}}{{println $value}}{{end}}' %s", framework.ShellQuote(containerID)))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
 }
 
 func (s *DockerContainers) dockerContainerIDsByNamePrefixAll(ctx context.Context, worker string) (map[string]struct{}, error) {
@@ -328,6 +365,33 @@ func parseIDSet(output string) map[string]struct{} {
 		result[id] = struct{}{}
 	}
 	return result
+}
+
+func graphDriverPathsUnder(output, root string) bool {
+	foundPath := false
+	for _, line := range strings.Split(output, "\n") {
+		value := strings.TrimSpace(line)
+		if value == "" {
+			continue
+		}
+		for _, field := range strings.Split(value, ":") {
+			candidate := strings.TrimSpace(field)
+			if candidate == "" || !strings.HasPrefix(candidate, "/") {
+				continue
+			}
+			foundPath = true
+			if !pathIsUnder(candidate, root) {
+				return false
+			}
+		}
+	}
+	return foundPath
+}
+
+func pathIsUnder(value, root string) bool {
+	cleanValue := path.Clean(strings.TrimSpace(value))
+	cleanRoot := path.Clean(strings.TrimSpace(root))
+	return cleanValue == cleanRoot || strings.HasPrefix(cleanValue, cleanRoot+"/")
 }
 
 func (s *DockerContainers) stopContainersByNamePrefix(ctx context.Context) {

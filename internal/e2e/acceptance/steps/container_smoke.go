@@ -9,7 +9,14 @@ import (
 	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
 )
 
-const containerSmokeSacctTimeout = 2 * time.Minute
+const (
+	containerSmokeSacctTimeout = 2 * time.Minute
+
+	// Cluster-supported GPU diagnostic image; includes nvidia-smi for container GPU visibility.
+	gpuSmokeImageRef    = "ml-containers/training_diag:13.0.2-ubuntu24.04-20260709140028"
+	gpuSmokeDockerImage = "cr.eu-north1.nebius.cloud/" + gpuSmokeImageRef
+	gpuSmokeEnrootImage = "docker://cr.eu-north1.nebius.cloud#" + gpuSmokeImageRef
+)
 
 func waitForJobSucceeded(ctx context.Context, exec framework.Exec, slurm *framework.SlurmClient, job framework.SbatchJob, timeout time.Duration) error {
 	if err := framework.AnnotateWithJobLog(ctx, exec, slurm, job, slurm.WaitForJobGone(ctx, job.ID, timeout)); err != nil {
