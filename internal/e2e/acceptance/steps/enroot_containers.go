@@ -40,6 +40,7 @@ type EnrootContainers struct {
 	squashPath         string
 	expectedSquashPath string
 	squashStatBefore   string
+	runtimeNamePrefix  string
 
 	directSquashFS *bool
 }
@@ -90,6 +91,7 @@ func (s *EnrootContainers) aLongRunningEnrootContainerJobIsSubmittedOnTwoWorkers
 	s.squashPath = ""
 	s.expectedSquashPath = ""
 	s.squashStatBefore = ""
+	s.runtimeNamePrefix = ""
 
 	expectedSquashPath, err := s.expectedLifecycleSquashPath(ctx)
 	if err != nil {
@@ -263,6 +265,7 @@ func (s *EnrootContainers) submitEnrootLifecycleJob(ctx context.Context, jobName
 		return err
 	}
 	s.job = job
+	s.runtimeNamePrefix = fmt.Sprintf("pyxis_%s.", job.ID)
 	s.exec.Logf("enroot containers: submitted job=%s id=%s stdout=%s stderr=%s",
 		job.JobName, job.ID, job.StdoutPath, job.StderrPath)
 	return nil
@@ -520,8 +523,8 @@ func (s *EnrootContainers) legacyEnrootDataTree(ctx context.Context, worker stri
 }
 
 func (s *EnrootContainers) enrootRuntimeNamePrefix() (string, error) {
-	if s.job.IsZero() {
-		return "", fmt.Errorf("enroot job id is empty")
+	if s.runtimeNamePrefix == "" {
+		return "", fmt.Errorf("enroot runtime name prefix is not captured")
 	}
-	return fmt.Sprintf("pyxis_%s.", s.job.ID), nil
+	return s.runtimeNamePrefix, nil
 }
