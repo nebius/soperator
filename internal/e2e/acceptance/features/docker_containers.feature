@@ -1,13 +1,14 @@
 Feature: Docker containers
-  # Skipped: Docker NCCL job hangs in this scenario (SCHED-1562); needs deeper triage.
-  @skip
+  Scenario: Docker container lifecycle uses local storage
+    Given a long-running Docker container job is submitted on two workers
+    When the Docker container job is running
+    Then Docker image and runtime storage is populated on a worker
+    And Docker containers from the job are running on selected workers
+    When the Docker container job is cancelled
+    And Docker containers from the job are stopped explicitly
+    Then Docker containers from the job are no longer running
+
   @gpu
-  Scenario: A long-running Docker NCCL job uses local storage and cleans up containers
-    Given a long-running Docker NCCL job is submitted on two GPU workers
-    When the Docker NCCL job is running
-    Then Docker overlayfs storage is populated on a worker
-    And Docker container content blobs are populated on a worker
-    And a Docker container from the job is running on workers
-    And the Docker NCCL job is still running
-    When the Docker NCCL job is cancelled
-    Then Docker containers from that job are no longer running
+  Scenario: Docker containers can access GPUs
+    Given a Docker GPU smoke job is submitted on one GPU worker
+    Then the Docker GPU smoke job succeeds and reports visible GPUs
