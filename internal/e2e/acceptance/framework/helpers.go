@@ -33,41 +33,6 @@ func ParseSbatchJobID(output string) (string, error) {
 	return jobID, nil
 }
 
-func TreeOutputHasEntries(output string) bool {
-	lines := make([]string, 0)
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		lines = append(lines, line)
-	}
-	if len(lines) < 3 {
-		return false
-	}
-
-	for _, line := range lines[1 : len(lines)-1] {
-		if strings.TrimSpace(line) != "" {
-			return true
-		}
-	}
-	return false
-}
-
-func WaitForTreeEntriesOnWorker(ctx context.Context, exec Exec, worker, storagePath, description string, timeout time.Duration) error {
-	trimmedWorker := strings.TrimSpace(worker)
-	if trimmedWorker == "" {
-		return fmt.Errorf("%s: worker is not selected", description)
-	}
-
-	return exec.WaitFor(ctx, description, timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		out, err := exec.Worker(trimmedWorker).RunWithDefaultRetry(waitCtx, fmt.Sprintf("sudo tree -L 2 -a %s", ShellQuote(storagePath)))
-		if err != nil {
-			return false, err
-		}
-		return TreeOutputHasEntries(out), nil
-	})
-}
-
 // WaitForWithJobAlive is Exec.WaitFor with an added short‑circuit on job death. On each tick:
 //   - if Slurm still considers the job alive (PENDING / RUNNING / COMPLETING / …), probe runs exactly
 //     as it would under a plain Exec.WaitFor; the tick result — ready / not‑ready / error — is passed through;
