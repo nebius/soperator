@@ -29,3 +29,42 @@ tests:
       - equal:
           path: spec.values.kube-state-metrics.vmScrape.spec.endpoints[0].max_scrape_size
           value: "150554432"
+
+  - it: should not set kube-state-metrics resources by default
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.values.kube-state-metrics.resources
+
+  - it: should pin kube-state-metrics to system nodes
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.kube-state-metrics.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: slurm.nebius.ai/nodeset
+      - equal:
+          path: spec.values.kube-state-metrics.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]
+          value: system
+
+  - it: should pass kube-state-metrics resources through
+    set:
+      observability.vmStack.values.kubeStateMetrics.resources:
+        requests:
+          cpu: 200m
+          memory: 1024Mi
+        limits:
+          memory: 2048Mi
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.kube-state-metrics.resources.requests.cpu
+          value: 200m
+      - equal:
+          path: spec.values.kube-state-metrics.resources.requests.memory
+          value: 1024Mi
+      - equal:
+          path: spec.values.kube-state-metrics.resources.limits.memory
+          value: 2048Mi
