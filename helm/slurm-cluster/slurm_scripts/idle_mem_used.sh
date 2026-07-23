@@ -8,27 +8,43 @@ node_real_memory_bytes="${CHECKS_NODE_REAL_MEM_BYTES:-}"
 
 echo "[$(date)] Check memory usage when node ${node_name} is idle"
 echo "Slurm RealMemory input: ${node_real_memory_bytes:-<unavailable>} bytes"
-echo "Idle state source: local 'scontrol listjobs' (no controller RPC)"
-echo "Idle state rule: exit code 1 with \"No slurmstepd's found on this node\" means the node has no local jobs"
+echo "Idle state source: local 'scontrol listjobs --json' (no controller RPC)"
+echo "Idle state rule: an empty JSON .jobs array means the node has no local jobs"
 
-if listjobs_output="$(scontrol listjobs 2>&1)"; then
+if listjobs_output="$(scontrol listjobs --json 2>&1)"; then
     listjobs_rc=0
 else
     listjobs_rc=$?
 fi
 
-echo "scontrol listjobs exit code: ${listjobs_rc}"
-echo "scontrol listjobs output: ${listjobs_output:-<empty>}"
+echo "scontrol listjobs --json exit code: ${listjobs_rc}"
+echo "scontrol listjobs --json output: ${listjobs_output:-<empty>}"
 
-if (( listjobs_rc == 0 )); then
-    node_is_idle=false
-    echo "Local Slurm jobs are present; treating the node as non-idle"
-elif (( listjobs_rc == 1 )) && [[ "${listjobs_output}" == *"No slurmstepd's found on this node"* ]]; then
-    node_is_idle=true
-    echo "No local slurmstepd was found; treating the node as idle"
-else
-    echo "Could not determine whether the node is idle from 'scontrol listjobs'; skipping memory validation" >&2
+if (( listjobs_rc != 0 )); then
+    echo "Could not determine whether the node is idle because 'scontrol listjobs --json' failed; skipping memory validation" >&2
     exit 0
+fi
+
+if ! local_job_count="$(
+    jq -er '
+        if (.jobs | type) == "array" then
+            .jobs | length
+        else
+            error(".jobs must be an array")
+        end
+    ' <<<"${listjobs_output}" 2>/dev/null
+)"; then
+    echo "Could not determine whether the node is idle because 'scontrol listjobs --json' returned invalid job data; skipping memory validation" >&2
+    exit 0
+fi
+
+echo "Local Slurm job count from JSON .jobs array: ${local_job_count}"
+if (( local_job_count == 0 )); then
+    node_is_idle=true
+    echo "The JSON .jobs array is empty; treating the node as idle"
+else
+    node_is_idle=false
+    echo "The JSON .jobs array contains local jobs; treating the node as non-idle"
 fi
 
 echo "Node is idle: ${node_is_idle}"
