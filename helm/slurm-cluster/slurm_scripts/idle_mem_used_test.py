@@ -5,7 +5,8 @@ import unittest
 from pathlib import Path
 
 
-SCRIPT_PATH = Path(__file__).with_name("idle_mem_used.sh")
+DRAIN_SCRIPT_PATH = Path(__file__).with_name("idle_mem_used.drain.sh")
+UNDRAIN_SCRIPT_PATH = Path(__file__).with_name("idle_mem_used.undrain.sh")
 GIB = 1024 * 1024 * 1024
 
 
@@ -19,6 +20,7 @@ class IdleMemUsedTest(unittest.TestCase):
         available_bytes: int | None,
         node_real_memory_bytes: int | None = 56 * GIB,
         free_bytes_rc: int = 0,
+        script_path: Path = DRAIN_SCRIPT_PATH,
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmpdir:
             scontrol_path = Path(tmpdir) / "scontrol"
@@ -87,7 +89,7 @@ class IdleMemUsedTest(unittest.TestCase):
                     "-c",
                     'exec 3>&1; exec bash "$1"',
                     "idle-mem-used-test",
-                    str(SCRIPT_PATH),
+                    str(script_path),
                 ],
                 check=False,
                 env=env,
@@ -144,7 +146,7 @@ class IdleMemUsedTest(unittest.TestCase):
         self.assertEqual(1, result.returncode)
         self.assertIn("Node is idle: true", result.stdout)
         self.assertIn(
-            "available memory 23.62 GB < Slurm RealMemory 60.13 GB", result.stdout
+            "available memory 23.62 GB < configured 60.13 GB", result.stdout
         )
         self.assertIn("stop leftover processes or reboot", result.stdout)
 
@@ -237,6 +239,49 @@ class IdleMemUsedTest(unittest.TestCase):
         self.assertEqual(0, result.returncode)
         self.assertIn("returned invalid job data", result.stderr)
         self.assertNotIn("Node is idle:", result.stdout)
+        self.assertNotIn("Memory comparison:", result.stdout)
+
+    def test_undrain_confirms_recovery_without_querying_local_jobs(self):
+        result = self.run_check(
+            listjobs_rc=64,
+            listjobs_output="undrain must not query local jobs",
+            total_bytes=64 * GIB,
+            available_bytes=60 * GIB,
+            script_path=UNDRAIN_SCRIPT_PATH,
+        )
+
+        self.assertEqual(0, result.returncode)
+        self.assertNotIn("listjobs", result.stdout)
+        self.assertNotIn("listjobs", result.stderr)
+        self.assertIn("scheduled only for drained nodes", result.stdout)
+        self.assertIn("memory recovery confirmed", result.stdout)
+
+    def test_undrain_keeps_node_drained_when_available_memory_is_insufficient(self):
+        result = self.run_check(
+            listjobs_rc=64,
+            listjobs_output="undrain must not query local jobs",
+            total_bytes=64 * GIB,
+            available_bytes=22 * GIB,
+            script_path=UNDRAIN_SCRIPT_PATH,
+        )
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("is still below configured memory", result.stderr)
+        self.assertIn("keeping node drained", result.stderr)
+
+    def test_undrain_keeps_node_drained_when_memory_data_is_unavailable(self):
+        result = self.run_check(
+            listjobs_rc=64,
+            listjobs_output="undrain must not query local jobs",
+            total_bytes=None,
+            available_bytes=None,
+            free_bytes_rc=2,
+            script_path=UNDRAIN_SCRIPT_PATH,
+        )
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("Could not read local memory information", result.stderr)
+        self.assertIn("keeping node drained", result.stderr)
         self.assertNotIn("Memory comparison:", result.stdout)
 
 
