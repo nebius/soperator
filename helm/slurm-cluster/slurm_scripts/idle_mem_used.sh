@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-meminfo_path="${IDLE_MEM_USED_MEMINFO_PATH:-/proc/meminfo}"
 node_name="${SLURMD_NODENAME:-unknown}"
 node_real_memory_bytes="${CHECKS_NODE_REAL_MEM_BYTES:-}"
 
@@ -58,48 +57,38 @@ if ! [[ "${node_real_memory_bytes}" =~ ^[0-9]+$ ]] || [[ "${node_real_memory_byt
     exit 0
 fi
 
-meminfo_values="$(
-    awk '
-        /^MemTotal:/ { total = $2 }
-        /^MemAvailable:/ { available = $2 }
-        END { if (total != "" && available != "") print total, available }
-    ' "${meminfo_path}" 2>/dev/null || true
-)"
-read -r mem_total_kib mem_available_kib <<< "${meminfo_values}"
-
-if ! [[ "${mem_total_kib:-}" =~ ^[0-9]+$ ]] ||
-   ! [[ "${mem_available_kib:-}" =~ ^[0-9]+$ ]] ||
-   (( mem_available_kib > mem_total_kib )); then
-    echo "Could not determine valid MemTotal and MemAvailable values from ${meminfo_path}; skipping memory validation" >&2
+if ! free_bytes_output="$(LC_ALL=C free -b 2>&1)"; then
+    echo "Could not read local memory information with 'free -b'; skipping memory validation" >&2
     exit 0
 fi
 
-mem_total_bytes=$((mem_total_kib * 1024))
-mem_available_bytes=$((mem_available_kib * 1024))
-mem_used_bytes=$((mem_total_bytes - mem_available_bytes))
+memory_values="$(awk '/^Mem:/ { print $2, $7; exit }' <<<"${free_bytes_output}")"
+read -r mem_total_bytes mem_available_bytes <<<"${memory_values}"
+
+if ! [[ "${mem_total_bytes:-}" =~ ^[0-9]+$ ]] ||
+   ! [[ "${mem_available_bytes:-}" =~ ^[0-9]+$ ]] ||
+   (( mem_available_bytes > mem_total_bytes )); then
+    echo "Could not determine valid total and available memory from 'free -b'; skipping memory validation" >&2
+    exit 0
+fi
 
 if (( node_real_memory_bytes > mem_total_bytes )); then
     echo "Slurm RealMemory ${node_real_memory_bytes} bytes exceeds MemTotal ${mem_total_bytes} bytes; skipping memory validation" >&2
     exit 0
 fi
 
-max_idle_used_bytes=$((mem_total_bytes - node_real_memory_bytes))
-
-mem_total_gb="$(awk -v bytes="${mem_total_bytes}" 'BEGIN { printf "%.2f", bytes / 1000000000 }')"
 mem_available_gb="$(awk -v bytes="${mem_available_bytes}" 'BEGIN { printf "%.2f", bytes / 1000000000 }')"
-mem_used_gb="$(awk -v bytes="${mem_used_bytes}" 'BEGIN { printf "%.2f", bytes / 1000000000 }')"
 node_real_memory_gb="$(awk -v bytes="${node_real_memory_bytes}" 'BEGIN { printf "%.2f", bytes / 1000000000 }')"
-max_idle_used_gb="$(awk -v bytes="${max_idle_used_bytes}" 'BEGIN { printf "%.2f", bytes / 1000000000 }')"
 
-echo "Memory source: ${meminfo_path}"
-echo "Memory measurements: total=${mem_total_gb} GB (${mem_total_bytes} bytes), available=${mem_available_gb} GB (${mem_available_bytes} bytes), used=total-available=${mem_used_gb} GB (${mem_used_bytes} bytes)"
-echo "Slurm RealMemory: ${node_real_memory_gb} GB (${node_real_memory_bytes} bytes)"
-echo "Derived maximum idle used memory: MemTotal-RealMemory=${max_idle_used_gb} GB (${max_idle_used_bytes} bytes)"
+echo "Memory source: local 'free'"
+echo "Memory comparison: available=${mem_available_gb} GB (${mem_available_bytes} bytes), Slurm RealMemory=${node_real_memory_gb} GB (${node_real_memory_bytes} bytes)"
+echo "Memory snapshot (free -hw):"
+if ! LC_ALL=C free -hw; then
+    echo "Could not print the human-readable memory snapshot with 'free -hw'" >&2
+fi
 
 if (( mem_available_bytes < node_real_memory_bytes )); then
-    memory_deficit_bytes=$((node_real_memory_bytes - mem_available_bytes))
-    memory_deficit_gb="$(awk -v bytes="${memory_deficit_bytes}" 'BEGIN { printf "%.2f", bytes / 1000000000 }')"
-    echo "Node ${node_name} is IDLE but has only ${mem_available_gb} GB of memory available, below Slurm RealMemory ${node_real_memory_gb} GB by ${memory_deficit_gb} GB (used: ${mem_used_gb} GB; derived maximum idle usage: ${max_idle_used_gb} GB; MemTotal: ${mem_total_gb} GB). This may indicate leftover or spurious processes consuming memory." >&3
+    echo "available memory ${mem_available_gb} GB < Slurm RealMemory ${node_real_memory_gb} GB; stop leftover processes or reboot" >&3
     exit 1
 fi
 
