@@ -18,7 +18,8 @@ const (
 	ContainerNameCustom            = "custom-container"
 	ContainerNameSConfigController = SConfigControllerName
 
-	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"
+	ContainerSecurityContextCapabilitySysAdmin  = "SYS_ADMIN"
+	ContainerSecurityContextCapabilitySysChroot = "SYS_CHROOT"
 
 	ContainerPortNameExporter = "metrics"
 	ContainerPortExporter     = 8080

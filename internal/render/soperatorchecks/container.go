@@ -34,7 +34,10 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 			Env:             check.Spec.K8sJobSpec.JobContainer.Env,
 			SecurityContext: &corev1.SecurityContext{
 				Capabilities: &corev1.Capabilities{
-					Add: []corev1.Capability{consts.ContainerSecurityContextCapabilitySysAdmin},
+					Add: []corev1.Capability{
+						consts.ContainerSecurityContextCapabilitySysAdmin,
+						consts.ContainerSecurityContextCapabilitySysChroot,
+					},
 				},
 				AppArmorProfile: common.ParseAppArmorProfile(
 					check.Spec.K8sJobSpec.JobContainer.AppArmorProfile),
@@ -99,7 +102,10 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 		Env:             slurmEnvVars,
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{consts.ContainerSecurityContextCapabilitySysAdmin},
+				Add: []corev1.Capability{
+					consts.ContainerSecurityContextCapabilitySysAdmin,
+					consts.ContainerSecurityContextCapabilitySysChroot,
+				},
 			},
 			AppArmorProfile: common.ParseAppArmorProfile(
 				check.Spec.K8sJobSpec.JobContainer.AppArmorProfile),
