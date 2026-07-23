@@ -88,7 +88,7 @@ if ! LC_ALL=C free -hw; then
 fi
 
 if (( mem_available_bytes < node_real_memory_bytes )); then
-    echo "available memory ${mem_available_gb} GB < Slurm RealMemory ${node_real_memory_gb} GB; stop leftover processes or reboot" >&3
+    echo "available memory ${mem_available_gb} GB < configured ${node_real_memory_gb} GB; stop leftover processes or reboot" >&3
     exit 1
 fi
 
