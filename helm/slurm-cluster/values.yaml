@@ -774,6 +774,14 @@ slurmScripts:
       enabled: true
       customContent: null
       customConfig: null
+    idle_mem_used.drain.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
+    idle_mem_used.undrain.sh:
+      enabled: true
+      customContent: null
+      customConfig: null
     job_tmpfs_delete.sh:
       enabled: true
       customContent: null
