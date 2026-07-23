@@ -1,0 +1,59 @@
+{{- $config := .Values.clusterInitialization.createUserSoperatorchecks -}}
+{{- if $config.enabled -}}
+{{- $jailVolumeSourceName := required "clusterInitialization.jailVolumeSourceName must be provided" .Values.clusterInitialization.jailVolumeSourceName -}}
+{{- $jailVolumeSource := dict -}}
+{{- range $source := .Values.volumeSources -}}
+  {{- if eq $source.name $jailVolumeSourceName -}}
+    {{- $jailVolumeSource = omit $source "name" "createPVC" "storageClassName" "size" -}}
+  {{- end -}}
+{{- end -}}
+{{- if empty $jailVolumeSource -}}
+  {{- fail (printf "volume source %q configured by clusterInitialization.jailVolumeSourceName was not found" $jailVolumeSourceName) -}}
+{{- end -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-create-user-soperatorchecks" (include "slurm-cluster.name" .) | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "slurm-cluster.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cluster-initialization
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  activeDeadlineSeconds: {{ $config.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "slurm-cluster.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: cluster-initialization
+    spec:
+      restartPolicy: Never
+      {{- if not (kindIs "invalid" .Values.clusterInitialization.hostUsers) }}
+      hostUsers: {{ .Values.clusterInitialization.hostUsers }}
+      {{- else if semverCompare ">=1.33.0" .Capabilities.KubeVersion.Version }}
+      hostUsers: true
+      {{- else }}
+      hostUsers: false
+      {{- end }}
+      containers:
+        - name: create-user-soperatorchecks
+          image: {{ required "images.k8sJob must be provided" .Values.images.k8sJob | quote }}
+          imagePullPolicy: {{ $config.imagePullPolicy | quote }}
+          command:
+            - bash
+            - -c
+            - |
+{{ .Files.Get "scripts/create-user-soperatorchecks.sh" | indent 14 }}
+          securityContext:
+            capabilities:
+              add:
+                - SYS_ADMIN
+          volumeMounts:
+            - name: jail
+              mountPath: /mnt/jail
+      volumes:
+        - name: jail
+{{ toYaml $jailVolumeSource | indent 10 }}
+{{- end }}

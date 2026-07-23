@@ -1,0 +1,116 @@
+suite: test cluster initialization
+templates:
+  - templates/create-user-soperatorchecks-job.yaml
+tests:
+  - it: should not render create-user-soperatorchecks by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render create-user-soperatorchecks as a Helm hook when enabled
+    set:
+      clusterInitialization.createUserSoperatorchecks.enabled: true
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.name
+          value: slurm1-create-user-soperatorchecks
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,post-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 1800
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: Never
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: IfNotPresent
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: bash
+      - equal:
+          path: spec.template.spec.containers[0].command[1]
+          value: -c
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: 'id "soperatorchecks" \|\| echo "" \| soperator-createuser soperatorchecks --home /opt/soperator-home/soperatorchecks --gecos ""'
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: 'soperatorchecks_id_ecdsa'
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: 'mkdir -p /etc/soperatorchecks'
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: 'sleep 20'
+      - contains:
+          path: spec.template.spec.containers[0].securityContext.capabilities.add
+          content: SYS_ADMIN
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: jail
+            mountPath: /mnt/jail
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: jail
+            persistentVolumeClaim:
+              claimName: jail-pvc
+              readOnly: false
+
+  - it: should allow initialization runtime settings to be overridden
+    set:
+      clusterInitialization.hostUsers: true
+      clusterInitialization.createUserSoperatorchecks.enabled: true
+      clusterInitialization.createUserSoperatorchecks.activeDeadlineSeconds: 240
+      clusterInitialization.createUserSoperatorchecks.imagePullPolicy: Always
+      images.k8sJob: example.invalid/k8s-job:test
+    asserts:
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 240
+      - equal:
+          path: spec.template.spec.hostUsers
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: example.invalid/k8s-job:test
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: Always
+
+  - it: should use the configured jail volume source
+    set:
+      clusterInitialization.createUserSoperatorchecks.enabled: true
+      clusterInitialization.jailVolumeSourceName: custom-jail
+      volumeSources:
+        - name: custom-jail
+          createPVC: false
+          storageClassName: ""
+          size: ""
+          persistentVolumeClaim:
+            claimName: custom-jail-pvc
+            readOnly: false
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: jail
+            persistentVolumeClaim:
+              claimName: custom-jail-pvc
+              readOnly: false
+
+  - it: should fail when the configured jail volume source is missing
+    set:
+      clusterInitialization.createUserSoperatorchecks.enabled: true
+      clusterInitialization.jailVolumeSourceName: missing
+    asserts:
+      - failedTemplate:
+          errorMessage: 'volume source "missing" configured by clusterInitialization.jailVolumeSourceName was not found'
