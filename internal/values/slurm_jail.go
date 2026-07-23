@@ -29,9 +29,10 @@ func buildSlurmPopulateJailFrom(clusterName string, maintenance *consts.Maintena
 		ContainerPopulateJail: Container{
 			Name: consts.ContainerNamePopulateJail,
 			NodeContainer: slurmv1.NodeContainer{
-				Image:           populateJail.Image,
-				ImagePullPolicy: populateJail.ImagePullPolicy,
-				AppArmorProfile: populateJail.AppArmorProfile,
+				Image:            populateJail.Image,
+				ImagePullPolicy:  populateJail.ImagePullPolicy,
+				ImagePullSecrets: populateJail.ImagePullSecrets,
+				AppArmorProfile:  populateJail.AppArmorProfile,
 			},
 		},
 		VolumeJail: slurmv1.NodeVolume{

@@ -549,6 +549,11 @@ type PopulateJail struct {
 	// +kubebuilder:default="IfNotPresent"
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
+	// ImagePullSecrets is a list of secret names in the same namespace used for pulling the container's image.
+	//
+	// +kubebuilder:validation:Optional
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
 	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
 	// Must correspond to the name of one of [K8sNodeFilter]
 	//
@@ -1241,6 +1246,11 @@ type NodeContainer struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="IfNotPresent"
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// ImagePullSecrets is a list of secret names in the same namespace used for pulling the container's image.
+	//
+	// +kubebuilder:validation:Optional
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
 	// Port defines the port the container exposes
 	//
