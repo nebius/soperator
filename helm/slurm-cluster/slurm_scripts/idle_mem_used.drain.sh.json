@@ -1,6 +1,6 @@
 {
   "name": "idle_mem_used",
-  "command": "./idle_mem_used.sh",
+  "command": "./idle_mem_used.drain.sh",
   "platforms": ["any"],
   "skip_for_cpu_jobs": false,
   "skip_for_partial_gpu_jobs": false,
@@ -11,6 +11,6 @@
   "reason_base": "[user_problem] $name",
   "reason_append_details": true,
   "run_in_jail": false,
-  "log": "slurm_scripts/$worker.$name.$context.out",
+  "log": "slurm_scripts/$worker.$name.drain.$context.out",
   "need_env": ["CHECKS_NODE_REAL_MEM_BYTES"]
 }

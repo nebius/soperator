@@ -2,16 +2,21 @@ suite: test idle memory health check
 templates:
   - slurm-scripts-cm.yaml
 tests:
-  - it: should enable the idle memory check with node RealMemory
+  - it: should enable the idle memory drain and undrain checks with node RealMemory
     asserts:
       - isNotNull:
-          path: data["idle_mem_used.sh"]
+          path: data["idle_mem_used.drain.sh"]
+      - isNotNull:
+          path: data["idle_mem_used.undrain.sh"]
       - matchRegex:
           path: data["checks.json"]
           pattern: '"name": "idle_mem_used"'
       - matchRegex:
           path: data["checks.json"]
-          pattern: '"command": "./idle_mem_used.sh"'
+          pattern: '"command": "./idle_mem_used.drain.sh"'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"command": "./idle_mem_used.undrain.sh"'
       - matchRegex:
           path: data["checks.json"]
           pattern: '"contexts": \[\s*"hc_program"\s*\]'
@@ -20,17 +25,27 @@ tests:
           pattern: '"on_fail": "drain"'
       - matchRegex:
           path: data["checks.json"]
+          pattern: '"node_states": \[\s*"drain"\s*\]'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"on_ok": "undrain"'
+      - matchRegex:
+          path: data["checks.json"]
           pattern: '"need_env": \[\s*"CHECKS_NODE_REAL_MEM_BYTES"\s*\]'
 
   - it: should allow the idle memory check to be disabled
     set:
       slurmScripts:
         builtIn:
-          idle_mem_used.sh:
+          idle_mem_used.drain.sh:
+            enabled: false
+          idle_mem_used.undrain.sh:
             enabled: false
     asserts:
       - isNull:
-          path: data["idle_mem_used.sh"]
+          path: data["idle_mem_used.drain.sh"]
+      - isNull:
+          path: data["idle_mem_used.undrain.sh"]
       - notMatchRegex:
           path: data["checks.json"]
-          pattern: '"name": "idle_mem_used"'
+          pattern: '"command": "./idle_mem_used.(drain|undrain).sh"'
