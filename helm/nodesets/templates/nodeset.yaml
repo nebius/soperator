@@ -148,14 +148,36 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
-      {{- with (.jailSubMounts | default list) }}
+      {{- $slurmScriptsCMName := include "nodesets.slurmScriptsCMName" $ }}
+
+      {{- if or $slurmScriptsCMName (.jailSubMounts | default list) }}
       jailSubMounts:
+        {{- if $slurmScriptsCMName }}
+        - name: slurm-scripts-jail
+          mountPath: /opt/slurm_scripts
+          volumeSource:
+            configMap:
+              name: {{ $slurmScriptsCMName | quote }}
+              defaultMode: 0755
+        {{- end }}
+        {{- with (.jailSubMounts | default list) }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
 
-      {{- with (.customVolumeMounts | default list) }}
+      {{- if or $slurmScriptsCMName (.customVolumeMounts | default list) }}
       customVolumeMounts:
+        {{- if $slurmScriptsCMName }}
+        - name: slurm-scripts
+          mountPath: /opt/slurm_scripts
+          volumeSource:
+            configMap:
+              name: {{ $slurmScriptsCMName | quote }}
+              defaultMode: 0755
+        {{- end }}
+        {{- with (.customVolumeMounts | default list) }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
 
       {{- with (.sharedMemorySize | default "") }}

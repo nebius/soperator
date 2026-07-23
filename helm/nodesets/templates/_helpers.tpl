@@ -114,6 +114,13 @@ customInitContainers:
 {{- end }}
 {{- end -}}
 
+{{/* Name of the slurm-scripts ConfigMap. Empty if clusterName is not set. */}}
+{{- define "nodesets.slurmScriptsCMName" -}}
+{{- if $.Values.clusterName -}}
+{{- printf "%s-slurm-scripts" $.Values.clusterName -}}
+{{- end -}}
+{{- end -}}
+
 {{/* Construct container gpu resource from GPU spec ([0]) and GPU resource spec ([1]) */}}
 {{- define "nodesets.resource.gpuFrom" -}}
   {{- $gpuSpec := (index . 0) | default dict -}}
