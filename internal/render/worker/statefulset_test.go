@@ -310,6 +310,182 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 	}
 }
 
+func TestRenderNodeSetStatefulSet_NvidiaIMEXCLIMount(t *testing.T) {
+	nodeSet := &values.SlurmNodeSet{
+		Name: "test-nodeset",
+		ParentalCluster: client.ObjectKey{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
+		},
+		ContainerSlurmd: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image:           "test-image",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory:           resource.MustParse("1Gi"),
+					corev1.ResourceCPU:              resource.MustParse("100m"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+		ContainerMunge: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "munge-image",
+			},
+		},
+		VolumeSpool: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+		},
+		VolumeJail: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+		},
+		StatefulSet:              values.StatefulSet{Replicas: 1},
+		ServiceUmbrella:          values.Service{Name: "test-umbrella"},
+		SupervisorDConfigMapName: "supervisord-config",
+		SSHDConfigMapName:        "sshd-config",
+		GPU:                      &slurmv1alpha1.GPUSpec{Enabled: true},
+	}
+
+	result, err := worker.RenderNodeSetStatefulSet(
+		"test-cluster",
+		nodeSet,
+		&slurmv1.Secrets{},
+		consts.CGroupV2,
+		true,
+		false,
+		"",
+	)
+	assert.NoError(t, err)
+
+	assertHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXCLI)
+	assertHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXCLIJail)
+	assertHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXConfig)
+	assertHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXConfigJail)
+
+	slurmd := result.Spec.Template.Spec.Containers[0]
+	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXCLI, consts.NvidiaIMEXCLIMountPath)
+	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXCLIJail, consts.NvidiaIMEXCLIJailPath)
+	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXConfig, consts.NvidiaIMEXConfigMountPath)
+	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXConfigJail, consts.NvidiaIMEXConfigJailPath)
+}
+
+func TestRenderNodeSetStatefulSet_NvidiaIMEXNotMountedForCPUWorker(t *testing.T) {
+	nodeSet := &values.SlurmNodeSet{
+		Name: "test-nodeset",
+		ParentalCluster: client.ObjectKey{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
+		},
+		ContainerSlurmd: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image:           "test-image",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory:           resource.MustParse("1Gi"),
+					corev1.ResourceCPU:              resource.MustParse("100m"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+		ContainerMunge: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "munge-image",
+			},
+		},
+		VolumeSpool: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+		},
+		VolumeJail: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+		},
+		StatefulSet:              values.StatefulSet{Replicas: 1},
+		ServiceUmbrella:          values.Service{Name: "test-umbrella"},
+		SupervisorDConfigMapName: "supervisord-config",
+		SSHDConfigMapName:        "sshd-config",
+		GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+	}
+
+	result, err := worker.RenderNodeSetStatefulSet(
+		"test-cluster",
+		nodeSet,
+		&slurmv1.Secrets{},
+		consts.CGroupV2,
+		false,
+		false,
+		"",
+	)
+	assert.NoError(t, err)
+
+	assertNoHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXCLI)
+	assertNoHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXCLIJail)
+	assertNoHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXConfig)
+	assertNoHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXConfigJail)
+
+	slurmd := result.Spec.Template.Spec.Containers[0]
+	assertNoVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXCLI)
+	assertNoVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXCLIJail)
+	assertNoVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXConfig)
+	assertNoVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXConfigJail)
+}
+
+func assertHostPathVolume(t *testing.T, volumes []corev1.Volume, name string) {
+	t.Helper()
+
+	for i := range volumes {
+		volume := &volumes[i]
+		if volume.Name == name {
+			if assert.NotNil(t, volume.HostPath) {
+				expectedPath, expectedType := expectedNvidiaIMEXHostPath(name)
+				assert.Equal(t, expectedPath, volume.HostPath.Path)
+				assert.Equal(t, expectedType, *volume.HostPath.Type)
+			}
+			return
+		}
+	}
+
+	t.Fatalf("volume %s not found", name)
+}
+
+func assertNoHostPathVolume(t *testing.T, volumes []corev1.Volume, name string) {
+	t.Helper()
+
+	for i := range volumes {
+		assert.NotEqual(t, name, volumes[i].Name)
+	}
+}
+
+func expectedNvidiaIMEXHostPath(name string) (string, corev1.HostPathType) {
+	switch name {
+	case consts.VolumeNameNvidiaIMEXConfig, consts.VolumeNameNvidiaIMEXConfigJail:
+		return consts.NvidiaIMEXConfigHostPath, corev1.HostPathDirectoryOrCreate
+	default:
+		return consts.NvidiaIMEXCLIHostPath, corev1.HostPathFileOrCreate
+	}
+}
+
+func assertVolumeMount(t *testing.T, mounts []corev1.VolumeMount, name, expectedPath string) {
+	t.Helper()
+
+	for i := range mounts {
+		mount := &mounts[i]
+		if mount.Name == name {
+			assert.Equal(t, expectedPath, mount.MountPath)
+			assert.True(t, mount.ReadOnly)
+			return
+		}
+	}
+
+	t.Fatalf("volume mount %s not found", name)
+}
+
+func assertNoVolumeMount(t *testing.T, mounts []corev1.VolumeMount, name string) {
+	t.Helper()
+
+	for i := range mounts {
+		assert.NotEqual(t, name, mounts[i].Name)
+	}
+}
+
 func TestRenderNodeSetStatefulSet_HostJournalMount(t *testing.T) {
 	nodeSet := &values.SlurmNodeSet{
 		Name: "test-nodeset",
