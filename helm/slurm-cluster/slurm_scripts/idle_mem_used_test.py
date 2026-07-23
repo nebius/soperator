@@ -23,6 +23,10 @@ class IdleMemUsedTest(unittest.TestCase):
             scontrol_path = Path(tmpdir) / "scontrol"
             scontrol_path.write_text(
                 "#!/bin/bash\n"
+                'if [[ "$*" != "listjobs --json" ]]; then\n'
+                '    printf \'Unexpected arguments: %s\\n\' "$*" >&2\n'
+                "    exit 64\n"
+                "fi\n"
                 "printf '%s\\n' \"${MOCK_SCONTROL_LISTJOBS_OUTPUT}\"\n"
                 "exit \"${MOCK_SCONTROL_LISTJOBS_RC}\"\n",
                 encoding="utf-8",
@@ -70,28 +74,30 @@ class IdleMemUsedTest(unittest.TestCase):
     def test_non_idle_node_skips_memory_validation(self):
         result = self.run_check(
             listjobs_rc=0,
-            listjobs_output="JOBID\n1011",
+            listjobs_output='{"jobs":[{"job_id":1011}],"errors":[]}',
             total_bytes=None,
             available_bytes=None,
         )
 
         self.assertEqual(0, result.returncode)
         self.assertIn("Node is idle: false", result.stdout)
-        self.assertIn("Local Slurm jobs are present", result.stdout)
+        self.assertIn("Local Slurm job count from JSON .jobs array: 1", result.stdout)
+        self.assertIn("JSON .jobs array contains local jobs", result.stdout)
         self.assertIn("Node has local jobs; skipping memory validation", result.stdout)
         self.assertNotIn("Memory measurements:", result.stdout)
 
     def test_idle_node_with_enough_available_memory_passes(self):
         result = self.run_check(
-            listjobs_rc=1,
-            listjobs_output="No slurmstepd's found on this node",
+            listjobs_rc=0,
+            listjobs_output='{"jobs":[],"errors":[]}',
             total_bytes=64 * GIB,
             available_bytes=60 * GIB,
         )
 
         self.assertEqual(0, result.returncode)
         self.assertIn("Node is idle: true", result.stdout)
-        self.assertIn("No local slurmstepd was found", result.stdout)
+        self.assertIn("Local Slurm job count from JSON .jobs array: 0", result.stdout)
+        self.assertIn("JSON .jobs array is empty", result.stdout)
         self.assertIn(f"used=total-available=4.29 GB ({4 * GIB} bytes)", result.stdout)
         self.assertIn(
             f"Slurm RealMemory: 60.13 GB ({56 * GIB} bytes)", result.stdout
@@ -103,8 +109,8 @@ class IdleMemUsedTest(unittest.TestCase):
 
     def test_idle_node_with_insufficient_available_memory_fails(self):
         result = self.run_check(
-            listjobs_rc=1,
-            listjobs_output="No slurmstepd's found on this node",
+            listjobs_rc=0,
+            listjobs_output='{"jobs":[],"errors":[]}',
             total_bytes=64 * GIB,
             available_bytes=22 * GIB,
         )
@@ -118,8 +124,8 @@ class IdleMemUsedTest(unittest.TestCase):
 
     def test_unavailable_memory_data_does_not_drain_node(self):
         result = self.run_check(
-            listjobs_rc=1,
-            listjobs_output="No slurmstepd's found on this node",
+            listjobs_rc=0,
+            listjobs_output='{"jobs":[],"errors":[]}',
             total_bytes=None,
             available_bytes=None,
         )
@@ -129,8 +135,8 @@ class IdleMemUsedTest(unittest.TestCase):
 
     def test_unavailable_real_memory_does_not_drain_node(self):
         result = self.run_check(
-            listjobs_rc=1,
-            listjobs_output="No slurmstepd's found on this node",
+            listjobs_rc=0,
+            listjobs_output='{"jobs":[],"errors":[]}',
             total_bytes=None,
             available_bytes=None,
             node_real_memory_bytes=None,
@@ -142,8 +148,8 @@ class IdleMemUsedTest(unittest.TestCase):
 
     def test_real_memory_larger_than_memtotal_does_not_drain_node(self):
         result = self.run_check(
-            listjobs_rc=1,
-            listjobs_output="No slurmstepd's found on this node",
+            listjobs_rc=0,
+            listjobs_output='{"jobs":[],"errors":[]}',
             total_bytes=64 * GIB,
             available_bytes=60 * GIB,
             node_real_memory_bytes=72 * GIB,
@@ -162,8 +168,34 @@ class IdleMemUsedTest(unittest.TestCase):
         )
 
         self.assertEqual(0, result.returncode)
-        self.assertIn("scontrol listjobs exit code: 2", result.stdout)
-        self.assertIn("Could not determine whether the node is idle", result.stderr)
+        self.assertIn("scontrol listjobs --json exit code: 2", result.stdout)
+        self.assertIn("scontrol listjobs --json' failed", result.stderr)
+        self.assertNotIn("Memory measurements:", result.stdout)
+
+    def test_invalid_listjobs_json_does_not_validate_memory(self):
+        result = self.run_check(
+            listjobs_rc=0,
+            listjobs_output="not JSON",
+            total_bytes=None,
+            available_bytes=None,
+        )
+
+        self.assertEqual(0, result.returncode)
+        self.assertIn("returned invalid job data", result.stderr)
+        self.assertNotIn("Node is idle:", result.stdout)
+        self.assertNotIn("Memory measurements:", result.stdout)
+
+    def test_missing_jobs_array_does_not_validate_memory(self):
+        result = self.run_check(
+            listjobs_rc=0,
+            listjobs_output='{"jobs":null,"errors":[]}',
+            total_bytes=None,
+            available_bytes=None,
+        )
+
+        self.assertEqual(0, result.returncode)
+        self.assertIn("returned invalid job data", result.stderr)
+        self.assertNotIn("Node is idle:", result.stdout)
         self.assertNotIn("Memory measurements:", result.stdout)
 
 
