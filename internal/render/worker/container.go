@@ -188,6 +188,7 @@ func renderContainerNodeSetSlurmd(
 	}
 	if nodeSet.GPU.Enabled {
 		volumeMounts = append(volumeMounts, renderVolumeMountNvidia())
+		volumeMounts = append(volumeMounts, common.RenderVolumeMountsNvidiaIMEX()...)
 	}
 	if topologyEnabled {
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
