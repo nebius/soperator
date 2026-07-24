@@ -132,17 +132,20 @@ func (s *SlurmClient) JobInfo(ctx context.Context, jobID string) (SlurmJobInfo, 
 		ID:         id,
 		QueueState: strings.TrimSpace(rawState),
 	}
-	rawDump, sacctErr := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf(
+	s.addBestEffortSacctInfo(ctx, &info)
+	return info, nil
+}
+
+func (s *SlurmClient) addBestEffortSacctInfo(ctx context.Context, info *SlurmJobInfo) {
+	rawDump, err := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf(
 		"sacct -j %s --noheader --parsable2 --format=JobID,State,ExitCode,Reason,Start,End 2>/dev/null || true",
-		ShellQuote(id),
+		ShellQuote(info.ID),
 	))
-	if sacctErr != nil {
-		// Return what we have from squeue; sacct is best-effort.
-		return info, nil //nolint:nilerr // swallowing sacctErr is intentional here
+	if err != nil {
+		return
 	}
 	info.SacctDump = strings.TrimSpace(rawDump)
-	info.SacctState, info.SacctExit, info.SacctReason, info.SacctFound = parseSacctJob(info.SacctDump, id)
-	return info, nil
+	info.SacctState, info.SacctExit, info.SacctReason, info.SacctFound = parseSacctJob(info.SacctDump, info.ID)
 }
 
 // AssertJobRunning returns an error if jobID is not currently in RUNNING state.
@@ -206,12 +209,12 @@ func IsJobAliveState(state string) bool {
 	}
 }
 
-func (s *SlurmClient) AnyWorkers(count int) ([]string, error) {
-	return pickAnyWorkerNames(s.exec.AvailableWorkers(), count, "workers")
+func (s *SlurmClient) AnyWorkers(count int) ([]WorkerRef, error) {
+	return pickAnyWorkerRefs(s.exec.AvailableWorkers(), count, "workers")
 }
 
-func (s *SlurmClient) AnyGPUWorkers(count int) ([]string, error) {
-	return pickAnyWorkerNames(s.exec.AvailableGPUWorkers(), count, "GPU workers")
+func (s *SlurmClient) AnyGPUWorkers(count int) ([]WorkerRef, error) {
+	return pickAnyWorkerRefs(s.exec.AvailableGPUWorkers(), count, "GPU workers")
 }
 
 func (s *SlurmClient) WaitForJobRunning(ctx context.Context, jobID string, timeout time.Duration) error {
@@ -260,7 +263,7 @@ func (s *SlurmClient) CancelJob(ctx context.Context, jobID string, waitTimeout t
 	return nil
 }
 
-func pickAnyWorkerNames(pool []WorkerPodRef, count int, label string) ([]string, error) {
+func pickAnyWorkerRefs(pool []WorkerRef, count int, label string) ([]WorkerRef, error) {
 	if count < 1 {
 		return nil, fmt.Errorf("invalid %s count %d", label, count)
 	}
@@ -269,9 +272,9 @@ func pickAnyWorkerNames(pool []WorkerPodRef, count int, label string) ([]string,
 	}
 
 	indices := rand.Perm(len(pool))[:count]
-	out := make([]string, 0, count)
+	out := make([]WorkerRef, 0, count)
 	for _, i := range indices {
-		out = append(out, pool[i].Name)
+		out = append(out, pool[i])
 	}
 	return out, nil
 }

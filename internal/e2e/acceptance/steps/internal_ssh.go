@@ -15,7 +15,7 @@ const sshUserName = "bob"
 type InternalSSH struct {
 	exec         framework.Exec
 	slurm        *framework.SlurmClient
-	targetWorker string
+	targetWorker framework.WorkerRef
 	sshOutput    string
 }
 
@@ -46,7 +46,7 @@ func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Contex
 }
 
 func (s *InternalSSH) theUserSSHsFromTheLoginNodeToAWorker(ctx context.Context) error {
-	worker := framework.ShellQuote(s.targetWorker)
+	worker := framework.ShellQuote(s.targetWorker.Name)
 	// Remove the worker key before each SSH attempt so retries don't depend on
 	// persisted known_hosts state from previous attempts.
 	cmd := fmt.Sprintf("su - %s -c %s",
@@ -66,9 +66,9 @@ func (s *InternalSSH) theUserSSHsFromTheLoginNodeToAWorker(ctx context.Context) 
 }
 
 func (s *InternalSSH) theConnectionSucceedsWithoutExtraSSHOptions() error {
-	if !strings.Contains(s.sshOutput, s.targetWorker) {
+	if !strings.Contains(s.sshOutput, s.targetWorker.Name) {
 		return fmt.Errorf("unexpected ssh output %q, expected hostname %q",
-			strings.TrimSpace(s.sshOutput), s.targetWorker)
+			strings.TrimSpace(s.sshOutput), s.targetWorker.Name)
 	}
 	return nil
 }

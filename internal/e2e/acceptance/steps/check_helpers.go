@@ -96,16 +96,17 @@ func waitForPassingHealthCheckReports(ctx context.Context, exec framework.Exec, 
 			return false, nil
 		}
 		content = out
-		reports, err := parseHealthCheckReports(out)
-		if err != nil {
-			return false, nil
+		reports, parseErr := parseHealthCheckReports(out)
+		if parseErr == nil {
+			ids, err := assertHealthCheckReportsPassing(reports)
+			if err != nil {
+				return false, err
+			}
+			runIDs = ids
+			return true, nil
 		}
-		ids, err := assertHealthCheckReportsPassing(reports)
-		if err != nil {
-			return false, err
-		}
-		runIDs = ids
-		return true, nil
+		// The health-check output can be present before the JSON report line is complete.
+		return false, nil
 	})
 	if err != nil {
 		if strings.TrimSpace(content) != "" {
@@ -288,11 +289,11 @@ func assertHealthCheckRawOutputsPresent(ctx context.Context, exec framework.Exec
 	return nil
 }
 
-func runManualHCProgram(ctx context.Context, exec framework.Exec, worker string) error {
+func runManualHCProgram(ctx context.Context, exec framework.Exec, worker framework.WorkerRef) error {
 	_, err := exec.Worker(worker).RunWithDefaultRetry(ctx,
-		fmt.Sprintf("SLURMD_NODENAME=%s /opt/slurm_scripts/hc_program.sh", framework.ShellQuote(worker)))
+		fmt.Sprintf("SLURMD_NODENAME=%s /opt/slurm_scripts/hc_program.sh", framework.ShellQuote(worker.Name)))
 	if err != nil {
-		return fmt.Errorf("run hc_program.sh on %s: %w", worker, err)
+		return fmt.Errorf("run hc_program.sh on %s: %w", worker.Name, err)
 	}
 	return nil
 }

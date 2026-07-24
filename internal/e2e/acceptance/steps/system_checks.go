@@ -32,10 +32,10 @@ type SystemChecks struct {
 	exec  framework.Exec
 	slurm *framework.SlurmClient
 
-	worker              framework.WorkerPodRef
+	worker              framework.WorkerRef
 	workerPod           corev1.Pod
 	fillSizeByte        uint64
-	kubeletWorker       framework.WorkerPodRef
+	kubeletWorker       framework.WorkerRef
 	kubeletK8sNodeName  string
 	kubeletK8sNodeUID   string
 	kubeletWorkerPodUID string
@@ -183,7 +183,7 @@ func (s *SystemChecks) theSelectedWorkerRecoversFromPodEphemeralStorage(ctx cont
 	if err := s.slurm.WaitForNodeUsableWithoutReason(ctx, s.worker.Name, systemEphemeralReason, systemEphemeralRecoverTimeout); err != nil {
 		return err
 	}
-	s.worker = framework.WorkerPodRef{}
+	s.worker = framework.WorkerRef{}
 	s.workerPod = corev1.Pod{}
 	s.fillSizeByte = 0
 	return nil
@@ -294,7 +294,7 @@ func (s *SystemChecks) theSelectedSlurmWorkerRecoversAfterKubeletReplacement(ctx
 	}); err != nil {
 		return err
 	}
-	s.kubeletWorker = framework.WorkerPodRef{}
+	s.kubeletWorker = framework.WorkerRef{}
 	s.kubeletK8sNodeName = ""
 	s.kubeletK8sNodeUID = ""
 	s.kubeletWorkerPodUID = ""
@@ -321,7 +321,7 @@ func (s *SystemChecks) cleanup(ctx context.Context) {
 		if err := s.slurm.ResumeNodeIfDrainedByReason(ctx, s.worker.Name, systemEphemeralReason); err != nil {
 			s.exec.Logf("cleanup: resume %s after pod_ephemeral_storage: %v", s.worker.Name, err)
 		} else {
-			s.worker = framework.WorkerPodRef{}
+			s.worker = framework.WorkerRef{}
 		}
 	}
 }

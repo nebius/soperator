@@ -44,7 +44,7 @@ func TestParseOptionsExplicitValues(t *testing.T) {
 
 func TestRunnerTagFilter(t *testing.T) {
 	gpuState := &framework.ClusterState{
-		GPUWorkers: []framework.WorkerPodRef{{Name: "worker-gpu-0"}},
+		GPUWorkers: []framework.WorkerRef{{Name: "worker-gpu-0"}},
 	}
 	noGPUState := &framework.ClusterState{}
 

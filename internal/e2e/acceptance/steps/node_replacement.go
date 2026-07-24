@@ -26,7 +26,7 @@ const (
 type NodeReplacement struct {
 	exec               framework.Exec
 	slurm              *framework.SlurmClient
-	replacementWorker  string
+	replacementWorker  framework.WorkerRef
 	originalInstanceID string
 	maintenanceJob     framework.SbatchJob
 }
@@ -65,7 +65,7 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context
 	}
 	s.replacementWorker = workers[0]
 
-	node, err := s.slurm.NodeInfo(ctx, s.replacementWorker)
+	node, err := s.slurm.NodeInfo(ctx, s.replacementWorker.Name)
 	if err != nil {
 		return fmt.Errorf("read original node state: %w", err)
 	}
@@ -77,7 +77,7 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context
 
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:    "e2e-node-replacement",
-		ExtraFlags: []string{fmt.Sprintf("-w %s", framework.ShellQuote(s.replacementWorker))},
+		ExtraFlags: []string{fmt.Sprintf("-w %s", framework.ShellQuote(s.replacementWorker.Name))},
 		Wrap:       "sleep 600",
 	})
 	if err != nil {
@@ -102,7 +102,7 @@ func (s *NodeReplacement) aMaintenanceEventIsTriggeredForThatNode(ctx context.Co
 }
 
 func (s *NodeReplacement) theNodeIsDrainedWithAMaintenanceReason(ctx context.Context) error {
-	workerName := s.replacementWorker
+	workerName := s.replacementWorker.Name
 	return s.exec.WaitFor(ctx, "node drain reason", nodeReplacementDrainTimeout, 15*time.Second, func(waitCtx context.Context) (bool, error) {
 		node, err := s.slurm.NodeInfo(waitCtx, workerName)
 		if err != nil {
@@ -135,7 +135,7 @@ func (s *NodeReplacement) theOldInstanceIsRemoved(ctx context.Context) error {
 }
 
 func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) error {
-	workerName := s.replacementWorker
+	workerName := s.replacementWorker.Name
 	originalInstanceID := s.originalInstanceID
 	return s.exec.WaitFor(ctx, "replacement node ready", nodeReplacementReadyTimeout, 60*time.Second, func(waitCtx context.Context) (bool, error) {
 		node, err := s.slurm.NodeInfo(waitCtx, workerName)
@@ -159,7 +159,7 @@ func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) e
 }
 
 func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Context) error {
-	workerName := s.replacementWorker
+	workerName := s.replacementWorker.Name
 	if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=8 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
 		node, stateErr := s.slurm.NodeInfo(ctx, workerName)
 		if stateErr == nil {

@@ -23,16 +23,16 @@ type ArgsScope interface {
 }
 
 type Exec interface {
-	AvailableWorkers() []WorkerPodRef
-	AvailableGPUWorkers() []WorkerPodRef
+	AvailableWorkers() []WorkerRef
+	AvailableGPUWorkers() []WorkerRef
 	Kubectl() ArgsScope
 	// Local returns a local process scope. Do not use it for kubectl commands;
 	// use Kubectl instead so the explicit Kubernetes context is applied.
 	Local() ArgsScope
 	Controller() CommandScope
 	Jail() CommandScope
-	Worker(worker string) CommandScope
-	WorkerPod(worker WorkerPodRef) CommandScope
+	Worker(worker WorkerRef) CommandScope
+	WorkerPod(worker WorkerRef) CommandScope
 	WaitFor(ctx context.Context, description string, timeout, pollInterval time.Duration, condition func(context.Context) (bool, error)) error
 	Logf(format string, args ...any)
 }

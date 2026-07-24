@@ -1,6 +1,6 @@
 package framework
 
-type WorkerPodRef struct {
+type WorkerRef struct {
 	Name    string
 	PodName string
 }
@@ -14,9 +14,9 @@ type DiscoveredNodeSet struct {
 
 type ClusterState struct {
 	SlurmClusterName   string
-	Workers            []WorkerPodRef
-	GPUWorkers         []WorkerPodRef
-	WorkersByNodeSet   map[string][]WorkerPodRef
+	Workers            []WorkerRef
+	GPUWorkers         []WorkerRef
+	WorkersByNodeSet   map[string][]WorkerRef
 	DiscoveredNodeSets []DiscoveredNodeSet
 }
 
@@ -34,4 +34,12 @@ func (s *ClusterState) DesiredWorkerCount() int {
 
 func (s *ClusterState) HasGPUWorkers() bool {
 	return len(s.GPUWorkers) > 0
+}
+
+func WorkerNames(workers []WorkerRef) []string {
+	names := make([]string, 0, len(workers))
+	for _, worker := range workers {
+		names = append(names, worker.Name)
+	}
+	return names
 }

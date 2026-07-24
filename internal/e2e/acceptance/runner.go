@@ -42,11 +42,11 @@ type Runner struct {
 func NewRunner(state *framework.ClusterState, runUnstableTests bool, scenarioPaths []string, kubectlContext, reportDir string) *Runner {
 	if state == nil {
 		state = &framework.ClusterState{
-			WorkersByNodeSet: make(map[string][]framework.WorkerPodRef),
+			WorkersByNodeSet: make(map[string][]framework.WorkerRef),
 		}
 	}
 	if state.WorkersByNodeSet == nil {
-		state.WorkersByNodeSet = make(map[string][]framework.WorkerPodRef)
+		state.WorkersByNodeSet = make(map[string][]framework.WorkerRef)
 	}
 	return &Runner{
 		state:            state,
@@ -156,7 +156,7 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	}
 
 	seen := make(map[string]struct{})
-	var workers []framework.WorkerPodRef
+	var workers []framework.WorkerRef
 	for _, line := range strings.Split(workerOutput, "\n") {
 		name := strings.TrimSpace(line)
 		if name == "" {
@@ -170,7 +170,7 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 			return fmt.Errorf("worker pod for Slurm node %q was not discovered", name)
 		}
 		seen[name] = struct{}{}
-		workers = append(workers, framework.WorkerPodRef{Name: name, PodName: podName})
+		workers = append(workers, framework.WorkerRef{Name: name, PodName: podName})
 	}
 	if len(workers) == 0 {
 		return fmt.Errorf("no worker nodes discovered")
@@ -367,7 +367,7 @@ func (w *world) logf(format string, args ...any) {
 	log.Printf("%s: %s", w.logPrefix, fmt.Sprintf(format, args...))
 }
 
-func workerNames(workers []framework.WorkerPodRef) string {
+func workerNames(workers []framework.WorkerRef) string {
 	if len(workers) == 0 {
 		return "<none>"
 	}
@@ -378,7 +378,7 @@ func workerNames(workers []framework.WorkerPodRef) string {
 	return strings.Join(names, ", ")
 }
 
-func workersByNodeSetSummary(workersByNodeSet map[string][]framework.WorkerPodRef) string {
+func workersByNodeSetSummary(workersByNodeSet map[string][]framework.WorkerRef) string {
 	if len(workersByNodeSet) == 0 {
 		return "<none>"
 	}
@@ -434,7 +434,7 @@ func verifyPodReady(ctx context.Context, w *world, namespace, name string) error
 }
 
 func classifyWorkers(state *framework.ClusterState) {
-	state.WorkersByNodeSet = make(map[string][]framework.WorkerPodRef, len(state.DiscoveredNodeSets))
+	state.WorkersByNodeSet = make(map[string][]framework.WorkerRef, len(state.DiscoveredNodeSets))
 	state.GPUWorkers = nil
 
 	if len(state.DiscoveredNodeSets) == 0 {

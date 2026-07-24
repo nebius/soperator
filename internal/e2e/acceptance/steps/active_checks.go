@@ -282,7 +282,7 @@ func (s *ActiveChecks) gpuActiveCheckSlurmJobRecords(ctx context.Context) (map[s
 	return parseActiveCheckSlurmJobRecords(out), nil
 }
 
-func assertGPUActiveCheckSlurmRecords(records map[string]activeCheckSlurmJobRecord, jobIDs []string, expectedWorkers []framework.WorkerPodRef) error {
+func assertGPUActiveCheckSlurmRecords(records map[string]activeCheckSlurmJobRecord, jobIDs []string, expectedWorkers []framework.WorkerRef) error {
 	expected := make(map[string]struct{}, len(expectedWorkers))
 	for _, worker := range expectedWorkers {
 		expected[worker.Name] = struct{}{}

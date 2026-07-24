@@ -33,8 +33,8 @@ type EnrootContainers struct {
 	exec  framework.Exec
 	slurm *framework.SlurmClient
 
-	workers          []string
-	connectionWorker string
+	workers          []framework.WorkerRef
+	connectionWorker framework.WorkerRef
 	job              framework.SbatchJob
 
 	squashPath         string
@@ -86,7 +86,7 @@ func (s *EnrootContainers) aLongRunningEnrootContainerJobIsSubmittedOnTwoWorkers
 		}
 		s.workers = workers
 		s.connectionWorker = workers[0]
-		s.exec.Logf("enroot containers: selected workers=%s", strings.Join(s.workers, ","))
+		s.exec.Logf("enroot containers: selected workers=%s", strings.Join(framework.WorkerNames(s.workers), ","))
 	}
 	s.squashPath = ""
 	s.expectedSquashPath = ""
@@ -111,7 +111,7 @@ func (s *EnrootContainers) theEnrootContainerJobIsRunning(ctx context.Context) e
 }
 
 func (s *EnrootContainers) anEnrootImageArtifactIsPresentOnAWorker(ctx context.Context) error {
-	if s.connectionWorker == "" {
+	if s.connectionWorker.Name == "" {
 		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
@@ -213,7 +213,7 @@ func (s *EnrootContainers) anEnrootGPUSmokeJobIsSubmittedOnOneGPUWorker(ctx cont
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      "e2e-enroot-gpu-smoke",
 		Nodes:        1,
-		Nodelist:     s.workers,
+		Nodelist:     framework.WorkerNames(s.workers),
 		GPUsPerNode:  1,
 		TasksPerNode: 1,
 		Wrap:         wrap,
@@ -223,7 +223,7 @@ func (s *EnrootContainers) anEnrootGPUSmokeJobIsSubmittedOnOneGPUWorker(ctx cont
 	}
 	s.job = job
 	s.exec.Logf("enroot GPU smoke: selected worker=%s job_id=%s stdout=%s stderr=%s",
-		s.connectionWorker, job.ID, job.StdoutPath, job.StderrPath)
+		s.connectionWorker.Name, job.ID, job.StdoutPath, job.StderrPath)
 	return nil
 }
 
@@ -246,7 +246,7 @@ func (s *EnrootContainers) submitEnrootLifecycleJob(ctx context.Context, jobName
 	if len(s.workers) == 0 {
 		return fmt.Errorf("enroot workers are not selected")
 	}
-	if s.connectionWorker == "" {
+	if s.connectionWorker.Name == "" {
 		s.connectionWorker = s.workers[0]
 	}
 
@@ -257,7 +257,7 @@ func (s *EnrootContainers) submitEnrootLifecycleJob(ctx context.Context, jobName
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      jobName,
 		Nodes:        2,
-		Nodelist:     s.workers,
+		Nodelist:     framework.WorkerNames(s.workers),
 		TasksPerNode: 1,
 		Wrap:         wrap,
 	})
@@ -275,7 +275,7 @@ func (s *EnrootContainers) waitForRuntimeStateCleanedUpAndArtifactRemains(ctx co
 	if s.squashPath == "" {
 		return fmt.Errorf("squashfs path is not captured")
 	}
-	if s.connectionWorker == "" {
+	if s.connectionWorker.Name == "" {
 		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
@@ -328,7 +328,7 @@ func (s *EnrootContainers) waitForDirectRuntimeCleanedUpAndArtifactRemains(ctx c
 }
 
 func (s *EnrootContainers) enrootRuntimeContainerDataIsVisibleWhileTheJobIsRunning(ctx context.Context) error {
-	if s.connectionWorker == "" {
+	if s.connectionWorker.Name == "" {
 		return fmt.Errorf("enroot connection worker is not selected")
 	}
 	runtimePrefix, err := s.enrootRuntimeNamePrefix()
@@ -358,7 +358,7 @@ func (s *EnrootContainers) enrootRuntimeContainerDataIsVisibleWhileTheJobIsRunni
 }
 
 func (s *EnrootContainers) enrootSquashfsImageIsMountedDirectlyWhileTheJobIsRunning(ctx context.Context) error {
-	if s.connectionWorker == "" {
+	if s.connectionWorker.Name == "" {
 		return fmt.Errorf("enroot connection worker is not selected")
 	}
 	if s.squashPath == "" {
@@ -456,7 +456,7 @@ func (s *EnrootContainers) expectedLifecycleSquashPath(ctx context.Context) (str
 }
 
 func (s *EnrootContainers) enrootImageDigest(ctx context.Context, image string) (string, error) {
-	if s.connectionWorker == "" {
+	if s.connectionWorker.Name == "" {
 		return "", fmt.Errorf("enroot connection worker is not selected")
 	}
 
@@ -518,7 +518,7 @@ func (s *EnrootContainers) squashStatForPath(ctx context.Context, squashPath str
 	return strings.TrimSpace(statOutput), nil
 }
 
-func (s *EnrootContainers) legacyEnrootDataTree(ctx context.Context, worker string) (string, error) {
+func (s *EnrootContainers) legacyEnrootDataTree(ctx context.Context, worker framework.WorkerRef) (string, error) {
 	return s.exec.Worker(worker).RunWithDefaultRetry(ctx, fmt.Sprintf("sudo tree -L 1 %s", framework.ShellQuote(enrootDedicatedDataPath)))
 }
 

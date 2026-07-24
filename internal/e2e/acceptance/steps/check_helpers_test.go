@@ -62,7 +62,7 @@ func TestAssertGPUActiveCheckSlurmRecords(t *testing.T) {
 102|soperator-gpu-checks|COMPLETED|0:0|worker-1
 102.batch|batch|COMPLETED|0:0|worker-1
 `)
-	expected := []framework.WorkerPodRef{
+	expected := []framework.WorkerRef{
 		{Name: "worker-0"},
 		{Name: "worker-1"},
 	}
