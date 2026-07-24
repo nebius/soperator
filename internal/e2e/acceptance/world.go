@@ -80,6 +80,20 @@ func (w *world) Worker(worker string) framework.CommandScope {
 	}
 }
 
+func (w *world) WorkerPod(worker framework.WorkerPodRef) framework.CommandScope {
+	return commandScope{
+		run: func(ctx context.Context, command string) (string, error) {
+			if strings.TrimSpace(worker.PodName) == "" {
+				return "", fmt.Errorf("Kubernetes worker pod for Slurm node %s was not discovered", worker.Name)
+			}
+			return w.Kubectl().Run(ctx,
+				"exec", "-n", soperatorNamespace, worker.PodName, "-c", "slurmd",
+				"--", "bash", "-lc", command,
+			)
+		},
+	}
+}
+
 func (w *world) Run(ctx context.Context, name string, args ...string) (string, error) {
 	cmdCtx, cancel := context.WithTimeout(ctx, commandTimeout)
 	defer cancel()

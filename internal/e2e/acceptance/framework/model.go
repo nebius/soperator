@@ -1,7 +1,8 @@
 package framework
 
 type WorkerPodRef struct {
-	Name string
+	Name    string
+	PodName string
 }
 
 type DiscoveredNodeSet struct {

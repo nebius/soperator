@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"regexp"
 	"strings"
 	"time"
 
@@ -22,12 +21,6 @@ const (
 	nodeReplacementDrainTimeout  = 25 * time.Minute
 	nodeReplacementRemoveTimeout = 25 * time.Minute
 	nodeReplacementReadyTimeout  = 25 * time.Minute
-)
-
-var (
-	instanceIDPattern = regexp.MustCompile(`InstanceId=([^\s]+)`)
-	reasonPattern     = regexp.MustCompile(`Reason=([^\n]+)`)
-	statePattern      = regexp.MustCompile(`State=([^\s]+)`)
 )
 
 type NodeReplacement struct {
@@ -72,16 +65,15 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context
 	}
 	s.replacementWorker = workers[0]
 
-	nodeState, err := s.exec.Controller().RunWithDefaultRetry(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(s.replacementWorker)))
+	node, err := s.slurm.NodeInfo(ctx, s.replacementWorker)
 	if err != nil {
 		return fmt.Errorf("read original node state: %w", err)
 	}
 
-	originalInstanceID := parseInstanceID(nodeState)
-	if originalInstanceID == "" {
-		return fmt.Errorf("parse InstanceId: no match in %q", nodeState)
+	if node.InstanceID == "" {
+		return fmt.Errorf("parse InstanceId: no match in %q", node.Raw)
 	}
-	s.originalInstanceID = originalInstanceID
+	s.originalInstanceID = node.InstanceID
 
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:    "e2e-node-replacement",
@@ -95,13 +87,7 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context
 	s.exec.Logf("node replacement: submitted maintenance job id=%s stdout=%s stderr=%s",
 		job.ID, job.StdoutPath, job.StderrPath)
 
-	return s.exec.WaitFor(ctx, "maintenance job running", nodeReplacementJobTimeout, 10*time.Second, func(waitCtx context.Context) (bool, error) {
-		status, err := s.exec.Jail().Run(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", framework.ShellQuote(job.ID)))
-		if err != nil {
-			return false, err
-		}
-		return strings.Contains(status, "RUNNING"), nil
-	})
+	return s.slurm.WaitForJobRunning(ctx, job.ID, nodeReplacementJobTimeout)
 }
 
 func (s *NodeReplacement) aMaintenanceEventIsTriggeredForThatNode(ctx context.Context) error {
@@ -118,12 +104,11 @@ func (s *NodeReplacement) aMaintenanceEventIsTriggeredForThatNode(ctx context.Co
 func (s *NodeReplacement) theNodeIsDrainedWithAMaintenanceReason(ctx context.Context) error {
 	workerName := s.replacementWorker
 	return s.exec.WaitFor(ctx, "node drain reason", nodeReplacementDrainTimeout, 15*time.Second, func(waitCtx context.Context) (bool, error) {
-		state, err := s.exec.Controller().Run(waitCtx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
+		node, err := s.slurm.NodeInfo(waitCtx, workerName)
 		if err != nil {
 			return false, err
 		}
-		reason := parseReason(state)
-		return strings.Contains(state, "DRAIN") && strings.HasPrefix(reason, "[compute_maintenance]"), nil
+		return node.HasStateFlag("DRAIN") && strings.HasPrefix(node.Reason, "[compute_maintenance]"), nil
 	})
 }
 
@@ -153,24 +138,20 @@ func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) e
 	workerName := s.replacementWorker
 	originalInstanceID := s.originalInstanceID
 	return s.exec.WaitFor(ctx, "replacement node ready", nodeReplacementReadyTimeout, 60*time.Second, func(waitCtx context.Context) (bool, error) {
-		state, err := s.exec.Controller().Run(waitCtx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
+		node, err := s.slurm.NodeInfo(waitCtx, workerName)
 		if err != nil {
 			return false, err
 		}
 
-		newInstanceID := parseInstanceID(state)
-		if newInstanceID == "" || newInstanceID == originalInstanceID {
+		if node.InstanceID == "" || node.InstanceID == originalInstanceID {
 			return false, nil
 		}
 
-		nodeState := parseNodeState(state)
-		if nodeState == "" {
+		if node.State == "" {
 			return false, nil
 		}
-		for _, bad := range []string{"DRAIN", "DOWN", "NOT_RESPONDING", "FAIL", "INVALID_REG"} {
-			if strings.Contains(nodeState, bad) {
-				return false, nil
-			}
+		if !node.IsUsable() {
+			return false, nil
 		}
 
 		return true, nil
@@ -180,9 +161,9 @@ func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) e
 func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Context) error {
 	workerName := s.replacementWorker
 	if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=8 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
-		output, stateErr := s.exec.Controller().Run(ctx, fmt.Sprintf("scontrol show node %s", framework.ShellQuote(workerName)))
+		node, stateErr := s.slurm.NodeInfo(ctx, workerName)
 		if stateErr == nil {
-			s.exec.Logf("replacement worker state after failed final validation:\n%s", strings.TrimSpace(output))
+			s.exec.Logf("replacement worker state after failed final validation:\n%s", strings.TrimSpace(node.Raw))
 		}
 		return fmt.Errorf("validate replacement worker is operational from login node: %w", err)
 	}
@@ -198,28 +179,4 @@ func (s *NodeReplacement) cancelJob(ctx context.Context, maintenanceJobID string
 		return fmt.Errorf("cancel maintenance job %s: %w", maintenanceJobID, err)
 	}
 	return nil
-}
-
-func parseInstanceID(state string) string {
-	match := instanceIDPattern.FindStringSubmatch(state)
-	if len(match) != 2 {
-		return ""
-	}
-	return match[1]
-}
-
-func parseReason(state string) string {
-	match := reasonPattern.FindStringSubmatch(state)
-	if len(match) != 2 {
-		return ""
-	}
-	return strings.TrimSpace(match[1])
-}
-
-func parseNodeState(state string) string {
-	match := statePattern.FindStringSubmatch(state)
-	if len(match) != 2 {
-		return ""
-	}
-	return strings.TrimSpace(match[1])
 }

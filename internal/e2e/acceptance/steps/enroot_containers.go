@@ -250,9 +250,9 @@ func (s *EnrootContainers) submitEnrootLifecycleJob(ctx context.Context, jobName
 		s.connectionWorker = s.workers[0]
 	}
 
-	wrap := fmt.Sprintf("srun --container-image=%s bash -lc %s",
+	wrap := fmt.Sprintf("srun --container-image=%s %s",
 		framework.ShellQuote(enrootLifecycleImage),
-		framework.ShellQuote(enrootLifecycleCommand),
+		framework.BashLC(enrootLifecycleCommand),
 	)
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      jobName,

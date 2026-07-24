@@ -32,6 +32,7 @@ type Exec interface {
 	Controller() CommandScope
 	Jail() CommandScope
 	Worker(worker string) CommandScope
+	WorkerPod(worker WorkerPodRef) CommandScope
 	WaitFor(ctx context.Context, description string, timeout, pollInterval time.Duration, condition func(context.Context) (bool, error)) error
 	Logf(format string, args ...any)
 }

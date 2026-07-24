@@ -25,6 +25,7 @@ const (
 	clusterCreationHelmNamespace       = "flux-system"
 	clusterCreationSmokeJobTimeout     = 2 * time.Minute
 	clusterCreationPerNodeSmokeTimeout = 3 * time.Minute
+	clusterCreationHCProgramTimeout    = 3 * time.Minute
 )
 
 var nodeStatePattern = regexp.MustCompile(`State=([^\s]+)`)
@@ -45,7 +46,9 @@ func (s *ClusterCreation) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^all NodeSet CRs are ready$`, s.checkNodeSetsReady)
 	sc.Step(`^main and hidden partitions are present and sane$`, s.checkPartitions)
 	sc.Step(`^all Slurm nodes are healthy$`, s.checkSlurmNodeHealth)
+	sc.Step(`^HealthCheckProgram outputs are healthy$`, s.checkHealthCheckProgramOutputs)
 	sc.Step(`^all ActiveChecks completed successfully$`, s.checkActiveChecks)
+	sc.Step(`^nebius and soperatorchecks users are present$`, s.checkNebiusAndSoperatorchecksUsers)
 	sc.Step(`^login welcome output shows cluster information$`, s.checkWelcomeOutput)
 	sc.Step(`^main partition smoke job succeeds$`, s.checkMainSmokeJob)
 	sc.Step(`^hidden partition smoke job succeeds$`, s.checkHiddenSmokeJob)
@@ -264,6 +267,49 @@ func (s *ClusterCreation) checkSlurmNodeHealth(ctx context.Context) error {
 	return nil
 }
 
+func (s *ClusterCreation) checkHealthCheckProgramOutputs(ctx context.Context) error {
+	if err := assertHealthCheckProgramConfigured(ctx, s.exec); err != nil {
+		return err
+	}
+	if len(s.state.Workers) == 0 {
+		return fmt.Errorf("no workers discovered for HealthCheckProgram output validation")
+	}
+
+	var outputs map[string]string
+	if err := s.exec.WaitFor(ctx, "HealthCheckProgram outputs healthy", clusterCreationHCProgramTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+		next := make(map[string]string, len(s.state.Workers))
+		for _, worker := range s.state.Workers {
+			output, exists, err := readJailFileIfExists(waitCtx, s.exec, checkRunnerOutputPath(worker.Name, "hc_program"))
+			if err != nil {
+				return false, err
+			}
+			if !exists {
+				return false, nil
+			}
+			if err := assertCheckRunnerHealthy(output); err != nil {
+				return false, err
+			}
+			next[worker.Name] = output
+		}
+		outputs = next
+		return true, nil
+	}); err != nil {
+		return err
+	}
+
+	var problems []string
+	for worker, output := range outputs {
+		if err := assertLoggedCheckOutputsExist(ctx, s.exec, output); err != nil {
+			problems = append(problems, fmt.Sprintf("%s: %v", worker, err))
+		}
+	}
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		return fmt.Errorf("%s", strings.Join(problems, "; "))
+	}
+	return nil
+}
+
 func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 	var checks slurmv1alpha1.ActiveCheckList
 	if err := kubectlJSON(ctx, s.exec, &checks, "get", "activechecks", "-A", "-o", "json"); err != nil {
@@ -310,6 +356,28 @@ func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 	if len(problems) > 0 {
 		sort.Strings(problems)
 		return fmt.Errorf("%s", strings.Join(problems, "; "))
+	}
+	return nil
+}
+
+func (s *ClusterCreation) checkNebiusAndSoperatorchecksUsers(ctx context.Context) error {
+	script := `
+set -euo pipefail
+for user in nebius soperatorchecks; do
+  id "$user" >/dev/null
+  test -d "/opt/soperator-home/$user"
+done
+
+key=/opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa
+pub="${key}.pub"
+authorized=/opt/soperator-home/soperatorchecks/.ssh/authorized_keys
+test -s "$key"
+test -s "$pub"
+test -s "$authorized"
+grep -F "$(cat "$pub")" "$authorized" >/dev/null
+`
+	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, framework.BashLC(script)); err != nil {
+		return fmt.Errorf("check nebius and soperatorchecks users: %w", err)
 	}
 	return nil
 }

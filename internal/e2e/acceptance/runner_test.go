@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
@@ -145,6 +146,47 @@ func TestDiscoveredNodeSetsFromLiveList(t *testing.T) {
 	assert.Equal(t, "worker-gpu", discovered[1].Name)
 	assert.Equal(t, 2, discovered[1].Size)
 	assert.True(t, discovered[1].HasGPU)
+}
+
+func TestWorkerPodsBySlurmNodeName(t *testing.T) {
+	pods := corev1.PodList{
+		Items: []corev1.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "kube-worker-a"},
+				Spec:       corev1.PodSpec{Hostname: "worker-a"},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "kube-worker-b"},
+				Spec:       corev1.PodSpec{Hostname: "worker-b"},
+			},
+		},
+	}
+
+	discovered, err := workerPodsBySlurmNodeName(pods)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{
+		"worker-a": "kube-worker-a",
+		"worker-b": "kube-worker-b",
+	}, discovered)
+}
+
+func TestWorkerPodsBySlurmNodeNameRejectsMissingHostname(t *testing.T) {
+	_, err := workerPodsBySlurmNodeName(corev1.PodList{
+		Items: []corev1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "worker-0"}}},
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "empty spec.hostname")
+}
+
+func TestWorkerPodsBySlurmNodeNameRejectsDuplicateHostname(t *testing.T) {
+	_, err := workerPodsBySlurmNodeName(corev1.PodList{
+		Items: []corev1.Pod{
+			{ObjectMeta: metav1.ObjectMeta{Name: "worker-a-0"}, Spec: corev1.PodSpec{Hostname: "worker-0"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "worker-b-0"}, Spec: corev1.PodSpec{Hostname: "worker-0"}},
+		},
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "both declare spec.hostname=worker-0")
 }
 
 func TestReportFormat(t *testing.T) {
