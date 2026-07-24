@@ -84,12 +84,12 @@ func (_c *MockClient_GetDiag_Call) RunAndReturn(run func(context.Context) (*v004
 	return _c
 }
 
-// GetJobsByID provides a mock function with given fields: ctx, jobID
-func (_m *MockClient) GetJobsByID(ctx context.Context, jobID string) ([]slurmapi.Job, error) {
+// GetJobsByIDFromAccounting provides a mock function with given fields: ctx, jobID
+func (_m *MockClient) GetJobsByIDFromAccounting(ctx context.Context, jobID string) ([]slurmapi.Job, error) {
 	ret := _m.Called(ctx, jobID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetJobsByID")
+		panic("no return value specified for GetJobsByIDFromAccounting")
 	}
 
 	var r0 []slurmapi.Job
@@ -114,31 +114,31 @@ func (_m *MockClient) GetJobsByID(ctx context.Context, jobID string) ([]slurmapi
 	return r0, r1
 }
 
-// MockClient_GetJobsByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetJobsByID'
-type MockClient_GetJobsByID_Call struct {
+// MockClient_GetJobsByIDFromAccounting_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetJobsByIDFromAccounting'
+type MockClient_GetJobsByIDFromAccounting_Call struct {
 	*mock.Call
 }
 
-// GetJobsByID is a helper method to define mock.On call
+// GetJobsByIDFromAccounting is a helper method to define mock.On call
 //   - ctx context.Context
 //   - jobID string
-func (_e *MockClient_Expecter) GetJobsByID(ctx interface{}, jobID interface{}) *MockClient_GetJobsByID_Call {
-	return &MockClient_GetJobsByID_Call{Call: _e.mock.On("GetJobsByID", ctx, jobID)}
+func (_e *MockClient_Expecter) GetJobsByIDFromAccounting(ctx interface{}, jobID interface{}) *MockClient_GetJobsByIDFromAccounting_Call {
+	return &MockClient_GetJobsByIDFromAccounting_Call{Call: _e.mock.On("GetJobsByIDFromAccounting", ctx, jobID)}
 }
 
-func (_c *MockClient_GetJobsByID_Call) Run(run func(ctx context.Context, jobID string)) *MockClient_GetJobsByID_Call {
+func (_c *MockClient_GetJobsByIDFromAccounting_Call) Run(run func(ctx context.Context, jobID string)) *MockClient_GetJobsByIDFromAccounting_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *MockClient_GetJobsByID_Call) Return(_a0 []slurmapi.Job, _a1 error) *MockClient_GetJobsByID_Call {
+func (_c *MockClient_GetJobsByIDFromAccounting_Call) Return(_a0 []slurmapi.Job, _a1 error) *MockClient_GetJobsByIDFromAccounting_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_GetJobsByID_Call) RunAndReturn(run func(context.Context, string) ([]slurmapi.Job, error)) *MockClient_GetJobsByID_Call {
+func (_c *MockClient_GetJobsByIDFromAccounting_Call) RunAndReturn(run func(context.Context, string) ([]slurmapi.Job, error)) *MockClient_GetJobsByIDFromAccounting_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -196,63 +196,6 @@ func (_c *MockClient_GetNode_Call) Return(_a0 slurmapi.Node, _a1 error) *MockCli
 }
 
 func (_c *MockClient_GetNode_Call) RunAndReturn(run func(context.Context, string) (slurmapi.Node, error)) *MockClient_GetNode_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetReservation provides a mock function with given fields: ctx, name
-func (_m *MockClient) GetReservation(ctx context.Context, name string) (slurmapi.Reservation, error) {
-	ret := _m.Called(ctx, name)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetReservation")
-	}
-
-	var r0 slurmapi.Reservation
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (slurmapi.Reservation, error)); ok {
-		return rf(ctx, name)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) slurmapi.Reservation); ok {
-		r0 = rf(ctx, name)
-	} else {
-		r0 = ret.Get(0).(slurmapi.Reservation)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, name)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_GetReservation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetReservation'
-type MockClient_GetReservation_Call struct {
-	*mock.Call
-}
-
-// GetReservation is a helper method to define mock.On call
-//   - ctx context.Context
-//   - name string
-func (_e *MockClient_Expecter) GetReservation(ctx interface{}, name interface{}) *MockClient_GetReservation_Call {
-	return &MockClient_GetReservation_Call{Call: _e.mock.On("GetReservation", ctx, name)}
-}
-
-func (_c *MockClient_GetReservation_Call) Run(run func(ctx context.Context, name string)) *MockClient_GetReservation_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockClient_GetReservation_Call) Return(_a0 slurmapi.Reservation, _a1 error) *MockClient_GetReservation_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_GetReservation_Call) RunAndReturn(run func(context.Context, string) (slurmapi.Reservation, error)) *MockClient_GetReservation_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -315,6 +258,65 @@ func (_c *MockClient_ListJobs_Call) RunAndReturn(run func(context.Context) ([]sl
 	return _c
 }
 
+// ListJobsWithParams provides a mock function with given fields: ctx, params
+func (_m *MockClient) ListJobsWithParams(ctx context.Context, params slurmapi.ListJobsParams) ([]slurmapi.Job, error) {
+	ret := _m.Called(ctx, params)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListJobsWithParams")
+	}
+
+	var r0 []slurmapi.Job
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, slurmapi.ListJobsParams) ([]slurmapi.Job, error)); ok {
+		return rf(ctx, params)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, slurmapi.ListJobsParams) []slurmapi.Job); ok {
+		r0 = rf(ctx, params)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]slurmapi.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, slurmapi.ListJobsParams) error); ok {
+		r1 = rf(ctx, params)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_ListJobsWithParams_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListJobsWithParams'
+type MockClient_ListJobsWithParams_Call struct {
+	*mock.Call
+}
+
+// ListJobsWithParams is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params slurmapi.ListJobsParams
+func (_e *MockClient_Expecter) ListJobsWithParams(ctx interface{}, params interface{}) *MockClient_ListJobsWithParams_Call {
+	return &MockClient_ListJobsWithParams_Call{Call: _e.mock.On("ListJobsWithParams", ctx, params)}
+}
+
+func (_c *MockClient_ListJobsWithParams_Call) Run(run func(ctx context.Context, params slurmapi.ListJobsParams)) *MockClient_ListJobsWithParams_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(slurmapi.ListJobsParams))
+	})
+	return _c
+}
+
+func (_c *MockClient_ListJobsWithParams_Call) Return(_a0 []slurmapi.Job, _a1 error) *MockClient_ListJobsWithParams_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_ListJobsWithParams_Call) RunAndReturn(run func(context.Context, slurmapi.ListJobsParams) ([]slurmapi.Job, error)) *MockClient_ListJobsWithParams_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListNodes provides a mock function with given fields: ctx
 func (_m *MockClient) ListNodes(ctx context.Context) ([]slurmapi.Node, error) {
 	ret := _m.Called(ctx)
@@ -369,54 +371,6 @@ func (_c *MockClient_ListNodes_Call) Return(_a0 []slurmapi.Node, _a1 error) *Moc
 }
 
 func (_c *MockClient_ListNodes_Call) RunAndReturn(run func(context.Context) ([]slurmapi.Node, error)) *MockClient_ListNodes_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// PostMaintenanceReservation provides a mock function with given fields: ctx, name, nodeList
-func (_m *MockClient) PostMaintenanceReservation(ctx context.Context, name string, nodeList []string) error {
-	ret := _m.Called(ctx, name, nodeList)
-
-	if len(ret) == 0 {
-		panic("no return value specified for PostMaintenanceReservation")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []string) error); ok {
-		r0 = rf(ctx, name, nodeList)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockClient_PostMaintenanceReservation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PostMaintenanceReservation'
-type MockClient_PostMaintenanceReservation_Call struct {
-	*mock.Call
-}
-
-// PostMaintenanceReservation is a helper method to define mock.On call
-//   - ctx context.Context
-//   - name string
-//   - nodeList []string
-func (_e *MockClient_Expecter) PostMaintenanceReservation(ctx interface{}, name interface{}, nodeList interface{}) *MockClient_PostMaintenanceReservation_Call {
-	return &MockClient_PostMaintenanceReservation_Call{Call: _e.mock.On("PostMaintenanceReservation", ctx, name, nodeList)}
-}
-
-func (_c *MockClient_PostMaintenanceReservation_Call) Run(run func(ctx context.Context, name string, nodeList []string)) *MockClient_PostMaintenanceReservation_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].([]string))
-	})
-	return _c
-}
-
-func (_c *MockClient_PostMaintenanceReservation_Call) Return(_a0 error) *MockClient_PostMaintenanceReservation_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockClient_PostMaintenanceReservation_Call) RunAndReturn(run func(context.Context, string, []string) error) *MockClient_PostMaintenanceReservation_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -5775,53 +5729,6 @@ func (_c *MockClient_SlurmdbV0041PostWckeysWithResponse_Call) Return(_a0 *v0041.
 }
 
 func (_c *MockClient_SlurmdbV0041PostWckeysWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041PostWckeysParams, v0041.SlurmdbV0041PostWckeysJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostWckeysResponse, error)) *MockClient_SlurmdbV0041PostWckeysWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// StopReservation provides a mock function with given fields: ctx, name
-func (_m *MockClient) StopReservation(ctx context.Context, name string) error {
-	ret := _m.Called(ctx, name)
-
-	if len(ret) == 0 {
-		panic("no return value specified for StopReservation")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, name)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockClient_StopReservation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopReservation'
-type MockClient_StopReservation_Call struct {
-	*mock.Call
-}
-
-// StopReservation is a helper method to define mock.On call
-//   - ctx context.Context
-//   - name string
-func (_e *MockClient_Expecter) StopReservation(ctx interface{}, name interface{}) *MockClient_StopReservation_Call {
-	return &MockClient_StopReservation_Call{Call: _e.mock.On("StopReservation", ctx, name)}
-}
-
-func (_c *MockClient_StopReservation_Call) Run(run func(ctx context.Context, name string)) *MockClient_StopReservation_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockClient_StopReservation_Call) Return(_a0 error) *MockClient_StopReservation_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockClient_StopReservation_Call) RunAndReturn(run func(context.Context, string) error) *MockClient_StopReservation_Call {
 	_c.Call.Return(run)
 	return _c
 }

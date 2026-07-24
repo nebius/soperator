@@ -9,7 +9,7 @@ import typing
 
 
 # Open the directory from which the checks should be run
-def chdir_into_tmp():
+def chdir_into_tmp() -> None:
     try:
         os.chdir("/tmp")
     except Exception as e:
@@ -23,7 +23,7 @@ def print_hc_result(
     hc_exitcode: int = -1,
     hc_stdout: str = None,
     hc_stderr: str = None,
-):
+) -> None:
     print(res_desc)
     print(f"Health checker exit code: {hc_exitcode}")
     print("Health checker stdout:")
@@ -77,7 +77,7 @@ def get_hc_result(proc: subprocess.CompletedProcess) -> HealthCheckerResult:
         return res
 
 
-def ensure_output_dir(path_str: str):
+def ensure_output_dir(path_str: str) -> None:
     path = pathlib.Path(path_str)
 
     old_umask = os.umask(0)
@@ -100,15 +100,7 @@ try:
     # Change into /tmp before running health-checker
     chdir_into_tmp()
 
-    # Define tests to run
-    tests: str = ""
-    if CHECKS_CONTEXT == "prolog":
-        tests = "module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg,ib_link"
-    elif CHECKS_CONTEXT == "epilog":
-        tests = "module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dcgmi_diag_r1,dmesg,ib_link"
-    elif CHECKS_CONTEXT == "hc_program":
-        tests = "module,nvidia_smi,nvidia_smi_nvlink,nvidia_smi_topo,dmesg,ib_link"
-    else:
+    if CHECKS_CONTEXT not in ("prolog", "epilog", "hc_program"):
         print(f"Unknown context '{CHECKS_CONTEXT}'")
         sys.exit(0)
 
@@ -122,9 +114,8 @@ try:
     # Run Nebius GPU health-checker
     cmd = [
         "health-checker", "run",
-        "-e", "soperator",
+        "-e", f"soperator_{CHECKS_CONTEXT}",
         "-p", CHECKS_PLATFORM_TAG,
-        "-n", tests,
         "-f", "json-partial",
         "--tests-stdout-path", output_dir,
         "--log-level", "info",

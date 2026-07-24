@@ -34,6 +34,7 @@ spec:
   upgrade:
     {{- toYaml .Values.nodesets.upgrade | nindent 4 }}
   values:
+    clusterName: {{ .Values.nodesets.clusterName | quote }}
   {{- if .Values.nodesets.overrideValues }}
     {{- toYaml .Values.nodesets.overrideValues | nindent 4 }}
   {{- else }}

@@ -65,7 +65,7 @@ func BasePodTemplateSpec(
 		common.RenderContainerMunge(&accounting.ContainerMunge),
 	)
 
-	return &corev1.PodTemplateSpec{
+	res := &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      matchLabels,
 			Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameAccounting),
@@ -83,5 +83,7 @@ func BasePodTemplateSpec(
 			},
 			Volumes: volumes,
 		},
-	}, nil
+	}
+
+	return res, nil
 }

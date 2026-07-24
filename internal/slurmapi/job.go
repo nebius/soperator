@@ -28,13 +28,19 @@ type Job struct {
 	NodeCount      *int32
 	ArrayJobID     *int32
 	ArrayTaskID    *int32
-	SubmitTime     *metav1.Time
-	StartTime      *metav1.Time
-	EndTime        *metav1.Time
-	TresAllocated  string
-	TresRequested  string
-	CPUs           *int32
-	MemoryPerNode  *int64 // in MB
+	// ArrayTaskString is the range expression for an array job's master record (e.g. "1-5",
+	// "1,3,5", "1-10:2"). Slurmdbd collapses pending array tasks into one row with this field set
+	// and ArrayTaskID unset; slurmctld also populates it on the master record. Per-task records
+	// have ArrayTaskID set instead. Used as a fallback when ArrayTaskID is nil so dashboards can
+	// still distinguish array master records from non-array jobs.
+	ArrayTaskString string
+	SubmitTime      *metav1.Time
+	StartTime       *metav1.Time
+	EndTime         *metav1.Time
+	TresAllocated   string
+	TresRequested   string
+	CPUs            *int32
+	MemoryPerNode   *int64 // in MB
 }
 
 func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
@@ -86,7 +92,7 @@ func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
 		job.StandardOutput = *apiJob.StandardOutput
 	}
 
-	if apiJob.Nodes != nil {
+	if apiJob.Nodes != nil && !isUnallocatedNodeList(*apiJob.Nodes) {
 		job.Nodes = *apiJob.Nodes
 	}
 
@@ -101,6 +107,9 @@ func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
 	job.NodeCount = convertToInt(apiJob.NodeCount)
 	job.ArrayJobID = convertToInt(apiJob.ArrayJobId)
 	job.ArrayTaskID = convertToInt(apiJob.ArrayTaskId)
+	if apiJob.ArrayTaskString != nil {
+		job.ArrayTaskString = *apiJob.ArrayTaskString
+	}
 	job.SubmitTime = convertToMetav1Time(apiJob.SubmitTime)
 	job.StartTime = convertToMetav1Time(apiJob.StartTime)
 	job.EndTime = convertToMetav1Time(apiJob.EndTime)
@@ -113,6 +122,103 @@ func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
 	}
 	job.CPUs = convertToInt(apiJob.Cpus)
 	job.MemoryPerNode = convertToInt64(apiJob.MemoryPerNode)
+
+	return job, nil
+}
+
+func JobFromAccountingAPI(apiJob api.V0041Job) (Job, error) {
+	job := Job{}
+	if apiJob.JobId == nil {
+		return job, fmt.Errorf("job ID is missing")
+	}
+	job.ID = *apiJob.JobId
+
+	if apiJob.Name != nil {
+		job.Name = *apiJob.Name
+	}
+
+	if apiJob.State == nil || apiJob.State.Current == nil || len(*apiJob.State.Current) == 0 {
+		return Job{}, fmt.Errorf("job state is missing")
+	}
+
+	job.State = string((*apiJob.State.Current)[0])
+
+	if apiJob.State.Reason != nil {
+		job.StateReason = *apiJob.State.Reason
+	}
+
+	if apiJob.Partition != nil {
+		job.Partition = *apiJob.Partition
+	}
+
+	if apiJob.User != nil {
+		job.UserName = *apiJob.User
+	} else if apiJob.Association != nil {
+		job.UserName = apiJob.Association.User
+	}
+
+	if apiJob.StderrExpanded != nil {
+		job.StandardError = *apiJob.StderrExpanded
+	} else if apiJob.Stderr != nil {
+		job.StandardError = *apiJob.Stderr
+	}
+
+	if apiJob.StdoutExpanded != nil {
+		job.StandardOutput = *apiJob.StdoutExpanded
+	} else if apiJob.Stdout != nil {
+		job.StandardOutput = *apiJob.Stdout
+	}
+
+	if apiJob.Nodes != nil && !isUnallocatedNodeList(*apiJob.Nodes) {
+		job.Nodes = *apiJob.Nodes
+	}
+
+	// V0041Job (accounting) only carries allocation_nodes — the count of nodes already assigned.
+	// For pending jobs that's 0, which would zero out per-node memory metrics downstream
+	// (jobAllocatedResources multiplies MemoryPerNode by NodeCount). Leave NodeCount nil in that
+	// case so the fallback nodeCount=1 kicks in. The accounting API doesn't expose the originally
+	// requested node count, so multi-node pending jobs will report MemoryPerNode×1 — controller
+	// mode is the source of truth for live pending state.
+	if apiJob.AllocationNodes != nil && *apiJob.AllocationNodes > 0 {
+		job.NodeCount = apiJob.AllocationNodes
+	}
+	if apiJob.Array != nil {
+		job.ArrayJobID = apiJob.Array.JobId
+		job.ArrayTaskID = convertToInt(apiJob.Array.TaskId)
+		if apiJob.Array.Task != nil {
+			job.ArrayTaskString = *apiJob.Array.Task
+		}
+	}
+
+	if apiJob.Time != nil {
+		job.SubmitTime = unixTimeToMetav1Time(apiJob.Time.Submission)
+		job.StartTime = unixTimeToMetav1Time(apiJob.Time.Start)
+		job.EndTime = unixTimeToMetav1Time(apiJob.Time.End)
+
+		// Slurmdbd stores time_end=0 for unfinished jobs. Project end = start + time_limit for
+		// RUNNING jobs to mirror slurmctld's behaviour on the controller path; this keeps
+		// slurm_job_info.end_time semantically consistent across sources. Time.Limit is in minutes;
+		// if the job has no time limit (UNLIMITED / NO_VAL) convertToInt returns nil and we leave
+		// end_time empty, which is also what the controller does.
+		if job.EndTime == nil &&
+			job.State == string(api.V0041JobStateCurrentRUNNING) &&
+			job.StartTime != nil && job.StartTime.Unix() > 0 {
+			if limitMin := convertToInt(apiJob.Time.Limit); limitMin != nil {
+				projected := metav1.NewTime(job.StartTime.Add(time.Duration(*limitMin) * time.Minute))
+				job.EndTime = &projected
+			}
+		}
+	}
+
+	if apiJob.Tres != nil {
+		job.TresAllocated = tresListToString(apiJob.Tres.Allocated)
+		job.TresRequested = tresListToString(apiJob.Tres.Requested)
+	}
+
+	if apiJob.Required != nil {
+		job.CPUs = apiJob.Required.CPUs
+		job.MemoryPerNode = convertToInt64(apiJob.Required.MemoryPerNode)
+	}
 
 	return job, nil
 }
@@ -133,11 +239,14 @@ func (j Job) GetArrayJobIDString() string {
 	return strconv.Itoa(int(*j.ArrayJobID))
 }
 
+// GetArrayTaskIDString returns the per-task array index (e.g. "3") for an exploded array task,
+// falling back to the range expression (e.g. "1-5") on a master record where ArrayTaskID is unset.
+// Returns "" for non-array jobs.
 func (j Job) GetArrayTaskIDString() string {
-	if j.ArrayTaskID == nil {
-		return ""
+	if j.ArrayTaskID != nil {
+		return strconv.Itoa(int(*j.ArrayTaskID))
 	}
-	return strconv.Itoa(int(*j.ArrayTaskID))
+	return j.ArrayTaskString
 }
 
 func (j Job) GetNodeList() ([]string, error) {
@@ -306,6 +415,48 @@ func convertToMetav1Time(input *api.V0041Uint64NoValStruct) *metav1.Time {
 	return &metav1.Time{Time: t}
 }
 
+func unixTimeToMetav1Time(input *int64) *metav1.Time {
+	if input == nil || *input <= 0 {
+		return nil
+	}
+
+	t := time.Unix(*input, 0)
+	return &metav1.Time{Time: t}
+}
+
+// isStaleAccountingPending reports whether an accounting job record is a "zombie" — never
+// started, never ended, and submitted long enough ago that it cannot represent an active job.
+// Slurmdbd's no-state predicate keeps any row with time_end=0 forever (the underlying SQL is
+// `(t1.time_end >= start_time OR t1.time_end = 0)`), so leftovers from a scancel that didn't
+// propagate or a controller crash accumulate as permanent Prometheus series until PurgeJobAfter
+// sweeps them. Dropping them at fetch time avoids that cardinality leak.
+func isStaleAccountingPending(j api.V0041Job, submitCutoff int64) bool {
+	if j.Time == nil {
+		return false
+	}
+	end := derefInt64(j.Time.End)
+	start := derefInt64(j.Time.Start)
+	submit := derefInt64(j.Time.Submission)
+	return end == 0 && start == 0 && submit > 0 && submit < submitCutoff
+}
+
+func derefInt64(p *int64) int64 {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
+// isUnallocatedNodeList reports whether the given Slurm "nodes" string represents an unallocated
+// job (no nodes yet assigned). Slurmdbd returns the literal "None assigned" for pending jobs, and
+// has historically used "(null)" for similar cases; the controller path may return an empty or
+// whitespace-only string. Treating these as no-nodes at the conversion boundary keeps downstream
+// callers (parseNodeList, slurm_node_job emission) free of per-call special cases.
+func isUnallocatedNodeList(s string) bool {
+	s = strings.TrimSpace(s)
+	return s == "" || s == "None assigned" || s == "(null)"
+}
+
 func convertToInt(input *api.V0041Uint32NoValStruct) *int32 {
 	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
 		return nil
@@ -328,4 +479,34 @@ func convertToInt64(input *api.V0041Uint64NoValStruct) *int64 {
 	}
 
 	return input.Number
+}
+
+func tresListToString(input *api.V0041TresList) string {
+	if input == nil {
+		return ""
+	}
+
+	parts := make([]string, 0, len(*input))
+	for _, tres := range *input {
+		if tres.Count == nil {
+			continue
+		}
+
+		key := tres.Type
+		if tres.Name != nil && *tres.Name != "" {
+			key = fmt.Sprintf("%s/%s", key, *tres.Name)
+		}
+
+		// Slurm reports memory TRES counts in MB (matching `sacct -P -o ReqTRES`); the rest are dimensionless.
+		// Append "M" so parseMemoryValue interprets the value correctly - without a suffix
+		// it would treat the number as bytes.
+		value := strconv.FormatInt(*tres.Count, 10)
+		if tres.Type == "mem" {
+			value += "M"
+		}
+
+		parts = append(parts, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	return strings.Join(parts, ",")
 }

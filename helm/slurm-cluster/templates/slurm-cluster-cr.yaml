@@ -94,7 +94,7 @@ spec:
   volumeSources:
     - name: slurm-scripts
       configMap:
-        name: slurm-scripts
+        name: {{ include "slurm-cluster.slurmScriptsCMName" . }}
         defaultMode: 0755
     {{- range .Values.volumeSources }}
     - name: {{ .name | quote }}
@@ -169,7 +169,7 @@ spec:
         readinessProbe:
           {{- toYaml . | nindent 10 }}
         {{- end }}
-      customInitContainers: {{- default list .Values.slurmNodes.accounting.customInitContainers | toYaml | nindent 10 }}
+      {{- include "slurm-cluster.customInitContainers" (dict "root" . "customInitContainers" .Values.slurmNodes.accounting.customInitContainers "nodeExporter" .Values.slurmNodes.accounting.nodeExporter) | nindent 6 }}
       {{- if .Values.slurmNodes.accounting.externalDB.enabled }}
       externalDB:
         enabled: {{ default false .Values.slurmNodes.accounting.externalDB.enabled }}
@@ -313,7 +313,7 @@ spec:
       {{- with .Values.slurmNodes.sssd.sssdLdapCAConfigMapRefName }}
       sssdLdapCAConfigMapRefName: {{ . | quote }}
       {{- end }}
-      customInitContainers: {{- default list .Values.slurmNodes.controller.customInitContainers | toYaml | nindent 10 }}
+      {{- include "slurm-cluster.customInitContainers" (dict "root" . "customInitContainers" .Values.slurmNodes.controller.customInitContainers "nodeExporter" .Values.slurmNodes.controller.nodeExporter) | nindent 6 }}
       {{- if .Values.slurmNodes.controller.serviceAccount.create }}
       serviceAccountName: {{ include "slurm-cluster.controller.serviceAccountName" . | quote }}
       {{- else if .Values.slurmNodes.controller.serviceAccount.name }}
@@ -431,7 +431,7 @@ spec:
       {{- with .Values.slurmNodes.sssd.sssdLdapCAConfigMapRefName }}
       sssdLdapCAConfigMapRefName: {{ . | quote }}
       {{- end }}
-      customInitContainers: {{- default list .Values.slurmNodes.login.customInitContainers | toYaml | nindent 10 }}
+      {{- include "slurm-cluster.customInitContainers" (dict "root" . "customInitContainers" .Values.slurmNodes.login.customInitContainers "nodeExporter" .Values.slurmNodes.login.nodeExporter) | nindent 6 }}
       volumes:
         jail:
           {{- required ".Values.slurmNodes.login.volumes.jail must be provided." .Values.slurmNodes.login.volumes.jail | toYaml | nindent 10 }}
@@ -458,6 +458,15 @@ spec:
       {{- if .Values.slurmNodes.exporter.collectionInterval }}
       collectionInterval: {{ .Values.slurmNodes.exporter.collectionInterval | quote }}
       {{- end }}
+      {{- if .Values.slurmNodes.exporter.maxCollectorInflight }}
+      maxCollectorInflight: {{ .Values.slurmNodes.exporter.maxCollectorInflight }}
+      {{- end }}
+      {{- if .Values.slurmNodes.exporter.jobSource }}
+      jobSource: {{ .Values.slurmNodes.exporter.jobSource | quote }}
+      {{- end }}
+      {{- if .Values.slurmNodes.exporter.accountingJobsLookback }}
+      accountingJobsLookback: {{ .Values.slurmNodes.exporter.accountingJobsLookback | quote }}
+      {{- end }}
       {{- if .Values.slurmNodes.exporter.podMonitorConfig }}
       podMonitorConfig:
         {{- toYaml .Values.slurmNodes.exporter.podMonitorConfig | nindent 8 }}
@@ -467,6 +476,12 @@ spec:
         imagePullPolicy: {{ default "IfNotPresent" .Values.slurmNodes.exporter.imagePullPolicy | quote }}
         appArmorProfile: {{ default "unconfined" .Values.slurmNodes.exporter.appArmorProfile | quote }}
         {{- with (default dict .Values.slurmNodes.exporter.exporterContainer) }}
+        {{- with .resources }}
+        resources:
+          cpu: {{ required ".Values.slurmNodes.exporter.exporterContainer.resources.cpu must be provided." .cpu | quote }}
+          memory: {{ required ".Values.slurmNodes.exporter.exporterContainer.resources.memory must be provided." .memory | quote }}
+          ephemeral-storage: {{ required ".Values.slurmNodes.exporter.exporterContainer.resources.ephemeralStorage must be provided." .ephemeralStorage | quote }}
+        {{- end }}
         {{- with .livenessProbe }}
         livenessProbe:
           {{- toYaml . | nindent 10 }}
@@ -491,7 +506,7 @@ spec:
       {{- if .Values.slurmNodes.rest.maxConnections }}
       maxConnections: {{ .Values.slurmNodes.rest.maxConnections }}
       {{- end }}
-      customInitContainers: {{- default list .Values.slurmNodes.rest.customInitContainers | toYaml | nindent 10 }}
+      {{- include "slurm-cluster.customInitContainers" (dict "root" . "customInitContainers" .Values.slurmNodes.rest.customInitContainers "nodeExporter" .Values.slurmNodes.rest.nodeExporter) | nindent 6 }}
       rest:
         image: {{ required "rest image" .Values.images.slurmrestd | quote }}
         {{- if .Values.slurmNodes.rest.rest.command }}
@@ -521,6 +536,7 @@ spec:
       size: {{ required ".Values.sConfigController.node.size must be provided." .Values.sConfigController.node.size }}
       k8sNodeFilterName: {{ required ".Values.sConfigController.node.k8sNodeFilterName must be provided." .Values.sConfigController.node.k8sNodeFilterName | quote }}
       priorityClass: {{ default (printf "%s-%s" (include "slurm-cluster.name" .) "slurm-sconfigcontroller") .Values.sConfigController.node.priorityClass | quote }}
+      {{- include "slurm-cluster.customInitContainers" (dict "root" . "customInitContainers" .Values.sConfigController.node.customInitContainers "nodeExporter" .Values.sConfigController.nodeExporter) | nindent 6 }}
     container:
       image: {{ required "sConfigController image" .Values.images.sConfigController | quote }}
       imagePullPolicy: {{ default "IfNotPresent" .Values.sConfigController.container.imagePullPolicy | quote }}

@@ -5,7 +5,7 @@ tests:
   - it: should default activeDeadlineSeconds to 1800
     documentSelector:
       path: metadata.name
-      value: test-default-deadline
+      value: test-cluster-test-default-deadline
     set:
       slurmClusterRefName: test-cluster
       images:
@@ -28,7 +28,7 @@ tests:
   - it: should override activeDeadlineSeconds for manage-jail-state
     documentSelector:
       path: metadata.name
-      value: manage-jail-state
+      value: test-cluster-manage-jail-state
     set:
       slurmClusterRefName: test-cluster
       images:
@@ -45,7 +45,7 @@ tests:
   - it: should override activeDeadlineSeconds for manage-jail-state-force
     documentSelector:
       path: metadata.name
-      value: manage-jail-state-force
+      value: test-cluster-manage-jail-state-force
     set:
       slurmClusterRefName: test-cluster
       images:
@@ -62,7 +62,7 @@ tests:
   - it: should override activeDeadlineSeconds for manage-jail-state-dry-run
     documentSelector:
       path: metadata.name
-      value: manage-jail-state-dry-run
+      value: test-cluster-manage-jail-state-dry-run
     set:
       slurmClusterRefName: test-cluster
       images:

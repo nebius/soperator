@@ -64,7 +64,7 @@ func RenderStatefulSet(
 		))
 	}
 
-	return kruisev1b1.StatefulSet{
+	res := kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      login.StatefulSet.Name,
 			Namespace: namespace,
@@ -132,5 +132,7 @@ func RenderStatefulSet(
 				},
 			},
 		},
-	}, nil
+	}
+
+	return res, nil
 }

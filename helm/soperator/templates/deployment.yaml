@@ -18,6 +18,9 @@ spec:
     metadata:
       labels:
         control-plane: controller-manager
+        {{- if .Values.nodeExporter.enabled }}
+        slurm.nebius.ai/pod-node-exporter: "true"
+        {{- end }}
       {{- include "soperator.selectorLabels" . | nindent 8 }}
       annotations:
         kubectl.kubernetes.io/default-container: manager
@@ -59,6 +62,9 @@ spec:
           periodSeconds: 20
         name: manager
         ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
         - containerPort: 9443
           name: webhook-server
           protocol: TCP
@@ -78,23 +84,30 @@ spec:
           name: cert
           readOnly: true
         {{- end }}
-      - args: {{- toYaml .Values.controllerManager.kubeRbacProxy.args | nindent 8 }}
-        env:
-        - name: KUBERNETES_CLUSTER_DOMAIN
-          value: {{ quote .Values.kubernetesClusterDomain }}
-        image: {{ .Values.controllerManager.kubeRbacProxy.image.repository }}:{{ .Values.controllerManager.kubeRbacProxy.image.tag
-          | default .Chart.AppVersion }}
-        name: kube-rbac-proxy
-        ports:
-        - containerPort: 8443
-          name: https
-          protocol: TCP
-        resources: {{- toYaml .Values.controllerManager.kubeRbacProxy.resources | nindent
-          10 }}
-        securityContext: {{- toYaml .Values.controllerManager.kubeRbacProxy.containerSecurityContext
-          | nindent 10 }}
       securityContext:
         runAsNonRoot: true
+      {{- if .Values.nodeExporter.enabled }}
+      initContainers:
+      - name: pod-node-exporter
+        image: {{ .Values.nodeExporter.image.repository }}:{{ .Values.nodeExporter.image.tag }}
+        imagePullPolicy: {{ .Values.nodeExporter.image.pullPolicy }}
+        restartPolicy: Always
+        args:
+        {{- range .Values.nodeExporter.args }}
+        - {{ . | quote }}
+        {{- end }}
+        - --web.listen-address=:{{ .Values.nodeExporter.port }}
+        ports:
+        - containerPort: {{ .Values.nodeExporter.port }}
+          name: node-exporter
+          protocol: TCP
+        resources: {{- toYaml .Values.nodeExporter.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- end }}
       serviceAccountName: {{ include "soperator.fullname" . }}-manager
       terminationGracePeriodSeconds: 10
       {{- if .Values.certManager.enabled }}

@@ -52,6 +52,68 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{/*
+Render node-exporter as a native sidecar init container.
+Usage: include "nodesets.nodeExporterInitContainer" (dict "root" $ "nodeExporter" .Values.path.to.nodeExporter)
+*/}}
+{{- define "nodesets.nodeExporterInitContainer" -}}
+{{- $root := .root -}}
+{{- $nodeExporter := .nodeExporter | default dict -}}
+{{- $nodeExporterImage := $nodeExporter.image | default dict -}}
+{{- if $nodeExporter.enabled }}
+- name: pod-node-exporter
+  image: {{ printf "%s:%s" (default $root.Values.images.nodeExporter.repository $nodeExporterImage.repository) (default $root.Values.images.nodeExporter.tag $nodeExporterImage.tag) | quote }}
+  imagePullPolicy: {{ default "IfNotPresent" $nodeExporterImage.pullPolicy | quote }}
+  restartPolicy: Always
+  args:
+    {{- range (default (list "--collector.disable-defaults" "--collector.netdev" "--collector.netstat" "--collector.sockstat" "--collector.conntrack") $nodeExporter.args) }}
+    - {{ . | quote }}
+    {{- end }}
+    - {{ printf "--web.listen-address=:%v" (default 9100 $nodeExporter.port) | quote }}
+  ports:
+    - name: node-exporter
+      containerPort: {{ default 9100 $nodeExporter.port }}
+      protocol: TCP
+  resources:
+    requests:
+      cpu: {{ default "50m" (get ($nodeExporter.resources | default dict) "cpu") | quote }}
+      memory: {{ default "64Mi" (get ($nodeExporter.resources | default dict) "memory") | quote }}
+      ephemeral-storage: {{ default "128Mi" (coalesce (get ($nodeExporter.resources | default dict) "ephemeralStorage") (get ($nodeExporter.resources | default dict) "ephemeral-storage")) | quote }}
+    limits:
+      memory: {{ default "64Mi" (get ($nodeExporter.resources | default dict) "memory") | quote }}
+      ephemeral-storage: {{ default "128Mi" (coalesce (get ($nodeExporter.resources | default dict) "ephemeralStorage") (get ($nodeExporter.resources | default dict) "ephemeral-storage")) | quote }}
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  {{- with $nodeExporter.livenessProbe }}
+  livenessProbe:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $nodeExporter.readinessProbe }}
+  readinessProbe:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Render NodeSet customInitContainers with optional node-exporter sidecar appended.
+Usage: include "nodesets.customInitContainers" (dict "root" $ "customInitContainers" .Values.path.to.customInitContainers "nodeExporter" .Values.path.to.nodeExporter)
+*/}}
+{{- define "nodesets.customInitContainers" -}}
+{{- $customInitContainers := default list .customInitContainers -}}
+{{- $nodeExporter := .nodeExporter | default dict -}}
+{{- if or $customInitContainers $nodeExporter.enabled }}
+customInitContainers:
+{{- if $customInitContainers }}
+{{- toYaml $customInitContainers | nindent 2 }}
+{{- end }}
+{{- include "nodesets.nodeExporterInitContainer" . | nindent 2 }}
+{{- end }}
+{{- end -}}
+
 {{/* Construct container gpu resource from GPU spec ([0]) and GPU resource spec ([1]) */}}
 {{- define "nodesets.resource.gpuFrom" -}}
   {{- $gpuSpec := (index . 0) | default dict -}}

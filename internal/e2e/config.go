@@ -100,6 +100,7 @@ type Config struct {
 	O11yAccessToken    string `split_words:"true" required:"true"`                // O11Y_ACCESS_TOKEN
 	O11ySecretName     string `split_words:"true" default:"o11y-writer-sa-token"` // O11Y_SECRET_NAME
 	O11yNamespace      string `split_words:"true" default:"logs-system"`          // O11Y_NAMESPACE
+	SlurmClusterName   string `split_words:"true" default:"soperator"`            // SLURM_CLUSTER_NAME
 
 	Profile      Profile `ignored:"true"`
 	SSHPublicKey string  `ignored:"true"`

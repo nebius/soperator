@@ -4,7 +4,7 @@ type WorkerPodRef struct {
 	Name string
 }
 
-type ExpectedNodeSet struct {
+type DiscoveredNodeSet struct {
 	Name   string
 	Size   int
 	Preset string
@@ -12,15 +12,20 @@ type ExpectedNodeSet struct {
 }
 
 type ClusterState struct {
-	Workers          []WorkerPodRef
-	GPUWorkers       []WorkerPodRef
-	WorkersByNodeSet map[string][]WorkerPodRef
-	ExpectedNodeSets []ExpectedNodeSet
+	SlurmClusterName   string
+	Workers            []WorkerPodRef
+	GPUWorkers         []WorkerPodRef
+	WorkersByNodeSet   map[string][]WorkerPodRef
+	DiscoveredNodeSets []DiscoveredNodeSet
 }
 
-func (s *ClusterState) ExpectedWorkerCount() int {
+func (s *ClusterState) PodName(podName string) string {
+	return ClusterPrefixedName(s.SlurmClusterName, podName)
+}
+
+func (s *ClusterState) DesiredWorkerCount() int {
 	total := 0
-	for _, nodeSet := range s.ExpectedNodeSets {
+	for _, nodeSet := range s.DiscoveredNodeSets {
 		total += nodeSet.Size
 	}
 	return total

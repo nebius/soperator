@@ -70,7 +70,7 @@ func RenderStatefulSet(
 		slurmctldContainer = renderContainerSlurmctldWithSSSD(&controller.ContainerSlurmctld, controller.CustomVolumeMounts)
 	}
 
-	return kruisev1b1.StatefulSet{
+	res := kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      controller.StatefulSet.Name,
 			Namespace: namespace,
@@ -128,5 +128,7 @@ func RenderStatefulSet(
 				},
 			},
 		},
-	}, nil
+	}
+
+	return res, nil
 }

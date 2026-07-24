@@ -970,6 +970,11 @@ spec:
                         x-kubernetes-list-type: atomic
                     type: object
                 type: object
+              clusterName:
+                description: |-
+                  ClusterName is the name of the SlurmCluster this NodeSet belongs to.
+                  Must be in the same namespace as the NodeSet.
+                type: string
               configMapRefSshd:
                 description: |-
                   ConfigMapRefSSHD defines the config name of Slurm SSHD.
@@ -2506,6 +2511,18 @@ spec:
                   - name
                   type: object
                 type: array
+              docker:
+                description: Docker defines the settings related to Docker support
+                  for Slurm workers.
+                properties:
+                  enabled:
+                    default: true
+                    description: |-
+                      Enabled indicates whether Docker is available on the Nodes of the NodeSet.
+                      Docker requires dedicated image-storage disks for storing OCI data,
+                      so it must be disabled on clusters deployed without them.
+                    type: boolean
+                type: object
               enableHostUserNamespace:
                 default: false
                 description: |-
@@ -2562,6 +2579,20 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              maxConcurrentStartup:
+                anyOf:
+                - type: integer
+                - type: string
+                default: 500
+                description: |-
+                  MaxConcurrentStartup caps the number of worker pods created in parallel
+                  during initial NodeSet scale-out (i.e. cluster creation or NodeSet growth).
+                  Value can be an absolute number (ex: 500) or a percentage of desired pods (ex: 10%).
+                  Maps to the underlying kruise AdvancedStatefulSet's scaleStrategy.maxUnavailable.
+                  Prevents overloading the Slurm controller with simultaneous slurmd registrations
+                  on large clusters.
+                  Defaults to 500.
+                x-kubernetes-int-or-string: true
               maxUnavailable:
                 anyOf:
                 - type: integer
@@ -12052,12 +12083,37 @@ spec:
                       type: string
                   type: object
                 type: array
+              topology:
+                description: Topology defines network-topology settings for this NodeSet.
+                properties:
+                  fabric:
+                    default: root
+                    description: |-
+                      Fabric is the IB fabric this NodeSet belongs to. Its workers are grouped under a
+                      per-fabric root switch (named after the fabric) so Slurm never schedules a job across
+                      fabrics. Powered-down / unscheduled nodes are placed under "<fabric>.unknown".
+                      Defaults to "root", which preserves the single-fabric behavior.
+                    type: string
+                type: object
               workerAnnotations:
                 additionalProperties:
                   type: string
                 description: WorkerAnnotations represent K8S annotations that should
                   be added to the worker pods.
                 type: object
+              workerInitRandomDelaySeconds:
+                default: 0
+                description: |-
+                  WorkerInitRandomDelaySeconds is the upper bound (in seconds) of a random delay the
+                  worker-init container sleeps before running its readiness checks. The actual delay is
+                  picked uniformly from [0, WorkerInitRandomDelaySeconds]. It spreads slurmd registrations
+                  across workers to avoid overloading the Slurm controller (thundering herd) when many
+                  worker pods start at once, e.g. after a cluster-wide restart.
+                  Set to 0 to disable the delay.
+                  Defaults to 0.
+                format: int32
+                minimum: 0
+                type: integer
             required:
             - munge
             - slurmd

@@ -1,8 +1,11 @@
 package slurmapi
 
 import (
+	"cmp"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"time"
@@ -11,7 +14,45 @@ import (
 	api0043 "github.com/SlinkyProject/slurm-client/api/v0043"
 	"github.com/hashicorp/go-retryablehttp"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+// stalePendingMaxAge is the maximum submission age for a still-pending accounting record before
+// the exporter treats it as a zombie and drops it. See isStaleAccountingPending for the rationale.
+//
+// 30 days is conservative on purpose: a job legitimately pending for that long is unusual but
+// possible (long resource queues, held jobs that were never released). False positives at this
+// threshold are accepted as a trade-off against the unbounded cardinality of forever-time_end=0
+// rows. If a deployment has many genuinely long-pending jobs, this is the knob to revisit.
+const stalePendingMaxAge = 30 * 24 * time.Hour
+
+// summarizeSlurmRESTBody extracts the descriptions/errors from a Slurm REST API JSON envelope,
+// which all error responses follow ({"errors": [{"description": "...", "error": "..."}], ...}).
+// Returns "errors=[...]" when the envelope parses, otherwise the raw body. Used to keep error
+// logs scannable instead of dumping kilobytes of envelope metadata.
+func summarizeSlurmRESTBody(body []byte) string {
+	var parsed struct {
+		Errors []struct {
+			Description string `json:"description"`
+			Error       string `json:"error"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal(body, &parsed); err == nil && len(parsed.Errors) > 0 {
+		msgs := make([]string, 0, len(parsed.Errors))
+		for _, e := range parsed.Errors {
+			switch {
+			case e.Description != "":
+				msgs = append(msgs, e.Description)
+			case e.Error != "":
+				msgs = append(msgs, e.Error)
+			}
+		}
+		if len(msgs) > 0 {
+			return fmt.Sprintf("errors=%v", msgs)
+		}
+	}
+	return fmt.Sprintf("body=%s", string(body))
+}
 
 const (
 	headerSlurmUserToken = "X-SLURM-USER-TOKEN"
@@ -28,6 +69,19 @@ func DefaultHTTPClient() *http.Client {
 	retryClient.RetryMax = 3
 	retryClient.RetryWaitMin = 250 * time.Millisecond
 	retryClient.RetryWaitMax = 2 * time.Second
+	// On retry exhaustion, surface the last response's status and a summary of the body so
+	// callers can see why slurmrestd kept failing instead of just "giving up after N attempt(s)".
+	retryClient.ErrorHandler = func(resp *http.Response, err error, numTries int) (*http.Response, error) {
+		if resp != nil {
+			body, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("giving up after %d attempt(s): status=%d %s", numTries, resp.StatusCode, summarizeSlurmRESTBody(body))
+		}
+		if err != nil {
+			return nil, fmt.Errorf("giving up after %d attempt(s): %w", numTries, err)
+		}
+		return nil, fmt.Errorf("giving up after %d attempt(s)", numTries)
+	}
 	return retryClient.StandardClient()
 }
 
@@ -166,13 +220,24 @@ func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
 	return node, nil
 }
 
-func (c *client) GetJobsByID(ctx context.Context, jobID string) ([]Job, error) {
-	getJobResp, err := c.SlurmV0041GetJobWithResponse(ctx, jobID, &api.SlurmV0041GetJobParams{})
+// GetJobsByIDFromAccounting looks up a single Slurm job through slurmdbd's
+// `/slurmdb/v0.0.41/job/{id}`. Going to slurmdbd here, instead of slurmctld, keeps active-check
+// polling off the scheduler's hot path — on busy clusters this single call site dominates
+// slurmctld's REQUEST_JOB_INFO_SINGLE counter. Slurmdbd has all the fields the active-check
+// reconciler reads (state, end_time, name, nodes, state_reason).
+//
+// An empty `Jobs` slice with no error means slurmdbd has no record for the ID. That happens in
+// two situations callers must distinguish themselves: (a) the job was just submitted and the
+// slurmctld→slurmdbd propagation hasn't completed yet — the right behavior is requeue/retry;
+// (b) the job has been purged by slurmdbd's `PurgeJobAfter` (default 12 months) — retries will
+// loop forever. Bound retries by elapsed time since submit if a caller can hit case (b).
+func (c *client) GetJobsByIDFromAccounting(ctx context.Context, jobID string) ([]Job, error) {
+	getJobResp, err := c.SlurmdbV0041GetJobWithResponse(ctx, jobID)
 	if err != nil {
 		return nil, fmt.Errorf("get job %s: %w", jobID, err)
 	}
 	if getJobResp.JSON200 == nil {
-		return nil, fmt.Errorf("json200 field is nil for job ID %s", jobID)
+		return nil, fmt.Errorf("get job %s: status=%d %s", jobID, getJobResp.StatusCode(), summarizeSlurmRESTBody(getJobResp.Body))
 	}
 	if getJobResp.JSON200.Errors != nil && len(*getJobResp.JSON200.Errors) != 0 {
 		return nil, fmt.Errorf("get job %s responded with errors: %v", jobID, *getJobResp.JSON200.Errors)
@@ -180,9 +245,9 @@ func (c *client) GetJobsByID(ctx context.Context, jobID string) ([]Job, error) {
 
 	jobs := make([]Job, 0, len(getJobResp.JSON200.Jobs))
 	for _, j := range getJobResp.JSON200.Jobs {
-		job, err := JobFromAPI(j)
+		job, err := JobFromAccountingAPI(j)
 		if err != nil {
-			return nil, fmt.Errorf("convert job from api response: %w", err)
+			return nil, fmt.Errorf("convert job from accounting api response: %w", err)
 		}
 
 		jobs = append(jobs, job)
@@ -192,25 +257,111 @@ func (c *client) GetJobsByID(ctx context.Context, jobID string) ([]Job, error) {
 }
 
 func (c *client) ListJobs(ctx context.Context) ([]Job, error) {
+	return c.ListJobsWithParams(ctx, ListJobsParams{Source: JobSourceController})
+}
+
+func (c *client) ListJobsWithParams(ctx context.Context, params ListJobsParams) ([]Job, error) {
+	source := cmp.Or(params.Source, JobSourceController)
+
+	switch source {
+	case JobSourceController:
+		return c.listControllerJobs(ctx)
+	case JobSourceAccounting:
+		return c.listAccountingJobs(ctx, params)
+	default:
+		return nil, fmt.Errorf("list jobs: unsupported source %q", source)
+	}
+}
+
+func (c *client) listControllerJobs(ctx context.Context) ([]Job, error) {
 	getJobsResp, err := c.SlurmV0041GetJobsWithResponse(ctx, &api.SlurmV0041GetJobsParams{})
 	if err != nil {
-		return nil, fmt.Errorf("list jobs: %w", err)
+		return nil, fmt.Errorf("list jobs from controller API: %w", err)
 	}
 	if getJobsResp.JSON200 == nil {
-		return nil, fmt.Errorf("json200 field is nil")
+		return nil, fmt.Errorf("list jobs from controller API: status=%d %s", getJobsResp.StatusCode(), summarizeSlurmRESTBody(getJobsResp.Body))
 	}
 	if getJobsResp.JSON200.Errors != nil && len(*getJobsResp.JSON200.Errors) != 0 {
-		return nil, fmt.Errorf("list jobs responded with errors: %v", *getJobsResp.JSON200.Errors)
+		return nil, fmt.Errorf("list jobs from controller API responded with errors: %v", *getJobsResp.JSON200.Errors)
 	}
 
 	jobs := make([]Job, 0, len(getJobsResp.JSON200.Jobs))
 	for _, j := range getJobsResp.JSON200.Jobs {
 		job, err := JobFromAPI(j)
 		if err != nil {
-			return nil, fmt.Errorf("convert job from api response: %w", err)
+			return nil, fmt.Errorf("convert job from controller api response: %w", err)
 		}
 
 		jobs = append(jobs, job)
+	}
+
+	return jobs, nil
+}
+
+func (c *client) listAccountingJobs(ctx context.Context, params ListJobsParams) ([]Job, error) {
+	if params.AccountingLookback <= 0 {
+		return nil, fmt.Errorf("list jobs from accounting API: AccountingLookback must be > 0")
+	}
+
+	// Slurm's parse_time() rejects bare Unix epoch integers (despite the OpenAPI spec calling them
+	// "UNIX timestamp") and is also picky about relative units (`sec` is too short for the 6-char
+	// `xstrncasecmp(_, "second", 6)` check in 24.11). The "uts<epoch>" prefix is the explicit
+	// Slurm-specific Unix-timestamp form that bypasses timezone handling and unit parsing.
+	now := time.Now()
+	startTime := fmt.Sprintf("uts%d", now.Add(-params.AccountingLookback).Unix())
+	endTime := fmt.Sprintf("uts%d", now.Add(accountingEndTimeSkew).Unix())
+
+	var clusterFilter *string
+	if params.AccountingCluster != "" {
+		clusterFilter = &params.AccountingCluster
+	}
+	getJobsResp, err := c.SlurmdbV0041GetJobsWithResponse(ctx, &api.SlurmdbV0041GetJobsParams{
+		Cluster:   clusterFilter,
+		StartTime: &startTime,
+		EndTime:   &endTime,
+		// State is intentionally nil: the query returns jobs in any state during the window.
+		State: nil,
+		// Without this, slurmdbd clamps each job's reported start/end times to the query window
+		// (matching `sacct --truncate`). Downstream metrics like slurm_job_duration_seconds rely
+		// on the original timestamps, so any job whose lifetime extends outside the window would
+		// otherwise expose synthetic timestamps and cap its duration at the lookback.
+		DisableTruncateUsageTime: ptr.To("true"),
+		// Per-step payloads are not used in downstream; skipping them keeps slurmdbd from
+		// returning batch/extern/application step entries that would otherwise inflate every scrape on busy clusters.
+		SkipSteps: ptr.To("true"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list jobs from accounting API: %w", err)
+	}
+	if getJobsResp.JSON200 == nil {
+		return nil, fmt.Errorf("list jobs from accounting API: status=%d %s", getJobsResp.StatusCode(), summarizeSlurmRESTBody(getJobsResp.Body))
+	}
+	if getJobsResp.JSON200.Errors != nil && len(*getJobsResp.JSON200.Errors) != 0 {
+		return nil, fmt.Errorf("list jobs from accounting API responded with errors: %v", *getJobsResp.JSON200.Errors)
+	}
+
+	staleCutoff := now.Add(-stalePendingMaxAge).Unix()
+	var droppedStale int
+
+	jobs := make([]Job, 0, len(getJobsResp.JSON200.Jobs))
+	for _, j := range getJobsResp.JSON200.Jobs {
+		if isStaleAccountingPending(j, staleCutoff) {
+			droppedStale++
+			continue
+		}
+		job, err := JobFromAccountingAPI(j)
+		if err != nil {
+			return nil, fmt.Errorf("convert job from accounting api response: %w", err)
+		}
+
+		jobs = append(jobs, job)
+	}
+
+	if droppedStale > 0 {
+		log.FromContext(ctx).Info("Dropped stale zombie-pending accounting jobs",
+			"dropped", droppedStale,
+			"max_age", stalePendingMaxAge.String(),
+		)
 	}
 
 	return jobs, nil
@@ -229,75 +380,4 @@ func (c *client) GetDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error)
 	}
 
 	return getDiagResp.JSON200, nil
-}
-
-func (c *client) GetReservation(ctx context.Context, name string) (Reservation, error) {
-	resp, err := c.client0043.SlurmV0043GetReservationWithResponse(ctx, name, &api0043.SlurmV0043GetReservationParams{})
-	if err != nil {
-		return Reservation{}, fmt.Errorf("get reservation: %w", err)
-	}
-	if resp == nil {
-		return Reservation{}, fmt.Errorf("get reservation response is nil")
-	}
-	if resp.JSON200 == nil {
-		return Reservation{}, fmt.Errorf("json200 field is nil")
-	}
-	if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
-		return Reservation{}, fmt.Errorf("get reservation responded with errors: %v", *resp.JSON200.Errors)
-	}
-
-	if reservationsLength := len(resp.JSON200.Reservations); reservationsLength != 1 {
-		return Reservation{}, fmt.Errorf("expected only one reservation in response for get %s request, got %d", name, reservationsLength)
-	}
-
-	reservation := ReservationFromAPI(resp.JSON200.Reservations[0])
-
-	return reservation, nil
-}
-
-func (c *client) PostMaintenanceReservation(ctx context.Context, name string, nodeList []string) error {
-	resp, err := c.client0043.SlurmV0043PostReservationWithResponse(ctx, api0043.V0043ReservationDescMsg{
-		Name:     ptr.To(name),
-		NodeList: ptr.To(api0043.V0043HostlistString(nodeList)),
-		Flags:    ptr.To([]api0043.V0043ReservationDescMsgFlags{api0043.V0043ReservationDescMsgFlagsMAINT, api0043.V0043ReservationDescMsgFlagsIGNOREJOBS}),
-		Users:    ptr.To([]string{SlurmUserSoperatorchecks}),
-		StartTime: &api0043.V0043Uint64NoValStruct{
-			Number: ptr.To(time.Now().Unix()),
-			Set:    ptr.To(true),
-		},
-		Duration: &api0043.V0043Uint32NoValStruct{
-			Infinite: ptr.To(true),
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("post reservation: %w", err)
-	}
-	if resp == nil {
-		return fmt.Errorf("post reservation response is nil")
-	}
-
-	if resp.StatusCode() != 200 {
-		return fmt.Errorf("post reservation returned status code %d body:%s", resp.StatusCode(), string(resp.Body))
-	}
-	if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
-		return fmt.Errorf("post reservation returned errors: %v", *resp.JSON200.Errors)
-	}
-	return nil
-}
-
-func (c *client) StopReservation(ctx context.Context, name string) error {
-	resp, err := c.client0043.SlurmV0043PostReservationWithResponse(ctx, api0043.V0043ReservationDescMsg{
-		Name: ptr.To(name),
-		Duration: &api0043.V0043Uint32NoValStruct{
-			Number: ptr.To(int32(0)),
-			Set:    ptr.To(true),
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("stop reservation: %w", err)
-	}
-	if resp.JSON200.Errors != nil && len(*resp.JSON200.Errors) != 0 {
-		return fmt.Errorf("stop reservation returned errors: %v", *resp.JSON200.Errors)
-	}
-	return nil
 }

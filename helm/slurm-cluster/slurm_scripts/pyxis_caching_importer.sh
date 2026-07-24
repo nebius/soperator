@@ -8,6 +8,7 @@ readonly cmd="$1"
 readonly cache_dir="${ENROOT_CONTAINER_IMAGES_CACHE_DIR:-/var/cache/enroot-container-images}"
 readonly squashfs_temp_path="${cache_dir}/${SLURM_JOB_ID}.${SLURM_STEP_ID}.sqsh"
 readonly lock_path="${squashfs_temp_path}.lock"
+trap 'rm -f "${lock_path}"' EXIT
 
 # Since it's not an ephemeral squashfs file, we can use compression.
 export ENROOT_SQUASH_OPTIONS="-comp zstd -Xcompression-level 3 -b 1M"

@@ -32,7 +32,7 @@ func BasePodTemplateSpec(
 		return nil, err
 	}
 
-	return &corev1.PodTemplateSpec{
+	res := &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      matchLabels,
 			Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameREST),
@@ -48,5 +48,7 @@ func BasePodTemplateSpec(
 			Volumes:           volumes,
 			PriorityClassName: valuesREST.PriorityClass,
 		},
-	}, nil
+	}
+
+	return res, nil
 }

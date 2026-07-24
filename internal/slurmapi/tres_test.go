@@ -2,6 +2,11 @@ package slurmapi
 
 import (
 	"testing"
+
+	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"k8s.io/utils/ptr"
 )
 
 func TestParseTrackableResources_Success(t *testing.T) {
@@ -45,6 +50,31 @@ func TestParseTrackableResources_Success(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestTresListToString_RoundTrip locks in the contract between tresListToString (used on the accounting path)
+// and ParseTrackableResources (used downstream by the exporter).
+// Memory must round-trip with its MB unit preserved - without the "M" suffix,
+// parseMemoryValue would interpret "8192" as bytes (8 KiB) instead of 8 GiB.
+func TestTresListToString_RoundTrip(t *testing.T) {
+	list := api.V0041TresList{
+		{Type: "cpu", Count: ptr.To(int64(4))},
+		{Type: "mem", Count: ptr.To(int64(8192))},
+		{Type: "gres", Name: ptr.To("gpu"), Count: ptr.To(int64(2))},
+	}
+
+	got := tresListToString(&list)
+	assert.Equal(t, "cpu=4,mem=8192M,gres/gpu=2", got)
+
+	parsed, err := ParseTrackableResources(got)
+	require.NoError(t, err)
+	assert.Equal(t, 4, parsed.CPUCount)
+	assert.Equal(t, 8192*1024*1024, parsed.MemoryBytes)
+	assert.Equal(t, 2, parsed.GPUCount)
+}
+
+func TestTresListToString_NilInput(t *testing.T) {
+	assert.Equal(t, "", tresListToString(nil))
 }
 
 func TestParseTrackableResources_Failure(t *testing.T) {

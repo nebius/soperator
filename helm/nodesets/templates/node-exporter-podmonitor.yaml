@@ -1,0 +1,56 @@
+{{- $enabledNodeSets := list -}}
+{{- $clusterName := .Values.clusterName -}}
+{{- range .Values.nodesets }}
+{{- $nodeExporter := .nodeExporter | default dict -}}
+{{- if $nodeExporter.enabled }}
+{{- $enabledNodeSets = append $enabledNodeSets .name -}}
+{{- end }}
+{{- if not $clusterName }}
+{{- $annotations := .annotations | default dict -}}
+{{- $clusterName = get $annotations "slurm.nebius.ai/parental-cluster-ref" -}}
+{{- end }}
+{{- end }}
+{{- $podMonitor := .Values.nodeExporter.podMonitor | default dict -}}
+{{- $podMonitorEnabled := true -}}
+{{- if hasKey $podMonitor "enabled" -}}
+{{- $podMonitorEnabled = $podMonitor.enabled -}}
+{{- end -}}
+{{- if and $podMonitorEnabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/PodMonitor") $clusterName (gt (len $enabledNodeSets) 0) }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ printf "%s-node-exporter" $clusterName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nodesets.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $clusterName | quote }}
+      app.kubernetes.io/component: "nodeset"
+    matchExpressions:
+      - key: slurm.nebius.ai/nodeset
+        operator: In
+        values:
+          {{- range $enabledNodeSets }}
+          - {{ . | quote }}
+          {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace | quote }}
+  jobLabel: app.kubernetes.io/component
+  podMetricsEndpoints:
+    - port: node-exporter
+      path: /metrics
+      scheme: http
+      interval: {{ default "30s" $podMonitor.interval }}
+      scrapeTimeout: {{ default "10s" $podMonitor.scrapeTimeout }}
+      {{- if $podMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml $podMonitor.metricRelabelings | nindent 8 }}
+      {{- end }}
+      {{- if $podMonitor.relabelings }}
+      relabelings:
+        {{- toYaml $podMonitor.relabelings | nindent 8 }}
+      {{- end }}
+{{- end }}
