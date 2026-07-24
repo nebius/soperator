@@ -8,7 +8,7 @@
   "node_states": ["drain"],
   "on_fail": "none",
   "on_ok": "undrain",
-  "reason_base": "[user_problem] $name",
+  "reason_base": "[user_problem] alloc_mem_used",
   "reason_append_details": false,
   "run_in_jail": false,
   "log": "slurm_scripts/$worker.$name.undrain.$context.out",
