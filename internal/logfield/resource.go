@@ -9,7 +9,7 @@ import (
 func ResourceKV(obj client.Object) []any {
 	var kind string
 	t := reflect.TypeOf(obj)
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		kind = t.Elem().Name()
 	} else {
 		kind = t.Name()

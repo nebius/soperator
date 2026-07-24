@@ -2,9 +2,9 @@ package values
 
 import (
 	"maps"
+	"slices"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
