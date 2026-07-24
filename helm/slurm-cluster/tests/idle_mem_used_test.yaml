@@ -31,6 +31,12 @@ tests:
           pattern: '"on_ok": "undrain"'
       - matchRegex:
           path: data["checks.json"]
+          pattern: '"command": "./idle_mem_used\.drain\.sh"[^}]*?"on_fail": "drain"[^}]*?"reason_base": "\[user_problem\] alloc_mem_used"'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"command": "./idle_mem_used\.undrain\.sh"[^}]*?"on_ok": "undrain"[^}]*?"reason_base": "\[user_problem\] alloc_mem_used"'
+      - matchRegex:
+          path: data["checks.json"]
           pattern: '"need_env": \[\s*"CHECKS_NODE_REAL_MEM_BYTES"\s*\]'
 
   - it: should allow the idle memory check to be disabled

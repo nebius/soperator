@@ -738,14 +738,6 @@ slurmScripts:
       enabled: true
       customContent: null
       customConfig: null
-    alloc_mem_used.drain.sh:
-      enabled: true
-      customContent: null
-      customConfig: null
-    alloc_mem_used.undrain.sh:
-      enabled: true
-      customContent: null
-      customConfig: null
     boot_disk_full.sh:
       enabled: true
       customContent: null
