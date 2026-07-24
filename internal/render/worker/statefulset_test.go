@@ -1,14 +1,12 @@
 package worker_test
 
 import (
-	"strconv"
 	"testing"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -48,18 +46,15 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			true,
 			300,
 			consts.SlurmTopologyBlock,
-			"fab-test",
-			0,
 		)
 
 		assert.Equal(t, consts.ContainerNameWorkerInit, result.Name)
 		assert.Equal(t, container.Image, result.Image)
 		assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller", "wait-topology"}, result.Command)
-		assert.Equal(t, 12, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 5 topology
+		assert.Equal(t, 11, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 4 topology
 		assert.Equal(t, 3, len(result.VolumeMounts))
 		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
-		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_FABRIC", "fab-test")
 
 		expectedMounts := map[string]string{
 			consts.VolumeNameJail:               consts.VolumeMountPathJail,
@@ -82,8 +77,6 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			false,
 			0,
 			"",
-			"",
-			0,
 		)
 
 		assert.Equal(t, consts.ContainerNameWorkerInit, result.Name)
@@ -112,42 +105,8 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 				"TOPOLOGY_WAIT_TIMEOUT",
 				"TOPOLOGY_POLL_INTERVAL",
 				"SLURM_TOPOLOGY_PLUGIN",
-				"SLURM_TOPOLOGY_FABRIC",
 			}, envVar.Name,
 				"topology env var %s should not be present when topology is disabled", envVar.Name)
-		}
-	})
-
-	t.Run("random delay env present when positive", func(t *testing.T) {
-		result := worker.RenderContainerWorkerInit(
-			"test-cluster",
-			container,
-			false,
-			false,
-			0,
-			"",
-			"",
-			120,
-		)
-
-		assertEnvValue(t, result.Env, "WORKER_INIT_RANDOM_DELAY_SECONDS", "120")
-	})
-
-	t.Run("random delay env absent when zero", func(t *testing.T) {
-		result := worker.RenderContainerWorkerInit(
-			"test-cluster",
-			container,
-			false,
-			false,
-			0,
-			"",
-			"",
-			0,
-		)
-
-		for _, envVar := range result.Env {
-			assert.NotEqual(t, "WORKER_INIT_RANDOM_DELAY_SECONDS", envVar.Name,
-				"random delay env var should not be present when delay is 0")
 		}
 	})
 }
@@ -481,98 +440,6 @@ func assertNoVolumeMount(t *testing.T, mounts []corev1.VolumeMount, name string)
 
 	for i := range mounts {
 		assert.NotEqual(t, name, mounts[i].Name)
-	}
-}
-
-func TestRenderNodeSetStatefulSet_HostJournalMount(t *testing.T) {
-	nodeSet := &values.SlurmNodeSet{
-		Name: "test-nodeset",
-		ParentalCluster: client.ObjectKey{
-			Namespace: "test-namespace",
-			Name:      "test-cluster",
-		},
-		ContainerSlurmd: values.Container{
-			NodeContainer: slurmv1.NodeContainer{
-				Image:           "test-image",
-				ImagePullPolicy: corev1.PullIfNotPresent,
-				Resources: corev1.ResourceList{
-					corev1.ResourceMemory:           resource.MustParse("1Gi"),
-					corev1.ResourceCPU:              resource.MustParse("100m"),
-					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
-				},
-			},
-		},
-		ContainerMunge: values.Container{
-			NodeContainer: slurmv1.NodeContainer{
-				Image: "munge-image",
-			},
-		},
-		VolumeSpool: corev1.VolumeSource{
-			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
-		},
-		VolumeJail: corev1.VolumeSource{
-			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
-		},
-		StatefulSet: values.StatefulSet{
-			Replicas: 1,
-		},
-		ServiceUmbrella:          values.Service{Name: "test-umbrella"},
-		SupervisorDConfigMapName: "supervisord-config",
-		SSHDConfigMapName:        "sshd-config",
-		GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
-	}
-
-	result, err := worker.RenderNodeSetStatefulSet(
-		"test-cluster",
-		nodeSet,
-		&slurmv1.Secrets{},
-		consts.CGroupV2,
-		false,
-		false,
-		"",
-	)
-	assert.NoError(t, err)
-
-	var journalVolume *corev1.Volume
-	for i := range result.Spec.Template.Spec.Volumes {
-		volume := &result.Spec.Template.Spec.Volumes[i]
-		if volume.Name == consts.VolumeNameHostLogJournal {
-			journalVolume = volume
-			break
-		}
-	}
-	if assert.NotNil(t, journalVolume, "worker pod should have host journal volume") &&
-		assert.NotNil(t, journalVolume.HostPath, "host journal volume should be HostPath") {
-		assert.Equal(t, consts.VolumeHostPathJournal, journalVolume.HostPath.Path)
-		if assert.NotNil(t, journalVolume.HostPath.Type) {
-			assert.Empty(t, *journalVolume.HostPath.Type)
-		}
-	}
-
-	var slurmdContainer *corev1.Container
-	for i := range result.Spec.Template.Spec.Containers {
-		container := &result.Spec.Template.Spec.Containers[i]
-		if container.Name == consts.ContainerNameSlurmd {
-			slurmdContainer = container
-			break
-		}
-	}
-	if !assert.NotNil(t, slurmdContainer, "worker pod should have slurmd container") {
-		return
-	}
-
-	var journalMount *corev1.VolumeMount
-	for i := range slurmdContainer.VolumeMounts {
-		mount := &slurmdContainer.VolumeMounts[i]
-		if mount.Name == consts.VolumeNameHostLogJournal {
-			journalMount = mount
-			break
-		}
-	}
-	if assert.NotNil(t, journalMount, "slurmd container should mount host journal") {
-		assert.Equal(t, consts.VolumeMountPathHostLogJournal, journalMount.MountPath)
-		assert.Equal(t, consts.VolumeMountPathJailUpper+"/var/hostlog/journal", journalMount.MountPath)
-		assert.True(t, journalMount.ReadOnly)
 	}
 }
 
