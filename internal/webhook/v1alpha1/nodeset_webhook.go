@@ -18,11 +18,8 @@ package v1alpha1
 
 import (
 	"context"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
@@ -30,7 +27,7 @@ import (
 
 // SetupNodeSetWebhookWithManager registers the webhook for NodeSet in the manager.
 func SetupNodeSetWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&slurmv1alpha1.NodeSet{}).
+	return ctrl.NewWebhookManagedBy(mgr, &slurmv1alpha1.NodeSet{}).
 		WithValidator(&NodeSetCustomValidator{}).
 		Complete()
 }
@@ -41,27 +38,19 @@ func SetupNodeSetWebhookWithManager(mgr ctrl.Manager) error {
 // when it is created, updated, or deleted.
 type NodeSetCustomValidator struct{}
 
-var _ webhook.CustomValidator = &NodeSetCustomValidator{}
+var _ admission.Validator[*slurmv1alpha1.NodeSet] = &NodeSetCustomValidator{}
 
-// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type NodeSet.
-func (v *NodeSetCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	if _, ok := obj.(*slurmv1alpha1.NodeSet); !ok {
-		return nil, fmt.Errorf("expected a NodeSet object but got %T", obj)
-	}
-
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type NodeSet.
+func (v *NodeSetCustomValidator) ValidateCreate(_ context.Context, _ *slurmv1alpha1.NodeSet) (admission.Warnings, error) {
 	return nil, nil
 }
 
-// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type NodeSet.
-func (v *NodeSetCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
-	if _, ok := newObj.(*slurmv1alpha1.NodeSet); !ok {
-		return nil, fmt.Errorf("expected a NodeSet object for the newObj but got %T", newObj)
-	}
-
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type NodeSet.
+func (v *NodeSetCustomValidator) ValidateUpdate(_ context.Context, _, _ *slurmv1alpha1.NodeSet) (admission.Warnings, error) {
 	return nil, nil
 }
 
-// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type NodeSet.
-func (v *NodeSetCustomValidator) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type NodeSet.
+func (v *NodeSetCustomValidator) ValidateDelete(_ context.Context, _ *slurmv1alpha1.NodeSet) (admission.Warnings, error) {
 	return nil, nil
 }
