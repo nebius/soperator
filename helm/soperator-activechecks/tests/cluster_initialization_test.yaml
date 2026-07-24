@@ -49,6 +49,17 @@ tests:
           name: soperator-manage-jail-state
         not: true
 
+  - it: should suppress any check marked as an initialization check
+    set:
+      clusterInitialization.managedBySlurmCluster: true
+      checks.wait-for-topology.initializationCheck: true
+    asserts:
+      - containsDocument:
+          apiVersion: slurm.nebius.ai/v1alpha1
+          kind: ActiveCheck
+          name: soperator-wait-for-topology
+        not: true
+
   - it: should remove the legacy jail dependency while retaining other dependencies
     documentSelector:
       path: metadata.name
@@ -61,6 +72,19 @@ tests:
           value:
             - soperator-wait-for-soperatorchecks-srun-ready
             - soperator-wait-for-topology
+
+  - it: should remove dependencies on any check marked as an initialization check
+    documentSelector:
+      path: metadata.name
+      value: soperator-prepull-container-image
+    set:
+      clusterInitialization.managedBySlurmCluster: true
+      checks.wait-for-topology.initializationCheck: true
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - soperator-wait-for-soperatorchecks-srun-ready
 
   - it: should remove an only dependency on a legacy initialization check
     documentSelector:
