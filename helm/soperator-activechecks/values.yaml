@@ -1,4 +1,8 @@
 slurmClusterRefName: "soperator"
+clusterInitialization:
+  # Set to true once cluster initialization is handled by the slurm-cluster chart.
+  # This suppresses ActiveChecks marked as initialization checks and their dependencies.
+  managedBySlurmCluster: false
 nodeSelector: {}
 affinity: {}
 tolerations: []
@@ -113,6 +117,7 @@ checks:
           - name: "NUM_OF_LOGIN_NODES"
             value: "2"
   create-user-soperatorchecks:
+    initializationCheck: true
     enabled: true
     checkType: "k8sJob"
     suspend: true
@@ -120,6 +125,7 @@ checks:
     k8sJobSpec:
       scriptFile: "scripts/create-user-soperatorchecks.sh"
   create-user-nebius:
+    initializationCheck: true
     enabled: true
     checkType: "k8sJob"
     dependsOn:
@@ -158,6 +164,7 @@ checks:
           - name: "SNCCLPRECON_DUMP_DIR"
             value: "/opt/soperator-outputs/nccl_profiles"
   manage-jail-state:
+    initializationCheck: true
     enabled: true
     checkType: "k8sJob"
     dependsOn:

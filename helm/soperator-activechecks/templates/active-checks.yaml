@@ -1,6 +1,8 @@
 {{- $root := . -}}
+{{- $managedBySlurmCluster := .Values.clusterInitialization.managedBySlurmCluster -}}
 {{- range $name, $check := .Values.checks }}
-{{- if $check.enabled }}
+{{- $initializationCheck := default false $check.initializationCheck -}}
+{{- if and $check.enabled (not (and $managedBySlurmCluster $initializationCheck)) }}
 {{- include "soperator-activechecks.checkReactionsConflict" (dict "name" $name "vals" $root.Values) -}}
 ---
 apiVersion: slurm.nebius.ai/v1alpha1
@@ -10,7 +12,15 @@ metadata:
 spec:
   checkType: {{ $check.checkType | quote }}
   name: {{ printf "%s-%s" $root.Values.slurmClusterRefName $name | quote }}
-  {{- with $check.dependsOn }}
+  {{- $dependsOn := list -}}
+  {{- range $dependency := $check.dependsOn -}}
+    {{- $dependencyCheck := index $root.Values.checks $dependency | default dict -}}
+    {{- $initializationDependency := default false $dependencyCheck.initializationCheck -}}
+    {{- if not (and $managedBySlurmCluster $initializationDependency) -}}
+      {{- $dependsOn = append $dependsOn $dependency -}}
+    {{- end -}}
+  {{- end -}}
+  {{- with $dependsOn }}
   dependsOn:
     {{- range . }}
     - {{ printf "%s-%s" $root.Values.slurmClusterRefName . | quote }}
