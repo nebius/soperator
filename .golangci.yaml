@@ -15,7 +15,7 @@ linters:
     - gocheckcompilerdirectives # Verify compiler directives like //go:generate.
     - goheader # Check presence and format of copyright headers.
     - gomoddirectives # Enforce rules for go.mod files (replace/retract directives).
-    - gomodguard # Control package imports.
+    - gomodguard_v2 # Control package imports.
     - goprintffuncname # Enforce consistent printf-like function naming conventions.
     - grouper # Group related constant/variable/import/type declarations.
     - inamedparam # Reports interfaces with unnamed method parameters.
