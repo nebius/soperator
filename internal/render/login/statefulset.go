@@ -2,6 +2,7 @@ package login
 
 import (
 	"fmt"
+	"maps"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,6 +33,10 @@ func RenderStatefulSet(
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeLogin, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName)
+	maps.Copy(labels, login.Labels)
+
+	annotations := renderPodAnnotations()
+	maps.Copy(annotations, login.Annotations)
 
 	nodeFilter := utils.MustGetBy(
 		nodeFilters,
@@ -94,7 +99,7 @@ func RenderStatefulSet(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
-					Annotations: renderPodAnnotations(),
+					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
 					HostUsers:        login.HostUsers,

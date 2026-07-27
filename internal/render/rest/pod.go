@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"maps"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -32,10 +34,16 @@ func BasePodTemplateSpec(
 		return nil, err
 	}
 
+	labels := maps.Clone(matchLabels)
+	maps.Copy(labels, valuesREST.Labels)
+
+	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNameREST)
+	maps.Copy(annotations, valuesREST.Annotations)
+
 	res := &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:      matchLabels,
-			Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameREST),
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: corev1.PodSpec{
 			HostUsers:         valuesREST.HostUsers,

@@ -115,3 +115,18 @@ func Test_BasePodTemplateSpec_PriorityClass(t *testing.T) {
 		})
 	}
 }
+
+func Test_BasePodTemplateSpec_CustomLabelsAndAnnotations(t *testing.T) {
+	testAcc := *acc
+	testAcc.Labels = map[string]string{"gcore.com/project-id": "123"}
+	testAcc.Annotations = map[string]string{"gcore.com/note": "abc"}
+
+	result, err := accounting.BasePodTemplateSpec(
+		defaultNameCluster, &testAcc, defaultNodeFilter, defaultVolumeSources, matchLabels,
+	)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "123", result.Labels["gcore.com/project-id"])
+	assert.Equal(t, "value", result.Labels["key"]) // matchLabels preserved
+	assert.Equal(t, "abc", result.Annotations["gcore.com/note"])
+}

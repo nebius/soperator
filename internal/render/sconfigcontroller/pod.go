@@ -1,6 +1,8 @@
 package sconfigcontroller
 
 import (
+	"maps"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -41,12 +43,18 @@ func BasePodTemplateSpec(
 		}
 	}
 
+	labels := maps.Clone(matchLabels)
+	maps.Copy(labels, sConfigController.Labels)
+
+	annotations := map[string]string{
+		consts.AnnotationDefaultContainerName: consts.ContainerNameSConfigController,
+	}
+	maps.Copy(annotations, sConfigController.Annotations)
+
 	res := &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: matchLabels,
-			Annotations: map[string]string{
-				consts.AnnotationDefaultContainerName: consts.ContainerNameSConfigController,
-			},
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: corev1.PodSpec{
 			HostUsers:         sConfigController.HostUsers,

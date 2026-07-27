@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 
 	appspub "github.com/openkruise/kruise-api/apps/pub"
@@ -34,6 +35,12 @@ func RenderStatefulSet(
 
 	labels[consts.LabelControllerType] = consts.LabelControllerTypeMain
 	matchLabels[consts.LabelControllerType] = consts.LabelControllerTypeMain
+	maps.Copy(labels, controller.Labels)
+
+	annotations := map[string]string{
+		consts.AnnotationDefaultContainerName: consts.ContainerNameSlurmctld,
+	}
+	maps.Copy(annotations, controller.Annotations)
 
 	nodeFilter := sliceutils.MustGetBy(
 		nodeFilters,
@@ -100,10 +107,8 @@ func RenderStatefulSet(
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-					Annotations: map[string]string{
-						consts.AnnotationDefaultContainerName: consts.ContainerNameSlurmctld,
-					},
+					Labels:      labels,
+					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
 					ReadinessGates: []corev1.PodReadinessGate{
