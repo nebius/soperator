@@ -19,6 +19,7 @@ const (
 	ContainerNameSConfigController = SConfigControllerName
 
 	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"
+	ContainerSecurityContextCapabilitySetFcap  = "SETFCAP"
 
 	ContainerPortNameExporter = "metrics"
 	ContainerPortExporter     = 8080
