@@ -34,6 +34,7 @@ func renderContainerPopulateJail(populateJail *values.PopulateJail) corev1.Conta
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{
 					consts.ContainerSecurityContextCapabilitySysAdmin,
+					consts.ContainerSecurityContextCapabilitySetFcap,
 				},
 			},
 			AppArmorProfile: common.ParseAppArmorProfile(populateJail.ContainerPopulateJail.AppArmorProfile),
