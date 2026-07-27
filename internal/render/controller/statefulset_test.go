@@ -537,3 +537,47 @@ func TestRenderStatefulSetHostUsers(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderStatefulSet_CustomLabelsAndAnnotations(t *testing.T) {
+	controller := &values.SlurmController{
+		K8sNodeFilterName: "test-filter",
+		Labels:            map[string]string{"gcore.com/project-id": "123"},
+		Annotations:       map[string]string{"gcore.com/note": "abc"},
+		StatefulSet: values.StatefulSet{
+			Name:           "test-controller-sts",
+			Replicas:       1,
+			MaxUnavailable: intstr.FromInt32(1),
+		},
+		Service: values.Service{
+			Name: "test-controller-svc",
+		},
+		ContainerSlurmctld: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "test-image:latest",
+			},
+			Name: "slurmctld",
+		},
+		ContainerMunge: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "munge-image:latest",
+			},
+		},
+		VolumeSpool: slurmv1.NodeVolume{VolumeSourceName: ptr.To("test-volume")},
+		VolumeJail:  slurmv1.NodeVolume{VolumeSourceName: ptr.To("test-volume")},
+	}
+
+	nodeFilters := []slurmv1.K8sNodeFilter{{Name: "test-filter"}}
+	volumeSources := []slurmv1.VolumeSource{
+		{
+			Name:         "test-volume",
+			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+		},
+	}
+
+	result, err := RenderStatefulSet("test-namespace", "test-cluster", nodeFilters, volumeSources, controller, false)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "123", result.Labels["gcore.com/project-id"])
+	assert.Equal(t, "123", result.Spec.Template.Labels["gcore.com/project-id"])
+	assert.Equal(t, "abc", result.Spec.Template.Annotations["gcore.com/note"])
+}
