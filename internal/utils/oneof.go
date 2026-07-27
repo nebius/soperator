@@ -18,7 +18,7 @@ func ValidateOneOf(v any) bool {
 		field := val.Field(i)
 
 		// Check if the field is a pointer and is not nil
-		if field.Kind() == reflect.Ptr && !field.IsNil() {
+		if field.Kind() == reflect.Pointer && !field.IsNil() {
 			count++
 			if count > 1 {
 				return false
