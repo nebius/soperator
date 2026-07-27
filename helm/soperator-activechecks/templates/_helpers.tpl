@@ -92,7 +92,12 @@ Render slurmJobSpec for an ActiveCheck.
 {{- $ctx := .ctx -}}
 {{- $spec := default dict .check.slurmJobSpec -}}
 {{- $jobContainerRaw := default dict $spec.jobContainer -}}
-{{- $baseContainer := dict "appArmorProfile" "unconfined" "image" $ctx.Values.images.slurmJob "env" $ctx.Values.jobContainer.env "volumeMounts" $ctx.Values.jobContainer.volumeMounts "volumes" $ctx.Values.jobContainer.volumes -}}
+{{- $baseContainer := dict "appArmorProfile" "unconfined" "image" $ctx.Values.images.slurmJob -}}
+{{- $_ := set $baseContainer "env" $ctx.Values.jobContainer.env -}}
+{{- $_ := set $baseContainer "volumeMounts" $ctx.Values.jobContainer.volumeMounts -}}
+{{- $_ := set $baseContainer "volumes" $ctx.Values.jobContainer.volumes -}}
+{{- $_ := set $baseContainer "imagePullPolicy" $ctx.Values.jobContainer.imagePullPolicy -}}
+{{- $_ := set $baseContainer "imagePullSecrets" $ctx.Values.jobContainer.imagePullSecrets -}}
 {{- $jobContainer := mustMerge (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") $baseContainer -}}
 {{- $env := default (list) $jobContainer.env -}}
 {{- $workingDir := default "" $jobContainer.workingDir -}}
@@ -115,6 +120,13 @@ jobContainer:
 {{- end }}
   appArmorProfile: {{ $jobContainer.appArmorProfile }}
   image: {{ tpl $jobContainer.image $ctx | quote }}
+{{- with $jobContainer.imagePullPolicy }}
+  imagePullPolicy: {{ . }}
+{{- end }}
+{{- with $jobContainer.imagePullSecrets }}
+  imagePullSecrets:
+{{ toYaml . | indent 4 }}
+{{- end }}
 {{- with $jobContainer.command }}
   command:
 {{ toYaml . | indent 4 }}
@@ -150,6 +162,8 @@ Render k8sJobSpec for an ActiveCheck.
 {{- $useCommonVolumes := default true $spec.useCommonVolumes -}}
 {{- $includeCommonEnv := default false $spec.includeCommonEnv -}}
 {{- $baseContainer := dict "image" $ctx.Values.images.k8sJob -}}
+{{- $_ := set $baseContainer "imagePullPolicy" $ctx.Values.jobContainer.imagePullPolicy -}}
+{{- $_ := set $baseContainer "imagePullSecrets" $ctx.Values.jobContainer.imagePullSecrets -}}
 {{- if $useCommonVolumeMounts }}{{- $_ := set $baseContainer "volumeMounts" $ctx.Values.jobContainer.volumeMounts -}}{{- end }}
 {{- if $includeCommonEnv }}{{- $_ := set $baseContainer "env" $ctx.Values.jobContainer.env -}}{{- end }}
 {{- $jobContainer := mustMerge (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") $baseContainer -}}
@@ -182,6 +196,13 @@ jobContainer:
   image: {{ $image | quote }}
 {{- with $jobContainer.appArmorProfile }}
   appArmorProfile: {{ . }}
+{{- end }}
+{{- with $jobContainer.imagePullPolicy }}
+  imagePullPolicy: {{ . }}
+{{- end }}
+{{- with $jobContainer.imagePullSecrets }}
+  imagePullSecrets:
+{{ toYaml . | indent 4 }}
 {{- end }}
 {{- if $command }}
   command:

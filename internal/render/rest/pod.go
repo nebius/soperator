@@ -39,6 +39,7 @@ func BasePodTemplateSpec(
 		},
 		Spec: corev1.PodSpec{
 			HostUsers:         valuesREST.HostUsers,
+			ImagePullSecrets:  valuesREST.ContainerREST.ImagePullSecrets,
 			Affinity:          nodeFilter.Affinity,
 			Tolerations:       nodeFilter.Tolerations,
 			NodeSelector:      nodeFilter.NodeSelector,

@@ -37,6 +37,7 @@ checks:
       repository: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
       tag: 4.1.5
     imagePullPolicy: Always
+    imagePullSecrets: []
     resources:
       limits:
         memory: 128Mi
