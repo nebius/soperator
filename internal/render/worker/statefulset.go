@@ -40,6 +40,7 @@ func RenderNodeSetStatefulSet(
 	labels[consts.LabelSoperatorRollingUpdateEnabled] = strconv.FormatBool(
 		nodeSet.UpdateStrategy == consts.UpdateStrategySlurmAwareRollingUpdate,
 	)
+	maps.Copy(labels, nodeSet.Labels)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	matchLabels[consts.LabelNodeSetKey] = nodeSet.Name
 
