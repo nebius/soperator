@@ -145,7 +145,7 @@ func normalizeIssuer(t tokenIssuer) tokenIssuer {
 	}
 	v := reflect.ValueOf(t)
 	// handle pointers or interfaces wrapping a nil pointer
-	if (v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface) && v.IsNil() {
+	if (v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface) && v.IsNil() {
 		return nil
 	}
 	return t
