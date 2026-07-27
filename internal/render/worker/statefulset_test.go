@@ -320,10 +320,10 @@ func TestRenderNodeSetStatefulSet_NvidiaIMEXCLIMount(t *testing.T) {
 	assertHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXConfigJail)
 
 	slurmd := result.Spec.Template.Spec.Containers[0]
-	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXCLI, consts.NvidiaIMEXCLIMountPath)
-	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXCLIJail, consts.NvidiaIMEXCLIJailPath)
-	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXConfig, consts.NvidiaIMEXConfigMountPath)
-	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXConfigJail, consts.NvidiaIMEXConfigJailPath)
+	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXCLI, consts.NvidiaIMEXCLIMountPath, true)
+	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXCLIJail, consts.NvidiaIMEXCLIJailPath, true)
+	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXConfig, consts.NvidiaIMEXConfigMountPath, true)
+	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXConfigJail, consts.NvidiaIMEXConfigJailPath, true)
 }
 
 func TestRenderNodeSetStatefulSet_NvidiaIMEXNotMountedForCPUWorker(t *testing.T) {
@@ -420,14 +420,14 @@ func expectedNvidiaIMEXHostPath(name string) (string, corev1.HostPathType) {
 	}
 }
 
-func assertVolumeMount(t *testing.T, mounts []corev1.VolumeMount, name, expectedPath string) {
+func assertVolumeMount(t *testing.T, mounts []corev1.VolumeMount, name, expectedPath string, expectedReadOnly bool) {
 	t.Helper()
 
 	for i := range mounts {
 		mount := &mounts[i]
-		if mount.Name == name {
+		if mount.Name == name && mount.MountPath == expectedPath {
 			assert.Equal(t, expectedPath, mount.MountPath)
-			assert.True(t, mount.ReadOnly)
+			assert.Equal(t, expectedReadOnly, mount.ReadOnly)
 			return
 		}
 	}
