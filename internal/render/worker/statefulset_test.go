@@ -1293,3 +1293,60 @@ func TestRenderNodeSetStatefulSet_EphemeralNodesReserveOrdinals(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderNodeSetStatefulSet_CustomLabelsAndAnnotations(t *testing.T) {
+	nodeSet := &values.SlurmNodeSet{
+		Name: "test-nodeset",
+		ParentalCluster: client.ObjectKey{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
+		},
+		Labels:      map[string]string{"gcore.com/flavor": "gpu-8x-h100"},
+		Annotations: map[string]string{"gcore.com/note": "abc"},
+		ContainerSlurmd: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image:           "test-image",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory:           resource.MustParse("1Gi"),
+					corev1.ResourceCPU:              resource.MustParse("100m"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+		ContainerMunge: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "munge-image",
+			},
+		},
+		VolumeSpool: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+		},
+		VolumeJail: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+		},
+		StatefulSet: values.StatefulSet{
+			Replicas: 1,
+		},
+		ServiceUmbrella:          values.Service{Name: "test-umbrella"},
+		SupervisorDConfigMapName: "supervisord-config",
+		SSHDConfigMapName:        "sshd-config",
+		GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+	}
+
+	result, err := worker.RenderNodeSetStatefulSet(
+		"test-cluster",
+		nodeSet,
+		&slurmv1.Secrets{},
+		consts.CGroupV2,
+		false,
+		false,
+		"",
+	)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "gpu-8x-h100", result.Labels["gcore.com/flavor"])
+	assert.Equal(t, "gpu-8x-h100", result.Spec.Template.Labels["gcore.com/flavor"])
+	assert.Equal(t, consts.LabelWorkerValue, result.Spec.Template.Labels[consts.LabelWorkerKey])
+	assert.Equal(t, "abc", result.Spec.Template.Annotations["gcore.com/note"])
+}

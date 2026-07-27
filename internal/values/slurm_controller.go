@@ -13,6 +13,8 @@ type SlurmController struct {
 	K8sNodeFilterName    string
 	CustomInitContainers []corev1.Container
 	HostUsers            *bool
+	Labels               map[string]string
+	Annotations          map[string]string
 
 	ContainerSlurmctld Container
 	ContainerMunge     Container

@@ -58,6 +58,16 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Required
 	SlurmNodes SlurmNodes `json:"slurmNodes"`
 
+	// ExtraLabels are custom K8s labels added to every Pod and the spool PVC of this cluster.
+	//
+	// +kubebuilder:validation:Optional
+	ExtraLabels map[string]string `json:"extraLabels,omitempty"`
+
+	// ExtraAnnotations are custom K8s annotations added to every Pod and the spool PVC of this cluster.
+	//
+	// +kubebuilder:validation:Optional
+	ExtraAnnotations map[string]string `json:"extraAnnotations,omitempty"`
+
 	// PartitionConfiguration define partition configuration of slurm worker nodes
 	// https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION
 	// +kubebuilder:validation:Optional
