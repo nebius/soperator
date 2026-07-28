@@ -119,11 +119,13 @@ func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
 }
 
-// getNode returns the node with the given name directly from the API server,
-// bypassing the informer cache.
+// getNode returns the rebooter's own node from the manager cache.
+// The cache is restricted (in cmd/rebooter/main.go) to this single node via a server-side field selector,
+// so the informer started lazily by the first read LISTs and WATCHes one object
+// instead of issuing a direct API request per reconcile.
 func (r *RebooterReconciler) getNode(ctx context.Context) (*corev1.Node, error) {
 	node := &corev1.Node{}
-	if err := r.APIReader.Get(ctx, client.ObjectKey{Name: r.nodeName}, node); err != nil {
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: r.nodeName}, node); err != nil {
 		return nil, fmt.Errorf("failed to get node %s: %w", r.nodeName, err)
 	}
 	return node, nil
@@ -606,9 +608,9 @@ func (r *RebooterReconciler) RebootNode(ctx context.Context, node *corev1.Node) 
 }
 
 // SetupWithManager sets up the controller with the Manager.
-// No node informer is registered — this avoids a LIST+WATCH against the API server
-// at startup. Instead, one GenericEvent is sent on startCh to kick off the first
-// reconcile; subsequent cycles are driven by ctrl.Result{RequeueAfter: ...}.
+// No typed watch is registered: one GenericEvent is sent on startCh to kick off the first reconcile,
+// and subsequent cycles are driven by ctrl.Result{RequeueAfter: ...}.
+// Node reads are served by the manager cache, whose field selectors restrict it to this pod's own node.
 func (r *RebooterReconciler) SetupWithManager(
 	mgr ctrl.Manager, maxConcurrency int, cacheSyncTimeout time.Duration, nodeName string,
 ) error {
