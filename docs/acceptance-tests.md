@@ -38,6 +38,9 @@ All flags:
 GPU scenarios are selected automatically. If no GPU workers are discovered,
 scenarios tagged `@gpu` are excluded.
 
+CPU scenarios are selected automatically. If no CPU workers are discovered,
+scenarios tagged `@cpu` are excluded.
+
 For focused manual runs on a dev cluster, pass the scenario location:
 
 ```bash
