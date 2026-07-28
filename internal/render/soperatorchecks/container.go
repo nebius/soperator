@@ -30,7 +30,7 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 			Command:         check.Spec.K8sJobSpec.JobContainer.Command,
 			Args:            check.Spec.K8sJobSpec.JobContainer.Args,
 			WorkingDir:      check.Spec.K8sJobSpec.JobContainer.WorkingDir,
-			ImagePullPolicy: corev1.PullIfNotPresent,
+			ImagePullPolicy: check.Spec.K8sJobSpec.JobContainer.ImagePullPolicy,
 			Env:             check.Spec.K8sJobSpec.JobContainer.Env,
 			SecurityContext: &corev1.SecurityContext{
 				Capabilities: &corev1.Capabilities{
@@ -92,7 +92,7 @@ func renderContainerK8sCronjob(check *slurmv1alpha1.ActiveCheck) corev1.Containe
 	container = corev1.Container{
 		Name:            check.Spec.Name,
 		Image:           check.Spec.SlurmJobSpec.JobContainer.Image,
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: check.Spec.SlurmJobSpec.JobContainer.ImagePullPolicy,
 		Command:         check.Spec.SlurmJobSpec.JobContainer.Command,
 		Args:            check.Spec.SlurmJobSpec.JobContainer.Args,
 		WorkingDir:      check.Spec.SlurmJobSpec.JobContainer.WorkingDir,

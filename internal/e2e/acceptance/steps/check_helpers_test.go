@@ -96,6 +96,17 @@ func TestAssertGPUActiveCheckSlurmRecords(t *testing.T) {
 	require.Error(t, assertGPUActiveCheckSlurmRecords(records, []string{"101", "102"}, expected))
 }
 
+func TestActiveCheckSlurmJobRecordsTerminal(t *testing.T) {
+	records := map[string]activeCheckSlurmJobRecord{
+		"101": {ID: "101", State: "COMPLETED"},
+		"102": {ID: "102", State: "RUNNING"},
+	}
+	assert.False(t, activeCheckSlurmJobRecordsTerminal(records, []string{"101", "102"}))
+
+	records["102"] = activeCheckSlurmJobRecord{ID: "102", State: "FAILED"}
+	assert.True(t, activeCheckSlurmJobRecordsTerminal(records, []string{"101", "102"}))
+}
+
 func TestAssertActiveGPUCheckOutputPassing(t *testing.T) {
 	require.NoError(t, assertActiveGPUCheckOutputPassing("Health checker status: PASS\n"))
 	require.Error(t, assertActiveGPUCheckOutputPassing("Health checker status: FAIL\n"))

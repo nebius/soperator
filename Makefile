@@ -580,9 +580,9 @@ FLUX			?= $(LOCALBIN)/flux
 
 ## Tool Versions
 KUSTOMIZE_VERSION			?= v5.5.0
-CONTROLLER_TOOLS_VERSION	?= v0.19.0
-ENVTEST_VERSION				?= release-0.17
-GOLANGCI_LINT_VERSION		?= v2.5.0  # Should be in sync with the github CI step.
+CONTROLLER_TOOLS_VERSION	?= v0.21.0
+ENVTEST_VERSION				?= release-0.24
+GOLANGCI_LINT_VERSION		?= v2.12.2  # Should be in sync with the github CI step.
 HELMIFY_VERSION				?= 0.4.13
 HELM_VERSION				?= v3.18.3
 HELM_UNITTEST_VERSION		?= 0.8.2
@@ -625,7 +625,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
 $(ENVTEST): $(LOCALBIN)
-	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.22
+	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.

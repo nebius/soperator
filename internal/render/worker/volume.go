@@ -44,6 +44,7 @@ func renderVolumesAndClaimTemplateSpecsForNodeSet(
 	}
 	if nodeSet.GPU.Enabled {
 		volumes = append(volumes, renderVolumeNvidia())
+		volumes = append(volumes, common.RenderVolumesNvidiaIMEX()...)
 	}
 
 	// region Worker Spool

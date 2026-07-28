@@ -76,6 +76,18 @@ spec:
           datasources:
             searchNamespace: {{- toYaml .Values.observability.vmStack.values.dashboardNamespaces | nindent 12 }}
       kube-state-metrics:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: slurm.nebius.ai/nodeset
+                      operator: In
+                      values:
+                        - system
+        {{- with $kubeStateMetrics.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
         extraArgs:
           - '--metric-allowlist=kube_pod_info'
           - '--metric-allowlist=kube_pod_created'

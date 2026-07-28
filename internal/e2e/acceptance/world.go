@@ -29,6 +29,10 @@ func (w *world) AvailableWorkers() []framework.WorkerRef {
 	return append([]framework.WorkerRef(nil), w.state.Workers...)
 }
 
+func (w *world) AvailableCPUWorkers() []framework.WorkerRef {
+	return append([]framework.WorkerRef(nil), w.state.CPUWorkers...)
+}
+
 func (w *world) AvailableGPUWorkers() []framework.WorkerRef {
 	return append([]framework.WorkerRef(nil), w.state.GPUWorkers...)
 }

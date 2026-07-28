@@ -101,11 +101,12 @@ func RenderStatefulSet(
 					Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameSshd),
 				},
 				Spec: corev1.PodSpec{
-					HostUsers:      login.HostUsers,
-					Affinity:       nodeFilter.Affinity,
-					NodeSelector:   nodeFilter.NodeSelector,
-					Tolerations:    nodeFilter.Tolerations,
-					InitContainers: initContainers,
+					HostUsers:        login.HostUsers,
+					ImagePullSecrets: login.ContainerSshd.ImagePullSecrets,
+					Affinity:         nodeFilter.Affinity,
+					NodeSelector:     nodeFilter.NodeSelector,
+					Tolerations:      nodeFilter.Tolerations,
+					InitContainers:   initContainers,
 					Containers: []corev1.Container{
 						renderContainerSshd(
 							clusterWithGPU,

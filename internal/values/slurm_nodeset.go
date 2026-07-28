@@ -2,9 +2,9 @@ package values
 
 import (
 	"maps"
+	"slices"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,11 +19,12 @@ type SlurmNodeSet struct {
 	Name            string
 	ParentalCluster client.ObjectKey
 
-	NodeSelector  map[string]string
-	Affinity      *corev1.Affinity
-	Tolerations   []corev1.Toleration
-	PriorityClass string
-	Annotations   map[string]string
+	NodeSelector     map[string]string
+	Affinity         *corev1.Affinity
+	Tolerations      []corev1.Toleration
+	PriorityClass    string
+	Annotations      map[string]string
+	ImagePullSecrets []corev1.LocalObjectReference
 
 	ContainerSlurmd           Container
 	ContainerMunge            Container
@@ -87,11 +88,12 @@ func BuildSlurmNodeSetFrom(
 			Name:      clusterName,
 		},
 		//
-		NodeSelector:  maps.Clone(nsSpec.NodeSelector),
-		Affinity:      nsSpec.Affinity.DeepCopy(),
-		Tolerations:   slices.Clone(nsSpec.Tolerations),
-		PriorityClass: nsSpec.PriorityClass,
-		Annotations:   maps.Clone(nsSpec.WorkerAnnotations),
+		NodeSelector:     maps.Clone(nsSpec.NodeSelector),
+		Affinity:         nsSpec.Affinity.DeepCopy(),
+		Tolerations:      slices.Clone(nsSpec.Tolerations),
+		PriorityClass:    nsSpec.PriorityClass,
+		Annotations:      maps.Clone(nsSpec.WorkerAnnotations),
+		ImagePullSecrets: slices.Clone(nsSpec.ImagePullSecrets),
 		//
 		ContainerSlurmd: buildContainerFrom(
 			slurmv1.NodeContainer{

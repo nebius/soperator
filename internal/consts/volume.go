@@ -45,6 +45,10 @@ const (
 	VolumeNameMungeKey                 = mungeKey
 	VolumenameRESTJWTKey               = RESTJWTKey
 	VolumeNameNvidia                   = nvidia
+	VolumeNameNvidiaIMEXCLI            = "nvidia-imex-cli"
+	VolumeNameNvidiaIMEXCLIJail        = "nvidia-imex-cli-jail"
+	VolumeNameNvidiaIMEXConfig         = "nvidia-imex-config"
+	VolumeNameNvidiaIMEXConfigJail     = "nvidia-imex-config-jail"
 	VolumeNameBoot                     = boot
 	VolumeNameSSHDConfigsLogin         = sshConfigsLogin
 	VolumeNameSSHDConfigsWorker        = sshConfigsWorker

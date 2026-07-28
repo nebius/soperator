@@ -112,6 +112,7 @@ func RenderStatefulSet(
 						},
 					},
 					HostUsers:                     controller.HostUsers,
+					ImagePullSecrets:              controller.ContainerSlurmctld.ImagePullSecrets,
 					Affinity:                      nodeFilter.Affinity,
 					NodeSelector:                  nodeFilter.NodeSelector,
 					Tolerations:                   nodeFilter.Tolerations,

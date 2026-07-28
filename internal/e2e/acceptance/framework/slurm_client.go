@@ -111,6 +111,10 @@ func (s *SlurmClient) AnyWorkers(count int) ([]WorkerRef, error) {
 	return pickAnyWorkerRefs(s.exec.AvailableWorkers(), count, "workers")
 }
 
+func (s *SlurmClient) AnyCPUWorkers(count int) ([]WorkerRef, error) {
+	return pickAnyWorkerRefs(s.exec.AvailableCPUWorkers(), count, "CPU workers")
+}
+
 func (s *SlurmClient) AnyGPUWorkers(count int) ([]WorkerRef, error) {
 	return pickAnyWorkerRefs(s.exec.AvailableGPUWorkers(), count, "GPU workers")
 }

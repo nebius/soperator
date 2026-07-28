@@ -43,10 +43,14 @@ func TestParseOptionsExplicitValues(t *testing.T) {
 }
 
 func TestRunnerTagFilter(t *testing.T) {
-	gpuState := &framework.ClusterState{
+	heterogeneousState := &framework.ClusterState{
+		CPUWorkers: []framework.WorkerRef{{Name: "worker-cpu-0"}},
 		GPUWorkers: []framework.WorkerRef{{Name: "worker-gpu-0"}},
 	}
 	noGPUState := &framework.ClusterState{}
+	gpuOnlyState := &framework.ClusterState{
+		GPUWorkers: []framework.WorkerRef{{Name: "worker-gpu-0"}},
+	}
 
 	tests := []struct {
 		name             string
@@ -56,19 +60,25 @@ func TestRunnerTagFilter(t *testing.T) {
 	}{
 		{
 			name:  "default excludes unstable",
-			state: gpuState,
+			state: heterogeneousState,
 			want:  "~@unstable",
 		},
 		{
-			name:             "run unstable has no tag filter when GPU workers exist",
-			state:            gpuState,
+			name:             "run unstable has no tag filter when CPU and GPU workers exist",
+			state:            heterogeneousState,
 			runUnstableTests: true,
 			want:             "",
 		},
 		{
 			name:  "without GPU workers also excludes GPU",
 			state: noGPUState,
-			want:  "~@unstable && ~@gpu",
+			want:  "~@unstable && ~@gpu && ~@cpu && ~@heterogeneous",
+		},
+		{
+			name:             "without CPU workers excludes CPU and heterogeneous",
+			state:            gpuOnlyState,
+			runUnstableTests: true,
+			want:             "~@cpu && ~@heterogeneous",
 		},
 	}
 
@@ -148,6 +158,34 @@ func TestDiscoveredNodeSetsFromLiveList(t *testing.T) {
 	assert.True(t, discovered[1].HasGPU)
 }
 
+func TestDiscoveredNodeSetsFromLiveListDoesNotFilterWhenClusterNameIsEmpty(t *testing.T) {
+	nodeSets := slurmv1alpha1.NodeSetList{
+		Items: []slurmv1alpha1.NodeSet{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "worker-gpu"},
+				Spec: slurmv1alpha1.NodeSetSpec{
+					ClusterName: "soperator",
+					Replicas:    2,
+					GPU:         slurmv1alpha1.GPUSpec{Enabled: true},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "worker-cpu"},
+				Spec: slurmv1alpha1.NodeSetSpec{
+					ClusterName: "soperator",
+					Replicas:    3,
+				},
+			},
+		},
+	}
+
+	discovered := discoveredNodeSetsFromLiveList(nodeSets, "")
+	require.Len(t, discovered, 2)
+
+	assert.Equal(t, "worker-cpu", discovered[0].Name)
+	assert.Equal(t, "worker-gpu", discovered[1].Name)
+}
+
 func TestWorkerPodsBySlurmNodeName(t *testing.T) {
 	pods := corev1.PodList{
 		Items: []corev1.Pod{
@@ -217,6 +255,45 @@ func TestApplyGPUCounts(t *testing.T) {
 	assert.Equal(t, 8, state.GPUWorkers[0].GPUCount)
 	assert.Equal(t, 8, state.Workers[0].GPUCount)
 	assert.Zero(t, state.Workers[1].GPUCount)
+}
+
+func TestClassifyWorkersSeparatesCPUAndGPU(t *testing.T) {
+	state := &framework.ClusterState{
+		Workers: []framework.WorkerRef{
+			{Name: "worker-gpu-0"},
+			{Name: "worker-cpu-0"},
+			{Name: "worker-gpu-1"},
+		},
+		DiscoveredNodeSets: []framework.DiscoveredNodeSet{
+			{Name: "worker-gpu", Size: 2, HasGPU: true},
+			{Name: "worker-cpu", Size: 1, HasGPU: false},
+		},
+	}
+
+	classifyWorkers(state)
+
+	assert.ElementsMatch(t, []framework.WorkerRef{{Name: "worker-cpu-0"}}, state.CPUWorkers)
+	assert.ElementsMatch(t, []framework.WorkerRef{{Name: "worker-gpu-0"}, {Name: "worker-gpu-1"}}, state.GPUWorkers)
+	assert.ElementsMatch(t, []framework.WorkerRef{{Name: "worker-cpu-0"}}, state.WorkersByNodeSet["worker-cpu"])
+	assert.ElementsMatch(t, []framework.WorkerRef{{Name: "worker-gpu-0"}, {Name: "worker-gpu-1"}}, state.WorkersByNodeSet["worker-gpu"])
+	assert.True(t, state.IsHeterogeneousCluster())
+}
+
+func TestTagFilterExcludesHeterogeneousScenariosWithoutCPUAndGPUWorkers(t *testing.T) {
+	runner := NewRunner(&framework.ClusterState{
+		GPUWorkers: []framework.WorkerRef{{Name: "worker-gpu-0"}},
+	}, true, nil, "dev-context", "")
+
+	assert.Equal(t, "~@cpu && ~@heterogeneous", runner.tagFilter())
+}
+
+func TestTagFilterAllowsHeterogeneousScenariosWithCPUAndGPUWorkers(t *testing.T) {
+	runner := NewRunner(&framework.ClusterState{
+		CPUWorkers: []framework.WorkerRef{{Name: "worker-cpu-0"}},
+		GPUWorkers: []framework.WorkerRef{{Name: "worker-gpu-0"}},
+	}, true, nil, "dev-context", "")
+
+	assert.Empty(t, runner.tagFilter())
 }
 
 func TestReportFormat(t *testing.T) {

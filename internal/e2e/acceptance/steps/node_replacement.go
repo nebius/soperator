@@ -29,6 +29,8 @@ type NodeReplacement struct {
 	replacementWorker  framework.WorkerRef
 	originalInstanceID string
 	maintenanceJob     framework.SbatchJob
+	preExistingWorkers []string
+	gpuWorkers         map[string]struct{}
 }
 
 func NewNodeReplacement(exec framework.Exec, slurm *framework.SlurmClient) *NodeReplacement {
@@ -49,21 +51,39 @@ func (s *NodeReplacement) Register(sc *godog.ScenarioContext) {
 		return ctx, nil
 	})
 
-	sc.Step(`^a test job is submitted and running on a worker node$`, s.aTestJobIsSubmittedAndRunningOnAWorkerNode)
+	sc.Step(`^a test job is submitted and running on a (CPU|GPU) worker node$`, s.aTestJobIsSubmittedAndRunningOnWorkerNode)
 	sc.Step(`^a maintenance event is triggered for that node$`, s.aMaintenanceEventIsTriggeredForThatNode)
 	sc.Step(`^the node is drained with a maintenance reason$`, s.theNodeIsDrainedWithAMaintenanceReason)
 	sc.Step(`^the test job is cancelled$`, s.theTestJobIsCancelled)
 	sc.Step(`^the old instance is removed$`, s.theOldInstanceIsRemoved)
 	sc.Step(`^a replacement node joins the cluster$`, s.aReplacementNodeJoinsTheCluster)
 	sc.Step(`^the replacement node passes GPU validation$`, s.theReplacementNodePassesGPUValidation)
+	sc.Step(`^all pre-existing worker nodes are operational$`, s.allPreExistingWorkerNodesAreOperational)
 }
 
-func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context.Context) error {
-	workers, err := s.slurm.AnyGPUWorkers(1)
+func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnWorkerNode(ctx context.Context, workerType string) error {
+	workers, err := s.anyWorkersByType(workerType, 1)
 	if err != nil {
 		return err
 	}
-	s.replacementWorker = workers[0]
+	return s.submitTestJobOnWorker(ctx, workers[0])
+}
+
+func (s *NodeReplacement) anyWorkersByType(workerType string, count int) ([]framework.WorkerRef, error) {
+	switch strings.ToUpper(workerType) {
+	case "CPU":
+		return s.slurm.AnyCPUWorkers(count)
+	case "GPU":
+		return s.slurm.AnyGPUWorkers(count)
+	default:
+		return nil, fmt.Errorf("unsupported worker type %q", workerType)
+	}
+}
+
+func (s *NodeReplacement) submitTestJobOnWorker(ctx context.Context, worker framework.WorkerRef) error {
+	s.replacementWorker = worker
+	s.preExistingWorkers = workerNamesFromRefs(s.exec.AvailableWorkers())
+	s.gpuWorkers = workerNameSet(s.exec.AvailableGPUWorkers())
 
 	node, err := s.slurm.NodeInfo(ctx, s.replacementWorker.Name)
 	if err != nil {
@@ -160,13 +180,63 @@ func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) e
 
 func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Context) error {
 	workerName := s.replacementWorker.Name
-	if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=8 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
+	if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=1 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
 		node, stateErr := s.slurm.NodeInfo(ctx, workerName)
 		if stateErr == nil {
 			s.exec.Logf("replacement worker state after failed final validation: name=%s state=%s reason=%s instance_id=%s",
 				node.Name, node.State, node.Reason, node.InstanceID)
 		}
 		return fmt.Errorf("validate replacement worker is operational from login node: %w", err)
+	}
+	return nil
+}
+
+func (s *NodeReplacement) allPreExistingWorkerNodesAreOperational(ctx context.Context) error {
+	if len(s.preExistingWorkers) == 0 {
+		return fmt.Errorf("no pre-existing workers were recorded before replacement")
+	}
+
+	for _, workerName := range s.preExistingWorkers {
+		if err := s.validateWorkerNodeState(ctx, workerName); err != nil {
+			return err
+		}
+		if _, isGPU := s.gpuWorkers[workerName]; isGPU {
+			if err := s.validateGPUWorker(ctx, workerName); err != nil {
+				return fmt.Errorf("validate pre-existing GPU worker %s: %w", workerName, err)
+			}
+			continue
+		}
+		if err := s.validateCPUWorker(ctx, workerName); err != nil {
+			return fmt.Errorf("validate pre-existing CPU worker %s: %w", workerName, err)
+		}
+	}
+	return nil
+}
+
+func (s *NodeReplacement) validateWorkerNodeState(ctx context.Context, workerName string) error {
+	node, err := s.slurm.NodeInfo(ctx, workerName)
+	if err != nil {
+		return fmt.Errorf("read worker node state %s: %w", workerName, err)
+	}
+	if node.State == "" {
+		return fmt.Errorf("parse worker node state %s: no State field", workerName)
+	}
+	if !node.IsUsable() {
+		return fmt.Errorf("worker node %s has bad state=%s reason=%s", workerName, node.State, node.Reason)
+	}
+	return nil
+}
+
+func (s *NodeReplacement) validateCPUWorker(ctx context.Context, workerName string) error {
+	if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("srun -w %s true", framework.ShellQuote(workerName))); err != nil {
+		return fmt.Errorf("validate worker accepts a targeted Slurm job: %w", err)
+	}
+	return nil
+}
+
+func (s *NodeReplacement) validateGPUWorker(ctx context.Context, workerName string) error {
+	if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=1 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
+		return fmt.Errorf("validate worker GPU from login node: %w", err)
 	}
 	return nil
 }
@@ -180,4 +250,26 @@ func (s *NodeReplacement) cancelJob(ctx context.Context, maintenanceJobID string
 		return fmt.Errorf("cancel maintenance job %s: %w", maintenanceJobID, err)
 	}
 	return nil
+}
+
+func workerNamesFromRefs(workers []framework.WorkerRef) []string {
+	names := make([]string, 0, len(workers))
+	for _, worker := range workers {
+		if strings.TrimSpace(worker.Name) == "" {
+			continue
+		}
+		names = append(names, worker.Name)
+	}
+	return names
+}
+
+func workerNameSet(workers []framework.WorkerRef) map[string]struct{} {
+	names := make(map[string]struct{}, len(workers))
+	for _, worker := range workers {
+		if strings.TrimSpace(worker.Name) == "" {
+			continue
+		}
+		names[worker.Name] = struct{}{}
+	}
+	return names
 }

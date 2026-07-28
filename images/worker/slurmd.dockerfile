@@ -157,6 +157,7 @@ RUN mkdir -p /var/log/slurm/multilog && \
 
 # Copy slurmd entrypoint script
 COPY images/worker/slurmd_entrypoint.sh /opt/bin/slurm/
+COPY images/worker/write_soperator_metadata.sh /opt/bin/slurm/
 
 # Copy worker init script (controller readiness + topology for ephemeral nodes)
 COPY images/worker/worker_init.py /opt/bin/slurm/
@@ -167,6 +168,7 @@ COPY images/worker/docker_proxy_nginx_entrypoint.sh /opt/bin/slurm/
 COPY images/worker/dockerd_entrypoint.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
+    chmod +x /opt/bin/slurm/write_soperator_metadata.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
     chmod +x /opt/bin/slurm/worker_init.py && \
     chmod +x /opt/bin/slurm/docker_proxy_nginx_entrypoint.sh && \

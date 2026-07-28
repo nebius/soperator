@@ -20,7 +20,6 @@ const (
 
 	activeK8sJobTimeout        = 5 * time.Minute
 	activeGPUCheckTimeout      = 40 * time.Minute
-	activeSlurmAccountingWait  = 3 * time.Minute
 	activeSlurmOutputWait      = 3 * time.Minute
 	activeOutputCleanupTimeout = 3 * time.Minute
 
@@ -277,7 +276,10 @@ func (s *ActiveChecks) waitForActiveCheckSlurmRunComplete(ctx context.Context, c
 		switch status.LastRunStatus {
 		case consts.ActiveCheckSlurmRunStatusComplete:
 			return true, nil
-		case consts.ActiveCheckSlurmRunStatusFailed, consts.ActiveCheckSlurmRunStatusCancelled, consts.ActiveCheckSlurmRunStatusError:
+		case consts.ActiveCheckSlurmRunStatusFailed,
+			consts.ActiveCheckSlurmRunStatusCancelled,
+			consts.ActiveCheckSlurmRunStatusError,
+			consts.ActiveCheckSlurmRunStatusSkipped:
 			return false, fmt.Errorf("ActiveCheck %s finished with status=%s fail_jobs=%+v error_jobs=%+v cancelled_jobs=%v",
 				checkName, status.LastRunStatus, status.LastRunFailJobsAndReasons, status.LastRunErrorJobsAndReasons, status.LastRunCancelledJobs)
 		default:
@@ -315,7 +317,7 @@ func slurmJobIDsFromAnnotation(annotations map[string]string) []string {
 
 func (s *ActiveChecks) waitForGPUActiveCheckSlurmJobsCompletedOnAllGPUWorkers(ctx context.Context) error {
 	var records map[string]activeCheckSlurmJobRecord
-	err := s.exec.WaitFor(ctx, "GPU ActiveCheck Slurm jobs completed on all GPU workers", activeSlurmAccountingWait, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	err := s.exec.WaitFor(ctx, "GPU ActiveCheck Slurm jobs completed on all GPU workers", activeGPUCheckTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		next, err := s.gpuActiveCheckSlurmJobRecords(waitCtx)
 		if err != nil {
 			return false, err
@@ -326,7 +328,7 @@ func (s *ActiveChecks) waitForGPUActiveCheckSlurmJobsCompletedOnAllGPUWorkers(ct
 				return false, nil
 			}
 		}
-		return true, nil
+		return activeCheckSlurmJobRecordsTerminal(records, s.gpuCheckJobIDs), nil
 	})
 	if err != nil {
 		return err
@@ -418,6 +420,16 @@ func assertGPUActiveCheckSlurmRecords(records map[string]activeCheckSlurmJobReco
 		return fmt.Errorf("%s", strings.Join(problems, "; "))
 	}
 	return nil
+}
+
+func activeCheckSlurmJobRecordsTerminal(records map[string]activeCheckSlurmJobRecord, jobIDs []string) bool {
+	for _, jobID := range jobIDs {
+		record, ok := records[jobID]
+		if !ok || framework.IsJobAliveState(record.State) {
+			return false
+		}
+	}
+	return len(jobIDs) > 0
 }
 
 func parseActiveCheckSlurmJobRecords(output string) map[string]activeCheckSlurmJobRecord {
