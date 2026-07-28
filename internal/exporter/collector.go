@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -191,13 +191,13 @@ func isNodeUnavailable(node slurmapi.Node) bool {
 	if node.IsNotRespondingState() {
 		return true
 	}
-	if node.BaseState() == api.V0041NodeStateIDLE && node.IsDrainState() {
+	if node.BaseState() == api.V0044NodeStateIDLE && node.IsDrainState() {
 		return true
 	}
-	if node.BaseState() == api.V0041NodeStateUNKNOWN {
+	if node.BaseState() == api.V0044NodeStateUNKNOWN {
 		return true
 	}
-	if node.BaseState() == api.V0041NodeStateERROR {
+	if node.BaseState() == api.V0044NodeStateERROR {
 		return true
 	}
 	if node.IsFailState() {
@@ -215,7 +215,7 @@ func isNodeDraining(node slurmapi.Node) bool {
 		return false
 	}
 	baseState := node.BaseState()
-	return baseState == api.V0041NodeStateALLOCATED || baseState == api.V0041NodeStateMIXED
+	return baseState == api.V0044NodeStateALLOCATED || baseState == api.V0044NodeStateMIXED
 }
 
 func (c *MetricsCollector) updateGPUSecondsMetrics(ctx context.Context, nodes []slurmapi.Node, previousTime time.Time, currentTime time.Time) time.Time {
@@ -455,7 +455,7 @@ func (c *MetricsCollector) refreshJobs(ctx context.Context, sequence uint64) (er
 	return nil
 }
 
-func (c *MetricsCollector) getDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error) {
+func (c *MetricsCollector) getDiag(ctx context.Context) (*api.V0044OpenapiDiagResp, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 
 	diagStart := time.Now()
@@ -782,7 +782,7 @@ func jobAllocatedResources(logger logr.Logger, job slurmapi.Job) (cpu float64, c
 	return cpu, cpuOK, mem, memOK
 }
 
-func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0041OpenapiDiagResp) iter.Seq[prometheus.Metric] {
+func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0044OpenapiDiagResp) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
 		if diag == nil {
 			return

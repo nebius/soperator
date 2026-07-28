@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -43,7 +43,7 @@ type Job struct {
 	MemoryPerNode   *int64 // in MB
 }
 
-func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
+func JobFromAPI(apiJob api.V0044JobInfo) (Job, error) {
 	job := Job{}
 	if apiJob.JobId == nil {
 		return job, fmt.Errorf("job ID is missing")
@@ -126,7 +126,7 @@ func JobFromAPI(apiJob api.V0041JobInfo) (Job, error) {
 	return job, nil
 }
 
-func JobFromAccountingAPI(apiJob api.V0041Job) (Job, error) {
+func JobFromAccountingAPI(apiJob api.V0044Job) (Job, error) {
 	job := Job{}
 	if apiJob.JobId == nil {
 		return job, fmt.Errorf("job ID is missing")
@@ -173,7 +173,7 @@ func JobFromAccountingAPI(apiJob api.V0041Job) (Job, error) {
 		job.Nodes = *apiJob.Nodes
 	}
 
-	// V0041Job (accounting) only carries allocation_nodes — the count of nodes already assigned.
+	// V0044Job (accounting) only carries allocation_nodes — the count of nodes already assigned.
 	// For pending jobs that's 0, which would zero out per-node memory metrics downstream
 	// (jobAllocatedResources multiplies MemoryPerNode by NodeCount). Leave NodeCount nil in that
 	// case so the fallback nodeCount=1 kicks in. The accounting API doesn't expose the originally
@@ -201,7 +201,7 @@ func JobFromAccountingAPI(apiJob api.V0041Job) (Job, error) {
 		// if the job has no time limit (UNLIMITED / NO_VAL) convertToInt returns nil and we leave
 		// end_time empty, which is also what the controller does.
 		if job.EndTime == nil &&
-			job.State == string(api.V0041JobStateCurrentRUNNING) &&
+			job.State == string(api.V0044JobStateCurrentRUNNING) &&
 			job.StartTime != nil && job.StartTime.Unix() > 0 {
 			if limitMin := convertToInt(apiJob.Time.Limit); limitMin != nil {
 				projected := metav1.NewTime(job.StartTime.Add(time.Duration(*limitMin) * time.Minute))
@@ -263,20 +263,20 @@ func (j Job) GetRequiredNodeList() ([]string, error) {
 
 func (j Job) IsTerminalState() bool {
 	switch j.State {
-	case string(api.V0041JobInfoJobStateFAILED),
-		string(api.V0041JobInfoJobStateCANCELLED),
-		string(api.V0041JobInfoJobStateTIMEOUT),
-		string(api.V0041JobInfoJobStateOUTOFMEMORY),
-		string(api.V0041JobInfoJobStateBOOTFAIL),
-		string(api.V0041JobInfoJobStateDEADLINE),
-		string(api.V0041JobInfoJobStateLAUNCHFAILED),
-		string(api.V0041JobInfoJobStateNODEFAIL),
-		string(api.V0041JobInfoJobStatePREEMPTED),
-		string(api.V0041JobInfoJobStateRECONFIGFAIL),
-		string(api.V0041JobInfoJobStateREVOKED),
-		string(api.V0041JobInfoJobStateSPECIALEXIT),
-		string(api.V0041JobInfoJobStateCOMPLETED),
-		string(api.V0041JobInfoJobStateSTOPPED):
+	case string(api.V0044JobInfoJobStateFAILED),
+		string(api.V0044JobInfoJobStateCANCELLED),
+		string(api.V0044JobInfoJobStateTIMEOUT),
+		string(api.V0044JobInfoJobStateOUTOFMEMORY),
+		string(api.V0044JobInfoJobStateBOOTFAIL),
+		string(api.V0044JobInfoJobStateDEADLINE),
+		string(api.V0044JobInfoJobStateLAUNCHFAILED),
+		string(api.V0044JobInfoJobStateNODEFAIL),
+		string(api.V0044JobInfoJobStatePREEMPTED),
+		string(api.V0044JobInfoJobStateRECONFIGFAIL),
+		string(api.V0044JobInfoJobStateREVOKED),
+		string(api.V0044JobInfoJobStateSPECIALEXIT),
+		string(api.V0044JobInfoJobStateCOMPLETED),
+		string(api.V0044JobInfoJobStateSTOPPED):
 		return true
 	default:
 		return false
@@ -284,15 +284,15 @@ func (j Job) IsTerminalState() bool {
 }
 
 func (j Job) IsFailedState() bool {
-	return j.State == string(api.V0041JobInfoJobStateFAILED)
+	return j.State == string(api.V0044JobInfoJobStateFAILED)
 }
 
 func (j Job) IsCompletedState() bool {
-	return j.State == string(api.V0041JobInfoJobStateCOMPLETED)
+	return j.State == string(api.V0044JobInfoJobStateCOMPLETED)
 }
 
 func (j Job) IsCancelledState() bool {
-	return j.State == string(api.V0041JobInfoJobStateCANCELLED)
+	return j.State == string(api.V0044JobInfoJobStateCANCELLED)
 }
 
 func parseNodeList(nodeString string) ([]string, error) {
@@ -402,7 +402,7 @@ func expandNodeRange(nodePattern string) ([]string, error) {
 	return nodes, nil
 }
 
-func convertToMetav1Time(input *api.V0041Uint64NoValStruct) *metav1.Time {
+func convertToMetav1Time(input *api.V0044Uint64NoValStruct) *metav1.Time {
 	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
 		return nil
 	}
@@ -430,7 +430,7 @@ func unixTimeToMetav1Time(input *int64) *metav1.Time {
 // `(t1.time_end >= start_time OR t1.time_end = 0)`), so leftovers from a scancel that didn't
 // propagate or a controller crash accumulate as permanent Prometheus series until PurgeJobAfter
 // sweeps them. Dropping them at fetch time avoids that cardinality leak.
-func isStaleAccountingPending(j api.V0041Job, submitCutoff int64) bool {
+func isStaleAccountingPending(j api.V0044Job, submitCutoff int64) bool {
 	if j.Time == nil {
 		return false
 	}
@@ -457,7 +457,7 @@ func isUnallocatedNodeList(s string) bool {
 	return s == "" || s == "None assigned" || s == "(null)"
 }
 
-func convertToInt(input *api.V0041Uint32NoValStruct) *int32 {
+func convertToInt(input *api.V0044Uint32NoValStruct) *int32 {
 	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
 		return nil
 	}
@@ -469,7 +469,7 @@ func convertToInt(input *api.V0041Uint32NoValStruct) *int32 {
 	return input.Number
 }
 
-func convertToInt64(input *api.V0041Uint64NoValStruct) *int64 {
+func convertToInt64(input *api.V0044Uint64NoValStruct) *int64 {
 	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
 		return nil
 	}
@@ -481,7 +481,7 @@ func convertToInt64(input *api.V0041Uint64NoValStruct) *int64 {
 	return input.Number
 }
 
-func tresListToString(input *api.V0041TresList) string {
+func tresListToString(input *api.V0044TresList) string {
 	if input == nil {
 		return ""
 	}

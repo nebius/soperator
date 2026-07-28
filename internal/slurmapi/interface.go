@@ -3,7 +3,7 @@ package slurmapi
 import (
 	"context"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 )
 
 type Client interface {
@@ -13,5 +13,5 @@ type Client interface {
 	GetJobsByIDFromAccounting(ctx context.Context, jobID string) ([]Job, error)
 	ListJobs(ctx context.Context) ([]Job, error)
 	ListJobsWithParams(ctx context.Context, params ListJobsParams) ([]Job, error)
-	GetDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error)
+	GetDiag(ctx context.Context) (*api.V0044OpenapiDiagResp, error)
 }

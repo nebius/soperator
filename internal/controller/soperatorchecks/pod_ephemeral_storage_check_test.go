@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -1558,8 +1558,8 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "drained by ephemeral storage check",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateDRAIN: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateDRAIN: {},
 				},
 				Reason: &slurmapi.NodeReason{
 					Reason: consts.SlurmUserReasonHC + " pod_ephemeral_storage 90.00% of ephemeral storage is used.",
@@ -1570,8 +1570,8 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "drained by different reason",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateDRAIN: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateDRAIN: {},
 				},
 				Reason: &slurmapi.NodeReason{
 					Reason: consts.SlurmUserReasonHC + " gpu_check some GPU failure",
@@ -1582,8 +1582,8 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "drained with no reason",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateDRAIN: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateDRAIN: {},
 				},
 				Reason: nil,
 			},
@@ -1592,8 +1592,8 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "not drained but reason matches prefix",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateIDLE: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateIDLE: {},
 				},
 				Reason: &slurmapi.NodeReason{
 					Reason: consts.SlurmUserReasonHC + " pod_ephemeral_storage 90.00%",
@@ -1604,9 +1604,9 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "drain+idle with matching reason",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateDRAIN: {},
-					api.V0041NodeStateIDLE:  {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateDRAIN: {},
+					api.V0044NodeStateIDLE:  {},
 				},
 				Reason: &slurmapi.NodeReason{
 					Reason: consts.SlurmUserReasonHC + " pod_ephemeral_storage 85.50% of ephemeral storage is used.",
@@ -1617,8 +1617,8 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "drained manually by user",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateDRAIN: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateDRAIN: {},
 				},
 				Reason: &slurmapi.NodeReason{
 					Reason: "manual maintenance",
@@ -1629,8 +1629,8 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "reason is exact prefix with no trailing content",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateDRAIN: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateDRAIN: {},
 				},
 				Reason: &slurmapi.NodeReason{
 					Reason: consts.SlurmUserReasonHC + " pod_ephemeral_storage",
@@ -1662,13 +1662,13 @@ func TestUndrainSlurmNode(t *testing.T) {
 			name: "successful undrain",
 			setupMock: func(m *slurmapifake.MockClient) {
 				m.EXPECT().
-					SlurmV0041PostNodeWithResponse(mock.Anything, nodeName, mock.MatchedBy(func(body api.V0041UpdateNodeMsg) bool {
+					SlurmV0044PostNodeWithResponse(mock.Anything, nodeName, mock.MatchedBy(func(body api.V0044UpdateNodeMsg) bool {
 						return body.State != nil &&
 							len(*body.State) == 1 &&
-							(*body.State)[0] == api.V0041UpdateNodeMsgStateRESUME
+							(*body.State)[0] == api.V0044UpdateNodeMsgStateRESUME
 					})).
-					Return(&api.SlurmV0041PostNodeResponse{
-						JSON200: &api.V0041OpenapiResp{},
+					Return(&api.SlurmV0044PostNodeResponse{
+						JSON200: &api.V0044OpenapiResp{},
 					}, nil)
 			},
 			expectError:  false,
@@ -1678,7 +1678,7 @@ func TestUndrainSlurmNode(t *testing.T) {
 			name: "API returns error",
 			setupMock: func(m *slurmapifake.MockClient) {
 				m.EXPECT().
-					SlurmV0041PostNodeWithResponse(mock.Anything, nodeName, mock.Anything).
+					SlurmV0044PostNodeWithResponse(mock.Anything, nodeName, mock.Anything).
 					Return(nil, fmt.Errorf("connection refused"))
 			},
 			expectError: true,
@@ -1686,13 +1686,13 @@ func TestUndrainSlurmNode(t *testing.T) {
 		{
 			name: "API returns response with errors",
 			setupMock: func(m *slurmapifake.MockClient) {
-				errs := api.V0041OpenapiErrors{
+				errs := api.V0044OpenapiErrors{
 					{Description: strPtr("node not found"), ErrorNumber: int32Ptr(404)},
 				}
 				m.EXPECT().
-					SlurmV0041PostNodeWithResponse(mock.Anything, nodeName, mock.Anything).
-					Return(&api.SlurmV0041PostNodeResponse{
-						JSON200: &api.V0041OpenapiResp{
+					SlurmV0044PostNodeWithResponse(mock.Anything, nodeName, mock.Anything).
+					Return(&api.SlurmV0044PostNodeResponse{
+						JSON200: &api.V0044OpenapiResp{
 							Errors: &errs,
 						},
 					}, nil)

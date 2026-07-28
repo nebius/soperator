@@ -6,7 +6,7 @@ import (
 	context "context"
 	io "io"
 
-	v0041 "github.com/SlinkyProject/slurm-client/api/v0041"
+	v0044 "github.com/SlinkyProject/slurm-client/api/v0044"
 	mock "github.com/stretchr/testify/mock"
 	slurmapi "nebius.ai/slurm-operator/internal/slurmapi"
 )
@@ -25,23 +25,23 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 }
 
 // GetDiag provides a mock function with given fields: ctx
-func (_m *MockClient) GetDiag(ctx context.Context) (*v0041.V0041OpenapiDiagResp, error) {
+func (_m *MockClient) GetDiag(ctx context.Context) (*v0044.V0044OpenapiDiagResp, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetDiag")
 	}
 
-	var r0 *v0041.V0041OpenapiDiagResp
+	var r0 *v0044.V0044OpenapiDiagResp
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*v0041.V0041OpenapiDiagResp, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (*v0044.V0044OpenapiDiagResp, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) *v0041.V0041OpenapiDiagResp); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) *v0044.V0044OpenapiDiagResp); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.V0041OpenapiDiagResp)
+			r0 = ret.Get(0).(*v0044.V0044OpenapiDiagResp)
 		}
 	}
 
@@ -72,12 +72,12 @@ func (_c *MockClient_GetDiag_Call) Run(run func(ctx context.Context)) *MockClien
 	return _c
 }
 
-func (_c *MockClient_GetDiag_Call) Return(_a0 *v0041.V0041OpenapiDiagResp, _a1 error) *MockClient_GetDiag_Call {
+func (_c *MockClient_GetDiag_Call) Return(_a0 *v0044.V0044OpenapiDiagResp, _a1 error) *MockClient_GetDiag_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_GetDiag_Call) RunAndReturn(run func(context.Context) (*v0041.V0041OpenapiDiagResp, error)) *MockClient_GetDiag_Call {
+func (_c *MockClient_GetDiag_Call) RunAndReturn(run func(context.Context) (*v0044.V0044OpenapiDiagResp, error)) *MockClient_GetDiag_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -373,8 +373,8 @@ func (_c *MockClient_ListNodes_Call) RunAndReturn(run func(context.Context) ([]s
 	return _c
 }
 
-// SlurmV0041DeleteJobWithResponse provides a mock function with given fields: ctx, jobId, params, reqEditors
-func (_m *MockClient) SlurmV0041DeleteJobWithResponse(ctx context.Context, jobId string, params *v0041.SlurmV0041DeleteJobParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteJobResponse, error) {
+// SlurmV0044DeleteJobWithResponse provides a mock function with given fields: ctx, jobId, params, reqEditors
+func (_m *MockClient) SlurmV0044DeleteJobWithResponse(ctx context.Context, jobId string, params *v0044.SlurmV0044DeleteJobParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteJobResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -385,23 +385,23 @@ func (_m *MockClient) SlurmV0041DeleteJobWithResponse(ctx context.Context, jobId
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041DeleteJobWithResponse")
+		panic("no return value specified for SlurmV0044DeleteJobWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041DeleteJobResponse
+	var r0 *v0044.SlurmV0044DeleteJobResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmV0041DeleteJobParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteJobResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmV0044DeleteJobParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteJobResponse, error)); ok {
 		return rf(ctx, jobId, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmV0041DeleteJobParams, ...v0041.RequestEditorFn) *v0041.SlurmV0041DeleteJobResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmV0044DeleteJobParams, ...v0044.RequestEditorFn) *v0044.SlurmV0044DeleteJobResponse); ok {
 		r0 = rf(ctx, jobId, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041DeleteJobResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044DeleteJobResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v0041.SlurmV0041DeleteJobParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, *v0044.SlurmV0044DeleteJobParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, jobId, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -410,46 +410,46 @@ func (_m *MockClient) SlurmV0041DeleteJobWithResponse(ctx context.Context, jobId
 	return r0, r1
 }
 
-// MockClient_SlurmV0041DeleteJobWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041DeleteJobWithResponse'
-type MockClient_SlurmV0041DeleteJobWithResponse_Call struct {
+// MockClient_SlurmV0044DeleteJobWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044DeleteJobWithResponse'
+type MockClient_SlurmV0044DeleteJobWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041DeleteJobWithResponse is a helper method to define mock.On call
+// SlurmV0044DeleteJobWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - jobId string
-//   - params *v0041.SlurmV0041DeleteJobParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041DeleteJobWithResponse(ctx interface{}, jobId interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041DeleteJobWithResponse_Call {
-	return &MockClient_SlurmV0041DeleteJobWithResponse_Call{Call: _e.mock.On("SlurmV0041DeleteJobWithResponse",
+//   - params *v0044.SlurmV0044DeleteJobParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044DeleteJobWithResponse(ctx interface{}, jobId interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044DeleteJobWithResponse_Call {
+	return &MockClient_SlurmV0044DeleteJobWithResponse_Call{Call: _e.mock.On("SlurmV0044DeleteJobWithResponse",
 		append([]interface{}{ctx, jobId, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041DeleteJobWithResponse_Call) Run(run func(ctx context.Context, jobId string, params *v0041.SlurmV0041DeleteJobParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041DeleteJobWithResponse_Call {
+func (_c *MockClient_SlurmV0044DeleteJobWithResponse_Call) Run(run func(ctx context.Context, jobId string, params *v0044.SlurmV0044DeleteJobParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044DeleteJobWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(string), args[2].(*v0041.SlurmV0041DeleteJobParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(string), args[2].(*v0044.SlurmV0044DeleteJobParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041DeleteJobWithResponse_Call) Return(_a0 *v0041.SlurmV0041DeleteJobResponse, _a1 error) *MockClient_SlurmV0041DeleteJobWithResponse_Call {
+func (_c *MockClient_SlurmV0044DeleteJobWithResponse_Call) Return(_a0 *v0044.SlurmV0044DeleteJobResponse, _a1 error) *MockClient_SlurmV0044DeleteJobWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041DeleteJobWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0041.SlurmV0041DeleteJobParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteJobResponse, error)) *MockClient_SlurmV0041DeleteJobWithResponse_Call {
+func (_c *MockClient_SlurmV0044DeleteJobWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0044.SlurmV0044DeleteJobParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteJobResponse, error)) *MockClient_SlurmV0044DeleteJobWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041DeleteJobsWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
-func (_m *MockClient) SlurmV0041DeleteJobsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteJobsResponse, error) {
+// SlurmV0044DeleteJobsWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmV0044DeleteJobsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteJobsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -460,23 +460,23 @@ func (_m *MockClient) SlurmV0041DeleteJobsWithBodyWithResponse(ctx context.Conte
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041DeleteJobsWithBodyWithResponse")
+		panic("no return value specified for SlurmV0044DeleteJobsWithBodyWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041DeleteJobsResponse
+	var r0 *v0044.SlurmV0044DeleteJobsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteJobsResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteJobsResponse, error)); ok {
 		return rf(ctx, contentType, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmV0041DeleteJobsResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmV0044DeleteJobsResponse); ok {
 		r0 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041DeleteJobsResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044DeleteJobsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -485,27 +485,27 @@ func (_m *MockClient) SlurmV0041DeleteJobsWithBodyWithResponse(ctx context.Conte
 	return r0, r1
 }
 
-// MockClient_SlurmV0041DeleteJobsWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041DeleteJobsWithBodyWithResponse'
-type MockClient_SlurmV0041DeleteJobsWithBodyWithResponse_Call struct {
+// MockClient_SlurmV0044DeleteJobsWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044DeleteJobsWithBodyWithResponse'
+type MockClient_SlurmV0044DeleteJobsWithBodyWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041DeleteJobsWithBodyWithResponse is a helper method to define mock.On call
+// SlurmV0044DeleteJobsWithBodyWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - contentType string
 //   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041DeleteJobsWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041DeleteJobsWithBodyWithResponse_Call {
-	return &MockClient_SlurmV0041DeleteJobsWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0041DeleteJobsWithBodyWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044DeleteJobsWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044DeleteJobsWithBodyWithResponse_Call {
+	return &MockClient_SlurmV0044DeleteJobsWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0044DeleteJobsWithBodyWithResponse",
 		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041DeleteJobsWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041DeleteJobsWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmV0044DeleteJobsWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044DeleteJobsWithBodyWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
@@ -513,18 +513,18 @@ func (_c *MockClient_SlurmV0041DeleteJobsWithBodyWithResponse_Call) Run(run func
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041DeleteJobsWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmV0041DeleteJobsResponse, _a1 error) *MockClient_SlurmV0041DeleteJobsWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmV0044DeleteJobsWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmV0044DeleteJobsResponse, _a1 error) *MockClient_SlurmV0044DeleteJobsWithBodyWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041DeleteJobsWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteJobsResponse, error)) *MockClient_SlurmV0041DeleteJobsWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmV0044DeleteJobsWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteJobsResponse, error)) *MockClient_SlurmV0044DeleteJobsWithBodyWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041DeleteJobsWithResponse provides a mock function with given fields: ctx, body, reqEditors
-func (_m *MockClient) SlurmV0041DeleteJobsWithResponse(ctx context.Context, body v0041.SlurmV0041DeleteJobsJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteJobsResponse, error) {
+// SlurmV0044DeleteJobsWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmV0044DeleteJobsWithResponse(ctx context.Context, body v0044.SlurmV0044DeleteJobsJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteJobsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -535,23 +535,23 @@ func (_m *MockClient) SlurmV0041DeleteJobsWithResponse(ctx context.Context, body
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041DeleteJobsWithResponse")
+		panic("no return value specified for SlurmV0044DeleteJobsWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041DeleteJobsResponse
+	var r0 *v0044.SlurmV0044DeleteJobsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmV0041DeleteJobsJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteJobsResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044DeleteJobsJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteJobsResponse, error)); ok {
 		return rf(ctx, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmV0041DeleteJobsJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmV0041DeleteJobsResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044DeleteJobsJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmV0044DeleteJobsResponse); ok {
 		r0 = rf(ctx, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041DeleteJobsResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044DeleteJobsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, v0041.SlurmV0041DeleteJobsJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmV0044DeleteJobsJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -560,45 +560,45 @@ func (_m *MockClient) SlurmV0041DeleteJobsWithResponse(ctx context.Context, body
 	return r0, r1
 }
 
-// MockClient_SlurmV0041DeleteJobsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041DeleteJobsWithResponse'
-type MockClient_SlurmV0041DeleteJobsWithResponse_Call struct {
+// MockClient_SlurmV0044DeleteJobsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044DeleteJobsWithResponse'
+type MockClient_SlurmV0044DeleteJobsWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041DeleteJobsWithResponse is a helper method to define mock.On call
+// SlurmV0044DeleteJobsWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - body v0041.SlurmV0041DeleteJobsJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041DeleteJobsWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041DeleteJobsWithResponse_Call {
-	return &MockClient_SlurmV0041DeleteJobsWithResponse_Call{Call: _e.mock.On("SlurmV0041DeleteJobsWithResponse",
+//   - body v0044.SlurmV0044DeleteJobsJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044DeleteJobsWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044DeleteJobsWithResponse_Call {
+	return &MockClient_SlurmV0044DeleteJobsWithResponse_Call{Call: _e.mock.On("SlurmV0044DeleteJobsWithResponse",
 		append([]interface{}{ctx, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041DeleteJobsWithResponse_Call) Run(run func(ctx context.Context, body v0041.SlurmV0041DeleteJobsJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041DeleteJobsWithResponse_Call {
+func (_c *MockClient_SlurmV0044DeleteJobsWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmV0044DeleteJobsJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044DeleteJobsWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(v0041.SlurmV0041DeleteJobsJSONRequestBody), variadicArgs...)
+		run(args[0].(context.Context), args[1].(v0044.SlurmV0044DeleteJobsJSONRequestBody), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041DeleteJobsWithResponse_Call) Return(_a0 *v0041.SlurmV0041DeleteJobsResponse, _a1 error) *MockClient_SlurmV0041DeleteJobsWithResponse_Call {
+func (_c *MockClient_SlurmV0044DeleteJobsWithResponse_Call) Return(_a0 *v0044.SlurmV0044DeleteJobsResponse, _a1 error) *MockClient_SlurmV0044DeleteJobsWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041DeleteJobsWithResponse_Call) RunAndReturn(run func(context.Context, v0041.SlurmV0041DeleteJobsJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteJobsResponse, error)) *MockClient_SlurmV0041DeleteJobsWithResponse_Call {
+func (_c *MockClient_SlurmV0044DeleteJobsWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmV0044DeleteJobsJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteJobsResponse, error)) *MockClient_SlurmV0044DeleteJobsWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041DeleteNodeWithResponse provides a mock function with given fields: ctx, nodeName, reqEditors
-func (_m *MockClient) SlurmV0041DeleteNodeWithResponse(ctx context.Context, nodeName string, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteNodeResponse, error) {
+// SlurmV0044DeleteNodeWithResponse provides a mock function with given fields: ctx, nodeName, reqEditors
+func (_m *MockClient) SlurmV0044DeleteNodeWithResponse(ctx context.Context, nodeName string, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteNodeResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -609,23 +609,23 @@ func (_m *MockClient) SlurmV0041DeleteNodeWithResponse(ctx context.Context, node
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041DeleteNodeWithResponse")
+		panic("no return value specified for SlurmV0044DeleteNodeWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041DeleteNodeResponse
+	var r0 *v0044.SlurmV0044DeleteNodeResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteNodeResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteNodeResponse, error)); ok {
 		return rf(ctx, nodeName, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) *v0041.SlurmV0041DeleteNodeResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) *v0044.SlurmV0044DeleteNodeResponse); ok {
 		r0 = rf(ctx, nodeName, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041DeleteNodeResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044DeleteNodeResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, nodeName, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -634,26 +634,26 @@ func (_m *MockClient) SlurmV0041DeleteNodeWithResponse(ctx context.Context, node
 	return r0, r1
 }
 
-// MockClient_SlurmV0041DeleteNodeWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041DeleteNodeWithResponse'
-type MockClient_SlurmV0041DeleteNodeWithResponse_Call struct {
+// MockClient_SlurmV0044DeleteNodeWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044DeleteNodeWithResponse'
+type MockClient_SlurmV0044DeleteNodeWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041DeleteNodeWithResponse is a helper method to define mock.On call
+// SlurmV0044DeleteNodeWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - nodeName string
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041DeleteNodeWithResponse(ctx interface{}, nodeName interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041DeleteNodeWithResponse_Call {
-	return &MockClient_SlurmV0041DeleteNodeWithResponse_Call{Call: _e.mock.On("SlurmV0041DeleteNodeWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044DeleteNodeWithResponse(ctx interface{}, nodeName interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044DeleteNodeWithResponse_Call {
+	return &MockClient_SlurmV0044DeleteNodeWithResponse_Call{Call: _e.mock.On("SlurmV0044DeleteNodeWithResponse",
 		append([]interface{}{ctx, nodeName}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041DeleteNodeWithResponse_Call) Run(run func(ctx context.Context, nodeName string, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041DeleteNodeWithResponse_Call {
+func (_c *MockClient_SlurmV0044DeleteNodeWithResponse_Call) Run(run func(ctx context.Context, nodeName string, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044DeleteNodeWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), args[1].(string), variadicArgs...)
@@ -661,18 +661,92 @@ func (_c *MockClient_SlurmV0041DeleteNodeWithResponse_Call) Run(run func(ctx con
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041DeleteNodeWithResponse_Call) Return(_a0 *v0041.SlurmV0041DeleteNodeResponse, _a1 error) *MockClient_SlurmV0041DeleteNodeWithResponse_Call {
+func (_c *MockClient_SlurmV0044DeleteNodeWithResponse_Call) Return(_a0 *v0044.SlurmV0044DeleteNodeResponse, _a1 error) *MockClient_SlurmV0044DeleteNodeWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041DeleteNodeWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmV0041DeleteNodeResponse, error)) *MockClient_SlurmV0041DeleteNodeWithResponse_Call {
+func (_c *MockClient_SlurmV0044DeleteNodeWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteNodeResponse, error)) *MockClient_SlurmV0044DeleteNodeWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetDiagWithResponse provides a mock function with given fields: ctx, reqEditors
-func (_m *MockClient) SlurmV0041GetDiagWithResponse(ctx context.Context, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetDiagResponse, error) {
+// SlurmV0044DeleteReservationWithResponse provides a mock function with given fields: ctx, reservationName, reqEditors
+func (_m *MockClient) SlurmV0044DeleteReservationWithResponse(ctx context.Context, reservationName string, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteReservationResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, reservationName)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044DeleteReservationWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044DeleteReservationResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteReservationResponse, error)); ok {
+		return rf(ctx, reservationName, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) *v0044.SlurmV0044DeleteReservationResponse); ok {
+		r0 = rf(ctx, reservationName, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044DeleteReservationResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, reservationName, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044DeleteReservationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044DeleteReservationWithResponse'
+type MockClient_SlurmV0044DeleteReservationWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044DeleteReservationWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - reservationName string
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044DeleteReservationWithResponse(ctx interface{}, reservationName interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044DeleteReservationWithResponse_Call {
+	return &MockClient_SlurmV0044DeleteReservationWithResponse_Call{Call: _e.mock.On("SlurmV0044DeleteReservationWithResponse",
+		append([]interface{}{ctx, reservationName}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044DeleteReservationWithResponse_Call) Run(run func(ctx context.Context, reservationName string, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044DeleteReservationWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044DeleteReservationWithResponse_Call) Return(_a0 *v0044.SlurmV0044DeleteReservationResponse, _a1 error) *MockClient_SlurmV0044DeleteReservationWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044DeleteReservationWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteReservationResponse, error)) *MockClient_SlurmV0044DeleteReservationWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044GetDiagWithResponse provides a mock function with given fields: ctx, reqEditors
+func (_m *MockClient) SlurmV0044GetDiagWithResponse(ctx context.Context, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetDiagResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -683,23 +757,23 @@ func (_m *MockClient) SlurmV0041GetDiagWithResponse(ctx context.Context, reqEdit
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetDiagWithResponse")
+		panic("no return value specified for SlurmV0044GetDiagWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetDiagResponse
+	var r0 *v0044.SlurmV0044GetDiagResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetDiagResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetDiagResponse, error)); ok {
 		return rf(ctx, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetDiagResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetDiagResponse); ok {
 		r0 = rf(ctx, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetDiagResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetDiagResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -708,25 +782,25 @@ func (_m *MockClient) SlurmV0041GetDiagWithResponse(ctx context.Context, reqEdit
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetDiagWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetDiagWithResponse'
-type MockClient_SlurmV0041GetDiagWithResponse_Call struct {
+// MockClient_SlurmV0044GetDiagWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetDiagWithResponse'
+type MockClient_SlurmV0044GetDiagWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetDiagWithResponse is a helper method to define mock.On call
+// SlurmV0044GetDiagWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetDiagWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetDiagWithResponse_Call {
-	return &MockClient_SlurmV0041GetDiagWithResponse_Call{Call: _e.mock.On("SlurmV0041GetDiagWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetDiagWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetDiagWithResponse_Call {
+	return &MockClient_SlurmV0044GetDiagWithResponse_Call{Call: _e.mock.On("SlurmV0044GetDiagWithResponse",
 		append([]interface{}{ctx}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetDiagWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetDiagWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetDiagWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetDiagWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-1)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-1)
 		for i, a := range args[1:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), variadicArgs...)
@@ -734,18 +808,18 @@ func (_c *MockClient_SlurmV0041GetDiagWithResponse_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetDiagWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetDiagResponse, _a1 error) *MockClient_SlurmV0041GetDiagWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetDiagWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetDiagResponse, _a1 error) *MockClient_SlurmV0044GetDiagWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetDiagWithResponse_Call) RunAndReturn(run func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetDiagResponse, error)) *MockClient_SlurmV0041GetDiagWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetDiagWithResponse_Call) RunAndReturn(run func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetDiagResponse, error)) *MockClient_SlurmV0044GetDiagWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetJobWithResponse provides a mock function with given fields: ctx, jobId, params, reqEditors
-func (_m *MockClient) SlurmV0041GetJobWithResponse(ctx context.Context, jobId string, params *v0041.SlurmV0041GetJobParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetJobResponse, error) {
+// SlurmV0044GetJobWithResponse provides a mock function with given fields: ctx, jobId, params, reqEditors
+func (_m *MockClient) SlurmV0044GetJobWithResponse(ctx context.Context, jobId string, params *v0044.SlurmV0044GetJobParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetJobResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -756,23 +830,23 @@ func (_m *MockClient) SlurmV0041GetJobWithResponse(ctx context.Context, jobId st
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetJobWithResponse")
+		panic("no return value specified for SlurmV0044GetJobWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetJobResponse
+	var r0 *v0044.SlurmV0044GetJobResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmV0041GetJobParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetJobResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmV0044GetJobParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetJobResponse, error)); ok {
 		return rf(ctx, jobId, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmV0041GetJobParams, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetJobResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmV0044GetJobParams, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetJobResponse); ok {
 		r0 = rf(ctx, jobId, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetJobResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetJobResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v0041.SlurmV0041GetJobParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, *v0044.SlurmV0044GetJobParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, jobId, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -781,46 +855,46 @@ func (_m *MockClient) SlurmV0041GetJobWithResponse(ctx context.Context, jobId st
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetJobWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetJobWithResponse'
-type MockClient_SlurmV0041GetJobWithResponse_Call struct {
+// MockClient_SlurmV0044GetJobWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetJobWithResponse'
+type MockClient_SlurmV0044GetJobWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetJobWithResponse is a helper method to define mock.On call
+// SlurmV0044GetJobWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - jobId string
-//   - params *v0041.SlurmV0041GetJobParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetJobWithResponse(ctx interface{}, jobId interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetJobWithResponse_Call {
-	return &MockClient_SlurmV0041GetJobWithResponse_Call{Call: _e.mock.On("SlurmV0041GetJobWithResponse",
+//   - params *v0044.SlurmV0044GetJobParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetJobWithResponse(ctx interface{}, jobId interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetJobWithResponse_Call {
+	return &MockClient_SlurmV0044GetJobWithResponse_Call{Call: _e.mock.On("SlurmV0044GetJobWithResponse",
 		append([]interface{}{ctx, jobId, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetJobWithResponse_Call) Run(run func(ctx context.Context, jobId string, params *v0041.SlurmV0041GetJobParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetJobWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetJobWithResponse_Call) Run(run func(ctx context.Context, jobId string, params *v0044.SlurmV0044GetJobParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetJobWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(string), args[2].(*v0041.SlurmV0041GetJobParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(string), args[2].(*v0044.SlurmV0044GetJobParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetJobWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetJobResponse, _a1 error) *MockClient_SlurmV0041GetJobWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetJobWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetJobResponse, _a1 error) *MockClient_SlurmV0044GetJobWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetJobWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0041.SlurmV0041GetJobParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetJobResponse, error)) *MockClient_SlurmV0041GetJobWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetJobWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0044.SlurmV0044GetJobParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetJobResponse, error)) *MockClient_SlurmV0044GetJobWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetJobsStateWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmV0041GetJobsStateWithResponse(ctx context.Context, params *v0041.SlurmV0041GetJobsStateParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetJobsStateResponse, error) {
+// SlurmV0044GetJobsStateWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmV0044GetJobsStateWithResponse(ctx context.Context, params *v0044.SlurmV0044GetJobsStateParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetJobsStateResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -831,23 +905,23 @@ func (_m *MockClient) SlurmV0041GetJobsStateWithResponse(ctx context.Context, pa
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetJobsStateWithResponse")
+		panic("no return value specified for SlurmV0044GetJobsStateWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetJobsStateResponse
+	var r0 *v0044.SlurmV0044GetJobsStateResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmV0041GetJobsStateParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetJobsStateResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmV0044GetJobsStateParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetJobsStateResponse, error)); ok {
 		return rf(ctx, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmV0041GetJobsStateParams, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetJobsStateResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmV0044GetJobsStateParams, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetJobsStateResponse); ok {
 		r0 = rf(ctx, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetJobsStateResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetJobsStateResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmV0041GetJobsStateParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmV0044GetJobsStateParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -856,45 +930,45 @@ func (_m *MockClient) SlurmV0041GetJobsStateWithResponse(ctx context.Context, pa
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetJobsStateWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetJobsStateWithResponse'
-type MockClient_SlurmV0041GetJobsStateWithResponse_Call struct {
+// MockClient_SlurmV0044GetJobsStateWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetJobsStateWithResponse'
+type MockClient_SlurmV0044GetJobsStateWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetJobsStateWithResponse is a helper method to define mock.On call
+// SlurmV0044GetJobsStateWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmV0041GetJobsStateParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetJobsStateWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetJobsStateWithResponse_Call {
-	return &MockClient_SlurmV0041GetJobsStateWithResponse_Call{Call: _e.mock.On("SlurmV0041GetJobsStateWithResponse",
+//   - params *v0044.SlurmV0044GetJobsStateParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetJobsStateWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetJobsStateWithResponse_Call {
+	return &MockClient_SlurmV0044GetJobsStateWithResponse_Call{Call: _e.mock.On("SlurmV0044GetJobsStateWithResponse",
 		append([]interface{}{ctx, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetJobsStateWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmV0041GetJobsStateParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetJobsStateWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetJobsStateWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmV0044GetJobsStateParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetJobsStateWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmV0041GetJobsStateParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmV0044GetJobsStateParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetJobsStateWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetJobsStateResponse, _a1 error) *MockClient_SlurmV0041GetJobsStateWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetJobsStateWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetJobsStateResponse, _a1 error) *MockClient_SlurmV0044GetJobsStateWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetJobsStateWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmV0041GetJobsStateParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetJobsStateResponse, error)) *MockClient_SlurmV0041GetJobsStateWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetJobsStateWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmV0044GetJobsStateParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetJobsStateResponse, error)) *MockClient_SlurmV0044GetJobsStateWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetJobsWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmV0041GetJobsWithResponse(ctx context.Context, params *v0041.SlurmV0041GetJobsParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetJobsResponse, error) {
+// SlurmV0044GetJobsWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmV0044GetJobsWithResponse(ctx context.Context, params *v0044.SlurmV0044GetJobsParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetJobsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -905,23 +979,23 @@ func (_m *MockClient) SlurmV0041GetJobsWithResponse(ctx context.Context, params 
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetJobsWithResponse")
+		panic("no return value specified for SlurmV0044GetJobsWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetJobsResponse
+	var r0 *v0044.SlurmV0044GetJobsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmV0041GetJobsParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetJobsResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmV0044GetJobsParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetJobsResponse, error)); ok {
 		return rf(ctx, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmV0041GetJobsParams, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetJobsResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmV0044GetJobsParams, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetJobsResponse); ok {
 		r0 = rf(ctx, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetJobsResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetJobsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmV0041GetJobsParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmV0044GetJobsParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -930,45 +1004,45 @@ func (_m *MockClient) SlurmV0041GetJobsWithResponse(ctx context.Context, params 
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetJobsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetJobsWithResponse'
-type MockClient_SlurmV0041GetJobsWithResponse_Call struct {
+// MockClient_SlurmV0044GetJobsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetJobsWithResponse'
+type MockClient_SlurmV0044GetJobsWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetJobsWithResponse is a helper method to define mock.On call
+// SlurmV0044GetJobsWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmV0041GetJobsParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetJobsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetJobsWithResponse_Call {
-	return &MockClient_SlurmV0041GetJobsWithResponse_Call{Call: _e.mock.On("SlurmV0041GetJobsWithResponse",
+//   - params *v0044.SlurmV0044GetJobsParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetJobsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetJobsWithResponse_Call {
+	return &MockClient_SlurmV0044GetJobsWithResponse_Call{Call: _e.mock.On("SlurmV0044GetJobsWithResponse",
 		append([]interface{}{ctx, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetJobsWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmV0041GetJobsParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetJobsWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetJobsWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmV0044GetJobsParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetJobsWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmV0041GetJobsParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmV0044GetJobsParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetJobsWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetJobsResponse, _a1 error) *MockClient_SlurmV0041GetJobsWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetJobsWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetJobsResponse, _a1 error) *MockClient_SlurmV0044GetJobsWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetJobsWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmV0041GetJobsParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetJobsResponse, error)) *MockClient_SlurmV0041GetJobsWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetJobsWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmV0044GetJobsParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetJobsResponse, error)) *MockClient_SlurmV0044GetJobsWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetLicensesWithResponse provides a mock function with given fields: ctx, reqEditors
-func (_m *MockClient) SlurmV0041GetLicensesWithResponse(ctx context.Context, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetLicensesResponse, error) {
+// SlurmV0044GetLicensesWithResponse provides a mock function with given fields: ctx, reqEditors
+func (_m *MockClient) SlurmV0044GetLicensesWithResponse(ctx context.Context, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetLicensesResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -979,23 +1053,23 @@ func (_m *MockClient) SlurmV0041GetLicensesWithResponse(ctx context.Context, req
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetLicensesWithResponse")
+		panic("no return value specified for SlurmV0044GetLicensesWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetLicensesResponse
+	var r0 *v0044.SlurmV0044GetLicensesResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetLicensesResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetLicensesResponse, error)); ok {
 		return rf(ctx, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetLicensesResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetLicensesResponse); ok {
 		r0 = rf(ctx, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetLicensesResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetLicensesResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -1004,25 +1078,25 @@ func (_m *MockClient) SlurmV0041GetLicensesWithResponse(ctx context.Context, req
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetLicensesWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetLicensesWithResponse'
-type MockClient_SlurmV0041GetLicensesWithResponse_Call struct {
+// MockClient_SlurmV0044GetLicensesWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetLicensesWithResponse'
+type MockClient_SlurmV0044GetLicensesWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetLicensesWithResponse is a helper method to define mock.On call
+// SlurmV0044GetLicensesWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetLicensesWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetLicensesWithResponse_Call {
-	return &MockClient_SlurmV0041GetLicensesWithResponse_Call{Call: _e.mock.On("SlurmV0041GetLicensesWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetLicensesWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetLicensesWithResponse_Call {
+	return &MockClient_SlurmV0044GetLicensesWithResponse_Call{Call: _e.mock.On("SlurmV0044GetLicensesWithResponse",
 		append([]interface{}{ctx}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetLicensesWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetLicensesWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetLicensesWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetLicensesWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-1)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-1)
 		for i, a := range args[1:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), variadicArgs...)
@@ -1030,18 +1104,18 @@ func (_c *MockClient_SlurmV0041GetLicensesWithResponse_Call) Run(run func(ctx co
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetLicensesWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetLicensesResponse, _a1 error) *MockClient_SlurmV0041GetLicensesWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetLicensesWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetLicensesResponse, _a1 error) *MockClient_SlurmV0044GetLicensesWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetLicensesWithResponse_Call) RunAndReturn(run func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetLicensesResponse, error)) *MockClient_SlurmV0041GetLicensesWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetLicensesWithResponse_Call) RunAndReturn(run func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetLicensesResponse, error)) *MockClient_SlurmV0044GetLicensesWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetNodeWithResponse provides a mock function with given fields: ctx, nodeName, params, reqEditors
-func (_m *MockClient) SlurmV0041GetNodeWithResponse(ctx context.Context, nodeName string, params *v0041.SlurmV0041GetNodeParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetNodeResponse, error) {
+// SlurmV0044GetNodeWithResponse provides a mock function with given fields: ctx, nodeName, params, reqEditors
+func (_m *MockClient) SlurmV0044GetNodeWithResponse(ctx context.Context, nodeName string, params *v0044.SlurmV0044GetNodeParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetNodeResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -1052,23 +1126,23 @@ func (_m *MockClient) SlurmV0041GetNodeWithResponse(ctx context.Context, nodeNam
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetNodeWithResponse")
+		panic("no return value specified for SlurmV0044GetNodeWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetNodeResponse
+	var r0 *v0044.SlurmV0044GetNodeResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmV0041GetNodeParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetNodeResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmV0044GetNodeParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetNodeResponse, error)); ok {
 		return rf(ctx, nodeName, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmV0041GetNodeParams, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetNodeResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmV0044GetNodeParams, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetNodeResponse); ok {
 		r0 = rf(ctx, nodeName, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetNodeResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetNodeResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v0041.SlurmV0041GetNodeParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, *v0044.SlurmV0044GetNodeParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, nodeName, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -1077,46 +1151,46 @@ func (_m *MockClient) SlurmV0041GetNodeWithResponse(ctx context.Context, nodeNam
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetNodeWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetNodeWithResponse'
-type MockClient_SlurmV0041GetNodeWithResponse_Call struct {
+// MockClient_SlurmV0044GetNodeWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetNodeWithResponse'
+type MockClient_SlurmV0044GetNodeWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetNodeWithResponse is a helper method to define mock.On call
+// SlurmV0044GetNodeWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - nodeName string
-//   - params *v0041.SlurmV0041GetNodeParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetNodeWithResponse(ctx interface{}, nodeName interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetNodeWithResponse_Call {
-	return &MockClient_SlurmV0041GetNodeWithResponse_Call{Call: _e.mock.On("SlurmV0041GetNodeWithResponse",
+//   - params *v0044.SlurmV0044GetNodeParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetNodeWithResponse(ctx interface{}, nodeName interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetNodeWithResponse_Call {
+	return &MockClient_SlurmV0044GetNodeWithResponse_Call{Call: _e.mock.On("SlurmV0044GetNodeWithResponse",
 		append([]interface{}{ctx, nodeName, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetNodeWithResponse_Call) Run(run func(ctx context.Context, nodeName string, params *v0041.SlurmV0041GetNodeParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetNodeWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetNodeWithResponse_Call) Run(run func(ctx context.Context, nodeName string, params *v0044.SlurmV0044GetNodeParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetNodeWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(string), args[2].(*v0041.SlurmV0041GetNodeParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(string), args[2].(*v0044.SlurmV0044GetNodeParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetNodeWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetNodeResponse, _a1 error) *MockClient_SlurmV0041GetNodeWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetNodeWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetNodeResponse, _a1 error) *MockClient_SlurmV0044GetNodeWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetNodeWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0041.SlurmV0041GetNodeParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetNodeResponse, error)) *MockClient_SlurmV0041GetNodeWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetNodeWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0044.SlurmV0044GetNodeParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetNodeResponse, error)) *MockClient_SlurmV0044GetNodeWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetNodesWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmV0041GetNodesWithResponse(ctx context.Context, params *v0041.SlurmV0041GetNodesParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetNodesResponse, error) {
+// SlurmV0044GetNodesWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmV0044GetNodesWithResponse(ctx context.Context, params *v0044.SlurmV0044GetNodesParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetNodesResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -1127,23 +1201,23 @@ func (_m *MockClient) SlurmV0041GetNodesWithResponse(ctx context.Context, params
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetNodesWithResponse")
+		panic("no return value specified for SlurmV0044GetNodesWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetNodesResponse
+	var r0 *v0044.SlurmV0044GetNodesResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmV0041GetNodesParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetNodesResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmV0044GetNodesParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetNodesResponse, error)); ok {
 		return rf(ctx, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmV0041GetNodesParams, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetNodesResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmV0044GetNodesParams, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetNodesResponse); ok {
 		r0 = rf(ctx, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetNodesResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetNodesResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmV0041GetNodesParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmV0044GetNodesParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -1152,45 +1226,45 @@ func (_m *MockClient) SlurmV0041GetNodesWithResponse(ctx context.Context, params
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetNodesWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetNodesWithResponse'
-type MockClient_SlurmV0041GetNodesWithResponse_Call struct {
+// MockClient_SlurmV0044GetNodesWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetNodesWithResponse'
+type MockClient_SlurmV0044GetNodesWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetNodesWithResponse is a helper method to define mock.On call
+// SlurmV0044GetNodesWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmV0041GetNodesParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetNodesWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetNodesWithResponse_Call {
-	return &MockClient_SlurmV0041GetNodesWithResponse_Call{Call: _e.mock.On("SlurmV0041GetNodesWithResponse",
+//   - params *v0044.SlurmV0044GetNodesParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetNodesWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetNodesWithResponse_Call {
+	return &MockClient_SlurmV0044GetNodesWithResponse_Call{Call: _e.mock.On("SlurmV0044GetNodesWithResponse",
 		append([]interface{}{ctx, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetNodesWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmV0041GetNodesParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetNodesWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetNodesWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmV0044GetNodesParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetNodesWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmV0041GetNodesParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmV0044GetNodesParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetNodesWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetNodesResponse, _a1 error) *MockClient_SlurmV0041GetNodesWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetNodesWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetNodesResponse, _a1 error) *MockClient_SlurmV0044GetNodesWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetNodesWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmV0041GetNodesParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetNodesResponse, error)) *MockClient_SlurmV0041GetNodesWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetNodesWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmV0044GetNodesParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetNodesResponse, error)) *MockClient_SlurmV0044GetNodesWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetPartitionWithResponse provides a mock function with given fields: ctx, partitionName, params, reqEditors
-func (_m *MockClient) SlurmV0041GetPartitionWithResponse(ctx context.Context, partitionName string, params *v0041.SlurmV0041GetPartitionParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetPartitionResponse, error) {
+// SlurmV0044GetPartitionWithResponse provides a mock function with given fields: ctx, partitionName, params, reqEditors
+func (_m *MockClient) SlurmV0044GetPartitionWithResponse(ctx context.Context, partitionName string, params *v0044.SlurmV0044GetPartitionParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetPartitionResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -1201,23 +1275,23 @@ func (_m *MockClient) SlurmV0041GetPartitionWithResponse(ctx context.Context, pa
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetPartitionWithResponse")
+		panic("no return value specified for SlurmV0044GetPartitionWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetPartitionResponse
+	var r0 *v0044.SlurmV0044GetPartitionResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmV0041GetPartitionParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetPartitionResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmV0044GetPartitionParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetPartitionResponse, error)); ok {
 		return rf(ctx, partitionName, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmV0041GetPartitionParams, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetPartitionResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmV0044GetPartitionParams, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetPartitionResponse); ok {
 		r0 = rf(ctx, partitionName, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetPartitionResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetPartitionResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v0041.SlurmV0041GetPartitionParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, *v0044.SlurmV0044GetPartitionParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, partitionName, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -1226,46 +1300,46 @@ func (_m *MockClient) SlurmV0041GetPartitionWithResponse(ctx context.Context, pa
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetPartitionWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetPartitionWithResponse'
-type MockClient_SlurmV0041GetPartitionWithResponse_Call struct {
+// MockClient_SlurmV0044GetPartitionWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetPartitionWithResponse'
+type MockClient_SlurmV0044GetPartitionWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetPartitionWithResponse is a helper method to define mock.On call
+// SlurmV0044GetPartitionWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - partitionName string
-//   - params *v0041.SlurmV0041GetPartitionParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetPartitionWithResponse(ctx interface{}, partitionName interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetPartitionWithResponse_Call {
-	return &MockClient_SlurmV0041GetPartitionWithResponse_Call{Call: _e.mock.On("SlurmV0041GetPartitionWithResponse",
+//   - params *v0044.SlurmV0044GetPartitionParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetPartitionWithResponse(ctx interface{}, partitionName interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetPartitionWithResponse_Call {
+	return &MockClient_SlurmV0044GetPartitionWithResponse_Call{Call: _e.mock.On("SlurmV0044GetPartitionWithResponse",
 		append([]interface{}{ctx, partitionName, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetPartitionWithResponse_Call) Run(run func(ctx context.Context, partitionName string, params *v0041.SlurmV0041GetPartitionParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetPartitionWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetPartitionWithResponse_Call) Run(run func(ctx context.Context, partitionName string, params *v0044.SlurmV0044GetPartitionParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetPartitionWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(string), args[2].(*v0041.SlurmV0041GetPartitionParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(string), args[2].(*v0044.SlurmV0044GetPartitionParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetPartitionWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetPartitionResponse, _a1 error) *MockClient_SlurmV0041GetPartitionWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetPartitionWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetPartitionResponse, _a1 error) *MockClient_SlurmV0044GetPartitionWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetPartitionWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0041.SlurmV0041GetPartitionParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetPartitionResponse, error)) *MockClient_SlurmV0041GetPartitionWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetPartitionWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0044.SlurmV0044GetPartitionParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetPartitionResponse, error)) *MockClient_SlurmV0044GetPartitionWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetPartitionsWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmV0041GetPartitionsWithResponse(ctx context.Context, params *v0041.SlurmV0041GetPartitionsParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetPartitionsResponse, error) {
+// SlurmV0044GetPartitionsWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmV0044GetPartitionsWithResponse(ctx context.Context, params *v0044.SlurmV0044GetPartitionsParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetPartitionsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -1276,23 +1350,23 @@ func (_m *MockClient) SlurmV0041GetPartitionsWithResponse(ctx context.Context, p
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetPartitionsWithResponse")
+		panic("no return value specified for SlurmV0044GetPartitionsWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetPartitionsResponse
+	var r0 *v0044.SlurmV0044GetPartitionsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmV0041GetPartitionsParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetPartitionsResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmV0044GetPartitionsParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetPartitionsResponse, error)); ok {
 		return rf(ctx, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmV0041GetPartitionsParams, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetPartitionsResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmV0044GetPartitionsParams, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetPartitionsResponse); ok {
 		r0 = rf(ctx, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetPartitionsResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetPartitionsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmV0041GetPartitionsParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmV0044GetPartitionsParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -1301,45 +1375,45 @@ func (_m *MockClient) SlurmV0041GetPartitionsWithResponse(ctx context.Context, p
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetPartitionsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetPartitionsWithResponse'
-type MockClient_SlurmV0041GetPartitionsWithResponse_Call struct {
+// MockClient_SlurmV0044GetPartitionsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetPartitionsWithResponse'
+type MockClient_SlurmV0044GetPartitionsWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetPartitionsWithResponse is a helper method to define mock.On call
+// SlurmV0044GetPartitionsWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmV0041GetPartitionsParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetPartitionsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetPartitionsWithResponse_Call {
-	return &MockClient_SlurmV0041GetPartitionsWithResponse_Call{Call: _e.mock.On("SlurmV0041GetPartitionsWithResponse",
+//   - params *v0044.SlurmV0044GetPartitionsParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetPartitionsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetPartitionsWithResponse_Call {
+	return &MockClient_SlurmV0044GetPartitionsWithResponse_Call{Call: _e.mock.On("SlurmV0044GetPartitionsWithResponse",
 		append([]interface{}{ctx, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetPartitionsWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmV0041GetPartitionsParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetPartitionsWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetPartitionsWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmV0044GetPartitionsParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetPartitionsWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmV0041GetPartitionsParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmV0044GetPartitionsParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetPartitionsWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetPartitionsResponse, _a1 error) *MockClient_SlurmV0041GetPartitionsWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetPartitionsWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetPartitionsResponse, _a1 error) *MockClient_SlurmV0044GetPartitionsWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetPartitionsWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmV0041GetPartitionsParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetPartitionsResponse, error)) *MockClient_SlurmV0041GetPartitionsWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetPartitionsWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmV0044GetPartitionsParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetPartitionsResponse, error)) *MockClient_SlurmV0044GetPartitionsWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetPingWithResponse provides a mock function with given fields: ctx, reqEditors
-func (_m *MockClient) SlurmV0041GetPingWithResponse(ctx context.Context, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetPingResponse, error) {
+// SlurmV0044GetPingWithResponse provides a mock function with given fields: ctx, reqEditors
+func (_m *MockClient) SlurmV0044GetPingWithResponse(ctx context.Context, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetPingResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -1350,23 +1424,23 @@ func (_m *MockClient) SlurmV0041GetPingWithResponse(ctx context.Context, reqEdit
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetPingWithResponse")
+		panic("no return value specified for SlurmV0044GetPingWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetPingResponse
+	var r0 *v0044.SlurmV0044GetPingResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetPingResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetPingResponse, error)); ok {
 		return rf(ctx, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetPingResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetPingResponse); ok {
 		r0 = rf(ctx, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetPingResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetPingResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -1375,25 +1449,25 @@ func (_m *MockClient) SlurmV0041GetPingWithResponse(ctx context.Context, reqEdit
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetPingWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetPingWithResponse'
-type MockClient_SlurmV0041GetPingWithResponse_Call struct {
+// MockClient_SlurmV0044GetPingWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetPingWithResponse'
+type MockClient_SlurmV0044GetPingWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetPingWithResponse is a helper method to define mock.On call
+// SlurmV0044GetPingWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetPingWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetPingWithResponse_Call {
-	return &MockClient_SlurmV0041GetPingWithResponse_Call{Call: _e.mock.On("SlurmV0041GetPingWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetPingWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetPingWithResponse_Call {
+	return &MockClient_SlurmV0044GetPingWithResponse_Call{Call: _e.mock.On("SlurmV0044GetPingWithResponse",
 		append([]interface{}{ctx}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetPingWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetPingWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetPingWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetPingWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-1)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-1)
 		for i, a := range args[1:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), variadicArgs...)
@@ -1401,18 +1475,18 @@ func (_c *MockClient_SlurmV0041GetPingWithResponse_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetPingWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetPingResponse, _a1 error) *MockClient_SlurmV0041GetPingWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetPingWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetPingResponse, _a1 error) *MockClient_SlurmV0044GetPingWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetPingWithResponse_Call) RunAndReturn(run func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetPingResponse, error)) *MockClient_SlurmV0041GetPingWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetPingWithResponse_Call) RunAndReturn(run func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetPingResponse, error)) *MockClient_SlurmV0044GetPingWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetReconfigureWithResponse provides a mock function with given fields: ctx, reqEditors
-func (_m *MockClient) SlurmV0041GetReconfigureWithResponse(ctx context.Context, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetReconfigureResponse, error) {
+// SlurmV0044GetReconfigureWithResponse provides a mock function with given fields: ctx, reqEditors
+func (_m *MockClient) SlurmV0044GetReconfigureWithResponse(ctx context.Context, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetReconfigureResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -1423,23 +1497,23 @@ func (_m *MockClient) SlurmV0041GetReconfigureWithResponse(ctx context.Context, 
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetReconfigureWithResponse")
+		panic("no return value specified for SlurmV0044GetReconfigureWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetReconfigureResponse
+	var r0 *v0044.SlurmV0044GetReconfigureResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetReconfigureResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetReconfigureResponse, error)); ok {
 		return rf(ctx, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetReconfigureResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetReconfigureResponse); ok {
 		r0 = rf(ctx, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetReconfigureResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetReconfigureResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -1448,25 +1522,25 @@ func (_m *MockClient) SlurmV0041GetReconfigureWithResponse(ctx context.Context, 
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetReconfigureWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetReconfigureWithResponse'
-type MockClient_SlurmV0041GetReconfigureWithResponse_Call struct {
+// MockClient_SlurmV0044GetReconfigureWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetReconfigureWithResponse'
+type MockClient_SlurmV0044GetReconfigureWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetReconfigureWithResponse is a helper method to define mock.On call
+// SlurmV0044GetReconfigureWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetReconfigureWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetReconfigureWithResponse_Call {
-	return &MockClient_SlurmV0041GetReconfigureWithResponse_Call{Call: _e.mock.On("SlurmV0041GetReconfigureWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetReconfigureWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetReconfigureWithResponse_Call {
+	return &MockClient_SlurmV0044GetReconfigureWithResponse_Call{Call: _e.mock.On("SlurmV0044GetReconfigureWithResponse",
 		append([]interface{}{ctx}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetReconfigureWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetReconfigureWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetReconfigureWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetReconfigureWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-1)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-1)
 		for i, a := range args[1:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), variadicArgs...)
@@ -1474,18 +1548,18 @@ func (_c *MockClient_SlurmV0041GetReconfigureWithResponse_Call) Run(run func(ctx
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetReconfigureWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetReconfigureResponse, _a1 error) *MockClient_SlurmV0041GetReconfigureWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetReconfigureWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetReconfigureResponse, _a1 error) *MockClient_SlurmV0044GetReconfigureWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetReconfigureWithResponse_Call) RunAndReturn(run func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetReconfigureResponse, error)) *MockClient_SlurmV0041GetReconfigureWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetReconfigureWithResponse_Call) RunAndReturn(run func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetReconfigureResponse, error)) *MockClient_SlurmV0044GetReconfigureWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetReservationWithResponse provides a mock function with given fields: ctx, reservationName, params, reqEditors
-func (_m *MockClient) SlurmV0041GetReservationWithResponse(ctx context.Context, reservationName string, params *v0041.SlurmV0041GetReservationParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetReservationResponse, error) {
+// SlurmV0044GetReservationWithResponse provides a mock function with given fields: ctx, reservationName, params, reqEditors
+func (_m *MockClient) SlurmV0044GetReservationWithResponse(ctx context.Context, reservationName string, params *v0044.SlurmV0044GetReservationParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetReservationResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -1496,23 +1570,23 @@ func (_m *MockClient) SlurmV0041GetReservationWithResponse(ctx context.Context, 
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetReservationWithResponse")
+		panic("no return value specified for SlurmV0044GetReservationWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetReservationResponse
+	var r0 *v0044.SlurmV0044GetReservationResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmV0041GetReservationParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetReservationResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmV0044GetReservationParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetReservationResponse, error)); ok {
 		return rf(ctx, reservationName, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmV0041GetReservationParams, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetReservationResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmV0044GetReservationParams, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetReservationResponse); ok {
 		r0 = rf(ctx, reservationName, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetReservationResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetReservationResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v0041.SlurmV0041GetReservationParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, *v0044.SlurmV0044GetReservationParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, reservationName, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -1521,46 +1595,46 @@ func (_m *MockClient) SlurmV0041GetReservationWithResponse(ctx context.Context, 
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetReservationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetReservationWithResponse'
-type MockClient_SlurmV0041GetReservationWithResponse_Call struct {
+// MockClient_SlurmV0044GetReservationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetReservationWithResponse'
+type MockClient_SlurmV0044GetReservationWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetReservationWithResponse is a helper method to define mock.On call
+// SlurmV0044GetReservationWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - reservationName string
-//   - params *v0041.SlurmV0041GetReservationParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetReservationWithResponse(ctx interface{}, reservationName interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetReservationWithResponse_Call {
-	return &MockClient_SlurmV0041GetReservationWithResponse_Call{Call: _e.mock.On("SlurmV0041GetReservationWithResponse",
+//   - params *v0044.SlurmV0044GetReservationParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetReservationWithResponse(ctx interface{}, reservationName interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetReservationWithResponse_Call {
+	return &MockClient_SlurmV0044GetReservationWithResponse_Call{Call: _e.mock.On("SlurmV0044GetReservationWithResponse",
 		append([]interface{}{ctx, reservationName, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetReservationWithResponse_Call) Run(run func(ctx context.Context, reservationName string, params *v0041.SlurmV0041GetReservationParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetReservationWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetReservationWithResponse_Call) Run(run func(ctx context.Context, reservationName string, params *v0044.SlurmV0044GetReservationParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetReservationWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(string), args[2].(*v0041.SlurmV0041GetReservationParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(string), args[2].(*v0044.SlurmV0044GetReservationParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetReservationWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetReservationResponse, _a1 error) *MockClient_SlurmV0041GetReservationWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetReservationWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetReservationResponse, _a1 error) *MockClient_SlurmV0044GetReservationWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetReservationWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0041.SlurmV0041GetReservationParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetReservationResponse, error)) *MockClient_SlurmV0041GetReservationWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetReservationWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0044.SlurmV0044GetReservationParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetReservationResponse, error)) *MockClient_SlurmV0044GetReservationWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetReservationsWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmV0041GetReservationsWithResponse(ctx context.Context, params *v0041.SlurmV0041GetReservationsParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetReservationsResponse, error) {
+// SlurmV0044GetReservationsWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmV0044GetReservationsWithResponse(ctx context.Context, params *v0044.SlurmV0044GetReservationsParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetReservationsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -1571,23 +1645,23 @@ func (_m *MockClient) SlurmV0041GetReservationsWithResponse(ctx context.Context,
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetReservationsWithResponse")
+		panic("no return value specified for SlurmV0044GetReservationsWithResponse")
 	}
 
-	var r0 *v0041.SlurmV0041GetReservationsResponse
+	var r0 *v0044.SlurmV0044GetReservationsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmV0041GetReservationsParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetReservationsResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmV0044GetReservationsParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetReservationsResponse, error)); ok {
 		return rf(ctx, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmV0041GetReservationsParams, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetReservationsResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmV0044GetReservationsParams, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetReservationsResponse); ok {
 		r0 = rf(ctx, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetReservationsResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetReservationsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmV0041GetReservationsParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmV0044GetReservationsParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -1596,1978 +1670,45 @@ func (_m *MockClient) SlurmV0041GetReservationsWithResponse(ctx context.Context,
 	return r0, r1
 }
 
-// MockClient_SlurmV0041GetReservationsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetReservationsWithResponse'
-type MockClient_SlurmV0041GetReservationsWithResponse_Call struct {
+// MockClient_SlurmV0044GetReservationsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetReservationsWithResponse'
+type MockClient_SlurmV0044GetReservationsWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmV0041GetReservationsWithResponse is a helper method to define mock.On call
+// SlurmV0044GetReservationsWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmV0041GetReservationsParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetReservationsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetReservationsWithResponse_Call {
-	return &MockClient_SlurmV0041GetReservationsWithResponse_Call{Call: _e.mock.On("SlurmV0041GetReservationsWithResponse",
+//   - params *v0044.SlurmV0044GetReservationsParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetReservationsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetReservationsWithResponse_Call {
+	return &MockClient_SlurmV0044GetReservationsWithResponse_Call{Call: _e.mock.On("SlurmV0044GetReservationsWithResponse",
 		append([]interface{}{ctx, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmV0041GetReservationsWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmV0041GetReservationsParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetReservationsWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetReservationsWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmV0044GetReservationsParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetReservationsWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmV0041GetReservationsParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmV0044GetReservationsParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetReservationsWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetReservationsResponse, _a1 error) *MockClient_SlurmV0041GetReservationsWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetReservationsWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetReservationsResponse, _a1 error) *MockClient_SlurmV0044GetReservationsWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmV0041GetReservationsWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmV0041GetReservationsParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetReservationsResponse, error)) *MockClient_SlurmV0041GetReservationsWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetReservationsWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmV0044GetReservationsParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetReservationsResponse, error)) *MockClient_SlurmV0044GetReservationsWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmV0041GetSharesWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmV0041GetSharesWithResponse(ctx context.Context, params *v0041.SlurmV0041GetSharesParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetSharesResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041GetSharesWithResponse")
-	}
-
-	var r0 *v0041.SlurmV0041GetSharesResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmV0041GetSharesParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetSharesResponse, error)); ok {
-		return rf(ctx, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmV0041GetSharesParams, ...v0041.RequestEditorFn) *v0041.SlurmV0041GetSharesResponse); ok {
-		r0 = rf(ctx, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041GetSharesResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmV0041GetSharesParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmV0041GetSharesWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041GetSharesWithResponse'
-type MockClient_SlurmV0041GetSharesWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmV0041GetSharesWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - params *v0041.SlurmV0041GetSharesParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041GetSharesWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041GetSharesWithResponse_Call {
-	return &MockClient_SlurmV0041GetSharesWithResponse_Call{Call: _e.mock.On("SlurmV0041GetSharesWithResponse",
-		append([]interface{}{ctx, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmV0041GetSharesWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmV0041GetSharesParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041GetSharesWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmV0041GetSharesParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041GetSharesWithResponse_Call) Return(_a0 *v0041.SlurmV0041GetSharesResponse, _a1 error) *MockClient_SlurmV0041GetSharesWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041GetSharesWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmV0041GetSharesParams, ...v0041.RequestEditorFn) (*v0041.SlurmV0041GetSharesResponse, error)) *MockClient_SlurmV0041GetSharesWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmV0041PostJobAllocateWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
-func (_m *MockClient) SlurmV0041PostJobAllocateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobAllocateResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, contentType, body)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041PostJobAllocateWithBodyWithResponse")
-	}
-
-	var r0 *v0041.SlurmV0041PostJobAllocateResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobAllocateResponse, error)); ok {
-		return rf(ctx, contentType, body, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmV0041PostJobAllocateResponse); ok {
-		r0 = rf(ctx, contentType, body, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041PostJobAllocateResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, contentType, body, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmV0041PostJobAllocateWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041PostJobAllocateWithBodyWithResponse'
-type MockClient_SlurmV0041PostJobAllocateWithBodyWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmV0041PostJobAllocateWithBodyWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - contentType string
-//   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041PostJobAllocateWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041PostJobAllocateWithBodyWithResponse_Call {
-	return &MockClient_SlurmV0041PostJobAllocateWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0041PostJobAllocateWithBodyWithResponse",
-		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmV0041PostJobAllocateWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041PostJobAllocateWithBodyWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
-		for i, a := range args[3:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostJobAllocateWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmV0041PostJobAllocateResponse, _a1 error) *MockClient_SlurmV0041PostJobAllocateWithBodyWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostJobAllocateWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobAllocateResponse, error)) *MockClient_SlurmV0041PostJobAllocateWithBodyWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmV0041PostJobAllocateWithResponse provides a mock function with given fields: ctx, body, reqEditors
-func (_m *MockClient) SlurmV0041PostJobAllocateWithResponse(ctx context.Context, body v0041.SlurmV0041PostJobAllocateJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobAllocateResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, body)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041PostJobAllocateWithResponse")
-	}
-
-	var r0 *v0041.SlurmV0041PostJobAllocateResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmV0041PostJobAllocateJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobAllocateResponse, error)); ok {
-		return rf(ctx, body, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmV0041PostJobAllocateJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmV0041PostJobAllocateResponse); ok {
-		r0 = rf(ctx, body, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041PostJobAllocateResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, v0041.SlurmV0041PostJobAllocateJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, body, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmV0041PostJobAllocateWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041PostJobAllocateWithResponse'
-type MockClient_SlurmV0041PostJobAllocateWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmV0041PostJobAllocateWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - body v0041.SlurmV0041PostJobAllocateJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041PostJobAllocateWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041PostJobAllocateWithResponse_Call {
-	return &MockClient_SlurmV0041PostJobAllocateWithResponse_Call{Call: _e.mock.On("SlurmV0041PostJobAllocateWithResponse",
-		append([]interface{}{ctx, body}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmV0041PostJobAllocateWithResponse_Call) Run(run func(ctx context.Context, body v0041.SlurmV0041PostJobAllocateJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041PostJobAllocateWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(v0041.SlurmV0041PostJobAllocateJSONRequestBody), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostJobAllocateWithResponse_Call) Return(_a0 *v0041.SlurmV0041PostJobAllocateResponse, _a1 error) *MockClient_SlurmV0041PostJobAllocateWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostJobAllocateWithResponse_Call) RunAndReturn(run func(context.Context, v0041.SlurmV0041PostJobAllocateJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobAllocateResponse, error)) *MockClient_SlurmV0041PostJobAllocateWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmV0041PostJobSubmitWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
-func (_m *MockClient) SlurmV0041PostJobSubmitWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobSubmitResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, contentType, body)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041PostJobSubmitWithBodyWithResponse")
-	}
-
-	var r0 *v0041.SlurmV0041PostJobSubmitResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobSubmitResponse, error)); ok {
-		return rf(ctx, contentType, body, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmV0041PostJobSubmitResponse); ok {
-		r0 = rf(ctx, contentType, body, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041PostJobSubmitResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, contentType, body, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmV0041PostJobSubmitWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041PostJobSubmitWithBodyWithResponse'
-type MockClient_SlurmV0041PostJobSubmitWithBodyWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmV0041PostJobSubmitWithBodyWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - contentType string
-//   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041PostJobSubmitWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041PostJobSubmitWithBodyWithResponse_Call {
-	return &MockClient_SlurmV0041PostJobSubmitWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0041PostJobSubmitWithBodyWithResponse",
-		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmV0041PostJobSubmitWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041PostJobSubmitWithBodyWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
-		for i, a := range args[3:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostJobSubmitWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmV0041PostJobSubmitResponse, _a1 error) *MockClient_SlurmV0041PostJobSubmitWithBodyWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostJobSubmitWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobSubmitResponse, error)) *MockClient_SlurmV0041PostJobSubmitWithBodyWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmV0041PostJobSubmitWithResponse provides a mock function with given fields: ctx, body, reqEditors
-func (_m *MockClient) SlurmV0041PostJobSubmitWithResponse(ctx context.Context, body v0041.SlurmV0041PostJobSubmitJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobSubmitResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, body)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041PostJobSubmitWithResponse")
-	}
-
-	var r0 *v0041.SlurmV0041PostJobSubmitResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmV0041PostJobSubmitJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobSubmitResponse, error)); ok {
-		return rf(ctx, body, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmV0041PostJobSubmitJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmV0041PostJobSubmitResponse); ok {
-		r0 = rf(ctx, body, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041PostJobSubmitResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, v0041.SlurmV0041PostJobSubmitJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, body, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmV0041PostJobSubmitWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041PostJobSubmitWithResponse'
-type MockClient_SlurmV0041PostJobSubmitWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmV0041PostJobSubmitWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - body v0041.SlurmV0041PostJobSubmitJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041PostJobSubmitWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041PostJobSubmitWithResponse_Call {
-	return &MockClient_SlurmV0041PostJobSubmitWithResponse_Call{Call: _e.mock.On("SlurmV0041PostJobSubmitWithResponse",
-		append([]interface{}{ctx, body}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmV0041PostJobSubmitWithResponse_Call) Run(run func(ctx context.Context, body v0041.SlurmV0041PostJobSubmitJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041PostJobSubmitWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(v0041.SlurmV0041PostJobSubmitJSONRequestBody), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostJobSubmitWithResponse_Call) Return(_a0 *v0041.SlurmV0041PostJobSubmitResponse, _a1 error) *MockClient_SlurmV0041PostJobSubmitWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostJobSubmitWithResponse_Call) RunAndReturn(run func(context.Context, v0041.SlurmV0041PostJobSubmitJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobSubmitResponse, error)) *MockClient_SlurmV0041PostJobSubmitWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmV0041PostJobWithBodyWithResponse provides a mock function with given fields: ctx, jobId, contentType, body, reqEditors
-func (_m *MockClient) SlurmV0041PostJobWithBodyWithResponse(ctx context.Context, jobId string, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, jobId, contentType, body)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041PostJobWithBodyWithResponse")
-	}
-
-	var r0 *v0041.SlurmV0041PostJobResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobResponse, error)); ok {
-		return rf(ctx, jobId, contentType, body, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmV0041PostJobResponse); ok {
-		r0 = rf(ctx, jobId, contentType, body, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041PostJobResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, jobId, contentType, body, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmV0041PostJobWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041PostJobWithBodyWithResponse'
-type MockClient_SlurmV0041PostJobWithBodyWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmV0041PostJobWithBodyWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - jobId string
-//   - contentType string
-//   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041PostJobWithBodyWithResponse(ctx interface{}, jobId interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041PostJobWithBodyWithResponse_Call {
-	return &MockClient_SlurmV0041PostJobWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0041PostJobWithBodyWithResponse",
-		append([]interface{}{ctx, jobId, contentType, body}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmV0041PostJobWithBodyWithResponse_Call) Run(run func(ctx context.Context, jobId string, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041PostJobWithBodyWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-4)
-		for i, a := range args[4:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(io.Reader), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostJobWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmV0041PostJobResponse, _a1 error) *MockClient_SlurmV0041PostJobWithBodyWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostJobWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobResponse, error)) *MockClient_SlurmV0041PostJobWithBodyWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmV0041PostJobWithResponse provides a mock function with given fields: ctx, jobId, body, reqEditors
-func (_m *MockClient) SlurmV0041PostJobWithResponse(ctx context.Context, jobId string, body v0041.SlurmV0041PostJobJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, jobId, body)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041PostJobWithResponse")
-	}
-
-	var r0 *v0041.SlurmV0041PostJobResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, v0041.SlurmV0041PostJobJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobResponse, error)); ok {
-		return rf(ctx, jobId, body, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, v0041.SlurmV0041PostJobJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmV0041PostJobResponse); ok {
-		r0 = rf(ctx, jobId, body, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041PostJobResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, v0041.SlurmV0041PostJobJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, jobId, body, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmV0041PostJobWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041PostJobWithResponse'
-type MockClient_SlurmV0041PostJobWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmV0041PostJobWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - jobId string
-//   - body v0041.SlurmV0041PostJobJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041PostJobWithResponse(ctx interface{}, jobId interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041PostJobWithResponse_Call {
-	return &MockClient_SlurmV0041PostJobWithResponse_Call{Call: _e.mock.On("SlurmV0041PostJobWithResponse",
-		append([]interface{}{ctx, jobId, body}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmV0041PostJobWithResponse_Call) Run(run func(ctx context.Context, jobId string, body v0041.SlurmV0041PostJobJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041PostJobWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
-		for i, a := range args[3:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), args[2].(v0041.SlurmV0041PostJobJSONRequestBody), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostJobWithResponse_Call) Return(_a0 *v0041.SlurmV0041PostJobResponse, _a1 error) *MockClient_SlurmV0041PostJobWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostJobWithResponse_Call) RunAndReturn(run func(context.Context, string, v0041.SlurmV0041PostJobJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostJobResponse, error)) *MockClient_SlurmV0041PostJobWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmV0041PostNodeWithBodyWithResponse provides a mock function with given fields: ctx, nodeName, contentType, body, reqEditors
-func (_m *MockClient) SlurmV0041PostNodeWithBodyWithResponse(ctx context.Context, nodeName string, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostNodeResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, nodeName, contentType, body)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041PostNodeWithBodyWithResponse")
-	}
-
-	var r0 *v0041.SlurmV0041PostNodeResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostNodeResponse, error)); ok {
-		return rf(ctx, nodeName, contentType, body, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmV0041PostNodeResponse); ok {
-		r0 = rf(ctx, nodeName, contentType, body, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041PostNodeResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, nodeName, contentType, body, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmV0041PostNodeWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041PostNodeWithBodyWithResponse'
-type MockClient_SlurmV0041PostNodeWithBodyWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmV0041PostNodeWithBodyWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - nodeName string
-//   - contentType string
-//   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041PostNodeWithBodyWithResponse(ctx interface{}, nodeName interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041PostNodeWithBodyWithResponse_Call {
-	return &MockClient_SlurmV0041PostNodeWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0041PostNodeWithBodyWithResponse",
-		append([]interface{}{ctx, nodeName, contentType, body}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmV0041PostNodeWithBodyWithResponse_Call) Run(run func(ctx context.Context, nodeName string, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041PostNodeWithBodyWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-4)
-		for i, a := range args[4:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(io.Reader), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostNodeWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmV0041PostNodeResponse, _a1 error) *MockClient_SlurmV0041PostNodeWithBodyWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostNodeWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostNodeResponse, error)) *MockClient_SlurmV0041PostNodeWithBodyWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmV0041PostNodeWithResponse provides a mock function with given fields: ctx, nodeName, body, reqEditors
-func (_m *MockClient) SlurmV0041PostNodeWithResponse(ctx context.Context, nodeName string, body v0041.SlurmV0041PostNodeJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostNodeResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, nodeName, body)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmV0041PostNodeWithResponse")
-	}
-
-	var r0 *v0041.SlurmV0041PostNodeResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, v0041.SlurmV0041PostNodeJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostNodeResponse, error)); ok {
-		return rf(ctx, nodeName, body, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, v0041.SlurmV0041PostNodeJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmV0041PostNodeResponse); ok {
-		r0 = rf(ctx, nodeName, body, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmV0041PostNodeResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, v0041.SlurmV0041PostNodeJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, nodeName, body, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmV0041PostNodeWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0041PostNodeWithResponse'
-type MockClient_SlurmV0041PostNodeWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmV0041PostNodeWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - nodeName string
-//   - body v0041.SlurmV0041PostNodeJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmV0041PostNodeWithResponse(ctx interface{}, nodeName interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0041PostNodeWithResponse_Call {
-	return &MockClient_SlurmV0041PostNodeWithResponse_Call{Call: _e.mock.On("SlurmV0041PostNodeWithResponse",
-		append([]interface{}{ctx, nodeName, body}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmV0041PostNodeWithResponse_Call) Run(run func(ctx context.Context, nodeName string, body v0041.SlurmV0041PostNodeJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmV0041PostNodeWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
-		for i, a := range args[3:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), args[2].(v0041.SlurmV0041PostNodeJSONRequestBody), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostNodeWithResponse_Call) Return(_a0 *v0041.SlurmV0041PostNodeResponse, _a1 error) *MockClient_SlurmV0041PostNodeWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmV0041PostNodeWithResponse_Call) RunAndReturn(run func(context.Context, string, v0041.SlurmV0041PostNodeJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmV0041PostNodeResponse, error)) *MockClient_SlurmV0041PostNodeWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041DeleteAccountWithResponse provides a mock function with given fields: ctx, accountName, reqEditors
-func (_m *MockClient) SlurmdbV0041DeleteAccountWithResponse(ctx context.Context, accountName string, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteAccountResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, accountName)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041DeleteAccountWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041DeleteAccountResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteAccountResponse, error)); ok {
-		return rf(ctx, accountName, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041DeleteAccountResponse); ok {
-		r0 = rf(ctx, accountName, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041DeleteAccountResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, accountName, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041DeleteAccountWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041DeleteAccountWithResponse'
-type MockClient_SlurmdbV0041DeleteAccountWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041DeleteAccountWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - accountName string
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041DeleteAccountWithResponse(ctx interface{}, accountName interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041DeleteAccountWithResponse_Call {
-	return &MockClient_SlurmdbV0041DeleteAccountWithResponse_Call{Call: _e.mock.On("SlurmdbV0041DeleteAccountWithResponse",
-		append([]interface{}{ctx, accountName}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteAccountWithResponse_Call) Run(run func(ctx context.Context, accountName string, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041DeleteAccountWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteAccountWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041DeleteAccountResponse, _a1 error) *MockClient_SlurmdbV0041DeleteAccountWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteAccountWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteAccountResponse, error)) *MockClient_SlurmdbV0041DeleteAccountWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041DeleteAssociationWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmdbV0041DeleteAssociationWithResponse(ctx context.Context, params *v0041.SlurmdbV0041DeleteAssociationParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteAssociationResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041DeleteAssociationWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041DeleteAssociationResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041DeleteAssociationParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteAssociationResponse, error)); ok {
-		return rf(ctx, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041DeleteAssociationParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041DeleteAssociationResponse); ok {
-		r0 = rf(ctx, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041DeleteAssociationResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041DeleteAssociationParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041DeleteAssociationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041DeleteAssociationWithResponse'
-type MockClient_SlurmdbV0041DeleteAssociationWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041DeleteAssociationWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - params *v0041.SlurmdbV0041DeleteAssociationParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041DeleteAssociationWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041DeleteAssociationWithResponse_Call {
-	return &MockClient_SlurmdbV0041DeleteAssociationWithResponse_Call{Call: _e.mock.On("SlurmdbV0041DeleteAssociationWithResponse",
-		append([]interface{}{ctx, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteAssociationWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041DeleteAssociationParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041DeleteAssociationWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041DeleteAssociationParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteAssociationWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041DeleteAssociationResponse, _a1 error) *MockClient_SlurmdbV0041DeleteAssociationWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteAssociationWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041DeleteAssociationParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteAssociationResponse, error)) *MockClient_SlurmdbV0041DeleteAssociationWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041DeleteAssociationsWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmdbV0041DeleteAssociationsWithResponse(ctx context.Context, params *v0041.SlurmdbV0041DeleteAssociationsParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteAssociationsResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041DeleteAssociationsWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041DeleteAssociationsResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041DeleteAssociationsParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteAssociationsResponse, error)); ok {
-		return rf(ctx, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041DeleteAssociationsParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041DeleteAssociationsResponse); ok {
-		r0 = rf(ctx, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041DeleteAssociationsResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041DeleteAssociationsParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041DeleteAssociationsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041DeleteAssociationsWithResponse'
-type MockClient_SlurmdbV0041DeleteAssociationsWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041DeleteAssociationsWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - params *v0041.SlurmdbV0041DeleteAssociationsParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041DeleteAssociationsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041DeleteAssociationsWithResponse_Call {
-	return &MockClient_SlurmdbV0041DeleteAssociationsWithResponse_Call{Call: _e.mock.On("SlurmdbV0041DeleteAssociationsWithResponse",
-		append([]interface{}{ctx, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteAssociationsWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041DeleteAssociationsParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041DeleteAssociationsWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041DeleteAssociationsParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteAssociationsWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041DeleteAssociationsResponse, _a1 error) *MockClient_SlurmdbV0041DeleteAssociationsWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteAssociationsWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041DeleteAssociationsParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteAssociationsResponse, error)) *MockClient_SlurmdbV0041DeleteAssociationsWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041DeleteClusterWithResponse provides a mock function with given fields: ctx, clusterName, params, reqEditors
-func (_m *MockClient) SlurmdbV0041DeleteClusterWithResponse(ctx context.Context, clusterName string, params *v0041.SlurmdbV0041DeleteClusterParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteClusterResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, clusterName, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041DeleteClusterWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041DeleteClusterResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmdbV0041DeleteClusterParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteClusterResponse, error)); ok {
-		return rf(ctx, clusterName, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmdbV0041DeleteClusterParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041DeleteClusterResponse); ok {
-		r0 = rf(ctx, clusterName, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041DeleteClusterResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v0041.SlurmdbV0041DeleteClusterParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, clusterName, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041DeleteClusterWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041DeleteClusterWithResponse'
-type MockClient_SlurmdbV0041DeleteClusterWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041DeleteClusterWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - clusterName string
-//   - params *v0041.SlurmdbV0041DeleteClusterParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041DeleteClusterWithResponse(ctx interface{}, clusterName interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041DeleteClusterWithResponse_Call {
-	return &MockClient_SlurmdbV0041DeleteClusterWithResponse_Call{Call: _e.mock.On("SlurmdbV0041DeleteClusterWithResponse",
-		append([]interface{}{ctx, clusterName, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteClusterWithResponse_Call) Run(run func(ctx context.Context, clusterName string, params *v0041.SlurmdbV0041DeleteClusterParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041DeleteClusterWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
-		for i, a := range args[3:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), args[2].(*v0041.SlurmdbV0041DeleteClusterParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteClusterWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041DeleteClusterResponse, _a1 error) *MockClient_SlurmdbV0041DeleteClusterWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteClusterWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0041.SlurmdbV0041DeleteClusterParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteClusterResponse, error)) *MockClient_SlurmdbV0041DeleteClusterWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041DeleteSingleQosWithResponse provides a mock function with given fields: ctx, qos, reqEditors
-func (_m *MockClient) SlurmdbV0041DeleteSingleQosWithResponse(ctx context.Context, qos string, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteSingleQosResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, qos)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041DeleteSingleQosWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041DeleteSingleQosResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteSingleQosResponse, error)); ok {
-		return rf(ctx, qos, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041DeleteSingleQosResponse); ok {
-		r0 = rf(ctx, qos, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041DeleteSingleQosResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, qos, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041DeleteSingleQosWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041DeleteSingleQosWithResponse'
-type MockClient_SlurmdbV0041DeleteSingleQosWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041DeleteSingleQosWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - qos string
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041DeleteSingleQosWithResponse(ctx interface{}, qos interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041DeleteSingleQosWithResponse_Call {
-	return &MockClient_SlurmdbV0041DeleteSingleQosWithResponse_Call{Call: _e.mock.On("SlurmdbV0041DeleteSingleQosWithResponse",
-		append([]interface{}{ctx, qos}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteSingleQosWithResponse_Call) Run(run func(ctx context.Context, qos string, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041DeleteSingleQosWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteSingleQosWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041DeleteSingleQosResponse, _a1 error) *MockClient_SlurmdbV0041DeleteSingleQosWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteSingleQosWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteSingleQosResponse, error)) *MockClient_SlurmdbV0041DeleteSingleQosWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041DeleteUserWithResponse provides a mock function with given fields: ctx, name, reqEditors
-func (_m *MockClient) SlurmdbV0041DeleteUserWithResponse(ctx context.Context, name string, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteUserResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, name)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041DeleteUserWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041DeleteUserResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteUserResponse, error)); ok {
-		return rf(ctx, name, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041DeleteUserResponse); ok {
-		r0 = rf(ctx, name, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041DeleteUserResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, name, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041DeleteUserWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041DeleteUserWithResponse'
-type MockClient_SlurmdbV0041DeleteUserWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041DeleteUserWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - name string
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041DeleteUserWithResponse(ctx interface{}, name interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041DeleteUserWithResponse_Call {
-	return &MockClient_SlurmdbV0041DeleteUserWithResponse_Call{Call: _e.mock.On("SlurmdbV0041DeleteUserWithResponse",
-		append([]interface{}{ctx, name}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteUserWithResponse_Call) Run(run func(ctx context.Context, name string, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041DeleteUserWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteUserWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041DeleteUserResponse, _a1 error) *MockClient_SlurmdbV0041DeleteUserWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteUserWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteUserResponse, error)) *MockClient_SlurmdbV0041DeleteUserWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041DeleteWckeyWithResponse provides a mock function with given fields: ctx, id, reqEditors
-func (_m *MockClient) SlurmdbV0041DeleteWckeyWithResponse(ctx context.Context, id string, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteWckeyResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, id)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041DeleteWckeyWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041DeleteWckeyResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteWckeyResponse, error)); ok {
-		return rf(ctx, id, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041DeleteWckeyResponse); ok {
-		r0 = rf(ctx, id, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041DeleteWckeyResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, id, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041DeleteWckeyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041DeleteWckeyWithResponse'
-type MockClient_SlurmdbV0041DeleteWckeyWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041DeleteWckeyWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - id string
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041DeleteWckeyWithResponse(ctx interface{}, id interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041DeleteWckeyWithResponse_Call {
-	return &MockClient_SlurmdbV0041DeleteWckeyWithResponse_Call{Call: _e.mock.On("SlurmdbV0041DeleteWckeyWithResponse",
-		append([]interface{}{ctx, id}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteWckeyWithResponse_Call) Run(run func(ctx context.Context, id string, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041DeleteWckeyWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteWckeyWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041DeleteWckeyResponse, _a1 error) *MockClient_SlurmdbV0041DeleteWckeyWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041DeleteWckeyWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041DeleteWckeyResponse, error)) *MockClient_SlurmdbV0041DeleteWckeyWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetAccountWithResponse provides a mock function with given fields: ctx, accountName, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetAccountWithResponse(ctx context.Context, accountName string, params *v0041.SlurmdbV0041GetAccountParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetAccountResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, accountName, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetAccountWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetAccountResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmdbV0041GetAccountParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetAccountResponse, error)); ok {
-		return rf(ctx, accountName, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmdbV0041GetAccountParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetAccountResponse); ok {
-		r0 = rf(ctx, accountName, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetAccountResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v0041.SlurmdbV0041GetAccountParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, accountName, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetAccountWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetAccountWithResponse'
-type MockClient_SlurmdbV0041GetAccountWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetAccountWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - accountName string
-//   - params *v0041.SlurmdbV0041GetAccountParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetAccountWithResponse(ctx interface{}, accountName interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetAccountWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetAccountWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetAccountWithResponse",
-		append([]interface{}{ctx, accountName, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetAccountWithResponse_Call) Run(run func(ctx context.Context, accountName string, params *v0041.SlurmdbV0041GetAccountParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetAccountWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
-		for i, a := range args[3:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), args[2].(*v0041.SlurmdbV0041GetAccountParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetAccountWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetAccountResponse, _a1 error) *MockClient_SlurmdbV0041GetAccountWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetAccountWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0041.SlurmdbV0041GetAccountParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetAccountResponse, error)) *MockClient_SlurmdbV0041GetAccountWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetAccountsWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetAccountsWithResponse(ctx context.Context, params *v0041.SlurmdbV0041GetAccountsParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetAccountsResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetAccountsWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetAccountsResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetAccountsParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetAccountsResponse, error)); ok {
-		return rf(ctx, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetAccountsParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetAccountsResponse); ok {
-		r0 = rf(ctx, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetAccountsResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041GetAccountsParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetAccountsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetAccountsWithResponse'
-type MockClient_SlurmdbV0041GetAccountsWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetAccountsWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - params *v0041.SlurmdbV0041GetAccountsParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetAccountsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetAccountsWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetAccountsWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetAccountsWithResponse",
-		append([]interface{}{ctx, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetAccountsWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041GetAccountsParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetAccountsWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041GetAccountsParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetAccountsWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetAccountsResponse, _a1 error) *MockClient_SlurmdbV0041GetAccountsWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetAccountsWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041GetAccountsParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetAccountsResponse, error)) *MockClient_SlurmdbV0041GetAccountsWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetAssociationWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetAssociationWithResponse(ctx context.Context, params *v0041.SlurmdbV0041GetAssociationParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetAssociationResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetAssociationWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetAssociationResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetAssociationParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetAssociationResponse, error)); ok {
-		return rf(ctx, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetAssociationParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetAssociationResponse); ok {
-		r0 = rf(ctx, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetAssociationResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041GetAssociationParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetAssociationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetAssociationWithResponse'
-type MockClient_SlurmdbV0041GetAssociationWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetAssociationWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - params *v0041.SlurmdbV0041GetAssociationParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetAssociationWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetAssociationWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetAssociationWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetAssociationWithResponse",
-		append([]interface{}{ctx, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetAssociationWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041GetAssociationParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetAssociationWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041GetAssociationParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetAssociationWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetAssociationResponse, _a1 error) *MockClient_SlurmdbV0041GetAssociationWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetAssociationWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041GetAssociationParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetAssociationResponse, error)) *MockClient_SlurmdbV0041GetAssociationWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetAssociationsWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetAssociationsWithResponse(ctx context.Context, params *v0041.SlurmdbV0041GetAssociationsParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetAssociationsResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetAssociationsWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetAssociationsResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetAssociationsParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetAssociationsResponse, error)); ok {
-		return rf(ctx, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetAssociationsParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetAssociationsResponse); ok {
-		r0 = rf(ctx, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetAssociationsResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041GetAssociationsParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetAssociationsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetAssociationsWithResponse'
-type MockClient_SlurmdbV0041GetAssociationsWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetAssociationsWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - params *v0041.SlurmdbV0041GetAssociationsParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetAssociationsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetAssociationsWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetAssociationsWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetAssociationsWithResponse",
-		append([]interface{}{ctx, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetAssociationsWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041GetAssociationsParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetAssociationsWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041GetAssociationsParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetAssociationsWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetAssociationsResponse, _a1 error) *MockClient_SlurmdbV0041GetAssociationsWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetAssociationsWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041GetAssociationsParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetAssociationsResponse, error)) *MockClient_SlurmdbV0041GetAssociationsWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetClusterWithResponse provides a mock function with given fields: ctx, clusterName, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetClusterWithResponse(ctx context.Context, clusterName string, params *v0041.SlurmdbV0041GetClusterParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetClusterResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, clusterName, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetClusterWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetClusterResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmdbV0041GetClusterParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetClusterResponse, error)); ok {
-		return rf(ctx, clusterName, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmdbV0041GetClusterParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetClusterResponse); ok {
-		r0 = rf(ctx, clusterName, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetClusterResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v0041.SlurmdbV0041GetClusterParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, clusterName, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetClusterWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetClusterWithResponse'
-type MockClient_SlurmdbV0041GetClusterWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetClusterWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - clusterName string
-//   - params *v0041.SlurmdbV0041GetClusterParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetClusterWithResponse(ctx interface{}, clusterName interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetClusterWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetClusterWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetClusterWithResponse",
-		append([]interface{}{ctx, clusterName, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetClusterWithResponse_Call) Run(run func(ctx context.Context, clusterName string, params *v0041.SlurmdbV0041GetClusterParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetClusterWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
-		for i, a := range args[3:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), args[2].(*v0041.SlurmdbV0041GetClusterParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetClusterWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetClusterResponse, _a1 error) *MockClient_SlurmdbV0041GetClusterWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetClusterWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0041.SlurmdbV0041GetClusterParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetClusterResponse, error)) *MockClient_SlurmdbV0041GetClusterWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetClustersWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetClustersWithResponse(ctx context.Context, params *v0041.SlurmdbV0041GetClustersParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetClustersResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetClustersWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetClustersResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetClustersParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetClustersResponse, error)); ok {
-		return rf(ctx, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetClustersParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetClustersResponse); ok {
-		r0 = rf(ctx, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetClustersResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041GetClustersParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetClustersWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetClustersWithResponse'
-type MockClient_SlurmdbV0041GetClustersWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetClustersWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - params *v0041.SlurmdbV0041GetClustersParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetClustersWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetClustersWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetClustersWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetClustersWithResponse",
-		append([]interface{}{ctx, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetClustersWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041GetClustersParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetClustersWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041GetClustersParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetClustersWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetClustersResponse, _a1 error) *MockClient_SlurmdbV0041GetClustersWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetClustersWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041GetClustersParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetClustersResponse, error)) *MockClient_SlurmdbV0041GetClustersWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetConfigWithResponse provides a mock function with given fields: ctx, reqEditors
-func (_m *MockClient) SlurmdbV0041GetConfigWithResponse(ctx context.Context, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetConfigResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetConfigWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetConfigResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetConfigResponse, error)); ok {
-		return rf(ctx, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetConfigResponse); ok {
-		r0 = rf(ctx, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetConfigResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetConfigWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetConfigWithResponse'
-type MockClient_SlurmdbV0041GetConfigWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetConfigWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetConfigWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetConfigWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetConfigWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetConfigWithResponse",
-		append([]interface{}{ctx}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetConfigWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetConfigWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-1)
-		for i, a := range args[1:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetConfigWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetConfigResponse, _a1 error) *MockClient_SlurmdbV0041GetConfigWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetConfigWithResponse_Call) RunAndReturn(run func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetConfigResponse, error)) *MockClient_SlurmdbV0041GetConfigWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetDiagWithResponse provides a mock function with given fields: ctx, reqEditors
-func (_m *MockClient) SlurmdbV0041GetDiagWithResponse(ctx context.Context, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetDiagResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetDiagWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetDiagResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetDiagResponse, error)); ok {
-		return rf(ctx, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetDiagResponse); ok {
-		r0 = rf(ctx, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetDiagResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetDiagWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetDiagWithResponse'
-type MockClient_SlurmdbV0041GetDiagWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetDiagWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetDiagWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetDiagWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetDiagWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetDiagWithResponse",
-		append([]interface{}{ctx}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetDiagWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetDiagWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-1)
-		for i, a := range args[1:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetDiagWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetDiagResponse, _a1 error) *MockClient_SlurmdbV0041GetDiagWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetDiagWithResponse_Call) RunAndReturn(run func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetDiagResponse, error)) *MockClient_SlurmdbV0041GetDiagWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetInstanceWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetInstanceWithResponse(ctx context.Context, params *v0041.SlurmdbV0041GetInstanceParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetInstanceResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetInstanceWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetInstanceResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetInstanceParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetInstanceResponse, error)); ok {
-		return rf(ctx, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetInstanceParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetInstanceResponse); ok {
-		r0 = rf(ctx, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetInstanceResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041GetInstanceParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetInstanceWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetInstanceWithResponse'
-type MockClient_SlurmdbV0041GetInstanceWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetInstanceWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - params *v0041.SlurmdbV0041GetInstanceParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetInstanceWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetInstanceWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetInstanceWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetInstanceWithResponse",
-		append([]interface{}{ctx, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetInstanceWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041GetInstanceParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetInstanceWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041GetInstanceParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetInstanceWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetInstanceResponse, _a1 error) *MockClient_SlurmdbV0041GetInstanceWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetInstanceWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041GetInstanceParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetInstanceResponse, error)) *MockClient_SlurmdbV0041GetInstanceWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetInstancesWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetInstancesWithResponse(ctx context.Context, params *v0041.SlurmdbV0041GetInstancesParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetInstancesResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetInstancesWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetInstancesResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetInstancesParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetInstancesResponse, error)); ok {
-		return rf(ctx, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetInstancesParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetInstancesResponse); ok {
-		r0 = rf(ctx, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetInstancesResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041GetInstancesParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetInstancesWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetInstancesWithResponse'
-type MockClient_SlurmdbV0041GetInstancesWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetInstancesWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - params *v0041.SlurmdbV0041GetInstancesParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetInstancesWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetInstancesWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetInstancesWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetInstancesWithResponse",
-		append([]interface{}{ctx, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetInstancesWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041GetInstancesParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetInstancesWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
-		for i, a := range args[2:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041GetInstancesParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetInstancesWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetInstancesResponse, _a1 error) *MockClient_SlurmdbV0041GetInstancesWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetInstancesWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041GetInstancesParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetInstancesResponse, error)) *MockClient_SlurmdbV0041GetInstancesWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetJobWithResponse provides a mock function with given fields: ctx, jobId, reqEditors
-func (_m *MockClient) SlurmdbV0041GetJobWithResponse(ctx context.Context, jobId string, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetJobResponse, error) {
+// SlurmV0044GetResourcesWithResponse provides a mock function with given fields: ctx, jobId, reqEditors
+func (_m *MockClient) SlurmV0044GetResourcesWithResponse(ctx context.Context, jobId string, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetResourcesResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -3578,23 +1719,23 @@ func (_m *MockClient) SlurmdbV0041GetJobWithResponse(ctx context.Context, jobId 
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetJobWithResponse")
+		panic("no return value specified for SlurmV0044GetResourcesWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041GetJobResponse
+	var r0 *v0044.SlurmV0044GetResourcesResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetJobResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetResourcesResponse, error)); ok {
 		return rf(ctx, jobId, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetJobResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetResourcesResponse); ok {
 		r0 = rf(ctx, jobId, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetJobResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetResourcesResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, jobId, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -3603,26 +1744,26 @@ func (_m *MockClient) SlurmdbV0041GetJobWithResponse(ctx context.Context, jobId 
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041GetJobWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetJobWithResponse'
-type MockClient_SlurmdbV0041GetJobWithResponse_Call struct {
+// MockClient_SlurmV0044GetResourcesWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetResourcesWithResponse'
+type MockClient_SlurmV0044GetResourcesWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041GetJobWithResponse is a helper method to define mock.On call
+// SlurmV0044GetResourcesWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - jobId string
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetJobWithResponse(ctx interface{}, jobId interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetJobWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetJobWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetJobWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetResourcesWithResponse(ctx interface{}, jobId interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetResourcesWithResponse_Call {
+	return &MockClient_SlurmV0044GetResourcesWithResponse_Call{Call: _e.mock.On("SlurmV0044GetResourcesWithResponse",
 		append([]interface{}{ctx, jobId}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041GetJobWithResponse_Call) Run(run func(ctx context.Context, jobId string, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetJobWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetResourcesWithResponse_Call) Run(run func(ctx context.Context, jobId string, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetResourcesWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), args[1].(string), variadicArgs...)
@@ -3630,18 +1771,18 @@ func (_c *MockClient_SlurmdbV0041GetJobWithResponse_Call) Run(run func(ctx conte
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041GetJobWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetJobResponse, _a1 error) *MockClient_SlurmdbV0041GetJobWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetResourcesWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetResourcesResponse, _a1 error) *MockClient_SlurmV0044GetResourcesWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041GetJobWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetJobResponse, error)) *MockClient_SlurmdbV0041GetJobWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetResourcesWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetResourcesResponse, error)) *MockClient_SlurmV0044GetResourcesWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041GetJobsWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetJobsWithResponse(ctx context.Context, params *v0041.SlurmdbV0041GetJobsParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetJobsResponse, error) {
+// SlurmV0044GetSharesWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmV0044GetSharesWithResponse(ctx context.Context, params *v0044.SlurmV0044GetSharesParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetSharesResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -3652,23 +1793,23 @@ func (_m *MockClient) SlurmdbV0041GetJobsWithResponse(ctx context.Context, param
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetJobsWithResponse")
+		panic("no return value specified for SlurmV0044GetSharesWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041GetJobsResponse
+	var r0 *v0044.SlurmV0044GetSharesResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetJobsParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetJobsResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmV0044GetSharesParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetSharesResponse, error)); ok {
 		return rf(ctx, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetJobsParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetJobsResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmV0044GetSharesParams, ...v0044.RequestEditorFn) *v0044.SlurmV0044GetSharesResponse); ok {
 		r0 = rf(ctx, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetJobsResponse)
+			r0 = ret.Get(0).(*v0044.SlurmV0044GetSharesResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041GetJobsParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmV0044GetSharesParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -3677,45 +1818,1315 @@ func (_m *MockClient) SlurmdbV0041GetJobsWithResponse(ctx context.Context, param
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041GetJobsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetJobsWithResponse'
-type MockClient_SlurmdbV0041GetJobsWithResponse_Call struct {
+// MockClient_SlurmV0044GetSharesWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044GetSharesWithResponse'
+type MockClient_SlurmV0044GetSharesWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041GetJobsWithResponse is a helper method to define mock.On call
+// SlurmV0044GetSharesWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmdbV0041GetJobsParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetJobsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetJobsWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetJobsWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetJobsWithResponse",
+//   - params *v0044.SlurmV0044GetSharesParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044GetSharesWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044GetSharesWithResponse_Call {
+	return &MockClient_SlurmV0044GetSharesWithResponse_Call{Call: _e.mock.On("SlurmV0044GetSharesWithResponse",
 		append([]interface{}{ctx, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041GetJobsWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041GetJobsParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetJobsWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetSharesWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmV0044GetSharesParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044GetSharesWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041GetJobsParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmV0044GetSharesParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041GetJobsWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetJobsResponse, _a1 error) *MockClient_SlurmdbV0041GetJobsWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetSharesWithResponse_Call) Return(_a0 *v0044.SlurmV0044GetSharesResponse, _a1 error) *MockClient_SlurmV0044GetSharesWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041GetJobsWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041GetJobsParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetJobsResponse, error)) *MockClient_SlurmdbV0041GetJobsWithResponse_Call {
+func (_c *MockClient_SlurmV0044GetSharesWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmV0044GetSharesParams, ...v0044.RequestEditorFn) (*v0044.SlurmV0044GetSharesResponse, error)) *MockClient_SlurmV0044GetSharesWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041GetQosWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetQosWithResponse(ctx context.Context, params *v0041.SlurmdbV0041GetQosParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetQosResponse, error) {
+// SlurmV0044PostJobAllocateWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmV0044PostJobAllocateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobAllocateResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostJobAllocateWithBodyWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostJobAllocateResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobAllocateResponse, error)); ok {
+		return rf(ctx, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostJobAllocateResponse); ok {
+		r0 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostJobAllocateResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostJobAllocateWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostJobAllocateWithBodyWithResponse'
+type MockClient_SlurmV0044PostJobAllocateWithBodyWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostJobAllocateWithBodyWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - contentType string
+//   - body io.Reader
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostJobAllocateWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostJobAllocateWithBodyWithResponse_Call {
+	return &MockClient_SlurmV0044PostJobAllocateWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0044PostJobAllocateWithBodyWithResponse",
+		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostJobAllocateWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostJobAllocateWithBodyWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostJobAllocateWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostJobAllocateResponse, _a1 error) *MockClient_SlurmV0044PostJobAllocateWithBodyWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostJobAllocateWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobAllocateResponse, error)) *MockClient_SlurmV0044PostJobAllocateWithBodyWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostJobAllocateWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmV0044PostJobAllocateWithResponse(ctx context.Context, body v0044.SlurmV0044PostJobAllocateJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobAllocateResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostJobAllocateWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostJobAllocateResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044PostJobAllocateJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobAllocateResponse, error)); ok {
+		return rf(ctx, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044PostJobAllocateJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostJobAllocateResponse); ok {
+		r0 = rf(ctx, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostJobAllocateResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmV0044PostJobAllocateJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostJobAllocateWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostJobAllocateWithResponse'
+type MockClient_SlurmV0044PostJobAllocateWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostJobAllocateWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - body v0044.SlurmV0044PostJobAllocateJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostJobAllocateWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostJobAllocateWithResponse_Call {
+	return &MockClient_SlurmV0044PostJobAllocateWithResponse_Call{Call: _e.mock.On("SlurmV0044PostJobAllocateWithResponse",
+		append([]interface{}{ctx, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostJobAllocateWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmV0044PostJobAllocateJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostJobAllocateWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(v0044.SlurmV0044PostJobAllocateJSONRequestBody), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostJobAllocateWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostJobAllocateResponse, _a1 error) *MockClient_SlurmV0044PostJobAllocateWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostJobAllocateWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmV0044PostJobAllocateJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobAllocateResponse, error)) *MockClient_SlurmV0044PostJobAllocateWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostJobSubmitWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmV0044PostJobSubmitWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobSubmitResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostJobSubmitWithBodyWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostJobSubmitResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobSubmitResponse, error)); ok {
+		return rf(ctx, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostJobSubmitResponse); ok {
+		r0 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostJobSubmitResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostJobSubmitWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostJobSubmitWithBodyWithResponse'
+type MockClient_SlurmV0044PostJobSubmitWithBodyWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostJobSubmitWithBodyWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - contentType string
+//   - body io.Reader
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostJobSubmitWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostJobSubmitWithBodyWithResponse_Call {
+	return &MockClient_SlurmV0044PostJobSubmitWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0044PostJobSubmitWithBodyWithResponse",
+		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostJobSubmitWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostJobSubmitWithBodyWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostJobSubmitWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostJobSubmitResponse, _a1 error) *MockClient_SlurmV0044PostJobSubmitWithBodyWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostJobSubmitWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobSubmitResponse, error)) *MockClient_SlurmV0044PostJobSubmitWithBodyWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostJobSubmitWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmV0044PostJobSubmitWithResponse(ctx context.Context, body v0044.SlurmV0044PostJobSubmitJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobSubmitResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostJobSubmitWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostJobSubmitResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044PostJobSubmitJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobSubmitResponse, error)); ok {
+		return rf(ctx, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044PostJobSubmitJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostJobSubmitResponse); ok {
+		r0 = rf(ctx, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostJobSubmitResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmV0044PostJobSubmitJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostJobSubmitWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostJobSubmitWithResponse'
+type MockClient_SlurmV0044PostJobSubmitWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostJobSubmitWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - body v0044.SlurmV0044PostJobSubmitJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostJobSubmitWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostJobSubmitWithResponse_Call {
+	return &MockClient_SlurmV0044PostJobSubmitWithResponse_Call{Call: _e.mock.On("SlurmV0044PostJobSubmitWithResponse",
+		append([]interface{}{ctx, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostJobSubmitWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmV0044PostJobSubmitJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostJobSubmitWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(v0044.SlurmV0044PostJobSubmitJSONRequestBody), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostJobSubmitWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostJobSubmitResponse, _a1 error) *MockClient_SlurmV0044PostJobSubmitWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostJobSubmitWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmV0044PostJobSubmitJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobSubmitResponse, error)) *MockClient_SlurmV0044PostJobSubmitWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostJobWithBodyWithResponse provides a mock function with given fields: ctx, jobId, contentType, body, reqEditors
+func (_m *MockClient) SlurmV0044PostJobWithBodyWithResponse(ctx context.Context, jobId string, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, jobId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostJobWithBodyWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostJobResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobResponse, error)); ok {
+		return rf(ctx, jobId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostJobResponse); ok {
+		r0 = rf(ctx, jobId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostJobResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, jobId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostJobWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostJobWithBodyWithResponse'
+type MockClient_SlurmV0044PostJobWithBodyWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostJobWithBodyWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - jobId string
+//   - contentType string
+//   - body io.Reader
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostJobWithBodyWithResponse(ctx interface{}, jobId interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostJobWithBodyWithResponse_Call {
+	return &MockClient_SlurmV0044PostJobWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0044PostJobWithBodyWithResponse",
+		append([]interface{}{ctx, jobId, contentType, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostJobWithBodyWithResponse_Call) Run(run func(ctx context.Context, jobId string, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostJobWithBodyWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-4)
+		for i, a := range args[4:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(io.Reader), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostJobWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostJobResponse, _a1 error) *MockClient_SlurmV0044PostJobWithBodyWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostJobWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobResponse, error)) *MockClient_SlurmV0044PostJobWithBodyWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostJobWithResponse provides a mock function with given fields: ctx, jobId, body, reqEditors
+func (_m *MockClient) SlurmV0044PostJobWithResponse(ctx context.Context, jobId string, body v0044.SlurmV0044PostJobJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, jobId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostJobWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostJobResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, v0044.SlurmV0044PostJobJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobResponse, error)); ok {
+		return rf(ctx, jobId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, v0044.SlurmV0044PostJobJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostJobResponse); ok {
+		r0 = rf(ctx, jobId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostJobResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, v0044.SlurmV0044PostJobJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, jobId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostJobWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostJobWithResponse'
+type MockClient_SlurmV0044PostJobWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostJobWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - jobId string
+//   - body v0044.SlurmV0044PostJobJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostJobWithResponse(ctx interface{}, jobId interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostJobWithResponse_Call {
+	return &MockClient_SlurmV0044PostJobWithResponse_Call{Call: _e.mock.On("SlurmV0044PostJobWithResponse",
+		append([]interface{}{ctx, jobId, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostJobWithResponse_Call) Run(run func(ctx context.Context, jobId string, body v0044.SlurmV0044PostJobJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostJobWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(v0044.SlurmV0044PostJobJSONRequestBody), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostJobWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostJobResponse, _a1 error) *MockClient_SlurmV0044PostJobWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostJobWithResponse_Call) RunAndReturn(run func(context.Context, string, v0044.SlurmV0044PostJobJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostJobResponse, error)) *MockClient_SlurmV0044PostJobWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostNewNodeWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmV0044PostNewNodeWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNewNodeResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostNewNodeWithBodyWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostNewNodeResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNewNodeResponse, error)); ok {
+		return rf(ctx, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostNewNodeResponse); ok {
+		r0 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostNewNodeResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostNewNodeWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostNewNodeWithBodyWithResponse'
+type MockClient_SlurmV0044PostNewNodeWithBodyWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostNewNodeWithBodyWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - contentType string
+//   - body io.Reader
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostNewNodeWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostNewNodeWithBodyWithResponse_Call {
+	return &MockClient_SlurmV0044PostNewNodeWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0044PostNewNodeWithBodyWithResponse",
+		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostNewNodeWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostNewNodeWithBodyWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostNewNodeWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostNewNodeResponse, _a1 error) *MockClient_SlurmV0044PostNewNodeWithBodyWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostNewNodeWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNewNodeResponse, error)) *MockClient_SlurmV0044PostNewNodeWithBodyWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostNewNodeWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmV0044PostNewNodeWithResponse(ctx context.Context, body v0044.SlurmV0044PostNewNodeJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNewNodeResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostNewNodeWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostNewNodeResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044PostNewNodeJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNewNodeResponse, error)); ok {
+		return rf(ctx, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044PostNewNodeJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostNewNodeResponse); ok {
+		r0 = rf(ctx, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostNewNodeResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmV0044PostNewNodeJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostNewNodeWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostNewNodeWithResponse'
+type MockClient_SlurmV0044PostNewNodeWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostNewNodeWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - body v0044.SlurmV0044PostNewNodeJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostNewNodeWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostNewNodeWithResponse_Call {
+	return &MockClient_SlurmV0044PostNewNodeWithResponse_Call{Call: _e.mock.On("SlurmV0044PostNewNodeWithResponse",
+		append([]interface{}{ctx, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostNewNodeWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmV0044PostNewNodeJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostNewNodeWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(v0044.SlurmV0044PostNewNodeJSONRequestBody), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostNewNodeWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostNewNodeResponse, _a1 error) *MockClient_SlurmV0044PostNewNodeWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostNewNodeWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmV0044PostNewNodeJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNewNodeResponse, error)) *MockClient_SlurmV0044PostNewNodeWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostNodeWithBodyWithResponse provides a mock function with given fields: ctx, nodeName, contentType, body, reqEditors
+func (_m *MockClient) SlurmV0044PostNodeWithBodyWithResponse(ctx context.Context, nodeName string, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNodeResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, nodeName, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostNodeWithBodyWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostNodeResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNodeResponse, error)); ok {
+		return rf(ctx, nodeName, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostNodeResponse); ok {
+		r0 = rf(ctx, nodeName, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostNodeResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, nodeName, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostNodeWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostNodeWithBodyWithResponse'
+type MockClient_SlurmV0044PostNodeWithBodyWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostNodeWithBodyWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nodeName string
+//   - contentType string
+//   - body io.Reader
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostNodeWithBodyWithResponse(ctx interface{}, nodeName interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostNodeWithBodyWithResponse_Call {
+	return &MockClient_SlurmV0044PostNodeWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0044PostNodeWithBodyWithResponse",
+		append([]interface{}{ctx, nodeName, contentType, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostNodeWithBodyWithResponse_Call) Run(run func(ctx context.Context, nodeName string, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostNodeWithBodyWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-4)
+		for i, a := range args[4:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(io.Reader), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostNodeWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostNodeResponse, _a1 error) *MockClient_SlurmV0044PostNodeWithBodyWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostNodeWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNodeResponse, error)) *MockClient_SlurmV0044PostNodeWithBodyWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostNodeWithResponse provides a mock function with given fields: ctx, nodeName, body, reqEditors
+func (_m *MockClient) SlurmV0044PostNodeWithResponse(ctx context.Context, nodeName string, body v0044.SlurmV0044PostNodeJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNodeResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, nodeName, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostNodeWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostNodeResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, v0044.SlurmV0044PostNodeJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNodeResponse, error)); ok {
+		return rf(ctx, nodeName, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, v0044.SlurmV0044PostNodeJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostNodeResponse); ok {
+		r0 = rf(ctx, nodeName, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostNodeResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, v0044.SlurmV0044PostNodeJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, nodeName, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostNodeWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostNodeWithResponse'
+type MockClient_SlurmV0044PostNodeWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostNodeWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nodeName string
+//   - body v0044.SlurmV0044PostNodeJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostNodeWithResponse(ctx interface{}, nodeName interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostNodeWithResponse_Call {
+	return &MockClient_SlurmV0044PostNodeWithResponse_Call{Call: _e.mock.On("SlurmV0044PostNodeWithResponse",
+		append([]interface{}{ctx, nodeName, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostNodeWithResponse_Call) Run(run func(ctx context.Context, nodeName string, body v0044.SlurmV0044PostNodeJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostNodeWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(v0044.SlurmV0044PostNodeJSONRequestBody), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostNodeWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostNodeResponse, _a1 error) *MockClient_SlurmV0044PostNodeWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostNodeWithResponse_Call) RunAndReturn(run func(context.Context, string, v0044.SlurmV0044PostNodeJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNodeResponse, error)) *MockClient_SlurmV0044PostNodeWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostNodesWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmV0044PostNodesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNodesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostNodesWithBodyWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostNodesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNodesResponse, error)); ok {
+		return rf(ctx, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostNodesResponse); ok {
+		r0 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostNodesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostNodesWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostNodesWithBodyWithResponse'
+type MockClient_SlurmV0044PostNodesWithBodyWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostNodesWithBodyWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - contentType string
+//   - body io.Reader
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostNodesWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostNodesWithBodyWithResponse_Call {
+	return &MockClient_SlurmV0044PostNodesWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0044PostNodesWithBodyWithResponse",
+		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostNodesWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostNodesWithBodyWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostNodesWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostNodesResponse, _a1 error) *MockClient_SlurmV0044PostNodesWithBodyWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostNodesWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNodesResponse, error)) *MockClient_SlurmV0044PostNodesWithBodyWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostNodesWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmV0044PostNodesWithResponse(ctx context.Context, body v0044.SlurmV0044PostNodesJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNodesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostNodesWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostNodesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044PostNodesJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNodesResponse, error)); ok {
+		return rf(ctx, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044PostNodesJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostNodesResponse); ok {
+		r0 = rf(ctx, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostNodesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmV0044PostNodesJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostNodesWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostNodesWithResponse'
+type MockClient_SlurmV0044PostNodesWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostNodesWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - body v0044.SlurmV0044PostNodesJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostNodesWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostNodesWithResponse_Call {
+	return &MockClient_SlurmV0044PostNodesWithResponse_Call{Call: _e.mock.On("SlurmV0044PostNodesWithResponse",
+		append([]interface{}{ctx, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostNodesWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmV0044PostNodesJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostNodesWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(v0044.SlurmV0044PostNodesJSONRequestBody), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostNodesWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostNodesResponse, _a1 error) *MockClient_SlurmV0044PostNodesWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostNodesWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmV0044PostNodesJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostNodesResponse, error)) *MockClient_SlurmV0044PostNodesWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostReservationWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmV0044PostReservationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostReservationResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostReservationWithBodyWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostReservationResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostReservationResponse, error)); ok {
+		return rf(ctx, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostReservationResponse); ok {
+		r0 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostReservationResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostReservationWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostReservationWithBodyWithResponse'
+type MockClient_SlurmV0044PostReservationWithBodyWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostReservationWithBodyWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - contentType string
+//   - body io.Reader
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostReservationWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostReservationWithBodyWithResponse_Call {
+	return &MockClient_SlurmV0044PostReservationWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0044PostReservationWithBodyWithResponse",
+		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostReservationWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostReservationWithBodyWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostReservationWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostReservationResponse, _a1 error) *MockClient_SlurmV0044PostReservationWithBodyWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostReservationWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostReservationResponse, error)) *MockClient_SlurmV0044PostReservationWithBodyWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostReservationWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmV0044PostReservationWithResponse(ctx context.Context, body v0044.SlurmV0044PostReservationJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostReservationResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostReservationWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostReservationResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044PostReservationJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostReservationResponse, error)); ok {
+		return rf(ctx, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044PostReservationJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostReservationResponse); ok {
+		r0 = rf(ctx, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostReservationResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmV0044PostReservationJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostReservationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostReservationWithResponse'
+type MockClient_SlurmV0044PostReservationWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostReservationWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - body v0044.SlurmV0044PostReservationJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostReservationWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostReservationWithResponse_Call {
+	return &MockClient_SlurmV0044PostReservationWithResponse_Call{Call: _e.mock.On("SlurmV0044PostReservationWithResponse",
+		append([]interface{}{ctx, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostReservationWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmV0044PostReservationJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostReservationWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(v0044.SlurmV0044PostReservationJSONRequestBody), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostReservationWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostReservationResponse, _a1 error) *MockClient_SlurmV0044PostReservationWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostReservationWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmV0044PostReservationJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostReservationResponse, error)) *MockClient_SlurmV0044PostReservationWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostReservationsWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmV0044PostReservationsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostReservationsResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostReservationsWithBodyWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostReservationsResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostReservationsResponse, error)); ok {
+		return rf(ctx, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostReservationsResponse); ok {
+		r0 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostReservationsResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostReservationsWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostReservationsWithBodyWithResponse'
+type MockClient_SlurmV0044PostReservationsWithBodyWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostReservationsWithBodyWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - contentType string
+//   - body io.Reader
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostReservationsWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostReservationsWithBodyWithResponse_Call {
+	return &MockClient_SlurmV0044PostReservationsWithBodyWithResponse_Call{Call: _e.mock.On("SlurmV0044PostReservationsWithBodyWithResponse",
+		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostReservationsWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostReservationsWithBodyWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostReservationsWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostReservationsResponse, _a1 error) *MockClient_SlurmV0044PostReservationsWithBodyWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostReservationsWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostReservationsResponse, error)) *MockClient_SlurmV0044PostReservationsWithBodyWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmV0044PostReservationsWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmV0044PostReservationsWithResponse(ctx context.Context, body v0044.SlurmV0044PostReservationsJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostReservationsResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmV0044PostReservationsWithResponse")
+	}
+
+	var r0 *v0044.SlurmV0044PostReservationsResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044PostReservationsJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostReservationsResponse, error)); ok {
+		return rf(ctx, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmV0044PostReservationsJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmV0044PostReservationsResponse); ok {
+		r0 = rf(ctx, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmV0044PostReservationsResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmV0044PostReservationsJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmV0044PostReservationsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmV0044PostReservationsWithResponse'
+type MockClient_SlurmV0044PostReservationsWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmV0044PostReservationsWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - body v0044.SlurmV0044PostReservationsJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmV0044PostReservationsWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmV0044PostReservationsWithResponse_Call {
+	return &MockClient_SlurmV0044PostReservationsWithResponse_Call{Call: _e.mock.On("SlurmV0044PostReservationsWithResponse",
+		append([]interface{}{ctx, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmV0044PostReservationsWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmV0044PostReservationsJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmV0044PostReservationsWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(v0044.SlurmV0044PostReservationsJSONRequestBody), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostReservationsWithResponse_Call) Return(_a0 *v0044.SlurmV0044PostReservationsResponse, _a1 error) *MockClient_SlurmV0044PostReservationsWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmV0044PostReservationsWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmV0044PostReservationsJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmV0044PostReservationsResponse, error)) *MockClient_SlurmV0044PostReservationsWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044DeleteAccountWithResponse provides a mock function with given fields: ctx, accountName, reqEditors
+func (_m *MockClient) SlurmdbV0044DeleteAccountWithResponse(ctx context.Context, accountName string, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteAccountResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, accountName)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044DeleteAccountWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044DeleteAccountResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteAccountResponse, error)); ok {
+		return rf(ctx, accountName, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044DeleteAccountResponse); ok {
+		r0 = rf(ctx, accountName, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044DeleteAccountResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, accountName, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044DeleteAccountWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044DeleteAccountWithResponse'
+type MockClient_SlurmdbV0044DeleteAccountWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044DeleteAccountWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - accountName string
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044DeleteAccountWithResponse(ctx interface{}, accountName interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044DeleteAccountWithResponse_Call {
+	return &MockClient_SlurmdbV0044DeleteAccountWithResponse_Call{Call: _e.mock.On("SlurmdbV0044DeleteAccountWithResponse",
+		append([]interface{}{ctx, accountName}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044DeleteAccountWithResponse_Call) Run(run func(ctx context.Context, accountName string, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044DeleteAccountWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044DeleteAccountWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044DeleteAccountResponse, _a1 error) *MockClient_SlurmdbV0044DeleteAccountWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044DeleteAccountWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteAccountResponse, error)) *MockClient_SlurmdbV0044DeleteAccountWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044DeleteAssociationWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmdbV0044DeleteAssociationWithResponse(ctx context.Context, params *v0044.SlurmdbV0044DeleteAssociationParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteAssociationResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -3726,23 +3137,23 @@ func (_m *MockClient) SlurmdbV0041GetQosWithResponse(ctx context.Context, params
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetQosWithResponse")
+		panic("no return value specified for SlurmdbV0044DeleteAssociationWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041GetQosResponse
+	var r0 *v0044.SlurmdbV0044DeleteAssociationResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetQosParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetQosResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044DeleteAssociationParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteAssociationResponse, error)); ok {
 		return rf(ctx, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetQosParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetQosResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044DeleteAssociationParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044DeleteAssociationResponse); ok {
 		r0 = rf(ctx, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetQosResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044DeleteAssociationResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041GetQosParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044DeleteAssociationParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -3751,73 +3162,73 @@ func (_m *MockClient) SlurmdbV0041GetQosWithResponse(ctx context.Context, params
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041GetQosWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetQosWithResponse'
-type MockClient_SlurmdbV0041GetQosWithResponse_Call struct {
+// MockClient_SlurmdbV0044DeleteAssociationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044DeleteAssociationWithResponse'
+type MockClient_SlurmdbV0044DeleteAssociationWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041GetQosWithResponse is a helper method to define mock.On call
+// SlurmdbV0044DeleteAssociationWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmdbV0041GetQosParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetQosWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetQosWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetQosWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetQosWithResponse",
+//   - params *v0044.SlurmdbV0044DeleteAssociationParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044DeleteAssociationWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044DeleteAssociationWithResponse_Call {
+	return &MockClient_SlurmdbV0044DeleteAssociationWithResponse_Call{Call: _e.mock.On("SlurmdbV0044DeleteAssociationWithResponse",
 		append([]interface{}{ctx, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041GetQosWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041GetQosParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetQosWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044DeleteAssociationWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044DeleteAssociationParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044DeleteAssociationWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041GetQosParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044DeleteAssociationParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041GetQosWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetQosResponse, _a1 error) *MockClient_SlurmdbV0041GetQosWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044DeleteAssociationWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044DeleteAssociationResponse, _a1 error) *MockClient_SlurmdbV0044DeleteAssociationWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041GetQosWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041GetQosParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetQosResponse, error)) *MockClient_SlurmdbV0041GetQosWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044DeleteAssociationWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044DeleteAssociationParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteAssociationResponse, error)) *MockClient_SlurmdbV0044DeleteAssociationWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041GetSingleQosWithResponse provides a mock function with given fields: ctx, qos, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetSingleQosWithResponse(ctx context.Context, qos string, params *v0041.SlurmdbV0041GetSingleQosParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetSingleQosResponse, error) {
+// SlurmdbV0044DeleteAssociationsWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmdbV0044DeleteAssociationsWithResponse(ctx context.Context, params *v0044.SlurmdbV0044DeleteAssociationsParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteAssociationsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, ctx, qos, params)
+	_ca = append(_ca, ctx, params)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetSingleQosWithResponse")
+		panic("no return value specified for SlurmdbV0044DeleteAssociationsWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041GetSingleQosResponse
+	var r0 *v0044.SlurmdbV0044DeleteAssociationsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmdbV0041GetSingleQosParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetSingleQosResponse, error)); ok {
-		return rf(ctx, qos, params, reqEditors...)
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044DeleteAssociationsParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteAssociationsResponse, error)); ok {
+		return rf(ctx, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmdbV0041GetSingleQosParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetSingleQosResponse); ok {
-		r0 = rf(ctx, qos, params, reqEditors...)
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044DeleteAssociationsParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044DeleteAssociationsResponse); ok {
+		r0 = rf(ctx, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetSingleQosResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044DeleteAssociationsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v0041.SlurmdbV0041GetSingleQosParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, qos, params, reqEditors...)
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044DeleteAssociationsParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -3825,268 +3236,268 @@ func (_m *MockClient) SlurmdbV0041GetSingleQosWithResponse(ctx context.Context, 
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041GetSingleQosWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetSingleQosWithResponse'
-type MockClient_SlurmdbV0041GetSingleQosWithResponse_Call struct {
+// MockClient_SlurmdbV0044DeleteAssociationsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044DeleteAssociationsWithResponse'
+type MockClient_SlurmdbV0044DeleteAssociationsWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041GetSingleQosWithResponse is a helper method to define mock.On call
+// SlurmdbV0044DeleteAssociationsWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params *v0044.SlurmdbV0044DeleteAssociationsParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044DeleteAssociationsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044DeleteAssociationsWithResponse_Call {
+	return &MockClient_SlurmdbV0044DeleteAssociationsWithResponse_Call{Call: _e.mock.On("SlurmdbV0044DeleteAssociationsWithResponse",
+		append([]interface{}{ctx, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044DeleteAssociationsWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044DeleteAssociationsParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044DeleteAssociationsWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044DeleteAssociationsParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044DeleteAssociationsWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044DeleteAssociationsResponse, _a1 error) *MockClient_SlurmdbV0044DeleteAssociationsWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044DeleteAssociationsWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044DeleteAssociationsParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteAssociationsResponse, error)) *MockClient_SlurmdbV0044DeleteAssociationsWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044DeleteClusterWithResponse provides a mock function with given fields: ctx, clusterName, params, reqEditors
+func (_m *MockClient) SlurmdbV0044DeleteClusterWithResponse(ctx context.Context, clusterName string, params *v0044.SlurmdbV0044DeleteClusterParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, clusterName, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044DeleteClusterWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044DeleteClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmdbV0044DeleteClusterParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteClusterResponse, error)); ok {
+		return rf(ctx, clusterName, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmdbV0044DeleteClusterParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044DeleteClusterResponse); ok {
+		r0 = rf(ctx, clusterName, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044DeleteClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *v0044.SlurmdbV0044DeleteClusterParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, clusterName, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044DeleteClusterWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044DeleteClusterWithResponse'
+type MockClient_SlurmdbV0044DeleteClusterWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044DeleteClusterWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterName string
+//   - params *v0044.SlurmdbV0044DeleteClusterParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044DeleteClusterWithResponse(ctx interface{}, clusterName interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044DeleteClusterWithResponse_Call {
+	return &MockClient_SlurmdbV0044DeleteClusterWithResponse_Call{Call: _e.mock.On("SlurmdbV0044DeleteClusterWithResponse",
+		append([]interface{}{ctx, clusterName, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044DeleteClusterWithResponse_Call) Run(run func(ctx context.Context, clusterName string, params *v0044.SlurmdbV0044DeleteClusterParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044DeleteClusterWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(*v0044.SlurmdbV0044DeleteClusterParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044DeleteClusterWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044DeleteClusterResponse, _a1 error) *MockClient_SlurmdbV0044DeleteClusterWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044DeleteClusterWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0044.SlurmdbV0044DeleteClusterParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteClusterResponse, error)) *MockClient_SlurmdbV0044DeleteClusterWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044DeleteSingleQosWithResponse provides a mock function with given fields: ctx, qos, reqEditors
+func (_m *MockClient) SlurmdbV0044DeleteSingleQosWithResponse(ctx context.Context, qos string, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteSingleQosResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, qos)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044DeleteSingleQosWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044DeleteSingleQosResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteSingleQosResponse, error)); ok {
+		return rf(ctx, qos, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044DeleteSingleQosResponse); ok {
+		r0 = rf(ctx, qos, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044DeleteSingleQosResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, qos, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044DeleteSingleQosWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044DeleteSingleQosWithResponse'
+type MockClient_SlurmdbV0044DeleteSingleQosWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044DeleteSingleQosWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - qos string
-//   - params *v0041.SlurmdbV0041GetSingleQosParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetSingleQosWithResponse(ctx interface{}, qos interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetSingleQosWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetSingleQosWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetSingleQosWithResponse",
-		append([]interface{}{ctx, qos, params}, reqEditors...)...)}
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044DeleteSingleQosWithResponse(ctx interface{}, qos interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044DeleteSingleQosWithResponse_Call {
+	return &MockClient_SlurmdbV0044DeleteSingleQosWithResponse_Call{Call: _e.mock.On("SlurmdbV0044DeleteSingleQosWithResponse",
+		append([]interface{}{ctx, qos}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041GetSingleQosWithResponse_Call) Run(run func(ctx context.Context, qos string, params *v0041.SlurmdbV0041GetSingleQosParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetSingleQosWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044DeleteSingleQosWithResponse_Call) Run(run func(ctx context.Context, qos string, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044DeleteSingleQosWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
-		for i, a := range args[3:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), args[2].(*v0041.SlurmdbV0041GetSingleQosParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetSingleQosWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetSingleQosResponse, _a1 error) *MockClient_SlurmdbV0041GetSingleQosWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetSingleQosWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0041.SlurmdbV0041GetSingleQosParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetSingleQosResponse, error)) *MockClient_SlurmdbV0041GetSingleQosWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetTresWithResponse provides a mock function with given fields: ctx, reqEditors
-func (_m *MockClient) SlurmdbV0041GetTresWithResponse(ctx context.Context, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetTresResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetTresWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetTresResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetTresResponse, error)); ok {
-		return rf(ctx, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetTresResponse); ok {
-		r0 = rf(ctx, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetTresResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetTresWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetTresWithResponse'
-type MockClient_SlurmdbV0041GetTresWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetTresWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetTresWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetTresWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetTresWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetTresWithResponse",
-		append([]interface{}{ctx}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetTresWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetTresWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-1)
-		for i, a := range args[1:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetTresWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetTresResponse, _a1 error) *MockClient_SlurmdbV0041GetTresWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetTresWithResponse_Call) RunAndReturn(run func(context.Context, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetTresResponse, error)) *MockClient_SlurmdbV0041GetTresWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetUserWithResponse provides a mock function with given fields: ctx, name, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetUserWithResponse(ctx context.Context, name string, params *v0041.SlurmdbV0041GetUserParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetUserResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, name, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetUserWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetUserResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmdbV0041GetUserParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetUserResponse, error)); ok {
-		return rf(ctx, name, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *v0041.SlurmdbV0041GetUserParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetUserResponse); ok {
-		r0 = rf(ctx, name, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetUserResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, *v0041.SlurmdbV0041GetUserParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, name, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetUserWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetUserWithResponse'
-type MockClient_SlurmdbV0041GetUserWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetUserWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - name string
-//   - params *v0041.SlurmdbV0041GetUserParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetUserWithResponse(ctx interface{}, name interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetUserWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetUserWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetUserWithResponse",
-		append([]interface{}{ctx, name, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetUserWithResponse_Call) Run(run func(ctx context.Context, name string, params *v0041.SlurmdbV0041GetUserParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetUserWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
-		for i, a := range args[3:] {
-			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
-			}
-		}
-		run(args[0].(context.Context), args[1].(string), args[2].(*v0041.SlurmdbV0041GetUserParams), variadicArgs...)
-	})
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetUserWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetUserResponse, _a1 error) *MockClient_SlurmdbV0041GetUserWithResponse_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockClient_SlurmdbV0041GetUserWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0041.SlurmdbV0041GetUserParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetUserResponse, error)) *MockClient_SlurmdbV0041GetUserWithResponse_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// SlurmdbV0041GetUsersWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetUsersWithResponse(ctx context.Context, params *v0041.SlurmdbV0041GetUsersParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetUsersResponse, error) {
-	_va := make([]interface{}, len(reqEditors))
-	for _i := range reqEditors {
-		_va[_i] = reqEditors[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, params)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetUsersWithResponse")
-	}
-
-	var r0 *v0041.SlurmdbV0041GetUsersResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetUsersParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetUsersResponse, error)); ok {
-		return rf(ctx, params, reqEditors...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetUsersParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetUsersResponse); ok {
-		r0 = rf(ctx, params, reqEditors...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetUsersResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041GetUsersParams, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, params, reqEditors...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockClient_SlurmdbV0041GetUsersWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetUsersWithResponse'
-type MockClient_SlurmdbV0041GetUsersWithResponse_Call struct {
-	*mock.Call
-}
-
-// SlurmdbV0041GetUsersWithResponse is a helper method to define mock.On call
-//   - ctx context.Context
-//   - params *v0041.SlurmdbV0041GetUsersParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetUsersWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetUsersWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetUsersWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetUsersWithResponse",
-		append([]interface{}{ctx, params}, reqEditors...)...)}
-}
-
-func (_c *MockClient_SlurmdbV0041GetUsersWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041GetUsersParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetUsersWithResponse_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041GetUsersParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(string), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041GetUsersWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetUsersResponse, _a1 error) *MockClient_SlurmdbV0041GetUsersWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044DeleteSingleQosWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044DeleteSingleQosResponse, _a1 error) *MockClient_SlurmdbV0044DeleteSingleQosWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041GetUsersWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041GetUsersParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetUsersResponse, error)) *MockClient_SlurmdbV0041GetUsersWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044DeleteSingleQosWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteSingleQosResponse, error)) *MockClient_SlurmdbV0044DeleteSingleQosWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041GetWckeyWithResponse provides a mock function with given fields: ctx, id, reqEditors
-func (_m *MockClient) SlurmdbV0041GetWckeyWithResponse(ctx context.Context, id string, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetWckeyResponse, error) {
+// SlurmdbV0044DeleteUserWithResponse provides a mock function with given fields: ctx, name, reqEditors
+func (_m *MockClient) SlurmdbV0044DeleteUserWithResponse(ctx context.Context, name string, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteUserResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, name)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044DeleteUserWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044DeleteUserResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteUserResponse, error)); ok {
+		return rf(ctx, name, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044DeleteUserResponse); ok {
+		r0 = rf(ctx, name, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044DeleteUserResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, name, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044DeleteUserWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044DeleteUserWithResponse'
+type MockClient_SlurmdbV0044DeleteUserWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044DeleteUserWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044DeleteUserWithResponse(ctx interface{}, name interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044DeleteUserWithResponse_Call {
+	return &MockClient_SlurmdbV0044DeleteUserWithResponse_Call{Call: _e.mock.On("SlurmdbV0044DeleteUserWithResponse",
+		append([]interface{}{ctx, name}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044DeleteUserWithResponse_Call) Run(run func(ctx context.Context, name string, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044DeleteUserWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044DeleteUserWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044DeleteUserResponse, _a1 error) *MockClient_SlurmdbV0044DeleteUserWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044DeleteUserWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteUserResponse, error)) *MockClient_SlurmdbV0044DeleteUserWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044DeleteWckeyWithResponse provides a mock function with given fields: ctx, id, reqEditors
+func (_m *MockClient) SlurmdbV0044DeleteWckeyWithResponse(ctx context.Context, id string, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteWckeyResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -4097,23 +3508,23 @@ func (_m *MockClient) SlurmdbV0041GetWckeyWithResponse(ctx context.Context, id s
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetWckeyWithResponse")
+		panic("no return value specified for SlurmdbV0044DeleteWckeyWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041GetWckeyResponse
+	var r0 *v0044.SlurmdbV0044DeleteWckeyResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetWckeyResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteWckeyResponse, error)); ok {
 		return rf(ctx, id, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetWckeyResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044DeleteWckeyResponse); ok {
 		r0 = rf(ctx, id, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetWckeyResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044DeleteWckeyResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, id, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -4122,26 +3533,26 @@ func (_m *MockClient) SlurmdbV0041GetWckeyWithResponse(ctx context.Context, id s
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041GetWckeyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetWckeyWithResponse'
-type MockClient_SlurmdbV0041GetWckeyWithResponse_Call struct {
+// MockClient_SlurmdbV0044DeleteWckeyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044DeleteWckeyWithResponse'
+type MockClient_SlurmdbV0044DeleteWckeyWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041GetWckeyWithResponse is a helper method to define mock.On call
+// SlurmdbV0044DeleteWckeyWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - id string
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetWckeyWithResponse(ctx interface{}, id interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetWckeyWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetWckeyWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetWckeyWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044DeleteWckeyWithResponse(ctx interface{}, id interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044DeleteWckeyWithResponse_Call {
+	return &MockClient_SlurmdbV0044DeleteWckeyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044DeleteWckeyWithResponse",
 		append([]interface{}{ctx, id}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041GetWckeyWithResponse_Call) Run(run func(ctx context.Context, id string, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetWckeyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044DeleteWckeyWithResponse_Call) Run(run func(ctx context.Context, id string, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044DeleteWckeyWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), args[1].(string), variadicArgs...)
@@ -4149,18 +3560,93 @@ func (_c *MockClient_SlurmdbV0041GetWckeyWithResponse_Call) Run(run func(ctx con
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041GetWckeyWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetWckeyResponse, _a1 error) *MockClient_SlurmdbV0041GetWckeyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044DeleteWckeyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044DeleteWckeyResponse, _a1 error) *MockClient_SlurmdbV0044DeleteWckeyWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041GetWckeyWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetWckeyResponse, error)) *MockClient_SlurmdbV0041GetWckeyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044DeleteWckeyWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044DeleteWckeyResponse, error)) *MockClient_SlurmdbV0044DeleteWckeyWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041GetWckeysWithResponse provides a mock function with given fields: ctx, params, reqEditors
-func (_m *MockClient) SlurmdbV0041GetWckeysWithResponse(ctx context.Context, params *v0041.SlurmdbV0041GetWckeysParams, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetWckeysResponse, error) {
+// SlurmdbV0044GetAccountWithResponse provides a mock function with given fields: ctx, accountName, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetAccountWithResponse(ctx context.Context, accountName string, params *v0044.SlurmdbV0044GetAccountParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetAccountResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, accountName, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetAccountWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetAccountResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmdbV0044GetAccountParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetAccountResponse, error)); ok {
+		return rf(ctx, accountName, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmdbV0044GetAccountParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetAccountResponse); ok {
+		r0 = rf(ctx, accountName, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetAccountResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *v0044.SlurmdbV0044GetAccountParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, accountName, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetAccountWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetAccountWithResponse'
+type MockClient_SlurmdbV0044GetAccountWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetAccountWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - accountName string
+//   - params *v0044.SlurmdbV0044GetAccountParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetAccountWithResponse(ctx interface{}, accountName interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetAccountWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetAccountWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetAccountWithResponse",
+		append([]interface{}{ctx, accountName, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetAccountWithResponse_Call) Run(run func(ctx context.Context, accountName string, params *v0044.SlurmdbV0044GetAccountParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetAccountWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(*v0044.SlurmdbV0044GetAccountParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetAccountWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetAccountResponse, _a1 error) *MockClient_SlurmdbV0044GetAccountWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetAccountWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0044.SlurmdbV0044GetAccountParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetAccountResponse, error)) *MockClient_SlurmdbV0044GetAccountWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetAccountsWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetAccountsWithResponse(ctx context.Context, params *v0044.SlurmdbV0044GetAccountsParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetAccountsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -4171,23 +3657,23 @@ func (_m *MockClient) SlurmdbV0041GetWckeysWithResponse(ctx context.Context, par
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041GetWckeysWithResponse")
+		panic("no return value specified for SlurmdbV0044GetAccountsWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041GetWckeysResponse
+	var r0 *v0044.SlurmdbV0044GetAccountsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetWckeysParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetWckeysResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetAccountsParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetAccountsResponse, error)); ok {
 		return rf(ctx, params, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041GetWckeysParams, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041GetWckeysResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetAccountsParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetAccountsResponse); ok {
 		r0 = rf(ctx, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041GetWckeysResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetAccountsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041GetWckeysParams, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044GetAccountsParams, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -4196,45 +3682,1376 @@ func (_m *MockClient) SlurmdbV0041GetWckeysWithResponse(ctx context.Context, par
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041GetWckeysWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041GetWckeysWithResponse'
-type MockClient_SlurmdbV0041GetWckeysWithResponse_Call struct {
+// MockClient_SlurmdbV0044GetAccountsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetAccountsWithResponse'
+type MockClient_SlurmdbV0044GetAccountsWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041GetWckeysWithResponse is a helper method to define mock.On call
+// SlurmdbV0044GetAccountsWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmdbV0041GetWckeysParams
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041GetWckeysWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041GetWckeysWithResponse_Call {
-	return &MockClient_SlurmdbV0041GetWckeysWithResponse_Call{Call: _e.mock.On("SlurmdbV0041GetWckeysWithResponse",
+//   - params *v0044.SlurmdbV0044GetAccountsParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetAccountsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetAccountsWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetAccountsWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetAccountsWithResponse",
 		append([]interface{}{ctx, params}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041GetWckeysWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041GetWckeysParams, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041GetWckeysWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044GetAccountsWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044GetAccountsParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetAccountsWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041GetWckeysParams), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044GetAccountsParams), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041GetWckeysWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041GetWckeysResponse, _a1 error) *MockClient_SlurmdbV0041GetWckeysWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044GetAccountsWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetAccountsResponse, _a1 error) *MockClient_SlurmdbV0044GetAccountsWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041GetWckeysWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041GetWckeysParams, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041GetWckeysResponse, error)) *MockClient_SlurmdbV0041GetWckeysWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044GetAccountsWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044GetAccountsParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetAccountsResponse, error)) *MockClient_SlurmdbV0044GetAccountsWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostAccountsAssociationWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostAccountsAssociationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAccountsAssociationResponse, error) {
+// SlurmdbV0044GetAssociationWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetAssociationWithResponse(ctx context.Context, params *v0044.SlurmdbV0044GetAssociationParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetAssociationResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetAssociationWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetAssociationResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetAssociationParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetAssociationResponse, error)); ok {
+		return rf(ctx, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetAssociationParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetAssociationResponse); ok {
+		r0 = rf(ctx, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetAssociationResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044GetAssociationParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetAssociationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetAssociationWithResponse'
+type MockClient_SlurmdbV0044GetAssociationWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetAssociationWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params *v0044.SlurmdbV0044GetAssociationParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetAssociationWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetAssociationWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetAssociationWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetAssociationWithResponse",
+		append([]interface{}{ctx, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetAssociationWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044GetAssociationParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetAssociationWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044GetAssociationParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetAssociationWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetAssociationResponse, _a1 error) *MockClient_SlurmdbV0044GetAssociationWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetAssociationWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044GetAssociationParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetAssociationResponse, error)) *MockClient_SlurmdbV0044GetAssociationWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetAssociationsWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetAssociationsWithResponse(ctx context.Context, params *v0044.SlurmdbV0044GetAssociationsParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetAssociationsResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetAssociationsWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetAssociationsResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetAssociationsParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetAssociationsResponse, error)); ok {
+		return rf(ctx, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetAssociationsParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetAssociationsResponse); ok {
+		r0 = rf(ctx, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetAssociationsResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044GetAssociationsParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetAssociationsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetAssociationsWithResponse'
+type MockClient_SlurmdbV0044GetAssociationsWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetAssociationsWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params *v0044.SlurmdbV0044GetAssociationsParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetAssociationsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetAssociationsWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetAssociationsWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetAssociationsWithResponse",
+		append([]interface{}{ctx, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetAssociationsWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044GetAssociationsParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetAssociationsWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044GetAssociationsParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetAssociationsWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetAssociationsResponse, _a1 error) *MockClient_SlurmdbV0044GetAssociationsWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetAssociationsWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044GetAssociationsParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetAssociationsResponse, error)) *MockClient_SlurmdbV0044GetAssociationsWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetClusterWithResponse provides a mock function with given fields: ctx, clusterName, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetClusterWithResponse(ctx context.Context, clusterName string, params *v0044.SlurmdbV0044GetClusterParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetClusterResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, clusterName, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetClusterWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetClusterResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmdbV0044GetClusterParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetClusterResponse, error)); ok {
+		return rf(ctx, clusterName, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmdbV0044GetClusterParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetClusterResponse); ok {
+		r0 = rf(ctx, clusterName, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetClusterResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *v0044.SlurmdbV0044GetClusterParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, clusterName, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetClusterWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetClusterWithResponse'
+type MockClient_SlurmdbV0044GetClusterWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetClusterWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterName string
+//   - params *v0044.SlurmdbV0044GetClusterParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetClusterWithResponse(ctx interface{}, clusterName interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetClusterWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetClusterWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetClusterWithResponse",
+		append([]interface{}{ctx, clusterName, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetClusterWithResponse_Call) Run(run func(ctx context.Context, clusterName string, params *v0044.SlurmdbV0044GetClusterParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetClusterWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(*v0044.SlurmdbV0044GetClusterParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetClusterWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetClusterResponse, _a1 error) *MockClient_SlurmdbV0044GetClusterWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetClusterWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0044.SlurmdbV0044GetClusterParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetClusterResponse, error)) *MockClient_SlurmdbV0044GetClusterWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetClustersWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetClustersWithResponse(ctx context.Context, params *v0044.SlurmdbV0044GetClustersParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetClustersResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetClustersWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetClustersResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetClustersParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetClustersResponse, error)); ok {
+		return rf(ctx, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetClustersParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetClustersResponse); ok {
+		r0 = rf(ctx, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetClustersResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044GetClustersParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetClustersWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetClustersWithResponse'
+type MockClient_SlurmdbV0044GetClustersWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetClustersWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params *v0044.SlurmdbV0044GetClustersParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetClustersWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetClustersWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetClustersWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetClustersWithResponse",
+		append([]interface{}{ctx, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetClustersWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044GetClustersParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetClustersWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044GetClustersParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetClustersWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetClustersResponse, _a1 error) *MockClient_SlurmdbV0044GetClustersWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetClustersWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044GetClustersParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetClustersResponse, error)) *MockClient_SlurmdbV0044GetClustersWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetConfigWithResponse provides a mock function with given fields: ctx, reqEditors
+func (_m *MockClient) SlurmdbV0044GetConfigWithResponse(ctx context.Context, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetConfigResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetConfigWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetConfigResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetConfigResponse, error)); ok {
+		return rf(ctx, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetConfigResponse); ok {
+		r0 = rf(ctx, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetConfigResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetConfigWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetConfigWithResponse'
+type MockClient_SlurmdbV0044GetConfigWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetConfigWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetConfigWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetConfigWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetConfigWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetConfigWithResponse",
+		append([]interface{}{ctx}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetConfigWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetConfigWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-1)
+		for i, a := range args[1:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetConfigWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetConfigResponse, _a1 error) *MockClient_SlurmdbV0044GetConfigWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetConfigWithResponse_Call) RunAndReturn(run func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetConfigResponse, error)) *MockClient_SlurmdbV0044GetConfigWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetDiagWithResponse provides a mock function with given fields: ctx, reqEditors
+func (_m *MockClient) SlurmdbV0044GetDiagWithResponse(ctx context.Context, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetDiagResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetDiagWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetDiagResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetDiagResponse, error)); ok {
+		return rf(ctx, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetDiagResponse); ok {
+		r0 = rf(ctx, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetDiagResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetDiagWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetDiagWithResponse'
+type MockClient_SlurmdbV0044GetDiagWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetDiagWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetDiagWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetDiagWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetDiagWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetDiagWithResponse",
+		append([]interface{}{ctx}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetDiagWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetDiagWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-1)
+		for i, a := range args[1:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetDiagWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetDiagResponse, _a1 error) *MockClient_SlurmdbV0044GetDiagWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetDiagWithResponse_Call) RunAndReturn(run func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetDiagResponse, error)) *MockClient_SlurmdbV0044GetDiagWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetInstanceWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetInstanceWithResponse(ctx context.Context, params *v0044.SlurmdbV0044GetInstanceParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetInstanceResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetInstanceWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetInstanceResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetInstanceParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetInstanceResponse, error)); ok {
+		return rf(ctx, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetInstanceParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetInstanceResponse); ok {
+		r0 = rf(ctx, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetInstanceResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044GetInstanceParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetInstanceWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetInstanceWithResponse'
+type MockClient_SlurmdbV0044GetInstanceWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetInstanceWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params *v0044.SlurmdbV0044GetInstanceParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetInstanceWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetInstanceWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetInstanceWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetInstanceWithResponse",
+		append([]interface{}{ctx, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetInstanceWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044GetInstanceParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetInstanceWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044GetInstanceParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetInstanceWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetInstanceResponse, _a1 error) *MockClient_SlurmdbV0044GetInstanceWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetInstanceWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044GetInstanceParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetInstanceResponse, error)) *MockClient_SlurmdbV0044GetInstanceWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetInstancesWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetInstancesWithResponse(ctx context.Context, params *v0044.SlurmdbV0044GetInstancesParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetInstancesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetInstancesWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetInstancesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetInstancesParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetInstancesResponse, error)); ok {
+		return rf(ctx, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetInstancesParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetInstancesResponse); ok {
+		r0 = rf(ctx, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetInstancesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044GetInstancesParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetInstancesWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetInstancesWithResponse'
+type MockClient_SlurmdbV0044GetInstancesWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetInstancesWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params *v0044.SlurmdbV0044GetInstancesParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetInstancesWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetInstancesWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetInstancesWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetInstancesWithResponse",
+		append([]interface{}{ctx, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetInstancesWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044GetInstancesParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetInstancesWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044GetInstancesParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetInstancesWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetInstancesResponse, _a1 error) *MockClient_SlurmdbV0044GetInstancesWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetInstancesWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044GetInstancesParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetInstancesResponse, error)) *MockClient_SlurmdbV0044GetInstancesWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetJobWithResponse provides a mock function with given fields: ctx, jobId, reqEditors
+func (_m *MockClient) SlurmdbV0044GetJobWithResponse(ctx context.Context, jobId string, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetJobResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, jobId)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetJobWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetJobResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetJobResponse, error)); ok {
+		return rf(ctx, jobId, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetJobResponse); ok {
+		r0 = rf(ctx, jobId, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetJobResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, jobId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetJobWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetJobWithResponse'
+type MockClient_SlurmdbV0044GetJobWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetJobWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - jobId string
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetJobWithResponse(ctx interface{}, jobId interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetJobWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetJobWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetJobWithResponse",
+		append([]interface{}{ctx, jobId}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetJobWithResponse_Call) Run(run func(ctx context.Context, jobId string, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetJobWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetJobWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetJobResponse, _a1 error) *MockClient_SlurmdbV0044GetJobWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetJobWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetJobResponse, error)) *MockClient_SlurmdbV0044GetJobWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetJobsWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetJobsWithResponse(ctx context.Context, params *v0044.SlurmdbV0044GetJobsParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetJobsResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetJobsWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetJobsResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetJobsParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetJobsResponse, error)); ok {
+		return rf(ctx, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetJobsParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetJobsResponse); ok {
+		r0 = rf(ctx, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetJobsResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044GetJobsParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetJobsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetJobsWithResponse'
+type MockClient_SlurmdbV0044GetJobsWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetJobsWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params *v0044.SlurmdbV0044GetJobsParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetJobsWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetJobsWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetJobsWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetJobsWithResponse",
+		append([]interface{}{ctx, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetJobsWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044GetJobsParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetJobsWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044GetJobsParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetJobsWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetJobsResponse, _a1 error) *MockClient_SlurmdbV0044GetJobsWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetJobsWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044GetJobsParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetJobsResponse, error)) *MockClient_SlurmdbV0044GetJobsWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetPingWithResponse provides a mock function with given fields: ctx, reqEditors
+func (_m *MockClient) SlurmdbV0044GetPingWithResponse(ctx context.Context, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetPingResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetPingWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetPingResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetPingResponse, error)); ok {
+		return rf(ctx, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetPingResponse); ok {
+		r0 = rf(ctx, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetPingResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetPingWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetPingWithResponse'
+type MockClient_SlurmdbV0044GetPingWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetPingWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetPingWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetPingWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetPingWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetPingWithResponse",
+		append([]interface{}{ctx}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetPingWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetPingWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-1)
+		for i, a := range args[1:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetPingWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetPingResponse, _a1 error) *MockClient_SlurmdbV0044GetPingWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetPingWithResponse_Call) RunAndReturn(run func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetPingResponse, error)) *MockClient_SlurmdbV0044GetPingWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetQosWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetQosWithResponse(ctx context.Context, params *v0044.SlurmdbV0044GetQosParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetQosResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetQosWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetQosResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetQosParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetQosResponse, error)); ok {
+		return rf(ctx, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetQosParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetQosResponse); ok {
+		r0 = rf(ctx, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetQosResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044GetQosParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetQosWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetQosWithResponse'
+type MockClient_SlurmdbV0044GetQosWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetQosWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params *v0044.SlurmdbV0044GetQosParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetQosWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetQosWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetQosWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetQosWithResponse",
+		append([]interface{}{ctx, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetQosWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044GetQosParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetQosWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044GetQosParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetQosWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetQosResponse, _a1 error) *MockClient_SlurmdbV0044GetQosWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetQosWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044GetQosParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetQosResponse, error)) *MockClient_SlurmdbV0044GetQosWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetSingleQosWithResponse provides a mock function with given fields: ctx, qos, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetSingleQosWithResponse(ctx context.Context, qos string, params *v0044.SlurmdbV0044GetSingleQosParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetSingleQosResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, qos, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetSingleQosWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetSingleQosResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmdbV0044GetSingleQosParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetSingleQosResponse, error)); ok {
+		return rf(ctx, qos, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmdbV0044GetSingleQosParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetSingleQosResponse); ok {
+		r0 = rf(ctx, qos, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetSingleQosResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *v0044.SlurmdbV0044GetSingleQosParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, qos, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetSingleQosWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetSingleQosWithResponse'
+type MockClient_SlurmdbV0044GetSingleQosWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetSingleQosWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - qos string
+//   - params *v0044.SlurmdbV0044GetSingleQosParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetSingleQosWithResponse(ctx interface{}, qos interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetSingleQosWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetSingleQosWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetSingleQosWithResponse",
+		append([]interface{}{ctx, qos, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetSingleQosWithResponse_Call) Run(run func(ctx context.Context, qos string, params *v0044.SlurmdbV0044GetSingleQosParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetSingleQosWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(*v0044.SlurmdbV0044GetSingleQosParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetSingleQosWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetSingleQosResponse, _a1 error) *MockClient_SlurmdbV0044GetSingleQosWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetSingleQosWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0044.SlurmdbV0044GetSingleQosParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetSingleQosResponse, error)) *MockClient_SlurmdbV0044GetSingleQosWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetTresWithResponse provides a mock function with given fields: ctx, reqEditors
+func (_m *MockClient) SlurmdbV0044GetTresWithResponse(ctx context.Context, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetTresResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetTresWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetTresResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetTresResponse, error)); ok {
+		return rf(ctx, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetTresResponse); ok {
+		r0 = rf(ctx, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetTresResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetTresWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetTresWithResponse'
+type MockClient_SlurmdbV0044GetTresWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetTresWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetTresWithResponse(ctx interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetTresWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetTresWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetTresWithResponse",
+		append([]interface{}{ctx}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetTresWithResponse_Call) Run(run func(ctx context.Context, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetTresWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-1)
+		for i, a := range args[1:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetTresWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetTresResponse, _a1 error) *MockClient_SlurmdbV0044GetTresWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetTresWithResponse_Call) RunAndReturn(run func(context.Context, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetTresResponse, error)) *MockClient_SlurmdbV0044GetTresWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetUserWithResponse provides a mock function with given fields: ctx, name, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetUserWithResponse(ctx context.Context, name string, params *v0044.SlurmdbV0044GetUserParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetUserResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, name, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetUserWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetUserResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmdbV0044GetUserParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetUserResponse, error)); ok {
+		return rf(ctx, name, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v0044.SlurmdbV0044GetUserParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetUserResponse); ok {
+		r0 = rf(ctx, name, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetUserResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *v0044.SlurmdbV0044GetUserParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, name, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetUserWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetUserWithResponse'
+type MockClient_SlurmdbV0044GetUserWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetUserWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+//   - params *v0044.SlurmdbV0044GetUserParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetUserWithResponse(ctx interface{}, name interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetUserWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetUserWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetUserWithResponse",
+		append([]interface{}{ctx, name, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetUserWithResponse_Call) Run(run func(ctx context.Context, name string, params *v0044.SlurmdbV0044GetUserParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetUserWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(*v0044.SlurmdbV0044GetUserParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetUserWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetUserResponse, _a1 error) *MockClient_SlurmdbV0044GetUserWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetUserWithResponse_Call) RunAndReturn(run func(context.Context, string, *v0044.SlurmdbV0044GetUserParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetUserResponse, error)) *MockClient_SlurmdbV0044GetUserWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetUsersWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetUsersWithResponse(ctx context.Context, params *v0044.SlurmdbV0044GetUsersParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetUsersResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetUsersWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetUsersResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetUsersParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetUsersResponse, error)); ok {
+		return rf(ctx, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetUsersParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetUsersResponse); ok {
+		r0 = rf(ctx, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetUsersResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044GetUsersParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetUsersWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetUsersWithResponse'
+type MockClient_SlurmdbV0044GetUsersWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetUsersWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params *v0044.SlurmdbV0044GetUsersParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetUsersWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetUsersWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetUsersWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetUsersWithResponse",
+		append([]interface{}{ctx, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetUsersWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044GetUsersParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetUsersWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044GetUsersParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetUsersWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetUsersResponse, _a1 error) *MockClient_SlurmdbV0044GetUsersWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetUsersWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044GetUsersParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetUsersResponse, error)) *MockClient_SlurmdbV0044GetUsersWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetWckeyWithResponse provides a mock function with given fields: ctx, id, reqEditors
+func (_m *MockClient) SlurmdbV0044GetWckeyWithResponse(ctx context.Context, id string, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetWckeyResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, id)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetWckeyWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetWckeyResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetWckeyResponse, error)); ok {
+		return rf(ctx, id, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetWckeyResponse); ok {
+		r0 = rf(ctx, id, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetWckeyResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, id, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetWckeyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetWckeyWithResponse'
+type MockClient_SlurmdbV0044GetWckeyWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetWckeyWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetWckeyWithResponse(ctx interface{}, id interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetWckeyWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetWckeyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetWckeyWithResponse",
+		append([]interface{}{ctx, id}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetWckeyWithResponse_Call) Run(run func(ctx context.Context, id string, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetWckeyWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetWckeyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetWckeyResponse, _a1 error) *MockClient_SlurmdbV0044GetWckeyWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetWckeyWithResponse_Call) RunAndReturn(run func(context.Context, string, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetWckeyResponse, error)) *MockClient_SlurmdbV0044GetWckeyWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044GetWckeysWithResponse provides a mock function with given fields: ctx, params, reqEditors
+func (_m *MockClient) SlurmdbV0044GetWckeysWithResponse(ctx context.Context, params *v0044.SlurmdbV0044GetWckeysParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetWckeysResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044GetWckeysWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044GetWckeysResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetWckeysParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetWckeysResponse, error)); ok {
+		return rf(ctx, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044GetWckeysParams, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044GetWckeysResponse); ok {
+		r0 = rf(ctx, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044GetWckeysResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044GetWckeysParams, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044GetWckeysWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044GetWckeysWithResponse'
+type MockClient_SlurmdbV0044GetWckeysWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044GetWckeysWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params *v0044.SlurmdbV0044GetWckeysParams
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044GetWckeysWithResponse(ctx interface{}, params interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044GetWckeysWithResponse_Call {
+	return &MockClient_SlurmdbV0044GetWckeysWithResponse_Call{Call: _e.mock.On("SlurmdbV0044GetWckeysWithResponse",
+		append([]interface{}{ctx, params}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044GetWckeysWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044GetWckeysParams, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044GetWckeysWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044GetWckeysParams), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetWckeysWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044GetWckeysResponse, _a1 error) *MockClient_SlurmdbV0044GetWckeysWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044GetWckeysWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044GetWckeysParams, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044GetWckeysResponse, error)) *MockClient_SlurmdbV0044GetWckeysWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044PostAccountsAssociationWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostAccountsAssociationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAccountsAssociationResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -4245,23 +5062,23 @@ func (_m *MockClient) SlurmdbV0041PostAccountsAssociationWithBodyWithResponse(ct
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostAccountsAssociationWithBodyWithResponse")
+		panic("no return value specified for SlurmdbV0044PostAccountsAssociationWithBodyWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostAccountsAssociationResponse
+	var r0 *v0044.SlurmdbV0044PostAccountsAssociationResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAccountsAssociationResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAccountsAssociationResponse, error)); ok {
 		return rf(ctx, contentType, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostAccountsAssociationResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostAccountsAssociationResponse); ok {
 		r0 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostAccountsAssociationResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostAccountsAssociationResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -4270,27 +5087,27 @@ func (_m *MockClient) SlurmdbV0041PostAccountsAssociationWithBodyWithResponse(ct
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostAccountsAssociationWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostAccountsAssociationWithBodyWithResponse'
-type MockClient_SlurmdbV0041PostAccountsAssociationWithBodyWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostAccountsAssociationWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostAccountsAssociationWithBodyWithResponse'
+type MockClient_SlurmdbV0044PostAccountsAssociationWithBodyWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostAccountsAssociationWithBodyWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostAccountsAssociationWithBodyWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - contentType string
 //   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostAccountsAssociationWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostAccountsAssociationWithBodyWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostAccountsAssociationWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostAccountsAssociationWithBodyWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostAccountsAssociationWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostAccountsAssociationWithBodyWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostAccountsAssociationWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostAccountsAssociationWithBodyWithResponse",
 		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostAccountsAssociationWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostAccountsAssociationWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAccountsAssociationWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostAccountsAssociationWithBodyWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
@@ -4298,18 +5115,18 @@ func (_c *MockClient_SlurmdbV0041PostAccountsAssociationWithBodyWithResponse_Cal
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostAccountsAssociationWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostAccountsAssociationResponse, _a1 error) *MockClient_SlurmdbV0041PostAccountsAssociationWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAccountsAssociationWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostAccountsAssociationResponse, _a1 error) *MockClient_SlurmdbV0044PostAccountsAssociationWithBodyWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostAccountsAssociationWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAccountsAssociationResponse, error)) *MockClient_SlurmdbV0041PostAccountsAssociationWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAccountsAssociationWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAccountsAssociationResponse, error)) *MockClient_SlurmdbV0044PostAccountsAssociationWithBodyWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostAccountsAssociationWithResponse provides a mock function with given fields: ctx, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostAccountsAssociationWithResponse(ctx context.Context, body v0041.SlurmdbV0041PostAccountsAssociationJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAccountsAssociationResponse, error) {
+// SlurmdbV0044PostAccountsAssociationWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostAccountsAssociationWithResponse(ctx context.Context, body v0044.SlurmdbV0044PostAccountsAssociationJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAccountsAssociationResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -4320,23 +5137,23 @@ func (_m *MockClient) SlurmdbV0041PostAccountsAssociationWithResponse(ctx contex
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostAccountsAssociationWithResponse")
+		panic("no return value specified for SlurmdbV0044PostAccountsAssociationWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostAccountsAssociationResponse
+	var r0 *v0044.SlurmdbV0044PostAccountsAssociationResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmdbV0041PostAccountsAssociationJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAccountsAssociationResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostAccountsAssociationJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAccountsAssociationResponse, error)); ok {
 		return rf(ctx, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmdbV0041PostAccountsAssociationJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostAccountsAssociationResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostAccountsAssociationJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostAccountsAssociationResponse); ok {
 		r0 = rf(ctx, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostAccountsAssociationResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostAccountsAssociationResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, v0041.SlurmdbV0041PostAccountsAssociationJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmdbV0044PostAccountsAssociationJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -4345,45 +5162,45 @@ func (_m *MockClient) SlurmdbV0041PostAccountsAssociationWithResponse(ctx contex
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostAccountsAssociationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostAccountsAssociationWithResponse'
-type MockClient_SlurmdbV0041PostAccountsAssociationWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostAccountsAssociationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostAccountsAssociationWithResponse'
+type MockClient_SlurmdbV0044PostAccountsAssociationWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostAccountsAssociationWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostAccountsAssociationWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - body v0041.SlurmdbV0041PostAccountsAssociationJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostAccountsAssociationWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostAccountsAssociationWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostAccountsAssociationWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostAccountsAssociationWithResponse",
+//   - body v0044.SlurmdbV0044PostAccountsAssociationJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostAccountsAssociationWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostAccountsAssociationWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostAccountsAssociationWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostAccountsAssociationWithResponse",
 		append([]interface{}{ctx, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostAccountsAssociationWithResponse_Call) Run(run func(ctx context.Context, body v0041.SlurmdbV0041PostAccountsAssociationJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostAccountsAssociationWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAccountsAssociationWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmdbV0044PostAccountsAssociationJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostAccountsAssociationWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(v0041.SlurmdbV0041PostAccountsAssociationJSONRequestBody), variadicArgs...)
+		run(args[0].(context.Context), args[1].(v0044.SlurmdbV0044PostAccountsAssociationJSONRequestBody), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostAccountsAssociationWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostAccountsAssociationResponse, _a1 error) *MockClient_SlurmdbV0041PostAccountsAssociationWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAccountsAssociationWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostAccountsAssociationResponse, _a1 error) *MockClient_SlurmdbV0044PostAccountsAssociationWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostAccountsAssociationWithResponse_Call) RunAndReturn(run func(context.Context, v0041.SlurmdbV0041PostAccountsAssociationJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAccountsAssociationResponse, error)) *MockClient_SlurmdbV0041PostAccountsAssociationWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAccountsAssociationWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmdbV0044PostAccountsAssociationJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAccountsAssociationResponse, error)) *MockClient_SlurmdbV0044PostAccountsAssociationWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostAccountsWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostAccountsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAccountsResponse, error) {
+// SlurmdbV0044PostAccountsWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostAccountsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAccountsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -4394,23 +5211,23 @@ func (_m *MockClient) SlurmdbV0041PostAccountsWithBodyWithResponse(ctx context.C
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostAccountsWithBodyWithResponse")
+		panic("no return value specified for SlurmdbV0044PostAccountsWithBodyWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostAccountsResponse
+	var r0 *v0044.SlurmdbV0044PostAccountsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAccountsResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAccountsResponse, error)); ok {
 		return rf(ctx, contentType, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostAccountsResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostAccountsResponse); ok {
 		r0 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostAccountsResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostAccountsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -4419,27 +5236,27 @@ func (_m *MockClient) SlurmdbV0041PostAccountsWithBodyWithResponse(ctx context.C
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostAccountsWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostAccountsWithBodyWithResponse'
-type MockClient_SlurmdbV0041PostAccountsWithBodyWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostAccountsWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostAccountsWithBodyWithResponse'
+type MockClient_SlurmdbV0044PostAccountsWithBodyWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostAccountsWithBodyWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostAccountsWithBodyWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - contentType string
 //   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostAccountsWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostAccountsWithBodyWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostAccountsWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostAccountsWithBodyWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostAccountsWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostAccountsWithBodyWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostAccountsWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostAccountsWithBodyWithResponse",
 		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostAccountsWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostAccountsWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAccountsWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostAccountsWithBodyWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
@@ -4447,18 +5264,18 @@ func (_c *MockClient_SlurmdbV0041PostAccountsWithBodyWithResponse_Call) Run(run 
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostAccountsWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostAccountsResponse, _a1 error) *MockClient_SlurmdbV0041PostAccountsWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAccountsWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostAccountsResponse, _a1 error) *MockClient_SlurmdbV0044PostAccountsWithBodyWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostAccountsWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAccountsResponse, error)) *MockClient_SlurmdbV0041PostAccountsWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAccountsWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAccountsResponse, error)) *MockClient_SlurmdbV0044PostAccountsWithBodyWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostAccountsWithResponse provides a mock function with given fields: ctx, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostAccountsWithResponse(ctx context.Context, body v0041.SlurmdbV0041PostAccountsJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAccountsResponse, error) {
+// SlurmdbV0044PostAccountsWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostAccountsWithResponse(ctx context.Context, body v0044.SlurmdbV0044PostAccountsJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAccountsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -4469,23 +5286,23 @@ func (_m *MockClient) SlurmdbV0041PostAccountsWithResponse(ctx context.Context, 
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostAccountsWithResponse")
+		panic("no return value specified for SlurmdbV0044PostAccountsWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostAccountsResponse
+	var r0 *v0044.SlurmdbV0044PostAccountsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmdbV0041PostAccountsJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAccountsResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostAccountsJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAccountsResponse, error)); ok {
 		return rf(ctx, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmdbV0041PostAccountsJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostAccountsResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostAccountsJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostAccountsResponse); ok {
 		r0 = rf(ctx, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostAccountsResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostAccountsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, v0041.SlurmdbV0041PostAccountsJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmdbV0044PostAccountsJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -4494,45 +5311,45 @@ func (_m *MockClient) SlurmdbV0041PostAccountsWithResponse(ctx context.Context, 
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostAccountsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostAccountsWithResponse'
-type MockClient_SlurmdbV0041PostAccountsWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostAccountsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostAccountsWithResponse'
+type MockClient_SlurmdbV0044PostAccountsWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostAccountsWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostAccountsWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - body v0041.SlurmdbV0041PostAccountsJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostAccountsWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostAccountsWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostAccountsWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostAccountsWithResponse",
+//   - body v0044.SlurmdbV0044PostAccountsJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostAccountsWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostAccountsWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostAccountsWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostAccountsWithResponse",
 		append([]interface{}{ctx, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostAccountsWithResponse_Call) Run(run func(ctx context.Context, body v0041.SlurmdbV0041PostAccountsJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostAccountsWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAccountsWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmdbV0044PostAccountsJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostAccountsWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(v0041.SlurmdbV0041PostAccountsJSONRequestBody), variadicArgs...)
+		run(args[0].(context.Context), args[1].(v0044.SlurmdbV0044PostAccountsJSONRequestBody), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostAccountsWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostAccountsResponse, _a1 error) *MockClient_SlurmdbV0041PostAccountsWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAccountsWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostAccountsResponse, _a1 error) *MockClient_SlurmdbV0044PostAccountsWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostAccountsWithResponse_Call) RunAndReturn(run func(context.Context, v0041.SlurmdbV0041PostAccountsJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAccountsResponse, error)) *MockClient_SlurmdbV0041PostAccountsWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAccountsWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmdbV0044PostAccountsJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAccountsResponse, error)) *MockClient_SlurmdbV0044PostAccountsWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostAssociationsWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostAssociationsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAssociationsResponse, error) {
+// SlurmdbV0044PostAssociationsWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostAssociationsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAssociationsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -4543,23 +5360,23 @@ func (_m *MockClient) SlurmdbV0041PostAssociationsWithBodyWithResponse(ctx conte
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostAssociationsWithBodyWithResponse")
+		panic("no return value specified for SlurmdbV0044PostAssociationsWithBodyWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostAssociationsResponse
+	var r0 *v0044.SlurmdbV0044PostAssociationsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAssociationsResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAssociationsResponse, error)); ok {
 		return rf(ctx, contentType, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostAssociationsResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostAssociationsResponse); ok {
 		r0 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostAssociationsResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostAssociationsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -4568,27 +5385,27 @@ func (_m *MockClient) SlurmdbV0041PostAssociationsWithBodyWithResponse(ctx conte
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostAssociationsWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostAssociationsWithBodyWithResponse'
-type MockClient_SlurmdbV0041PostAssociationsWithBodyWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostAssociationsWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostAssociationsWithBodyWithResponse'
+type MockClient_SlurmdbV0044PostAssociationsWithBodyWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostAssociationsWithBodyWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostAssociationsWithBodyWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - contentType string
 //   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostAssociationsWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostAssociationsWithBodyWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostAssociationsWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostAssociationsWithBodyWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostAssociationsWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostAssociationsWithBodyWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostAssociationsWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostAssociationsWithBodyWithResponse",
 		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostAssociationsWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostAssociationsWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAssociationsWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostAssociationsWithBodyWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
@@ -4596,18 +5413,18 @@ func (_c *MockClient_SlurmdbV0041PostAssociationsWithBodyWithResponse_Call) Run(
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostAssociationsWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostAssociationsResponse, _a1 error) *MockClient_SlurmdbV0041PostAssociationsWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAssociationsWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostAssociationsResponse, _a1 error) *MockClient_SlurmdbV0044PostAssociationsWithBodyWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostAssociationsWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAssociationsResponse, error)) *MockClient_SlurmdbV0041PostAssociationsWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAssociationsWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAssociationsResponse, error)) *MockClient_SlurmdbV0044PostAssociationsWithBodyWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostAssociationsWithResponse provides a mock function with given fields: ctx, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostAssociationsWithResponse(ctx context.Context, body v0041.SlurmdbV0041PostAssociationsJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAssociationsResponse, error) {
+// SlurmdbV0044PostAssociationsWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostAssociationsWithResponse(ctx context.Context, body v0044.SlurmdbV0044PostAssociationsJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAssociationsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -4618,23 +5435,23 @@ func (_m *MockClient) SlurmdbV0041PostAssociationsWithResponse(ctx context.Conte
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostAssociationsWithResponse")
+		panic("no return value specified for SlurmdbV0044PostAssociationsWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostAssociationsResponse
+	var r0 *v0044.SlurmdbV0044PostAssociationsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmdbV0041PostAssociationsJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAssociationsResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostAssociationsJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAssociationsResponse, error)); ok {
 		return rf(ctx, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmdbV0041PostAssociationsJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostAssociationsResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostAssociationsJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostAssociationsResponse); ok {
 		r0 = rf(ctx, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostAssociationsResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostAssociationsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, v0041.SlurmdbV0041PostAssociationsJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmdbV0044PostAssociationsJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -4643,45 +5460,45 @@ func (_m *MockClient) SlurmdbV0041PostAssociationsWithResponse(ctx context.Conte
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostAssociationsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostAssociationsWithResponse'
-type MockClient_SlurmdbV0041PostAssociationsWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostAssociationsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostAssociationsWithResponse'
+type MockClient_SlurmdbV0044PostAssociationsWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostAssociationsWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostAssociationsWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - body v0041.SlurmdbV0041PostAssociationsJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostAssociationsWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostAssociationsWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostAssociationsWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostAssociationsWithResponse",
+//   - body v0044.SlurmdbV0044PostAssociationsJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostAssociationsWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostAssociationsWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostAssociationsWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostAssociationsWithResponse",
 		append([]interface{}{ctx, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostAssociationsWithResponse_Call) Run(run func(ctx context.Context, body v0041.SlurmdbV0041PostAssociationsJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostAssociationsWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAssociationsWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmdbV0044PostAssociationsJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostAssociationsWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(v0041.SlurmdbV0041PostAssociationsJSONRequestBody), variadicArgs...)
+		run(args[0].(context.Context), args[1].(v0044.SlurmdbV0044PostAssociationsJSONRequestBody), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostAssociationsWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostAssociationsResponse, _a1 error) *MockClient_SlurmdbV0041PostAssociationsWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAssociationsWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostAssociationsResponse, _a1 error) *MockClient_SlurmdbV0044PostAssociationsWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostAssociationsWithResponse_Call) RunAndReturn(run func(context.Context, v0041.SlurmdbV0041PostAssociationsJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostAssociationsResponse, error)) *MockClient_SlurmdbV0041PostAssociationsWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostAssociationsWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmdbV0044PostAssociationsJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostAssociationsResponse, error)) *MockClient_SlurmdbV0044PostAssociationsWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostClustersWithBodyWithResponse provides a mock function with given fields: ctx, params, contentType, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostClustersWithBodyWithResponse(ctx context.Context, params *v0041.SlurmdbV0041PostClustersParams, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostClustersResponse, error) {
+// SlurmdbV0044PostClustersWithBodyWithResponse provides a mock function with given fields: ctx, params, contentType, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostClustersWithBodyWithResponse(ctx context.Context, params *v0044.SlurmdbV0044PostClustersParams, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostClustersResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -4692,23 +5509,23 @@ func (_m *MockClient) SlurmdbV0041PostClustersWithBodyWithResponse(ctx context.C
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostClustersWithBodyWithResponse")
+		panic("no return value specified for SlurmdbV0044PostClustersWithBodyWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostClustersResponse
+	var r0 *v0044.SlurmdbV0044PostClustersResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostClustersParams, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostClustersResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostClustersParams, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostClustersResponse, error)); ok {
 		return rf(ctx, params, contentType, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostClustersParams, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostClustersResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostClustersParams, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostClustersResponse); ok {
 		r0 = rf(ctx, params, contentType, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostClustersResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostClustersResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041PostClustersParams, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044PostClustersParams, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, contentType, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -4717,47 +5534,47 @@ func (_m *MockClient) SlurmdbV0041PostClustersWithBodyWithResponse(ctx context.C
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostClustersWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostClustersWithBodyWithResponse'
-type MockClient_SlurmdbV0041PostClustersWithBodyWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostClustersWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostClustersWithBodyWithResponse'
+type MockClient_SlurmdbV0044PostClustersWithBodyWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostClustersWithBodyWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostClustersWithBodyWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmdbV0041PostClustersParams
+//   - params *v0044.SlurmdbV0044PostClustersParams
 //   - contentType string
 //   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostClustersWithBodyWithResponse(ctx interface{}, params interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostClustersWithBodyWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostClustersWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostClustersWithBodyWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostClustersWithBodyWithResponse(ctx interface{}, params interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostClustersWithBodyWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostClustersWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostClustersWithBodyWithResponse",
 		append([]interface{}{ctx, params, contentType, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostClustersWithBodyWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041PostClustersParams, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostClustersWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostClustersWithBodyWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044PostClustersParams, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostClustersWithBodyWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-4)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-4)
 		for i, a := range args[4:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041PostClustersParams), args[2].(string), args[3].(io.Reader), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044PostClustersParams), args[2].(string), args[3].(io.Reader), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostClustersWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostClustersResponse, _a1 error) *MockClient_SlurmdbV0041PostClustersWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostClustersWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostClustersResponse, _a1 error) *MockClient_SlurmdbV0044PostClustersWithBodyWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostClustersWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041PostClustersParams, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostClustersResponse, error)) *MockClient_SlurmdbV0041PostClustersWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostClustersWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044PostClustersParams, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostClustersResponse, error)) *MockClient_SlurmdbV0044PostClustersWithBodyWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostClustersWithResponse provides a mock function with given fields: ctx, params, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostClustersWithResponse(ctx context.Context, params *v0041.SlurmdbV0041PostClustersParams, body v0041.SlurmdbV0041PostClustersJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostClustersResponse, error) {
+// SlurmdbV0044PostClustersWithResponse provides a mock function with given fields: ctx, params, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostClustersWithResponse(ctx context.Context, params *v0044.SlurmdbV0044PostClustersParams, body v0044.SlurmdbV0044PostClustersJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostClustersResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -4768,23 +5585,23 @@ func (_m *MockClient) SlurmdbV0041PostClustersWithResponse(ctx context.Context, 
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostClustersWithResponse")
+		panic("no return value specified for SlurmdbV0044PostClustersWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostClustersResponse
+	var r0 *v0044.SlurmdbV0044PostClustersResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostClustersParams, v0041.SlurmdbV0041PostClustersJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostClustersResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostClustersParams, v0044.SlurmdbV0044PostClustersJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostClustersResponse, error)); ok {
 		return rf(ctx, params, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostClustersParams, v0041.SlurmdbV0041PostClustersJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostClustersResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostClustersParams, v0044.SlurmdbV0044PostClustersJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostClustersResponse); ok {
 		r0 = rf(ctx, params, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostClustersResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostClustersResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041PostClustersParams, v0041.SlurmdbV0041PostClustersJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044PostClustersParams, v0044.SlurmdbV0044PostClustersJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -4793,46 +5610,46 @@ func (_m *MockClient) SlurmdbV0041PostClustersWithResponse(ctx context.Context, 
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostClustersWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostClustersWithResponse'
-type MockClient_SlurmdbV0041PostClustersWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostClustersWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostClustersWithResponse'
+type MockClient_SlurmdbV0044PostClustersWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostClustersWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostClustersWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmdbV0041PostClustersParams
-//   - body v0041.SlurmdbV0041PostClustersJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostClustersWithResponse(ctx interface{}, params interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostClustersWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostClustersWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostClustersWithResponse",
+//   - params *v0044.SlurmdbV0044PostClustersParams
+//   - body v0044.SlurmdbV0044PostClustersJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostClustersWithResponse(ctx interface{}, params interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostClustersWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostClustersWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostClustersWithResponse",
 		append([]interface{}{ctx, params, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostClustersWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041PostClustersParams, body v0041.SlurmdbV0041PostClustersJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostClustersWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostClustersWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044PostClustersParams, body v0044.SlurmdbV0044PostClustersJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostClustersWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041PostClustersParams), args[2].(v0041.SlurmdbV0041PostClustersJSONRequestBody), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044PostClustersParams), args[2].(v0044.SlurmdbV0044PostClustersJSONRequestBody), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostClustersWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostClustersResponse, _a1 error) *MockClient_SlurmdbV0041PostClustersWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostClustersWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostClustersResponse, _a1 error) *MockClient_SlurmdbV0044PostClustersWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostClustersWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041PostClustersParams, v0041.SlurmdbV0041PostClustersJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostClustersResponse, error)) *MockClient_SlurmdbV0041PostClustersWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostClustersWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044PostClustersParams, v0044.SlurmdbV0044PostClustersJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostClustersResponse, error)) *MockClient_SlurmdbV0044PostClustersWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostConfigWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostConfigWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostConfigResponse, error) {
+// SlurmdbV0044PostConfigWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostConfigWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostConfigResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -4843,23 +5660,23 @@ func (_m *MockClient) SlurmdbV0041PostConfigWithBodyWithResponse(ctx context.Con
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostConfigWithBodyWithResponse")
+		panic("no return value specified for SlurmdbV0044PostConfigWithBodyWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostConfigResponse
+	var r0 *v0044.SlurmdbV0044PostConfigResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostConfigResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostConfigResponse, error)); ok {
 		return rf(ctx, contentType, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostConfigResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostConfigResponse); ok {
 		r0 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostConfigResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostConfigResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -4868,27 +5685,27 @@ func (_m *MockClient) SlurmdbV0041PostConfigWithBodyWithResponse(ctx context.Con
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostConfigWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostConfigWithBodyWithResponse'
-type MockClient_SlurmdbV0041PostConfigWithBodyWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostConfigWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostConfigWithBodyWithResponse'
+type MockClient_SlurmdbV0044PostConfigWithBodyWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostConfigWithBodyWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostConfigWithBodyWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - contentType string
 //   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostConfigWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostConfigWithBodyWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostConfigWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostConfigWithBodyWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostConfigWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostConfigWithBodyWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostConfigWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostConfigWithBodyWithResponse",
 		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostConfigWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostConfigWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostConfigWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostConfigWithBodyWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
@@ -4896,18 +5713,18 @@ func (_c *MockClient_SlurmdbV0041PostConfigWithBodyWithResponse_Call) Run(run fu
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostConfigWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostConfigResponse, _a1 error) *MockClient_SlurmdbV0041PostConfigWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostConfigWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostConfigResponse, _a1 error) *MockClient_SlurmdbV0044PostConfigWithBodyWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostConfigWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostConfigResponse, error)) *MockClient_SlurmdbV0041PostConfigWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostConfigWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostConfigResponse, error)) *MockClient_SlurmdbV0044PostConfigWithBodyWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostConfigWithResponse provides a mock function with given fields: ctx, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostConfigWithResponse(ctx context.Context, body v0041.SlurmdbV0041PostConfigJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostConfigResponse, error) {
+// SlurmdbV0044PostConfigWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostConfigWithResponse(ctx context.Context, body v0044.SlurmdbV0044PostConfigJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostConfigResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -4918,23 +5735,23 @@ func (_m *MockClient) SlurmdbV0041PostConfigWithResponse(ctx context.Context, bo
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostConfigWithResponse")
+		panic("no return value specified for SlurmdbV0044PostConfigWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostConfigResponse
+	var r0 *v0044.SlurmdbV0044PostConfigResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmdbV0041PostConfigJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostConfigResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostConfigJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostConfigResponse, error)); ok {
 		return rf(ctx, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmdbV0041PostConfigJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostConfigResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostConfigJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostConfigResponse); ok {
 		r0 = rf(ctx, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostConfigResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostConfigResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, v0041.SlurmdbV0041PostConfigJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmdbV0044PostConfigJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -4943,73 +5760,73 @@ func (_m *MockClient) SlurmdbV0041PostConfigWithResponse(ctx context.Context, bo
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostConfigWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostConfigWithResponse'
-type MockClient_SlurmdbV0041PostConfigWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostConfigWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostConfigWithResponse'
+type MockClient_SlurmdbV0044PostConfigWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostConfigWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostConfigWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - body v0041.SlurmdbV0041PostConfigJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostConfigWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostConfigWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostConfigWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostConfigWithResponse",
+//   - body v0044.SlurmdbV0044PostConfigJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostConfigWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostConfigWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostConfigWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostConfigWithResponse",
 		append([]interface{}{ctx, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostConfigWithResponse_Call) Run(run func(ctx context.Context, body v0041.SlurmdbV0041PostConfigJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostConfigWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostConfigWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmdbV0044PostConfigJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostConfigWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(v0041.SlurmdbV0041PostConfigJSONRequestBody), variadicArgs...)
+		run(args[0].(context.Context), args[1].(v0044.SlurmdbV0044PostConfigJSONRequestBody), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostConfigWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostConfigResponse, _a1 error) *MockClient_SlurmdbV0041PostConfigWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostConfigWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostConfigResponse, _a1 error) *MockClient_SlurmdbV0044PostConfigWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostConfigWithResponse_Call) RunAndReturn(run func(context.Context, v0041.SlurmdbV0041PostConfigJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostConfigResponse, error)) *MockClient_SlurmdbV0041PostConfigWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostConfigWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmdbV0044PostConfigJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostConfigResponse, error)) *MockClient_SlurmdbV0044PostConfigWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostQosWithBodyWithResponse provides a mock function with given fields: ctx, params, contentType, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostQosWithBodyWithResponse(ctx context.Context, params *v0041.SlurmdbV0041PostQosParams, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostQosResponse, error) {
+// SlurmdbV0044PostJobWithBodyWithResponse provides a mock function with given fields: ctx, jobId, contentType, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostJobWithBodyWithResponse(ctx context.Context, jobId string, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostJobResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, ctx, params, contentType, body)
+	_ca = append(_ca, ctx, jobId, contentType, body)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostQosWithBodyWithResponse")
+		panic("no return value specified for SlurmdbV0044PostJobWithBodyWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostQosResponse
+	var r0 *v0044.SlurmdbV0044PostJobResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostQosParams, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostQosResponse, error)); ok {
-		return rf(ctx, params, contentType, body, reqEditors...)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostJobResponse, error)); ok {
+		return rf(ctx, jobId, contentType, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostQosParams, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostQosResponse); ok {
-		r0 = rf(ctx, params, contentType, body, reqEditors...)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostJobResponse); ok {
+		r0 = rf(ctx, jobId, contentType, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostQosResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostJobResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041PostQosParams, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, params, contentType, body, reqEditors...)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, jobId, contentType, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -5017,75 +5834,75 @@ func (_m *MockClient) SlurmdbV0041PostQosWithBodyWithResponse(ctx context.Contex
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostQosWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostQosWithBodyWithResponse'
-type MockClient_SlurmdbV0041PostQosWithBodyWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostJobWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostJobWithBodyWithResponse'
+type MockClient_SlurmdbV0044PostJobWithBodyWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostQosWithBodyWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostJobWithBodyWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmdbV0041PostQosParams
+//   - jobId string
 //   - contentType string
 //   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostQosWithBodyWithResponse(ctx interface{}, params interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostQosWithBodyWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostQosWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostQosWithBodyWithResponse",
-		append([]interface{}{ctx, params, contentType, body}, reqEditors...)...)}
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostJobWithBodyWithResponse(ctx interface{}, jobId interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostJobWithBodyWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostJobWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostJobWithBodyWithResponse",
+		append([]interface{}{ctx, jobId, contentType, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostQosWithBodyWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041PostQosParams, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostQosWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostJobWithBodyWithResponse_Call) Run(run func(ctx context.Context, jobId string, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostJobWithBodyWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-4)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-4)
 		for i, a := range args[4:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041PostQosParams), args[2].(string), args[3].(io.Reader), variadicArgs...)
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(io.Reader), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostQosWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostQosResponse, _a1 error) *MockClient_SlurmdbV0041PostQosWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostJobWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostJobResponse, _a1 error) *MockClient_SlurmdbV0044PostJobWithBodyWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostQosWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041PostQosParams, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostQosResponse, error)) *MockClient_SlurmdbV0041PostQosWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostJobWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostJobResponse, error)) *MockClient_SlurmdbV0044PostJobWithBodyWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostQosWithResponse provides a mock function with given fields: ctx, params, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostQosWithResponse(ctx context.Context, params *v0041.SlurmdbV0041PostQosParams, body v0041.SlurmdbV0041PostQosJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostQosResponse, error) {
+// SlurmdbV0044PostJobWithResponse provides a mock function with given fields: ctx, jobId, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostJobWithResponse(ctx context.Context, jobId string, body v0044.SlurmdbV0044PostJobJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostJobResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, ctx, params, body)
+	_ca = append(_ca, ctx, jobId, body)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostQosWithResponse")
+		panic("no return value specified for SlurmdbV0044PostJobWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostQosResponse
+	var r0 *v0044.SlurmdbV0044PostJobResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostQosParams, v0041.SlurmdbV0041PostQosJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostQosResponse, error)); ok {
-		return rf(ctx, params, body, reqEditors...)
+	if rf, ok := ret.Get(0).(func(context.Context, string, v0044.SlurmdbV0044PostJobJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostJobResponse, error)); ok {
+		return rf(ctx, jobId, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostQosParams, v0041.SlurmdbV0041PostQosJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostQosResponse); ok {
-		r0 = rf(ctx, params, body, reqEditors...)
+	if rf, ok := ret.Get(0).(func(context.Context, string, v0044.SlurmdbV0044PostJobJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostJobResponse); ok {
+		r0 = rf(ctx, jobId, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostQosResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostJobResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041PostQosParams, v0041.SlurmdbV0041PostQosJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
-		r1 = rf(ctx, params, body, reqEditors...)
+	if rf, ok := ret.Get(1).(func(context.Context, string, v0044.SlurmdbV0044PostJobJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, jobId, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -5093,46 +5910,46 @@ func (_m *MockClient) SlurmdbV0041PostQosWithResponse(ctx context.Context, param
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostQosWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostQosWithResponse'
-type MockClient_SlurmdbV0041PostQosWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostJobWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostJobWithResponse'
+type MockClient_SlurmdbV0044PostJobWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostQosWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostJobWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmdbV0041PostQosParams
-//   - body v0041.SlurmdbV0041PostQosJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostQosWithResponse(ctx interface{}, params interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostQosWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostQosWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostQosWithResponse",
-		append([]interface{}{ctx, params, body}, reqEditors...)...)}
+//   - jobId string
+//   - body v0044.SlurmdbV0044PostJobJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostJobWithResponse(ctx interface{}, jobId interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostJobWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostJobWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostJobWithResponse",
+		append([]interface{}{ctx, jobId, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostQosWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041PostQosParams, body v0041.SlurmdbV0041PostQosJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostQosWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostJobWithResponse_Call) Run(run func(ctx context.Context, jobId string, body v0044.SlurmdbV0044PostJobJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostJobWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041PostQosParams), args[2].(v0041.SlurmdbV0041PostQosJSONRequestBody), variadicArgs...)
+		run(args[0].(context.Context), args[1].(string), args[2].(v0044.SlurmdbV0044PostJobJSONRequestBody), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostQosWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostQosResponse, _a1 error) *MockClient_SlurmdbV0041PostQosWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostJobWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostJobResponse, _a1 error) *MockClient_SlurmdbV0044PostJobWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostQosWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041PostQosParams, v0041.SlurmdbV0041PostQosJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostQosResponse, error)) *MockClient_SlurmdbV0041PostQosWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostJobWithResponse_Call) RunAndReturn(run func(context.Context, string, v0044.SlurmdbV0044PostJobJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostJobResponse, error)) *MockClient_SlurmdbV0044PostJobWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostTresWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostTresWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostTresResponse, error) {
+// SlurmdbV0044PostJobsWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostJobsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostJobsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -5143,23 +5960,23 @@ func (_m *MockClient) SlurmdbV0041PostTresWithBodyWithResponse(ctx context.Conte
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostTresWithBodyWithResponse")
+		panic("no return value specified for SlurmdbV0044PostJobsWithBodyWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostTresResponse
+	var r0 *v0044.SlurmdbV0044PostJobsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostTresResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostJobsResponse, error)); ok {
 		return rf(ctx, contentType, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostTresResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostJobsResponse); ok {
 		r0 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostTresResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostJobsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -5168,27 +5985,27 @@ func (_m *MockClient) SlurmdbV0041PostTresWithBodyWithResponse(ctx context.Conte
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostTresWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostTresWithBodyWithResponse'
-type MockClient_SlurmdbV0041PostTresWithBodyWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostJobsWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostJobsWithBodyWithResponse'
+type MockClient_SlurmdbV0044PostJobsWithBodyWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostTresWithBodyWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostJobsWithBodyWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - contentType string
 //   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostTresWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostTresWithBodyWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostTresWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostTresWithBodyWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostJobsWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostJobsWithBodyWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostJobsWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostJobsWithBodyWithResponse",
 		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostTresWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostTresWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostJobsWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostJobsWithBodyWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
@@ -5196,18 +6013,18 @@ func (_c *MockClient_SlurmdbV0041PostTresWithBodyWithResponse_Call) Run(run func
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostTresWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostTresResponse, _a1 error) *MockClient_SlurmdbV0041PostTresWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostJobsWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostJobsResponse, _a1 error) *MockClient_SlurmdbV0044PostJobsWithBodyWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostTresWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostTresResponse, error)) *MockClient_SlurmdbV0041PostTresWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostJobsWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostJobsResponse, error)) *MockClient_SlurmdbV0044PostJobsWithBodyWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostTresWithResponse provides a mock function with given fields: ctx, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostTresWithResponse(ctx context.Context, body v0041.SlurmdbV0041PostTresJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostTresResponse, error) {
+// SlurmdbV0044PostJobsWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostJobsWithResponse(ctx context.Context, body v0044.SlurmdbV0044PostJobsJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostJobsResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -5218,23 +6035,23 @@ func (_m *MockClient) SlurmdbV0041PostTresWithResponse(ctx context.Context, body
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostTresWithResponse")
+		panic("no return value specified for SlurmdbV0044PostJobsWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostTresResponse
+	var r0 *v0044.SlurmdbV0044PostJobsResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmdbV0041PostTresJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostTresResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostJobsJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostJobsResponse, error)); ok {
 		return rf(ctx, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmdbV0041PostTresJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostTresResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostJobsJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostJobsResponse); ok {
 		r0 = rf(ctx, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostTresResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostJobsResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, v0041.SlurmdbV0041PostTresJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmdbV0044PostJobsJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -5243,45 +6060,45 @@ func (_m *MockClient) SlurmdbV0041PostTresWithResponse(ctx context.Context, body
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostTresWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostTresWithResponse'
-type MockClient_SlurmdbV0041PostTresWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostJobsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostJobsWithResponse'
+type MockClient_SlurmdbV0044PostJobsWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostTresWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostJobsWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - body v0041.SlurmdbV0041PostTresJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostTresWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostTresWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostTresWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostTresWithResponse",
+//   - body v0044.SlurmdbV0044PostJobsJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostJobsWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostJobsWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostJobsWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostJobsWithResponse",
 		append([]interface{}{ctx, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostTresWithResponse_Call) Run(run func(ctx context.Context, body v0041.SlurmdbV0041PostTresJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostTresWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostJobsWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmdbV0044PostJobsJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostJobsWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(v0041.SlurmdbV0041PostTresJSONRequestBody), variadicArgs...)
+		run(args[0].(context.Context), args[1].(v0044.SlurmdbV0044PostJobsJSONRequestBody), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostTresWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostTresResponse, _a1 error) *MockClient_SlurmdbV0041PostTresWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostJobsWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostJobsResponse, _a1 error) *MockClient_SlurmdbV0044PostJobsWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostTresWithResponse_Call) RunAndReturn(run func(context.Context, v0041.SlurmdbV0041PostTresJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostTresResponse, error)) *MockClient_SlurmdbV0041PostTresWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostJobsWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmdbV0044PostJobsJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostJobsResponse, error)) *MockClient_SlurmdbV0044PostJobsWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostUsersAssociationWithBodyWithResponse provides a mock function with given fields: ctx, params, contentType, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostUsersAssociationWithBodyWithResponse(ctx context.Context, params *v0041.SlurmdbV0041PostUsersAssociationParams, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostUsersAssociationResponse, error) {
+// SlurmdbV0044PostQosWithBodyWithResponse provides a mock function with given fields: ctx, params, contentType, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostQosWithBodyWithResponse(ctx context.Context, params *v0044.SlurmdbV0044PostQosParams, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostQosResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -5292,23 +6109,23 @@ func (_m *MockClient) SlurmdbV0041PostUsersAssociationWithBodyWithResponse(ctx c
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostUsersAssociationWithBodyWithResponse")
+		panic("no return value specified for SlurmdbV0044PostQosWithBodyWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostUsersAssociationResponse
+	var r0 *v0044.SlurmdbV0044PostQosResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostUsersAssociationParams, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostUsersAssociationResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostQosParams, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostQosResponse, error)); ok {
 		return rf(ctx, params, contentType, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostUsersAssociationParams, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostUsersAssociationResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostQosParams, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostQosResponse); ok {
 		r0 = rf(ctx, params, contentType, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostUsersAssociationResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostQosResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041PostUsersAssociationParams, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044PostQosParams, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, contentType, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -5317,47 +6134,47 @@ func (_m *MockClient) SlurmdbV0041PostUsersAssociationWithBodyWithResponse(ctx c
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostUsersAssociationWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostUsersAssociationWithBodyWithResponse'
-type MockClient_SlurmdbV0041PostUsersAssociationWithBodyWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostQosWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostQosWithBodyWithResponse'
+type MockClient_SlurmdbV0044PostQosWithBodyWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostUsersAssociationWithBodyWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostQosWithBodyWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmdbV0041PostUsersAssociationParams
+//   - params *v0044.SlurmdbV0044PostQosParams
 //   - contentType string
 //   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostUsersAssociationWithBodyWithResponse(ctx interface{}, params interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostUsersAssociationWithBodyWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostUsersAssociationWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostUsersAssociationWithBodyWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostQosWithBodyWithResponse(ctx interface{}, params interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostQosWithBodyWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostQosWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostQosWithBodyWithResponse",
 		append([]interface{}{ctx, params, contentType, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostUsersAssociationWithBodyWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041PostUsersAssociationParams, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostUsersAssociationWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostQosWithBodyWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044PostQosParams, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostQosWithBodyWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-4)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-4)
 		for i, a := range args[4:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041PostUsersAssociationParams), args[2].(string), args[3].(io.Reader), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044PostQosParams), args[2].(string), args[3].(io.Reader), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostUsersAssociationWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostUsersAssociationResponse, _a1 error) *MockClient_SlurmdbV0041PostUsersAssociationWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostQosWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostQosResponse, _a1 error) *MockClient_SlurmdbV0044PostQosWithBodyWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostUsersAssociationWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041PostUsersAssociationParams, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostUsersAssociationResponse, error)) *MockClient_SlurmdbV0041PostUsersAssociationWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostQosWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044PostQosParams, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostQosResponse, error)) *MockClient_SlurmdbV0044PostQosWithBodyWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostUsersAssociationWithResponse provides a mock function with given fields: ctx, params, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostUsersAssociationWithResponse(ctx context.Context, params *v0041.SlurmdbV0041PostUsersAssociationParams, body v0041.SlurmdbV0041PostUsersAssociationJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostUsersAssociationResponse, error) {
+// SlurmdbV0044PostQosWithResponse provides a mock function with given fields: ctx, params, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostQosWithResponse(ctx context.Context, params *v0044.SlurmdbV0044PostQosParams, body v0044.SlurmdbV0044PostQosJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostQosResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -5368,23 +6185,23 @@ func (_m *MockClient) SlurmdbV0041PostUsersAssociationWithResponse(ctx context.C
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostUsersAssociationWithResponse")
+		panic("no return value specified for SlurmdbV0044PostQosWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostUsersAssociationResponse
+	var r0 *v0044.SlurmdbV0044PostQosResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostUsersAssociationParams, v0041.SlurmdbV0041PostUsersAssociationJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostUsersAssociationResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostQosParams, v0044.SlurmdbV0044PostQosJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostQosResponse, error)); ok {
 		return rf(ctx, params, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostUsersAssociationParams, v0041.SlurmdbV0041PostUsersAssociationJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostUsersAssociationResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostQosParams, v0044.SlurmdbV0044PostQosJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostQosResponse); ok {
 		r0 = rf(ctx, params, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostUsersAssociationResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostQosResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041PostUsersAssociationParams, v0041.SlurmdbV0041PostUsersAssociationJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044PostQosParams, v0044.SlurmdbV0044PostQosJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -5393,46 +6210,46 @@ func (_m *MockClient) SlurmdbV0041PostUsersAssociationWithResponse(ctx context.C
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostUsersAssociationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostUsersAssociationWithResponse'
-type MockClient_SlurmdbV0041PostUsersAssociationWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostQosWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostQosWithResponse'
+type MockClient_SlurmdbV0044PostQosWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostUsersAssociationWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostQosWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmdbV0041PostUsersAssociationParams
-//   - body v0041.SlurmdbV0041PostUsersAssociationJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostUsersAssociationWithResponse(ctx interface{}, params interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostUsersAssociationWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostUsersAssociationWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostUsersAssociationWithResponse",
+//   - params *v0044.SlurmdbV0044PostQosParams
+//   - body v0044.SlurmdbV0044PostQosJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostQosWithResponse(ctx interface{}, params interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostQosWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostQosWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostQosWithResponse",
 		append([]interface{}{ctx, params, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostUsersAssociationWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041PostUsersAssociationParams, body v0041.SlurmdbV0041PostUsersAssociationJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostUsersAssociationWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostQosWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044PostQosParams, body v0044.SlurmdbV0044PostQosJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostQosWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041PostUsersAssociationParams), args[2].(v0041.SlurmdbV0041PostUsersAssociationJSONRequestBody), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044PostQosParams), args[2].(v0044.SlurmdbV0044PostQosJSONRequestBody), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostUsersAssociationWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostUsersAssociationResponse, _a1 error) *MockClient_SlurmdbV0041PostUsersAssociationWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostQosWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostQosResponse, _a1 error) *MockClient_SlurmdbV0044PostQosWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostUsersAssociationWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041PostUsersAssociationParams, v0041.SlurmdbV0041PostUsersAssociationJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostUsersAssociationResponse, error)) *MockClient_SlurmdbV0041PostUsersAssociationWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostQosWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044PostQosParams, v0044.SlurmdbV0044PostQosJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostQosResponse, error)) *MockClient_SlurmdbV0044PostQosWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostUsersWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostUsersWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostUsersResponse, error) {
+// SlurmdbV0044PostTresWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostTresWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostTresResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -5443,23 +6260,23 @@ func (_m *MockClient) SlurmdbV0041PostUsersWithBodyWithResponse(ctx context.Cont
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostUsersWithBodyWithResponse")
+		panic("no return value specified for SlurmdbV0044PostTresWithBodyWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostUsersResponse
+	var r0 *v0044.SlurmdbV0044PostTresResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostUsersResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostTresResponse, error)); ok {
 		return rf(ctx, contentType, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostUsersResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostTresResponse); ok {
 		r0 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostUsersResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostTresResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, contentType, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -5468,27 +6285,27 @@ func (_m *MockClient) SlurmdbV0041PostUsersWithBodyWithResponse(ctx context.Cont
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostUsersWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostUsersWithBodyWithResponse'
-type MockClient_SlurmdbV0041PostUsersWithBodyWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostTresWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostTresWithBodyWithResponse'
+type MockClient_SlurmdbV0044PostTresWithBodyWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostUsersWithBodyWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostTresWithBodyWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - contentType string
 //   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostUsersWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostUsersWithBodyWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostUsersWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostUsersWithBodyWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostTresWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostTresWithBodyWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostTresWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostTresWithBodyWithResponse",
 		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostUsersWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostUsersWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostTresWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostTresWithBodyWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
 		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
@@ -5496,18 +6313,18 @@ func (_c *MockClient_SlurmdbV0041PostUsersWithBodyWithResponse_Call) Run(run fun
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostUsersWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostUsersResponse, _a1 error) *MockClient_SlurmdbV0041PostUsersWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostTresWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostTresResponse, _a1 error) *MockClient_SlurmdbV0044PostTresWithBodyWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostUsersWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostUsersResponse, error)) *MockClient_SlurmdbV0041PostUsersWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostTresWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostTresResponse, error)) *MockClient_SlurmdbV0044PostTresWithBodyWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostUsersWithResponse provides a mock function with given fields: ctx, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostUsersWithResponse(ctx context.Context, body v0041.SlurmdbV0041PostUsersJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostUsersResponse, error) {
+// SlurmdbV0044PostTresWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostTresWithResponse(ctx context.Context, body v0044.SlurmdbV0044PostTresJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostTresResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -5518,23 +6335,23 @@ func (_m *MockClient) SlurmdbV0041PostUsersWithResponse(ctx context.Context, bod
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostUsersWithResponse")
+		panic("no return value specified for SlurmdbV0044PostTresWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostUsersResponse
+	var r0 *v0044.SlurmdbV0044PostTresResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmdbV0041PostUsersJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostUsersResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostTresJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostTresResponse, error)); ok {
 		return rf(ctx, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, v0041.SlurmdbV0041PostUsersJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostUsersResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostTresJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostTresResponse); ok {
 		r0 = rf(ctx, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostUsersResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostTresResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, v0041.SlurmdbV0041PostUsersJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmdbV0044PostTresJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -5543,45 +6360,45 @@ func (_m *MockClient) SlurmdbV0041PostUsersWithResponse(ctx context.Context, bod
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostUsersWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostUsersWithResponse'
-type MockClient_SlurmdbV0041PostUsersWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostTresWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostTresWithResponse'
+type MockClient_SlurmdbV0044PostTresWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostUsersWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostTresWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - body v0041.SlurmdbV0041PostUsersJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostUsersWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostUsersWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostUsersWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostUsersWithResponse",
+//   - body v0044.SlurmdbV0044PostTresJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostTresWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostTresWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostTresWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostTresWithResponse",
 		append([]interface{}{ctx, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostUsersWithResponse_Call) Run(run func(ctx context.Context, body v0041.SlurmdbV0041PostUsersJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostUsersWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostTresWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmdbV0044PostTresJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostTresWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-2)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
 		for i, a := range args[2:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(v0041.SlurmdbV0041PostUsersJSONRequestBody), variadicArgs...)
+		run(args[0].(context.Context), args[1].(v0044.SlurmdbV0044PostTresJSONRequestBody), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostUsersWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostUsersResponse, _a1 error) *MockClient_SlurmdbV0041PostUsersWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostTresWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostTresResponse, _a1 error) *MockClient_SlurmdbV0044PostTresWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostUsersWithResponse_Call) RunAndReturn(run func(context.Context, v0041.SlurmdbV0041PostUsersJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostUsersResponse, error)) *MockClient_SlurmdbV0041PostUsersWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostTresWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmdbV0044PostTresJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostTresResponse, error)) *MockClient_SlurmdbV0044PostTresWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostWckeysWithBodyWithResponse provides a mock function with given fields: ctx, params, contentType, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostWckeysWithBodyWithResponse(ctx context.Context, params *v0041.SlurmdbV0041PostWckeysParams, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostWckeysResponse, error) {
+// SlurmdbV0044PostUsersAssociationWithBodyWithResponse provides a mock function with given fields: ctx, params, contentType, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostUsersAssociationWithBodyWithResponse(ctx context.Context, params *v0044.SlurmdbV0044PostUsersAssociationParams, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostUsersAssociationResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -5592,23 +6409,23 @@ func (_m *MockClient) SlurmdbV0041PostWckeysWithBodyWithResponse(ctx context.Con
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostWckeysWithBodyWithResponse")
+		panic("no return value specified for SlurmdbV0044PostUsersAssociationWithBodyWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostWckeysResponse
+	var r0 *v0044.SlurmdbV0044PostUsersAssociationResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostWckeysParams, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostWckeysResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostUsersAssociationParams, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostUsersAssociationResponse, error)); ok {
 		return rf(ctx, params, contentType, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostWckeysParams, string, io.Reader, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostWckeysResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostUsersAssociationParams, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostUsersAssociationResponse); ok {
 		r0 = rf(ctx, params, contentType, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostWckeysResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostUsersAssociationResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041PostWckeysParams, string, io.Reader, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044PostUsersAssociationParams, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, contentType, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -5617,47 +6434,47 @@ func (_m *MockClient) SlurmdbV0041PostWckeysWithBodyWithResponse(ctx context.Con
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostWckeysWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostWckeysWithBodyWithResponse'
-type MockClient_SlurmdbV0041PostWckeysWithBodyWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostUsersAssociationWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostUsersAssociationWithBodyWithResponse'
+type MockClient_SlurmdbV0044PostUsersAssociationWithBodyWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostWckeysWithBodyWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostUsersAssociationWithBodyWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmdbV0041PostWckeysParams
+//   - params *v0044.SlurmdbV0044PostUsersAssociationParams
 //   - contentType string
 //   - body io.Reader
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostWckeysWithBodyWithResponse(ctx interface{}, params interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostWckeysWithBodyWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostWckeysWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostWckeysWithBodyWithResponse",
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostUsersAssociationWithBodyWithResponse(ctx interface{}, params interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostUsersAssociationWithBodyWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostUsersAssociationWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostUsersAssociationWithBodyWithResponse",
 		append([]interface{}{ctx, params, contentType, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostWckeysWithBodyWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041PostWckeysParams, contentType string, body io.Reader, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostWckeysWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostUsersAssociationWithBodyWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044PostUsersAssociationParams, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostUsersAssociationWithBodyWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-4)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-4)
 		for i, a := range args[4:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041PostWckeysParams), args[2].(string), args[3].(io.Reader), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044PostUsersAssociationParams), args[2].(string), args[3].(io.Reader), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostWckeysWithBodyWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostWckeysResponse, _a1 error) *MockClient_SlurmdbV0041PostWckeysWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostUsersAssociationWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostUsersAssociationResponse, _a1 error) *MockClient_SlurmdbV0044PostUsersAssociationWithBodyWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostWckeysWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041PostWckeysParams, string, io.Reader, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostWckeysResponse, error)) *MockClient_SlurmdbV0041PostWckeysWithBodyWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostUsersAssociationWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044PostUsersAssociationParams, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostUsersAssociationResponse, error)) *MockClient_SlurmdbV0044PostUsersAssociationWithBodyWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SlurmdbV0041PostWckeysWithResponse provides a mock function with given fields: ctx, params, body, reqEditors
-func (_m *MockClient) SlurmdbV0041PostWckeysWithResponse(ctx context.Context, params *v0041.SlurmdbV0041PostWckeysParams, body v0041.SlurmdbV0041PostWckeysJSONRequestBody, reqEditors ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostWckeysResponse, error) {
+// SlurmdbV0044PostUsersAssociationWithResponse provides a mock function with given fields: ctx, params, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostUsersAssociationWithResponse(ctx context.Context, params *v0044.SlurmdbV0044PostUsersAssociationParams, body v0044.SlurmdbV0044PostUsersAssociationJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostUsersAssociationResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
 	for _i := range reqEditors {
 		_va[_i] = reqEditors[_i]
@@ -5668,23 +6485,23 @@ func (_m *MockClient) SlurmdbV0041PostWckeysWithResponse(ctx context.Context, pa
 	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
-		panic("no return value specified for SlurmdbV0041PostWckeysWithResponse")
+		panic("no return value specified for SlurmdbV0044PostUsersAssociationWithResponse")
 	}
 
-	var r0 *v0041.SlurmdbV0041PostWckeysResponse
+	var r0 *v0044.SlurmdbV0044PostUsersAssociationResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostWckeysParams, v0041.SlurmdbV0041PostWckeysJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostWckeysResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostUsersAssociationParams, v0044.SlurmdbV0044PostUsersAssociationJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostUsersAssociationResponse, error)); ok {
 		return rf(ctx, params, body, reqEditors...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v0041.SlurmdbV0041PostWckeysParams, v0041.SlurmdbV0041PostWckeysJSONRequestBody, ...v0041.RequestEditorFn) *v0041.SlurmdbV0041PostWckeysResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostUsersAssociationParams, v0044.SlurmdbV0044PostUsersAssociationJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostUsersAssociationResponse); ok {
 		r0 = rf(ctx, params, body, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v0041.SlurmdbV0041PostWckeysResponse)
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostUsersAssociationResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v0041.SlurmdbV0041PostWckeysParams, v0041.SlurmdbV0041PostWckeysJSONRequestBody, ...v0041.RequestEditorFn) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044PostUsersAssociationParams, v0044.SlurmdbV0044PostUsersAssociationJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
 		r1 = rf(ctx, params, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
@@ -5693,40 +6510,340 @@ func (_m *MockClient) SlurmdbV0041PostWckeysWithResponse(ctx context.Context, pa
 	return r0, r1
 }
 
-// MockClient_SlurmdbV0041PostWckeysWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0041PostWckeysWithResponse'
-type MockClient_SlurmdbV0041PostWckeysWithResponse_Call struct {
+// MockClient_SlurmdbV0044PostUsersAssociationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostUsersAssociationWithResponse'
+type MockClient_SlurmdbV0044PostUsersAssociationWithResponse_Call struct {
 	*mock.Call
 }
 
-// SlurmdbV0041PostWckeysWithResponse is a helper method to define mock.On call
+// SlurmdbV0044PostUsersAssociationWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
-//   - params *v0041.SlurmdbV0041PostWckeysParams
-//   - body v0041.SlurmdbV0041PostWckeysJSONRequestBody
-//   - reqEditors ...v0041.RequestEditorFn
-func (_e *MockClient_Expecter) SlurmdbV0041PostWckeysWithResponse(ctx interface{}, params interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0041PostWckeysWithResponse_Call {
-	return &MockClient_SlurmdbV0041PostWckeysWithResponse_Call{Call: _e.mock.On("SlurmdbV0041PostWckeysWithResponse",
+//   - params *v0044.SlurmdbV0044PostUsersAssociationParams
+//   - body v0044.SlurmdbV0044PostUsersAssociationJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostUsersAssociationWithResponse(ctx interface{}, params interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostUsersAssociationWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostUsersAssociationWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostUsersAssociationWithResponse",
 		append([]interface{}{ctx, params, body}, reqEditors...)...)}
 }
 
-func (_c *MockClient_SlurmdbV0041PostWckeysWithResponse_Call) Run(run func(ctx context.Context, params *v0041.SlurmdbV0041PostWckeysParams, body v0041.SlurmdbV0041PostWckeysJSONRequestBody, reqEditors ...v0041.RequestEditorFn)) *MockClient_SlurmdbV0041PostWckeysWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostUsersAssociationWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044PostUsersAssociationParams, body v0044.SlurmdbV0044PostUsersAssociationJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostUsersAssociationWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]v0041.RequestEditorFn, len(args)-3)
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
 		for i, a := range args[3:] {
 			if a != nil {
-				variadicArgs[i] = a.(v0041.RequestEditorFn)
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
 			}
 		}
-		run(args[0].(context.Context), args[1].(*v0041.SlurmdbV0041PostWckeysParams), args[2].(v0041.SlurmdbV0041PostWckeysJSONRequestBody), variadicArgs...)
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044PostUsersAssociationParams), args[2].(v0044.SlurmdbV0044PostUsersAssociationJSONRequestBody), variadicArgs...)
 	})
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostWckeysWithResponse_Call) Return(_a0 *v0041.SlurmdbV0041PostWckeysResponse, _a1 error) *MockClient_SlurmdbV0041PostWckeysWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostUsersAssociationWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostUsersAssociationResponse, _a1 error) *MockClient_SlurmdbV0044PostUsersAssociationWithResponse_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_SlurmdbV0041PostWckeysWithResponse_Call) RunAndReturn(run func(context.Context, *v0041.SlurmdbV0041PostWckeysParams, v0041.SlurmdbV0041PostWckeysJSONRequestBody, ...v0041.RequestEditorFn) (*v0041.SlurmdbV0041PostWckeysResponse, error)) *MockClient_SlurmdbV0041PostWckeysWithResponse_Call {
+func (_c *MockClient_SlurmdbV0044PostUsersAssociationWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044PostUsersAssociationParams, v0044.SlurmdbV0044PostUsersAssociationJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostUsersAssociationResponse, error)) *MockClient_SlurmdbV0044PostUsersAssociationWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044PostUsersWithBodyWithResponse provides a mock function with given fields: ctx, contentType, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostUsersWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostUsersResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044PostUsersWithBodyWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044PostUsersResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostUsersResponse, error)); ok {
+		return rf(ctx, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostUsersResponse); ok {
+		r0 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostUsersResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044PostUsersWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostUsersWithBodyWithResponse'
+type MockClient_SlurmdbV0044PostUsersWithBodyWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044PostUsersWithBodyWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - contentType string
+//   - body io.Reader
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostUsersWithBodyWithResponse(ctx interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostUsersWithBodyWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostUsersWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostUsersWithBodyWithResponse",
+		append([]interface{}{ctx, contentType, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044PostUsersWithBodyWithResponse_Call) Run(run func(ctx context.Context, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostUsersWithBodyWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].(io.Reader), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044PostUsersWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostUsersResponse, _a1 error) *MockClient_SlurmdbV0044PostUsersWithBodyWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044PostUsersWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostUsersResponse, error)) *MockClient_SlurmdbV0044PostUsersWithBodyWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044PostUsersWithResponse provides a mock function with given fields: ctx, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostUsersWithResponse(ctx context.Context, body v0044.SlurmdbV0044PostUsersJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostUsersResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044PostUsersWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044PostUsersResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostUsersJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostUsersResponse, error)); ok {
+		return rf(ctx, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, v0044.SlurmdbV0044PostUsersJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostUsersResponse); ok {
+		r0 = rf(ctx, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostUsersResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, v0044.SlurmdbV0044PostUsersJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044PostUsersWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostUsersWithResponse'
+type MockClient_SlurmdbV0044PostUsersWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044PostUsersWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - body v0044.SlurmdbV0044PostUsersJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostUsersWithResponse(ctx interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostUsersWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostUsersWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostUsersWithResponse",
+		append([]interface{}{ctx, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044PostUsersWithResponse_Call) Run(run func(ctx context.Context, body v0044.SlurmdbV0044PostUsersJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostUsersWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(v0044.SlurmdbV0044PostUsersJSONRequestBody), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044PostUsersWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostUsersResponse, _a1 error) *MockClient_SlurmdbV0044PostUsersWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044PostUsersWithResponse_Call) RunAndReturn(run func(context.Context, v0044.SlurmdbV0044PostUsersJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostUsersResponse, error)) *MockClient_SlurmdbV0044PostUsersWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044PostWckeysWithBodyWithResponse provides a mock function with given fields: ctx, params, contentType, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostWckeysWithBodyWithResponse(ctx context.Context, params *v0044.SlurmdbV0044PostWckeysParams, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostWckeysResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044PostWckeysWithBodyWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044PostWckeysResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostWckeysParams, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostWckeysResponse, error)); ok {
+		return rf(ctx, params, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostWckeysParams, string, io.Reader, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostWckeysResponse); ok {
+		r0 = rf(ctx, params, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostWckeysResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044PostWckeysParams, string, io.Reader, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044PostWckeysWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostWckeysWithBodyWithResponse'
+type MockClient_SlurmdbV0044PostWckeysWithBodyWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044PostWckeysWithBodyWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params *v0044.SlurmdbV0044PostWckeysParams
+//   - contentType string
+//   - body io.Reader
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostWckeysWithBodyWithResponse(ctx interface{}, params interface{}, contentType interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostWckeysWithBodyWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostWckeysWithBodyWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostWckeysWithBodyWithResponse",
+		append([]interface{}{ctx, params, contentType, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044PostWckeysWithBodyWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044PostWckeysParams, contentType string, body io.Reader, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostWckeysWithBodyWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-4)
+		for i, a := range args[4:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044PostWckeysParams), args[2].(string), args[3].(io.Reader), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044PostWckeysWithBodyWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostWckeysResponse, _a1 error) *MockClient_SlurmdbV0044PostWckeysWithBodyWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044PostWckeysWithBodyWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044PostWckeysParams, string, io.Reader, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostWckeysResponse, error)) *MockClient_SlurmdbV0044PostWckeysWithBodyWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SlurmdbV0044PostWckeysWithResponse provides a mock function with given fields: ctx, params, body, reqEditors
+func (_m *MockClient) SlurmdbV0044PostWckeysWithResponse(ctx context.Context, params *v0044.SlurmdbV0044PostWckeysParams, body v0044.SlurmdbV0044PostWckeysJSONRequestBody, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostWckeysResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SlurmdbV0044PostWckeysWithResponse")
+	}
+
+	var r0 *v0044.SlurmdbV0044PostWckeysResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostWckeysParams, v0044.SlurmdbV0044PostWckeysJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostWckeysResponse, error)); ok {
+		return rf(ctx, params, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v0044.SlurmdbV0044PostWckeysParams, v0044.SlurmdbV0044PostWckeysJSONRequestBody, ...v0044.RequestEditorFn) *v0044.SlurmdbV0044PostWckeysResponse); ok {
+		r0 = rf(ctx, params, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v0044.SlurmdbV0044PostWckeysResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v0044.SlurmdbV0044PostWckeysParams, v0044.SlurmdbV0044PostWckeysJSONRequestBody, ...v0044.RequestEditorFn) error); ok {
+		r1 = rf(ctx, params, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_SlurmdbV0044PostWckeysWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SlurmdbV0044PostWckeysWithResponse'
+type MockClient_SlurmdbV0044PostWckeysWithResponse_Call struct {
+	*mock.Call
+}
+
+// SlurmdbV0044PostWckeysWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params *v0044.SlurmdbV0044PostWckeysParams
+//   - body v0044.SlurmdbV0044PostWckeysJSONRequestBody
+//   - reqEditors ...v0044.RequestEditorFn
+func (_e *MockClient_Expecter) SlurmdbV0044PostWckeysWithResponse(ctx interface{}, params interface{}, body interface{}, reqEditors ...interface{}) *MockClient_SlurmdbV0044PostWckeysWithResponse_Call {
+	return &MockClient_SlurmdbV0044PostWckeysWithResponse_Call{Call: _e.mock.On("SlurmdbV0044PostWckeysWithResponse",
+		append([]interface{}{ctx, params, body}, reqEditors...)...)}
+}
+
+func (_c *MockClient_SlurmdbV0044PostWckeysWithResponse_Call) Run(run func(ctx context.Context, params *v0044.SlurmdbV0044PostWckeysParams, body v0044.SlurmdbV0044PostWckeysJSONRequestBody, reqEditors ...v0044.RequestEditorFn)) *MockClient_SlurmdbV0044PostWckeysWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]v0044.RequestEditorFn, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(v0044.RequestEditorFn)
+			}
+		}
+		run(args[0].(context.Context), args[1].(*v0044.SlurmdbV0044PostWckeysParams), args[2].(v0044.SlurmdbV0044PostWckeysJSONRequestBody), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044PostWckeysWithResponse_Call) Return(_a0 *v0044.SlurmdbV0044PostWckeysResponse, _a1 error) *MockClient_SlurmdbV0044PostWckeysWithResponse_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_SlurmdbV0044PostWckeysWithResponse_Call) RunAndReturn(run func(context.Context, *v0044.SlurmdbV0044PostWckeysParams, v0044.SlurmdbV0044PostWckeysJSONRequestBody, ...v0044.RequestEditorFn) (*v0044.SlurmdbV0044PostWckeysResponse, error)) *MockClient_SlurmdbV0044PostWckeysWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }

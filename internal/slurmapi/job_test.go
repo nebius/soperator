@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/utils/ptr"
@@ -15,16 +15,16 @@ import (
 func TestJobFromAPI(t *testing.T) {
 	tests := []struct {
 		name    string
-		apiJob  api.V0041JobInfo
+		apiJob  api.V0044JobInfo
 		want    Job
 		wantErr bool
 	}{
 		{
 			name: "complete job",
-			apiJob: api.V0041JobInfo{
+			apiJob: api.V0044JobInfo{
 				JobId:          ptr.To(int32(12345)),
 				Name:           ptr.To("test_job"),
-				JobState:       &[]api.V0041JobInfoJobState{api.V0041JobInfoJobStateCOMPLETED},
+				JobState:       &[]api.V0044JobInfoJobState{api.V0044JobInfoJobStateCOMPLETED},
 				StateReason:    ptr.To("None"),
 				Partition:      ptr.To("gpu"),
 				UserName:       ptr.To("testuser"),
@@ -51,9 +51,9 @@ func TestJobFromAPI(t *testing.T) {
 		},
 		{
 			name: "minimal job",
-			apiJob: api.V0041JobInfo{
+			apiJob: api.V0044JobInfo{
 				JobId:    ptr.To(int32(123)),
-				JobState: &[]api.V0041JobInfoJobState{api.V0041JobInfoJobStateCOMPLETED},
+				JobState: &[]api.V0044JobInfoJobState{api.V0044JobInfoJobStateCOMPLETED},
 			},
 			want: Job{
 				ID:    123,
@@ -63,7 +63,7 @@ func TestJobFromAPI(t *testing.T) {
 		},
 		{
 			name: "job without ID",
-			apiJob: api.V0041JobInfo{
+			apiJob: api.V0044JobInfo{
 				Name: ptr.To("test"),
 			},
 			want:    Job{},
@@ -71,7 +71,7 @@ func TestJobFromAPI(t *testing.T) {
 		},
 		{
 			name: "job without State",
-			apiJob: api.V0041JobInfo{
+			apiJob: api.V0044JobInfo{
 				JobId: ptr.To(int32(123)),
 			},
 			want:    Job{},
@@ -96,23 +96,23 @@ func TestJobFromAPI(t *testing.T) {
 func TestJobFromAccountingAPI(t *testing.T) {
 	tests := []struct {
 		name    string
-		apiJob  api.V0041Job
+		apiJob  api.V0044Job
 		want    Job
 		wantErr bool
 	}{
 		{
 			name: "complete accounting job",
-			apiJob: api.V0041Job{
+			apiJob: api.V0044Job{
 				JobId:     ptr.To(int32(54321)),
 				Name:      ptr.To("accounting_job"),
 				Partition: ptr.To("main"),
 				User:      ptr.To("testuser"),
 				Nodes:     ptr.To("worker-[1,2]"),
 				State: &struct {
-					Current *[]api.V0041JobStateCurrent `json:"current,omitempty"`
+					Current *[]api.V0044JobStateCurrent `json:"current,omitempty"`
 					Reason  *string                     `json:"reason,omitempty"`
 				}{
-					Current: &[]api.V0041JobStateCurrent{api.V0041JobStateCurrentRUNNING},
+					Current: &[]api.V0044JobStateCurrent{api.V0044JobStateCurrentRUNNING},
 					Reason:  ptr.To("None"),
 				},
 				Stderr: ptr.To("/tmp/stderr"),
@@ -127,10 +127,10 @@ func TestJobFromAccountingAPI(t *testing.T) {
 						} `json:"max,omitempty"`
 					} `json:"limits,omitempty"`
 					Task   *string                     `json:"task,omitempty"`
-					TaskId *api.V0041Uint32NoValStruct `json:"task_id,omitempty"`
+					TaskId *api.V0044Uint32NoValStruct `json:"task_id,omitempty"`
 				}{
 					JobId: ptr.To(int32(54000)),
-					TaskId: &api.V0041Uint32NoValStruct{
+					TaskId: &api.V0044Uint32NoValStruct{
 						Set:    ptr.To(true),
 						Number: ptr.To(int32(7)),
 					},
@@ -138,11 +138,11 @@ func TestJobFromAccountingAPI(t *testing.T) {
 				AllocationNodes: ptr.To(int32(2)),
 				Required: &struct {
 					CPUs          *int32                      `json:"CPUs,omitempty"`
-					MemoryPerCpu  *api.V0041Uint64NoValStruct `json:"memory_per_cpu,omitempty"`
-					MemoryPerNode *api.V0041Uint64NoValStruct `json:"memory_per_node,omitempty"`
+					MemoryPerCpu  *api.V0044Uint64NoValStruct `json:"memory_per_cpu,omitempty"`
+					MemoryPerNode *api.V0044Uint64NoValStruct `json:"memory_per_node,omitempty"`
 				}{
 					CPUs: ptr.To(int32(8)),
-					MemoryPerNode: &api.V0041Uint64NoValStruct{
+					MemoryPerNode: &api.V0044Uint64NoValStruct{
 						Set:    ptr.To(true),
 						Number: ptr.To(int64(32768)),
 					},
@@ -151,8 +151,8 @@ func TestJobFromAccountingAPI(t *testing.T) {
 					Elapsed    *int32                      `json:"elapsed,omitempty"`
 					Eligible   *int64                      `json:"eligible,omitempty"`
 					End        *int64                      `json:"end,omitempty"`
-					Limit      *api.V0041Uint32NoValStruct `json:"limit,omitempty"`
-					Planned    *api.V0041Uint64NoValStruct `json:"planned,omitempty"`
+					Limit      *api.V0044Uint32NoValStruct `json:"limit,omitempty"`
+					Planned    *api.V0044Uint64NoValStruct `json:"planned,omitempty"`
 					Start      *int64                      `json:"start,omitempty"`
 					Submission *int64                      `json:"submission,omitempty"`
 					Suspended  *int32                      `json:"suspended,omitempty"`
@@ -194,31 +194,31 @@ func TestJobFromAccountingAPI(t *testing.T) {
 		},
 		{
 			name: "job without state",
-			apiJob: api.V0041Job{
+			apiJob: api.V0044Job{
 				JobId: ptr.To(int32(123)),
 			},
 			wantErr: true,
 		},
 		{
 			name: "user falls back to association user",
-			apiJob: api.V0041Job{
+			apiJob: api.V0044Job{
 				JobId: ptr.To(int32(123)),
 				Group: ptr.To("group-name"),
-				Association: &api.V0041AssocShort{
+				Association: &api.V0044AssocShort{
 					User: "association-user",
 				},
 				State: &struct {
-					Current *[]api.V0041JobStateCurrent `json:"current,omitempty"`
+					Current *[]api.V0044JobStateCurrent `json:"current,omitempty"`
 					Reason  *string                     `json:"reason,omitempty"`
 				}{
-					Current: &[]api.V0041JobStateCurrent{api.V0041JobStateCurrentRUNNING},
+					Current: &[]api.V0044JobStateCurrent{api.V0044JobStateCurrentRUNNING},
 				},
 				Time: &struct {
 					Elapsed    *int32                      `json:"elapsed,omitempty"`
 					Eligible   *int64                      `json:"eligible,omitempty"`
 					End        *int64                      `json:"end,omitempty"`
-					Limit      *api.V0041Uint32NoValStruct `json:"limit,omitempty"`
-					Planned    *api.V0041Uint64NoValStruct `json:"planned,omitempty"`
+					Limit      *api.V0044Uint32NoValStruct `json:"limit,omitempty"`
+					Planned    *api.V0044Uint64NoValStruct `json:"planned,omitempty"`
 					Start      *int64                      `json:"start,omitempty"`
 					Submission *int64                      `json:"submission,omitempty"`
 					Suspended  *int32                      `json:"suspended,omitempty"`
@@ -249,22 +249,22 @@ func TestJobFromAccountingAPI(t *testing.T) {
 		},
 		{
 			name: "pending job leaves NodeCount nil",
-			apiJob: api.V0041Job{
+			apiJob: api.V0044Job{
 				JobId: ptr.To(int32(125)),
 				State: &struct {
-					Current *[]api.V0041JobStateCurrent `json:"current,omitempty"`
+					Current *[]api.V0044JobStateCurrent `json:"current,omitempty"`
 					Reason  *string                     `json:"reason,omitempty"`
 				}{
-					Current: &[]api.V0041JobStateCurrent{api.V0041JobStateCurrentPENDING},
+					Current: &[]api.V0044JobStateCurrent{api.V0044JobStateCurrentPENDING},
 				},
 				AllocationNodes: ptr.To(int32(0)),
 				Required: &struct {
 					CPUs          *int32                      `json:"CPUs,omitempty"`
-					MemoryPerCpu  *api.V0041Uint64NoValStruct `json:"memory_per_cpu,omitempty"`
-					MemoryPerNode *api.V0041Uint64NoValStruct `json:"memory_per_node,omitempty"`
+					MemoryPerCpu  *api.V0044Uint64NoValStruct `json:"memory_per_cpu,omitempty"`
+					MemoryPerNode *api.V0044Uint64NoValStruct `json:"memory_per_node,omitempty"`
 				}{
 					CPUs: ptr.To(int32(4)),
-					MemoryPerNode: &api.V0041Uint64NoValStruct{
+					MemoryPerNode: &api.V0044Uint64NoValStruct{
 						Set:    ptr.To(true),
 						Number: ptr.To(int64(8192)),
 					},
@@ -273,8 +273,8 @@ func TestJobFromAccountingAPI(t *testing.T) {
 					Elapsed    *int32                      `json:"elapsed,omitempty"`
 					Eligible   *int64                      `json:"eligible,omitempty"`
 					End        *int64                      `json:"end,omitempty"`
-					Limit      *api.V0041Uint32NoValStruct `json:"limit,omitempty"`
-					Planned    *api.V0041Uint64NoValStruct `json:"planned,omitempty"`
+					Limit      *api.V0044Uint32NoValStruct `json:"limit,omitempty"`
+					Planned    *api.V0044Uint64NoValStruct `json:"planned,omitempty"`
 					Start      *int64                      `json:"start,omitempty"`
 					Submission *int64                      `json:"submission,omitempty"`
 					Suspended  *int32                      `json:"suspended,omitempty"`
@@ -307,24 +307,24 @@ func TestJobFromAccountingAPI(t *testing.T) {
 		},
 		{
 			name: "tres fields",
-			apiJob: api.V0041Job{
+			apiJob: api.V0044Job{
 				JobId: ptr.To(int32(124)),
 				State: &struct {
-					Current *[]api.V0041JobStateCurrent `json:"current,omitempty"`
+					Current *[]api.V0044JobStateCurrent `json:"current,omitempty"`
 					Reason  *string                     `json:"reason,omitempty"`
 				}{
-					Current: &[]api.V0041JobStateCurrent{api.V0041JobStateCurrentRUNNING},
+					Current: &[]api.V0044JobStateCurrent{api.V0044JobStateCurrentRUNNING},
 				},
 				Tres: &struct {
-					Allocated *api.V0041TresList `json:"allocated,omitempty"`
-					Requested *api.V0041TresList `json:"requested,omitempty"`
+					Allocated *api.V0044TresList `json:"allocated,omitempty"`
+					Requested *api.V0044TresList `json:"requested,omitempty"`
 				}{
-					Allocated: &api.V0041TresList{
+					Allocated: &api.V0044TresList{
 						{Type: "cpu", Count: ptr.To(int64(4))},
 						{Type: "mem", Count: ptr.To(int64(8192))},
 						{Type: "gres", Name: ptr.To("gpu"), Count: ptr.To(int64(2))},
 					},
-					Requested: &api.V0041TresList{
+					Requested: &api.V0044TresList{
 						{Type: "mem", Count: ptr.To(int64(8192))},
 					},
 				},
@@ -332,8 +332,8 @@ func TestJobFromAccountingAPI(t *testing.T) {
 					Elapsed    *int32                      `json:"elapsed,omitempty"`
 					Eligible   *int64                      `json:"eligible,omitempty"`
 					End        *int64                      `json:"end,omitempty"`
-					Limit      *api.V0041Uint32NoValStruct `json:"limit,omitempty"`
-					Planned    *api.V0041Uint64NoValStruct `json:"planned,omitempty"`
+					Limit      *api.V0044Uint32NoValStruct `json:"limit,omitempty"`
+					Planned    *api.V0044Uint64NoValStruct `json:"planned,omitempty"`
 					Start      *int64                      `json:"start,omitempty"`
 					Submission *int64                      `json:"submission,omitempty"`
 					Suspended  *int32                      `json:"suspended,omitempty"`
@@ -401,24 +401,24 @@ func TestJobFromAccountingAPI(t *testing.T) {
 	}
 }
 
-// runningJobWithTimeLimit constructs a minimal V0041Job in RUNNING state with the given start
+// runningJobWithTimeLimit constructs a minimal V0044Job in RUNNING state with the given start
 // timestamp and time-limit shape so the projection-related assertions stay focused.
-func runningJobWithTimeLimit(t *testing.T, start int64, limit *api.V0041Uint32NoValStruct) api.V0041Job {
+func runningJobWithTimeLimit(t *testing.T, start int64, limit *api.V0044Uint32NoValStruct) api.V0044Job {
 	t.Helper()
-	return api.V0041Job{
+	return api.V0044Job{
 		JobId: ptr.To(int32(900)),
 		State: &struct {
-			Current *[]api.V0041JobStateCurrent `json:"current,omitempty"`
+			Current *[]api.V0044JobStateCurrent `json:"current,omitempty"`
 			Reason  *string                     `json:"reason,omitempty"`
 		}{
-			Current: &[]api.V0041JobStateCurrent{api.V0041JobStateCurrentRUNNING},
+			Current: &[]api.V0044JobStateCurrent{api.V0044JobStateCurrentRUNNING},
 		},
 		Time: &struct {
 			Elapsed    *int32                      `json:"elapsed,omitempty"`
 			Eligible   *int64                      `json:"eligible,omitempty"`
 			End        *int64                      `json:"end,omitempty"`
-			Limit      *api.V0041Uint32NoValStruct `json:"limit,omitempty"`
-			Planned    *api.V0041Uint64NoValStruct `json:"planned,omitempty"`
+			Limit      *api.V0044Uint32NoValStruct `json:"limit,omitempty"`
+			Planned    *api.V0044Uint64NoValStruct `json:"planned,omitempty"`
 			Start      *int64                      `json:"start,omitempty"`
 			Submission *int64                      `json:"submission,omitempty"`
 			Suspended  *int32                      `json:"suspended,omitempty"`
@@ -446,7 +446,7 @@ func TestJobFromAccountingAPI_RunningProjectsEndTime(t *testing.T) {
 	const start = int64(1722697230)
 	const limitMinutes = int32(120)
 
-	apiJob := runningJobWithTimeLimit(t, start, &api.V0041Uint32NoValStruct{
+	apiJob := runningJobWithTimeLimit(t, start, &api.V0044Uint32NoValStruct{
 		Set:    ptr.To(true),
 		Number: ptr.To(limitMinutes),
 	})
@@ -459,7 +459,7 @@ func TestJobFromAccountingAPI_RunningProjectsEndTime(t *testing.T) {
 }
 
 func TestJobFromAccountingAPI_RunningWithUnlimitedTimeLeavesEndNil(t *testing.T) {
-	apiJob := runningJobWithTimeLimit(t, int64(1722697230), &api.V0041Uint32NoValStruct{
+	apiJob := runningJobWithTimeLimit(t, int64(1722697230), &api.V0044Uint32NoValStruct{
 		Infinite: ptr.To(true),
 	})
 
@@ -489,13 +489,13 @@ func TestJobFromAccountingAPI_NormalizesUnallocatedNodes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			apiJob := api.V0041Job{
+			apiJob := api.V0044Job{
 				JobId: ptr.To(int32(901)),
 				State: &struct {
-					Current *[]api.V0041JobStateCurrent `json:"current,omitempty"`
+					Current *[]api.V0044JobStateCurrent `json:"current,omitempty"`
 					Reason  *string                     `json:"reason,omitempty"`
 				}{
-					Current: &[]api.V0041JobStateCurrent{api.V0041JobStateCurrentPENDING},
+					Current: &[]api.V0044JobStateCurrent{api.V0044JobStateCurrentPENDING},
 				},
 				Nodes: ptr.To(tt.nodes),
 			}
@@ -507,14 +507,14 @@ func TestJobFromAccountingAPI_NormalizesUnallocatedNodes(t *testing.T) {
 }
 
 func TestIsStaleAccountingPending(t *testing.T) {
-	mkJob := func(start, end, submit *int64) api.V0041Job {
-		return api.V0041Job{
+	mkJob := func(start, end, submit *int64) api.V0044Job {
+		return api.V0044Job{
 			Time: &struct {
 				Elapsed    *int32                      `json:"elapsed,omitempty"`
 				Eligible   *int64                      `json:"eligible,omitempty"`
 				End        *int64                      `json:"end,omitempty"`
-				Limit      *api.V0041Uint32NoValStruct `json:"limit,omitempty"`
-				Planned    *api.V0041Uint64NoValStruct `json:"planned,omitempty"`
+				Limit      *api.V0044Uint32NoValStruct `json:"limit,omitempty"`
+				Planned    *api.V0044Uint64NoValStruct `json:"planned,omitempty"`
 				Start      *int64                      `json:"start,omitempty"`
 				Submission *int64                      `json:"submission,omitempty"`
 				Suspended  *int32                      `json:"suspended,omitempty"`
@@ -539,10 +539,10 @@ func TestIsStaleAccountingPending(t *testing.T) {
 
 	tests := []struct {
 		name string
-		job  api.V0041Job
+		job  api.V0044Job
 		want bool
 	}{
-		{name: "no Time field", job: api.V0041Job{}, want: false},
+		{name: "no Time field", job: api.V0044Job{}, want: false},
 		{name: "all zero", job: mkJob(ptr.To(int64(0)), ptr.To(int64(0)), ptr.To(int64(0))), want: false},
 		{name: "submitted within window, never started", job: mkJob(ptr.To(int64(0)), ptr.To(int64(0)), ptr.To(now-60*60)), want: false},
 		{name: "submitted long ago, never started, never ended → stale zombie", job: mkJob(ptr.To(int64(0)), ptr.To(int64(0)), ptr.To(now-48*60*60)), want: true},
@@ -596,7 +596,7 @@ func TestJobFromAPI_SmokeTest(t *testing.T) {
 			data, err := os.ReadFile(tt.filename)
 			require.NoError(t, err)
 
-			var apiJob api.V0041JobInfo
+			var apiJob api.V0044JobInfo
 			err = json.Unmarshal(data, &apiJob)
 			require.NoError(t, err)
 
@@ -766,13 +766,13 @@ func TestJob_GetArrayTaskIDString(t *testing.T) {
 }
 
 func TestJobFromAccountingAPI_PreservesArrayTaskString(t *testing.T) {
-	apiJob := api.V0041Job{
+	apiJob := api.V0044Job{
 		JobId: ptr.To(int32(901)),
 		State: &struct {
-			Current *[]api.V0041JobStateCurrent `json:"current,omitempty"`
+			Current *[]api.V0044JobStateCurrent `json:"current,omitempty"`
 			Reason  *string                     `json:"reason,omitempty"`
 		}{
-			Current: &[]api.V0041JobStateCurrent{api.V0041JobStateCurrentPENDING},
+			Current: &[]api.V0044JobStateCurrent{api.V0044JobStateCurrentPENDING},
 		},
 		Array: &struct {
 			JobId  *int32 `json:"job_id,omitempty"`
@@ -784,7 +784,7 @@ func TestJobFromAccountingAPI_PreservesArrayTaskString(t *testing.T) {
 				} `json:"max,omitempty"`
 			} `json:"limits,omitempty"`
 			Task   *string                     `json:"task,omitempty"`
-			TaskId *api.V0041Uint32NoValStruct `json:"task_id,omitempty"`
+			TaskId *api.V0044Uint32NoValStruct `json:"task_id,omitempty"`
 		}{
 			JobId: ptr.To(int32(900)),
 			Task:  ptr.To("1-5"),

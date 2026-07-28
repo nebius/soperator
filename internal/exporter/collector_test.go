@@ -10,7 +10,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
@@ -41,7 +41,7 @@ func testNode(name string) slurmapi.Node {
 	return slurmapi.Node{
 		Name:       name,
 		InstanceID: name + "-instance",
-		States:     map[api.V0041NodeState]struct{}{api.V0041NodeStateIDLE: {}},
+		States:     map[api.V0044NodeState]struct{}{api.V0044NodeStateIDLE: {}},
 		Tres:       "cpu=4,mem=8000M,gres/gpu=1",
 		Address:    "10.0.0.1",
 	}
@@ -88,9 +88,9 @@ func TestMetricsCollector_RefreshDiagDropsStaleSequence(t *testing.T) {
 	serverThreadCount1 := int32(1)
 
 	mockClient.EXPECT().GetDiag(mock.Anything).
-		Return(&api.V0041OpenapiDiagResp{Statistics: api.V0041StatsMsg{ServerThreadCount: &serverThreadCount2}}, nil).Once()
+		Return(&api.V0044OpenapiDiagResp{Statistics: api.V0044StatsMsg{ServerThreadCount: &serverThreadCount2}}, nil).Once()
 	mockClient.EXPECT().GetDiag(mock.Anything).
-		Return(&api.V0041OpenapiDiagResp{Statistics: api.V0041StatsMsg{ServerThreadCount: &serverThreadCount1}}, nil).Once()
+		Return(&api.V0044OpenapiDiagResp{Statistics: api.V0044StatsMsg{ServerThreadCount: &serverThreadCount1}}, nil).Once()
 
 	require.NoError(t, collector.refreshDiag(context.Background(), 2))
 	require.NoError(t, collector.refreshDiag(context.Background(), 1))
@@ -138,7 +138,7 @@ func TestMetricsCollector_PreservesLastSuccessfulJobsOnRefreshFailure(t *testing
 }
 
 // Helper function to setup mocks and collect state for tests
-func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *fake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *api.V0041OpenapiDiagResp) {
+func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *fake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *api.V0044OpenapiDiagResp) {
 	mockClient.EXPECT().ListNodes(mock.Anything).Return(nodes, nil).Once()
 	mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return(jobs, nil).Once()
 	mockClient.EXPECT().GetDiag(mock.Anything).Return(diag, nil).Once()
@@ -252,8 +252,8 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			{
 				Name:       "node-1",
 				InstanceID: "instance-1",
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateALLOCATED: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateALLOCATED: {},
 				},
 				Tres:                "cpu=16,mem=191356M,gres/gpu=2",
 				Address:             "10.0.0.1",
@@ -271,9 +271,9 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			{
 				Name:       "node-2",
 				InstanceID: "instance-2",
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateIDLE:  {},
-					api.V0041NodeStateDRAIN: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateIDLE:  {},
+					api.V0044NodeStateDRAIN: {},
 				},
 				Tres:                "cpu=8,mem=64000M,gres/gpu=1",
 				Address:             "10.0.0.2",
@@ -291,8 +291,8 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 
 		// Mock GetDiag response with realistic data
 		serverThreadCount := int32(1)
-		testDiag := &api.V0041OpenapiDiagResp{
-			Statistics: api.V0041StatsMsg{
+		testDiag := &api.V0044OpenapiDiagResp{
+			Statistics: api.V0044StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}
@@ -399,9 +399,9 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 			{
 				Name:       "node-maintenance",
 				InstanceID: "instance-maintenance",
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateIDLE:        {},
-					api.V0041NodeStateMAINTENANCE: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateIDLE:        {},
+					api.V0044NodeStateMAINTENANCE: {},
 				},
 				Tres:    "cpu=8,mem=64000M,gres/gpu=1",
 				Address: "10.0.0.3",
@@ -409,9 +409,9 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 			{
 				Name:       "node-reserved",
 				InstanceID: "instance-reserved",
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateIDLE:     {},
-					api.V0041NodeStateRESERVED: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateIDLE:     {},
+					api.V0044NodeStateRESERVED: {},
 				},
 				Tres:    "cpu=8,mem=64000M,gres/gpu=1",
 				Address: "10.0.0.4",
@@ -419,8 +419,8 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		}
 
 		serverThreadCount := int32(1)
-		testDiag := &api.V0041OpenapiDiagResp{
-			Statistics: api.V0041StatsMsg{
+		testDiag := &api.V0044OpenapiDiagResp{
+			Statistics: api.V0044StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}
@@ -468,10 +468,10 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 			{
 				Name:       "node-maintenance",
 				InstanceID: "instance-maintenance",
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateIDLE:        {},
-					api.V0041NodeStateMAINTENANCE: {},
-					api.V0041NodeStateDRAIN:       {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateIDLE:        {},
+					api.V0044NodeStateMAINTENANCE: {},
+					api.V0044NodeStateDRAIN:       {},
 				},
 				Tres:    "cpu=8,mem=64000M,gres/gpu=1",
 				Address: "10.0.0.3",
@@ -534,7 +534,7 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 
 		// Mock realistic RPC diagnostics data based on production output
 		serverThreadCount := int32(1)
-		rpcsByMessageType := api.V0041StatsMsgRpcsByType{
+		rpcsByMessageType := api.V0044StatsMsgRpcsByType{
 			{
 				MessageType: "REQUEST_NODE_INFO",
 				Count:       576,
@@ -551,7 +551,7 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 				TotalTime:   14239,
 			},
 		}
-		rpcsByUser := api.V0041StatsMsgRpcsByUser{
+		rpcsByUser := api.V0044StatsMsgRpcsByUser{
 			{
 				User:      "root",
 				UserId:    0,
@@ -566,8 +566,8 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 			},
 		}
 
-		testDiag := &api.V0041OpenapiDiagResp{
-			Statistics: api.V0041StatsMsg{
+		testDiag := &api.V0044OpenapiDiagResp{
+			Statistics: api.V0044StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 				RpcsByMessageType: &rpcsByMessageType,
 				RpcsByUser:        &rpcsByUser,
@@ -625,7 +625,7 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 		collector := newTestMetricsCollector(mockClient)
 
 		serverThreadCount := int32(0)
-		rpcsByMessageType := api.V0041StatsMsgRpcsByType{
+		rpcsByMessageType := api.V0044StatsMsgRpcsByType{
 			{
 				MessageType: "ZERO_COUNT",
 				Count:       0,
@@ -642,7 +642,7 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 				TotalTime:   1,
 			},
 		}
-		rpcsByUser := api.V0041StatsMsgRpcsByUser{
+		rpcsByUser := api.V0044StatsMsgRpcsByUser{
 			{
 				User:      "zero_user",
 				UserId:    999,
@@ -657,8 +657,8 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 			},
 		}
 
-		testDiag := &api.V0041OpenapiDiagResp{
-			Statistics: api.V0041StatsMsg{
+		testDiag := &api.V0044OpenapiDiagResp{
+			Statistics: api.V0044StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 				RpcsByMessageType: &rpcsByMessageType,
 				RpcsByUser:        &rpcsByUser,
@@ -723,8 +723,8 @@ func TestMetricsCollector_GetDiag_APIError(t *testing.T) {
 			{
 				Name:       "test-node",
 				InstanceID: "test-instance",
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateIDLE: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateIDLE: {},
 				},
 				Tres:    "cpu=4,mem=8000M,gres/gpu=0",
 				Address: "10.0.0.1",
@@ -783,8 +783,8 @@ func TestMetricsCollector_GetDiag_NilFields(t *testing.T) {
 		collector := newTestMetricsCollector(mockClient)
 
 		// Mock GetDiag response with nil fields
-		testDiag := &api.V0041OpenapiDiagResp{
-			Statistics: api.V0041StatsMsg{
+		testDiag := &api.V0044OpenapiDiagResp{
+			Statistics: api.V0044StatsMsg{
 				ServerThreadCount: nil, // Should not emit metric
 				RpcsByMessageType: nil, // Should not emit metrics
 				RpcsByUser:        nil, // Should not emit metrics
@@ -909,8 +909,8 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 
 		// Mock GetDiag response
 		serverThreadCount := int32(1)
-		testDiag := &api.V0041OpenapiDiagResp{
-			Statistics: api.V0041StatsMsg{
+		testDiag := &api.V0044OpenapiDiagResp{
+			Statistics: api.V0044StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}
@@ -1063,8 +1063,8 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 				Name:       "node-1",
 				InstanceID: "instance-1",
 				Address:    "10.0.0.1",
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateIDLE: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateIDLE: {},
 				},
 				Tres: "cpu=8,mem=32000,billing=8,gres/gpu=2",
 			},
@@ -1079,8 +1079,8 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 		}
 
 		serverThreadCount := int32(1)
-		testDiag := &api.V0041OpenapiDiagResp{
-			Statistics: api.V0041StatsMsg{
+		testDiag := &api.V0044OpenapiDiagResp{
+			Statistics: api.V0044StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}
@@ -1150,8 +1150,8 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				{
 					Name:       "node1",
 					InstanceID: "instance1",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateIDLE: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateIDLE: {},
 					},
 					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
 					Address: "10.0.0.1",
@@ -1165,8 +1165,8 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				{
 					Name:       "node1",
 					InstanceID: "instance1",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateDOWN: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateDOWN: {},
 					},
 					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
 					Address: "10.0.0.1",
@@ -1183,8 +1183,8 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				{
 					Name:       "node1",
 					InstanceID: "instance1",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateIDLE: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateIDLE: {},
 					},
 					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
 					Address: "10.0.0.1",
@@ -1242,8 +1242,8 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				{
 					Name:       "node1",
 					InstanceID: "instance1",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateALLOCATED: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateALLOCATED: {},
 					},
 					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
 					Address: "10.0.0.1",
@@ -1258,9 +1258,9 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				{
 					Name:       "node1",
 					InstanceID: "instance1",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateALLOCATED: {},
-						api.V0041NodeStateDRAIN:     {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateALLOCATED: {},
+						api.V0044NodeStateDRAIN:     {},
 					},
 					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
 					Address: "10.0.0.1",
@@ -1278,8 +1278,8 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				{
 					Name:       "node1",
 					InstanceID: "instance1",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateIDLE: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateIDLE: {},
 					},
 					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
 					Address: "10.0.0.1",
@@ -1335,8 +1335,8 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				{
 					Name:       "node1",
 					InstanceID: "instance1",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateIDLE: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateIDLE: {},
 					},
 					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
 					Address: "10.0.0.1",
@@ -1350,9 +1350,9 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				{
 					Name:       "node1",
 					InstanceID: "instance1",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateIDLE:  {},
-						api.V0041NodeStateDRAIN: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateIDLE:  {},
+						api.V0044NodeStateDRAIN: {},
 					},
 					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
 					Address: "10.0.0.1",
@@ -1382,8 +1382,8 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				{
 					Name:       "node1",
 					InstanceID: "instance1",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateMIXED: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateMIXED: {},
 					},
 					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
 					Address: "10.0.0.1",
@@ -1397,9 +1397,9 @@ func TestMetricsCollector_NodeOutageAndDrainingMetrics(t *testing.T) {
 				{
 					Name:       "node1",
 					InstanceID: "instance1",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateMIXED: {},
-						api.V0041NodeStateDRAIN: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateMIXED: {},
+						api.V0044NodeStateDRAIN: {},
 					},
 					Tres:    "cpu=4,mem=8000M,gres/gpu=1",
 					Address: "10.0.0.1",
@@ -1425,34 +1425,34 @@ func TestNodeStateDetectionFunctions(t *testing.T) {
 	t.Run("isNodeUnavailable", func(t *testing.T) {
 		// DOWN state is unavailability
 		downNode := slurmapi.Node{
-			States: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateDOWN: {},
+			States: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateDOWN: {},
 			},
 		}
 		assert.True(t, isNodeUnavailable(downNode))
 
 		// IDLE+DRAIN is unavailability
 		idleDrainNode := slurmapi.Node{
-			States: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateIDLE:  {},
-				api.V0041NodeStateDRAIN: {},
+			States: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateIDLE:  {},
+				api.V0044NodeStateDRAIN: {},
 			},
 		}
 		assert.True(t, isNodeUnavailable(idleDrainNode))
 
 		// Just IDLE is not unavailability
 		idleNode := slurmapi.Node{
-			States: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateIDLE: {},
+			States: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateIDLE: {},
 			},
 		}
 		assert.False(t, isNodeUnavailable(idleNode))
 
 		// ALLOCATED+DRAIN is not unavailability (it's draining)
 		allocDrainNode := slurmapi.Node{
-			States: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateALLOCATED: {},
-				api.V0041NodeStateDRAIN:     {},
+			States: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateALLOCATED: {},
+				api.V0044NodeStateDRAIN:     {},
 			},
 		}
 		assert.False(t, isNodeUnavailable(allocDrainNode))
@@ -1461,44 +1461,44 @@ func TestNodeStateDetectionFunctions(t *testing.T) {
 	t.Run("isNodeDraining", func(t *testing.T) {
 		// DRAIN+ALLOCATED is draining
 		drainAllocNode := slurmapi.Node{
-			States: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateALLOCATED: {},
-				api.V0041NodeStateDRAIN:     {},
+			States: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateALLOCATED: {},
+				api.V0044NodeStateDRAIN:     {},
 			},
 		}
 		assert.True(t, isNodeDraining(drainAllocNode))
 
 		// DRAIN+MIXED is draining
 		drainMixedNode := slurmapi.Node{
-			States: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateMIXED: {},
-				api.V0041NodeStateDRAIN: {},
+			States: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateMIXED: {},
+				api.V0044NodeStateDRAIN: {},
 			},
 		}
 		assert.True(t, isNodeDraining(drainMixedNode))
 
 		// DRAIN+IDLE is not draining (it's unavailability)
 		drainIdleNode := slurmapi.Node{
-			States: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateIDLE:  {},
-				api.V0041NodeStateDRAIN: {},
+			States: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateIDLE:  {},
+				api.V0044NodeStateDRAIN: {},
 			},
 		}
 		assert.False(t, isNodeDraining(drainIdleNode))
 
 		// No DRAIN flag means not draining
 		allocNode := slurmapi.Node{
-			States: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateALLOCATED: {},
+			States: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateALLOCATED: {},
 			},
 		}
 		assert.False(t, isNodeDraining(allocNode))
 
 		// DOWN+DRAIN is not draining (it's unavailability)
 		downDrainNode := slurmapi.Node{
-			States: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateDOWN:  {},
-				api.V0041NodeStateDRAIN: {},
+			States: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateDOWN:  {},
+				api.V0044NodeStateDRAIN: {},
 			},
 		}
 		assert.False(t, isNodeDraining(downDrainNode))
