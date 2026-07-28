@@ -14,6 +14,7 @@ import (
 const (
 	slurmScriptsOutputDir        = "/opt/soperator-outputs/slurm_scripts"
 	healthCheckerStdoutOutputDir = "/opt/soperator-outputs/health_checker_cmd_stdout"
+	gpuHealthCheckName           = "gpu_health_check"
 )
 
 var (
@@ -50,10 +51,6 @@ func assertHealthCheckProgramConfigured(ctx context.Context, exec framework.Exec
 	return nil
 }
 
-func waitForHealthyCheckRunnerOutput(ctx context.Context, exec framework.Exec, targetPath string, timeout time.Duration) (string, error) {
-	return waitForHealthyCheckRunnerOutputForJob(ctx, exec, targetPath, "", timeout)
-}
-
 func waitForHealthyCheckRunnerOutputForJob(ctx context.Context, exec framework.Exec, targetPath, jobID string, timeout time.Duration) (string, error) {
 	var content string
 	err := exec.WaitFor(ctx, fmt.Sprintf("healthy check_runner output %s", targetPath), timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
@@ -68,14 +65,11 @@ func waitForHealthyCheckRunnerOutputForJob(ctx context.Context, exec framework.E
 		if jobID != "" && !checkRunnerOutputMatchesJob(out, jobID) {
 			return false, nil
 		}
-		if match := checkRunnerFailPattern.FindString(out); match != "" {
-			return false, fmt.Errorf("check_runner has failed check %q:\n%s", match, strings.TrimSpace(out))
-		}
-		if strings.Contains(out, "ERROR:") {
-			return false, fmt.Errorf("check_runner has errors:\n%s", strings.TrimSpace(out))
-		}
 		if !strings.Contains(out, "INFO: Finished in") {
 			return false, nil
+		}
+		if err := assertCheckRunnerHealthy(out); err != nil {
+			return false, err
 		}
 		return true, nil
 	})
@@ -85,14 +79,7 @@ func waitForHealthyCheckRunnerOutputForJob(ctx context.Context, exec framework.E
 		}
 		return "", err
 	}
-	if err := assertCheckRunnerHealthy(content); err != nil {
-		return "", err
-	}
 	return content, nil
-}
-
-func waitForPassingHealthCheckReports(ctx context.Context, exec framework.Exec, targetPath string, timeout time.Duration) ([]string, error) {
-	return waitForPassingHealthCheckReportsForJob(ctx, exec, targetPath, "", timeout)
 }
 
 func waitForPassingHealthCheckReportsForJob(ctx context.Context, exec framework.Exec, targetPath, jobID string, timeout time.Duration) ([]string, error) {
@@ -148,7 +135,7 @@ func checkRunnerOutputPath(worker, contextName string) string {
 }
 
 func gpuHealthCheckOutputPath(worker, contextName string) string {
-	return fmt.Sprintf("%s/%s.gpu_health_check.%s.out", slurmScriptsOutputDir, worker, contextName)
+	return fmt.Sprintf("%s/%s.%s.%s.out", slurmScriptsOutputDir, worker, gpuHealthCheckName, contextName)
 }
 
 func assertCheckRunnerHealthy(output string) error {

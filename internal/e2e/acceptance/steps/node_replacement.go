@@ -71,7 +71,7 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAWorkerNode(ctx context
 	}
 
 	if node.InstanceID == "" {
-		return fmt.Errorf("parse InstanceId: no match in %q", node.Raw)
+		return fmt.Errorf("parse InstanceId for %s: no match in state=%s reason=%s", s.replacementWorker.Name, node.State, node.Reason)
 	}
 	s.originalInstanceID = node.InstanceID
 
@@ -163,7 +163,8 @@ func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Cont
 	if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=8 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
 		node, stateErr := s.slurm.NodeInfo(ctx, workerName)
 		if stateErr == nil {
-			s.exec.Logf("replacement worker state after failed final validation:\n%s", strings.TrimSpace(node.Raw))
+			s.exec.Logf("replacement worker state after failed final validation: name=%s state=%s reason=%s instance_id=%s",
+				node.Name, node.State, node.Reason, node.InstanceID)
 		}
 		return fmt.Errorf("validate replacement worker is operational from login node: %w", err)
 	}

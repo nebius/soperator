@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -177,6 +178,9 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	}
 	state.Workers = workers
 	classifyWorkers(state)
+	if err := discoverGPUCounts(ctx, w, state); err != nil {
+		return fmt.Errorf("discover GPU counts: %w", err)
+	}
 	if err := verifyDiscoveredWorkers(state); err != nil {
 		return err
 	}
@@ -250,6 +254,44 @@ func workerPodsBySlurmNodeName(pods corev1.PodList) (map[string]string, error) {
 	return workers, nil
 }
 
+func discoverGPUCounts(ctx context.Context, w *world, state *framework.ClusterState) error {
+	if len(state.GPUWorkers) == 0 {
+		return nil
+	}
+
+	counts := make(map[string]int, len(state.GPUWorkers))
+	for _, worker := range state.GPUWorkers {
+		out, err := w.Worker(worker).RunWithDefaultRetry(ctx, "nvidia-smi -L | wc -l")
+		if err != nil {
+			return fmt.Errorf("count GPUs on %s: %w", worker.Name, err)
+		}
+		count, err := parseDiscoveredGPUCount(worker.Name, out)
+		if err != nil {
+			return err
+		}
+		counts[worker.Name] = count
+	}
+	applyGPUCounts(state, counts)
+	return nil
+}
+
+func parseDiscoveredGPUCount(workerName, output string) (int, error) {
+	count, err := strconv.Atoi(strings.TrimSpace(output))
+	if err != nil || count <= 0 {
+		return 0, fmt.Errorf("invalid GPU count on %s: %q", workerName, strings.TrimSpace(output))
+	}
+	return count, nil
+}
+
+func applyGPUCounts(state *framework.ClusterState, counts map[string]int) {
+	for i := range state.Workers {
+		if count, ok := counts[state.Workers[i].Name]; ok {
+			state.Workers[i].GPUCount = count
+		}
+	}
+	classifyWorkers(state)
+}
+
 func discoveredNodeSetsFromLiveList(nodeSets slurmv1alpha1.NodeSetList, clusterName string) []framework.DiscoveredNodeSet {
 	discovered := make([]framework.DiscoveredNodeSet, 0, len(nodeSets.Items))
 	for _, nodeSet := range nodeSets.Items {
@@ -300,7 +342,7 @@ func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
 	steps.NewTopology(r.state, w).Register(sc)
 	steps.NewObservability(w).Register(sc)
 	steps.NewPassiveChecks(w, slurm).Register(sc)
-	steps.NewActiveChecks(r.state, w).Register(sc)
+	steps.NewActiveChecks(r.state, w, slurm).Register(sc)
 	steps.NewSystemChecks(w, slurm).Register(sc)
 
 	registerSkipHook(sc)

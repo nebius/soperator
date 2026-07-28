@@ -96,6 +96,12 @@ func TestAssertGPUActiveCheckSlurmRecords(t *testing.T) {
 	require.Error(t, assertGPUActiveCheckSlurmRecords(records, []string{"101", "102"}, expected))
 }
 
+func TestAssertActiveGPUCheckOutputPassing(t *testing.T) {
+	require.NoError(t, assertActiveGPUCheckOutputPassing("Health checker status: PASS\n"))
+	require.Error(t, assertActiveGPUCheckOutputPassing("Health checker status: FAIL\n"))
+	require.Error(t, assertActiveGPUCheckOutputPassing("no health status here\n"))
+}
+
 func TestAllocMemPressureBytes(t *testing.T) {
 	const gib = uint64(1024 * 1024 * 1024)
 

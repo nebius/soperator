@@ -48,7 +48,8 @@ func (s *ClusterCreation) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^all Slurm nodes are healthy$`, s.checkSlurmNodeHealth)
 	sc.Step(`^HealthCheckProgram outputs are healthy$`, s.checkHealthCheckProgramOutputs)
 	sc.Step(`^all ActiveChecks completed successfully$`, s.checkActiveChecks)
-	sc.Step(`^nebius and soperatorchecks users are present$`, s.checkNebiusAndSoperatorchecksUsers)
+	sc.Step(`^nebius user is present$`, s.checkNebiusUserPresent)
+	sc.Step(`^soperatorchecks user is present and configured$`, s.checkSoperatorchecksUserPresentAndConfigured)
 	sc.Step(`^login welcome output shows cluster information$`, s.checkWelcomeOutput)
 	sc.Step(`^main partition smoke job succeeds$`, s.checkMainSmokeJob)
 	sc.Step(`^hidden partition smoke job succeeds$`, s.checkHiddenSmokeJob)
@@ -360,24 +361,39 @@ func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 	return nil
 }
 
-func (s *ClusterCreation) checkNebiusAndSoperatorchecksUsers(ctx context.Context) error {
-	script := `
-set -euo pipefail
-for user in nebius soperatorchecks; do
-  id "$user" >/dev/null
-  test -d "/opt/soperator-home/$user"
-done
+func (s *ClusterCreation) checkNebiusUserPresent(ctx context.Context) error {
+	return s.checkJailUserHome(ctx, "nebius")
+}
 
-key=/opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa
-pub="${key}.pub"
-authorized=/opt/soperator-home/soperatorchecks/.ssh/authorized_keys
-test -s "$key"
-test -s "$pub"
-test -s "$authorized"
-grep -F "$(cat "$pub")" "$authorized" >/dev/null
-`
-	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, framework.BashLC(script)); err != nil {
-		return fmt.Errorf("check nebius and soperatorchecks users: %w", err)
+func (s *ClusterCreation) checkSoperatorchecksUserPresentAndConfigured(ctx context.Context) error {
+	if err := s.checkJailUserHome(ctx, "soperatorchecks"); err != nil {
+		return err
+	}
+
+	key := "/opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa"
+	pub := key + ".pub"
+	authorized := "/opt/soperator-home/soperatorchecks/.ssh/authorized_keys"
+	for _, path := range []string{key, pub, authorized} {
+		if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("test -s %s", framework.ShellQuote(path))); err != nil {
+			return fmt.Errorf("expected soperatorchecks SSH file %s to exist and be non-empty: %w", path, err)
+		}
+	}
+	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("grep -Fxf %s %s >/dev/null",
+		framework.ShellQuote(pub),
+		framework.ShellQuote(authorized),
+	)); err != nil {
+		return fmt.Errorf("soperatorchecks public key is not present in authorized_keys: %w", err)
+	}
+	return nil
+}
+
+func (s *ClusterCreation) checkJailUserHome(ctx context.Context, user string) error {
+	home := "/opt/soperator-home/" + user
+	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("id %s >/dev/null && test -d %s",
+		framework.ShellQuote(user),
+		framework.ShellQuote(home),
+	)); err != nil {
+		return fmt.Errorf("check jail user %s with home %s: %w", user, home, err)
 	}
 	return nil
 }

@@ -1,8 +1,9 @@
 package framework
 
 type WorkerRef struct {
-	Name    string
-	PodName string
+	Name     string
+	PodName  string
+	GPUCount int
 }
 
 type DiscoveredNodeSet struct {
