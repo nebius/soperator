@@ -47,7 +47,9 @@ type PassiveChecks struct {
 
 	cpuPrologOutput string
 	cpuEpilogOutput string
+	cpuHooksJob     framework.SbatchJob
 
+	gpuHooksJob     framework.SbatchJob
 	gpuHealthRunIDs []string
 
 	tmpfsJobID   string
@@ -116,12 +118,7 @@ func (s *PassiveChecks) aCPUOnlySlurmJobRunsOnTheSelectedWorker(ctx context.Cont
 	if err := s.ensureWorkerSelected(ctx); err != nil {
 		return err
 	}
-	if err := removeJailFiles(ctx, s.exec,
-		checkRunnerOutputPath(s.worker.Name, "prolog"),
-		checkRunnerOutputPath(s.worker.Name, "epilog"),
-	); err != nil {
-		return err
-	}
+	s.cpuHooksJob = framework.SbatchJob{}
 
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      "e2e-passive-cpu-hooks",
@@ -133,15 +130,22 @@ func (s *PassiveChecks) aCPUOnlySlurmJobRunsOnTheSelectedWorker(ctx context.Cont
 	if err != nil {
 		return err
 	}
-	return waitForJobSucceeded(ctx, s.exec, s.slurm, job, passiveCPUJobTimeout)
+	if err := waitForJobSucceeded(ctx, s.exec, s.slurm, job, passiveCPUJobTimeout); err != nil {
+		return err
+	}
+	s.cpuHooksJob = job
+	return nil
 }
 
 func (s *PassiveChecks) theCPUJobPrologAndEpilogCheckRunnerOutputsAreFreshAndHealthy(ctx context.Context) error {
-	prolog, err := waitForHealthyCheckRunnerOutput(ctx, s.exec, checkRunnerOutputPath(s.worker.Name, "prolog"), passiveCPUJobTimeout)
+	if s.cpuHooksJob.IsZero() {
+		return fmt.Errorf("CPU hook job is not captured")
+	}
+	prolog, err := waitForHealthyCheckRunnerOutputForJob(ctx, s.exec, checkRunnerOutputPath(s.worker.Name, "prolog"), s.cpuHooksJob.ID, passiveCPUJobTimeout)
 	if err != nil {
 		return err
 	}
-	epilog, err := waitForHealthyCheckRunnerOutput(ctx, s.exec, checkRunnerOutputPath(s.worker.Name, "epilog"), passiveCPUJobTimeout)
+	epilog, err := waitForHealthyCheckRunnerOutputForJob(ctx, s.exec, checkRunnerOutputPath(s.worker.Name, "epilog"), s.cpuHooksJob.ID, passiveCPUJobTimeout)
 	if err != nil {
 		return err
 	}
@@ -172,7 +176,10 @@ func (s *PassiveChecks) theDropPageCachePassiveCheckCompletedInEpilog(ctx contex
 	if s.worker.Name == "" {
 		return fmt.Errorf("worker is not selected")
 	}
-	epilog, err := waitForHealthyCheckRunnerOutput(ctx, s.exec, checkRunnerOutputPath(s.worker.Name, "epilog"), passiveCPUJobTimeout)
+	if s.cpuHooksJob.IsZero() {
+		return fmt.Errorf("CPU hook job is not captured")
+	}
+	epilog, err := waitForHealthyCheckRunnerOutputForJob(ctx, s.exec, checkRunnerOutputPath(s.worker.Name, "epilog"), s.cpuHooksJob.ID, passiveCPUJobTimeout)
 	if err != nil {
 		return err
 	}
@@ -308,12 +315,7 @@ func (s *PassiveChecks) aSmallGPUSlurmJobRunsOnTheSelectedGPUWorker(ctx context.
 	if err := s.ensureGPUWorkerSelected(ctx); err != nil {
 		return err
 	}
-	if err := removeJailFiles(ctx, s.exec,
-		gpuHealthCheckOutputPath(s.gpuWorker.Name, "prolog"),
-		gpuHealthCheckOutputPath(s.gpuWorker.Name, "epilog"),
-	); err != nil {
-		return err
-	}
+	s.gpuHooksJob = framework.SbatchJob{}
 
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      "e2e-passive-gpu-hooks",
@@ -326,16 +328,23 @@ func (s *PassiveChecks) aSmallGPUSlurmJobRunsOnTheSelectedGPUWorker(ctx context.
 	if err != nil {
 		return err
 	}
-	return waitForJobSucceeded(ctx, s.exec, s.slurm, job, passiveGPUJobTimeout)
+	if err := waitForJobSucceeded(ctx, s.exec, s.slurm, job, passiveGPUJobTimeout); err != nil {
+		return err
+	}
+	s.gpuHooksJob = job
+	return nil
 }
 
 func (s *PassiveChecks) theGPUJobHealthCheckPrologAndEpilogReportsAreFreshAndPassing(ctx context.Context) error {
 	if s.gpuWorker.Name == "" {
 		return fmt.Errorf("GPU worker is not selected")
 	}
+	if s.gpuHooksJob.IsZero() {
+		return fmt.Errorf("GPU hook job is not captured")
+	}
 	var runIDs []string
 	for _, hook := range []string{"prolog", "epilog"} {
-		ids, err := waitForPassingHealthCheckReports(ctx, s.exec, gpuHealthCheckOutputPath(s.gpuWorker.Name, hook), passiveGPUJobTimeout)
+		ids, err := waitForPassingHealthCheckReportsForJob(ctx, s.exec, gpuHealthCheckOutputPath(s.gpuWorker.Name, hook), s.gpuHooksJob.ID, passiveGPUJobTimeout)
 		if err != nil {
 			return fmt.Errorf("%s gpu_health_check report: %w", hook, err)
 		}

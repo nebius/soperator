@@ -51,6 +51,10 @@ func assertHealthCheckProgramConfigured(ctx context.Context, exec framework.Exec
 }
 
 func waitForHealthyCheckRunnerOutput(ctx context.Context, exec framework.Exec, targetPath string, timeout time.Duration) (string, error) {
+	return waitForHealthyCheckRunnerOutputForJob(ctx, exec, targetPath, "", timeout)
+}
+
+func waitForHealthyCheckRunnerOutputForJob(ctx context.Context, exec framework.Exec, targetPath, jobID string, timeout time.Duration) (string, error) {
 	var content string
 	err := exec.WaitFor(ctx, fmt.Sprintf("healthy check_runner output %s", targetPath), timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		out, exists, err := readJailFileIfExists(waitCtx, exec, targetPath)
@@ -61,6 +65,9 @@ func waitForHealthyCheckRunnerOutput(ctx context.Context, exec framework.Exec, t
 			return false, nil
 		}
 		content = out
+		if jobID != "" && !checkRunnerOutputMatchesJob(out, jobID) {
+			return false, nil
+		}
 		if match := checkRunnerFailPattern.FindString(out); match != "" {
 			return false, fmt.Errorf("check_runner has failed check %q:\n%s", match, strings.TrimSpace(out))
 		}
@@ -85,6 +92,10 @@ func waitForHealthyCheckRunnerOutput(ctx context.Context, exec framework.Exec, t
 }
 
 func waitForPassingHealthCheckReports(ctx context.Context, exec framework.Exec, targetPath string, timeout time.Duration) ([]string, error) {
+	return waitForPassingHealthCheckReportsForJob(ctx, exec, targetPath, "", timeout)
+}
+
+func waitForPassingHealthCheckReportsForJob(ctx context.Context, exec framework.Exec, targetPath, jobID string, timeout time.Duration) ([]string, error) {
 	var content string
 	var runIDs []string
 	err := exec.WaitFor(ctx, fmt.Sprintf("passing health-check reports %s", targetPath), timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
@@ -98,6 +109,9 @@ func waitForPassingHealthCheckReports(ctx context.Context, exec framework.Exec, 
 		content = out
 		reports, parseErr := parseHealthCheckReports(out)
 		if parseErr == nil {
+			if jobID != "" && !healthCheckReportsMatchJob(reports, jobID) {
+				return false, nil
+			}
 			ids, err := assertHealthCheckReportsPassing(reports)
 			if err != nil {
 				return false, err
@@ -129,20 +143,6 @@ func readJailFileIfExists(ctx context.Context, exec framework.Exec, targetPath s
 	return out, true, nil
 }
 
-func removeJailFiles(ctx context.Context, exec framework.Exec, targetPaths ...string) error {
-	if len(targetPaths) == 0 {
-		return nil
-	}
-	var quoted []string
-	for _, targetPath := range targetPaths {
-		quoted = append(quoted, framework.ShellQuote(targetPath))
-	}
-	if _, err := exec.Jail().RunWithDefaultRetry(ctx, "rm -f "+strings.Join(quoted, " ")); err != nil {
-		return fmt.Errorf("remove jail files %s: %w", strings.Join(targetPaths, ", "), err)
-	}
-	return nil
-}
-
 func checkRunnerOutputPath(worker, contextName string) string {
 	return fmt.Sprintf("%s/%s.check_runner.%s.out", slurmScriptsOutputDir, worker, contextName)
 }
@@ -172,6 +172,18 @@ func assertCheckRunnerHealthy(output string) error {
 		return fmt.Errorf("check_runner output has no successful checks:\n%s", trimmed)
 	}
 	return nil
+}
+
+func checkRunnerOutputMatchesJob(output, jobID string) bool {
+	if strings.TrimSpace(jobID) == "" {
+		return true
+	}
+	for _, key := range []string{"SLURM_JOB_ID", "SLURM_JOBID"} {
+		if strings.Contains(output, fmt.Sprintf("Environment %s=\"%s\"", key, jobID)) {
+			return true
+		}
+	}
+	return false
 }
 
 func assertCheckRunnerCheckAbsent(output, checkName string) error {
@@ -269,6 +281,34 @@ func assertHealthCheckReportsPassing(reports []healthCheckReport) ([]string, err
 		runIDs = append(runIDs, runID)
 	}
 	return runIDs, nil
+}
+
+func healthCheckReportsMatchJob(reports []healthCheckReport, jobID string) bool {
+	if strings.TrimSpace(jobID) == "" {
+		return true
+	}
+	for _, report := range reports {
+		if report.Meta == nil {
+			return false
+		}
+		environment, _ := report.Meta["environment"].(string)
+		if !environmentHasKeyValue(environment, "SLURM_JOB_ID", jobID) && !environmentHasKeyValue(environment, "SLURM_JOBID", jobID) {
+			return false
+		}
+	}
+	return len(reports) > 0
+}
+
+// Health-check metadata stores the environment as space-separated KEY=value fields.
+// Match whole fields so job ID "2" does not match "23".
+func environmentHasKeyValue(environment, key, value string) bool {
+	target := key + "=" + value
+	for _, field := range strings.Fields(environment) {
+		if field == target {
+			return true
+		}
+	}
+	return false
 }
 
 func assertHealthCheckRawOutputsPresent(ctx context.Context, exec framework.Exec, runIDs []string) error {

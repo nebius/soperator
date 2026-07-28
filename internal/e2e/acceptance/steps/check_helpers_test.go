@@ -36,6 +36,15 @@ func TestAssertCheckRunnerHealthy(t *testing.T) {
 	require.Error(t, assertCheckRunnerHealthy(failed))
 }
 
+func TestCheckRunnerOutputMatchesJob(t *testing.T) {
+	output := `
+[2026-01-01 00:00:00.000 UTC] INFO: Environment SLURM_JOB_ID="23"
+[2026-01-01 00:00:00.001 UTC] INFO: Environment SLURM_JOBID="23"
+`
+	assert.True(t, checkRunnerOutputMatchesJob(output, "23"))
+	assert.False(t, checkRunnerOutputMatchesJob(output, "16"))
+}
+
 func TestParseHealthCheckReports(t *testing.T) {
 	output := `
 noise
@@ -47,6 +56,21 @@ noise
 	runIDs, err := assertHealthCheckReportsPassing(reports)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"run-1", "run-2"}, runIDs)
+}
+
+func TestHealthCheckReportsMatchJob(t *testing.T) {
+	reports := []healthCheckReport{
+		{
+			Status: "PASS",
+			Meta: map[string]any{
+				"run_id":      "run-1",
+				"environment": "SLURM_JOB_USER=root SLURM_JOB_ID=23 SLURM_JOBID=23",
+			},
+		},
+	}
+	assert.True(t, healthCheckReportsMatchJob(reports, "23"))
+	assert.False(t, healthCheckReportsMatchJob(reports, "16"))
+	assert.False(t, healthCheckReportsMatchJob(reports, "2"))
 }
 
 func TestUniqueK8sJobName(t *testing.T) {
