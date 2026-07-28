@@ -82,8 +82,8 @@ func (s *NodeReplacement) anyWorkersByType(workerType string, count int) ([]fram
 
 func (s *NodeReplacement) submitTestJobOnWorker(ctx context.Context, worker framework.WorkerRef) error {
 	s.replacementWorker = worker
-	s.preExistingWorkers = workerNamesFromRefs(s.exec.AvailableWorkers())
-	s.gpuWorkers = workerNameSet(s.exec.AvailableGPUWorkers())
+	s.preExistingWorkers = workerNamesFromRefs(s.exec.AvailableWorkers(framework.WorkerAny))
+	s.gpuWorkers = workerNameSet(s.exec.AvailableWorkers(framework.WorkerGPU))
 
 	node, err := s.slurm.NodeInfo(ctx, s.replacementWorker.Name)
 	if err != nil {

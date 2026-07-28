@@ -88,7 +88,7 @@ func (s *SystemChecks) Register(sc *godog.ScenarioContext) {
 
 func (s *SystemChecks) aHealthyWorkerPodIsSelected(ctx context.Context) error {
 	var problems []string
-	for _, worker := range s.exec.AvailableWorkers() {
+	for _, worker := range s.exec.AvailableWorkers(framework.WorkerAny) {
 		node, err := s.slurm.NodeInfo(ctx, worker.Name)
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", worker.Name, err))

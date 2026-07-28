@@ -22,10 +22,19 @@ type ArgsScope interface {
 	RunWithDefaultRetry(ctx context.Context, args ...string) (string, error)
 }
 
+type WorkerKind string
+
+const (
+	WorkerAny WorkerKind = "any"
+	WorkerCPU WorkerKind = "cpu"
+	WorkerGPU WorkerKind = "gpu"
+)
+
 type Exec interface {
-	AvailableWorkers() []WorkerRef
-	AvailableCPUWorkers() []WorkerRef
-	AvailableGPUWorkers() []WorkerRef
+	// TODO: Split worker discovery into a WorkerInventory interface when the
+	// acceptance framework has a broader cleanup pass. Exec should focus on
+	// command execution, not cluster state inventory.
+	AvailableWorkers(kind WorkerKind) []WorkerRef
 	Kubectl() ArgsScope
 	// Local returns a local process scope. Do not use it for kubectl commands;
 	// use Kubectl instead so the explicit Kubernetes context is applied.
@@ -35,5 +44,7 @@ type Exec interface {
 	Worker(worker WorkerRef) CommandScope
 	WorkerPod(worker WorkerRef) CommandScope
 	WaitFor(ctx context.Context, description string, timeout, pollInterval time.Duration, condition func(context.Context) (bool, error)) error
+	// TODO: Move Logf to a small Logger/Reporter interface together with the
+	// WorkerInventory split so Exec stays limited to command execution.
 	Logf(format string, args ...any)
 }

@@ -25,16 +25,17 @@ type world struct {
 	kubectlContext string
 }
 
-func (w *world) AvailableWorkers() []framework.WorkerRef {
-	return append([]framework.WorkerRef(nil), w.state.Workers...)
-}
-
-func (w *world) AvailableCPUWorkers() []framework.WorkerRef {
-	return append([]framework.WorkerRef(nil), w.state.CPUWorkers...)
-}
-
-func (w *world) AvailableGPUWorkers() []framework.WorkerRef {
-	return append([]framework.WorkerRef(nil), w.state.GPUWorkers...)
+func (w *world) AvailableWorkers(kind framework.WorkerKind) []framework.WorkerRef {
+	switch kind {
+	case framework.WorkerAny:
+		return append([]framework.WorkerRef(nil), w.state.Workers...)
+	case framework.WorkerCPU:
+		return append([]framework.WorkerRef(nil), w.state.CPUWorkers...)
+	case framework.WorkerGPU:
+		return append([]framework.WorkerRef(nil), w.state.GPUWorkers...)
+	default:
+		return nil
+	}
 }
 
 func (w *world) Logf(format string, args ...any) {

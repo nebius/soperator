@@ -108,15 +108,15 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 }
 
 func (s *SlurmClient) AnyWorkers(count int) ([]WorkerRef, error) {
-	return pickAnyWorkerRefs(s.exec.AvailableWorkers(), count, "workers")
+	return pickAnyWorkerRefs(s.exec.AvailableWorkers(WorkerAny), count, "workers")
 }
 
 func (s *SlurmClient) AnyCPUWorkers(count int) ([]WorkerRef, error) {
-	return pickAnyWorkerRefs(s.exec.AvailableCPUWorkers(), count, "CPU workers")
+	return pickAnyWorkerRefs(s.exec.AvailableWorkers(WorkerCPU), count, "CPU workers")
 }
 
 func (s *SlurmClient) AnyGPUWorkers(count int) ([]WorkerRef, error) {
-	return pickAnyWorkerRefs(s.exec.AvailableGPUWorkers(), count, "GPU workers")
+	return pickAnyWorkerRefs(s.exec.AvailableWorkers(WorkerGPU), count, "GPU workers")
 }
 
 func (s *SlurmClient) WaitForJobRunning(ctx context.Context, jobID string, timeout time.Duration) error {
