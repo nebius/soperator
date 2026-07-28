@@ -1,6 +1,6 @@
 suite: test vmagent tsa-token writer
 templates:
-  - templates/vm-tsa-token-writer.yaml
+  - templates/o11y-tsa-token-writer.yaml
 
 tests:
   - it: should render a HelmRelease using the bedag raw chart
@@ -43,10 +43,10 @@ tests:
             writer:
               source: imds
     asserts:
-      # resources: ServiceAccount + Role + RoleBinding + Deployment
+      # resources: ServiceAccount + (Role + RoleBinding) for monitoring/logs + Deployment
       - lengthEqual:
           path: spec.values.resources
-          count: 4
+          count: 6
       - equal:
           path: spec.values.resources[0].kind
           value: ServiceAccount
@@ -54,17 +54,17 @@ tests:
           path: spec.values.resources[0].metadata.namespace
           value: monitoring-system
       - equal:
-          path: spec.values.resources[3].kind
+          path: spec.values.resources[5].kind
           value: Deployment
       - equal:
-          path: spec.values.resources[3].spec.template.spec.hostNetwork
+          path: spec.values.resources[5].spec.template.spec.hostNetwork
           value: true
       - equal:
-          path: spec.values.resources[3].spec.template.spec.containers[0].env[0].value
+          path: spec.values.resources[5].spec.template.spec.containers[0].env[0].value
           value: "imds"
       - equal:
-          path: spec.values.resources[3].spec.template.spec.containers[0].env[3].value
-          value: "monitoring-system"
+          path: spec.values.resources[5].spec.template.spec.containers[0].env[3].value
+          value: "monitoring-system logs-system"
 
   - it: should restrict secret access by resourceName but allow create
     set:
@@ -109,15 +109,15 @@ tests:
               source: file
     asserts:
       - notExists:
-          path: spec.values.resources[3].spec.template.spec.hostNetwork
+          path: spec.values.resources[5].spec.template.spec.hostNetwork
       - equal:
-          path: spec.values.resources[3].spec.template.spec.containers[0].env[0].value
+          path: spec.values.resources[5].spec.template.spec.containers[0].env[0].value
           value: "file"
       - equal:
-          path: spec.values.resources[3].spec.template.spec.volumes[0].hostPath.path
+          path: spec.values.resources[5].spec.template.spec.volumes[0].hostPath.path
           value: "/mnt/cloud-metadata"
       - equal:
-          path: spec.values.resources[3].spec.template.spec.containers[0].volumeMounts[0].mountPath
+          path: spec.values.resources[5].spec.template.spec.containers[0].volumeMounts[0].mountPath
           value: "/o11ytoken"
 
   - it: should maintain the secret in every configured namespace

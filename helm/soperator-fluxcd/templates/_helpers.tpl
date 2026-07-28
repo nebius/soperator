@@ -64,6 +64,81 @@ Validate observability.publicEndpointTokenKind is one of: secret, hostPath
 {{- end -}}
 
 {{/*
+Resolve o11y TSA token settings. observability.vmStack.tsaToken is kept as a
+legacy override path for existing installations.
+*/}}
+{{- define "soperator-fluxcd.o11yTsaToken" -}}
+{{- $global := .Values.observability.tsaToken | default dict -}}
+{{- $legacy := .Values.observability.vmStack.tsaToken | default dict -}}
+{{- mergeOverwrite (deepCopy $global) $legacy | toYaml -}}
+{{- end -}}
+
+{{- define "soperator-fluxcd.o11yTsaTokenSecretName" -}}
+{{- $token := include "soperator-fluxcd.o11yTsaToken" . | fromYaml -}}
+{{- $token.secretName | default "o11y-writer-sa-token" -}}
+{{- end -}}
+
+{{- define "soperator-fluxcd.o11yTsaTokenSecretKey" -}}
+{{- $token := include "soperator-fluxcd.o11yTsaToken" . | fromYaml -}}
+{{- $token.secretKey | default "accessToken" -}}
+{{- end -}}
+
+{{- define "soperator-fluxcd.o11yTsaTokenMountPath" -}}
+{{- $token := include "soperator-fluxcd.o11yTsaToken" . | fromYaml -}}
+{{- $token.mountPath | default "/o11ytoken" -}}
+{{- end -}}
+
+{{- define "soperator-fluxcd.o11yTsaTokenHostPath" -}}
+{{- $token := include "soperator-fluxcd.o11yTsaToken" . | fromYaml -}}
+{{- $token.hostPath | default "/mnt/cloud-metadata" -}}
+{{- end -}}
+
+{{- define "soperator-fluxcd.o11yTsaTokenHostPathFilename" -}}
+{{- $token := include "soperator-fluxcd.o11yTsaToken" . | fromYaml -}}
+{{- $token.hostPathFilename | default "tsa-token" -}}
+{{- end -}}
+
+{{- define "soperator-fluxcd.o11yTsaTokenWriterName" -}}
+{{- printf "%s-tsa-token-writer" (include "soperator-fluxcd.fullname" .) -}}
+{{- end -}}
+
+{{- define "soperator-fluxcd.o11yTsaTokenWriterNamespace" -}}
+{{- if .Values.observability.vmStack.enabled -}}
+{{- .Values.observability.vmStack.namespace | default "monitoring-system" -}}
+{{- else -}}
+{{- .Values.observability.opentelemetry.namespace | default "logs-system" -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "soperator-fluxcd.o11yTsaTokenWriterEnabled" -}}
+{{- $token := include "soperator-fluxcd.o11yTsaToken" . | fromYaml -}}
+{{- $writer := $token.writer | default dict -}}
+{{- $enabled := true -}}
+{{- if hasKey $writer "enabled" -}}
+{{- $enabled = $writer.enabled -}}
+{{- end -}}
+{{- if $enabled -}}true{{- end -}}
+{{- end -}}
+
+{{- define "soperator-fluxcd.o11yTsaTokenWriterNamespaces" -}}
+{{- $token := include "soperator-fluxcd.o11yTsaToken" . | fromYaml -}}
+{{- $writer := $token.writer | default dict -}}
+{{- $configured := $writer.namespaces | default list -}}
+{{- if gt (len $configured) 0 -}}
+{{- $configured | uniq | toYaml -}}
+{{- else -}}
+{{- $namespaces := list -}}
+{{- if .Values.observability.vmStack.enabled -}}
+{{- $namespaces = append $namespaces (.Values.observability.vmStack.namespace | default "monitoring-system") -}}
+{{- end -}}
+{{- if .Values.observability.opentelemetry.enabled -}}
+{{- $namespaces = append $namespaces (.Values.observability.opentelemetry.namespace | default "logs-system") -}}
+{{- end -}}
+{{- $namespaces | uniq | toYaml -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Convert a Kubernetes CPU quantity to a positive GOMAXPROCS value.
 */}}
 {{- define "soperator-fluxcd.cpuQuantityToGOMAXPROCS" -}}

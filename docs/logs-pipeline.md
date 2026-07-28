@@ -44,6 +44,13 @@ The public logging endpoint defaults to `dns:///write.logging.eu-north1.nebius.c
 `observability.region` does not change the log write region. Set
 `observability.opentelemetry.publicEndpoint` only when an explicit endpoint override is needed.
 
+By default, the o11y TSA token writer fetches the write token from IMDS and
+maintains it in a Kubernetes Secret. The OpenTelemetry log collectors mount that
+Secret and use it through the `bearertokenauth` extension. This avoids requiring
+a pre-existing `/mnt/cloud-metadata` token directory on every collector host.
+`observability.publicEndpointTokenKind: hostPath` remains available for
+installations that intentionally provide the token file from the host.
+
 ## Components
 
 ### Log Collection
@@ -166,8 +173,15 @@ The logging system automatically extracts metadata from filenames and creates th
 observability:
   # Cloud delivery
   publicEndpointEnabled: true  # Enable/disable cloud export
+  publicEndpointTokenKind: secret
   logsProjectId: "your-nebius-project-id"
   region: "eu-north1"
+  tsaToken:
+    secretName: o11y-writer-sa-token
+    secretKey: accessToken
+    writer:
+      source: imds
+      namespaces: []  # Defaults to enabled metrics/log collector namespaces
   opentelemetry:
     # Optional. Defaults to dns:///write.logging.eu-north1.nebius.cloud.:443
     publicEndpoint: "dns:///write.logging.eu-north1.nebius.cloud.:443"
