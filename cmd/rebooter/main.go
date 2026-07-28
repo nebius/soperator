@@ -30,10 +30,14 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/klog/v2"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -154,7 +158,19 @@ func main() {
 	})
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
+		Scheme: scheme,
+		// The rebooter runs on every node, so an unrestricted cache would hold the whole cluster in every pod.
+		// The field selectors below are server-side: any informer this manager ever starts LISTs and WATCHes
+		// only this pod's own node and the pods running on it.
+		Cache: cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Node{}: {Field: fields.OneTermEqualSelector("metadata.name", nodeName)},
+				// Guardrail: nothing caches pods today (pod reads go through the kubelet via nodes/proxy),
+				// but a single cached pod read added in the future would silently start an informer over
+				// every pod in the cluster. This selector caps such an informer to this node's own pods.
+				&corev1.Pod{}: {Field: fields.OneTermEqualSelector("spec.nodeName", nodeName)},
+			},
+		},
 		Metrics:                metricsopts.ServerOptions(metricsAddr, secureMetrics, tlsOpts),
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
