@@ -57,6 +57,7 @@ type PassiveChecks struct {
 	allocGPUScenarioActive bool
 	unmanagedGPUPID        string
 	allocGPUJob            framework.SbatchJob
+	gpuCount               int
 
 	allocMemScenarioActive bool
 	allocMemJob            framework.SbatchJob
@@ -472,7 +473,7 @@ func (s *PassiveChecks) aFullNodeGPUSlurmJobIsSubmittedToTheSelectedGPUWorker(ct
 		JobName:      "e2e-passive-alloc-gpus-busy",
 		Nodes:        1,
 		Nodelist:     []string{s.gpuWorker.Name},
-		GPUsPerNode:  s.gpuWorker.GPUCount,
+		GPUsPerNode:  s.gpuCount,
 		TasksPerNode: 1,
 		ExtraFlags:   []string{"--no-requeue"},
 		Wrap:         "true",
@@ -631,7 +632,7 @@ func (s *PassiveChecks) ensureGPUCountDiscovered(ctx context.Context) error {
 	if s.gpuWorker.Name == "" {
 		return fmt.Errorf("GPU worker is not selected")
 	}
-	if s.gpuWorker.GPUCount > 0 {
+	if s.gpuCount > 0 {
 		return nil
 	}
 	out, err := s.exec.Worker(s.gpuWorker).RunWithDefaultRetry(ctx, framework.BashLC(gpuCountCommand))
@@ -642,9 +643,8 @@ func (s *PassiveChecks) ensureGPUCountDiscovered(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	s.gpuWorker.GPUCount = count
-	s.worker = s.gpuWorker
-	s.exec.Logf("passive checks: discovered GPU count worker=%s gpu_count=%d", s.gpuWorker.Name, s.gpuWorker.GPUCount)
+	s.gpuCount = count
+	s.exec.Logf("passive checks: discovered GPU count worker=%s gpu_count=%d", s.gpuWorker.Name, s.gpuCount)
 	return nil
 }
 
