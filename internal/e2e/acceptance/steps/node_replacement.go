@@ -17,10 +17,10 @@ const (
 
 	// These timeouts intentionally leave slack for slower replacement flows; tune
 	// them together with the CI step budget when this scenario evolves.
-	nodeReplacementJobTimeout    = 25 * time.Minute
-	nodeReplacementDrainTimeout  = 25 * time.Minute
-	nodeReplacementRemoveTimeout = 25 * time.Minute
-	nodeReplacementReadyTimeout  = 25 * time.Minute
+	nodeReplacementJobTimeout    = 5 * time.Minute
+	nodeReplacementDrainTimeout  = 10 * time.Minute
+	nodeReplacementRemoveTimeout = 15 * time.Minute
+	nodeReplacementReadyTimeout  = 20 * time.Minute
 )
 
 type NodeReplacement struct {

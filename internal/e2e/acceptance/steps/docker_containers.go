@@ -21,10 +21,10 @@ const (
 
 	dockerLocalStorageRoot = "/mnt/image-storage/docker"
 
-	dockerJobStartTimeout      = 20 * time.Minute
-	dockerProbeTimeout         = 10 * time.Minute
-	dockerJobCancelTimeout     = 5 * time.Minute
-	dockerContainerStopTimeout = 5 * time.Minute
+	dockerJobStartTimeout      = 5 * time.Minute
+	dockerProbeTimeout         = 5 * time.Minute
+	dockerJobCancelTimeout     = 3 * time.Minute
+	dockerContainerStopTimeout = 3 * time.Minute
 	dockerGPUSmokeTimeout      = 10 * time.Minute
 )
 

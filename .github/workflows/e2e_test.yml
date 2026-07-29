@@ -414,7 +414,7 @@ jobs:
           pkill -9 -f terraform-provider || true
 
       - name: Acceptance Tests
-        timeout-minutes: 90
+        timeout-minutes: 120
         run: |
           bin/e2e acceptance
 

@@ -23,9 +23,9 @@ const (
 
 	enrootDedicatedDataPath = "/mnt/image-storage/enroot/data"
 
-	enrootJobStartTimeout = 25 * time.Minute
-	enrootProbeTimeout    = 10 * time.Minute
-	enrootStopTimeout     = 5 * time.Minute
+	enrootJobStartTimeout = 5 * time.Minute
+	enrootProbeTimeout    = 5 * time.Minute
+	enrootStopTimeout     = 3 * time.Minute
 	enrootGPUSmokeTimeout = 10 * time.Minute
 )
 

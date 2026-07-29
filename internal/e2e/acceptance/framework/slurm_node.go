@@ -54,6 +54,15 @@ func (s *SlurmClient) NodeInfo(ctx context.Context, worker string) (SlurmNodeInf
 	return ParseSlurmNodeInfo(worker, out), nil
 }
 
+func (s *SlurmClient) NodeInfoOnce(ctx context.Context, worker string) (SlurmNodeInfo, error) {
+	out, err := s.exec.Controller().Run(ctx,
+		fmt.Sprintf("scontrol show node %s", ShellQuote(worker)))
+	if err != nil {
+		return SlurmNodeInfo{}, fmt.Errorf("show Slurm node %s: %w", worker, err)
+	}
+	return ParseSlurmNodeInfo(worker, out), nil
+}
+
 func (n SlurmNodeInfo) HasStateFlag(flag string) bool {
 	for _, part := range strings.Split(n.State, "+") {
 		if strings.EqualFold(strings.TrimSpace(part), flag) {

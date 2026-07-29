@@ -18,8 +18,8 @@ const (
 	activeGPUChecksSuffix = "gpu-checks"
 
 	activeK8sJobTimeout   = 5 * time.Minute
-	activeGPUCheckTimeout = 40 * time.Minute
-	activeSlurmOutputWait = 15 * time.Minute
+	activeGPUCheckTimeout = 25 * time.Minute
+	activeSlurmOutputWait = 20 * time.Minute
 
 	activeSlurmJobOutputDir = "/opt/soperator-outputs/slurm_jobs"
 )

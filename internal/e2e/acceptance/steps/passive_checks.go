@@ -14,15 +14,15 @@ import (
 )
 
 const (
-	passiveCPUJobTimeout          = 5 * time.Minute
-	passiveGPUJobTimeout          = 15 * time.Minute
-	passiveAllocGPUDrainTimeout   = 5 * time.Minute
-	passiveAllocGPUJobTimeout     = 12 * time.Minute
-	passiveAllocGPURecoverTimeout = 7 * time.Minute
-	passiveAllocMemDrainTimeout   = 5 * time.Minute
-	passiveAllocMemJobTimeout     = 12 * time.Minute
-	passiveAllocMemRecoverTimeout = 7 * time.Minute
-	passiveTmpfsCleanupTimeout    = 2 * time.Minute
+	passiveCPUJobTimeout          = 3 * time.Minute
+	passiveGPUJobTimeout          = 5 * time.Minute
+	passiveAllocGPUDrainTimeout   = 3 * time.Minute
+	passiveAllocGPUJobTimeout     = 4 * time.Minute
+	passiveAllocGPURecoverTimeout = 3 * time.Minute
+	passiveAllocMemDrainTimeout   = 3 * time.Minute
+	passiveAllocMemJobTimeout     = 4 * time.Minute
+	passiveAllocMemRecoverTimeout = 3 * time.Minute
+	passiveTmpfsCleanupTimeout    = 1 * time.Minute
 
 	passiveAllocGPUReason = "[user_problem] alloc_gpus_busy"
 	passiveAllocMemReason = "[user_problem] alloc_mem_used"
@@ -430,10 +430,19 @@ func (s *PassiveChecks) theJobTmpfsDirectoryIsRemovedAfterTheJobExits(ctx contex
 		for _, target := range targets {
 			checks = append(checks, fmt.Sprintf("test ! -e %s", framework.ShellQuote(target)))
 		}
-		_, err := s.exec.Worker(s.worker).RunWithDefaultRetry(waitCtx, strings.Join(checks, " && "))
-		// The directory can still exist while the Epilog cleanup is settling.
-		ready := err == nil
-		return ready, nil
+		probe := fmt.Sprintf("if %s; then echo gone; else echo exists; fi", strings.Join(checks, " && "))
+		out, err := s.exec.Worker(s.worker).Run(waitCtx, probe)
+		if err != nil {
+			return false, fmt.Errorf("check job tmpfs directory removal: %w", err)
+		}
+		state := strings.TrimSpace(out)
+		if state == "gone" {
+			return true, nil
+		}
+		if state == "exists" {
+			return false, nil
+		}
+		return false, fmt.Errorf("unexpected job tmpfs removal probe output: %q", state)
 	}); err != nil {
 		return err
 	}

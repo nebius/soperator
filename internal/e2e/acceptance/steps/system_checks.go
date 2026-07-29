@@ -18,14 +18,14 @@ const (
 	systemEphemeralFillPath          = "/tmp/soperator-acceptance-ephemeral-fill"
 	systemEphemeralTargetPercent     = 87.0
 	systemEphemeralMaxInitialPercent = 75.0
-	systemEphemeralDrainTimeout      = 10 * time.Minute
-	systemEphemeralRecoverTimeout    = 12 * time.Minute
+	systemEphemeralDrainTimeout      = 5 * time.Minute
+	systemEphemeralRecoverTimeout    = 5 * time.Minute
 	systemEphemeralReason            = "[user_problem] pod_ephemeral_storage"
 	// Small mirrored image used only to enter the host namespace with kubectl debug.
 	systemKubeletDebugImage          = "cr.eu-north1.nebius.cloud/soperator/ubuntu:noble"
-	systemKubeletNodeRecreateTimeout = 35 * time.Minute
-	systemKubeletWorkerReadyTimeout  = 15 * time.Minute
-	systemKubeletSlurmRecoverTimeout = 15 * time.Minute
+	systemKubeletNodeRecreateTimeout = 30 * time.Minute
+	systemKubeletWorkerReadyTimeout  = 10 * time.Minute
+	systemKubeletSlurmRecoverTimeout = 5 * time.Minute
 )
 
 type SystemChecks struct {
@@ -270,7 +270,7 @@ func (s *SystemChecks) theSelectedSlurmWorkerIsPresentAfterKubeletReplacement(ct
 		return fmt.Errorf("worker is not selected")
 	}
 	return s.exec.WaitFor(ctx, fmt.Sprintf("Slurm node %s present after kubelet replacement", s.kubeletWorker.Name), systemKubeletSlurmRecoverTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		_, err := s.slurm.NodeInfo(waitCtx, s.kubeletWorker.Name)
+		_, err := s.slurm.NodeInfoOnce(waitCtx, s.kubeletWorker.Name)
 		ready := err == nil
 		return ready, nil
 	})
