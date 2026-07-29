@@ -30,6 +30,7 @@ const (
 	passiveAllocMemPressurePath = "/mnt/memory/soperator-acceptance-alloc-mem-used"
 	allocMemPressureMargin      = uint64(2 * 1024 * 1024 * 1024)
 	allocMemPressureMinimum     = uint64(1 * 1024 * 1024 * 1024)
+	gpuCountCommand             = "set -o pipefail; timeout 30s nvidia-smi -L | wc -l"
 )
 
 var (
@@ -319,10 +320,7 @@ func (s *PassiveChecks) aGPUWorkerIsSelected(ctx context.Context) error {
 	}
 	s.gpuWorker = workers[0]
 	s.worker = s.gpuWorker
-	if s.gpuWorker.GPUCount <= 0 {
-		return fmt.Errorf("GPU count was not discovered for worker %s", s.gpuWorker.Name)
-	}
-	s.exec.Logf("passive checks: selected GPU worker=%s gpu_count=%d", s.gpuWorker.Name, s.gpuWorker.GPUCount)
+	s.exec.Logf("passive checks: selected GPU worker=%s", s.gpuWorker.Name)
 	return nil
 }
 
@@ -463,8 +461,11 @@ func (s *PassiveChecks) anUnmanagedGPUWorkloadIsStartedOnTheSelectedGPUWorker(ct
 }
 
 func (s *PassiveChecks) aFullNodeGPUSlurmJobIsSubmittedToTheSelectedGPUWorker(ctx context.Context) error {
-	if s.gpuWorker.Name == "" || s.gpuWorker.GPUCount <= 0 {
-		return fmt.Errorf("GPU worker or GPU count is not captured")
+	if err := s.ensureGPUWorkerSelected(ctx); err != nil {
+		return err
+	}
+	if err := s.ensureGPUCountDiscovered(ctx); err != nil {
+		return err
 	}
 
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
@@ -624,6 +625,35 @@ func (s *PassiveChecks) ensureGPUWorkerSelected(ctx context.Context) error {
 		return nil
 	}
 	return s.aGPUWorkerIsSelected(ctx)
+}
+
+func (s *PassiveChecks) ensureGPUCountDiscovered(ctx context.Context) error {
+	if s.gpuWorker.Name == "" {
+		return fmt.Errorf("GPU worker is not selected")
+	}
+	if s.gpuWorker.GPUCount > 0 {
+		return nil
+	}
+	out, err := s.exec.Worker(s.gpuWorker).RunWithDefaultRetry(ctx, framework.BashLC(gpuCountCommand))
+	if err != nil {
+		return fmt.Errorf("count GPUs on %s: %w", s.gpuWorker.Name, err)
+	}
+	count, err := parseGPUCount(s.gpuWorker.Name, out)
+	if err != nil {
+		return err
+	}
+	s.gpuWorker.GPUCount = count
+	s.worker = s.gpuWorker
+	s.exec.Logf("passive checks: discovered GPU count worker=%s gpu_count=%d", s.gpuWorker.Name, s.gpuWorker.GPUCount)
+	return nil
+}
+
+func parseGPUCount(workerName, output string) (int, error) {
+	count, err := strconv.Atoi(strings.TrimSpace(output))
+	if err != nil || count <= 0 {
+		return 0, fmt.Errorf("invalid GPU count on %s: %q", workerName, strings.TrimSpace(output))
+	}
+	return count, nil
 }
 
 func (s *PassiveChecks) availableMemoryBytes(ctx context.Context, worker framework.WorkerRef) (uint64, error) {

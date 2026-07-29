@@ -227,36 +227,6 @@ func TestWorkerPodsBySlurmNodeNameRejectsDuplicateHostname(t *testing.T) {
 	assert.ErrorContains(t, err, "both declare spec.hostname=worker-0")
 }
 
-func TestParseDiscoveredGPUCount(t *testing.T) {
-	count, err := parseDiscoveredGPUCount("worker-0", "8\n")
-	require.NoError(t, err)
-	assert.Equal(t, 8, count)
-
-	_, err = parseDiscoveredGPUCount("worker-0", "0\n")
-	require.Error(t, err)
-}
-
-func TestApplyGPUCounts(t *testing.T) {
-	state := &framework.ClusterState{
-		DiscoveredNodeSets: []framework.DiscoveredNodeSet{
-			{Name: "worker-gpu", Size: 1, HasGPU: true},
-			{Name: "worker-cpu", Size: 1},
-		},
-		Workers: []framework.WorkerRef{
-			{Name: "worker-gpu-0", PodName: "worker-gpu-0"},
-			{Name: "worker-cpu-0", PodName: "worker-cpu-0"},
-		},
-	}
-	classifyWorkers(state)
-
-	applyGPUCounts(state, map[string]int{"worker-gpu-0": 8})
-
-	require.Len(t, state.GPUWorkers, 1)
-	assert.Equal(t, 8, state.GPUWorkers[0].GPUCount)
-	assert.Equal(t, 8, state.Workers[0].GPUCount)
-	assert.Zero(t, state.Workers[1].GPUCount)
-}
-
 func TestClassifyWorkersSeparatesCPUAndGPU(t *testing.T) {
 	state := &framework.ClusterState{
 		Workers: []framework.WorkerRef{

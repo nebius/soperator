@@ -128,6 +128,15 @@ func TestAssertActiveGPUCheckOutputPassing(t *testing.T) {
 	require.Error(t, assertActiveGPUCheckOutputPassing("no health status here\n"))
 }
 
+func TestParseGPUCount(t *testing.T) {
+	count, err := parseGPUCount("worker-0", "8\n")
+	require.NoError(t, err)
+	assert.Equal(t, 8, count)
+
+	_, err = parseGPUCount("worker-0", "0\n")
+	require.Error(t, err)
+}
+
 func TestAllocMemPressureBytes(t *testing.T) {
 	const gib = uint64(1024 * 1024 * 1024)
 

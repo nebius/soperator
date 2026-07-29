@@ -262,12 +262,11 @@ func (s *ActiveChecks) waitForGPUActiveCheckOutputsPassingOnAllGPUWorkers(ctx co
 			if !exists {
 				return false, nil
 			}
-			status, found := activeGPUCheckOutputStatus(out)
-			if !found {
+			if _, found := activeGPUCheckOutputStatus(out); !found {
 				return false, nil
 			}
-			if status != "PASS" {
-				return false, fmt.Errorf("expected GPU ActiveCheck health-check status PASS, got %s:\n%s", status, strings.TrimSpace(out))
+			if err := assertActiveGPUCheckOutputPassing(out); err != nil {
+				return false, err
 			}
 		}
 		records = next
