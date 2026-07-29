@@ -20,6 +20,7 @@ const (
 	activeK8sJobTimeout   = 5 * time.Minute
 	activeGPUCheckTimeout = 25 * time.Minute
 	activeSlurmOutputWait = 20 * time.Minute
+	activeSlurmOutputPoll = 30 * time.Second
 
 	activeSlurmJobOutputDir = "/opt/soperator-outputs/slurm_jobs"
 )
@@ -245,7 +246,7 @@ func (s *ActiveChecks) waitForGPUActiveCheckOutputsPassingOnAllGPUWorkers(ctx co
 		return fmt.Errorf("GPU ActiveCheck Slurm job IDs are not captured")
 	}
 	var records map[string]activeCheckSlurmJobRecord
-	if err := s.exec.WaitFor(ctx, "GPU ActiveCheck output files report PASS", activeSlurmOutputWait, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	if err := s.exec.WaitFor(ctx, "GPU ActiveCheck output files report PASS", activeSlurmOutputWait, activeSlurmOutputPoll, func(waitCtx context.Context) (bool, error) {
 		next, err := s.gpuActiveCheckSlurmJobRecords(waitCtx)
 		if err != nil {
 			return false, err
