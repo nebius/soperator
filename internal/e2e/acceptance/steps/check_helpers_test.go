@@ -96,6 +96,21 @@ func TestAssertGPUActiveCheckSlurmRecords(t *testing.T) {
 	require.Error(t, assertGPUActiveCheckSlurmRecords(records, []string{"101", "102"}, expected))
 }
 
+func TestAssertGPUActiveCheckSlurmRecordsTargetExpectedWorkers(t *testing.T) {
+	records := map[string]activeCheckSlurmJobRecord{
+		"101": {ID: "101", State: "RUNNING", NodeList: "worker-0"},
+		"102": {ID: "102", State: "RUNNING", NodeList: "worker-1"},
+	}
+	expected := []framework.WorkerRef{
+		{Name: "worker-0"},
+		{Name: "worker-1"},
+	}
+	require.NoError(t, assertGPUActiveCheckSlurmRecordsTargetExpectedWorkers(records, []string{"101", "102"}, expected))
+
+	records["102"] = activeCheckSlurmJobRecord{ID: "102", State: "RUNNING", NodeList: "worker-2"}
+	require.Error(t, assertGPUActiveCheckSlurmRecordsTargetExpectedWorkers(records, []string{"101", "102"}, expected))
+}
+
 func TestActiveCheckSlurmJobRecordsTerminal(t *testing.T) {
 	records := map[string]activeCheckSlurmJobRecord{
 		"101": {ID: "101", State: "COMPLETED"},

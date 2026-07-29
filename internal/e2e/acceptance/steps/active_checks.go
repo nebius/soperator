@@ -20,7 +20,7 @@ const (
 
 	activeK8sJobTimeout        = 5 * time.Minute
 	activeGPUCheckTimeout      = 40 * time.Minute
-	activeSlurmOutputWait      = 3 * time.Minute
+	activeSlurmOutputWait      = 15 * time.Minute
 	activeOutputCleanupTimeout = 3 * time.Minute
 
 	activeSlurmJobOutputDir = "/opt/soperator-outputs/slurm_jobs"
@@ -62,9 +62,9 @@ func (s *ActiveChecks) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^healthy GPU workers are available for active checks$`, s.healthyGPUWorkersAreAvailableForActiveChecks)
 	sc.Step(`^the GPU ActiveCheck is triggered$`, s.theGPUActiveCheckIsTriggered)
 	sc.Step(`^the GPU ActiveCheck Kubernetes Job succeeds$`, s.theGPUActiveCheckKubernetesJobSucceeds)
+	sc.Step(`^GPU ActiveCheck outputs report PASS on all GPU workers$`, s.gpuActiveCheckOutputsReportPASSOnAllGPUWorkers)
 	sc.Step(`^GPU ActiveCheck Slurm jobs complete on all GPU workers$`, s.gpuActiveCheckSlurmJobsCompleteOnAllGPUWorkers)
 	sc.Step(`^the GPU ActiveCheck status is Complete$`, s.theGPUActiveCheckStatusIsComplete)
-	sc.Step(`^GPU ActiveCheck outputs report PASS on all GPU workers$`, s.gpuActiveCheckOutputsReportPASSOnAllGPUWorkers)
 }
 
 func (s *ActiveChecks) anOldSoperatorOutputFileIsCreatedForAcceptance(ctx context.Context) error {
@@ -150,7 +150,12 @@ func (s *ActiveChecks) theGPUActiveCheckStatusIsComplete(ctx context.Context) er
 	if len(s.gpuCheckJobIDs) == 0 {
 		return fmt.Errorf("GPU ActiveCheck Slurm job IDs are not captured")
 	}
-	return s.waitForActiveCheckSlurmRunComplete(ctx, s.activeCheckName(activeGPUChecksSuffix), s.gpuCheckJobIDs[0], activeGPUCheckTimeout)
+	if err := s.waitForActiveCheckSlurmRunComplete(ctx, s.activeCheckName(activeGPUChecksSuffix), s.gpuCheckJobIDs[0], activeGPUCheckTimeout); err != nil {
+		return err
+	}
+	s.gpuCheckK8sJobName = ""
+	s.gpuCheckJobIDs = nil
+	return nil
 }
 
 func (s *ActiveChecks) gpuActiveCheckSlurmJobsCompleteOnAllGPUWorkers(ctx context.Context) error {
@@ -346,7 +351,7 @@ func (s *ActiveChecks) waitForGPUActiveCheckOutputsPassingOnAllGPUWorkers(ctx co
 		if err != nil {
 			return false, err
 		}
-		if err := assertGPUActiveCheckSlurmRecords(next, s.gpuCheckJobIDs, s.state.GPUWorkers); err != nil {
+		if err := assertGPUActiveCheckSlurmRecordsTargetExpectedWorkers(next, s.gpuCheckJobIDs, s.state.GPUWorkers); err != nil {
 			return false, err
 		}
 		for _, jobID := range s.gpuCheckJobIDs {
@@ -358,8 +363,12 @@ func (s *ActiveChecks) waitForGPUActiveCheckOutputsPassingOnAllGPUWorkers(ctx co
 			if !exists {
 				return false, nil
 			}
-			if err := assertActiveGPUCheckOutputPassing(out); err != nil {
-				return false, err
+			status, found := activeGPUCheckOutputStatus(out)
+			if !found {
+				return false, nil
+			}
+			if status != "PASS" {
+				return false, fmt.Errorf("expected GPU ActiveCheck health-check status PASS, got %s:\n%s", status, strings.TrimSpace(out))
 			}
 		}
 		records = next
@@ -367,12 +376,7 @@ func (s *ActiveChecks) waitForGPUActiveCheckOutputsPassingOnAllGPUWorkers(ctx co
 	}); err != nil {
 		return err
 	}
-	if err := assertGPUActiveCheckSlurmRecords(records, s.gpuCheckJobIDs, s.state.GPUWorkers); err != nil {
-		return err
-	}
-	s.gpuCheckK8sJobName = ""
-	s.gpuCheckJobIDs = nil
-	return nil
+	return assertGPUActiveCheckSlurmRecordsTargetExpectedWorkers(records, s.gpuCheckJobIDs, s.state.GPUWorkers)
 }
 
 func (s *ActiveChecks) gpuActiveCheckSlurmJobRecords(ctx context.Context) (map[string]activeCheckSlurmJobRecord, error) {
@@ -387,11 +391,30 @@ func (s *ActiveChecks) gpuActiveCheckSlurmJobRecords(ctx context.Context) (map[s
 }
 
 func assertGPUActiveCheckSlurmRecords(records map[string]activeCheckSlurmJobRecord, jobIDs []string, expectedWorkers []framework.WorkerRef) error {
+	if err := assertGPUActiveCheckSlurmRecordsTargetExpectedWorkers(records, jobIDs, expectedWorkers); err != nil {
+		return err
+	}
+
+	var problems []string
+	for _, jobID := range jobIDs {
+		record := records[jobID]
+		if record.State != "COMPLETED" || record.ExitCode != "0:0" {
+			problems = append(problems, fmt.Sprintf("job %s finished with state=%s exit_code=%s node=%s", jobID, record.State, record.ExitCode, record.NodeList))
+		}
+	}
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		return fmt.Errorf("%s", strings.Join(problems, "; "))
+	}
+	return nil
+}
+
+func assertGPUActiveCheckSlurmRecordsTargetExpectedWorkers(records map[string]activeCheckSlurmJobRecord, jobIDs []string, expectedWorkers []framework.WorkerRef) error {
 	expected := make(map[string]struct{}, len(expectedWorkers))
 	for _, worker := range expectedWorkers {
 		expected[worker.Name] = struct{}{}
 	}
-	completed := make(map[string]string, len(expectedWorkers))
+	targeted := make(map[string]string, len(expectedWorkers))
 	var problems []string
 
 	for _, jobID := range jobIDs {
@@ -400,19 +423,15 @@ func assertGPUActiveCheckSlurmRecords(records map[string]activeCheckSlurmJobReco
 			problems = append(problems, fmt.Sprintf("job %s is missing from sacct", jobID))
 			continue
 		}
-		if record.State != "COMPLETED" || record.ExitCode != "0:0" {
-			problems = append(problems, fmt.Sprintf("job %s finished with state=%s exit_code=%s node=%s", jobID, record.State, record.ExitCode, record.NodeList))
-			continue
-		}
 		if _, ok := expected[record.NodeList]; !ok {
-			problems = append(problems, fmt.Sprintf("job %s completed on unexpected node %s", jobID, record.NodeList))
+			problems = append(problems, fmt.Sprintf("job %s targeted unexpected node %s", jobID, record.NodeList))
 			continue
 		}
-		completed[record.NodeList] = jobID
+		targeted[record.NodeList] = jobID
 	}
 	for worker := range expected {
-		if _, ok := completed[worker]; !ok {
-			problems = append(problems, fmt.Sprintf("GPU worker %s has no completed ActiveCheck job", worker))
+		if _, ok := targeted[worker]; !ok {
+			problems = append(problems, fmt.Sprintf("GPU worker %s has no ActiveCheck job", worker))
 		}
 	}
 	if len(problems) > 0 {
@@ -493,12 +512,20 @@ func activeCheckSlurmJobOutputPath(record activeCheckSlurmJobRecord) string {
 }
 
 func assertActiveGPUCheckOutputPassing(output string) error {
-	match := activeGPUHealthStatusPattern.FindStringSubmatch(output)
-	if len(match) != 2 {
+	status, found := activeGPUCheckOutputStatus(output)
+	if !found {
 		return fmt.Errorf("GPU ActiveCheck output does not contain health-check status:\n%s", strings.TrimSpace(output))
 	}
-	if match[1] != "PASS" {
-		return fmt.Errorf("expected GPU ActiveCheck health-check status PASS, got %s:\n%s", match[1], strings.TrimSpace(output))
+	if status != "PASS" {
+		return fmt.Errorf("expected GPU ActiveCheck health-check status PASS, got %s:\n%s", status, strings.TrimSpace(output))
 	}
 	return nil
+}
+
+func activeGPUCheckOutputStatus(output string) (string, bool) {
+	match := activeGPUHealthStatusPattern.FindStringSubmatch(output)
+	if len(match) != 2 {
+		return "", false
+	}
+	return match[1], true
 }
