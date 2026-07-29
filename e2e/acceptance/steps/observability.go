@@ -7,7 +7,7 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
+	"nebius.ai/slurm-operator/e2e/acceptance/framework"
 )
 
 const observabilityNamespace = "monitoring-system"

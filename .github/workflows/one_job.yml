@@ -199,8 +199,8 @@ jobs:
         shell: bash
         run: |
           packages=(./cmd/e2e)
-          if [[ -d cmd/acceptance ]]; then
-            packages+=(./cmd/acceptance)
+          if [[ -d e2e/cmd/acceptance ]]; then
+            packages+=(./e2e/cmd/acceptance)
           fi
           go build "${packages[@]}"
 

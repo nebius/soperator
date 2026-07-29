@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
+	"nebius.ai/slurm-operator/e2e/acceptance/framework"
 )
 
 func TestParseOptionsDefaults(t *testing.T) {
@@ -43,7 +43,7 @@ func TestParseOptionsExplicitValues(t *testing.T) {
 }
 
 func TestRunnerTagFilter(t *testing.T) {
-	heterogeneousState := &framework.ClusterState{
+	cpuAndGPUState := &framework.ClusterState{
 		CPUWorkers: []framework.WorkerRef{{Name: "worker-cpu-0"}},
 		GPUWorkers: []framework.WorkerRef{{Name: "worker-gpu-0"}},
 	}
@@ -60,42 +60,55 @@ func TestRunnerTagFilter(t *testing.T) {
 	}{
 		{
 			name:  "default excludes unstable",
-			state: heterogeneousState,
+			state: cpuAndGPUState,
 			want:  "~@unstable",
 		},
 		{
 			name:             "run unstable has no tag filter when CPU and GPU workers exist",
-			state:            heterogeneousState,
+			state:            cpuAndGPUState,
 			runUnstableTests: true,
 			want:             "",
 		},
 		{
 			name:  "without GPU workers also excludes GPU",
 			state: noGPUState,
-			want:  "~@unstable && ~@gpu && ~@cpu && ~@heterogeneous",
+			want:  "~@unstable && ~@gpu && ~@cpu",
 		},
 		{
-			name:             "without CPU workers excludes CPU and heterogeneous",
+			name:             "without CPU workers excludes CPU",
 			state:            gpuOnlyState,
 			runUnstableTests: true,
-			want:             "~@cpu && ~@heterogeneous",
+			want:             "~@cpu",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			runner := NewRunner(tt.state, tt.runUnstableTests, nil, "", "")
+			runner, err := NewRunner(Options{
+				KubectlContext:            "dev-context",
+				State:                     tt.state,
+				ExcludeUnstable:           !tt.runUnstableTests,
+				ExcludeMissingWorkerKinds: true,
+			})
+			require.NoError(t, err)
 			assert.Equal(t, tt.want, runner.tagFilter())
 		})
 	}
 }
 
 func TestRunnerFeaturePaths(t *testing.T) {
-	runner := NewRunner(&framework.ClusterState{}, false, nil, "", "")
-	assert.Equal(t, featurePaths(), runner.featurePaths())
+	runner, err := NewRunner(Options{KubectlContext: "dev-context"})
+	require.NoError(t, err)
+	assert.Equal(t, FeaturePaths(), runner.featurePaths())
 
 	scenarios := []string{"features/internal_ssh.feature:2", "features/topology.feature:3"}
-	runner = NewRunner(&framework.ClusterState{}, false, scenarios, "", "")
+	features := SharedFeatureSource()
+	features.Paths = scenarios
+	runner, err = NewRunner(Options{
+		KubectlContext: "dev-context",
+		Features:       features,
+	})
+	require.NoError(t, err)
 	assert.Equal(t, scenarios, runner.featurePaths())
 }
 
@@ -246,24 +259,6 @@ func TestClassifyWorkersSeparatesCPUAndGPU(t *testing.T) {
 	assert.ElementsMatch(t, []framework.WorkerRef{{Name: "worker-gpu-0"}, {Name: "worker-gpu-1"}}, state.GPUWorkers)
 	assert.ElementsMatch(t, []framework.WorkerRef{{Name: "worker-cpu-0"}}, state.WorkersByNodeSet["worker-cpu"])
 	assert.ElementsMatch(t, []framework.WorkerRef{{Name: "worker-gpu-0"}, {Name: "worker-gpu-1"}}, state.WorkersByNodeSet["worker-gpu"])
-	assert.True(t, state.IsHeterogeneousCluster())
-}
-
-func TestTagFilterExcludesHeterogeneousScenariosWithoutCPUAndGPUWorkers(t *testing.T) {
-	runner := NewRunner(&framework.ClusterState{
-		GPUWorkers: []framework.WorkerRef{{Name: "worker-gpu-0"}},
-	}, true, nil, "dev-context", "")
-
-	assert.Equal(t, "~@cpu && ~@heterogeneous", runner.tagFilter())
-}
-
-func TestTagFilterAllowsHeterogeneousScenariosWithCPUAndGPUWorkers(t *testing.T) {
-	runner := NewRunner(&framework.ClusterState{
-		CPUWorkers: []framework.WorkerRef{{Name: "worker-cpu-0"}},
-		GPUWorkers: []framework.WorkerRef{{Name: "worker-gpu-0"}},
-	}, true, nil, "dev-context", "")
-
-	assert.Empty(t, runner.tagFilter())
 }
 
 func TestReportFormat(t *testing.T) {

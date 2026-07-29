@@ -13,7 +13,7 @@ Feature: Node replacement
   @cpu
   @gpu
   @unstable
-  Scenario: A maintenance event replaces a CPU worker node in a heterogeneous cluster
+  Scenario: A maintenance event replaces a CPU worker node when CPU and GPU workers exist
     Given a test job is submitted and running on a CPU worker node
     When a maintenance event is triggered for that node
     Then the node is drained with a maintenance reason

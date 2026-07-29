@@ -40,10 +40,6 @@ func (s *ClusterState) HasCPUWorkers() bool {
 	return len(s.CPUWorkers) > 0
 }
 
-func (s *ClusterState) IsHeterogeneousCluster() bool {
-	return s.HasCPUWorkers() && s.HasGPUWorkers()
-}
-
 func WorkerNames(workers []WorkerRef) []string {
 	names := make([]string, 0, len(workers))
 	for _, worker := range workers {

@@ -6,7 +6,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"nebius.ai/slurm-operator/internal/e2e/acceptance"
+	"nebius.ai/slurm-operator/e2e/acceptance"
+	"nebius.ai/slurm-operator/e2e/acceptance/framework"
 )
 
 const defaultAcceptanceReportDir = "e2e-reports/acceptance"
@@ -17,18 +18,31 @@ func RunAcceptance(ctx context.Context, cfg Config) error {
 		return err
 	}
 
-	if err := acceptance.Run(ctx, acceptanceArgsForConfig(cfg, kubectlContext)); err != nil {
+	runner, err := acceptance.NewRunner(acceptanceOptionsForConfig(cfg, kubectlContext))
+	if err != nil {
+		return fmt.Errorf("configure acceptance suite: %w", err)
+	}
+	if err := runner.Run(ctx); err != nil {
 		return fmt.Errorf("run acceptance suite: %w", err)
 	}
 	return nil
 }
 
-func acceptanceArgsForConfig(cfg Config, kubectlContext string) []string {
-	return []string{
-		"--kubectl-context", kubectlContext,
-		"--slurm-cluster-name", cfg.SlurmClusterName,
-		fmt.Sprintf("--run-unstable=%t", cfg.RunUnstableTests),
-		"--report-dir", defaultAcceptanceReportDir,
+func acceptanceOptionsForConfig(cfg Config, kubectlContext string) acceptance.Options {
+	state := &framework.ClusterState{
+		SlurmClusterName: cfg.SlurmClusterName,
+		WorkersByNodeSet: make(map[string][]framework.WorkerRef),
+	}
+
+	return acceptance.Options{
+		KubectlContext:            kubectlContext,
+		SlurmClusterName:          cfg.SlurmClusterName,
+		ReportDir:                 defaultAcceptanceReportDir,
+		Features:                  acceptance.SharedFeatureSource(),
+		ExcludeUnstable:           !cfg.RunUnstableTests,
+		ExcludeMissingWorkerKinds: true,
+		State:                     state,
+		StepRegistrars:            []acceptance.StepRegistrar{acceptance.SharedStepRegistrar()},
 	}
 }
 

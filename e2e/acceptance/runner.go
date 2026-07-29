@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,8 +18,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
-	"nebius.ai/slurm-operator/internal/e2e/acceptance/steps"
+	"nebius.ai/slurm-operator/e2e/acceptance/framework"
+	"nebius.ai/slurm-operator/e2e/acceptance/steps"
 )
 
 //go:embed features/*.feature
@@ -31,32 +32,156 @@ const (
 	stepStartTimeKey     timingCtxKey = "acceptance_step_start_time"
 )
 
+// Runner executes a configured Godog acceptance suite against a Soperator cluster.
 type Runner struct {
-	state            *framework.ClusterState
-	runUnstableTests bool
-	scenarioPaths    []string
-	kubectlContext   string
-	reportDir        string
+	suiteName                 string
+	state                     *framework.ClusterState
+	features                  FeatureSource
+	tags                      string
+	excludeUnstable           bool
+	excludeMissingWorkerKinds bool
+	kubectlContext            string
+	reportDir                 string
+	stepRegistrars            []StepRegistrar
 }
 
-func NewRunner(state *framework.ClusterState, runUnstableTests bool, scenarioPaths []string, kubectlContext, reportDir string) *Runner {
+// FeatureSource describes the feature files Godog should run.
+type FeatureSource struct {
+	FS    fs.FS
+	Paths []string
+}
+
+// StepRegistrar registers step definitions and scenario hooks for a suite.
+type StepRegistrar func(*godog.ScenarioContext, *framework.ClusterState, framework.Exec)
+
+// Options configures an acceptance suite run.
+type Options struct {
+	SuiteName                 string
+	KubectlContext            string
+	SlurmClusterName          string
+	ReportDir                 string
+	Features                  FeatureSource
+	Tags                      string
+	ExcludeUnstable           bool
+	ExcludeMissingWorkerKinds bool
+	State                     *framework.ClusterState
+	StepRegistrars            []StepRegistrar
+}
+
+// SharedFeatureSource returns the embedded open-source Soperator acceptance features.
+func SharedFeatureSource() FeatureSource {
+	return FeatureSource{
+		FS:    acceptanceFeatures,
+		Paths: FeaturePaths(),
+	}
+}
+
+// FeaturePaths returns the default embedded open-source Soperator feature paths.
+func FeaturePaths() []string {
+	return []string{
+		"features/cluster_creation.feature",
+		"features/observability.feature",
+		"features/internal_ssh.feature",
+		"features/package_installation.feature",
+		"features/node_replacement.feature",
+		"features/docker_containers.feature",
+		"features/enroot_containers.feature",
+		"features/topology.feature",
+		"features/passive_checks.feature",
+		"features/active_checks.feature",
+		"features/system_checks.feature",
+	}
+}
+
+// SharedStepRegistrar returns a registrar for the shared Soperator step definitions.
+func SharedStepRegistrar() StepRegistrar {
+	return RegisterSharedSteps
+}
+
+// RegisterDefaultHooks registers common timing and skip hooks.
+func RegisterDefaultHooks(sc *godog.ScenarioContext) {
+	registerTimingHooks(sc)
+	registerSkipHook(sc)
+}
+
+// RegisterSharedSteps registers the shared Soperator step definitions.
+func RegisterSharedSteps(sc *godog.ScenarioContext, state *framework.ClusterState, exec framework.Exec) {
+	slurm := framework.NewSlurmClient(exec)
+
+	steps.NewClusterCreation(state, exec).Register(sc)
+	steps.NewInternalSSH(exec, slurm).Register(sc)
+	steps.NewPackageInstallation(exec, slurm).Register(sc)
+	steps.NewNodeReplacement(exec, slurm).Register(sc)
+	steps.NewDockerContainers(exec, slurm).Register(sc)
+	steps.NewEnrootContainers(exec, slurm).Register(sc)
+	steps.NewTopology(state, exec).Register(sc)
+	steps.NewObservability(exec).Register(sc)
+	steps.NewPassiveChecks(exec, slurm).Register(sc)
+	steps.NewActiveChecks(state, exec, slurm).Register(sc)
+	steps.NewSystemChecks(exec, slurm).Register(sc)
+}
+
+// NewRunner constructs an acceptance runner.
+func NewRunner(opts Options) (*Runner, error) {
+	suiteName := strings.TrimSpace(opts.SuiteName)
+	if suiteName == "" {
+		suiteName = "soperator-acceptance"
+	}
+
+	kubectlContext := strings.TrimSpace(opts.KubectlContext)
+	if kubectlContext == "" {
+		return nil, fmt.Errorf("kubectl context is required")
+	}
+
+	state := opts.State
 	if state == nil {
-		state = &framework.ClusterState{
-			WorkersByNodeSet: make(map[string][]framework.WorkerRef),
+		state = &framework.ClusterState{}
+	}
+
+	slurmClusterName := strings.TrimSpace(opts.SlurmClusterName)
+	if state.SlurmClusterName != "" {
+		if slurmClusterName != "" && slurmClusterName != state.SlurmClusterName {
+			return nil, fmt.Errorf("slurm cluster name mismatch: options=%q state=%q", slurmClusterName, state.SlurmClusterName)
+		}
+		slurmClusterName = state.SlurmClusterName
+	}
+	if slurmClusterName == "" {
+		slurmClusterName = defaultSlurmClusterName
+	}
+	state.SlurmClusterName = slurmClusterName
+
+	features := opts.Features
+	if features.FS == nil && len(features.Paths) == 0 {
+		features = SharedFeatureSource()
+	}
+	if features.FS == nil {
+		return nil, fmt.Errorf("feature source FS is required")
+	}
+	features.Paths = slices.Clone(features.Paths)
+	for i, path := range features.Paths {
+		features.Paths[i] = strings.TrimSpace(path)
+		if features.Paths[i] == "" {
+			return nil, fmt.Errorf("feature path cannot be empty")
 		}
 	}
 	if state.WorkersByNodeSet == nil {
 		state.WorkersByNodeSet = make(map[string][]framework.WorkerRef)
 	}
+
 	return &Runner{
-		state:            state,
-		runUnstableTests: runUnstableTests,
-		scenarioPaths:    slices.Clone(scenarioPaths),
-		kubectlContext:   kubectlContext,
-		reportDir:        reportDir,
-	}
+		suiteName:                 suiteName,
+		state:                     state,
+		features:                  features,
+		tags:                      strings.TrimSpace(opts.Tags),
+		excludeUnstable:           opts.ExcludeUnstable,
+		excludeMissingWorkerKinds: opts.ExcludeMissingWorkerKinds,
+		kubectlContext:            kubectlContext,
+		reportDir:                 strings.TrimSpace(opts.ReportDir),
+		stepRegistrars:            slices.Clone(opts.StepRegistrars),
+	}, nil
 }
 
+// Run executes the configured acceptance suite.
 func (r *Runner) Run(ctx context.Context) error {
 	w := newWorld(r.state, r.kubectlContext)
 	if err := discoverCluster(ctx, w, r.state); err != nil {
@@ -76,11 +201,11 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	suite := godog.TestSuite{
-		Name:                "soperator-acceptance",
+		Name:                r.suiteName,
 		ScenarioInitializer: r.initializeScenario,
 		Options: &godog.Options{
 			Format:         format,
-			FS:             acceptanceFeatures,
+			FS:             r.features.FS,
 			Paths:          features,
 			TestingT:       nil,
 			Strict:         true,
@@ -102,32 +227,29 @@ func (r *Runner) Run(ctx context.Context) error {
 func (r *Runner) tagFilter() string {
 	var filters []string
 
-	if !r.runUnstableTests {
+	if r.tags != "" {
+		filters = append(filters, r.tags)
+	}
+	if r.excludeUnstable {
 		log.Printf("acceptance: run-unstable=false, excluding @unstable scenarios")
 		filters = append(filters, "~@unstable")
 	}
-	if !r.state.HasGPUWorkers() {
+	if r.excludeMissingWorkerKinds && !r.state.HasGPUWorkers() {
 		log.Printf("acceptance: no GPU workers found, excluding @gpu scenarios")
 		filters = append(filters, "~@gpu")
 	}
-	if !r.state.HasCPUWorkers() {
+	if r.excludeMissingWorkerKinds && !r.state.HasCPUWorkers() {
 		log.Printf("acceptance: no CPU workers found, excluding @cpu scenarios")
 		filters = append(filters, "~@cpu")
-	}
-	if !r.state.IsHeterogeneousCluster() {
-		log.Printf("acceptance: no heterogeneous CPU+GPU worker set found, excluding @heterogeneous scenarios")
-		filters = append(filters, "~@heterogeneous")
 	}
 
 	return strings.Join(filters, " && ")
 }
 
 func (r *Runner) featurePaths() []string {
-	if len(r.scenarioPaths) > 0 {
-		log.Printf("acceptance: running selected scenarios: %s", strings.Join(r.scenarioPaths, ", "))
-		return slices.Clone(r.scenarioPaths)
-	}
-	return featurePaths()
+	paths := slices.Clone(r.features.Paths)
+	log.Printf("acceptance: running features: %s", strings.Join(paths, ", "))
+	return paths
 }
 
 func discoverCluster(ctx context.Context, w *world, state *framework.ClusterState) error {
@@ -278,41 +400,12 @@ func discoveredNodeSetsFromLiveList(nodeSets slurmv1alpha1.NodeSetList, clusterN
 	return discovered
 }
 
-func featurePaths() []string {
-	return []string{
-		"features/cluster_creation.feature",
-		"features/observability.feature",
-		"features/internal_ssh.feature",
-		"features/package_installation.feature",
-		"features/node_replacement.feature",
-		"features/docker_containers.feature",
-		"features/enroot_containers.feature",
-		"features/topology.feature",
-		"features/passive_checks.feature",
-		"features/active_checks.feature",
-		"features/system_checks.feature",
-	}
-}
-
 func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
-	registerTimingHooks(sc)
-
 	w := newWorld(r.state, r.kubectlContext)
-	slurm := framework.NewSlurmClient(w)
-
-	steps.NewClusterCreation(r.state, w).Register(sc)
-	steps.NewInternalSSH(w, slurm).Register(sc)
-	steps.NewPackageInstallation(w, slurm).Register(sc)
-	steps.NewNodeReplacement(w, slurm).Register(sc)
-	steps.NewDockerContainers(w, slurm).Register(sc)
-	steps.NewEnrootContainers(w, slurm).Register(sc)
-	steps.NewTopology(r.state, w).Register(sc)
-	steps.NewObservability(w).Register(sc)
-	steps.NewPassiveChecks(w, slurm).Register(sc)
-	steps.NewActiveChecks(r.state, w, slurm).Register(sc)
-	steps.NewSystemChecks(w, slurm).Register(sc)
-
-	registerSkipHook(sc)
+	RegisterDefaultHooks(sc)
+	for _, register := range r.stepRegistrars {
+		register(sc, r.state, w)
+	}
 }
 
 func registerSkipHook(sc *godog.ScenarioContext) {
