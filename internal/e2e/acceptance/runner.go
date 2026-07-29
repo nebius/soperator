@@ -42,11 +42,11 @@ type Runner struct {
 func NewRunner(state *framework.ClusterState, runUnstableTests bool, scenarioPaths []string, kubectlContext, reportDir string) *Runner {
 	if state == nil {
 		state = &framework.ClusterState{
-			WorkersByNodeSet: make(map[string][]framework.WorkerPodRef),
+			WorkersByNodeSet: make(map[string][]framework.WorkerRef),
 		}
 	}
 	if state.WorkersByNodeSet == nil {
-		state.WorkersByNodeSet = make(map[string][]framework.WorkerPodRef)
+		state.WorkersByNodeSet = make(map[string][]framework.WorkerRef)
 	}
 	return &Runner{
 		state:            state,
@@ -158,9 +158,13 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 	if err != nil {
 		return fmt.Errorf("discover worker nodes: %w", err)
 	}
+	workerPods, err := discoverWorkerPods(ctx, w)
+	if err != nil {
+		return fmt.Errorf("discover worker pods: %w", err)
+	}
 
 	seen := make(map[string]struct{})
-	var workers []framework.WorkerPodRef
+	var workers []framework.WorkerRef
 	for _, line := range strings.Split(workerOutput, "\n") {
 		name := strings.TrimSpace(line)
 		if name == "" {
@@ -169,8 +173,12 @@ func discoverCluster(ctx context.Context, w *world, state *framework.ClusterStat
 		if _, ok := seen[name]; ok {
 			continue
 		}
+		podName, ok := workerPods[name]
+		if !ok {
+			return fmt.Errorf("worker pod for Slurm node %q was not discovered", name)
+		}
 		seen[name] = struct{}{}
-		workers = append(workers, framework.WorkerPodRef{Name: name})
+		workers = append(workers, framework.WorkerRef{Name: name, PodName: podName})
 	}
 	if len(workers) == 0 {
 		return fmt.Errorf("no worker nodes discovered")
@@ -219,6 +227,38 @@ func discoverNodeSets(ctx context.Context, w *world, clusterName string) ([]fram
 	return discovered, nil
 }
 
+func discoverWorkerPods(ctx context.Context, w *world) (map[string]string, error) {
+	output, err := w.Kubectl().RunWithDefaultRetry(ctx,
+		"get", "pods", "-n", soperatorNamespace, "-l", "slurm.nebius.ai/worker=true", "-o", "json")
+	if err != nil {
+		return nil, err
+	}
+
+	var pods corev1.PodList
+	if err := json.Unmarshal([]byte(output), &pods); err != nil {
+		return nil, fmt.Errorf("decode worker pod list: %w", err)
+	}
+	return workerPodsBySlurmNodeName(pods)
+}
+
+func workerPodsBySlurmNodeName(pods corev1.PodList) (map[string]string, error) {
+	workers := make(map[string]string, len(pods.Items))
+	for _, pod := range pods.Items {
+		nodeName := strings.TrimSpace(pod.Spec.Hostname)
+		if nodeName == "" {
+			return nil, fmt.Errorf("worker pod %s has empty spec.hostname", pod.Name)
+		}
+		if existing, ok := workers[nodeName]; ok {
+			return nil, fmt.Errorf("worker pods %s and %s both declare spec.hostname=%s", existing, pod.Name, nodeName)
+		}
+		workers[nodeName] = pod.Name
+	}
+	if len(workers) == 0 {
+		return nil, fmt.Errorf("no worker pods found")
+	}
+	return workers, nil
+}
+
 func discoveredNodeSetsFromLiveList(nodeSets slurmv1alpha1.NodeSetList, clusterName string) []framework.DiscoveredNodeSet {
 	discovered := make([]framework.DiscoveredNodeSet, 0, len(nodeSets.Items))
 	for _, nodeSet := range nodeSets.Items {
@@ -248,6 +288,9 @@ func featurePaths() []string {
 		"features/docker_containers.feature",
 		"features/enroot_containers.feature",
 		"features/topology.feature",
+		"features/passive_checks.feature",
+		"features/active_checks.feature",
+		"features/system_checks.feature",
 	}
 }
 
@@ -265,6 +308,9 @@ func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
 	steps.NewEnrootContainers(w, slurm).Register(sc)
 	steps.NewTopology(r.state, w).Register(sc)
 	steps.NewObservability(w).Register(sc)
+	steps.NewPassiveChecks(w, slurm).Register(sc)
+	steps.NewActiveChecks(r.state, w, slurm).Register(sc)
+	steps.NewSystemChecks(w, slurm).Register(sc)
 
 	registerSkipHook(sc)
 }
@@ -330,7 +376,7 @@ func (w *world) logf(format string, args ...any) {
 	log.Printf("%s: %s", w.logPrefix, fmt.Sprintf(format, args...))
 }
 
-func workerNames(workers []framework.WorkerPodRef) string {
+func workerNames(workers []framework.WorkerRef) string {
 	if len(workers) == 0 {
 		return "<none>"
 	}
@@ -341,7 +387,7 @@ func workerNames(workers []framework.WorkerPodRef) string {
 	return strings.Join(names, ", ")
 }
 
-func workersByNodeSetSummary(workersByNodeSet map[string][]framework.WorkerPodRef) string {
+func workersByNodeSetSummary(workersByNodeSet map[string][]framework.WorkerRef) string {
 	if len(workersByNodeSet) == 0 {
 		return "<none>"
 	}
@@ -397,7 +443,7 @@ func verifyPodReady(ctx context.Context, w *world, namespace, name string) error
 }
 
 func classifyWorkers(state *framework.ClusterState) {
-	state.WorkersByNodeSet = make(map[string][]framework.WorkerPodRef, len(state.DiscoveredNodeSets))
+	state.WorkersByNodeSet = make(map[string][]framework.WorkerRef, len(state.DiscoveredNodeSets))
 	state.CPUWorkers = nil
 	state.GPUWorkers = nil
 

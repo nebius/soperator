@@ -2,9 +2,7 @@
 
 set -euxo pipefail
 
-echo "Cleaning old Soperator outputs"
-
-find /mnt/jail/opt/soperator-outputs -type f -mmin +60 -print -delete
+echo "Cleaning empty NCCL Inspector Profiling dump directories"
 
 clean_sncclprecon_dump_dirs() {
   if [[ "$SNCCLPRECON_DUMP_DIR" != /* || "$SNCCLPRECON_DUMP_DIR" == "/" ]]; then

@@ -47,7 +47,7 @@ func Run(ctx context.Context, args []string) error {
 
 	state := &framework.ClusterState{
 		SlurmClusterName: opts.SlurmClusterName,
-		WorkersByNodeSet: make(map[string][]framework.WorkerPodRef),
+		WorkersByNodeSet: make(map[string][]framework.WorkerRef),
 	}
 
 	runner := NewRunner(state, opts.RunUnstableTests, opts.ScenarioPaths, opts.KubectlContext, opts.ReportDir)

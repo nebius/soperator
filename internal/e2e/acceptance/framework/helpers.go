@@ -53,14 +53,15 @@ func WaitForWithJobAlive(
 	}
 
 	return exec.WaitFor(ctx, description, timeout, pollInterval, func(waitCtx context.Context) (bool, error) {
-		// Only the state is inlined here; the sacct dump + log tails come from
-		// AnnotateWithJobLog at the outer call site, to keep the message single‑sourced.
-		state, _, stateErr := slurm.JobState(waitCtx, job.ID)
+		// Only the queue state is inlined here; the sacct dump + log tails come
+		// from AnnotateWithJobLog at the outer call site, to keep the message
+		// single-sourced.
+		info, stateErr := slurm.JobInfo(waitCtx, job.ID)
 		if stateErr != nil {
 			return false, fmt.Errorf("check job %s state: %w", job.ID, stateErr)
 		}
-		if !IsJobAliveState(state) {
-			return false, fmt.Errorf("job %s is not alive (state=%q)", job.ID, state)
+		if !info.IsAlive() {
+			return false, fmt.Errorf("job %s is not alive (state=%q)", job.ID, info.QueueState)
 		}
 		return probe(waitCtx)
 	})
@@ -79,8 +80,8 @@ func AnnotateWithJobLog(ctx context.Context, exec Exec, slurm *SlurmClient, job 
 	}
 
 	var extras []string
-	if _, dump, stateErr := slurm.JobState(ctx, job.ID); stateErr == nil && dump != "" {
-		extras = append(extras, fmt.Sprintf("sacct: %s", singleLine(dump)))
+	if info, stateErr := slurm.JobInfo(ctx, job.ID); stateErr == nil && info.SacctDump != "" {
+		extras = append(extras, fmt.Sprintf("sacct: %s", singleLine(info.SacctDump)))
 	}
 	for _, entry := range []struct{ label, path string }{
 		{"stdout", job.StdoutPath},

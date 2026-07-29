@@ -773,10 +773,6 @@ slurmScripts:
       enabled: true
       customContent: null
       customConfig: null
-    cleanup_enroot.sh:
-      enabled: true
-      customContent: null
-      customConfig: null
     cleanup_scratch_data.sh:
       enabled: true
       customContent: null

@@ -138,7 +138,7 @@ Example: worker-0.12345.67890.out
 worker_name.job_name.job_id[.array_id].out
 Examples:
 - worker-1.all-reduce-perf-nccl.12345.out
-- worker-2.enroot-cleanup.12345.1.out (array job)
+- worker-2.soperator-gpu-checks.12345.1.out (array job)
 ```
 
 **Slurm Scripts:**
@@ -146,7 +146,7 @@ Examples:
 worker_name.script_name.context.out
 Examples:
 - worker-0.health_checker.prolog.out
-- worker-3.cleanup_enroot.epilog.out
+- worker-3.drop_page_cache.epilog.out
 ```
 
 ### Generated Labels

@@ -107,69 +107,16 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	}, nil
 }
 
-// JobState returns the current squeue state (empty if the job is no longer listed by squeue,
-// i.e. has already finished and been dropped from the active queue) and a human‑readable sacct
-// dump covering JobID/State/ExitCode/Reason. Best‑effort: a missing job is not an error —
-// state is returned empty and dump carries whatever sacct produced (often empty right after completion).
-func (s *SlurmClient) JobState(ctx context.Context, jobID string) (state, sacctDump string, err error) {
-	id := strings.TrimSpace(jobID)
-	if id == "" {
-		return "", "", fmt.Errorf("job id is empty")
-	}
-	rawState, queueErr := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("squeue -h -j %s -o '%%T' 2>/dev/null || true", ShellQuote(id)))
-	if queueErr != nil {
-		return "", "", fmt.Errorf("query squeue for job %s: %w", id, queueErr)
-	}
-	state = strings.TrimSpace(rawState)
-	rawDump, sacctErr := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf(
-		"sacct -j %s --noheader --parsable2 --format=JobID,State,ExitCode,Reason,Start,End 2>/dev/null || true",
-		ShellQuote(id),
-	))
-	if sacctErr != nil {
-		// Return what we have from squeue; sacct is best‑effort.
-		return state, "", nil //nolint:nilerr // swallowing sacctErr is intentional here
-	}
-	return state, strings.TrimSpace(rawDump), nil
+func (s *SlurmClient) AnyWorkers(count int) ([]WorkerRef, error) {
+	return pickAnyWorkerRefs(s.exec.AvailableWorkers(WorkerAny), count, "workers")
 }
 
-// AssertJobRunning returns an error if jobID is not currently in RUNNING state.
-// Strict equality with "RUNNING": once a scenario has cleared WaitForJobRunning,
-// transitions back to PENDING / COMPLETING / etc. are unexpected and worth flagging.
-// The returned error carries the observed state; sacct dump and log tails are
-// expected to come from a call‑site wrapper such as AnnotateWithJobLog.
-func (s *SlurmClient) AssertJobRunning(ctx context.Context, jobID string) error {
-	state, _, err := s.JobState(ctx, jobID)
-	if err != nil {
-		return err
-	}
-	if state != "RUNNING" {
-		return fmt.Errorf("expected job %s to be RUNNING, got state=%q", strings.TrimSpace(jobID), state)
-	}
-	return nil
+func (s *SlurmClient) AnyCPUWorkers(count int) ([]WorkerRef, error) {
+	return pickAnyWorkerRefs(s.exec.AvailableWorkers(WorkerCPU), count, "CPU workers")
 }
 
-// IsJobAliveState reports whether state represents a job that Slurm still considers live
-// (scheduling, running, or finalizing). An empty state — squeue no longer lists the job, meaning
-// it has finished and been dropped from the active queue — is treated as not alive.
-func IsJobAliveState(state string) bool {
-	switch strings.ToUpper(strings.TrimSpace(state)) {
-	case "PENDING", "CONFIGURING", "RUNNING", "COMPLETING", "SUSPENDED", "RESIZING", "REQUEUED", "REQUEUE_HOLD", "REQUEUE_FED", "SIGNALING":
-		return true
-	default:
-		return false
-	}
-}
-
-func (s *SlurmClient) AnyWorkers(count int) ([]string, error) {
-	return pickAnyWorkerNames(s.exec.AvailableWorkers(), count, "workers")
-}
-
-func (s *SlurmClient) AnyCPUWorkers(count int) ([]string, error) {
-	return pickAnyWorkerNames(s.exec.AvailableCPUWorkers(), count, "CPU workers")
-}
-
-func (s *SlurmClient) AnyGPUWorkers(count int) ([]string, error) {
-	return pickAnyWorkerNames(s.exec.AvailableGPUWorkers(), count, "GPU workers")
+func (s *SlurmClient) AnyGPUWorkers(count int) ([]WorkerRef, error) {
+	return pickAnyWorkerRefs(s.exec.AvailableWorkers(WorkerGPU), count, "GPU workers")
 }
 
 func (s *SlurmClient) WaitForJobRunning(ctx context.Context, jobID string, timeout time.Duration) error {
@@ -218,7 +165,7 @@ func (s *SlurmClient) CancelJob(ctx context.Context, jobID string, waitTimeout t
 	return nil
 }
 
-func pickAnyWorkerNames(pool []WorkerPodRef, count int, label string) ([]string, error) {
+func pickAnyWorkerRefs(pool []WorkerRef, count int, label string) ([]WorkerRef, error) {
 	if count < 1 {
 		return nil, fmt.Errorf("invalid %s count %d", label, count)
 	}
@@ -227,9 +174,9 @@ func pickAnyWorkerNames(pool []WorkerPodRef, count int, label string) ([]string,
 	}
 
 	indices := rand.Perm(len(pool))[:count]
-	out := make([]string, 0, count)
+	out := make([]WorkerRef, 0, count)
 	for _, i := range indices {
-		out = append(out, pool[i].Name)
+		out = append(out, pool[i])
 	}
 	return out, nil
 }

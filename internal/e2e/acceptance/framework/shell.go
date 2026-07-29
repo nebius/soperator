@@ -12,3 +12,7 @@ func ShellQuote(value string) string {
 	result += "'"
 	return result
 }
+
+func BashLC(script string) string {
+	return "bash -lc " + ShellQuote(script)
+}

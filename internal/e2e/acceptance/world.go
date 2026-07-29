@@ -25,16 +25,17 @@ type world struct {
 	kubectlContext string
 }
 
-func (w *world) AvailableWorkers() []framework.WorkerPodRef {
-	return append([]framework.WorkerPodRef(nil), w.state.Workers...)
-}
-
-func (w *world) AvailableCPUWorkers() []framework.WorkerPodRef {
-	return append([]framework.WorkerPodRef(nil), w.state.CPUWorkers...)
-}
-
-func (w *world) AvailableGPUWorkers() []framework.WorkerPodRef {
-	return append([]framework.WorkerPodRef(nil), w.state.GPUWorkers...)
+func (w *world) AvailableWorkers(kind framework.WorkerKind) []framework.WorkerRef {
+	switch kind {
+	case framework.WorkerAny:
+		return append([]framework.WorkerRef(nil), w.state.Workers...)
+	case framework.WorkerCPU:
+		return append([]framework.WorkerRef(nil), w.state.CPUWorkers...)
+	case framework.WorkerGPU:
+		return append([]framework.WorkerRef(nil), w.state.GPUWorkers...)
+	default:
+		return nil
+	}
 }
 
 func (w *world) Logf(format string, args ...any) {
@@ -76,10 +77,27 @@ func (w *world) Jail() framework.CommandScope {
 	}
 }
 
-func (w *world) Worker(worker string) framework.CommandScope {
+func (w *world) Worker(worker framework.WorkerRef) framework.CommandScope {
 	return commandScope{
 		run: func(ctx context.Context, command string) (string, error) {
-			return w.Jail().Run(ctx, fmt.Sprintf("ssh %s %s", framework.ShellQuote(worker), framework.ShellQuote(command)))
+			if strings.TrimSpace(worker.Name) == "" {
+				return "", fmt.Errorf("Slurm worker name is empty")
+			}
+			return w.Jail().Run(ctx, fmt.Sprintf("ssh %s %s", framework.ShellQuote(worker.Name), framework.ShellQuote(command)))
+		},
+	}
+}
+
+func (w *world) WorkerPod(worker framework.WorkerRef) framework.CommandScope {
+	return commandScope{
+		run: func(ctx context.Context, command string) (string, error) {
+			if strings.TrimSpace(worker.PodName) == "" {
+				return "", fmt.Errorf("Kubernetes worker pod for Slurm node %s was not discovered", worker.Name)
+			}
+			return w.Kubectl().Run(ctx,
+				"exec", "-n", soperatorNamespace, worker.PodName, "-c", "slurmd",
+				"--", "bash", "-lc", command,
+			)
 		},
 	}
 }

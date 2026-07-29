@@ -32,18 +32,17 @@ func waitForJobSucceeded(ctx context.Context, exec framework.Exec, slurm *framew
 				fmt.Errorf("wait for job %s completed successfully: %w", job.ID, err))
 		}
 
-		_, dump, err := slurm.JobState(waitCtx, job.ID)
+		info, err := slurm.JobInfo(waitCtx, job.ID)
 		if err != nil {
 			return framework.AnnotateWithJobLog(ctx, exec, slurm, job, err)
 		}
-		state, exitCode, found := parseSacctOutcome(dump, job.ID)
-		if found {
-			if state == "COMPLETED" && exitCode == "0:0" {
+		if info.SacctFound {
+			if info.CompletedSuccessfully() {
 				return nil
 			}
-			if !framework.IsJobAliveState(state) {
+			if !framework.IsJobAliveState(info.SacctState) {
 				return framework.AnnotateWithJobLog(ctx, exec, slurm, job,
-					fmt.Errorf("job %s finished with state=%s exit_code=%s", job.ID, state, exitCode))
+					fmt.Errorf("job %s finished with state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit))
 			}
 		}
 
@@ -78,18 +77,4 @@ func readJobFile(ctx context.Context, exec framework.Exec, path string) (string,
 		return "", fmt.Errorf("read job output %s: %w", path, err)
 	}
 	return output, nil
-}
-
-func parseSacctOutcome(dump, jobID string) (string, string, bool) {
-	for _, line := range strings.Split(dump, "\n") {
-		fields := strings.Split(line, "|")
-		if len(fields) < 3 {
-			continue
-		}
-		if strings.TrimSpace(fields[0]) != jobID {
-			continue
-		}
-		return strings.TrimSpace(fields[1]), strings.TrimSpace(fields[2]), true
-	}
-	return "", "", false
 }

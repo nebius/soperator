@@ -1,22 +1,22 @@
 package framework
 
-type WorkerPodRef struct {
-	Name string
+type WorkerRef struct {
+	Name    string
+	PodName string
 }
 
 type DiscoveredNodeSet struct {
 	Name   string
 	Size   int
-	Preset string
 	HasGPU bool
 }
 
 type ClusterState struct {
 	SlurmClusterName   string
-	Workers            []WorkerPodRef
-	CPUWorkers         []WorkerPodRef
-	GPUWorkers         []WorkerPodRef
-	WorkersByNodeSet   map[string][]WorkerPodRef
+	Workers            []WorkerRef
+	CPUWorkers         []WorkerRef
+	GPUWorkers         []WorkerRef
+	WorkersByNodeSet   map[string][]WorkerRef
 	DiscoveredNodeSets []DiscoveredNodeSet
 }
 
@@ -42,4 +42,12 @@ func (s *ClusterState) HasCPUWorkers() bool {
 
 func (s *ClusterState) IsHeterogeneousCluster() bool {
 	return s.HasCPUWorkers() && s.HasGPUWorkers()
+}
+
+func WorkerNames(workers []WorkerRef) []string {
+	names := make([]string, 0, len(workers))
+	for _, worker := range workers {
+		names = append(names, worker.Name)
+	}
+	return names
 }
