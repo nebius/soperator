@@ -178,7 +178,7 @@ func (c *SlurmNodesController) processDegradedNode(
 	k8sNode, err := getK8SNode(ctx, c.Client, node.InstanceID)
 	if err != nil {
 		if client.IgnoreNotFound(err) == nil {
-			return c.undrainSlurmNode(ctx, slurmClusterName, node.Name)
+			return nil
 		}
 		return fmt.Errorf("get k8s node: %w", err)
 	}
