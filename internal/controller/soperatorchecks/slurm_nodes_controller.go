@@ -839,9 +839,10 @@ func (c *SlurmNodesController) undrainSlurmNode(
 		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
+	// Use State=UNDRAIN instead State=RESUME so that DOWN nodes don't become IDLE
 	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
 		api.V0041UpdateNodeMsg{
-			State: ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateRESUME}),
+			State: ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateUNDRAIN}),
 		},
 	)
 	if err != nil {
