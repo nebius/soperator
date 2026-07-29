@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -468,18 +468,18 @@ func updateSlurmNodeWithReactions(
 
 	failureMessage := fmt.Sprintf("%s: job %d [slurm_job]", activeCheckName, slurmJob.ID)
 	for _, node := range nodes {
-		updateReq := api.V0041UpdateNodeMsg{}
+		updateReq := api.V0044UpdateNodeMsg{}
 		if reactions.DrainSlurmNode != nil && reactions.DrainSlurmNode.DrainReasonPrefix != "" {
 			drainReason := fmt.Sprintf("%s %s", reactions.DrainSlurmNode.DrainReasonPrefix, failureMessage)
 			updateReq.Reason = ptr.To(drainReason)
-			updateReq.State = ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN})
+			updateReq.State = ptr.To([]api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateDRAIN})
 		}
 		if reactions.CommentSlurmNode != nil && reactions.CommentSlurmNode.CommentPrefix != "" {
 			comment := fmt.Sprintf("%s %s", reactions.CommentSlurmNode.CommentPrefix, failureMessage)
 			updateReq.Comment = ptr.To(comment)
 		}
 
-		resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, node, updateReq)
+		resp, err := slurmAPIClient.SlurmV0044PostNodeWithResponse(ctx, node, updateReq)
 		if err != nil {
 			return fmt.Errorf("post update slurm node: %w", err)
 		}

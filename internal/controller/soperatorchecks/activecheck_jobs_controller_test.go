@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -110,7 +110,7 @@ func TestActiveCheckJobReconciler_Reconcile_DoesNotFinalizeUntilAllSlurmJobsFini
 			return []slurmapi.Job{{
 				ID:         101,
 				Name:       activeCheckName,
-				State:      string(api.V0041JobInfoJobStateCOMPLETED),
+				State:      string(api.V0044JobInfoJobStateCOMPLETED),
 				SubmitTime: &submitTime,
 				EndTime:    &firstEndTime,
 			}}, nil
@@ -133,7 +133,7 @@ func TestActiveCheckJobReconciler_Reconcile_DoesNotFinalizeUntilAllSlurmJobsFini
 			return []slurmapi.Job{{
 				ID:          102,
 				Name:        activeCheckName,
-				State:       string(api.V0041JobInfoJobStateFAILED),
+				State:       string(api.V0044JobInfoJobStateFAILED),
 				StateReason: "node lost",
 				SubmitTime:  &submitTime,
 				EndTime:     &secondEndTime,
@@ -317,7 +317,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAggregatesTerminalResultsInS
 	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "101").Return([]slurmapi.Job{{
 		ID:          101,
 		Name:        activeCheck.Name,
-		State:       string(api.V0041JobInfoJobStateFAILED),
+		State:       string(api.V0044JobInfoJobStateFAILED),
 		StateReason: "boom",
 		SubmitTime:  &submitTime,
 		EndTime:     &failedEndTime,
@@ -325,21 +325,21 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAggregatesTerminalResultsInS
 	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "102").Return([]slurmapi.Job{{
 		ID:         102,
 		Name:       activeCheck.Name,
-		State:      string(api.V0041JobInfoJobStateCANCELLED),
+		State:      string(api.V0044JobInfoJobStateCANCELLED),
 		SubmitTime: &submitTime,
 		EndTime:    &cancelledEndTime,
 	}}, nil).Once()
 	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "103").Return([]slurmapi.Job{{
 		ID:         103,
 		Name:       activeCheck.Name,
-		State:      string(api.V0041JobInfoJobStateCOMPLETED),
+		State:      string(api.V0044JobInfoJobStateCOMPLETED),
 		SubmitTime: &submitTime,
 		EndTime:    &completedEndTime,
 	}}, nil).Once()
 	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "104").Return([]slurmapi.Job{{
 		ID:          104,
 		Name:        activeCheck.Name,
-		State:       string(api.V0041JobInfoJobStateTIMEOUT),
+		State:       string(api.V0044JobInfoJobStateTIMEOUT),
 		StateReason: "timeout",
 		SubmitTime:  &submitTime,
 		EndTime:     &errorEndTime,
@@ -396,7 +396,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAccumulatesTerminalResultsAc
 			return []slurmapi.Job{{
 				ID:          101,
 				Name:        activeCheck.Name,
-				State:       string(api.V0041JobInfoJobStateFAILED),
+				State:       string(api.V0044JobInfoJobStateFAILED),
 				StateReason: "boom",
 				SubmitTime:  &submitTime,
 				EndTime:     &failedEndTime,
@@ -419,7 +419,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAccumulatesTerminalResultsAc
 			return []slurmapi.Job{{
 				ID:         102,
 				Name:       activeCheck.Name,
-				State:      string(api.V0041JobInfoJobStateCANCELLED),
+				State:      string(api.V0044JobInfoJobStateCANCELLED),
 				SubmitTime: &submitTime,
 				EndTime:    &cancelledEndTime,
 			}}, nil
@@ -477,7 +477,7 @@ func TestActiveCheckJobReconciler_Reconcile_FailedSlurmJobWithoutReactionsOnlyUp
 	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "101").Return([]slurmapi.Job{{
 		ID:          101,
 		Name:        activeCheck.Name,
-		State:       string(api.V0041JobInfoJobStateFAILED),
+		State:       string(api.V0044JobInfoJobStateFAILED),
 		StateReason: "boom",
 		SubmitTime:  &submitTime,
 		EndTime:     &failedEndTime,
@@ -556,24 +556,24 @@ func TestActiveCheckJobReconciler_Reconcile_FailedSlurmJobExecutesCommentReactio
 	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "101").Return([]slurmapi.Job{{
 		ID:          101,
 		Name:        activeCheck.Name,
-		State:       string(api.V0041JobInfoJobStateFAILED),
+		State:       string(api.V0044JobInfoJobStateFAILED),
 		StateReason: "boom",
 		SubmitTime:  &submitTime,
 		EndTime:     &failedEndTime,
 		Nodes:       "worker-0",
 	}}, nil).Once()
 	mockClient.EXPECT().
-		SlurmV0041PostNodeWithResponse(
+		SlurmV0044PostNodeWithResponse(
 			mock.Anything,
 			"worker-0",
-			mock.MatchedBy(func(body api.SlurmV0041PostNodeJSONRequestBody) bool {
+			mock.MatchedBy(func(body api.SlurmV0044PostNodeJSONRequestBody) bool {
 				expectedComment := "[node_problem] gpu-check: job 101 [slurm_job]"
 				return body.Comment != nil && *body.Comment == expectedComment && body.State == nil
 			}),
 		).
-		Return(&api.SlurmV0041PostNodeResponse{
-			JSON200: &api.V0041OpenapiResp{
-				Errors: &[]api.V0041OpenapiError{},
+		Return(&api.SlurmV0044PostNodeResponse{
+			JSON200: &api.V0044OpenapiResp{
+				Errors: &[]api.V0044OpenapiError{},
 			},
 		}, nil).
 		Once()

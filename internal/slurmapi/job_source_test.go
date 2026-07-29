@@ -7,13 +7,13 @@ import (
 	"testing/synctest"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/utils/ptr"
 )
 
-// sdkStub is a tiny v0041 SDK fake that intercepts only the two endpoints exercised by ListJobsWithParams.
+// sdkStub is a tiny v0044 SDK fake that intercepts only the two endpoints exercised by ListJobsWithParams.
 // Any other SDK method panics via the nil embedded interface — that's deliberate, so unexpected calls fail loudly.
 type sdkStub struct {
 	api.ClientWithResponsesInterface
@@ -21,20 +21,20 @@ type sdkStub struct {
 	controllerCalls int
 	accountingCalls int
 
-	lastControllerParams *api.SlurmV0041GetJobsParams
-	lastAccountingParams *api.SlurmdbV0041GetJobsParams
+	lastControllerParams *api.SlurmV0044GetJobsParams
+	lastAccountingParams *api.SlurmdbV0044GetJobsParams
 }
 
-func (s *sdkStub) SlurmV0041GetJobsWithResponse(_ context.Context, params *api.SlurmV0041GetJobsParams, _ ...api.RequestEditorFn) (*api.SlurmV0041GetJobsResponse, error) {
+func (s *sdkStub) SlurmV0044GetJobsWithResponse(_ context.Context, params *api.SlurmV0044GetJobsParams, _ ...api.RequestEditorFn) (*api.SlurmV0044GetJobsResponse, error) {
 	s.controllerCalls++
 	s.lastControllerParams = params
-	return &api.SlurmV0041GetJobsResponse{JSON200: &api.V0041OpenapiJobInfoResp{Jobs: nil}}, nil
+	return &api.SlurmV0044GetJobsResponse{JSON200: &api.V0044OpenapiJobInfoResp{Jobs: nil}}, nil
 }
 
-func (s *sdkStub) SlurmdbV0041GetJobsWithResponse(_ context.Context, params *api.SlurmdbV0041GetJobsParams, _ ...api.RequestEditorFn) (*api.SlurmdbV0041GetJobsResponse, error) {
+func (s *sdkStub) SlurmdbV0044GetJobsWithResponse(_ context.Context, params *api.SlurmdbV0044GetJobsParams, _ ...api.RequestEditorFn) (*api.SlurmdbV0044GetJobsResponse, error) {
 	s.accountingCalls++
 	s.lastAccountingParams = params
-	return &api.SlurmdbV0041GetJobsResponse{JSON200: &api.V0041OpenapiSlurmdbdJobsResp{Jobs: nil}}, nil
+	return &api.SlurmdbV0044GetJobsResponse{JSON200: &api.V0044OpenapiSlurmdbdJobsResp{Jobs: nil}}, nil
 }
 
 func newTestClient(stub *sdkStub) *client {

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -30,7 +30,7 @@ func TestExporterCollectionLoopSkipsRunningSubCollector(t *testing.T) {
 	var closeStarted, closeDone sync.Once
 
 	mockClient.EXPECT().ListNodes(mock.Anything).Return([]slurmapi.Node{}, nil).Maybe()
-	mockClient.EXPECT().GetDiag(mock.Anything).Return(&api.V0041OpenapiDiagResp{}, nil).Maybe()
+	mockClient.EXPECT().GetDiag(mock.Anything).Return(&api.V0044OpenapiDiagResp{}, nil).Maybe()
 	mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).RunAndReturn(
 		func(ctx context.Context, _ slurmapi.ListJobsParams) ([]slurmapi.Job, error) {
 			jobsCalls.Add(1)
@@ -93,7 +93,7 @@ func TestExporterCollectionLoopAllowsConfiguredOverlap(t *testing.T) {
 	releaseJobs := make(chan struct{})
 
 	mockClient.EXPECT().ListNodes(mock.Anything).Return([]slurmapi.Node{}, nil).Maybe()
-	mockClient.EXPECT().GetDiag(mock.Anything).Return(&api.V0041OpenapiDiagResp{}, nil).Maybe()
+	mockClient.EXPECT().GetDiag(mock.Anything).Return(&api.V0044OpenapiDiagResp{}, nil).Maybe()
 	mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).RunAndReturn(
 		func(ctx context.Context, _ slurmapi.ListJobsParams) ([]slurmapi.Job, error) {
 			jobsCalls.Add(1)

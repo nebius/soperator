@@ -9,7 +9,7 @@ import (
 	"time"
 	"unicode"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -138,7 +138,7 @@ func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types
 		}
 
 		for _, node := range slurmNodes {
-			if _, ok := node.States[api.V0041NodeStateDRAIN]; !ok {
+			if _, ok := node.States[api.V0044NodeStateDRAIN]; !ok {
 				// Node is not drained, skipping
 				continue
 			}
@@ -676,10 +676,10 @@ func (c *SlurmNodesController) drainSlurmNode(
 		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
-	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
-		api.V0041UpdateNodeMsg{
+	resp, err := slurmAPIClient.SlurmV0044PostNodeWithResponse(ctx, slurmNodeName,
+		api.V0044UpdateNodeMsg{
 			Reason: ptr.To(string(reason)),
-			State:  ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN}),
+			State:  ptr.To([]api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateDRAIN}),
 		},
 	)
 	if err != nil {
@@ -718,7 +718,7 @@ func (c *SlurmNodesController) slurmNodesFullyDrained(
 		if err != nil {
 			return false, err
 		}
-		_, isCompleting := node.States[api.V0041NodeStateCOMPLETING]
+		_, isCompleting := node.States[api.V0044NodeStateCOMPLETING]
 		logger.Info("slurm node", "nodeStates", node.States)
 		// When epilog is running, node is in COMPLETING state and both IDLE and DRAIN states are set.
 		// Example: State=IDLE+COMPLETING+DRAIN+DYNAMIC_NORM
@@ -766,9 +766,9 @@ func (c *SlurmNodesController) undrainSlurmNode(
 		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
-	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
-		api.V0041UpdateNodeMsg{
-			State: ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateRESUME}),
+	resp, err := slurmAPIClient.SlurmV0044PostNodeWithResponse(ctx, slurmNodeName,
+		api.V0044UpdateNodeMsg{
+			State: ptr.To([]api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateRESUME}),
 		},
 	)
 	if err != nil {

@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -642,9 +642,9 @@ func (c *PodEphemeralStorageCheck) undrainSlurmNode(
 		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
-	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
-		api.V0041UpdateNodeMsg{
-			State: ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateRESUME}),
+	resp, err := slurmAPIClient.SlurmV0044PostNodeWithResponse(ctx, slurmNodeName,
+		api.V0044UpdateNodeMsg{
+			State: ptr.To([]api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateRESUME}),
 		},
 	)
 	if err != nil {
@@ -685,10 +685,10 @@ func (c *PodEphemeralStorageCheck) drainSlurmNode(
 		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
-	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
-		api.V0041UpdateNodeMsg{
+	resp, err := slurmAPIClient.SlurmV0044PostNodeWithResponse(ctx, slurmNodeName,
+		api.V0044UpdateNodeMsg{
 			Reason: ptr.To(string(reason)),
-			State:  ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN}),
+			State:  ptr.To([]api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateDRAIN}),
 		},
 	)
 	if err != nil {

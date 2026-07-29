@@ -3,7 +3,7 @@ package slurmapi
 import (
 	"testing"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/utils/ptr"
@@ -57,7 +57,7 @@ func TestParseTrackableResources_Success(t *testing.T) {
 // Memory must round-trip with its MB unit preserved - without the "M" suffix,
 // parseMemoryValue would interpret "8192" as bytes (8 KiB) instead of 8 GiB.
 func TestTresListToString_RoundTrip(t *testing.T) {
-	list := api.V0041TresList{
+	list := api.V0044TresList{
 		{Type: "cpu", Count: ptr.To(int64(4))},
 		{Type: "mem", Count: ptr.To(int64(8192))},
 		{Type: "gres", Name: ptr.To("gpu"), Count: ptr.To(int64(2))},

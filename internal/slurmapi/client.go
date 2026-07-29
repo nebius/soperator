@@ -10,8 +10,7 @@ import (
 	"reflect"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
-	api0043 "github.com/SlinkyProject/slurm-client/api/v0043"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/hashicorp/go-retryablehttp"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -92,8 +91,6 @@ type client struct {
 	 */
 	api.ClientWithResponsesInterface
 
-	client0043 api0043.ClientWithResponsesInterface
-
 	tokenIssuer tokenIssuer
 }
 
@@ -123,17 +120,6 @@ func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) 
 	}
 
 	apiClient.ClientWithResponsesInterface = c
-
-	c0043, err := api0043.NewClientWithResponses(
-		server,
-		api0043.WithHTTPClient(httpClient),
-		api0043.WithRequestEditorFn(apiClient.setHeaders),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create client: %v", err)
-	}
-
-	apiClient.client0043 = c0043
 
 	return apiClient, nil
 }
@@ -172,7 +158,7 @@ func (c *client) setHeaders(ctx context.Context, req *http.Request) error {
 }
 
 func (c *client) ListNodes(ctx context.Context) ([]Node, error) {
-	getNodesResp, err := c.SlurmV0041GetNodesWithResponse(ctx, &api.SlurmV0041GetNodesParams{})
+	getNodesResp, err := c.SlurmV0044GetNodesWithResponse(ctx, &api.SlurmV0044GetNodesParams{})
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
@@ -197,7 +183,7 @@ func (c *client) ListNodes(ctx context.Context) ([]Node, error) {
 }
 
 func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
-	getNodesResp, err := c.SlurmV0041GetNodeWithResponse(ctx, nodeName, &api.SlurmV0041GetNodeParams{})
+	getNodesResp, err := c.SlurmV0044GetNodeWithResponse(ctx, nodeName, &api.SlurmV0044GetNodeParams{})
 	if err != nil {
 		return Node{}, fmt.Errorf("get node %s: %w", nodeName, err)
 	}
@@ -221,7 +207,7 @@ func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
 }
 
 // GetJobsByIDFromAccounting looks up a single Slurm job through slurmdbd's
-// `/slurmdb/v0.0.41/job/{id}`. Going to slurmdbd here, instead of slurmctld, keeps active-check
+// `/slurmdb/v0.0.44/job/{id}`. Going to slurmdbd here, instead of slurmctld, keeps active-check
 // polling off the scheduler's hot path — on busy clusters this single call site dominates
 // slurmctld's REQUEST_JOB_INFO_SINGLE counter. Slurmdbd has all the fields the active-check
 // reconciler reads (state, end_time, name, nodes, state_reason).
@@ -232,7 +218,7 @@ func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
 // (b) the job has been purged by slurmdbd's `PurgeJobAfter` (default 12 months) — retries will
 // loop forever. Bound retries by elapsed time since submit if a caller can hit case (b).
 func (c *client) GetJobsByIDFromAccounting(ctx context.Context, jobID string) ([]Job, error) {
-	getJobResp, err := c.SlurmdbV0041GetJobWithResponse(ctx, jobID)
+	getJobResp, err := c.SlurmdbV0044GetJobWithResponse(ctx, jobID)
 	if err != nil {
 		return nil, fmt.Errorf("get job %s: %w", jobID, err)
 	}
@@ -274,7 +260,7 @@ func (c *client) ListJobsWithParams(ctx context.Context, params ListJobsParams) 
 }
 
 func (c *client) listControllerJobs(ctx context.Context) ([]Job, error) {
-	getJobsResp, err := c.SlurmV0041GetJobsWithResponse(ctx, &api.SlurmV0041GetJobsParams{})
+	getJobsResp, err := c.SlurmV0044GetJobsWithResponse(ctx, &api.SlurmV0044GetJobsParams{})
 	if err != nil {
 		return nil, fmt.Errorf("list jobs from controller API: %w", err)
 	}
@@ -315,7 +301,7 @@ func (c *client) listAccountingJobs(ctx context.Context, params ListJobsParams) 
 	if params.AccountingCluster != "" {
 		clusterFilter = &params.AccountingCluster
 	}
-	getJobsResp, err := c.SlurmdbV0041GetJobsWithResponse(ctx, &api.SlurmdbV0041GetJobsParams{
+	getJobsResp, err := c.SlurmdbV0044GetJobsWithResponse(ctx, &api.SlurmdbV0044GetJobsParams{
 		Cluster:   clusterFilter,
 		StartTime: &startTime,
 		EndTime:   &endTime,
@@ -367,8 +353,8 @@ func (c *client) listAccountingJobs(ctx context.Context, params ListJobsParams) 
 	return jobs, nil
 }
 
-func (c *client) GetDiag(ctx context.Context) (*api.V0041OpenapiDiagResp, error) {
-	getDiagResp, err := c.SlurmV0041GetDiagWithResponse(ctx)
+func (c *client) GetDiag(ctx context.Context) (*api.V0044OpenapiDiagResp, error) {
+	getDiagResp, err := c.SlurmV0044GetDiagWithResponse(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get diag: %w", err)
 	}
