@@ -123,19 +123,6 @@ checks:
         env:
           - name: "USER_NAME"
             value: "nebius"
-  soperator-outputs-logs-cleaner:
-    enabled: true
-    checkType: "k8sJob"
-    schedule: "40 */1 * * *"
-    suspend: false
-    runAfterCreation: false
-    k8sJobSpec:
-      scriptFile: "scripts/soperator-outputs-logs-cleaner.sh"
-      jobContainer:
-        appArmorProfile: unconfined
-        env:
-          - name: "SNCCLPRECON_DUMP_DIR"
-            value: "/opt/soperator-outputs/nccl_profiles"
   manage-jail-state:
     enabled: true
     checkType: "k8sJob"

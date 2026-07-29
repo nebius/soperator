@@ -15,13 +15,11 @@ import (
 )
 
 const (
-	activeLogsCleanerSuffix = "soperator-outputs-logs-cleaner"
-	activeGPUChecksSuffix   = "gpu-checks"
+	activeGPUChecksSuffix = "gpu-checks"
 
-	activeK8sJobTimeout        = 5 * time.Minute
-	activeGPUCheckTimeout      = 40 * time.Minute
-	activeSlurmOutputWait      = 15 * time.Minute
-	activeOutputCleanupTimeout = 3 * time.Minute
+	activeK8sJobTimeout   = 5 * time.Minute
+	activeGPUCheckTimeout = 40 * time.Minute
+	activeSlurmOutputWait = 15 * time.Minute
 
 	activeSlurmJobOutputDir = "/opt/soperator-outputs/slurm_jobs"
 )
@@ -32,9 +30,6 @@ type ActiveChecks struct {
 	state *framework.ClusterState
 	exec  framework.Exec
 	slurm *framework.SlurmClient
-
-	oldOutputFile         string
-	logsCleanerK8sJobName string
 
 	gpuCheckK8sJobName string
 	gpuCheckJobIDs     []string
@@ -49,58 +44,12 @@ func NewActiveChecks(state *framework.ClusterState, exec framework.Exec, slurm *
 }
 
 func (s *ActiveChecks) Register(sc *godog.ScenarioContext) {
-	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
-		s.cleanup(context.Background())
-		return ctx, nil
-	})
-
-	sc.Step(`^an old soperator output file is created for acceptance$`, s.anOldSoperatorOutputFileIsCreatedForAcceptance)
-	sc.Step(`^the logs cleaner ActiveCheck is triggered$`, s.theLogsCleanerActiveCheckIsTriggered)
-	sc.Step(`^the logs cleaner Kubernetes Job succeeds$`, s.theLogsCleanerKubernetesJobSucceeds)
-	sc.Step(`^the logs cleaner ActiveCheck status is Complete$`, s.theLogsCleanerActiveCheckStatusIsComplete)
-	sc.Step(`^the old soperator output file is removed$`, s.theOldSoperatorOutputFileIsRemoved)
 	sc.Step(`^healthy GPU workers are available for active checks$`, s.healthyGPUWorkersAreAvailableForActiveChecks)
 	sc.Step(`^the GPU ActiveCheck is triggered$`, s.theGPUActiveCheckIsTriggered)
 	sc.Step(`^the GPU ActiveCheck Kubernetes Job succeeds$`, s.theGPUActiveCheckKubernetesJobSucceeds)
 	sc.Step(`^GPU ActiveCheck outputs report PASS on all GPU workers$`, s.gpuActiveCheckOutputsReportPASSOnAllGPUWorkers)
 	sc.Step(`^GPU ActiveCheck Slurm jobs complete on all GPU workers$`, s.gpuActiveCheckSlurmJobsCompleteOnAllGPUWorkers)
 	sc.Step(`^the GPU ActiveCheck status is Complete$`, s.theGPUActiveCheckStatusIsComplete)
-}
-
-func (s *ActiveChecks) anOldSoperatorOutputFileIsCreatedForAcceptance(ctx context.Context) error {
-	s.oldOutputFile = fmt.Sprintf("/opt/soperator-outputs/acceptance-old-file-%d.txt", time.Now().UnixNano())
-	cmd := fmt.Sprintf("touch %s && touch -m -d '2025-01-01 12:34:56' %s && ls -la %s",
-		framework.ShellQuote(s.oldOutputFile),
-		framework.ShellQuote(s.oldOutputFile),
-		framework.ShellQuote(s.oldOutputFile),
-	)
-	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
-		return fmt.Errorf("create old soperator output file %s: %w", s.oldOutputFile, err)
-	}
-	return nil
-}
-
-func (s *ActiveChecks) theLogsCleanerActiveCheckIsTriggered(ctx context.Context) error {
-	jobName, err := s.createJobFromCronJob(ctx, s.activeCheckName(activeLogsCleanerSuffix))
-	if err != nil {
-		return err
-	}
-	s.logsCleanerK8sJobName = jobName
-	return nil
-}
-
-func (s *ActiveChecks) theLogsCleanerKubernetesJobSucceeds(ctx context.Context) error {
-	if s.logsCleanerK8sJobName == "" {
-		return fmt.Errorf("logs cleaner Kubernetes Job is not captured")
-	}
-	return s.waitForK8sJobCompleteSuccessfully(ctx, s.logsCleanerK8sJobName, activeK8sJobTimeout)
-}
-
-func (s *ActiveChecks) theLogsCleanerActiveCheckStatusIsComplete(ctx context.Context) error {
-	if s.logsCleanerK8sJobName == "" {
-		return fmt.Errorf("logs cleaner Kubernetes Job is not captured")
-	}
-	return s.waitForActiveCheckK8sJobComplete(ctx, s.activeCheckName(activeLogsCleanerSuffix), s.logsCleanerK8sJobName, activeK8sJobTimeout)
 }
 
 func (s *ActiveChecks) healthyGPUWorkersAreAvailableForActiveChecks(ctx context.Context) error {
@@ -166,35 +115,6 @@ func (s *ActiveChecks) gpuActiveCheckOutputsReportPASSOnAllGPUWorkers(ctx contex
 	return s.waitForGPUActiveCheckOutputsPassingOnAllGPUWorkers(ctx)
 }
 
-func (s *ActiveChecks) theOldSoperatorOutputFileIsRemoved(ctx context.Context) error {
-	if s.oldOutputFile == "" {
-		return fmt.Errorf("old output file path is not captured")
-	}
-	if err := s.exec.WaitFor(ctx, "old soperator output file removed", activeOutputCleanupTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		out, err := s.exec.Jail().RunWithDefaultRetry(waitCtx,
-			fmt.Sprintf("test ! -e %s && echo removed || true", framework.ShellQuote(s.oldOutputFile)))
-		if err != nil {
-			return false, err
-		}
-		return strings.TrimSpace(out) == "removed", nil
-	}); err != nil {
-		return err
-	}
-	s.oldOutputFile = ""
-	s.logsCleanerK8sJobName = ""
-	return nil
-}
-
-func (s *ActiveChecks) cleanup(ctx context.Context) {
-	if s.oldOutputFile != "" {
-		if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(s.oldOutputFile))); err != nil {
-			s.exec.Logf("cleanup: remove old output file %s: %v", s.oldOutputFile, err)
-		} else {
-			s.oldOutputFile = ""
-		}
-	}
-}
-
 func (s *ActiveChecks) activeCheckName(suffix string) string {
 	return fmt.Sprintf("%s-%s", s.state.SlurmClusterName, suffix)
 }
@@ -244,27 +164,6 @@ func (s *ActiveChecks) waitForK8sJobCompleteSuccessfully(ctx context.Context, jo
 			return false, fmt.Errorf("Kubernetes Job %s failed: %+v", jobName, job.Status)
 		}
 		return false, nil
-	})
-}
-
-func (s *ActiveChecks) waitForActiveCheckK8sJobComplete(ctx context.Context, checkName, jobName string, timeout time.Duration) error {
-	return s.exec.WaitFor(ctx, fmt.Sprintf("ActiveCheck %s Kubernetes Job %s complete", checkName, jobName), timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		var check activeCheckStatus
-		if err := kubectlJSON(waitCtx, s.exec, &check, "get", "activecheck", "-n", clusterCreationNamespace, checkName, "-o", "json"); err != nil {
-			return false, err
-		}
-		status := check.Status.K8sJobsStatus
-		if status.LastJobName != jobName {
-			return false, nil
-		}
-		switch status.LastJobStatus {
-		case consts.ActiveCheckK8sJobStatusComplete:
-			return true, nil
-		case consts.ActiveCheckK8sJobStatusFailed:
-			return false, fmt.Errorf("ActiveCheck %s Kubernetes Job %s finished with status=%s", checkName, jobName, status.LastJobStatus)
-		default:
-			return false, nil
-		}
 	})
 }
 
@@ -493,10 +392,6 @@ type activeCheckSlurmJobRecord struct {
 
 type activeCheckStatus struct {
 	Status struct {
-		K8sJobsStatus struct {
-			LastJobName   string                         `json:"lastJobName"`
-			LastJobStatus consts.ActiveCheckK8sJobStatus `json:"lastJobStatus"`
-		} `json:"k8sJobsStatus"`
 		SlurmJobsStatus struct {
 			LastRunID                  string                           `json:"lastRunId"`
 			LastRunStatus              consts.ActiveCheckSlurmRunStatus `json:"lastRunStatus"`

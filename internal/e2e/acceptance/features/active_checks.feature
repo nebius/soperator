@@ -1,11 +1,4 @@
 Feature: Active checks
-  Scenario: Logs cleaner ActiveCheck removes old output files
-    Given an old soperator output file is created for acceptance
-    When the logs cleaner ActiveCheck is triggered
-    Then the logs cleaner Kubernetes Job succeeds
-    And the logs cleaner ActiveCheck status is Complete
-    And the old soperator output file is removed
-
   @gpu
   Scenario: GPU ActiveCheck succeeds on all GPU workers
     Given healthy GPU workers are available for active checks

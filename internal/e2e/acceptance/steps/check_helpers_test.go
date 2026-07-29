@@ -74,9 +74,9 @@ func TestHealthCheckReportsMatchJob(t *testing.T) {
 }
 
 func TestUniqueK8sJobName(t *testing.T) {
-	name := uniqueK8sJobName("logs-cleaner")
+	name := uniqueK8sJobName("gpu-checks")
 	assert.LessOrEqual(t, len(name), 63)
-	assert.Contains(t, name, "acceptance-logs-cleaner-")
+	assert.Contains(t, name, "acceptance-gpu-checks-")
 }
 
 func TestAssertGPUActiveCheckSlurmRecords(t *testing.T) {
