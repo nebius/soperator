@@ -9,7 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
+	"nebius.ai/slurm-operator/e2e/acceptance/framework"
 )
 
 func TestLoggedCheckOutputPathsNormalizesJailPrefix(t *testing.T) {

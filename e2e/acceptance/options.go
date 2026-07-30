@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
+	"nebius.ai/slurm-operator/e2e/acceptance/framework"
 )
 
 const defaultSlurmClusterName = "soperator"
@@ -36,6 +36,7 @@ func (f *scenarioPathFlag) Set(value string) error {
 	return nil
 }
 
+// Run parses CLI-style acceptance arguments and runs the shared acceptance suite.
 func Run(ctx context.Context, args []string) error {
 	opts, err := parseOptions(args)
 	if errors.Is(err, flag.ErrHelp) {
@@ -50,7 +51,24 @@ func Run(ctx context.Context, args []string) error {
 		WorkersByNodeSet: make(map[string][]framework.WorkerRef),
 	}
 
-	runner := NewRunner(state, opts.RunUnstableTests, opts.ScenarioPaths, opts.KubectlContext, opts.ReportDir)
+	features := SharedFeatureSource()
+	if len(opts.ScenarioPaths) > 0 {
+		features.Paths = opts.ScenarioPaths
+	}
+
+	runner, err := NewRunner(Options{
+		KubectlContext:            opts.KubectlContext,
+		SlurmClusterName:          opts.SlurmClusterName,
+		ReportDir:                 opts.ReportDir,
+		Features:                  features,
+		ExcludeUnstable:           !opts.RunUnstableTests,
+		ExcludeMissingWorkerKinds: true,
+		State:                     state,
+		StepRegistrars:            []StepRegistrar{SharedStepRegistrar()},
+	})
+	if err != nil {
+		return err
+	}
 	return runner.Run(ctx)
 }
 
