@@ -200,7 +200,12 @@ jobs:
         run: |
           mkdir -p bin
           go build -o bin/e2e ./cmd/e2e
-          go build -o bin/acceptance ./e2e/cmd/acceptance
+
+          if [[ -d e2e/cmd/acceptance ]]; then
+            go build -o bin/acceptance ./e2e/cmd/acceptance
+          elif [[ -d cmd/acceptance ]]; then
+            go build -o bin/acceptance ./cmd/acceptance
+          fi
 
   build-soperator-images:
     needs:
@@ -250,7 +255,7 @@ jobs:
           echo "Nfs version: $NFS_VERSION"
 
       - name: Log in to the Github Container registry
-        uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -367,7 +372,7 @@ jobs:
           echo "Nfs version: $NFS_VERSION"
 
       - name: Log in to the Github Container registry
-        uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -497,7 +502,7 @@ jobs:
           cache: false
 
       - name: Log in to the Github Container registry
-        uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -587,7 +592,7 @@ jobs:
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Log in to the Github Container registry
-        uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -701,7 +706,7 @@ jobs:
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Log in to the Github Container registry
-        uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
