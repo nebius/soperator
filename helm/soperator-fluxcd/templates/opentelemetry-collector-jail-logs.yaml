@@ -1,18 +1,24 @@
-{{- if and .Values.observability.enabled
-            .Values.observability.opentelemetry.enabled
-            .Values.observability.opentelemetry.logs.values.jailLogs.enabled }}
+{{- if
+  and
+    .Values.observability.enabled
+    .Values.observability.opentelemetry.enabled
+    .Values.observability.opentelemetry.logs.values.jailLogs.enabled
+-}}
+
 {{- include "soperator-fluxcd.validatePublicEndpointTokenKind" . -}}
+
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: {{ include "soperator-fluxcd.fullname" . }}-opentelemetry-collector-jail-logs
   labels:
-  {{- include "soperator-fluxcd.labels" . | nindent 4 }}
+    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
 spec:
   {{- with .Values.observability.opentelemetry.logs.driftDetection }}
   driftDetection:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+
   chart:
     spec:
       chart: opentelemetry-collector
@@ -21,13 +27,15 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-opentelemetry-collector
       version: {{ .Values.observability.opentelemetry.logs.version }}
+
   dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
-  # nodesets itself reaches Ready very quickly (it just creates NodeSet CRs), so this is
-  # not sufficient on its own — the init container below waits for actual worker output.
-  # But the ordering is logically correct: jail logs cannot appear before nodesets exist.
-  - name: {{ include "soperator-fluxcd.fullname" . }}-nodesets
+    - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+    - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
+    # nodesets itself reaches Ready very quickly (it just creates NodeSet CRs), so this is
+    # not sufficient on its own — the init container below waits for actual worker output.
+    # But the ordering is logically correct: jail logs cannot appear before nodesets exist.
+    - name: {{ include "soperator-fluxcd.fullname" . }}-nodesets
+
   install:
     {{- toYaml .Values.observability.opentelemetry.logs.install | nindent 4 }}
   upgrade:
@@ -36,24 +44,207 @@ spec:
   timeout: {{ .Values.observability.opentelemetry.logs.timeout }}
   releaseName: opentelemetry-collector-jail-logs
   targetNamespace: logs-system
+
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
   {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
+  {{- $sendingQueue := .Values.observability.opentelemetry.sendingQueue | default dict }}
+  {{- $logsValues := .Values.observability.opentelemetry.logs.values | default dict }}
+  {{- $jailLogsValues := $logsValues.jailLogs | default dict }}
+  {{- $jailEnableFileStorage := true }}
+  {{- if hasKey $jailLogsValues "enableFileStorage" }}
+  {{- $jailEnableFileStorage = $jailLogsValues.enableFileStorage }}
+  {{- end }}
+  {{- $jailQueueStorage := "" }}
+  {{- if $jailEnableFileStorage }}
+  {{- $jailQueueStorage = "file_storage" }}
+  {{- end }}
+  {{- $jailDeleteAfterRead := $jailLogsValues.deleteAfterRead | default dict }}
+  {{- $jailDeleteAfterReadEnabled := false }}
+  {{- if hasKey $jailDeleteAfterRead "enabled" }}
+  {{- $jailDeleteAfterReadEnabled = $jailDeleteAfterRead.enabled }}
+  {{- end }}
+  {{- $jailLogsUseGoMemLimit := true }}
+  {{- if hasKey $jailLogsValues "useGoMemLimit" }}
+  {{- $jailLogsUseGoMemLimit = $jailLogsValues.useGoMemLimit }}
+  {{- end }}
+
   {{- if .Values.observability.opentelemetry.logs.overrideValues }}
     {{- toYaml .Values.observability.opentelemetry.logs.overrideValues | nindent 4 }}
   {{- else }}
     clusterRole:
       create: true
       rules:
-      - apiGroups:
-        - ""
-        resources:
-        - pods
-        - namespaces
-        verbs:
-        - get
-        - watch
-        - list
+        - apiGroups:
+            - ""
+          resources:
+            - pods
+            - namespaces
+          verbs:
+            - get
+            - watch
+            - list
+
+    image:
+      pullPolicy: IfNotPresent
+      repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
+      tag: 2.0.10
+
+    mode: deployment  # Single deployment on system nodes instead of DaemonSet on all workers
+    replicaCount: 1   # Only one replica to avoid file lock conflicts on shared storage and prevent log duplication
+
+    rollout:
+      strategy: Recreate  # Ensure old pod terminates before new one starts to maintain max one pod running
+
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: slurm.nebius.ai/nodeset
+                  operator: In
+                  values: ["system"]
+
+    extraVolumes:
+      - name: jail
+        hostPath:
+          path: /mnt/jail
+          type: Directory
+
+      {{- if $jailEnableFileStorage }}
+      - name: varlibotelcol
+        hostPath:
+          path: /var/lib/otelcol-jail
+          type: DirectoryOrCreate
+      {{- end }}
+
+      {{- if $hasPublicEndpoint }}
+      - name: o11ytoken
+        {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
+        secret:
+          secretName: o11y-writer-sa-token
+        {{- else if eq .Values.observability.publicEndpointTokenKind "hostPath" }}
+        hostPath:
+          path: /mnt/cloud-metadata
+          type: Directory
+        {{- end }}
+      {{- end }}
+
+    extraVolumeMounts:
+      - name: jail
+        mountPath: /mnt/jail
+        readOnly: {{ not $jailDeleteAfterReadEnabled }}
+
+    {{- if $jailEnableFileStorage }}
+      - name: varlibotelcol
+        mountPath: /var/lib/otelcol-jail
+    {{- end }}
+
+    {{- if $hasPublicEndpoint }}
+      - name: o11ytoken
+        mountPath: /o11ytoken
+        readOnly: true
+    {{- end }}
+
+    securityContext:
+      runAsGroup: 0
+      runAsUser: 10001
+    service:  # No external access needed - this collector only reads files and sends to Victoria Logs
+      enabled: false
+    serviceAccount:
+      create: true
+
+    extraEnvs:
+      {{- include "soperator-fluxcd.otelCollectorGoMaxProcsEnv" (dict "resources" $jailLogsValues.resources) | nindent 6 }}
+
+      {{- if .Values.observability.clusterId }}
+      - name: CLUSTER_ID
+        value: {{ .Values.observability.clusterId | quote }}
+      {{- end }}
+
+    initContainers:
+      # /mnt/jail/opt/soperator-outputs is created by complement_jail.sh on first
+      # worker/login startup; we mount the jail NFS root and gate on this directory here
+      # so the HelmRelease does not get marked Stalled before workers come up.
+      - name: wait-soperator-outputs
+        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        volumeMounts:
+          - mountPath: /mnt/jail
+            name: jail
+            readOnly: true
+        command:
+          - sh
+          - "-c"
+          - |
+            until [ -d /mnt/jail/opt/soperator-outputs ]; do
+              echo "Waiting for /mnt/jail/opt/soperator-outputs to be created by a worker or login pod"
+              sleep 5
+            done
+
+    {{- if $jailEnableFileStorage }}
+      - name: init-fs
+        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        volumeMounts:
+          - name: varlibotelcol
+            mountPath: /var/lib/otelcol-jail
+        securityContext:
+          runAsGroup: 0
+          runAsUser: 0
+        command:
+          - sh
+          - "-c"
+          - 'chown -R 10001: /var/lib/otelcol-jail'
+    {{- end }}
+
+    {{- if .Values.observability.opentelemetry.logs.values.jailLogs.resources }}
+    resources: {{- toYaml .Values.observability.opentelemetry.logs.values.jailLogs.resources | nindent 6 }}
+    {{- end }}
+
+    useGOMEMLIMIT: {{ $jailLogsUseGoMemLimit }}
+
+    {{- $featureGates := list }}
+    {{- if .Values.observability.opentelemetry.metrics.enabled }}
+    {{- $featureGates = append $featureGates "-telemetry.UseLocalHostAsDefaultMetricsAddress" }}
+    {{- end }}
+    {{- if $jailDeleteAfterReadEnabled }}
+    {{- $featureGates = append $featureGates "filelog.allowFileDeletion" }}
+    {{- end }}
+    {{- if $featureGates }}
+    command:
+      extraArgs:
+        - "--feature-gates={{ join "," $featureGates }}"
+    {{- end }}
+
+    ports:  # Disable all network receivers since this collector only reads files
+      jaeger-compact:
+        enabled: false
+      jaeger-grpc:
+        enabled: false
+      jaeger-thrift:
+        enabled: false
+      otlp:
+        enabled: false
+      otlp-http:
+        enabled: false
+      zipkin:
+        enabled: false
+      metrics:
+        enabled: {{ .Values.observability.opentelemetry.metrics.enabled | default true }}
+
+    {{- if .Values.observability.opentelemetry.metrics.enabled }}
+    podMonitor:
+      enabled: true
+      metricsEndpoints:
+        - port: metrics
+          interval: {{ .Values.observability.opentelemetry.metrics.interval | default "30s" }}
+          scrapeTimeout: {{ .Values.observability.opentelemetry.metrics.scrapeTimeout | default "10s" }}
+          relabelings:
+            - sourceLabels: [__meta_kubernetes_pod_name]
+              targetLabel: pod
+            - replacement: otel-collector-jail-logs
+              targetLabel: collector
+    {{- end }}
+
     config:
       receivers:
         filelog:
@@ -65,95 +256,155 @@ spec:
           include_file_path: true  # Adds attributes["log.file.path"]
           preserve_leading_whitespaces: true
           poll_interval: {{ .Values.observability.opentelemetry.logs.values.jailLogs.pollInterval | default "5s" }}
+
           operators:
             - id: extract_base_name_and_pod
               type: regex_parser
               parse_from: attributes["log.file.name"]
               regex: ^(?P<slurm_node_name>[^.]+)\.(?P<base_name>.+)\.out$
+
             - type: copy
               from: attributes.slurm_node_name
               to: resource["slurm_node_name"]
+
             - type: move
               from: attributes.slurm_node_name
               to: resource["k8s.pod.name"]
+
             - type: add
               field: resource["k8s.namespace.name"]
               value: {{ .Values.slurmCluster.namespace | default "soperator" | quote }}
+
             - type: add
               field: resource["region"]
               value: {{ .Values.observability.region | quote }}
+
             - id: extract_directory
               type: regex_parser
               parse_from: attributes["log.file.path"]
-              regex: ^.*/(?P<log_directory>nccl_logs|slurm_jobs|slurm_scripts)/.*$
+              regex: ^.*/(?P<log_directory>nccl_logs|slurm_jobs|slurm_scripts|task_prolog)/.*$
+
             - type: move
               from: attributes.log_directory
               to: resource["log_type"]
+
             - id: parse_nccl_log_base_name
               type: regex_parser
               parse_from: attributes.base_name
               regex: ^(?P<job_id>\d+)\.(?P<job_step_id>\d+)$
               if: resource["log_type"] == "nccl_logs"
+
             - type: move
               from: attributes.job_id
               to: resource["job_id"]
               if: resource["log_type"] == "nccl_logs" and attributes["job_id"] != nil
+
             - type: move
               from: attributes.job_step_id
               to: resource["job_step_id"]
               if: resource["log_type"] == "nccl_logs" and attributes["job_step_id"] != nil
+
+            - id: parse_task_prolog_base_name
+              type: regex_parser
+              parse_from: attributes.base_name
+              regex: ^(?P<job_id>\d+)\.(?P<job_step_id>\d+)?\.(?P<job_array_id>\d+)?$
+              if: resource["log_type"] == "task_prolog"
+
+            - type: move
+              from: attributes.job_id
+              to: resource["job_id"]
+              if: resource["log_type"] == "task_prolog" and attributes["job_id"] != nil
+
+            - type: move
+              from: attributes.job_step_id
+              to: resource["job_step_id"]
+              if: resource["log_type"] == "task_prolog" and attributes["job_step_id"] != nil
+
+            - type: move
+              from: attributes.job_array_id
+              to: resource["job_array_id"]
+              if: resource["log_type"] == "task_prolog" and attributes["job_array_id"] != nil
+
             - id: parse_slurm_job_log_base_name
               type: regex_parser
               parse_from: attributes.base_name
               regex: ^(?P<job_name>[^.]+)\.(?P<job_id>\d+)(?:\.(?P<job_array_id>\d+))?$
               if: resource["log_type"] == "slurm_jobs"
+
             - type: move
               from: attributes.job_name
               to: resource["job_name"]
               if: resource["log_type"] == "slurm_jobs" and attributes["job_name"] != nil
+
             - type: move
               from: attributes.job_id
               to: resource["job_id"]
               if: resource["log_type"] == "slurm_jobs" and attributes["job_id"] != nil
+
             - type: move
               from: attributes.job_array_id
               to: resource["job_array_id"]
               if: resource["log_type"] == "slurm_jobs" and attributes["job_array_id"] != nil
+
             - id: parse_script_log_base_name
               type: regex_parser
               parse_from: attributes.base_name
               regex: ^(?P<script_name>[^.]+)\.(?P<script_context>[^.]+)$
               if: resource["log_type"] == "slurm_scripts"
+
             - type: move
               from: attributes.script_name
               to: resource["slurm_script_name"]
               if: resource["log_type"] == "slurm_scripts" and attributes["script_name"] != nil
+
             - type: move
               from: attributes.script_context
               to: resource["slurm_script_context"]
               if: resource["log_type"] == "slurm_scripts" and attributes["script_context"] != nil
+
             - type: remove
               field: attributes.base_name
+
+            # Files on the shared jail FS are truncated and rewritten in place by check_runner.py,
+            # so the reader can see partially flushed lines (zero-filled tails). Skip bodies with
+            # NUL bytes and send the entry unparsed instead of logging an error on any parse failure.
             - id: parse_json_body # parse json body to extract fields
               type: json_parser
               parse_from: body
               parse_to: attributes.hc_json
-              if: body matches "^\\s*\\{"
+              if: body matches "^\\s*\\{" and not (body matches "\\x00")
+              on_error: send_quiet
+
             - type: move
               from: attributes.hc_json.status
               to: resource["slurm_run_status"]
               if: attributes.hc_json != nil && attributes.hc_json["status"] != nil
+
             - type: move
               from: attributes.hc_json.resolution
               to: resource["slurm_run_resolution"]
               if: attributes.hc_json != nil && attributes.hc_json["resolution"] != nil
+
             - type: remove # drop the parsed json body
               field: attributes.hc_json
               if: attributes.hc_json != nil
+
           retry_on_failure:
             enabled: true
+            max_elapsed_time: 0
+
+          {{- if $jailDeleteAfterReadEnabled }}
+          start_at: beginning
+          delete_after_read: true
+          delete_after_read_min_age: {{ $jailDeleteAfterRead.minAge | default "1m" }}
+          {{- else }}
           start_at: end  # Start reading from the end of the file on startup.
+          {{- end }}
+
+          {{- if $jailEnableFileStorage }}
           storage: file_storage  # Storage for the state (file offsets).
+          {{- end }}
+
         filelog/health_checker:
           include:
             - "/mnt/jail/opt/soperator-outputs/health_checker_cmd_stdout/*.out"
@@ -161,15 +412,18 @@ spec:
           include_file_path: true  # Adds attributes["log.file.path"]
           preserve_leading_whitespaces: true
           poll_interval: {{ .Values.observability.opentelemetry.logs.values.jailLogs.pollInterval | default "5s" }}
+
           operators:
             # Extract check_name and run_id
             - id: extract_check_name_and_run_id
               type: regex_parser
               parse_from: attributes["log.file.name"]
               regex: ^(?P<check_name>.+)\.(?P<run_id>[0-9a-fA-F-]+)\.out$
+
             - type: copy
               from: attributes.check_name
               to: resource["health_checker.check_name"]
+
             - type: copy
               from: attributes.run_id
               to: resource["health_checker.run_id"]
@@ -178,6 +432,7 @@ spec:
             - type: add
               field: resource["k8s.namespace.name"]
               value: {{ .Values.slurmCluster.namespace | default "soperator" | quote }}
+
             - type: add
               field: resource["region"]
               value: {{ .Values.observability.region | quote }}
@@ -189,18 +444,27 @@ spec:
 
           retry_on_failure:
             enabled: true
+            max_elapsed_time: 0
+
+          {{- if $jailDeleteAfterReadEnabled }}
+          start_at: beginning
+          delete_after_read: true
+          delete_after_read_min_age: {{ $jailDeleteAfterRead.minAge | default "1m" }}
+          {{- else }}
           start_at: end  # Start reading from the end of the file on startup.
+          {{- end }}
+
+          {{- if $jailEnableFileStorage }}
           storage: file_storage  # Storage for the state (file offsets).
+          {{- end }}
+
         # Disable irrelevant receivers that might be added by valuesFrom ConfigMap:
         zipkin: null
         jaeger: null
         otlp: null
         prometheus: null
+
       processors:
-        batch:
-          timeout: {{ $batch.timeout | default "1s" }}
-          send_batch_size: {{ $batch.sendBatchSize | default 250 }}
-          send_batch_max_size: {{ $batch.sendBatchMaxSize | default 700 }}
         k8s_attributes:
           pod_association:
           - sources:
@@ -228,10 +492,12 @@ spec:
           passthrough: false
           wait_for_metadata: true  # Wait for k8s metadata on startup.
           wait_for_metadata_timeout: 30s
+
         memory_limiter:
           check_interval: 5s
           limit_percentage: 80
           spike_limit_percentage: 25
+
         transform:
           log_statements:
           - context: log
@@ -241,22 +507,30 @@ spec:
             {{- if .Values.observability.clusterId }}
             - set(attributes["sp_resource_id"], "${env:CLUSTER_ID}")
             {{- end }}
+
       exporters:
         otlp_http/victorialogs:
           compression: gzip
           encoding: proto
           logs_endpoint: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
           retry_on_failure:
+            enabled: true
             initial_interval: 200ms
+            max_elapsed_time: 0
           timeout: 5s
+{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $batch "queue" $sendingQueue "storage" $jailQueueStorage) | indent 10 }}
+
         {{- if $hasPublicEndpoint }}
         otlp:
           endpoint: {{ .Values.observability.opentelemetry.publicEndpoint }}
           balancer_name: round_robin
           compression: snappy
           retry_on_failure:
+            enabled: true
             initial_interval: 200ms
+            max_elapsed_time: 0
           timeout: 5s
+{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $batch "queue" $sendingQueue "storage" $jailQueueStorage) | indent 10 }}
           headers:
             iam-container: {{ .Values.observability.logsProjectId }}
             {{- $extraHeaders := .Values.observability.opentelemetry.extraHeaders }}
@@ -266,19 +540,25 @@ spec:
           auth:
             authenticator: bearertokenauth
         {{- end }}
+
       extensions:
+        {{- if $jailEnableFileStorage }}
         file_storage:
           directory: /var/lib/otelcol-jail
+        {{- end }}
+
         health_check:
           endpoint: 0.0.0.0:13133
+
         {{- if $hasPublicEndpoint }}
         bearertokenauth:
-        {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
+          {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
           filename: "/o11ytoken/accessToken"
-        {{- else if eq .Values.observability.publicEndpointTokenKind "hostPath" }}
+          {{- else if eq .Values.observability.publicEndpointTokenKind "hostPath" }}
           filename: "/o11ytoken/tsa-token"
+          {{- end }}
         {{- end }}
-        {{- end }}
+
       service:
         {{- if .Values.observability.opentelemetry.metrics.enabled }}
         telemetry:
@@ -290,163 +570,48 @@ spec:
                       host: 0.0.0.0
                       port: 8888
         {{- end }}
+
         extensions:
-        - health_check
-        - file_storage
-        {{- if $hasPublicEndpoint }}
-        - bearertokenauth
-        {{- end }}
+          - health_check
+
+          {{- if $jailEnableFileStorage }}
+          - file_storage
+          {{- end }}
+
+          {{- if $hasPublicEndpoint }}
+          - bearertokenauth
+          {{- end }}
+
         pipelines:
           logs:
             receivers:
-            - filelog
-            - filelog/health_checker
+              - filelog
+              - filelog/health_checker
             processors:
-            - k8s_attributes
-            - transform
-            - memory_limiter
-            - batch
+              - k8s_attributes
+              - transform
+              - memory_limiter
             exporters:
-            - otlp_http/victorialogs
-            {{- if $hasPublicEndpoint }}
-            - otlp
-            {{- end }}
+              - otlp_http/victorialogs
+
+              {{- if $hasPublicEndpoint }}
+              - otlp
+              {{- end }}
+
           metrics: null
           traces: null
-    extraEnvs:
-    - name: GOMAXPROCS
-      value: "1"
-    {{- if .Values.observability.clusterId }}
-    - name: CLUSTER_ID
-      value: {{ .Values.observability.clusterId | quote }}
-    {{- end }}
-    extraVolumeMounts:
-    {{- if $hasPublicEndpoint }}
-    - mountPath: /o11ytoken
-      name: o11ytoken
-      readOnly: true
-    {{- end }}
-    - mountPath: /var/lib/otelcol-jail
-      name: varlibotelcol
-    - mountPath: /mnt/jail
-      name: jail
-      readOnly: true
-    extraVolumes:
-    {{- if $hasPublicEndpoint }}
-    - name: o11ytoken
-      {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
-      secret:
-        secretName: o11y-writer-sa-token
-      {{- else if eq .Values.observability.publicEndpointTokenKind "hostPath" }}
-      hostPath:
-        path: /mnt/cloud-metadata
-        type: Directory
-      {{- end }}
-    {{- end }}
-    - name: jail
-      hostPath:
-        path: /mnt/jail
-        type: Directory
-    - hostPath:
-        path: /var/lib/otelcol-jail
-        type: DirectoryOrCreate
-      name: varlibotelcol
-    image:
-      pullPolicy: IfNotPresent
-      repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
-      tag: 2.0.10
-    initContainers:
-    - command:
-      - sh
-      - -c
-      - 'chown -R 10001: /var/lib/otelcol-jail'
-      image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
-      name: init-fs
-      securityContext:
-        runAsGroup: 0
-        runAsUser: 0
-      volumeMounts:
-      - mountPath: /var/lib/otelcol-jail
-        name: varlibotelcol
-    # /mnt/jail/opt/soperator-outputs is created by complement_jail.sh on first
-    # worker/login startup; we mount the jail NFS root and gate on this directory here
-    # so the HelmRelease does not get marked Stalled before workers come up.
-    - command:
-      - sh
-      - -c
-      - |
-        until [ -d /mnt/jail/opt/soperator-outputs ]; do
-          echo "Waiting for /mnt/jail/opt/soperator-outputs to be created by a worker or login pod"
-          sleep 5
-        done
-      image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
-      name: wait-soperator-outputs
-      volumeMounts:
-      - mountPath: /mnt/jail
-        name: jail
-        readOnly: true
-    mode: deployment  # Single deployment on system nodes instead of DaemonSet on all workers
-    replicaCount: 1   # Only one replica to avoid file lock conflicts on shared storage and prevent log duplication
-    rollout:
-      strategy: Recreate  # Ensure old pod terminates before new one starts to maintain max one pod running
-    affinity:
-      nodeAffinity:
-        requiredDuringSchedulingIgnoredDuringExecution:
-          nodeSelectorTerms:
-            - matchExpressions:
-                - key: slurm.nebius.ai/nodeset
-                  operator: In
-                  values: ["system"]
-    ports:  # Disable all network receivers since this collector only reads files
-      jaeger-compact:
-        enabled: false
-      jaeger-grpc:
-        enabled: false
-      jaeger-thrift:
-        enabled: false
-      otlp:
-        enabled: false
-      otlp-http:
-        enabled: false
-      zipkin:
-        enabled: false
-      metrics:
-        enabled: {{ .Values.observability.opentelemetry.metrics.enabled | default true }}
-    securityContext:
-      runAsGroup: 0
-      runAsUser: 10001
-    service:  # No external access needed - this collector only reads files and sends to Victoria Logs
-      enabled: false
-    serviceAccount:
-      create: true
-    useGOMEMLIMIT: {{ .Values.observability.opentelemetry.logs.values.useGOMEMLIMIT | default true }}
-    {{- if .Values.observability.opentelemetry.logs.values.jailLogs.resources }}
-    resources: {{- toYaml .Values.observability.opentelemetry.logs.values.jailLogs.resources | nindent 6 }}
-    {{- end }}
-    {{- if .Values.observability.opentelemetry.metrics.enabled }}
-    command:
-      extraArgs:
-        - --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress
-    podMonitor:
-      enabled: true
-      metricsEndpoints:
-        - port: metrics
-          interval: {{ .Values.observability.opentelemetry.metrics.interval | default "30s" }}
-          scrapeTimeout: {{ .Values.observability.opentelemetry.metrics.scrapeTimeout | default "10s" }}
-          relabelings:
-            - sourceLabels: [__meta_kubernetes_pod_name]
-              targetLabel: pod
-            - replacement: otel-collector-jail-logs
-              targetLabel: collector
-    {{- end }}
+
   {{- end }}
+
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-opentelemetry-collector-jail-logs
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: opentelemetry-collector-jail-logs
-    optional: true
-    valuesKey: values.yaml
+    - kind: ConfigMap
+      name: terraform-opentelemetry-collector-jail-logs
+      optional: true
+      valuesKey: values.yaml
+
+    - kind: ConfigMap
+      name: opentelemetry-collector-jail-logs
+      optional: true
+      valuesKey: values.yaml
+
 {{- end }}

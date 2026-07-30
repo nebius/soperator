@@ -14,7 +14,7 @@ import (
 type PackageInstallation struct {
 	exec          framework.Exec
 	slurm         *framework.SlurmClient
-	packageWorker string
+	packageWorker framework.WorkerRef
 }
 
 func NewPackageInstallation(exec framework.Exec, slurm *framework.SlurmClient) *PackageInstallation {
@@ -35,9 +35,9 @@ func (s *PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.
 	}
 	s.packageWorker = workers[0]
 
-	cmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(s.packageWorker))
+	cmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(s.packageWorker.Name))
 	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
-		s.logInstallFailureDiagnostics(ctx, s.packageWorker)
+		s.logInstallFailureDiagnostics(ctx, s.packageWorker.Name)
 		return fmt.Errorf("verify nvidia-smi before install: %w", err)
 	}
 	return nil
@@ -47,7 +47,7 @@ func (s *PackageInstallation) jqIsInstalledOnTheWorkerNode(ctx context.Context) 
 	// TODO(SCHED-1498): switch this test back to installing nvitop.
 	// nvitop currently pulls NVIDIA user-space packages, and dpkg fails in our jail/chroot layout
 	// with "Invalid cross-device link" when creating backup hardlinks during package replacement.
-	workerName := s.packageWorker
+	workerName := s.packageWorker.Name
 	updateCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get update'", framework.ShellQuote(workerName))
 	if _, err := s.exec.Jail().Run(ctx, updateCmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
@@ -63,7 +63,7 @@ func (s *PackageInstallation) jqIsInstalledOnTheWorkerNode(ctx context.Context) 
 }
 
 func (s *PackageInstallation) theNVIDIADriverIsStillWorkingOnTheWorkerNode(ctx context.Context) error {
-	workerName := s.packageWorker
+	workerName := s.packageWorker.Name
 	cmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(workerName))
 	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
@@ -73,7 +73,7 @@ func (s *PackageInstallation) theNVIDIADriverIsStillWorkingOnTheWorkerNode(ctx c
 }
 
 func (s *PackageInstallation) jqIsAvailableOnTheWorkerNode(ctx context.Context) error {
-	workerName := s.packageWorker
+	workerName := s.packageWorker.Name
 	cmd := fmt.Sprintf("ssh %s 'jq --version >/dev/null'", framework.ShellQuote(workerName))
 	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)

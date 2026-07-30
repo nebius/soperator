@@ -39,6 +39,12 @@ configMaps:
     enabled: true
   imageStorage:
     enabled: true
+
+docker:
+  enabled: true
+
+enroot:
+  useDedicatedImageStorage: true
 ```
 
 ## Values
@@ -52,6 +58,8 @@ configMaps:
 | `configMaps.motd.name` | Name of MOTD ConfigMap | `motd-nebius-o11y` |
 | `configMaps.imageStorage.enabled` | Enable image storage ConfigMap | `true` |
 | `configMaps.imageStorage.name` | Name of image storage ConfigMap | `image-storage` |
+| `docker.enabled` | Start the Docker daemon on worker nodes; disable on clusters deployed without image-storage disks | `true` |
+| `enroot.useDedicatedImageStorage` | Store Enroot cache/data/runtime under `/mnt/image-storage/enroot`; when false, cache uses shared `/var/cache/enroot/user-$(id -u)` and data/runtime use Enroot defaults | `true` |
 
 ## Deployed ConfigMaps
 

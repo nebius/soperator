@@ -9,7 +9,7 @@ import (
 	"time"
 	"unicode"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,9 +36,8 @@ const (
 type SlurmNodesController struct {
 	*reconciler.Reconciler
 	slurmAPIClients          *slurmapi.ClientSet
-	reconcileTimeout         time.Duration
+	requeueAfter             time.Duration
 	enabledNodeReplacement   bool
-	enableExtensiveCheck     bool
 	apiReader                client.Reader // Direct API reader for pagination
 	MaintenanceConditionType corev1.NodeConditionType
 }
@@ -48,9 +47,8 @@ func NewSlurmNodesController(
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
-	reconcileTimeout time.Duration,
+	requeueAfter time.Duration,
 	enabledNodeReplacement bool,
-	enableExtensiveCheck bool,
 	apiReader client.Reader,
 	maintenanceConditionType corev1.NodeConditionType,
 ) *SlurmNodesController {
@@ -63,9 +61,8 @@ func NewSlurmNodesController(
 	return &SlurmNodesController{
 		Reconciler:               r,
 		slurmAPIClients:          slurmAPIClients,
-		reconcileTimeout:         reconcileTimeout,
+		requeueAfter:             requeueAfter,
 		enabledNodeReplacement:   enabledNodeReplacement,
-		enableExtensiveCheck:     enableExtensiveCheck,
 		apiReader:                apiReader,
 		MaintenanceConditionType: maintenanceConditionType,
 	}
@@ -100,17 +97,17 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 	logger.Info("Running slurm nodes controller")
 
 	if err := c.processK8SNodesMaintenance(ctx); err != nil {
-		logger.V(1).Error(err, "Process K8S node maintenance produced an error")
+		logger.Error(err, "Process K8S node maintenance produced an error")
 		return ctrl.Result{}, err
 	}
 
 	degradedNodes, err := c.findDegradedNodes(ctx)
 	if err != nil {
-		logger.V(1).Error(err, "Find degraded nodes produced an error")
+		logger.Error(err, "Find degraded nodes produced an error")
 		return ctrl.Result{}, err
 	}
 
-	logger.V(1).Info(fmt.Sprintf("found %d degraded nodes", len(degradedNodes)))
+	logger.Info(fmt.Sprintf("found %d degraded nodes", len(degradedNodes)))
 	var errs []error
 	for slurmClusterName, nodes := range degradedNodes {
 		for _, node := range nodes {
@@ -121,13 +118,13 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if err := errors.Join(errs...); err != nil {
-		logger.V(1).Error(err, "Process degraded nodes produced an error")
+		logger.Error(err, "Process degraded nodes produced an error")
 		return ctrl.Result{}, err
 	}
 
 	// Set RequeueAfter so SlurmNodesController can perform periodical checks against
 	// slurm nodes to find degraded nodes and k8s nodes to find maintenance.
-	return ctrl.Result{RequeueAfter: c.reconcileTimeout}, nil
+	return ctrl.Result{RequeueAfter: c.requeueAfter}, nil
 }
 
 // TODO: filter slurmNodes by supported slurm clusters
@@ -141,7 +138,7 @@ func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types
 		}
 
 		for _, node := range slurmNodes {
-			if _, ok := node.States[api.V0041NodeStateDRAIN]; !ok {
+			if _, ok := node.States[api.V0044NodeStateDRAIN]; !ok {
 				// Node is not drained, skipping
 				continue
 			}
@@ -211,7 +208,7 @@ func (c *SlurmNodesController) processSetUnhealthy(
 	logger := log.FromContext(ctx).WithName("SlurmNodesController.processSetUnhealthy")
 
 	if !c.enabledNodeReplacement {
-		logger.V(1).Info("Skipping extensive check failed processing, node replacement is disabled")
+		logger.Info("Skipping extensive check failed processing, node replacement is disabled")
 		return nil
 	}
 
@@ -222,7 +219,7 @@ func (c *SlurmNodesController) processSetUnhealthy(
 
 	if slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) ||
 		assignmentTime.After(slurmNode.Reason.ChangedAt) {
-		logger.V(1).Info(
+		logger.Info(
 			"Undraining slurm node because current compute instance was assigned after drain",
 			"assignmentTime", assignmentTime,
 			"drainTime", slurmNode.Reason.ChangedAt,
@@ -329,87 +326,14 @@ func (c *SlurmNodesController) processHealthCheckFailed(
 		return nil
 	}
 
-	if !c.enableExtensiveCheck {
-		logger.V(1).Info("Extensive check not enabled, setting unhealthy right away")
-		return c.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmNode)
-	}
-
-	if slurmNode.Reason.ChangedAt.Before(k8sNode.CreationTimestamp.Time) {
-		logger.V(1).Info("Undraining, slurm node drained before degraded condition changed")
-		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
-	}
-
-	/**
-	Health checks have success and failure reactions.
-	When a health check fails, we can already create a reservation using failureReaction.addReservation
-	There is no need to reactions.drainSlurmNode then execute logic here to handle DRAINED slurm nodes with [HC] reason
-
-	For backward compatability, we add some logic here to handle already drained slurm nodes with [HC] reason and create a reservation for them then undrain them.
-	*/
-
 	// Make sure is drained because of a health check failure.
 	_, _, err := parseHealthCheckReason(nodeReason.OriginalReason)
 	if err != nil {
 		return fmt.Errorf("parse health check reason: %w", err)
 	}
 
-	// If hardware issue condition is set, leave the node drained until MK8S deletes it
-	var hardwareIssuesCondition corev1.NodeCondition
-	for _, cond := range k8sNode.Status.Conditions {
-		if cond.Type == consts.HardwareIssuesSuspected {
-			hardwareIssuesCondition = cond
-			break
-		}
-	}
-	if hardwareIssuesCondition.Status == corev1.ConditionTrue {
-		// Node is still hardware degraded, skip
-		logger.V(1).Info("Skip, still hardware degraded")
-		return nil
-	}
-
-	logger.V(1).Info("Creating a slurm reservation for drained node with [HC] reason")
-
-	// Create a maintenance reservation for this slurm node to prevent work from being scheduled on it.
-	err = c.createMaintenanceReservationForSlurmNode(ctx, slurmClusterName, slurmNode.Name)
-	if err != nil {
-		return fmt.Errorf("failed to create maintenance reservaiton for slurm node: %w", err)
-	}
-
-	// Undrain node after creating the reservation to allow health checks to run.
-	err = c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
-	if err != nil {
-		return fmt.Errorf("failed to undrain slurm node after creating a maintenance reservaiton: %w", err)
-	}
-
-	return nil
-}
-
-const MaintenanceReservationPrefix = "suspicious-node"
-
-func (c *SlurmNodesController) createMaintenanceReservationForSlurmNode(
-	ctx context.Context,
-	slurmClusterName types.NamespacedName,
-	slurmNodeName string,
-) error {
-	logger := log.FromContext(ctx).WithName("SlurmNodesController.createMaintenanceReservationForSlurmNode").V(1).
-		WithValues(
-			"slurmNodeName", slurmNodeName,
-			"slurmCluster", slurmClusterName,
-		)
-	logger.Info("create maintenance reservation for slurm node")
-
-	slurmAPIClient, found := c.slurmAPIClients.GetClient(slurmClusterName)
-	if !found {
-		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
-	}
-
-	err := addReservationForNode(ctx, MaintenanceReservationPrefix, slurmNodeName, slurmAPIClient, logger)
-	if err != nil {
-		return fmt.Errorf("create reservation: %w", err)
-	}
-
-	logger.V(1).Info("slurm node added to a maintenance reservation")
-	return nil
+	logger.Info("Setting unhealthy after health check failure")
+	return c.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmNode)
 }
 
 // https://github.com/kubernetes/apimachinery/blob/release-1.33/pkg/apis/meta/v1/types.go#L1640
@@ -568,7 +492,7 @@ func (c *SlurmNodesController) processKillTaskFailed(
 
 	if degradedCondition == (corev1.NodeCondition{}) {
 		// No degraded condition found
-		logger.V(1).Info("draining because no degraded condition found")
+		logger.Info("draining because no degraded condition found")
 		return drainWithCondition()
 	}
 
@@ -587,7 +511,7 @@ func (c *SlurmNodesController) processKillTaskFailed(
 		return c.undrainSlurmNode(ctx, slurmClusterName, slurmNode.Name)
 	}
 
-	logger.V(1).Info("draining, slurm node drained after degraded condition changed")
+	logger.Info("draining, slurm node drained after degraded condition changed")
 	return drainWithCondition()
 }
 
@@ -752,10 +676,10 @@ func (c *SlurmNodesController) drainSlurmNode(
 		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
-	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
-		api.V0041UpdateNodeMsg{
+	resp, err := slurmAPIClient.SlurmV0044PostNodeWithResponse(ctx, slurmNodeName,
+		api.V0044UpdateNodeMsg{
 			Reason: ptr.To(string(reason)),
-			State:  ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN}),
+			State:  ptr.To([]api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateDRAIN}),
 		},
 	)
 	if err != nil {
@@ -794,7 +718,7 @@ func (c *SlurmNodesController) slurmNodesFullyDrained(
 		if err != nil {
 			return false, err
 		}
-		_, isCompleting := node.States[api.V0041NodeStateCOMPLETING]
+		_, isCompleting := node.States[api.V0044NodeStateCOMPLETING]
 		logger.Info("slurm node", "nodeStates", node.States)
 		// When epilog is running, node is in COMPLETING state and both IDLE and DRAIN states are set.
 		// Example: State=IDLE+COMPLETING+DRAIN+DYNAMIC_NORM
@@ -842,9 +766,9 @@ func (c *SlurmNodesController) undrainSlurmNode(
 		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
-	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
-		api.V0041UpdateNodeMsg{
-			State: ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateRESUME}),
+	resp, err := slurmAPIClient.SlurmV0044PostNodeWithResponse(ctx, slurmNodeName,
+		api.V0044UpdateNodeMsg{
+			State: ptr.To([]api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateRESUME}),
 		},
 	)
 	if err != nil {

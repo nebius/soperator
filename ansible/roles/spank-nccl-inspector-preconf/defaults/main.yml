@@ -1,0 +1,5 @@
+---
+
+spank_nccl_inspector_preconf_dump_dir: "/opt/soperator-outputs/nccl_profiles"
+spank_nccl_inspector_preconf_dump_dir_mode: "0777"
+spank_nccl_inspector_preconf_dump_dir_create: true

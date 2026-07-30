@@ -67,6 +67,8 @@ func RenderNodeSetStatefulSet(
 			nodeSet.GPU.Enabled,
 			topologyTimeOut,
 			topologyPlugin,
+			nodeSet.TopologyFabric,
+			nodeSet.WorkerInitRandomDelaySeconds,
 		),
 	)
 
@@ -91,6 +93,11 @@ func RenderNodeSetStatefulSet(
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}
 
+	containers := []corev1.Container{slurmdContainer}
+	if nodeSet.DockerEnabled {
+		containers = append(containers, renderContainerNodeSetDockerProxy(nodeSet))
+	}
+
 	replicas := &nodeSet.StatefulSet.Replicas
 	var reserveOrdinals []intstr.IntOrString
 
@@ -112,16 +119,15 @@ func RenderNodeSetStatefulSet(
 		},
 		PriorityClassName:  nodeSet.PriorityClass,
 		ServiceAccountName: naming.BuildServiceAccountWorkerName(nodeSet.ParentalCluster.Name),
+		ImagePullSecrets:   nodeSet.ImagePullSecrets,
 		Affinity:           nodeSet.Affinity,
 		NodeSelector:       nodeSet.NodeSelector,
 		Tolerations:        nodeSet.Tolerations,
 		InitContainers:     initContainers,
-		Containers: []corev1.Container{
-			slurmdContainer,
-		},
-		Volumes:   volumes,
-		Subdomain: nodeSet.ServiceUmbrella.Name,
-		DNSPolicy: corev1.DNSClusterFirst,
+		Containers:         containers,
+		Volumes:            volumes,
+		Subdomain:          nodeSet.ServiceUmbrella.Name,
+		DNSPolicy:          corev1.DNSClusterFirst,
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
 				naming.BuildServiceFQDN(nodeSet.ServiceUmbrella.Name, nodeSet.ParentalCluster.Namespace),
@@ -151,7 +157,7 @@ func RenderNodeSetStatefulSet(
 		}
 	}
 
-	return kruisev1b1.StatefulSet{
+	res := kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        nodeSet.StatefulSet.Name,
 			Namespace:   nodeSet.ParentalCluster.Namespace,
@@ -163,6 +169,9 @@ func RenderNodeSetStatefulSet(
 			ServiceName:         nodeSet.ServiceUmbrella.Name,
 			Replicas:            replicas,
 			ReserveOrdinals:     reserveOrdinals,
+			ScaleStrategy: &kruisev1b1.StatefulSetScaleStrategy{
+				MaxUnavailable: &nodeSet.StatefulSet.MaxConcurrentStartup,
+			},
 			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
@@ -193,7 +202,9 @@ func RenderNodeSetStatefulSet(
 			},
 			PersistentVolumeClaimRetentionPolicy: pvcRetentionPolicy,
 		},
-	}, nil
+	}
+
+	return res, nil
 }
 
 func renderNodeSetAnnotations(nodeSet *values.SlurmNodeSet) map[string]string {

@@ -27,8 +27,8 @@ type UpdateAction string
 
 const (
 	// UpdateActionReconfigure will call reconfigure endpoint and wait until slurmd restarts on every node
-	// See https://slurm.schedmd.com/rest_api.html#slurmV0043GetReconfigure
-	// See https://slurm.schedmd.com/rest_api.html#slurmV0043GetNodes
+	// See https://slurm.schedmd.com/rest_api.html#slurmV0044GetReconfigure
+	// See https://slurm.schedmd.com/rest_api.html#slurmV0044GetNodes
 	UpdateActionReconfigure UpdateAction = "Reconfigure"
 
 	DefaultMode int32 = 0o644
@@ -73,8 +73,8 @@ type JailedConfigSpec struct {
 	// updateActions are optional: it is a list of action to perform after materializing files
 	// They will be performed sequentially, in same order as in spec
 	// `Reconfigure` will call reconfigure endpoint and wait until slurmd restarts on every node
-	// See https://slurm.schedmd.com/rest_api.html#slurmV0043GetReconfigure
-	// See https://slurm.schedmd.com/rest_api.html#slurmV0043GetNodes
+	// See https://slurm.schedmd.com/rest_api.html#slurmV0044GetReconfigure
+	// See https://slurm.schedmd.com/rest_api.html#slurmV0044GetNodes
 	// +optional
 	// +listType=atomic
 	UpdateActions []UpdateAction `json:"updateActions,omitempty"`

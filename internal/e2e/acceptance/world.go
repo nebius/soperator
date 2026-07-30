@@ -21,35 +21,85 @@ const (
 type world struct {
 	logPrefix string
 
-	state *framework.ClusterState
+	state          *framework.ClusterState
+	kubectlContext string
 }
 
-func (w *world) AvailableWorkers() []framework.WorkerPodRef {
-	return append([]framework.WorkerPodRef(nil), w.state.Workers...)
-}
-
-func (w *world) AvailableGPUWorkers() []framework.WorkerPodRef {
-	return append([]framework.WorkerPodRef(nil), w.state.GPUWorkers...)
+func (w *world) AvailableWorkers(kind framework.WorkerKind) []framework.WorkerRef {
+	switch kind {
+	case framework.WorkerAny:
+		return append([]framework.WorkerRef(nil), w.state.Workers...)
+	case framework.WorkerCPU:
+		return append([]framework.WorkerRef(nil), w.state.CPUWorkers...)
+	case framework.WorkerGPU:
+		return append([]framework.WorkerRef(nil), w.state.GPUWorkers...)
+	default:
+		return nil
+	}
 }
 
 func (w *world) Logf(format string, args ...any) {
 	w.logf(format, args...)
 }
 
+func (w *world) Kubectl() framework.ArgsScope {
+	return argsScope{
+		run: func(ctx context.Context, args ...string) (string, error) {
+			return w.Run(ctx, "kubectl", kubectlArgs(w.kubectlContext, args)...)
+		},
+	}
+}
+
+func (w *world) Local() framework.ArgsScope {
+	return argsScope{
+		run: func(ctx context.Context, args ...string) (string, error) {
+			if len(args) == 0 {
+				return "", fmt.Errorf("local command requires executable name")
+			}
+			return w.Run(ctx, args[0], args[1:]...)
+		},
+	}
+}
+
 func (w *world) Controller() framework.CommandScope {
-	return controllerScope{world: w}
+	return commandScope{
+		run: func(ctx context.Context, command string) (string, error) {
+			return w.Kubectl().Run(ctx, "exec", "-n", soperatorNamespace, w.state.PodName("controller-0"), "--", "bash", "-lc", command)
+		},
+	}
 }
 
 func (w *world) Jail() framework.CommandScope {
-	return jailScope{world: w}
+	return commandScope{
+		run: func(ctx context.Context, command string) (string, error) {
+			return w.Kubectl().Run(ctx, "exec", "-n", soperatorNamespace, w.state.PodName("login-0"), "--", "chroot", "/mnt/jail", "bash", "-lc", command)
+		},
+	}
 }
 
-func (w *world) Worker(worker string) framework.CommandScope {
-	return workerScope{world: w, worker: worker}
+func (w *world) Worker(worker framework.WorkerRef) framework.CommandScope {
+	return commandScope{
+		run: func(ctx context.Context, command string) (string, error) {
+			if strings.TrimSpace(worker.Name) == "" {
+				return "", fmt.Errorf("Slurm worker name is empty")
+			}
+			return w.Jail().Run(ctx, fmt.Sprintf("ssh %s %s", framework.ShellQuote(worker.Name), framework.ShellQuote(command)))
+		},
+	}
 }
 
-func (w *world) RunWithDefaultRetry(ctx context.Context, name string, args ...string) (string, error) {
-	return w.RunWithRetry(ctx, framework.DefaultRetryAttempts, framework.DefaultRetryDelay, name, args...)
+func (w *world) WorkerPod(worker framework.WorkerRef) framework.CommandScope {
+	return commandScope{
+		run: func(ctx context.Context, command string) (string, error) {
+			if strings.TrimSpace(worker.PodName) == "" {
+				return "", fmt.Errorf("Kubernetes worker pod for Slurm node %s was not discovered", worker.Name)
+			}
+			return w.Kubectl().Run(ctx,
+				"exec", "-n", soperatorNamespace, worker.PodName, "-c", "slurmd",
+				"--", "bash", "-lc", command,
+			)
+		},
+	}
 }
 
 func (w *world) Run(ctx context.Context, name string, args ...string) (string, error) {
@@ -80,81 +130,15 @@ func (w *world) Run(ctx context.Context, name string, args ...string) (string, e
 	return out, nil
 }
 
-func (w *world) RunWithRetry(ctx context.Context, attempts int, delay time.Duration, name string, args ...string) (string, error) {
-	if attempts < 1 {
-		attempts = 1
+func kubectlArgs(kubectlContext string, args []string) []string {
+	if kubectlContext == "" {
+		return append([]string(nil), args...)
 	}
 
-	var lastErr error
-	var out string
-	for attempt := 1; attempt <= attempts; attempt++ {
-		out, lastErr = w.Run(ctx, name, args...)
-		if lastErr == nil {
-			return out, nil
-		}
-		if attempt == attempts {
-			break
-		}
-
-		w.logf("retrying command after attempt %d/%d: %s %s: %v",
-			attempt, attempts, name, strings.Join(args, " "), lastErr)
-		select {
-		case <-ctx.Done():
-			return out, ctx.Err()
-		case <-time.After(delay):
-		}
-	}
-
-	return out, lastErr
-}
-
-type controllerScope struct {
-	world *world
-}
-
-func (s controllerScope) Run(ctx context.Context, command string) (string, error) {
-	return s.world.Run(ctx, "kubectl", "exec", "-n", soperatorNamespace, "controller-0", "--", "bash", "-lc", command)
-}
-
-func (s controllerScope) RunWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error) {
-	return s.world.RunWithRetry(ctx, attempts, delay, "kubectl", "exec", "-n", soperatorNamespace, "controller-0", "--", "bash", "-lc", command)
-}
-
-func (s controllerScope) RunWithDefaultRetry(ctx context.Context, command string) (string, error) {
-	return s.RunWithRetry(ctx, command, framework.DefaultRetryAttempts, framework.DefaultRetryDelay)
-}
-
-type jailScope struct {
-	world *world
-}
-
-func (s jailScope) Run(ctx context.Context, command string) (string, error) {
-	return s.world.Run(ctx, "kubectl", "exec", "-n", soperatorNamespace, "login-0", "--", "chroot", "/mnt/jail", "bash", "-lc", command)
-}
-
-func (s jailScope) RunWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error) {
-	return s.world.RunWithRetry(ctx, attempts, delay, "kubectl", "exec", "-n", soperatorNamespace, "login-0", "--", "chroot", "/mnt/jail", "bash", "-lc", command)
-}
-
-func (s jailScope) RunWithDefaultRetry(ctx context.Context, command string) (string, error) {
-	return s.RunWithRetry(ctx, command, framework.DefaultRetryAttempts, framework.DefaultRetryDelay)
-}
-
-type workerScope struct {
-	world  *world
-	worker string
-}
-
-func (s workerScope) Run(ctx context.Context, command string) (string, error) {
-	return s.world.Jail().Run(ctx, fmt.Sprintf("ssh %s %s", framework.ShellQuote(s.worker), framework.ShellQuote(command)))
-}
-
-func (s workerScope) RunWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error) {
-	return s.world.Jail().RunWithRetry(ctx, fmt.Sprintf("ssh %s %s", framework.ShellQuote(s.worker), framework.ShellQuote(command)), attempts, delay)
-}
-
-func (s workerScope) RunWithDefaultRetry(ctx context.Context, command string) (string, error) {
-	return s.RunWithRetry(ctx, command, framework.DefaultRetryAttempts, framework.DefaultRetryDelay)
+	out := make([]string, 0, len(args)+2)
+	out = append(out, "--context", kubectlContext)
+	out = append(out, args...)
+	return out
 }
 
 func (w *world) WaitFor(ctx context.Context, description string, timeout, pollInterval time.Duration, condition func(context.Context) (bool, error)) error {

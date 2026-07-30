@@ -1,26 +1,32 @@
 package framework
 
-type WorkerPodRef struct {
-	Name string
+type WorkerRef struct {
+	Name    string
+	PodName string
 }
 
-type ExpectedNodeSet struct {
+type DiscoveredNodeSet struct {
 	Name   string
 	Size   int
-	Preset string
 	HasGPU bool
 }
 
 type ClusterState struct {
-	Workers          []WorkerPodRef
-	GPUWorkers       []WorkerPodRef
-	WorkersByNodeSet map[string][]WorkerPodRef
-	ExpectedNodeSets []ExpectedNodeSet
+	SlurmClusterName   string
+	Workers            []WorkerRef
+	CPUWorkers         []WorkerRef
+	GPUWorkers         []WorkerRef
+	WorkersByNodeSet   map[string][]WorkerRef
+	DiscoveredNodeSets []DiscoveredNodeSet
 }
 
-func (s *ClusterState) ExpectedWorkerCount() int {
+func (s *ClusterState) PodName(podName string) string {
+	return ClusterPrefixedName(s.SlurmClusterName, podName)
+}
+
+func (s *ClusterState) DesiredWorkerCount() int {
 	total := 0
-	for _, nodeSet := range s.ExpectedNodeSets {
+	for _, nodeSet := range s.DiscoveredNodeSets {
 		total += nodeSet.Size
 	}
 	return total
@@ -28,4 +34,20 @@ func (s *ClusterState) ExpectedWorkerCount() int {
 
 func (s *ClusterState) HasGPUWorkers() bool {
 	return len(s.GPUWorkers) > 0
+}
+
+func (s *ClusterState) HasCPUWorkers() bool {
+	return len(s.CPUWorkers) > 0
+}
+
+func (s *ClusterState) IsHeterogeneousCluster() bool {
+	return s.HasCPUWorkers() && s.HasGPUWorkers()
+}
+
+func WorkerNames(workers []WorkerRef) []string {
+	names := make([]string, 0, len(workers))
+	for _, worker := range workers {
+		names = append(names, worker.Name)
+	}
+	return names
 }
