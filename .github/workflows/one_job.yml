@@ -198,11 +198,14 @@ jobs:
       - name: go build e2e commands
         shell: bash
         run: |
-          packages=(./cmd/e2e)
-          if [[ -d cmd/acceptance ]]; then
-            packages+=(./cmd/acceptance)
+          mkdir -p bin
+          go build -o bin/e2e ./cmd/e2e
+
+          if [[ -d e2e/cmd/acceptance ]]; then
+            go build -o bin/acceptance ./e2e/cmd/acceptance
+          elif [[ -d cmd/acceptance ]]; then
+            go build -o bin/acceptance ./cmd/acceptance
           fi
-          go build "${packages[@]}"
 
   build-soperator-images:
     needs:
