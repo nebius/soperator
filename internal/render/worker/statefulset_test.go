@@ -576,6 +576,35 @@ func TestRenderNodeSetStatefulSet_HostJournalMount(t *testing.T) {
 		assert.Equal(t, consts.VolumeMountPathJailUpper+"/var/hostlog/journal", journalMount.MountPath)
 		assert.True(t, journalMount.ReadOnly)
 	}
+
+	var outputsVolume *corev1.Volume
+	for i := range result.Spec.Template.Spec.Volumes {
+		volume := &result.Spec.Template.Spec.Volumes[i]
+		if volume.Name == consts.VolumeNameSoperatorOutputs {
+			outputsVolume = volume
+			break
+		}
+	}
+	if assert.NotNil(t, outputsVolume, "worker pod should have soperator-outputs volume") &&
+		assert.NotNil(t, outputsVolume.HostPath, "soperator-outputs volume should be HostPath") {
+		assert.Equal(t, "/var/log/soperator-outputs", outputsVolume.HostPath.Path)
+		if assert.NotNil(t, outputsVolume.HostPath.Type) {
+			assert.Equal(t, corev1.HostPathDirectoryOrCreate, *outputsVolume.HostPath.Type)
+		}
+	}
+
+	var outputsMount *corev1.VolumeMount
+	for i := range slurmdContainer.VolumeMounts {
+		mount := &slurmdContainer.VolumeMounts[i]
+		if mount.Name == consts.VolumeNameSoperatorOutputs {
+			outputsMount = mount
+			break
+		}
+	}
+	if assert.NotNil(t, outputsMount, "slurmd container should mount soperator-outputs") {
+		assert.Equal(t, consts.VolumeMountPathJailUpper+"/opt/soperator-outputs/local", outputsMount.MountPath)
+		assert.False(t, outputsMount.ReadOnly)
+	}
 }
 
 func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {

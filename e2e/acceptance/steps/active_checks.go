@@ -22,7 +22,7 @@ const (
 	activeSlurmOutputWait = 20 * time.Minute
 	activeSlurmOutputPoll = 30 * time.Second
 
-	activeSlurmJobOutputDir = "/opt/soperator-outputs/slurm_jobs"
+	activeSlurmJobOutputDir = "/opt/soperator-outputs/local/slurm_jobs"
 )
 
 var activeGPUHealthStatusPattern = regexp.MustCompile(`(?m)^Health checker status:\s*(\S+)\s*$`)
@@ -256,7 +256,7 @@ func (s *ActiveChecks) waitForGPUActiveCheckOutputsPassingOnAllGPUWorkers(ctx co
 		}
 		for _, jobID := range s.gpuCheckJobIDs {
 			record := next[jobID]
-			out, exists, err := readJailFileIfExists(waitCtx, s.exec, activeCheckSlurmJobOutputPath(record))
+			out, exists, err := readWorkerFileIfExists(waitCtx, s.exec, framework.WorkerRef{Name: record.NodeList}, activeCheckSlurmJobOutputPath(record))
 			if err != nil {
 				return false, err
 			}

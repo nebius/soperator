@@ -13,7 +13,8 @@ const (
 	nvidia = "nvidia"
 	boot   = "boot"
 
-	hostLogJournal = "hostlog-journal"
+	hostLogJournal   = "hostlog-journal"
+	soperatorOutputs = "soperator-outputs"
 
 	SssdConfig = "sssd.conf"
 
@@ -66,6 +67,7 @@ const (
 	VolumeNameInMemorySubmount         = "in-memory"
 	VolumeNameTmpDisk                  = "tmp-disk"
 	VolumeNameHostLogJournal           = hostLogJournal
+	VolumeNameSoperatorOutputs         = soperatorOutputs
 	VolumeNameSlurmdbdSSLCACertificate = "slurmdbd-ssl-ca-cert"
 	VolumeNameSlurmdbdSSLClientKey     = "slurmdbd-ssl-client-key"
 
@@ -97,6 +99,8 @@ const (
 	VolumeMountPathTmpDisk                  = "/tmp"
 	VolumeHostPathJournal                   = "/var/log/journal"
 	VolumeMountPathHostLogJournal           = VolumeMountPathJailUpper + "/var/hostlog/journal"
+	VolumeHostPathSoperatorOutputs          = "/var/log/" + soperatorOutputs
+	VolumeMountPathSoperatorOutputs         = VolumeMountPathJailUpper + "/opt/" + soperatorOutputs + "/local"
 	VolumeMountPathSlurmdbdSSLCACertificate = "/mnt/" + slurmdbdSSLCACertificate
 	VolumeMountPathSlurmdbdSSLClientKey     = "/mnt/" + slurmdbdSSLClientKey
 )

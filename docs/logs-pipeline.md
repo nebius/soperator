@@ -8,17 +8,18 @@ The Soperator logs pipeline collects, stores, and provides search capabilities f
 
 ```
 ┌────────────────────────────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│          Jail Filesystem               │     │   K8s Nodes     │     │  K8s Events     │
-│ ┌─────────────┐ ┌────────┐ ┌─────────┐ │     │ ┌─────────────┐ │     │ ┌─────────────┐ │
-│ │ NCCL Logs   │ │ SLURM  │ │ SLURM   │ │     │ │ System Logs │ │     │ │ K8s Events  │ │
-│ │             │ │ Jobs   │ │ Scripts │ │     │ │             │ │     │ │             │ │
-│ └─────────────┘ └────────┘ └─────────┘ │     │ └─────────────┘ │     │ └─────────────┘ │
-└────────────────────┬───────────────────┘     └────────┬────────┘     └────────┬────────┘
+│      Worker Boot Disks (per node)      │     │   K8s Nodes     │     │  K8s Events     │
+│      /var/log/soperator-outputs        │     │ ┌─────────────┐ │     │ ┌─────────────┐ │
+│ ┌─────────────┐ ┌────────┐ ┌─────────┐ │     │ │ System Logs │ │     │ │ K8s Events  │ │
+│ │ NCCL Logs   │ │ SLURM  │ │ SLURM   │ │     │ │             │ │     │ │             │ │
+│ │             │ │ Jobs   │ │ Scripts │ │     │ └─────────────┘ │     │ └─────────────┘ │
+│ └─────────────┘ └────────┘ └─────────┘ │     └────────┬────────┘     └────────┬────────┘
+└────────────────────┬───────────────────┘              │                       │
                      │                                  │                       │
          ┌───────────▼───────────┐         ┌────────────▼────────┐   ┌──────────▼────────┐
          │  OTel Collector       │         │  OTel Collector     │   │  OTel Collector   │
          │  (Jail Logs)          │         │  (System Logs)      │   │  (Events)         │
-         │  Single Deployment    │         │  DaemonSet          │   │  Deployment       │
+         │  DaemonSet on workers │         │  DaemonSet          │   │  Deployment       │
          └───────────┬───────────┘         └────────────┬────────┘   └─────────┬─────────┘
                      │                                  │                      │
                      └──────────────────────────────────┴──────────────────────┘
@@ -49,10 +50,11 @@ The public logging endpoint defaults to `dns:///write.logging.eu-north1.nebius.c
 ### Log Collection
 
 #### 1. OpenTelemetry Collector - Jail Logs
-- Purpose: Collects logs from the jail filesystem
-- Deployment: Single pod deployment on system nodes
+- Purpose: Collects Slurm workload outputs written to each worker's boot disk
+- Deployment: DaemonSet on worker nodes; each instance reads (and deletes) only the files written on its own node
 - Log Sources: See Centralized Logging Scheme below
 - Poll Interval: 30s (configurable)
+- Retention: files are deleted after collection once unmodified for `deleteAfterRead.minAge` (default 4h), which is also the on-node debugging window
 
 #### 2. OpenTelemetry Collector - System Logs
 - Purpose: Collects system logs from nodes
@@ -114,13 +116,19 @@ Soperator implements a centralized logging system that automatically collects an
 
 ### Directory Structure
 
-Logs are organized in a flat structure by log type:
+The outputs tree inside the jail is split by storage locality. Directories under `local/` are node-local: each worker binds its boot-disk directory `/var/log/soperator-outputs` into its jail view, so writes never touch the shared filesystem and files are only visible on the worker that wrote them. Directories under `shared/` live on the shared jail filesystem.
 
 ```
 /opt/soperator-outputs/
-├── nccl_logs/      # NCCL debug outputs from all workers
-├── slurm_jobs/     # Active check jobs (all-reduce-perf-nccl) from all workers
-└── slurm_scripts/  # SLURM hook outputs (prolog, epilog, HealthCheckProgram) from all workers
+├── local/                          # node-local (worker boot disk)
+│   ├── nccl_logs/                  # NCCL debug outputs (SPANK plugin)
+│   ├── slurm_jobs/                 # Active check job outputs (gpu-checks, all-reduce-perf-nccl, ...)
+│   ├── slurm_scripts/              # Slurm hook outputs (prolog, epilog, HealthCheckProgram)
+│   ├── task_prolog/                # Per-task prolog outputs
+│   └── health_checker_cmd_stdout/  # Raw health-checker test command stdout
+└── shared/                         # shared jail filesystem
+    ├── nccl_profiles/              # NCCL Inspector profiling dumps
+    └── acceptance/                 # e2e acceptance job outputs
 ```
 
 ### Logging Schema
@@ -154,10 +162,11 @@ Examples:
 The logging system automatically extracts metadata from filenames and creates the following labels:
 
 - `slurm_node_name`: Slurm worker node identifier extracted from filename (e.g., "worker-0", "worker-1")
-- `log_type`: Category (nccl_logs, slurm_jobs, slurm_scripts)
-- `job_id`, `job_step_id`: For NCCL logs
+- `log_type`: Category (nccl_logs, slurm_jobs, slurm_scripts, task_prolog, health_checker_cmd_stdout)
+- `job_id`, `job_step_id`: For NCCL and task prolog logs
 - `job_name`, `job_array_id`: For Slurm job logs
 - `slurm_script_name`, `slurm_script_context`: For script logs
+- `health_checker.check_name`, `health_checker.run_id`: For raw health-checker outputs
 
 
 ## Configuration
@@ -192,3 +201,5 @@ Check storage usage:
 ```bash
 kubectl exec -n logs-system statefulset/vm-logs-victoria-logs-single-server -- df -h /storage
 ```
+
+On worker boot disks, collected files under `/var/log/soperator-outputs` are deleted by the jail-logs collector after they have been unmodified for `deleteAfterRead.minAge` (default 4h). Replacing a worker node discards any files not yet collected from it.

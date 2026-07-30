@@ -28,6 +28,7 @@ func renderVolumesAndClaimTemplateSpecsForNodeSet(
 		common.RenderVolumeTmpDisk(),
 		renderVolumeBoot(),
 		renderVolumeHostLogJournal(),
+		renderVolumeSoperatorOutputs(),
 		renderVolumeSharedMemory(nodeSet.SharedMemorySize),
 		renderVolumeSysctl(nodeSet.ParentalCluster.Name),
 		renderSupervisordConfigMap(nodeSet.SupervisorDConfigMapName),
@@ -125,6 +126,20 @@ func renderVolumeHostLogJournal() corev1.Volume {
 	}
 }
 
+// renderVolumeSoperatorOutputs renders [corev1.Volume] backed by the worker boot disk
+// for node-local Soperator log outputs, bound into the jail at /opt/soperator-outputs/local
+func renderVolumeSoperatorOutputs() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSoperatorOutputs,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: consts.VolumeHostPathSoperatorOutputs,
+				Type: ptr.To(corev1.HostPathDirectoryOrCreate),
+			},
+		},
+	}
+}
+
 // endregion Volumes & claims
 
 // region Nvidia
@@ -182,6 +197,13 @@ func renderVolumeMountHostLogJournal() corev1.VolumeMount {
 		Name:      consts.VolumeNameHostLogJournal,
 		MountPath: consts.VolumeMountPathHostLogJournal,
 		ReadOnly:  true,
+	}
+}
+
+func renderVolumeMountSoperatorOutputs() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSoperatorOutputs,
+		MountPath: consts.VolumeMountPathSoperatorOutputs,
 	}
 }
 

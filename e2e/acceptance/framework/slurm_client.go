@@ -12,7 +12,7 @@ import (
 // writes its stdout / stderr. The directory lives inside the jail on a shared
 // volume captured by the CI `jail` artifact (see .github/workflows/e2e_test.yml
 // "Collect Jail Files" step), so job output survives past the run.
-const AcceptanceJobOutputDir = "/opt/soperator-outputs/acceptance"
+const AcceptanceJobOutputDir = "/opt/soperator-outputs/shared/acceptance"
 
 type SlurmClient struct {
 	exec Exec

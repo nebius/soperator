@@ -106,7 +106,7 @@ type SlurmClusterSpec struct {
 	// PlugStackConfig represents the Plugin stack configurations in `plugstack.conf`.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ pyxis: { required: true, useSquashfuse: false, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
+	// +kubebuilder:default={ pyxis: { required: true, useSquashfuse: false, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/local/nccl_logs" } }
 	PlugStackConfig PlugStackConfig `json:"plugStackConfig,omitempty"`
 
 	// SConfigController defines the desired state of controller that watches after configs
@@ -228,13 +228,13 @@ type PlugStackConfig struct {
 	// NcclDebug represents the 'NCCL Debug' SPANK plugin configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" }
+	// +kubebuilder:default={ required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/local/nccl_logs" }
 	NcclDebug PluginConfigNcclDebug `json:"ncclDebug,omitempty"`
 
 	// NcclInspectorPreConf represents the NCCL Inspector Pre-Configuration SPANK plugin configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ required: false, enabled: false, profilerPlugin: "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so", dumpDir: "/opt/soperator-outputs/nccl_profiles/%j/%s", dumpVerbose: false, dumpThreadIntervalMicroseconds: 1000000 }
+	// +kubebuilder:default={ required: false, enabled: false, profilerPlugin: "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so", dumpDir: "/opt/soperator-outputs/shared/nccl_profiles/%j/%s", dumpVerbose: false, dumpThreadIntervalMicroseconds: 1000000 }
 	NcclInspectorPreConf PluginConfigNcclInspectorPreConf `json:"ncclInspectorPreConf,omitempty"`
 
 	// PluginConfigCustom represents a configuration of custom SPANK plugins.
@@ -326,7 +326,7 @@ type PluginConfigNcclDebug struct {
 	// If the path does not exist, it will be created by the plugin.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="/opt/soperator-outputs/nccl_logs"
+	// +kubebuilder:default="/opt/soperator-outputs/local/nccl_logs"
 	OutputDirectory string `json:"outputDirectory,omitempty"`
 }
 
@@ -358,7 +358,7 @@ type PluginConfigNcclInspectorPreConf struct {
 	// If the path does not exist, it will be created by the plugin.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="/opt/soperator-outputs/nccl_profiles/%j/%s"
+	// +kubebuilder:default="/opt/soperator-outputs/shared/nccl_profiles/%j/%s"
 	DumpDir string `json:"dumpDir,omitempty"`
 
 	// DumpVerbose defines if the NCCL profile dumps should be verbose.

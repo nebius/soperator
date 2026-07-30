@@ -410,11 +410,33 @@ pushd "${jaildir}"
     touch "usr/lib/slurm/spank_pyxis.so"
     mount --bind "/${SLURM_LIB_PATH}/spank_pyxis.so" "usr/lib/slurm/spank_pyxis.so"
 
-    log "[outputs] Creating Soperator output directory"
-    mkdir -m 777 -p opt/soperator-outputs
-    # The NCCL debug SPANK plugin writes per-job logs here; ensure it exists and is world-writable
-    # on every startup so all clusters have it (previously done by the ensure-dir-snccld-logs active check).
-    mkdir -m 777 -p opt/soperator-outputs/nccl_logs
+    log "[outputs] Creating Soperator output directories"
+    # local/ is node-local: on workers it is a bind of the host boot-disk directory (kubelet pre-creates it root:755),
+    # on login nodes it is a plain shared dir.
+    # shared/ stays on the shared jail FS.
+    # Explicit chmod everywhere: mkdir -m does not fix permissions of existing directories, and log writers
+    # (Slurm jobs, SPANK plugins, health checks) run as arbitrary users while the log collector deletes files as a non-root user.
+    for dir in \
+        opt/soperator-outputs \
+        opt/soperator-outputs/local \
+        opt/soperator-outputs/local/nccl_logs \
+        opt/soperator-outputs/local/slurm_jobs \
+        opt/soperator-outputs/local/slurm_scripts \
+        opt/soperator-outputs/local/task_prolog \
+        opt/soperator-outputs/local/health_checker_cmd_stdout \
+        opt/soperator-outputs/shared \
+        opt/soperator-outputs/shared/nccl_profiles \
+        opt/soperator-outputs/shared/acceptance
+    do
+        mkdir -p "${dir}"
+        # chmod only when perms actually differ: an unconditional chmod is a setattr that bumps ctime even when
+        # the mode is unchanged, and every node runs this on startup — on the shared-FS dirs that would be a metadata
+        # write storm scaling with cluster size, plus needless remote churn next to dentries workers keep bind mounts on.
+        # In the steady state this loop is stat-only.
+        if [ "$(stat -c '%a' "${dir}")" != "777" ]; then
+            chmod 777 "${dir}"
+        fi
+    done
 
     # For login nodes in GPU clusters and CPU workers in GPU clusters
     if { [ -z "$worker" ] && [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; } || { [ -n "$worker" ] && [ "$SLURM_CLUSTER_WITH_GPU" = "true" ] && [ "$NODESET_GPU_ENABLED" != "true" ]; }; then

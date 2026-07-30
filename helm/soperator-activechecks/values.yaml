@@ -135,7 +135,7 @@ checks:
         appArmorProfile: unconfined
         env:
           - name: "SNCCLPRECON_DUMP_DIR"
-            value: "/opt/soperator-outputs/nccl_profiles"
+            value: "/opt/soperator-outputs/shared/nccl_profiles"
   manage-jail-state:
     enabled: true
     checkType: "k8sJob"

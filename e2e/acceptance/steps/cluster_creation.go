@@ -280,7 +280,7 @@ func (s *ClusterCreation) checkHealthCheckProgramOutputs(ctx context.Context) er
 	if err := s.exec.WaitFor(ctx, "HealthCheckProgram outputs healthy", clusterCreationHCProgramTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		next := make(map[string]string, len(s.state.Workers))
 		for _, worker := range s.state.Workers {
-			output, exists, err := readJailFileIfExists(waitCtx, s.exec, checkRunnerOutputPath(worker.Name, "hc_program"))
+			output, exists, err := readWorkerFileIfExists(waitCtx, s.exec, worker, checkRunnerOutputPath(worker.Name, "hc_program"))
 			if err != nil {
 				return false, err
 			}
@@ -300,7 +300,7 @@ func (s *ClusterCreation) checkHealthCheckProgramOutputs(ctx context.Context) er
 
 	var problems []string
 	for worker, output := range outputs {
-		if err := assertLoggedCheckOutputsExist(ctx, s.exec, output); err != nil {
+		if err := assertLoggedCheckOutputsExist(ctx, s.exec, framework.WorkerRef{Name: worker}, output); err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", worker, err))
 		}
 	}

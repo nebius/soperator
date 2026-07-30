@@ -59,7 +59,7 @@ These tests verify the following kubebuilder default values:
 - `ncclDebug.logLevel: "INFO"`
 - `ncclDebug.outputToFile: true`
 - `ncclDebug.outputToStdOut: false`
-- `ncclDebug.outputDirectory: "/opt/soperator-outputs/nccl_logs"`
+- `ncclDebug.outputDirectory: "/opt/soperator-outputs/local/nccl_logs"`
 - `customPlugins: []`
 
 ### PartitionConfiguration
