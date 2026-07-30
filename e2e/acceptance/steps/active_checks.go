@@ -10,8 +10,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/e2e/acceptance/framework"
+	"nebius.ai/slurm-operator/internal/consts"
 )
 
 const (

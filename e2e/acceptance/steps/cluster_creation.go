@@ -16,8 +16,8 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/e2e/acceptance/framework"
+	"nebius.ai/slurm-operator/internal/consts"
 )
 
 const (
