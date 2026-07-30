@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
@@ -55,6 +54,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 	"nebius.ai/slurm-operator/internal/controllersenabled"
+	metricsopts "nebius.ai/slurm-operator/internal/metrics"
 	webhookv1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	webhookv1alpha1 "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -223,12 +223,8 @@ func main() {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
-		Metrics: metricsserver.Options{
-			BindAddress:   metricsAddr,
-			SecureServing: secureMetrics,
-			TLSOpts:       tlsOpts,
-		},
+		Scheme:                  scheme,
+		Metrics:                 metricsopts.ServerOptions(metricsAddr, secureMetrics, tlsOpts),
 		WebhookServer:           webhookServer,
 		HealthProbeBindAddress:  probeAddr,
 		LeaderElection:          enableLeaderElection,

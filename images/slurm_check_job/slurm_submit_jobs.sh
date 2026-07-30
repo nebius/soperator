@@ -8,7 +8,14 @@ echo "Cancelling currently active jobs with the same name..."
 scancel --partition="$PARTITION" --name="$ACTIVE_CHECK_NAME"
 
 echo "Finding nodes to exclude..."
-JQ_EXCLUDE_BAD_NODES='
+# When the check requires GPU (auto-detected from the sbatch #SBATCH directives
+# and exported by the entrypoint), also drop nodes without GPU gres in the same
+# pass. On mixed GPU+CPU clusters, submitting a GPU job pinned to a CPU node
+# fails with "Invalid generic resource (gres) specification"; filtering up front
+# avoids the wasted sbatch round-trips, the per-node error noise, and the risk of
+# that noise masking a real GPU-node failure. The ".gres.total" path is defined
+# by the SINFO_DATA parser in Slurm's data_parser plugin.
+JQ_SELECT_NODES='
 .sinfo[]
 | select(
     (
@@ -18,11 +25,24 @@ JQ_EXCLUDE_BAD_NODES='
     )
     | not
   )
+| select(
+    ($requires_gpu != "true")
+    or ((.gres.total // "") | test("(^|,)gpu:"))
+  )
 | .nodes.nodes[]
 '
 
-readarray -t NODES < <(sinfo -N --partition="$PARTITION" --responding --json | jq -r "$JQ_EXCLUDE_BAD_NODES")
+if [[ "${ACTIVE_CHECK_REQUIRES_GPU:-}" == "true" ]]; then
+    echo "Check requires GPU, restricting to GPU-capable nodes..."
+fi
+
+readarray -t NODES < <(
+    sinfo -N --partition="$PARTITION" --responding --json \
+    | jq -r --arg requires_gpu "${ACTIVE_CHECK_REQUIRES_GPU:-}" "$JQ_SELECT_NODES"
+)
 NUM_NODES=${#NODES[@]}
+# "scontrol show hostlistsorted" compacts the list (e.g. "worker-[0-7]") without contacting slurmctld
+echo "Candidate nodes ($NUM_NODES): $(scontrol show hostlistsorted "$(IFS=,; echo "${NODES[*]}")")"
 
 # Decide how many nodes to use: min(NUM_NODES, ACTIVE_CHECK_MAX_NUMBER_OF_JOBS), with 0/unset meaning no limit
 LIMIT="${ACTIVE_CHECK_MAX_NUMBER_OF_JOBS:-0}"

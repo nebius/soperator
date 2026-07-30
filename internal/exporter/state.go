@@ -3,7 +3,7 @@ package exporter
 import (
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
@@ -12,8 +12,11 @@ import (
 type metricsCollectorState struct {
 	lastGPUSecondsUpdate         time.Time
 	nodes                        []slurmapi.Node
+	nodesCollectionSequence      uint64
 	jobs                         []slurmapi.Job
-	diag                         *api.V0041OpenapiDiagResp
+	jobsCollectionSequence       uint64
+	diag                         *api.V0044OpenapiDiagResp
+	diagCollectionSequence       uint64
 	nodeUnavailabilityStartTimes map[string]time.Time
 	nodeDrainingStartTimes       map[string]time.Time
 }

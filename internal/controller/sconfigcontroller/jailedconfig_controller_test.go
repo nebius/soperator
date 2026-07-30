@@ -40,9 +40,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	v0041 "github.com/SlinkyProject/slurm-client/api/v0041"
+	v0044 "github.com/SlinkyProject/slurm-client/api/v0044"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/consts"
 	fakes "nebius.ai/slurm-operator/internal/controller/sconfigcontroller/fake"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
 )
@@ -87,6 +88,7 @@ func newTestJailedConfigController(
 	sctrl := NewJailedConfigReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
+		"test-cluster",
 		apiClient,
 		fakeFs,
 		1*time.Second, // Poll interval for tests
@@ -161,6 +163,9 @@ func prepareTest(t *testing.T, options ...testOption) (*JailedConfigReconciler, 
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      testJailedConfig,
 				Namespace: testNamespace,
+				Labels: map[string]string{
+					consts.LabelInstanceKey: "test-cluster",
+				},
 			},
 			Spec: slurmv1alpha1.JailedConfigSpec{
 				ConfigMap: slurmv1alpha1.ConfigMapReference{
@@ -224,57 +229,57 @@ func prepareSlurmApi(
 	slurmdStartTimeBefore := int64(1)
 	slurmdStartTimeAfter := int64(2)
 
-	var nodesBefore v0041.V0041Nodes
+	var nodesBefore v0044.V0044Nodes
 	for _, nodeName := range nodeNames {
-		nodesBefore = append(nodesBefore, v0041.V0041Node{
+		nodesBefore = append(nodesBefore, v0044.V0044Node{
 			Name: &nodeName,
-			SlurmdStartTime: &v0041.V0041Uint64NoValStruct{
+			SlurmdStartTime: &v0044.V0044Uint64NoValStruct{
 				Infinite: ptr.To(false),
 				Number:   &slurmdStartTimeBefore,
 				Set:      ptr.To(true),
 			},
-			State: &[]v0041.V0041NodeState{v0041.V0041NodeStateALLOCATED},
+			State: &[]v0044.V0044NodeState{v0044.V0044NodeStateALLOCATED},
 		})
 	}
 
-	var nodesOneDone v0041.V0041Nodes
+	var nodesOneDone v0044.V0044Nodes
 	for i, nodeName := range nodeNames {
 		slurmdStartTime := slurmdStartTimeBefore
 		if i == 0 {
 			slurmdStartTime = slurmdStartTimeAfter
 		}
 
-		nodesOneDone = append(nodesOneDone, v0041.V0041Node{
+		nodesOneDone = append(nodesOneDone, v0044.V0044Node{
 			Name: &nodeName,
-			SlurmdStartTime: &v0041.V0041Uint64NoValStruct{
+			SlurmdStartTime: &v0044.V0044Uint64NoValStruct{
 				Infinite: ptr.To(false),
 				Number:   &slurmdStartTime,
 				Set:      ptr.To(true),
 			},
-			State: &[]v0041.V0041NodeState{v0041.V0041NodeStateALLOCATED},
+			State: &[]v0044.V0044NodeState{v0044.V0044NodeStateALLOCATED},
 		})
 	}
 
-	var nodesAfter v0041.V0041Nodes
+	var nodesAfter v0044.V0044Nodes
 	for _, nodeName := range nodeNames {
-		nodesAfter = append(nodesAfter, v0041.V0041Node{
+		nodesAfter = append(nodesAfter, v0044.V0044Node{
 			Name: &nodeName,
-			SlurmdStartTime: &v0041.V0041Uint64NoValStruct{
+			SlurmdStartTime: &v0044.V0044Uint64NoValStruct{
 				Infinite: ptr.To(false),
 				Number:   &slurmdStartTimeAfter,
 				Set:      ptr.To(true),
 			},
-			State: &[]v0041.V0041NodeState{v0041.V0041NodeStateALLOCATED},
+			State: &[]v0044.V0044NodeState{v0044.V0044NodeStateALLOCATED},
 		})
 	}
 
-	mkNodes200Resp := func(nodes v0041.V0041Nodes) *v0041.SlurmV0041GetNodesResponse {
-		return &v0041.SlurmV0041GetNodesResponse{
+	mkNodes200Resp := func(nodes v0044.V0044Nodes) *v0044.SlurmV0044GetNodesResponse {
+		return &v0044.SlurmV0044GetNodesResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: http.StatusOK,
 			},
-			JSON200: &v0041.V0041OpenapiNodesResp{
-				Errors: &[]v0041.V0041OpenapiError{},
+			JSON200: &v0044.V0044OpenapiNodesResp{
+				Errors: &[]v0044.V0044OpenapiError{},
 				Nodes:  nodes,
 			},
 		}
@@ -282,12 +287,12 @@ func prepareSlurmApi(
 
 	nodesBeforeResp := mkNodes200Resp(nodesBefore)
 
-	reconfigureResponse := &v0041.SlurmV0041GetReconfigureResponse{
+	reconfigureResponse := &v0044.SlurmV0044GetReconfigureResponse{
 		HTTPResponse: &http.Response{
 			StatusCode: http.StatusOK,
 		},
-		JSON200: &v0041.V0041OpenapiResp{
-			Errors: &[]v0041.V0041OpenapiError{},
+		JSON200: &v0044.V0044OpenapiResp{
+			Errors: &[]v0044.V0044OpenapiError{},
 		},
 	}
 
@@ -304,14 +309,14 @@ func prepareSlurmApi(
 
 	mock.InOrder(
 		slurmapi.
-			On("SlurmV0041GetNodesWithResponse", anyContext, emptyGetNodesParams).
+			On("SlurmV0044GetNodesWithResponse", anyContext, emptyGetNodesParams).
 			Return(nodesBeforeResp, nil).
 			Once(),
 		slurmapi.
-			On("SlurmV0041GetReconfigureWithResponse", anyContext).
+			On("SlurmV0044GetReconfigureWithResponse", anyContext).
 			Return(reconfigureResponse, nil),
 		slurmapi.
-			On("SlurmV0041GetNodesWithResponse", anyContext, emptyGetNodesParams).
+			On("SlurmV0044GetNodesWithResponse", anyContext, emptyGetNodesParams).
 			Return(nodesBeforeResp, nil).
 			Once(),
 		clock.
@@ -319,7 +324,7 @@ func prepareSlurmApi(
 			Return(mkTimeChan()).
 			Once(),
 		slurmapi.
-			On("SlurmV0041GetNodesWithResponse", anyContext, emptyGetNodesParams).
+			On("SlurmV0044GetNodesWithResponse", anyContext, emptyGetNodesParams).
 			Return(nodesOneDoneResp, nil).
 			Once(),
 		clock.
@@ -327,7 +332,7 @@ func prepareSlurmApi(
 			Return(mkTimeChan()).
 			Once(),
 		slurmapi.
-			On("SlurmV0041GetNodesWithResponse", anyContext, emptyGetNodesParams).
+			On("SlurmV0044GetNodesWithResponse", anyContext, emptyGetNodesParams).
 			Return(nodesAfterResp, nil),
 	)
 }
@@ -337,7 +342,7 @@ var anyContext = mock.MatchedBy(func(val interface{}) bool {
 	return ok
 })
 
-var emptyGetNodesParams *v0041.SlurmV0041GetNodesParams = nil
+var emptyGetNodesParams *v0044.SlurmV0044GetNodesParams = nil
 
 func TestJailedConfigReconciler_Empty(t *testing.T) {
 	sctrl, request, _, _, _ := prepareTest(t) //nolint:dogsled

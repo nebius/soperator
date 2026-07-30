@@ -119,13 +119,6 @@ type Reactions struct {
 	// CommentSlurmNode enabling slurm node commenting
 	// +kubebuilder:validation:Optional
 	CommentSlurmNode *CommentSlurmNodeSpec `json:"commentSlurmNode,omitempty"`
-
-	// AddReservation adds a slurm reservation with name "<prefix>-<nodeName>"
-	// +kubebuilder:validation:Optional
-	AddReservation *ReservationSpec `json:"addReservation,omitempty"`
-	// RemoveReservation removs slurm reservation with name "<prefix>-<nodeName>"
-	// +kubebuilder:validation:Optional
-	RemoveReservation *ReservationSpec `json:"removeReservation,omitempty"`
 }
 
 type DrainSlurmNodeSpec struct {
@@ -134,10 +127,6 @@ type DrainSlurmNodeSpec struct {
 
 type CommentSlurmNodeSpec struct {
 	CommentPrefix string `json:"commentPrefix,omitempty"`
-}
-
-type ReservationSpec struct {
-	Prefix string `json:"prefix,omitempty"`
 }
 
 type ContainerSpec struct {
@@ -153,6 +142,18 @@ type ContainerSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="unconfined"
 	AppArmorProfile string `json:"appArmorProfile,omitempty"`
+
+	// ImagePullPolicy defines the image pull policy
+	//
+	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="IfNotPresent"
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// ImagePullSecrets is a list of secret names in the same namespace used for pulling the container's image.
+	//
+	// +kubebuilder:validation:Optional
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 type K8sJobSpec struct {
 	JobContainer ContainerSpec `json:"jobContainer,omitempty"`

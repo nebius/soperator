@@ -37,27 +37,38 @@ echo "Create directory for slurm job outputs"
 echo "Set HOME to soperatorchecks' home directory"
 export HOME=~soperatorchecks
 
-if [[ -n "${RESERVATION_NAME:-}" ]]; then
-    echo "Submitting Slurm job on reservation $RESERVATION_NAME..."
-    OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.out'
-    # Here we use env variables instead of --output and --error because they do not support %N (node name) parameter.
-    SLURM_OUTPUT=$(
-      SBATCH_OUTPUT="$OUT_PATTERN" \
-      SBATCH_ERROR="$OUT_PATTERN" \
-      /usr/bin/sbatch --parsable \
-        --reservation="$RESERVATION_NAME" \
-        --job-name="$ACTIVE_CHECK_NAME" \
-        --chdir=/opt/soperator-home/soperatorchecks \
-        --uid=soperatorchecks \
-        --partition="$PARTITION" \
-        /opt/bin/sbatch.sh
-    )
-    if [[ -z "$SLURM_OUTPUT" ]]; then
-        echo "Failed to submit Slurm job"
-        exit 1
+# Auto-detect GPU requirement from the sbatch script's #SBATCH directives and
+# export it, so downstream steps (the skip gate below and the per-node
+# submission in slurm_submit_jobs.sh) can target GPU nodes only.
+if grep -qE '#SBATCH\s+.*(--gpus-per-node|--gpus\b|--gres=gpu|-G\s)' /opt/bin/sbatch.sh; then
+    export ACTIVE_CHECK_REQUIRES_GPU=true
+fi
+
+# If the script requires GPU resources but the cluster has no GPU workers at all,
+# skip the check. Missing Slurm base config is fail-open (surface the real problem).
+if [[ "${ACTIVE_CHECK_REQUIRES_GPU:-}" == "true" ]]; then
+    SLURM_BASE_CONFIG="/etc/slurm/slurm_base.conf.noedit"
+    if [[ -f "$SLURM_BASE_CONFIG" ]] && ! grep -q '^[^#]*Gres=gpu' "$SLURM_BASE_CONFIG"; then
+        SKIP_REASON="script requires GPU but no GPU nodes in slurm_base.conf.noedit"
+        echo "$SKIP_REASON — marking check '$ACTIVE_CHECK_NAME' as Skipped"
+
+        K8S_JOB_NAME=$(kubectl get pod "$K8S_POD_NAME" -n "$K8S_POD_NAMESPACE" \
+            -o jsonpath='{.metadata.ownerReferences[?(@.kind=="Job")].name}')
+        if [[ -z "$K8S_JOB_NAME" ]]; then
+            echo "Could not find owning Job for pod: $K8S_POD_NAME"
+            exit 1
+        fi
+        kubectl annotate job "$K8S_JOB_NAME" \
+            -n "$K8S_POD_NAMESPACE" \
+            slurm-skipped-reason="$SKIP_REASON" --overwrite || {
+            echo "Failed to annotate Job $K8S_JOB_NAME with slurm-skipped-reason"
+            exit 1
+        }
+        exit 0
     fi
-    SLURM_JOB_ID="$SLURM_OUTPUT"
-elif [[ "${EACH_WORKER_JOBS:-}" == "true" ]]; then
+fi
+
+if [[ "${EACH_WORKER_JOBS:-}" == "true" ]]; then
     echo "Submitting job using slurm_submit_jobs.sh..."
     SUBMIT_OUTPUT=$(/opt/bin/slurm/slurm_submit_jobs.sh)
     SCRIPT_STATUS=$?
@@ -99,8 +110,8 @@ if [[ -z "$K8S_JOB_NAME" ]]; then
     exit 1
 fi
 
-echo "Annotating Job $K8S_JOB_NAME with slurm-job-id=$SLURM_JOB_ID"
-kubectl annotate job "$K8S_JOB_NAME" slurm-job-id="$SLURM_JOB_ID" \
+echo "Annotating Job $K8S_JOB_NAME with slurm-job-id and unhandled-slurm-job-id = $SLURM_JOB_ID"
+kubectl annotate job "$K8S_JOB_NAME" slurm-job-id="$SLURM_JOB_ID" unhandled-slurm-job-id="$SLURM_JOB_ID" \
     -n "$K8S_POD_NAMESPACE" --overwrite || {
     echo "Failed to annotate Job"
     exit 1

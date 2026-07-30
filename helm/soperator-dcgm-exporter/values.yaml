@@ -14,11 +14,20 @@ daemonSet:
     image:
       repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator/image/gpu-operator-validator
       tag: v24.6.2
+      pullPolicy: IfNotPresent
+
+  createHpcJobsDir:
+    image:
+      repository: cr.eu-north1.nebius.cloud/soperator/busybox
+      tag: latest
+      pullPolicy: IfNotPresent
 
   nvidiaDcgmExporter:
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/dcgm-exporter
       tag: 4.4.2-4.7.0-ubuntu22.04
+      pullPolicy: IfNotPresent
+      imagePullSecrets: []
     env:
       dcgmExporterListen: :9400
 

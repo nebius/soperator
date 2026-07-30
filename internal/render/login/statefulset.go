@@ -64,7 +64,7 @@ func RenderStatefulSet(
 		))
 	}
 
-	return kruisev1b1.StatefulSet{
+	res := kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      login.StatefulSet.Name,
 			Namespace: namespace,
@@ -101,11 +101,12 @@ func RenderStatefulSet(
 					Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameSshd),
 				},
 				Spec: corev1.PodSpec{
-					HostUsers:      login.HostUsers,
-					Affinity:       nodeFilter.Affinity,
-					NodeSelector:   nodeFilter.NodeSelector,
-					Tolerations:    nodeFilter.Tolerations,
-					InitContainers: initContainers,
+					HostUsers:        login.HostUsers,
+					ImagePullSecrets: login.ContainerSshd.ImagePullSecrets,
+					Affinity:         nodeFilter.Affinity,
+					NodeSelector:     nodeFilter.NodeSelector,
+					Tolerations:      nodeFilter.Tolerations,
+					InitContainers:   initContainers,
 					Containers: []corev1.Container{
 						renderContainerSshd(
 							clusterWithGPU,
@@ -132,5 +133,7 @@ func RenderStatefulSet(
 				},
 			},
 		},
-	}, nil
+	}
+
+	return res, nil
 }

@@ -32,13 +32,14 @@ func BasePodTemplateSpec(
 		return nil, err
 	}
 
-	return &corev1.PodTemplateSpec{
+	res := &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      matchLabels,
 			Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameREST),
 		},
 		Spec: corev1.PodSpec{
 			HostUsers:         valuesREST.HostUsers,
+			ImagePullSecrets:  valuesREST.ContainerREST.ImagePullSecrets,
 			Affinity:          nodeFilter.Affinity,
 			Tolerations:       nodeFilter.Tolerations,
 			NodeSelector:      nodeFilter.NodeSelector,
@@ -48,5 +49,7 @@ func BasePodTemplateSpec(
 			Volumes:           volumes,
 			PriorityClassName: valuesREST.PriorityClass,
 		},
-	}, nil
+	}
+
+	return res, nil
 }

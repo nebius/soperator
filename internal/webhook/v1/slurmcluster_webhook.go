@@ -18,12 +18,9 @@ package v1
 
 import (
 	"context"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -35,7 +32,7 @@ var slurmClusterLog = logf.Log.WithName("slurmcluster-resource")
 
 // SetupSlurmClusterWebhookWithManager registers the webhook for SlurmCluster in the manager.
 func SetupSlurmClusterWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&slurmv1.SlurmCluster{}).
+	return ctrl.NewWebhookManagedBy(mgr, &slurmv1.SlurmCluster{}).
 		WithValidator(&SlurmClusterCustomValidator{}).
 		Complete()
 }
@@ -48,31 +45,23 @@ type SlurmClusterCustomValidator struct {
 	// TODO(user): Add more fields as needed for validation
 }
 
-var _ webhook.CustomValidator = &SlurmClusterCustomValidator{}
+var _ admission.Validator[*slurmv1.SlurmCluster] = &SlurmClusterCustomValidator{}
 
-// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type SlurmCluster.
-func (v *SlurmClusterCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	slurmCluster, ok := obj.(*slurmv1.SlurmCluster)
-	if !ok {
-		return nil, fmt.Errorf("expected a SlurmCluster object but got %T", obj)
-	}
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type SlurmCluster.
+func (v *SlurmClusterCustomValidator) ValidateCreate(_ context.Context, slurmCluster *slurmv1.SlurmCluster) (admission.Warnings, error) {
 	slurmClusterLog.Info("Validation for SlurmCluster upon creation", "name", slurmCluster.GetName())
 
 	return nil, nil
 }
 
-// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type SlurmCluster.
-func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
-	slurmCluster, ok := newObj.(*slurmv1.SlurmCluster)
-	if !ok {
-		return nil, fmt.Errorf("expected a SlurmCluster object for the newObj but got %T", newObj)
-	}
-	slurmClusterLog.Info("Validation for SlurmCluster upon update", "name", slurmCluster.GetName())
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type SlurmCluster.
+func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, _, newSlurmCluster *slurmv1.SlurmCluster) (admission.Warnings, error) {
+	slurmClusterLog.Info("Validation for SlurmCluster upon update", "name", newSlurmCluster.GetName())
 
 	return nil, nil
 }
 
-// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type SlurmCluster.
-func (v *SlurmClusterCustomValidator) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type SlurmCluster.
+func (v *SlurmClusterCustomValidator) ValidateDelete(_ context.Context, _ *slurmv1.SlurmCluster) (admission.Warnings, error) {
 	return nil, nil
 }

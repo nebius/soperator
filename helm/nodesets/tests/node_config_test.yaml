@@ -249,6 +249,59 @@ tests:
           value: 2
         documentIndex: 1
 
+  - it: should configure maxConcurrentStartup when set and omit it when unset
+    set:
+      nodesets:
+        - name: gpu-workers
+          replicas: 3
+          maxConcurrentStartup: 250
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "4"
+              memory: "8Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+        - name: cpu-workers
+          replicas: 5
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - equal:
+          path: spec.maxConcurrentStartup
+          value: 250
+        documentIndex: 0
+      - notExists:
+          path: spec.maxConcurrentStartup
+        documentIndex: 1
+
   - it: should configure worker annotations correctly
     set:
       nodesets:

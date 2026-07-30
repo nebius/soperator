@@ -40,6 +40,10 @@ Logs are delivered to both local VictoriaLogs and Nebius Cloud Logging (when `pu
 - Local: VictoriaLogs at port 9428 for direct API queries
 - Cloud: Nebius Cloud Logging via OTLP/gRPC with bearer token authentication
 
+The public logging endpoint defaults to `dns:///write.logging.eu-north1.nebius.cloud.:443` by design.
+`observability.region` does not change the log write region. Set
+`observability.opentelemetry.publicEndpoint` only when an explicit endpoint override is needed.
+
 ## Components
 
 ### Log Collection
@@ -59,6 +63,18 @@ Logs are delivered to both local VictoriaLogs and Nebius Cloud Logging (when `pu
 #### 3. OpenTelemetry Collector - Events
 - Purpose: Collects Kubernetes events
 - Deployment: Single pod deployment
+
+### Collector Runtime Limits
+
+The log collectors set Go runtime limits from their configured pod resources:
+
+- `GOMAXPROCS` is derived from CPU limits when present, otherwise CPU requests.
+- CPU quantities are rounded up to a positive whole number: `500m` becomes `1`, `2` stays `2`.
+- When `useGoMemLimit` is enabled, the upstream OpenTelemetry collector chart derives `GOMEMLIMIT` from `resources.limits.memory`.
+- Upstream `GOMEMLIMIT` targets about 80% of the memory limit and does not fall back to memory requests.
+- When `spec.values.useGOMEMLIMIT` is false, the upstream chart does not inject a `GOMEMLIMIT` environment variable.
+
+This applies to the system logs, jail logs, and events collectors. Override values that replace the collector chart values are responsible for setting their own runtime environment.
 
 ### Log Storage
 
@@ -122,7 +138,7 @@ Example: worker-0.12345.67890.out
 worker_name.job_name.job_id[.array_id].out
 Examples:
 - worker-1.all-reduce-perf-nccl.12345.out
-- worker-2.enroot-cleanup.12345.1.out (array job)
+- worker-2.soperator-gpu-checks.12345.1.out (array job)
 ```
 
 **Slurm Scripts:**
@@ -130,7 +146,7 @@ Examples:
 worker_name.script_name.context.out
 Examples:
 - worker-0.health_checker.prolog.out
-- worker-3.cleanup_enroot.epilog.out
+- worker-3.drop_page_cache.epilog.out
 ```
 
 ### Generated Labels
@@ -150,8 +166,15 @@ The logging system automatically extracts metadata from filenames and creates th
 observability:
   # Cloud delivery
   publicEndpointEnabled: true  # Enable/disable cloud export
-  projectId: "your-nebius-project-id"
+  logsProjectId: "your-nebius-project-id"
   region: "eu-north1"
+  opentelemetry:
+    # Optional. Defaults to dns:///write.logging.eu-north1.nebius.cloud.:443
+    publicEndpoint: "dns:///write.logging.eu-north1.nebius.cloud.:443"
+    batch:
+      timeout: 1s
+      sendBatchSize: 2000
+      sendBatchMaxSize: 5000
   
   # Storage
   vmLogs:

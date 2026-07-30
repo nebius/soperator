@@ -61,13 +61,14 @@ func RenderMariaDb(
 			Labels:    labels,
 		},
 		Spec: mariadbv1alpha1.MariaDBSpec{
-			Image:       mariaDb.Image,
-			Replicas:    replicas,
-			Replication: accounting.MariaDb.Replication,
-			Port:        port,
-			Storage:     mariaDb.Storage,
-			Database:    ptr.To(consts.MariaDbDatabase),
-			Username:    ptr.To(consts.MariaDbUsername),
+			Image:           mariaDb.Image,
+			ImagePullPolicy: mariaDb.ImagePullPolicy,
+			Replicas:        replicas,
+			Replication:     accounting.MariaDb.Replication,
+			Port:            port,
+			Storage:         mariaDb.Storage,
+			Database:        ptr.To(consts.MariaDbDatabase),
+			Username:        ptr.To(consts.MariaDbUsername),
 			PasswordSecretKeyRef: &mariadbv1alpha1.GeneratedSecretKeyRef{
 				SecretKeySelector: mariadbv1alpha1.SecretKeySelector{
 					LocalObjectReference: mariadbv1alpha1.LocalObjectReference{
@@ -106,6 +107,7 @@ func RenderMariaDb(
 				Tolerations:        nodeFilter.Tolerations,
 				PodSecurityContext: mariaDb.PodSecurityContext,
 				PriorityClassName:  ptr.To(mariaDb.PriorityClassName),
+				ImagePullSecrets:   convertImagePullSecrets(mariaDb.ImagePullSecrets),
 			},
 			Metrics: &mariadbv1alpha1.MariadbMetrics{
 				Enabled: mariaDb.Metrics.Enabled,
@@ -113,6 +115,20 @@ func RenderMariaDb(
 			MyCnf: ptr.To(consts.MariaDbDefaultMyCnf),
 		},
 	}, nil
+}
+
+// convertImagePullSecrets converts []corev1.LocalObjectReference to []mariadbv1alpha1.LocalObjectReference
+func convertImagePullSecrets(refs []corev1.LocalObjectReference) []mariadbv1alpha1.LocalObjectReference {
+	if refs == nil {
+		return nil
+	}
+
+	converted := make([]mariadbv1alpha1.LocalObjectReference, 0, len(refs))
+	for _, ref := range refs {
+		converted = append(converted, mariadbv1alpha1.LocalObjectReference{Name: ref.Name})
+	}
+
+	return converted
 }
 
 func getMariaDbConfig(mariaDb slurmv1.MariaDbOperator) (int32, int32, *bool) {

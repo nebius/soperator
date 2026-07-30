@@ -2,13 +2,13 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   namespace: {{ .Release.Namespace }}
-  name: slurm-scripts
+  name: {{ include "slurm-cluster.slurmScriptsCMName" . }}
   labels:
     app: {{ .Chart.Name }}
     release: {{ .Release.Name }}
 data:
   # base scripts
-{{- range $name := list "check_runner.py" "prolog.sh" "epilog.sh" "hc_program.sh" "pyxis_caching_importer.sh" }}
+{{- range $name := list "check_runner.py" "prolog.sh" "task_prolog.sh" "epilog.sh" "hc_program.sh" "pyxis_caching_importer.sh" }}
 {{- $content := index $.Values.slurmScripts $name }}
   {{ $name }}: |-
   {{- if $content }}
@@ -24,7 +24,11 @@ data:
   {{- if $conf.customContent }}
 {{ tpl ($conf.customContent) $ | indent 4 }}
   {{- else }}
-{{ tpl (printf "slurm_scripts/%s" $name | $.Files.Get) $ | indent 4 }}
+    {{- $content := printf "slurm_scripts/%s" $name | $.Files.Get }}
+    {{- if not $content }}
+      {{- fail (printf "slurmScripts.builtIn.%s is enabled but no bundled script exists; remove this obsolete entry or set customContent" $name) }}
+    {{- end }}
+{{ tpl $content $ | indent 4 }}
   {{- end }}
 {{- end }}
 {{- end }}
@@ -41,7 +45,11 @@ data:
     {{- if $conf.customConfig }}
       {{- $checks = append $checks (fromJson (tpl ($conf.customConfig) $)) }}
     {{- else }}
-      {{- $checks = append $checks (fromJson (tpl (printf "slurm_scripts/%s.json" $name | $.Files.Get) $)) }}
+      {{- $config := printf "slurm_scripts/%s.json" $name | $.Files.Get }}
+      {{- if not $config }}
+        {{- fail (printf "slurmScripts.builtIn.%s is enabled but no bundled check configuration exists; remove this obsolete entry or set customConfig" $name) }}
+      {{- end }}
+      {{- $checks = append $checks (fromJson (tpl $config $)) }}
     {{- end }}
   {{- end }}
 {{- end }}
