@@ -23,7 +23,7 @@ require (
 	github.com/sethvargo/go-password v0.3.1
 	github.com/stretchr/testify v1.11.1
 	github.com/zclconf/go-cty v1.17.0
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.54.0
 	google.golang.org/grpc v1.82.1
 	istio.io/pkg v0.0.0-20241216214326-d70796207df3
