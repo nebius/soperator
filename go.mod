@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/SlinkyProject/slurm-client v1.2.1
 	github.com/cucumber/godog v0.15.1
-	github.com/go-logr/logr v1.4.3
+	github.com/go-logr/logr v1.4.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/hashicorp/hcl/v2 v2.22.0
