@@ -84,6 +84,9 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 		entry := map[string]interface{}{
 			"name": ns.Name,
 			"size": ns.Size,
+			"autoscaling": map[string]interface{}{
+				"enabled": false,
+			},
 			"resource": map[string]interface{}{
 				"platform": ns.Platform,
 				"preset":   ns.Preset,
