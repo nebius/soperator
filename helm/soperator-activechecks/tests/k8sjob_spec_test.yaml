@@ -316,6 +316,24 @@ tests:
           path: spec.hostUsers
           value: true
 
+  - it: should pass slurmClusterRefName to retrigger-checks
+    documentSelector:
+      path: metadata.name
+      value: test-cluster-retrigger-checks
+    set:
+      slurmClusterRefName: test-cluster
+      images:
+        k8sJob: "test-image:latest"
+      jobContainer:
+        volumeMounts: []
+        volumes: []
+    asserts:
+      - contains:
+          path: spec.k8sJobSpec.jobContainer.env
+          content:
+            name: SLURM_CLUSTER_REF_NAME
+            value: test-cluster
+
   - it: should fail when CUDA version is not in ncclTestsVersions map
     set:
       slurmClusterRefName: test-cluster

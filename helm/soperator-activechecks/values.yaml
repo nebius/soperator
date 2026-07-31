@@ -263,3 +263,5 @@ checks:
         env:
           - name: "NAMESPACE"
             value: "{{ .Release.Namespace }}"
+          - name: "SLURM_CLUSTER_REF_NAME"
+            value: "{{ .Values.slurmClusterRefName }}"
