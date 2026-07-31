@@ -301,7 +301,7 @@ func TestSlurmNodesController_processSetUnhealthy_reassignedInstanceUndrains(t *
 		mock.MatchedBy(func(body api.SlurmV0044PostNodeJSONRequestBody) bool {
 			return body.State != nil &&
 				len(*body.State) == 1 &&
-				(*body.State)[0] == api.V0044UpdateNodeMsgStateRESUME &&
+				(*body.State)[0] == api.V0044UpdateNodeMsgStateUNDRAIN &&
 				body.Comment == nil
 		}),
 	).Return(&api.SlurmV0044PostNodeResponse{
@@ -448,7 +448,7 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodUndrainsWhenCu
 		mock.MatchedBy(func(body api.SlurmV0044PostNodeJSONRequestBody) bool {
 			return body.State != nil &&
 				len(*body.State) == 1 &&
-				(*body.State)[0] == api.V0044UpdateNodeMsgStateRESUME &&
+				(*body.State)[0] == api.V0044UpdateNodeMsgStateUNDRAIN &&
 				body.Comment == nil
 		}),
 	).Return(&api.SlurmV0044PostNodeResponse{

@@ -174,10 +174,7 @@ func (c *SlurmNodesController) processDegradedNode(
 
 	k8sNode, err := getK8SNode(ctx, c.Client, node.InstanceID)
 	if err != nil {
-		if client.IgnoreNotFound(err) == nil {
-			return c.undrainSlurmNode(ctx, slurmClusterName, node.Name)
-		}
-		return fmt.Errorf("get k8s node: %w", err)
+		return client.IgnoreNotFound(fmt.Errorf("get k8s node: %w", err))
 	}
 
 	switch node.Reason.Reason {
@@ -766,9 +763,10 @@ func (c *SlurmNodesController) undrainSlurmNode(
 		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
+	// Use State=UNDRAIN instead State=RESUME so that DOWN nodes don't become IDLE
 	resp, err := slurmAPIClient.SlurmV0044PostNodeWithResponse(ctx, slurmNodeName,
 		api.V0044UpdateNodeMsg{
-			State: ptr.To([]api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateRESUME}),
+			State: ptr.To([]api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateUNDRAIN}),
 		},
 	)
 	if err != nil {
