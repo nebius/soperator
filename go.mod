@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/hashicorp/hcl/v2 v2.22.0
 	github.com/hashicorp/terraform-exec v0.24.0
-	github.com/hashicorp/terraform-json v0.27.2
+	github.com/hashicorp/terraform-json v0.28.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/kubereboot/kured v0.0.0-20241106074119-94e73465adc3
 	github.com/mackerelio/go-osstat v0.2.6
