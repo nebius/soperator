@@ -60,8 +60,9 @@ jobs:
             echo "Terraform ref: $TERRAFORM_REF"
 
             gh workflow run e2e_test.yml \
-              --ref "$REF" \
+              --ref main \
               -f profile_env_var="$PROFILE_NAME" \
+              -f soperator_ref="$REF" \
               -f terraform_repo_ref="$TERRAFORM_REF" \
               -f is_scheduled=true
 

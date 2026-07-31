@@ -37,6 +37,7 @@ func acceptanceOptionsForConfig(cfg Config, kubectlContext string) acceptance.Op
 	return acceptance.Options{
 		KubectlContext:            kubectlContext,
 		SlurmClusterName:          cfg.SlurmClusterName,
+		TargetSoperatorVersion:    cfg.SoperatorVersion,
 		ReportDir:                 defaultAcceptanceReportDir,
 		Features:                  acceptance.SharedFeatureSource(),
 		ExcludeUnstable:           !cfg.RunUnstableTests,

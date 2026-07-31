@@ -3,6 +3,7 @@ package acceptance
 import (
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,34 +14,7 @@ import (
 	"nebius.ai/slurm-operator/e2e/acceptance/framework"
 )
 
-func TestParseOptionsDefaults(t *testing.T) {
-	opts, err := parseOptions([]string{"--kubectl-context", "dev-context"})
-	require.NoError(t, err)
-
-	assert.Equal(t, "dev-context", opts.KubectlContext)
-	assert.Equal(t, "soperator", opts.SlurmClusterName)
-	assert.False(t, opts.RunUnstableTests)
-	assert.Empty(t, opts.ScenarioPaths)
-	assert.Empty(t, opts.ReportDir)
-}
-
-func TestParseOptionsExplicitValues(t *testing.T) {
-	opts, err := parseOptions([]string{
-		"--kubectl-context", "dev-context",
-		"--slurm-cluster-name", "custom",
-		"--run-unstable=true",
-		"--scenario", "features/internal_ssh.feature:2",
-		"--scenario=features/topology.feature:3",
-		"--report-dir", "reports",
-	})
-	require.NoError(t, err)
-
-	assert.Equal(t, "dev-context", opts.KubectlContext)
-	assert.Equal(t, "custom", opts.SlurmClusterName)
-	assert.True(t, opts.RunUnstableTests)
-	assert.Equal(t, []string{"features/internal_ssh.feature:2", "features/topology.feature:3"}, opts.ScenarioPaths)
-	assert.Equal(t, "reports", opts.ReportDir)
-}
+const testTargetSoperatorVersion = "4.2.0"
 
 func TestRunnerTagFilter(t *testing.T) {
 	cpuAndGPUState := &framework.ClusterState{
@@ -86,6 +60,7 @@ func TestRunnerTagFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			runner, err := NewRunner(Options{
 				KubectlContext:            "dev-context",
+				TargetSoperatorVersion:    testTargetSoperatorVersion,
 				State:                     tt.state,
 				ExcludeUnstable:           !tt.runUnstableTests,
 				ExcludeMissingWorkerKinds: true,
@@ -97,37 +72,48 @@ func TestRunnerTagFilter(t *testing.T) {
 }
 
 func TestRunnerFeaturePaths(t *testing.T) {
-	runner, err := NewRunner(Options{KubectlContext: "dev-context"})
-	require.NoError(t, err)
-	assert.Equal(t, FeaturePaths(), runner.featurePaths())
+	features := FeatureSource{
+		FS: fstest.MapFS{
+			"features/sample.feature": {Data: []byte(`Feature: Sample
+  @soperator_version_>=4.0.0
+  Scenario: old scenario
+    Then old behavior works
 
-	scenarios := []string{"features/internal_ssh.feature:2", "features/topology.feature:3"}
-	features := SharedFeatureSource()
-	features.Paths = scenarios
-	runner, err = NewRunner(Options{
-		KubectlContext: "dev-context",
-		Features:       features,
+  @soperator_version_>=4.2.0
+  Scenario: new scenario
+    Then new behavior works
+`)},
+		},
+		Paths: []string{"features/sample.feature"},
+	}
+
+	runner, err := NewRunner(Options{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: "4.1.5-reb85d0e5",
+		Features:               features,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, scenarios, runner.featurePaths())
+	paths, err := runner.featurePaths()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"features/sample.feature:3"}, paths)
+
+	scenarios := []string{"features/sample.feature:3", "features/sample.feature:7"}
+	features.Paths = scenarios
+	runner, err = NewRunner(Options{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: testTargetSoperatorVersion,
+		Features:               features,
+	})
+	require.NoError(t, err)
+	paths, err = runner.featurePaths()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"features/sample.feature:3", "features/sample.feature:7"}, paths)
 }
 
-func TestParseOptionsRequiresKubectlContext(t *testing.T) {
-	_, err := parseOptions(nil)
+func TestNewRunnerRequiresTargetSoperatorVersion(t *testing.T) {
+	_, err := NewRunner(Options{KubectlContext: "dev-context"})
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "--kubectl-context is required")
-}
-
-func TestParseOptionsRejectsExtraArgs(t *testing.T) {
-	_, err := parseOptions([]string{"--kubectl-context", "dev-context", "extra"})
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "unexpected acceptance arguments")
-}
-
-func TestParseOptionsRejectsEmptyScenario(t *testing.T) {
-	_, err := parseOptions([]string{"--kubectl-context", "dev-context", "--scenario", " "})
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "--scenario value cannot be empty")
+	assert.ErrorContains(t, err, "target Soperator version is required")
 }
 
 func TestDiscoveredNodeSetsFromLiveList(t *testing.T) {

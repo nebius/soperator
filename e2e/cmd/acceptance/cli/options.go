@@ -1,4 +1,4 @@
-package acceptance
+package cli
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"nebius.ai/slurm-operator/e2e/acceptance"
 	"nebius.ai/slurm-operator/e2e/acceptance/framework"
 )
 
@@ -16,6 +17,7 @@ const defaultSlurmClusterName = "soperator"
 type options struct {
 	KubectlContext   string
 	SlurmClusterName string
+	SoperatorVersion string
 	RunUnstableTests bool
 	ScenarioPaths    []string
 	ReportDir        string
@@ -50,21 +52,26 @@ func Run(ctx context.Context, args []string) error {
 		SlurmClusterName: opts.SlurmClusterName,
 		WorkersByNodeSet: make(map[string][]framework.WorkerRef),
 	}
+	targetSoperatorVersion, err := resolveTargetSoperatorVersion(ctx, opts)
+	if err != nil {
+		return err
+	}
 
-	features := SharedFeatureSource()
+	features := acceptance.SharedFeatureSource()
 	if len(opts.ScenarioPaths) > 0 {
 		features.Paths = opts.ScenarioPaths
 	}
 
-	runner, err := NewRunner(Options{
+	runner, err := acceptance.NewRunner(acceptance.Options{
 		KubectlContext:            opts.KubectlContext,
 		SlurmClusterName:          opts.SlurmClusterName,
+		TargetSoperatorVersion:    targetSoperatorVersion,
 		ReportDir:                 opts.ReportDir,
 		Features:                  features,
 		ExcludeUnstable:           !opts.RunUnstableTests,
 		ExcludeMissingWorkerKinds: true,
 		State:                     state,
-		StepRegistrars:            []StepRegistrar{SharedStepRegistrar()},
+		StepRegistrars:            []acceptance.StepRegistrar{acceptance.SharedStepRegistrar()},
 	})
 	if err != nil {
 		return err
@@ -81,8 +88,9 @@ func parseOptions(args []string) (options, error) {
 	fs.SetOutput(os.Stderr)
 	fs.StringVar(&opts.KubectlContext, "kubectl-context", "", "kubectl context to use for acceptance tests")
 	fs.StringVar(&opts.SlurmClusterName, "slurm-cluster-name", opts.SlurmClusterName, "SlurmCluster resource name")
+	fs.StringVar(&opts.SoperatorVersion, "soperator-version", "", "target Soperator version; when omitted, Flux HelmRelease discovery is used")
 	fs.BoolVar(&opts.RunUnstableTests, "run-unstable", false, "run scenarios tagged @unstable")
-	fs.Var((*scenarioPathFlag)(&opts.ScenarioPaths), "scenario", "scenario path to run, e.g. features/internal_ssh.feature:2; may be repeated")
+	fs.Var((*scenarioPathFlag)(&opts.ScenarioPaths), "scenario", "feature file or exact Scenario line to run, e.g. features/internal_ssh.feature:3; may be repeated")
 	fs.StringVar(&opts.ReportDir, "report-dir", "", "optional directory for Cucumber and JUnit reports")
 
 	if err := fs.Parse(args); err != nil {
@@ -97,7 +105,20 @@ func parseOptions(args []string) (options, error) {
 		return options{}, fmt.Errorf("--kubectl-context is required")
 	}
 	opts.SlurmClusterName = strings.TrimSpace(opts.SlurmClusterName)
+	opts.SoperatorVersion = strings.TrimSpace(opts.SoperatorVersion)
 	opts.ReportDir = strings.TrimSpace(opts.ReportDir)
 
 	return opts, nil
+}
+
+func resolveTargetSoperatorVersion(ctx context.Context, opts options) (string, error) {
+	if opts.SoperatorVersion != "" {
+		return opts.SoperatorVersion, nil
+	}
+
+	version, err := discoverFluxSoperatorVersion(ctx, opts.KubectlContext)
+	if err != nil {
+		return "", fmt.Errorf("discover target Soperator version from Flux HelmRelease: %w; pass --soperator-version to override", err)
+	}
+	return version, nil
 }
