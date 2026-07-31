@@ -584,6 +584,19 @@ jobs:
           else
             echo "No running sconfigcontroller pod found, skipping jail files collection"
           fi
+          # soperator-outputs/local is node-local (worker boot disk), invisible through the
+          # shared jail — collect it from every worker pod via its host mount.
+          WORKER_PODS=$(kubectl get pods -n soperator \
+            -l slurm.nebius.ai/worker=true \
+            --field-selector=status.phase=Running \
+            -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)
+          for pod in $WORKER_PODS; do
+            echo "Copying node-local soperator-outputs from $pod"
+            mkdir -p "./jail/workers/$pod"
+            kubectl cp -c slurmd \
+              "soperator/$pod:/mnt/jail.upper/opt/soperator-outputs/local" \
+              "./jail/workers/$pod" || true
+          done
 
       - name: Zip Jail
         if: always()

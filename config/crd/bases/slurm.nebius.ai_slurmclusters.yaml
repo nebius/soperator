@@ -1220,7 +1220,7 @@ spec:
                   ncclDebug:
                     enabled: false
                     logLevel: INFO
-                    outputDirectory: /opt/soperator-outputs/nccl_logs
+                    outputDirectory: /opt/soperator-outputs/local/nccl_logs
                     outputToFile: true
                     outputToStdOut: false
                     required: false
@@ -1265,7 +1265,7 @@ spec:
                     default:
                       enabled: false
                       logLevel: INFO
-                      outputDirectory: /opt/soperator-outputs/nccl_logs
+                      outputDirectory: /opt/soperator-outputs/local/nccl_logs
                       outputToFile: true
                       outputToStdOut: false
                       required: false
@@ -1286,7 +1286,7 @@ spec:
                         - TRACE
                         type: string
                       outputDirectory:
-                        default: /opt/soperator-outputs/nccl_logs
+                        default: /opt/soperator-outputs/local/nccl_logs
                         description: |-
                           OutputDirectory defines a directory path where OutputToFile has to be created.
 
@@ -1317,7 +1317,7 @@ spec:
                     type: object
                   ncclInspectorPreConf:
                     default:
-                      dumpDir: /opt/soperator-outputs/nccl_profiles/%j/%s
+                      dumpDir: /opt/soperator-outputs/shared/nccl_profiles/%j/%s
                       dumpThreadIntervalMicroseconds: 1000000
                       dumpVerbose: false
                       enabled: false
@@ -1327,7 +1327,7 @@ spec:
                       Pre-Configuration SPANK plugin configuration.
                     properties:
                       dumpDir:
-                        default: /opt/soperator-outputs/nccl_profiles/%j/%s
+                        default: /opt/soperator-outputs/shared/nccl_profiles/%j/%s
                         description: |-
                           DumpDir defines a directory path where NCCL profiles will be dumped into.
 

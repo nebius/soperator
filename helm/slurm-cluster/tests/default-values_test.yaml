@@ -95,7 +95,7 @@ tests:
           value: false
       - equal:
           path: spec.plugStackConfig.ncclDebug.outputDirectory
-          value: "/opt/soperator-outputs/nccl_logs"
+          value: "/opt/soperator-outputs/local/nccl_logs"
       - equal:
           path: spec.plugStackConfig.customPlugins
           value: []

@@ -195,7 +195,8 @@ observability:
             enabled: true
             # Nebius O11y agent fork option; not part of upstream filelogreceiver.
             # Files are deleted only after they have not been modified for at least this duration.
-            minAge: 15m
+            # Files are node-local (worker boot disk), so this is also the on-node debugging window.
+            minAge: 4h
           resources:
             requests:
               memory: 200Mi
@@ -481,7 +482,7 @@ observability:
         enabled: true
         interval: 30s
         scrapeTimeout: 10s
-      dumpDir: /mnt/jail/opt/soperator-outputs/nccl_profiles
+      dumpDir: /mnt/jail/opt/soperator-outputs/shared/nccl_profiles
       pollInterval: 30s
       exportLabels:
         slurmJobId: slurm_job_id

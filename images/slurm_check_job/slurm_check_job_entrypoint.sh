@@ -31,9 +31,6 @@ mkdir -p /mnt/jail/opt/bin
 touch /mnt/jail/opt/bin/sbatch.sh
 mount --bind /opt/bin/sbatch.sh /mnt/jail/opt/bin/sbatch.sh
 
-echo "Create directory for slurm job outputs"
-(umask 000; mkdir -p "/mnt/jail/opt/soperator-outputs/slurm_jobs")
-
 echo "Set HOME to soperatorchecks' home directory"
 export HOME=~soperatorchecks
 
@@ -81,7 +78,7 @@ if [[ "${EACH_WORKER_JOBS:-}" == "true" ]]; then
     SLURM_JOB_ID=$(echo "$SUBMIT_OUTPUT" | tail -n 1)
 else
     echo "Submitting regular Slurm job..."
-    OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.out'
+    OUT_PATTERN='/opt/soperator-outputs/local/slurm_jobs/%N.%x.%j.out'
     # Here we use env variables instead of --output and --error because they do not support %N (node name) parameter.
     SLURM_OUTPUT=$(
       SBATCH_OUTPUT="$OUT_PATTERN" \

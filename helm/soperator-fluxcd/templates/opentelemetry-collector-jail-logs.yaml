@@ -31,9 +31,6 @@ spec:
   dependsOn:
     - name: {{ include "soperator-fluxcd.fullname" . }}-ns
     - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
-    # nodesets itself reaches Ready very quickly (it just creates NodeSet CRs), so this is
-    # not sufficient on its own — the init container below waits for actual worker output.
-    # But the ordering is logically correct: jail logs cannot appear before nodesets exist.
     - name: {{ include "soperator-fluxcd.fullname" . }}-nodesets
 
   install:
@@ -90,11 +87,14 @@ spec:
       repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
       tag: 2.0.10
 
-    mode: deployment  # Single deployment on system nodes instead of DaemonSet on all workers
-    replicaCount: 1   # Only one replica to avoid file lock conflicts on shared storage and prevent log duplication
+    # One collector per worker node: each instance reads (and deletes) only the log files
+    # written to its own node's boot disk, so worker count no longer affects any shared storage.
+    mode: daemonset
 
     rollout:
-      strategy: Recreate  # Ensure old pod terminates before new one starts to maintain max one pod running
+      rollingUpdate:
+        maxUnavailable: 50%
+      strategy: RollingUpdate
 
     affinity:
       nodeAffinity:
@@ -103,13 +103,21 @@ spec:
             - matchExpressions:
                 - key: slurm.nebius.ai/nodeset
                   operator: In
-                  values: ["system"]
+                  values:
+                    - "worker"
+
+    tolerations:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Exists
 
     extraVolumes:
-      - name: jail
+      # Node-local log staging directory; workers bind it into their jail at
+      # /opt/soperator-outputs/local, so the type subdirectories appear here.
+      - name: soperator-outputs
         hostPath:
-          path: /mnt/jail
-          type: Directory
+          path: /var/log/soperator-outputs
+          type: DirectoryOrCreate
 
       {{- if $jailEnableFileStorage }}
       - name: varlibotelcol
@@ -131,8 +139,8 @@ spec:
       {{- end }}
 
     extraVolumeMounts:
-      - name: jail
-        mountPath: /mnt/jail
+      - name: soperator-outputs
+        mountPath: /var/log/soperator-outputs
         readOnly: {{ not $jailDeleteAfterReadEnabled }}
 
     {{- if $jailEnableFileStorage }}
@@ -162,26 +170,8 @@ spec:
         value: {{ .Values.observability.clusterId | quote }}
       {{- end }}
 
-    initContainers:
-      # /mnt/jail/opt/soperator-outputs is created by complement_jail.sh on first
-      # worker/login startup; we mount the jail NFS root and gate on this directory here
-      # so the HelmRelease does not get marked Stalled before workers come up.
-      - name: wait-soperator-outputs
-        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
-        volumeMounts:
-          - mountPath: /mnt/jail
-            name: jail
-            readOnly: true
-        command:
-          - sh
-          - "-c"
-          - |
-            until [ -d /mnt/jail/opt/soperator-outputs ]; do
-              echo "Waiting for /mnt/jail/opt/soperator-outputs to be created by a worker or login pod"
-              sleep 5
-            done
-
     {{- if $jailEnableFileStorage }}
+    initContainers:
       - name: init-fs
         image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
         volumeMounts:
@@ -241,6 +231,8 @@ spec:
           relabelings:
             - sourceLabels: [__meta_kubernetes_pod_name]
               targetLabel: pod
+            - sourceLabels: [__meta_kubernetes_node_name]
+              targetLabel: node
             - replacement: otel-collector-jail-logs
               targetLabel: collector
     {{- end }}
@@ -249,9 +241,9 @@ spec:
       receivers:
         filelog:
           include:
-            - "/mnt/jail/opt/soperator-outputs/*/*.out"
+            - "/var/log/soperator-outputs/*/*.out"
           exclude:
-            - "/mnt/jail/opt/soperator-outputs/health_checker_cmd_stdout/*.out"
+            - "/var/log/soperator-outputs/health_checker_cmd_stdout/*.out"
           include_file_name: true  # Adds attributes["log.file.name"]
           include_file_path: true  # Adds attributes["log.file.path"]
           preserve_leading_whitespaces: true
@@ -365,9 +357,9 @@ spec:
             - type: remove
               field: attributes.base_name
 
-            # Files on the shared jail FS are truncated and rewritten in place by check_runner.py,
-            # so the reader can see partially flushed lines (zero-filled tails). Skip bodies with
-            # NUL bytes and send the entry unparsed instead of logging an error on any parse failure.
+            # Files are truncated and rewritten in place by check_runner.py, so the reader can
+            # see partially flushed lines (zero-filled tails). Skip bodies with NUL bytes and
+            # send the entry unparsed instead of logging an error on any parse failure.
             - id: parse_json_body # parse json body to extract fields
               type: json_parser
               parse_from: body
@@ -407,7 +399,7 @@ spec:
 
         filelog/health_checker:
           include:
-            - "/mnt/jail/opt/soperator-outputs/health_checker_cmd_stdout/*.out"
+            - "/var/log/soperator-outputs/health_checker_cmd_stdout/*.out"
           include_file_name: true  # Adds attributes["log.file.name"]
           include_file_path: true  # Adds attributes["log.file.path"]
           preserve_leading_whitespaces: true

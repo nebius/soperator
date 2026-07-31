@@ -55,7 +55,7 @@ This section explains the main building blocks of the Active Checks framework, f
 - **Slurm Jobs**  
   Real Slurm jobs created by a Slurm Active Check K8s Job.
     - A batch may consist of one or many Slurm jobs.
-    - Job output is written to `/mnt/jail/opt/soperator-outputs/slurm_jobs/`, which is also used by the observability stack.
+    - Job output is written to `/opt/soperator-outputs/local/slurm_jobs/` inside the jail. The directory is node-local (worker boot disk), so each output file is only visible on the worker that ran the job; the observability stack collects it with a per-node collector.
 
 - **Slurm Workers**  
   Compute nodes in the Slurm cluster where Slurm jobs execute.  
@@ -169,7 +169,7 @@ In both cases, the Active Check Controller creates a CronJob (1:1 with CR) which
 ### Slurm Jobs (`slurmJob`)
 - The CronJob spawns a Kubernetes Job that **submits a Slurm batch job**.
 - Batch may contain one or many Slurm jobs.
-- Logs are written under `/mnt/jail/opt/soperator-outputs/slurm_jobs/`.
+- Logs are written under `/opt/soperator-outputs/local/slurm_jobs/` — node-local on the worker that ran the job.
 - After the run completes, the Jobs Controller may apply success/failure reactions (see [Reactions fields (spec)](#reactions-fields-spec)); affected nodes come from Slurm’s `GetNodeList()`.
 
 #### Slurm job submission modes
@@ -191,7 +191,7 @@ The Active Checks framework integrates with the cluster observability stack.
 
 ### Logging
 - **K8s jobs** → logs are available from the Pods of the Kubernetes Jobs.
-- **Slurm jobs** → logs are written under `/mnt/jail/opt/soperator-outputs/slurm_jobs/`.
+- **Slurm jobs** → logs are written under `/opt/soperator-outputs/local/slurm_jobs/`, node-local on the worker that ran the job, and shipped by the per-node jail-logs collector.
 - Other logs (e.g., passive checks) also exist under the broader `/soperator-outputs/` path, but are out of scope for this doc.
 
 ### Dashboards

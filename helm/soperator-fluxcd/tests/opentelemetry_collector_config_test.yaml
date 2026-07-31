@@ -271,3 +271,50 @@ tests:
       - equal:
           path: spec.values.command.extraArgs[0]
           value: --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress,filelog.allowFileDeletion
+
+  - it: should run as a node-local daemonset on worker nodes reading the boot disk directory
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.values.mode
+          value: daemonset
+      - notExists:
+          path: spec.values.replicaCount
+      - equal:
+          path: spec.values.rollout.strategy
+          value: RollingUpdate
+      - equal:
+          path: spec.values.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]
+          value: worker
+      - contains:
+          path: spec.values.tolerations
+          content:
+            effect: NoSchedule
+            key: nvidia.com/gpu
+            operator: Exists
+      - contains:
+          path: spec.values.extraVolumes
+          content:
+            name: soperator-outputs
+            hostPath:
+              path: /var/log/soperator-outputs
+              type: DirectoryOrCreate
+      - equal:
+          path: spec.values.extraVolumeMounts[0].mountPath
+          value: /var/log/soperator-outputs
+      - contains:
+          path: spec.values.config.receivers.filelog.include
+          content: /var/log/soperator-outputs/*/*.out
+      - contains:
+          path: spec.values.config.receivers["filelog/health_checker"].include
+          content: /var/log/soperator-outputs/health_checker_cmd_stdout/*.out
+      - equal:
+          path: spec.values.config.receivers.filelog.delete_after_read_min_age
+          value: 4h
+      - equal:
+          path: spec.values.initContainers[0].name
+          value: init-fs
+      - lengthEqual:
+          path: spec.values.initContainers
+          count: 1

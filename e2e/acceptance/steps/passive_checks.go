@@ -147,7 +147,7 @@ func (s *PassiveChecks) theCPUJobPrologCheckRunnerOutputIsFreshAndHealthy(ctx co
 		return err
 	}
 	s.cpuPrologOutput = output
-	return assertLoggedCheckOutputsExist(ctx, s.exec, output)
+	return assertLoggedCheckOutputsExist(ctx, s.exec, s.worker, output)
 }
 
 func (s *PassiveChecks) theCPUJobEpilogCheckRunnerOutputIsFreshAndHealthy(ctx context.Context) error {
@@ -156,14 +156,14 @@ func (s *PassiveChecks) theCPUJobEpilogCheckRunnerOutputIsFreshAndHealthy(ctx co
 		return err
 	}
 	s.cpuEpilogOutput = output
-	return assertLoggedCheckOutputsExist(ctx, s.exec, output)
+	return assertLoggedCheckOutputsExist(ctx, s.exec, s.worker, output)
 }
 
 func (s *PassiveChecks) cpuCheckRunnerOutput(ctx context.Context, hook string) (string, error) {
 	if s.cpuHooksJob.IsZero() {
 		return "", fmt.Errorf("CPU hook job is not captured")
 	}
-	output, err := waitForHealthyCheckRunnerOutputForJob(ctx, s.exec, checkRunnerOutputPath(s.worker.Name, hook), s.cpuHooksJob.ID, passiveCPUJobTimeout)
+	output, err := waitForHealthyCheckRunnerOutputForJob(ctx, s.exec, s.worker, checkRunnerOutputPath(s.worker.Name, hook), s.cpuHooksJob.ID, passiveCPUJobTimeout)
 	if err != nil {
 		return "", fmt.Errorf("%s check_runner output: %w", hook, err)
 	}
@@ -190,14 +190,14 @@ func (s *PassiveChecks) theDropPageCachePassiveCheckCompletedInEpilog(ctx contex
 	if s.cpuHooksJob.IsZero() {
 		return fmt.Errorf("CPU hook job is not captured")
 	}
-	epilog, err := waitForHealthyCheckRunnerOutputForJob(ctx, s.exec, checkRunnerOutputPath(s.worker.Name, "epilog"), s.cpuHooksJob.ID, passiveCPUJobTimeout)
+	epilog, err := waitForHealthyCheckRunnerOutputForJob(ctx, s.exec, s.worker, checkRunnerOutputPath(s.worker.Name, "epilog"), s.cpuHooksJob.ID, passiveCPUJobTimeout)
 	if err != nil {
 		return err
 	}
 	if err := assertCheckRunnerCheckOK(epilog, "drop_page_cache"); err != nil {
 		return err
 	}
-	return assertLoggedCheckOutputsExist(ctx, s.exec, epilog)
+	return assertLoggedCheckOutputsExist(ctx, s.exec, s.worker, epilog)
 }
 
 func (s *PassiveChecks) memoryPressureIsCreatedOnTheSelectedWorker(ctx context.Context) error {
@@ -364,7 +364,7 @@ func (s *PassiveChecks) gpuJobHealthCheckReportIsFreshAndPassing(ctx context.Con
 	if s.gpuHooksJob.IsZero() {
 		return fmt.Errorf("GPU hook job is not captured")
 	}
-	ids, err := waitForPassingHealthCheckReportsForJob(ctx, s.exec, gpuHealthCheckOutputPath(s.gpuWorker.Name, hook), s.gpuHooksJob.ID, passiveGPUJobTimeout)
+	ids, err := waitForPassingHealthCheckReportsForJob(ctx, s.exec, s.gpuWorker, gpuHealthCheckOutputPath(s.gpuWorker.Name, hook), s.gpuHooksJob.ID, passiveGPUJobTimeout)
 	if err != nil {
 		return fmt.Errorf("%s %s report: %w", hook, gpuHealthCheckName, err)
 	}
@@ -376,7 +376,7 @@ func (s *PassiveChecks) rawGPUHealthCheckCommandOutputsArePresent(ctx context.Co
 	if len(s.gpuHealthRunIDs) == 0 {
 		return fmt.Errorf("GPU health-check run IDs are not captured")
 	}
-	return assertHealthCheckRawOutputsPresent(ctx, s.exec, s.gpuHealthRunIDs)
+	return assertHealthCheckRawOutputsPresent(ctx, s.exec, s.gpuWorker, s.gpuHealthRunIDs)
 }
 
 func (s *PassiveChecks) aSlurmJobChecksItsJobTmpfsDirectoryOnTheSelectedWorker(ctx context.Context) error {

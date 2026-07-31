@@ -16,7 +16,7 @@ if [ "${SLURM_LOCALID}" = "0" ]; then
         echo export "DOCKER_CUSTOM_HEADERS=Cgroup-Parent=$cgroup"
     fi
 
-    export CHECKS_OUTPUTS_BASE_DIR="/opt/soperator-outputs"
+    export CHECKS_OUTPUTS_BASE_DIR="/opt/soperator-outputs/local"
     task_prolog="$CHECKS_OUTPUTS_BASE_DIR/task_prolog"
     (umask 000; mkdir -p "$task_prolog")
     (

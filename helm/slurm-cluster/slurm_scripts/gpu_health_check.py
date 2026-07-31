@@ -109,7 +109,7 @@ try:
     env["HC_DCGMI_DIAG_R1_DEBUGLOGFILE"] = "/dev/null"
     env["HC_DCGMI_DIAG_R1_DEBUGLEVEL"] = "NONE"
 
-    output_dir = "/opt/soperator-outputs/health_checker_cmd_stdout"
+    output_dir = "/opt/soperator-outputs/local/health_checker_cmd_stdout"
     ensure_output_dir(output_dir)
     # Run Nebius GPU health-checker
     cmd = [

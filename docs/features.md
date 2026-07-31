@@ -136,7 +136,7 @@ this information on the dashboards we provide as well.
 
 At the moment, the following information is gathered and can be viewed by users:
 - Logs for all K8s pods + K8s events.
-- Centralized Slurm workload logs: Structured collection of job outputs with automatic categorization.
+- Centralized Slurm workload logs: Structured collection of job outputs with automatic categorization. Outputs are staged on worker boot disks and shipped by a per-node collector, so log traffic never loads the shared filesystem.
 - K8s cluster metrics: node states, stateful set & deployment sizes, etc.
 - K8s node metrics: CPU, memory, network, disk usage, etc.
 - K8s pod resource metrics: resource usage by pods & containers.

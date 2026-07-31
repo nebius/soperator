@@ -14,13 +14,13 @@ import (
 
 func TestLoggedCheckOutputPathsNormalizesJailPrefix(t *testing.T) {
 	output := `
-[2026-01-01 00:00:00.000 UTC] INFO: Running check one (true), logging to /mnt/jail/opt/soperator-outputs/slurm_scripts/worker-0.one.prolog.out
-[2026-01-01 00:00:01.000 UTC] INFO: Running check two (true), logging to /opt/soperator-outputs/slurm_scripts/worker-0.two.prolog.out
-[2026-01-01 00:00:02.000 UTC] INFO: Running check one (true), logging to /mnt/jail/opt/soperator-outputs/slurm_scripts/worker-0.one.prolog.out
+[2026-01-01 00:00:00.000 UTC] INFO: Running check one (true), logging to /mnt/jail/opt/soperator-outputs/local/slurm_scripts/worker-0.one.prolog.out
+[2026-01-01 00:00:01.000 UTC] INFO: Running check two (true), logging to /opt/soperator-outputs/local/slurm_scripts/worker-0.two.prolog.out
+[2026-01-01 00:00:02.000 UTC] INFO: Running check one (true), logging to /mnt/jail/opt/soperator-outputs/local/slurm_scripts/worker-0.one.prolog.out
 `
 	assert.Equal(t, []string{
-		"/opt/soperator-outputs/slurm_scripts/worker-0.one.prolog.out",
-		"/opt/soperator-outputs/slurm_scripts/worker-0.two.prolog.out",
+		"/opt/soperator-outputs/local/slurm_scripts/worker-0.one.prolog.out",
+		"/opt/soperator-outputs/local/slurm_scripts/worker-0.two.prolog.out",
 	}, loggedCheckOutputPaths(output))
 }
 
