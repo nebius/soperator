@@ -17,7 +17,7 @@ require (
 	github.com/mariadb-operator/mariadb-operator/v25 v25.10.4
 	github.com/nebius/gosdk v0.2.43
 	github.com/onsi/ginkgo/v2 v2.28.1
-	github.com/onsi/gomega v1.39.1
+	github.com/onsi/gomega v1.42.1
 	github.com/openkruise/kruise-api v1.8.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.92.1
 	github.com/sethvargo/go-password v0.3.1
