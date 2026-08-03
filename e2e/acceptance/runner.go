@@ -28,8 +28,9 @@ var acceptanceFeatures embed.FS
 type timingCtxKey string
 
 const (
-	scenarioStartTimeKey timingCtxKey = "acceptance_scenario_start_time"
-	stepStartTimeKey     timingCtxKey = "acceptance_step_start_time"
+	scenarioStartTimeKey    timingCtxKey = "acceptance_scenario_start_time"
+	stepStartTimeKey        timingCtxKey = "acceptance_step_start_time"
+	defaultSlurmClusterName              = "soperator"
 )
 
 // Runner executes a configured Godog acceptance suite against a Soperator cluster.
@@ -59,6 +60,7 @@ type Options struct {
 	SuiteName                 string
 	KubectlContext            string
 	SlurmClusterName          string
+	TargetSoperatorVersion    string
 	ReportDir                 string
 	Features                  FeatureSource
 	Tags                      string
@@ -167,6 +169,15 @@ func NewRunner(opts Options) (*Runner, error) {
 	if state.WorkersByNodeSet == nil {
 		state.WorkersByNodeSet = make(map[string][]framework.WorkerRef)
 	}
+	targetVersion := strings.TrimSpace(opts.TargetSoperatorVersion)
+	if targetVersion == "" {
+		return nil, fmt.Errorf("target Soperator version is required")
+	}
+	normalizedTargetVersion, err := framework.NormalizeSoperatorVersion(targetVersion)
+	if err != nil {
+		return nil, fmt.Errorf("target Soperator version: %w", err)
+	}
+	state.TargetSoperatorVersion = normalizedTargetVersion
 
 	return &Runner{
 		suiteName:                 suiteName,
@@ -188,9 +199,12 @@ func (r *Runner) Run(ctx context.Context) error {
 		return fmt.Errorf("discover cluster before suite: %w", err)
 	}
 
-	features := r.featurePaths()
+	features, err := r.featurePaths()
+	if err != nil {
+		return err
+	}
 	if len(features) == 0 {
-		return fmt.Errorf("no acceptance feature files configured")
+		return fmt.Errorf("no acceptance scenarios compatible with Soperator version %s", r.state.TargetSoperatorVersion)
 	}
 
 	tags := r.tagFilter()
@@ -246,10 +260,14 @@ func (r *Runner) tagFilter() string {
 	return strings.Join(filters, " && ")
 }
 
-func (r *Runner) featurePaths() []string {
-	paths := slices.Clone(r.features.Paths)
-	log.Printf("acceptance: running features: %s", strings.Join(paths, ", "))
-	return paths
+func (r *Runner) featurePaths() ([]string, error) {
+	paths, err := selectCompatibleFeaturePaths(r.features, r.state.TargetSoperatorVersion)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("acceptance: target Soperator version=%s", r.state.TargetSoperatorVersion)
+	log.Printf("acceptance: running scenarios: %s", strings.Join(paths, ", "))
+	return paths, nil
 }
 
 func discoverCluster(ctx context.Context, w *world, state *framework.ClusterState) error {

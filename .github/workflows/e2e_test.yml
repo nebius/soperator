@@ -192,6 +192,9 @@ jobs:
       - name: Build e2e binary
         run: go build -o bin/e2e ./cmd/e2e
 
+      - name: Build acceptance binary
+        run: go build -o bin/acceptance ./e2e/cmd/acceptance
+
       - name: Export profile outputs
         shell: bash
         run: |
@@ -415,8 +418,19 @@ jobs:
 
       - name: Acceptance Tests
         timeout-minutes: 120
+        shell: bash
         run: |
-          bin/e2e acceptance
+          kubectl_context="$(kubectl config current-context)"
+          args=(
+            --kubectl-context "$kubectl_context"
+            --slurm-cluster-name "$SLURM_CLUSTER_NAME"
+            --soperator-version "$SOPERATOR_VERSION"
+            --report-dir e2e-reports/acceptance
+          )
+          if [[ "$RUN_UNSTABLE_TESTS" == "true" ]]; then
+            args+=(--run-unstable)
+          fi
+          bin/acceptance "${args[@]}"
 
       - name: Acceptance Summary
         if: always()
