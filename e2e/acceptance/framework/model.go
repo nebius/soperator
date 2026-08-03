@@ -12,12 +12,13 @@ type DiscoveredNodeSet struct {
 }
 
 type ClusterState struct {
-	SlurmClusterName   string
-	Workers            []WorkerRef
-	CPUWorkers         []WorkerRef
-	GPUWorkers         []WorkerRef
-	WorkersByNodeSet   map[string][]WorkerRef
-	DiscoveredNodeSets []DiscoveredNodeSet
+	SlurmClusterName       string
+	TargetSoperatorVersion string
+	Workers                []WorkerRef
+	CPUWorkers             []WorkerRef
+	GPUWorkers             []WorkerRef
+	WorkersByNodeSet       map[string][]WorkerRef
+	DiscoveredNodeSets     []DiscoveredNodeSet
 }
 
 func (s *ClusterState) PodName(podName string) string {

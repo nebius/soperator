@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"nebius.ai/slurm-operator/e2e/acceptance"
+	"nebius.ai/slurm-operator/e2e/cmd/acceptance/cli"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := acceptance.Run(ctx, os.Args[1:]); err != nil {
+	if err := cli.Run(ctx, os.Args[1:]); err != nil {
 		log.Fatalf("acceptance: %v", err)
 	}
 }

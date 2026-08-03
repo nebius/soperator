@@ -1,4 +1,5 @@
 Feature: Docker containers
+  @soperator_version_>=5.0.0
   Scenario: Docker container lifecycle uses local storage
     Given a long-running Docker container job is submitted on two workers
     When the Docker container job is running
@@ -8,7 +9,7 @@ Feature: Docker containers
     And Docker containers from the job are stopped explicitly
     Then Docker containers from the job are no longer running
 
-  @gpu
+  @gpu @soperator_version_>=5.0.0
   Scenario: Docker containers can access GPUs
     Given a Docker GPU smoke job is submitted on one GPU worker
     Then the Docker GPU smoke job succeeds and reports visible GPUs

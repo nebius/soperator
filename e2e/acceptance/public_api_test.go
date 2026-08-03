@@ -18,6 +18,7 @@ func TestPublicRunnerAPIIsImportable(t *testing.T) {
 
 	runner, err := acceptance.NewRunner(acceptance.Options{
 		KubectlContext:            "dev-context",
+		TargetSoperatorVersion:    "5.0.0",
 		Features:                  features,
 		Tags:                      "~@custom_only",
 		ExcludeUnstable:           true,
