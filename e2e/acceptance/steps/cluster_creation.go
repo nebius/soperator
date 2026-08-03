@@ -14,10 +14,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/e2e/acceptance/framework"
-	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/soperator-e2e/acceptance/framework"
+	"nebius.ai/soperator-e2e/acceptance/kubeobjects"
 )
 
 const (
@@ -113,7 +111,7 @@ func (s *ClusterCreation) checkHelmReleasesReady(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkSlurmClustersReady(ctx context.Context) error {
-	var clusters slurmv1.SlurmClusterList
+	var clusters kubeobjects.SlurmClusterList
 	if err := kubectlJSON(ctx, s.exec, &clusters, "get", "slurmclusters", "-A", "-o", "json"); err != nil {
 		return fmt.Errorf("list SlurmClusters: %w", err)
 	}
@@ -123,19 +121,19 @@ func (s *ClusterCreation) checkSlurmClustersReady(ctx context.Context) error {
 
 	var problems []string
 	for _, cluster := range clusters.Items {
-		if cluster.Status.Phase == nil || *cluster.Status.Phase != slurmv1.PhaseClusterAvailable {
+		if cluster.Status.Phase == nil || *cluster.Status.Phase != kubeobjects.SlurmClusterPhaseAvailable {
 			phase := "<nil>"
 			if cluster.Status.Phase != nil {
 				phase = *cluster.Status.Phase
 			}
-			problems = append(problems, fmt.Sprintf("%s/%s phase=%s", cluster.Namespace, cluster.Name, phase))
+			problems = append(problems, fmt.Sprintf("%s/%s phase=%s", cluster.Metadata.Namespace, cluster.Metadata.Name, phase))
 			continue
 		}
 
 		required := []string{
-			slurmv1.ConditionClusterControllersAvailable,
-			slurmv1.ConditionClusterLoginAvailable,
-			slurmv1.ConditionClusterSConfigControllerAvailable,
+			kubeobjects.SlurmClusterConditionControllersAvailable,
+			kubeobjects.SlurmClusterConditionLoginAvailable,
+			kubeobjects.SlurmClusterConditionSConfigControllerAvailable,
 		}
 		for _, conditionType := range required {
 			condition := findMetaCondition(cluster.Status.Conditions, conditionType)
@@ -144,18 +142,18 @@ func (s *ClusterCreation) checkSlurmClustersReady(ctx context.Context) error {
 				if condition != nil {
 					status = string(condition.Status)
 				}
-				problems = append(problems, fmt.Sprintf("%s/%s %s=%s", cluster.Namespace, cluster.Name, conditionType, status))
+				problems = append(problems, fmt.Sprintf("%s/%s %s=%s", cluster.Metadata.Namespace, cluster.Metadata.Name, conditionType, status))
 			}
 		}
 
 		optional := []string{
-			slurmv1.ConditionClusterCommonAvailable,
-			slurmv1.ConditionClusterAccountingAvailable,
+			kubeobjects.SlurmClusterConditionCommonAvailable,
+			kubeobjects.SlurmClusterConditionAccountingAvailable,
 		}
 		for _, conditionType := range optional {
 			condition := findMetaCondition(cluster.Status.Conditions, conditionType)
 			if condition != nil && condition.Status != metav1.ConditionTrue {
-				problems = append(problems, fmt.Sprintf("%s/%s %s=%s", cluster.Namespace, cluster.Name, conditionType, condition.Status))
+				problems = append(problems, fmt.Sprintf("%s/%s %s=%s", cluster.Metadata.Namespace, cluster.Metadata.Name, conditionType, condition.Status))
 			}
 		}
 	}
@@ -168,7 +166,7 @@ func (s *ClusterCreation) checkSlurmClustersReady(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkNodeSetsReady(ctx context.Context) error {
-	var nodeSets slurmv1alpha1.NodeSetList
+	var nodeSets kubeobjects.NodeSetList
 	if err := kubectlJSON(ctx, s.exec, &nodeSets, "get", "nodesets", "-A", "-o", "json"); err != nil {
 		return fmt.Errorf("list NodeSets: %w", err)
 	}
@@ -178,12 +176,12 @@ func (s *ClusterCreation) checkNodeSetsReady(ctx context.Context) error {
 
 	var problems []string
 	for _, nodeSet := range nodeSets.Items {
-		if nodeSet.Status.Phase != slurmv1alpha1.PhaseNodeSetReady {
-			problems = append(problems, fmt.Sprintf("%s/%s phase=%s", nodeSet.Namespace, nodeSet.Name, nodeSet.Status.Phase))
+		if nodeSet.Status.Phase != kubeobjects.NodeSetPhaseReady {
+			problems = append(problems, fmt.Sprintf("%s/%s phase=%s", nodeSet.Metadata.Namespace, nodeSet.Metadata.Name, nodeSet.Status.Phase))
 			continue
 		}
 		if nodeSet.Status.Replicas != nodeSet.Spec.Replicas {
-			problems = append(problems, fmt.Sprintf("%s/%s ready=%d desired=%d", nodeSet.Namespace, nodeSet.Name, nodeSet.Status.Replicas, nodeSet.Spec.Replicas))
+			problems = append(problems, fmt.Sprintf("%s/%s ready=%d desired=%d", nodeSet.Metadata.Namespace, nodeSet.Metadata.Name, nodeSet.Status.Replicas, nodeSet.Spec.Replicas))
 		}
 	}
 
@@ -312,7 +310,7 @@ func (s *ClusterCreation) checkHealthCheckProgramOutputs(ctx context.Context) er
 }
 
 func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
-	var checks slurmv1alpha1.ActiveCheckList
+	var checks kubeobjects.ActiveCheckList
 	if err := kubectlJSON(ctx, s.exec, &checks, "get", "activechecks", "-A", "-o", "json"); err != nil {
 		return fmt.Errorf("list ActiveChecks: %w", err)
 	}
@@ -334,20 +332,20 @@ func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 
 		checkType := check.Spec.CheckType
 		if checkType == "" {
-			checkType = "k8sJob"
+			checkType = kubeobjects.ActiveCheckTypeK8sJob
 		}
 
 		switch checkType {
-		case "k8sJob":
-			if check.Status.K8sJobsStatus.LastJobStatus != consts.ActiveCheckK8sJobStatusComplete {
-				problems = append(problems, fmt.Sprintf("%s/%s k8s status=%s", check.Namespace, check.Name, check.Status.K8sJobsStatus.LastJobStatus))
+		case kubeobjects.ActiveCheckTypeK8sJob:
+			if check.Status.K8sJobsStatus.LastJobStatus != kubeobjects.ActiveCheckK8sJobStatusComplete {
+				problems = append(problems, fmt.Sprintf("%s/%s k8s status=%s", check.Metadata.Namespace, check.Metadata.Name, check.Status.K8sJobsStatus.LastJobStatus))
 			}
-		case "slurmJob":
-			if check.Status.SlurmJobsStatus.LastRunStatus != consts.ActiveCheckSlurmRunStatusComplete {
-				problems = append(problems, fmt.Sprintf("%s/%s slurm status=%s", check.Namespace, check.Name, check.Status.SlurmJobsStatus.LastRunStatus))
+		case kubeobjects.ActiveCheckTypeSlurmJob:
+			if check.Status.SlurmJobsStatus.LastRunStatus != kubeobjects.ActiveCheckSlurmRunStatusComplete {
+				problems = append(problems, fmt.Sprintf("%s/%s slurm status=%s", check.Metadata.Namespace, check.Metadata.Name, check.Status.SlurmJobsStatus.LastRunStatus))
 			}
 		default:
-			problems = append(problems, fmt.Sprintf("%s/%s unknown checkType=%s", check.Namespace, check.Name, checkType))
+			problems = append(problems, fmt.Sprintf("%s/%s unknown checkType=%s", check.Metadata.Namespace, check.Metadata.Name, checkType))
 		}
 	}
 

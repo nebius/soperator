@@ -6,7 +6,7 @@ import (
 
 	semver "github.com/Masterminds/semver/v3"
 
-	"nebius.ai/slurm-operator/e2e/versionfilter"
+	"nebius.ai/soperator-e2e/versionfilter"
 )
 
 func NormalizeSoperatorVersion(raw string) (string, error) {

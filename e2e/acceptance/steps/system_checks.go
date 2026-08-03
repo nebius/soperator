@@ -11,7 +11,7 @@ import (
 	"github.com/cucumber/godog"
 	corev1 "k8s.io/api/core/v1"
 
-	"nebius.ai/slurm-operator/e2e/acceptance/framework"
+	"nebius.ai/soperator-e2e/acceptance/framework"
 )
 
 const (

@@ -10,8 +10,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/e2e/acceptance/framework"
+	"nebius.ai/soperator-e2e/acceptance/framework"
+	"nebius.ai/soperator-e2e/acceptance/kubeobjects"
 )
 
 const testTargetSoperatorVersion = "4.2.0"
@@ -117,29 +117,29 @@ func TestNewRunnerRequiresTargetSoperatorVersion(t *testing.T) {
 }
 
 func TestDiscoveredNodeSetsFromLiveList(t *testing.T) {
-	nodeSets := slurmv1alpha1.NodeSetList{
-		Items: []slurmv1alpha1.NodeSet{
+	nodeSets := kubeobjects.NodeSetList{
+		Items: []kubeobjects.NodeSet{
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "worker-gpu"},
-				Spec: slurmv1alpha1.NodeSetSpec{
+				Metadata: kubeobjects.ObjectMeta{Name: "worker-gpu"},
+				Spec: kubeobjects.NodeSetSpec{
 					ClusterName: "soperator",
 					Replicas:    2,
-					GPU:         slurmv1alpha1.GPUSpec{Enabled: true},
+					GPU:         kubeobjects.NodeSetGPUSpec{Enabled: true},
 				},
 			},
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "worker-cpu"},
-				Spec: slurmv1alpha1.NodeSetSpec{
+				Metadata: kubeobjects.ObjectMeta{Name: "worker-cpu"},
+				Spec: kubeobjects.NodeSetSpec{
 					ClusterName: "soperator",
 					Replicas:    3,
 				},
 			},
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "other-worker"},
-				Spec: slurmv1alpha1.NodeSetSpec{
+				Metadata: kubeobjects.ObjectMeta{Name: "other-worker"},
+				Spec: kubeobjects.NodeSetSpec{
 					ClusterName: "other",
 					Replicas:    4,
-					GPU:         slurmv1alpha1.GPUSpec{Enabled: true},
+					GPU:         kubeobjects.NodeSetGPUSpec{Enabled: true},
 				},
 			},
 		},
@@ -158,19 +158,19 @@ func TestDiscoveredNodeSetsFromLiveList(t *testing.T) {
 }
 
 func TestDiscoveredNodeSetsFromLiveListDoesNotFilterWhenClusterNameIsEmpty(t *testing.T) {
-	nodeSets := slurmv1alpha1.NodeSetList{
-		Items: []slurmv1alpha1.NodeSet{
+	nodeSets := kubeobjects.NodeSetList{
+		Items: []kubeobjects.NodeSet{
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "worker-gpu"},
-				Spec: slurmv1alpha1.NodeSetSpec{
+				Metadata: kubeobjects.ObjectMeta{Name: "worker-gpu"},
+				Spec: kubeobjects.NodeSetSpec{
 					ClusterName: "soperator",
 					Replicas:    2,
-					GPU:         slurmv1alpha1.GPUSpec{Enabled: true},
+					GPU:         kubeobjects.NodeSetGPUSpec{Enabled: true},
 				},
 			},
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "worker-cpu"},
-				Spec: slurmv1alpha1.NodeSetSpec{
+				Metadata: kubeobjects.ObjectMeta{Name: "worker-cpu"},
+				Spec: kubeobjects.NodeSetSpec{
 					ClusterName: "soperator",
 					Replicas:    3,
 				},

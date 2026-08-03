@@ -17,9 +17,9 @@ import (
 	"github.com/cucumber/godog"
 	corev1 "k8s.io/api/core/v1"
 
-	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/e2e/acceptance/framework"
-	"nebius.ai/slurm-operator/e2e/acceptance/steps"
+	"nebius.ai/soperator-e2e/acceptance/framework"
+	"nebius.ai/soperator-e2e/acceptance/kubeobjects"
+	"nebius.ai/soperator-e2e/acceptance/steps"
 )
 
 //go:embed features/*.feature
@@ -355,7 +355,7 @@ func discoverNodeSets(ctx context.Context, w *world, clusterName string) ([]fram
 		return nil, err
 	}
 
-	var nodeSets slurmv1alpha1.NodeSetList
+	var nodeSets kubeobjects.NodeSetList
 	if err := json.Unmarshal([]byte(output), &nodeSets); err != nil {
 		return nil, fmt.Errorf("decode NodeSet list: %w", err)
 	}
@@ -399,14 +399,14 @@ func workerPodsBySlurmNodeName(pods corev1.PodList) (map[string]string, error) {
 	return workers, nil
 }
 
-func discoveredNodeSetsFromLiveList(nodeSets slurmv1alpha1.NodeSetList, clusterName string) []framework.DiscoveredNodeSet {
+func discoveredNodeSetsFromLiveList(nodeSets kubeobjects.NodeSetList, clusterName string) []framework.DiscoveredNodeSet {
 	discovered := make([]framework.DiscoveredNodeSet, 0, len(nodeSets.Items))
 	for _, nodeSet := range nodeSets.Items {
 		if clusterName != "" && nodeSet.Spec.ClusterName != "" && nodeSet.Spec.ClusterName != clusterName {
 			continue
 		}
 		discovered = append(discovered, framework.DiscoveredNodeSet{
-			Name:   nodeSet.Name,
+			Name:   nodeSet.Metadata.Name,
 			Size:   int(nodeSet.Spec.Replicas),
 			HasGPU: nodeSet.Spec.GPU.Enabled,
 		})

@@ -201,8 +201,8 @@ jobs:
           path: soperator-main
 
       - name: Build acceptance binary
-        working-directory: "${{ github.workspace }}/soperator-main"
-        run: go build -o "${{ github.workspace }}/bin/acceptance" ./e2e/cmd/acceptance
+        working-directory: "${{ github.workspace }}/soperator-main/e2e"
+        run: go build -o "${{ github.workspace }}/bin/acceptance" ./cmd/acceptance
 
       - name: Export profile outputs
         shell: bash

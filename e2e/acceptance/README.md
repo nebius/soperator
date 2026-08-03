@@ -18,7 +18,7 @@ access to the runner through a kube context.
 Build the standalone acceptance binary from the repository root:
 
 ```bash
-go build -o bin/acceptance ./e2e/cmd/acceptance
+go -C e2e build -o ../bin/acceptance ./cmd/acceptance
 ```
 
 Run the shared suite against an existing cluster:
@@ -77,7 +77,7 @@ instance removal.
 
 ## Reusable Runner API
 
-Use `nebius.ai/slurm-operator/e2e/acceptance` from another Go runner when you
+Use `nebius.ai/soperator-e2e/acceptance` from another Go runner when you
 want to reuse the shared Soperator scenarios for a different Soperator cluster
 type.
 
@@ -88,8 +88,8 @@ import (
 	"context"
 	"log"
 
-	"nebius.ai/slurm-operator/e2e/acceptance"
-	"nebius.ai/slurm-operator/e2e/acceptance/framework"
+	"nebius.ai/soperator-e2e/acceptance"
+	"nebius.ai/soperator-e2e/acceptance/framework"
 )
 
 func run(ctx context.Context, kubectlContext string) error {
