@@ -16,6 +16,7 @@ controllerManager:
         drop:
           - ALL
     env:
+      enableWebhooks: "true"
       isMariadbCrdInstalled: "false"
       isOpentelemetryCollectorCrdInstalled: "false"
       isApparmorCrdInstalled: "false"
