@@ -201,7 +201,9 @@ jobs:
           mkdir -p bin
           go build -o bin/e2e ./cmd/e2e
 
-          if [[ -d e2e/cmd/acceptance ]]; then
+          if [[ -f e2e/go.mod ]]; then
+            go -C e2e build -o ../bin/acceptance ./cmd/acceptance
+          elif [[ -d e2e/cmd/acceptance ]]; then
             go build -o bin/acceptance ./e2e/cmd/acceptance
           elif [[ -d cmd/acceptance ]]; then
             go build -o bin/acceptance ./cmd/acceptance
