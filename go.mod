@@ -20,7 +20,7 @@ require (
 	github.com/onsi/gomega v1.42.1
 	github.com/openkruise/kruise-api v1.8.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.92.1
-	github.com/sethvargo/go-password v0.3.1
+	github.com/sethvargo/go-password v0.4.0
 	github.com/stretchr/testify v1.11.1
 	github.com/zclconf/go-cty v1.19.0
 	go.uber.org/zap v1.28.0
