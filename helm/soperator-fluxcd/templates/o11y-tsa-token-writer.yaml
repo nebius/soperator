@@ -1,27 +1,27 @@
-{{- if and .Values.observability.enabled .Values.observability.vmStack.enabled .Values.observability.publicEndpointEnabled }}
+{{- if and .Values.observability.enabled .Values.observability.publicEndpointEnabled }}
 {{- $tokenKind := .Values.observability.publicEndpointTokenKind }}
-{{- $tsaToken := .Values.observability.vmStack.tsaToken | default dict }}
+{{- $tsaToken := include "soperator-fluxcd.o11yTsaToken" . | fromYaml }}
 {{- $writer := $tsaToken.writer | default dict }}
 {{- $writerEnabled := true }}
 {{- if hasKey $writer "enabled" }}
 {{- $writerEnabled = $writer.enabled }}
 {{- end }}
-{{- if and $writerEnabled (eq $tokenKind "secret") }}
+{{- if and $writerEnabled (eq $tokenKind "secret") (or .Values.observability.vmStack.enabled .Values.observability.opentelemetry.enabled) }}
 {{- include "soperator-fluxcd.validatePublicEndpointTokenKind" . -}}
-{{- $ns := .Values.observability.vmStack.namespace }}
-{{- $secretName := $tsaToken.secretName | default "o11y-writer-sa-token" }}
-{{- $secretKey := $tsaToken.secretKey | default "accessToken" }}
+{{- $ns := include "soperator-fluxcd.o11yTsaTokenWriterNamespace" . }}
+{{- $secretName := include "soperator-fluxcd.o11yTsaTokenSecretName" . }}
+{{- $secretKey := include "soperator-fluxcd.o11yTsaTokenSecretKey" . }}
 {{- $source := $writer.source | default "imds" }}
-{{- $namespaces := $writer.namespaces | default (list $ns) }}
+{{- $namespaces := include "soperator-fluxcd.o11yTsaTokenWriterNamespaces" . | fromYamlArray }}
 {{- $image := $writer.image | default dict }}
-{{- $repo := required "observability.vmStack.tsaToken.writer.image.repository is required" $image.repository }}
-{{- $tag := required "observability.vmStack.tsaToken.writer.image.tag is required" $image.tag }}
+{{- $repo := required "observability.tsaToken.writer.image.repository is required" $image.repository }}
+{{- $tag := required "observability.tsaToken.writer.image.tag is required" $image.tag }}
 {{- $pullPolicy := $image.pullPolicy | default "IfNotPresent" }}
-{{- $hostPath := $tsaToken.hostPath | default "/mnt/cloud-metadata" }}
-{{- $mountPath := $tsaToken.mountPath | default "/o11ytoken" }}
-{{- $tokenFilename := $tsaToken.hostPathFilename | default "tsa-token" }}
+{{- $hostPath := include "soperator-fluxcd.o11yTsaTokenHostPath" . }}
+{{- $mountPath := include "soperator-fluxcd.o11yTsaTokenMountPath" . }}
+{{- $tokenFilename := include "soperator-fluxcd.o11yTsaTokenHostPathFilename" . }}
 {{- $hostNetwork := and (eq $source "imds") (ne (toString ($writer.hostNetwork | default true)) "false") }}
-{{- $name := printf "%s-tsa-token-writer" (include "soperator-fluxcd.fullname" .) }}
+{{- $name := include "soperator-fluxcd.o11yTsaTokenWriterName" . }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -47,7 +47,7 @@ spec:
     remediation:
       retries: 3
   interval: {{ $writer.interval }}
-  targetNamespace: {{ .Values.observability.vmStack.namespace }}
+  targetNamespace: {{ $ns }}
   releaseName: tsa-token-writer
   values:
     resources:

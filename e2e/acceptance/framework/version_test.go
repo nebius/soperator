@@ -12,13 +12,7 @@ func TestNormalizeSoperatorVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "4.1.5", base)
 
-	base, err = NormalizeSoperatorVersion("v4.2.0+build.1")
+	base, err = NormalizeSoperatorVersion("v5.0.0+build.1")
 	require.NoError(t, err)
-	assert.Equal(t, "4.2.0", base)
-}
-
-func TestParseSoperatorBaseVersionRejectsShortVersion(t *testing.T) {
-	_, err := ParseSoperatorBaseVersion("4.2")
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "full major.minor.patch")
+	assert.Equal(t, "5.0.0", base)
 }

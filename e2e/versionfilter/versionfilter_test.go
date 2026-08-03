@@ -21,11 +21,11 @@ func TestSelectScenariosFiltersByTargetVersion(t *testing.T) {
   Scenario: old scenario
     Then old behavior works
 
-  @soperator_version_>=4.2.0
+  @soperator_version_>=5.0.0
   Scenario: new scenario
     Then new behavior works
 
-  @soperator_version_>=4.0.0,<4.1.0||>=4.2.0
+  @soperator_version_>=4.0.0,<4.1.0||>=5.0.0
   Scenario: split range scenario
     Then split range behavior works
 `)},
@@ -37,7 +37,7 @@ func TestSelectScenariosFiltersByTargetVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"features/sample.feature:3"}, paths)
 
-	paths, err = SelectScenarios(features, Axis{TagPrefix: soperatorVersionTag, TargetVersion: "4.2.0"})
+	paths, err = SelectScenarios(features, Axis{TagPrefix: soperatorVersionTag, TargetVersion: "5.0.0"})
 	require.NoError(t, err)
 	assert.Equal(t, []string{
 		"features/sample.feature:3",
@@ -106,11 +106,11 @@ func TestSelectScenariosRequiresAllAxes(t *testing.T) {
 	features := FeatureSource{
 		FS: fstest.MapFS{
 			"features/another-soperator.feature": {Data: []byte(`Feature: Another Soperator
-  @soperator_version_>=4.2.0 @another_soperator_version_>=1.0.0
+  @soperator_version_>=5.0.0 @another_soperator_version_>=1.0.0
   Scenario: compatible scenario
     Then another Soperator behavior works
 
-  @soperator_version_>=4.2.0 @another_soperator_version_>=2.0.0
+  @soperator_version_>=5.0.0 @another_soperator_version_>=2.0.0
   Scenario: future another Soperator scenario
     Then future another Soperator behavior works
 `)},
@@ -120,7 +120,7 @@ func TestSelectScenariosRequiresAllAxes(t *testing.T) {
 
 	paths, err := SelectScenarios(
 		features,
-		Axis{TagPrefix: soperatorVersionTag, TargetVersion: "4.2.0"},
+		Axis{TagPrefix: soperatorVersionTag, TargetVersion: "5.0.0"},
 		Axis{TagPrefix: anotherSoperatorVersionTag, TargetVersion: "1.5.0"},
 	)
 	require.NoError(t, err)
@@ -131,7 +131,7 @@ func TestSelectScenariosRejectsMissingAxisTag(t *testing.T) {
 	features := FeatureSource{
 		FS: fstest.MapFS{
 			"features/another-soperator.feature": {Data: []byte(`Feature: Another Soperator
-  @soperator_version_>=4.2.0
+  @soperator_version_>=5.0.0
   Scenario: missing another Soperator version
     Then another Soperator behavior works
 `)},
@@ -141,7 +141,7 @@ func TestSelectScenariosRejectsMissingAxisTag(t *testing.T) {
 
 	_, err := SelectScenarios(
 		features,
-		Axis{TagPrefix: soperatorVersionTag, TargetVersion: "4.2.0"},
+		Axis{TagPrefix: soperatorVersionTag, TargetVersion: "5.0.0"},
 		Axis{TagPrefix: anotherSoperatorVersionTag, TargetVersion: "1.0.0"},
 	)
 	require.Error(t, err)
@@ -159,7 +159,7 @@ func TestSelectScenariosRejectsMissingVersionTag(t *testing.T) {
 		Paths: []string{"features/sample.feature"},
 	}
 
-	_, err := SelectScenarios(features, Axis{TagPrefix: soperatorVersionTag, TargetVersion: "4.2.0"})
+	_, err := SelectScenarios(features, Axis{TagPrefix: soperatorVersionTag, TargetVersion: "5.0.0"})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "must have exactly one @soperator_version_")
 }
@@ -176,7 +176,7 @@ func TestSelectScenariosRejectsDuplicateVersionTags(t *testing.T) {
 		Paths: []string{"features/sample.feature"},
 	}
 
-	_, err := SelectScenarios(features, Axis{TagPrefix: soperatorVersionTag, TargetVersion: "4.2.0"})
+	_, err := SelectScenarios(features, Axis{TagPrefix: soperatorVersionTag, TargetVersion: "5.0.0"})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "got 2")
 }
@@ -185,7 +185,7 @@ func TestSelectScenariosRejectsShortVersionConstraint(t *testing.T) {
 	features := FeatureSource{
 		FS: fstest.MapFS{
 			"features/sample.feature": {Data: []byte(`Feature: Sample
-  @soperator_version_>=4.2
+  @soperator_version_>=5.0
   Scenario: short version
     Then behavior works
 `)},
@@ -193,7 +193,7 @@ func TestSelectScenariosRejectsShortVersionConstraint(t *testing.T) {
 		Paths: []string{"features/sample.feature"},
 	}
 
-	_, err := SelectScenarios(features, Axis{TagPrefix: soperatorVersionTag, TargetVersion: "4.2.0"})
+	_, err := SelectScenarios(features, Axis{TagPrefix: soperatorVersionTag, TargetVersion: "5.0.0"})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "full major.minor.patch")
 }
@@ -202,7 +202,7 @@ func TestSelectScenariosRejectsMissingAxes(t *testing.T) {
 	features := FeatureSource{
 		FS: fstest.MapFS{
 			"features/sample.feature": {Data: []byte(`Feature: Sample
-  @soperator_version_>=4.2.0
+  @soperator_version_>=5.0.0
   Scenario: tagged
     Then behavior works
 `)},
@@ -220,7 +220,7 @@ func TestNormalizeVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "4.1.5", version)
 
-	version, err = NormalizeVersion("v4.2.0+build.1")
+	version, err = NormalizeVersion("v5.0.0+build.1")
 	require.NoError(t, err)
-	assert.Equal(t, "4.2.0", version)
+	assert.Equal(t, "5.0.0", version)
 }

@@ -176,8 +176,12 @@ curl "http://localhost:8429/api/v1/query?query=up"
 
 #### Remote Write to Nebius Cloud
 - Endpoint: `https://write.monitoring.{region}.nebius.cloud/projects/{projectId}/buckets/soperator/prometheus`
-- Authentication: Bearer token from `/mnt/imds/tsa-token`, populated and refreshed by the vmagent IMDS token sidecar
+- Authentication: Bearer token from the `o11y-writer-sa-token` Secret, populated and refreshed by the shared TSA token writer
 - When: Enabled with `publicEndpointEnabled: true`
+
+The default token writer source is IMDS (`observability.tsaToken.writer.source: imds`).
+Set `observability.publicEndpointTokenKind: hostPath` only when the token should be
+read directly from a host-mounted file such as `/mnt/cloud-metadata/tsa-token`.
 
 ### Visualization
 
