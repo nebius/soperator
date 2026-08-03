@@ -29,6 +29,9 @@ spec:
 
   dependsOn:
     - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+    {{- if and .Values.observability.publicEndpointEnabled (eq .Values.observability.publicEndpointTokenKind "secret") (include "soperator-fluxcd.o11yTsaTokenWriterEnabled" .) }}
+    - name: {{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}
+    {{- end }}
     - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
 
   install:
@@ -38,10 +41,15 @@ spec:
   interval: {{ .Values.observability.opentelemetry.events.interval }}
   timeout: {{ .Values.observability.opentelemetry.events.timeout }}
   releaseName: opentelemetry-collector-events
-  targetNamespace: logs-system
+  targetNamespace: {{ .Values.observability.opentelemetry.namespace }}
 
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
+  {{- $tokenSecretName := include "soperator-fluxcd.o11yTsaTokenSecretName" . }}
+  {{- $tokenSecretKey := include "soperator-fluxcd.o11yTsaTokenSecretKey" . }}
+  {{- $tokenHostPath := include "soperator-fluxcd.o11yTsaTokenHostPath" . }}
+  {{- $tokenMountPath := include "soperator-fluxcd.o11yTsaTokenMountPath" . }}
+  {{- $tokenHostPathFilename := include "soperator-fluxcd.o11yTsaTokenHostPathFilename" . }}
   {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
   {{- $sendingQueue := .Values.observability.opentelemetry.sendingQueue | default dict }}
   {{- $eventsValues := .Values.observability.opentelemetry.events.values | default dict }}
@@ -109,10 +117,10 @@ spec:
       - name: o11ytoken
         {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
         secret:
-          secretName: o11y-writer-sa-token
+          secretName: {{ $tokenSecretName | quote }}
         {{- else if eq .Values.observability.publicEndpointTokenKind "hostPath" }}
         hostPath:
-          path: /mnt/cloud-metadata
+          path: {{ $tokenHostPath | quote }}
           type: Directory
         {{- end }}
       {{- end }}
@@ -127,7 +135,7 @@ spec:
       {{- end }}
 
       {{- if $hasPublicEndpoint }}
-      - mountPath: /o11ytoken
+      - mountPath: {{ $tokenMountPath | quote }}
         name: o11ytoken
         readOnly: true
       {{- end }}
@@ -307,10 +315,10 @@ spec:
         {{- if $hasPublicEndpoint }}
         bearertokenauth:
           {{- if eq .Values.observability.publicEndpointTokenKind "secret" }}
-          filename: "/o11ytoken/accessToken"
+          filename: {{ printf "%s/%s" $tokenMountPath $tokenSecretKey | quote }}
           {{- else if eq .Values.observability.publicEndpointTokenKind "hostPath" }}
-          filename: "/o11ytoken/tsa-token"
-          {{- end }}
+          filename: {{ printf "%s/%s" $tokenMountPath $tokenHostPathFilename | quote }}
+        {{- end }}
         {{- end }}
 
 
