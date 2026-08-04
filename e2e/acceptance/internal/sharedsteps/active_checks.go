@@ -1,4 +1,4 @@
-package steps
+package sharedsteps
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/cucumber/godog"
 
 	"nebius.ai/soperator-e2e/acceptance/framework"
-	"nebius.ai/soperator-e2e/acceptance/kubeobjects"
+	"nebius.ai/soperator-e2e/acceptance/internal/kubeobjects"
 )
 
 const (
@@ -44,13 +44,18 @@ func NewActiveChecks(state *framework.ClusterState, exec framework.Exec, slurm *
 	}
 }
 
-func (s *ActiveChecks) Register(sc *godog.ScenarioContext) {
+func (s *ActiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^healthy GPU workers are available for active checks$`, s.healthyGPUWorkersAreAvailableForActiveChecks)
 	sc.Step(`^the GPU ActiveCheck is triggered$`, s.theGPUActiveCheckIsTriggered)
 	sc.Step(`^the GPU ActiveCheck Kubernetes Job succeeds$`, s.theGPUActiveCheckKubernetesJobSucceeds)
 	sc.Step(`^GPU ActiveCheck outputs report PASS on all GPU workers$`, s.gpuActiveCheckOutputsReportPASSOnAllGPUWorkers)
 	sc.Step(`^GPU ActiveCheck Slurm jobs complete on all GPU workers$`, s.gpuActiveCheckSlurmJobsCompleteOnAllGPUWorkers)
 	sc.Step(`^the GPU ActiveCheck status is Complete$`, s.theGPUActiveCheckStatusIsComplete)
+}
+
+func (s *ActiveChecks) CleanupAndReset(ctx context.Context) {
+	s.gpuCheckK8sJobName = ""
+	s.gpuCheckJobIDs = nil
 }
 
 func (s *ActiveChecks) healthyGPUWorkersAreAvailableForActiveChecks(ctx context.Context) error {

@@ -1,4 +1,4 @@
-package steps
+package sharedsteps
 
 import (
 	"fmt"

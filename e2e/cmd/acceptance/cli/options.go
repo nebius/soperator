@@ -57,21 +57,21 @@ func Run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	features := acceptance.SharedFeatureSource()
+	suite := acceptance.SoperatorSuite(targetSoperatorVersion)
 	if len(opts.ScenarioPaths) > 0 {
-		features.Paths = opts.ScenarioPaths
+		suite.Source.Paths = opts.ScenarioPaths
+	}
+	if opts.RunUnstableTests {
+		suite.FilterOptions.ExcludeUnstable = false
 	}
 
 	runner, err := acceptance.NewRunner(acceptance.Options{
-		KubectlContext:            opts.KubectlContext,
-		SlurmClusterName:          opts.SlurmClusterName,
-		TargetSoperatorVersion:    targetSoperatorVersion,
-		ReportDir:                 opts.ReportDir,
-		Features:                  features,
-		ExcludeUnstable:           !opts.RunUnstableTests,
-		ExcludeMissingWorkerKinds: true,
-		State:                     state,
-		StepRegistrars:            []acceptance.StepRegistrar{acceptance.SharedStepRegistrar()},
+		KubectlContext:         opts.KubectlContext,
+		SlurmClusterName:       opts.SlurmClusterName,
+		TargetSoperatorVersion: targetSoperatorVersion,
+		ReportDir:              opts.ReportDir,
+		Suites:                 []acceptance.SuiteConfig{suite},
+		State:                  state,
 	})
 	if err != nil {
 		return err

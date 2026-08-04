@@ -1,4 +1,4 @@
-package steps
+package sharedsteps
 
 import (
 	"context"
@@ -13,8 +13,6 @@ import (
 )
 
 const (
-	enrootContainersFeatureFile = "enroot_containers.feature"
-
 	// Mirrored Ubuntu has /bin/bash required by the Slurm task prolog under Pyxis.
 	enrootLifecycleImage   = "docker://cr.eu-north1.nebius.cloud#soperator/ubuntu:noble"
 	enrootLifecycleCommand = "echo ready; sleep 3600"
@@ -52,18 +50,7 @@ func NewEnrootContainers(exec framework.Exec, slurm *framework.SlurmClient) *Enr
 	}
 }
 
-func (s *EnrootContainers) Register(sc *godog.ScenarioContext) {
-	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
-		if path.Base(scenario.Uri) != enrootContainersFeatureFile {
-			return ctx, nil
-		}
-
-		if cleanupErr := s.cancelCurrentJob(context.Background()); cleanupErr != nil {
-			s.exec.Logf("cleanup: cancel enroot job: %v", cleanupErr)
-		}
-		return ctx, nil
-	})
-
+func (s *EnrootContainers) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a long-running Enroot container job is submitted on two workers$`, s.aLongRunningEnrootContainerJobIsSubmittedOnTwoWorkers)
 	sc.Step(`^the Enroot container job is running$`, s.theEnrootContainerJobIsRunning)
 	sc.Step(`^an Enroot image artifact is present on a worker$`, s.anEnrootImageArtifactIsPresentOnAWorker)
@@ -76,6 +63,20 @@ func (s *EnrootContainers) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^Enroot runtime state is cleaned up$`, s.enrootRuntimeStateIsCleanedUp)
 	sc.Step(`^an Enroot GPU smoke job is submitted on one GPU worker$`, s.anEnrootGPUSmokeJobIsSubmittedOnOneGPUWorker)
 	sc.Step(`^the Enroot GPU smoke job succeeds and reports visible GPUs$`, s.theEnrootGPUSmokeJobSucceedsAndReportsVisibleGPUs)
+}
+
+func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
+	if cleanupErr := s.cancelCurrentJob(ctx); cleanupErr != nil {
+		s.exec.Logf("cleanup: cancel enroot job: %v", cleanupErr)
+	}
+	s.workers = nil
+	s.connectionWorker = framework.WorkerRef{}
+	s.job = framework.SbatchJob{}
+	s.squashPath = ""
+	s.expectedSquashPath = ""
+	s.squashStatBefore = ""
+	s.runtimeNamePrefix = ""
+	s.directSquashFS = nil
 }
 
 func (s *EnrootContainers) aLongRunningEnrootContainerJobIsSubmittedOnTwoWorkers(ctx context.Context) error {
@@ -427,7 +428,6 @@ func (s *EnrootContainers) cancelCurrentJob(ctx context.Context) error {
 	if err := s.slurm.CancelJob(ctx, jobID, enrootStopTimeout); err != nil {
 		return fmt.Errorf("cancel enroot job %s: %w", jobID, err)
 	}
-	s.job = framework.SbatchJob{}
 	return nil
 }
 

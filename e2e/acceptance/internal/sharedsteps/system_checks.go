@@ -1,4 +1,4 @@
-package steps
+package sharedsteps
 
 import (
 	"context"
@@ -67,12 +67,7 @@ func NewSystemChecks(exec framework.Exec, slurm *framework.SlurmClient) *SystemC
 	}
 }
 
-func (s *SystemChecks) Register(sc *godog.ScenarioContext) {
-	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
-		s.cleanup(context.Background())
-		return ctx, nil
-	})
-
+func (s *SystemChecks) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a healthy worker pod is selected$`, s.aHealthyWorkerPodIsSelected)
 	sc.Step(`^pod-local ephemeral storage is filled above the warning threshold$`, s.podLocalEphemeralStorageIsFilledAboveTheWarningThreshold)
 	sc.Step(`^the selected worker is drained by pod_ephemeral_storage$`, s.theSelectedWorkerIsDrainedByPodEphemeralStorage)
@@ -84,6 +79,10 @@ func (s *SystemChecks) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^the selected worker pod is recreated and ready$`, s.theSelectedWorkerPodIsRecreatedAndReady)
 	sc.Step(`^the selected Slurm worker is present after kubelet replacement$`, s.theSelectedSlurmWorkerIsPresentAfterKubeletReplacement)
 	sc.Step(`^the selected Slurm worker is usable after kubelet replacement$`, s.theSelectedSlurmWorkerIsUsableAfterKubeletReplacement)
+}
+
+func (s *SystemChecks) CleanupAndReset(ctx context.Context) {
+	s.cleanupAndReset(ctx)
 }
 
 func (s *SystemChecks) aHealthyWorkerPodIsSelected(ctx context.Context) error {
@@ -299,28 +298,29 @@ func (s *SystemChecks) theSelectedSlurmWorkerIsUsableAfterKubeletReplacement(ctx
 	return nil
 }
 
-func (s *SystemChecks) cleanup(ctx context.Context) {
+func (s *SystemChecks) cleanupAndReset(ctx context.Context) {
 	if s.kubeletDebugPodName != "" {
 		if _, err := s.exec.Kubectl().Run(ctx, "delete", "pod", s.kubeletDebugPodName, "--ignore-not-found"); err != nil {
 			s.exec.Logf("cleanup: delete kubelet debug pod %s: %v", s.kubeletDebugPodName, err)
-		} else {
-			s.kubeletDebugPodName = ""
 		}
 	}
 	if s.workerPod.Name != "" {
 		if _, err := s.exec.WorkerPod(s.worker).Run(ctx, fmt.Sprintf("rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(systemEphemeralFillPath))); err != nil {
 			s.exec.Logf("cleanup: remove ephemeral fill file from %s: %v", s.workerPod.Name, err)
-		} else {
-			s.workerPod = corev1.Pod{}
 		}
 	}
 	if s.worker.Name != "" {
 		if err := s.slurm.ResumeNodeIfDrainedByReason(ctx, s.worker.Name, systemEphemeralReason); err != nil {
 			s.exec.Logf("cleanup: resume %s after pod_ephemeral_storage: %v", s.worker.Name, err)
-		} else {
-			s.worker = framework.WorkerRef{}
 		}
 	}
+	s.worker = framework.WorkerRef{}
+	s.workerPod = corev1.Pod{}
+	s.kubeletWorker = framework.WorkerRef{}
+	s.kubeletK8sNodeName = ""
+	s.kubeletK8sNodeUID = ""
+	s.kubeletWorkerPodUID = ""
+	s.kubeletDebugPodName = ""
 }
 
 func (s *SystemChecks) ephemeralInfo(ctx context.Context, pod corev1.Pod) (workerEphemeralInfo, error) {

@@ -2,28 +2,21 @@ package acceptance
 
 import (
 	"context"
-	"embed"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"io/fs"
 	"log"
-	"os"
-	"path/filepath"
+	"regexp"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/cucumber/godog"
-	corev1 "k8s.io/api/core/v1"
 
 	"nebius.ai/soperator-e2e/acceptance/framework"
-	"nebius.ai/soperator-e2e/acceptance/kubeobjects"
-	"nebius.ai/soperator-e2e/acceptance/steps"
+	"nebius.ai/soperator-e2e/acceptance/internal/discovery"
+	"nebius.ai/soperator-e2e/acceptance/internal/reports"
+	"nebius.ai/soperator-e2e/versionfilter"
 )
-
-//go:embed features/*.feature
-var acceptanceFeatures embed.FS
 
 type timingCtxKey string
 
@@ -33,71 +26,29 @@ const (
 	defaultSlurmClusterName              = "soperator"
 )
 
+var suiteNamePattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
 // Runner executes a configured Godog acceptance suite against a Soperator cluster.
 type Runner struct {
-	suiteName                 string
-	state                     *framework.ClusterState
-	features                  FeatureSource
-	tags                      string
-	excludeUnstable           bool
-	excludeMissingWorkerKinds bool
-	kubectlContext            string
-	reportDir                 string
-	stepRegistrars            []StepRegistrar
+	state          *framework.ClusterState
+	suites         []SuiteConfig
+	kubectlContext string
+	reportDir      string
+	discoveryHooks []DiscoveryHook
 }
 
-// FeatureSource describes the feature files Godog should run.
-type FeatureSource struct {
-	FS    fs.FS
-	Paths []string
-}
-
-// StepRegistrar registers step definitions and scenario hooks for a suite.
-type StepRegistrar func(*godog.ScenarioContext, *framework.ClusterState, framework.Exec)
+// DiscoveryHook discovers external runner-specific cluster data after base Soperator discovery.
+type DiscoveryHook func(context.Context, *framework.ClusterState, framework.Exec) error
 
 // Options configures an acceptance suite run.
 type Options struct {
-	SuiteName                 string
-	KubectlContext            string
-	SlurmClusterName          string
-	TargetSoperatorVersion    string
-	ReportDir                 string
-	Features                  FeatureSource
-	Tags                      string
-	ExcludeUnstable           bool
-	ExcludeMissingWorkerKinds bool
-	State                     *framework.ClusterState
-	StepRegistrars            []StepRegistrar
-}
-
-// SharedFeatureSource returns the embedded open-source Soperator acceptance features.
-func SharedFeatureSource() FeatureSource {
-	return FeatureSource{
-		FS:    acceptanceFeatures,
-		Paths: FeaturePaths(),
-	}
-}
-
-// FeaturePaths returns the default embedded open-source Soperator feature paths.
-func FeaturePaths() []string {
-	return []string{
-		"features/cluster_creation.feature",
-		"features/observability.feature",
-		"features/internal_ssh.feature",
-		"features/package_installation.feature",
-		"features/node_replacement.feature",
-		"features/docker_containers.feature",
-		"features/enroot_containers.feature",
-		"features/topology.feature",
-		"features/passive_checks.feature",
-		"features/active_checks.feature",
-		"features/system_checks.feature",
-	}
-}
-
-// SharedStepRegistrar returns a registrar for the shared Soperator step definitions.
-func SharedStepRegistrar() StepRegistrar {
-	return RegisterSharedSteps
+	KubectlContext         string
+	SlurmClusterName       string
+	TargetSoperatorVersion string
+	ReportDir              string
+	Suites                 []SuiteConfig
+	DiscoveryHooks         []DiscoveryHook
+	State                  *framework.ClusterState
 }
 
 // RegisterDefaultHooks registers common timing and skip hooks.
@@ -106,30 +57,8 @@ func RegisterDefaultHooks(sc *godog.ScenarioContext) {
 	registerSkipHook(sc)
 }
 
-// RegisterSharedSteps registers the shared Soperator step definitions.
-func RegisterSharedSteps(sc *godog.ScenarioContext, state *framework.ClusterState, exec framework.Exec) {
-	slurm := framework.NewSlurmClient(exec)
-
-	steps.NewClusterCreation(state, exec).Register(sc)
-	steps.NewInternalSSH(exec, slurm).Register(sc)
-	steps.NewPackageInstallation(exec, slurm).Register(sc)
-	steps.NewNodeReplacement(exec, slurm).Register(sc)
-	steps.NewDockerContainers(exec, slurm).Register(sc)
-	steps.NewEnrootContainers(exec, slurm).Register(sc)
-	steps.NewTopology(state, exec).Register(sc)
-	steps.NewObservability(exec).Register(sc)
-	steps.NewPassiveChecks(exec, slurm).Register(sc)
-	steps.NewActiveChecks(state, exec, slurm).Register(sc)
-	steps.NewSystemChecks(exec, slurm).Register(sc)
-}
-
 // NewRunner constructs an acceptance runner.
 func NewRunner(opts Options) (*Runner, error) {
-	suiteName := strings.TrimSpace(opts.SuiteName)
-	if suiteName == "" {
-		suiteName = "soperator-acceptance"
-	}
-
 	kubectlContext := strings.TrimSpace(opts.KubectlContext)
 	if kubectlContext == "" {
 		return nil, fmt.Errorf("kubectl context is required")
@@ -152,20 +81,6 @@ func NewRunner(opts Options) (*Runner, error) {
 	}
 	state.SlurmClusterName = slurmClusterName
 
-	features := opts.Features
-	if features.FS == nil && len(features.Paths) == 0 {
-		features = SharedFeatureSource()
-	}
-	if features.FS == nil {
-		return nil, fmt.Errorf("feature source FS is required")
-	}
-	features.Paths = slices.Clone(features.Paths)
-	for i, path := range features.Paths {
-		features.Paths[i] = strings.TrimSpace(path)
-		if features.Paths[i] == "" {
-			return nil, fmt.Errorf("feature path cannot be empty")
-		}
-	}
 	if state.WorkersByNodeSet == nil {
 		state.WorkersByNodeSet = make(map[string][]framework.WorkerRef)
 	}
@@ -178,48 +93,179 @@ func NewRunner(opts Options) (*Runner, error) {
 		return nil, fmt.Errorf("target Soperator version: %w", err)
 	}
 	state.TargetSoperatorVersion = normalizedTargetVersion
+	suites, err := normalizeSuites(opts.Suites)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Runner{
-		suiteName:                 suiteName,
-		state:                     state,
-		features:                  features,
-		tags:                      strings.TrimSpace(opts.Tags),
-		excludeUnstable:           opts.ExcludeUnstable,
-		excludeMissingWorkerKinds: opts.ExcludeMissingWorkerKinds,
-		kubectlContext:            kubectlContext,
-		reportDir:                 strings.TrimSpace(opts.ReportDir),
-		stepRegistrars:            slices.Clone(opts.StepRegistrars),
+		state:          state,
+		suites:         suites,
+		kubectlContext: kubectlContext,
+		reportDir:      strings.TrimSpace(opts.ReportDir),
+		discoveryHooks: slices.Clone(opts.DiscoveryHooks),
 	}, nil
 }
 
 // Run executes the configured acceptance suite.
 func (r *Runner) Run(ctx context.Context) error {
 	w := newWorld(r.state, r.kubectlContext)
-	if err := discoverCluster(ctx, w, r.state); err != nil {
+	if err := discovery.DiscoverCluster(ctx, w, r.state); err != nil {
 		return fmt.Errorf("discover cluster before suite: %w", err)
 	}
-
-	features, err := r.featurePaths()
-	if err != nil {
-		return err
-	}
-	if len(features) == 0 {
-		return fmt.Errorf("no acceptance scenarios compatible with Soperator version %s", r.state.TargetSoperatorVersion)
-	}
-
-	tags := r.tagFilter()
-
-	format, err := reportFormat(r.reportDir)
-	if err != nil {
+	if err := r.runDiscoveryHooks(ctx, w); err != nil {
 		return err
 	}
 
-	suite := godog.TestSuite{
-		Name:                r.suiteName,
-		ScenarioInitializer: r.initializeScenario,
+	return r.runConfiguredSuites(ctx, w)
+}
+
+func (r *Runner) runConfiguredSuites(ctx context.Context, exec framework.Exec) error {
+	selectedSuites := 0
+	var failures []error
+	for _, suite := range r.suites {
+		features, err := r.suiteFeaturePaths(suite)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("select suite %q scenarios: %w", suite.Name, err))
+			continue
+		}
+		if len(features) == 0 {
+			log.Printf("acceptance: suite %s selected no scenarios", suite.Name)
+			continue
+		}
+		selectedSuites++
+		if err := r.runSuite(ctx, exec, suite, features); err != nil {
+			failures = append(failures, err)
+		}
+	}
+	if selectedSuites == 0 && len(failures) == 0 {
+		failures = append(failures, fmt.Errorf("no acceptance scenarios compatible with Soperator version %s", r.state.TargetSoperatorVersion))
+	}
+
+	return errors.Join(failures...)
+}
+
+func (r *Runner) runDiscoveryHooks(ctx context.Context, exec framework.Exec) error {
+	for i, hook := range r.discoveryHooks {
+		if hook == nil {
+			return fmt.Errorf("discovery hook %d is nil", i)
+		}
+		if err := hook(ctx, r.state, exec); err != nil {
+			return fmt.Errorf("run discovery hook %d: %w", i, err)
+		}
+	}
+	return nil
+}
+
+func (r *Runner) suiteTagFilter(suite SuiteConfig) string {
+	var filters []string
+
+	if suite.Tags != "" {
+		filters = append(filters, suite.Tags)
+	}
+	if suite.FilterOptions.ExcludeUnstable {
+		log.Printf("acceptance: suite %s excluding @unstable scenarios", suite.Name)
+		filters = append(filters, "~@unstable")
+	}
+	if suite.FilterOptions.ExcludeMissingWorkerKinds && !r.state.HasGPUWorkers() {
+		log.Printf("acceptance: suite %s found no GPU workers, excluding @gpu scenarios", suite.Name)
+		filters = append(filters, "~@gpu")
+	}
+	if suite.FilterOptions.ExcludeMissingWorkerKinds && !r.state.HasCPUWorkers() {
+		log.Printf("acceptance: suite %s found no CPU workers, excluding @cpu scenarios", suite.Name)
+		filters = append(filters, "~@cpu")
+	}
+
+	return strings.Join(filters, " && ")
+}
+
+func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
+	if len(suites) == 0 {
+		return nil, fmt.Errorf("at least one suite is required")
+	}
+
+	out := make([]SuiteConfig, 0, len(suites))
+	seen := make(map[string]struct{}, len(suites))
+	for _, suite := range suites {
+		name := strings.TrimSpace(suite.Name)
+		if name == "" {
+			return nil, fmt.Errorf("suite name is required")
+		}
+		if !suiteNamePattern.MatchString(name) {
+			return nil, fmt.Errorf("suite name %q must match %s", name, suiteNamePattern.String())
+		}
+		if _, ok := seen[name]; ok {
+			return nil, fmt.Errorf("duplicate suite name %q", name)
+		}
+		seen[name] = struct{}{}
+
+		if suite.Source.FS == nil {
+			return nil, fmt.Errorf("suite %q source FS is required", name)
+		}
+		paths := slices.Clone(suite.Source.Paths)
+		if len(paths) == 0 {
+			return nil, fmt.Errorf("suite %q must include at least one feature path", name)
+		}
+		for i, path := range paths {
+			paths[i] = strings.TrimSpace(path)
+			if paths[i] == "" {
+				return nil, fmt.Errorf("suite %q feature path cannot be empty", name)
+			}
+		}
+		registrars := slices.Clone(suite.StepRegistrars)
+		for i, registrar := range registrars {
+			if registrar == nil {
+				return nil, fmt.Errorf("suite %q step registrar %d is nil", name, i)
+			}
+		}
+
+		out = append(out, SuiteConfig{
+			Name: name,
+			Source: FeatureSource{
+				FS:    suite.Source.FS,
+				Paths: paths,
+			},
+			VersionAxes:    slices.Clone(suite.VersionAxes),
+			Tags:           strings.TrimSpace(suite.Tags),
+			StepRegistrars: registrars,
+			FilterOptions:  suite.FilterOptions,
+		})
+	}
+	return out, nil
+}
+
+func (r *Runner) suiteFeaturePaths(suite SuiteConfig) ([]string, error) {
+	paths := slices.Clone(suite.Source.Paths)
+	if len(suite.VersionAxes) > 0 {
+		var err error
+		paths, err = versionfilter.SelectScenarios(
+			versionfilter.FeatureSource{FS: suite.Source.FS, Paths: suite.Source.Paths},
+			suite.VersionAxes...,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+	log.Printf("acceptance: target Soperator version=%s", r.state.TargetSoperatorVersion)
+	log.Printf("acceptance: suite %s running scenarios: %s", suite.Name, strings.Join(paths, ", "))
+	return paths, nil
+}
+
+func (r *Runner) runSuite(ctx context.Context, exec framework.Exec, suite SuiteConfig, features []string) error {
+	format, err := reports.Format(r.reportDir, suite.Name)
+	if err != nil {
+		return fmt.Errorf("suite %q report format: %w", suite.Name, err)
+	}
+
+	tags := r.suiteTagFilter(suite)
+	godogSuite := godog.TestSuite{
+		Name: suite.Name,
+		ScenarioInitializer: func(sc *godog.ScenarioContext) {
+			r.initializeSuiteScenario(sc, exec, suite)
+		},
 		Options: &godog.Options{
 			Format:         format,
-			FS:             r.features.FS,
+			FS:             suite.Source.FS,
 			Paths:          features,
 			TestingT:       nil,
 			Strict:         true,
@@ -229,200 +275,18 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 
 	suiteStart := time.Now()
-	status := suite.Run()
-	log.Printf("acceptance: suite finished duration=%s", time.Since(suiteStart).Round(time.Millisecond))
+	status := godogSuite.Run()
+	log.Printf("acceptance: suite %s finished duration=%s", suite.Name, time.Since(suiteStart).Round(time.Millisecond))
 	if status != 0 {
-		return fmt.Errorf("godog suite exited with status %d", status)
+		return fmt.Errorf("suite %q: godog exited with status %d", suite.Name, status)
 	}
-
 	return nil
 }
 
-func (r *Runner) tagFilter() string {
-	var filters []string
-
-	if r.tags != "" {
-		filters = append(filters, r.tags)
-	}
-	if r.excludeUnstable {
-		log.Printf("acceptance: run-unstable=false, excluding @unstable scenarios")
-		filters = append(filters, "~@unstable")
-	}
-	if r.excludeMissingWorkerKinds && !r.state.HasGPUWorkers() {
-		log.Printf("acceptance: no GPU workers found, excluding @gpu scenarios")
-		filters = append(filters, "~@gpu")
-	}
-	if r.excludeMissingWorkerKinds && !r.state.HasCPUWorkers() {
-		log.Printf("acceptance: no CPU workers found, excluding @cpu scenarios")
-		filters = append(filters, "~@cpu")
-	}
-
-	return strings.Join(filters, " && ")
-}
-
-func (r *Runner) featurePaths() ([]string, error) {
-	paths, err := selectCompatibleFeaturePaths(r.features, r.state.TargetSoperatorVersion)
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("acceptance: target Soperator version=%s", r.state.TargetSoperatorVersion)
-	log.Printf("acceptance: running scenarios: %s", strings.Join(paths, ", "))
-	return paths, nil
-}
-
-func discoverCluster(ctx context.Context, w *world, state *framework.ClusterState) error {
-	if _, err := w.Kubectl().RunWithDefaultRetry(ctx, "get", "pods", "-n", soperatorNamespace); err != nil {
-		return err
-	}
-	if err := verifyPodReady(ctx, w, soperatorNamespace, state.PodName("login-0")); err != nil {
-		return fmt.Errorf("verify login pod: %w", err)
-	}
-	if err := verifyPodReady(ctx, w, soperatorNamespace, state.PodName("controller-0")); err != nil {
-		return fmt.Errorf("verify controller pod: %w", err)
-	}
-	if _, err := w.Controller().RunWithDefaultRetry(ctx, "true"); err != nil {
-		return fmt.Errorf("exec controller sanity check: %w", err)
-	}
-	if _, err := w.Jail().RunWithDefaultRetry(ctx, "true"); err != nil {
-		return fmt.Errorf("exec login jail sanity check: %w", err)
-	}
-
-	discoveredNodeSets, err := discoverNodeSets(ctx, w, state.SlurmClusterName)
-	if err != nil {
-		return fmt.Errorf("discover NodeSets: %w", err)
-	}
-	state.DiscoveredNodeSets = discoveredNodeSets
-	log.Printf("acceptance: discovered nodesets: %s", discoveredNodeSetSummary(state.DiscoveredNodeSets))
-
-	workerOutput, err := w.Controller().RunWithDefaultRetry(ctx, `sinfo -hN -p main -o '%N'`)
-	if err != nil {
-		return fmt.Errorf("discover worker nodes: %w", err)
-	}
-	workerPods, err := discoverWorkerPods(ctx, w)
-	if err != nil {
-		return fmt.Errorf("discover worker pods: %w", err)
-	}
-
-	seen := make(map[string]struct{})
-	var workers []framework.WorkerRef
-	for _, line := range strings.Split(workerOutput, "\n") {
-		name := strings.TrimSpace(line)
-		if name == "" {
-			continue
-		}
-		if _, ok := seen[name]; ok {
-			continue
-		}
-		podName, ok := workerPods[name]
-		if !ok {
-			return fmt.Errorf("worker pod for Slurm node %q was not discovered", name)
-		}
-		seen[name] = struct{}{}
-		workers = append(workers, framework.WorkerRef{Name: name, PodName: podName})
-	}
-	if len(workers) == 0 {
-		return fmt.Errorf("no worker nodes discovered")
-	}
-	state.Workers = workers
-	classifyWorkers(state)
-	if err := verifyDiscoveredWorkers(state); err != nil {
-		return err
-	}
-
-	log.Printf("acceptance: discovered workers: %s", workerNames(state.Workers))
-	log.Printf("acceptance: discovered CPU workers: %s", workerNames(state.CPUWorkers))
-	log.Printf("acceptance: discovered GPU workers: %s", workerNames(state.GPUWorkers))
-	log.Printf("acceptance: discovered workers by nodeset: %s", workersByNodeSetSummary(state.WorkersByNodeSet))
-	return nil
-}
-
-func reportFormat(reportDir string) (string, error) {
-	if reportDir == "" {
-		return "pretty", nil
-	}
-	if err := os.MkdirAll(reportDir, 0o755); err != nil {
-		return "", fmt.Errorf("create report dir %q: %w", reportDir, err)
-	}
-	return fmt.Sprintf("pretty,cucumber:%s,junit:%s",
-		filepath.Join(reportDir, "acceptance.cucumber.json"),
-		filepath.Join(reportDir, "acceptance.junit.xml"),
-	), nil
-}
-
-func discoverNodeSets(ctx context.Context, w *world, clusterName string) ([]framework.DiscoveredNodeSet, error) {
-	output, err := w.Kubectl().RunWithDefaultRetry(ctx, "get", "nodesets", "-n", soperatorNamespace, "-o", "json")
-	if err != nil {
-		return nil, err
-	}
-
-	var nodeSets kubeobjects.NodeSetList
-	if err := json.Unmarshal([]byte(output), &nodeSets); err != nil {
-		return nil, fmt.Errorf("decode NodeSet list: %w", err)
-	}
-
-	discovered := discoveredNodeSetsFromLiveList(nodeSets, clusterName)
-	if len(discovered) == 0 {
-		return nil, fmt.Errorf("no NodeSets found in namespace %s for Slurm cluster %q", soperatorNamespace, clusterName)
-	}
-	return discovered, nil
-}
-
-func discoverWorkerPods(ctx context.Context, w *world) (map[string]string, error) {
-	output, err := w.Kubectl().RunWithDefaultRetry(ctx,
-		"get", "pods", "-n", soperatorNamespace, "-l", "slurm.nebius.ai/worker=true", "-o", "json")
-	if err != nil {
-		return nil, err
-	}
-
-	var pods corev1.PodList
-	if err := json.Unmarshal([]byte(output), &pods); err != nil {
-		return nil, fmt.Errorf("decode worker pod list: %w", err)
-	}
-	return workerPodsBySlurmNodeName(pods)
-}
-
-func workerPodsBySlurmNodeName(pods corev1.PodList) (map[string]string, error) {
-	workers := make(map[string]string, len(pods.Items))
-	for _, pod := range pods.Items {
-		nodeName := strings.TrimSpace(pod.Spec.Hostname)
-		if nodeName == "" {
-			return nil, fmt.Errorf("worker pod %s has empty spec.hostname", pod.Name)
-		}
-		if existing, ok := workers[nodeName]; ok {
-			return nil, fmt.Errorf("worker pods %s and %s both declare spec.hostname=%s", existing, pod.Name, nodeName)
-		}
-		workers[nodeName] = pod.Name
-	}
-	if len(workers) == 0 {
-		return nil, fmt.Errorf("no worker pods found")
-	}
-	return workers, nil
-}
-
-func discoveredNodeSetsFromLiveList(nodeSets kubeobjects.NodeSetList, clusterName string) []framework.DiscoveredNodeSet {
-	discovered := make([]framework.DiscoveredNodeSet, 0, len(nodeSets.Items))
-	for _, nodeSet := range nodeSets.Items {
-		if clusterName != "" && nodeSet.Spec.ClusterName != "" && nodeSet.Spec.ClusterName != clusterName {
-			continue
-		}
-		discovered = append(discovered, framework.DiscoveredNodeSet{
-			Name:   nodeSet.Metadata.Name,
-			Size:   int(nodeSet.Spec.Replicas),
-			HasGPU: nodeSet.Spec.GPU.Enabled,
-		})
-	}
-
-	sort.Slice(discovered, func(i, j int) bool {
-		return discovered[i].Name < discovered[j].Name
-	})
-	return discovered
-}
-
-func (r *Runner) initializeScenario(sc *godog.ScenarioContext) {
-	w := newWorld(r.state, r.kubectlContext)
+func (r *Runner) initializeSuiteScenario(sc *godog.ScenarioContext, exec framework.Exec, suite SuiteConfig) {
 	RegisterDefaultHooks(sc)
-	for _, register := range r.stepRegistrars {
-		register(sc, r.state, w)
+	for _, register := range suite.StepRegistrars {
+		register(sc, r.state, exec)
 	}
 }
 
@@ -485,127 +349,4 @@ func newWorld(state *framework.ClusterState, kubectlContext string) *world {
 
 func (w *world) logf(format string, args ...any) {
 	log.Printf("%s: %s", w.logPrefix, fmt.Sprintf(format, args...))
-}
-
-func workerNames(workers []framework.WorkerRef) string {
-	if len(workers) == 0 {
-		return "<none>"
-	}
-	names := make([]string, 0, len(workers))
-	for _, worker := range workers {
-		names = append(names, worker.Name)
-	}
-	return strings.Join(names, ", ")
-}
-
-func workersByNodeSetSummary(workersByNodeSet map[string][]framework.WorkerRef) string {
-	if len(workersByNodeSet) == 0 {
-		return "<none>"
-	}
-
-	names := make([]string, 0, len(workersByNodeSet))
-	for nodeSet := range workersByNodeSet {
-		names = append(names, nodeSet)
-	}
-	sort.Strings(names)
-
-	parts := make([]string, 0, len(names))
-	for _, nodeSet := range names {
-		parts = append(parts, fmt.Sprintf("%s=[%s]", nodeSet, workerNames(workersByNodeSet[nodeSet])))
-	}
-
-	return strings.Join(parts, "; ")
-}
-
-func discoveredNodeSetSummary(nodeSets []framework.DiscoveredNodeSet) string {
-	if len(nodeSets) == 0 {
-		return "<none>"
-	}
-	parts := make([]string, 0, len(nodeSets))
-	for _, nodeSet := range nodeSets {
-		nodeType := "cpu"
-		if nodeSet.HasGPU {
-			nodeType = "gpu"
-		}
-		parts = append(parts, fmt.Sprintf("%s=%d/%s", nodeSet.Name, nodeSet.Size, nodeType))
-	}
-	return strings.Join(parts, ", ")
-}
-
-func verifyPodReady(ctx context.Context, w *world, namespace, name string) error {
-	output, err := w.Kubectl().RunWithDefaultRetry(ctx, "get", "pod", "-n", namespace, name, "-o", "json")
-	if err != nil {
-		return err
-	}
-
-	var pod corev1.Pod
-	if err := json.Unmarshal([]byte(output), &pod); err != nil {
-		return fmt.Errorf("decode pod %s/%s: %w", namespace, name, err)
-	}
-	if pod.Status.Phase != corev1.PodRunning {
-		return fmt.Errorf("pod %s/%s phase=%s, want %s", namespace, name, pod.Status.Phase, corev1.PodRunning)
-	}
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-			return nil
-		}
-	}
-	return fmt.Errorf("pod %s/%s is not Ready", namespace, name)
-}
-
-func classifyWorkers(state *framework.ClusterState) {
-	state.WorkersByNodeSet = make(map[string][]framework.WorkerRef, len(state.DiscoveredNodeSets))
-	state.CPUWorkers = nil
-	state.GPUWorkers = nil
-
-	if len(state.DiscoveredNodeSets) == 0 {
-		return
-	}
-
-	discovered := slices.Clone(state.DiscoveredNodeSets)
-	sort.Slice(discovered, func(i, j int) bool {
-		return len(discovered[i].Name) > len(discovered[j].Name)
-	})
-
-	gpuByName := make(map[string]bool, len(discovered))
-	for _, nodeSet := range discovered {
-		gpuByName[nodeSet.Name] = nodeSet.HasGPU
-	}
-
-	for _, worker := range state.Workers {
-		for _, nodeSet := range discovered {
-			prefix := nodeSet.Name + "-"
-			if !strings.HasPrefix(worker.Name, prefix) {
-				continue
-			}
-			state.WorkersByNodeSet[nodeSet.Name] = append(state.WorkersByNodeSet[nodeSet.Name], worker)
-			if gpuByName[nodeSet.Name] {
-				state.GPUWorkers = append(state.GPUWorkers, worker)
-			} else {
-				state.CPUWorkers = append(state.CPUWorkers, worker)
-			}
-			break
-		}
-	}
-}
-
-func verifyDiscoveredWorkers(state *framework.ClusterState) error {
-	var problems []string
-	for _, nodeSet := range state.DiscoveredNodeSets {
-		liveWorkers := len(state.WorkersByNodeSet[nodeSet.Name])
-		if liveWorkers != nodeSet.Size {
-			problems = append(problems, fmt.Sprintf("NodeSet %s live workers in Slurm=%d desired=%d", nodeSet.Name, liveWorkers, nodeSet.Size))
-		}
-	}
-
-	desiredWorkers := state.DesiredWorkerCount()
-	if desiredWorkers > 0 && len(state.Workers) != desiredWorkers {
-		problems = append(problems, fmt.Sprintf("discovered workers=%d desired=%d", len(state.Workers), desiredWorkers))
-	}
-
-	if len(problems) > 0 {
-		sort.Strings(problems)
-		return fmt.Errorf("%s", strings.Join(problems, "; "))
-	}
-	return nil
 }

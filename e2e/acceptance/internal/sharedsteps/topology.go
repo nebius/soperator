@@ -1,4 +1,4 @@
-package steps
+package sharedsteps
 
 import (
 	"context"
@@ -47,12 +47,17 @@ func NewTopology(state *framework.ClusterState, exec framework.Exec) *Topology {
 	return &Topology{exec: exec, state: state}
 }
 
-func (s *Topology) Register(sc *godog.ScenarioContext) {
+func (s *Topology) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the Slurm topology plugin is topology/tree$`, s.theSlurmTopologyPluginIsTree)
 	sc.Step(`^scontrol show topology is parsed into a switch tree$`, s.scontrolTopologyIsParsedIntoASwitchTree)
 	sc.Step(`^every worker in the main partition is present in the topology$`, s.everyWorkerIsPresentInTheTopology)
 	sc.Step(`^a job runs on all available workers and reports SLURM_TOPOLOGY_ADDR$`, s.aJobRunsOnAllAvailableWorkers)
 	sc.Step(`^each task's SLURM_TOPOLOGY_ADDR matches its position in the topology$`, s.eachTaskAddrMatchesTheTree)
+}
+
+func (s *Topology) CleanupAndReset(ctx context.Context) {
+	s.graph = nil
+	s.reportedAddrs = nil
 }
 
 func (s *Topology) theSlurmTopologyPluginIsTree(ctx context.Context) error {

@@ -13,6 +13,11 @@ on:
         required: false
         default: ""
         type: string
+      soperator_e2e_repo_branch:
+        description: "Soperator E2E repo branch used to build acceptance (defaults to main)"
+        required: false
+        default: "main"
+        type: string
       profile_env_var:
         description: "Name of the GitHub variable containing the profile YAML (defaults to env setting)"
         required: false
@@ -68,12 +73,14 @@ jobs:
         env:
           PROFILE_ENV_VAR: ${{ inputs.profile_env_var || vars.PROFILE_ENV_VAR }}
           TERRAFORM_REPO_REF: ${{ github.event.inputs.terraform_repo_ref || github.ref_name }}
+          SOPERATOR_E2E_REPO_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
         run: |
           {
             echo "### Run Parameters"
             echo ""
             echo "- Branch: \`${{ github.ref_name }}\`"
             echo "- Terraform branch: \`$TERRAFORM_REPO_REF\`"
+            echo "- Soperator E2E repo branch: \`$SOPERATOR_E2E_REPO_BRANCH\`"
             echo "- Profile variable: \`$PROFILE_ENV_VAR\`"
             echo ""
             echo '```yaml'
@@ -162,6 +169,8 @@ jobs:
       PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/soperator/installations/example"
       TERRAFORM_REPO: "nebius/nebius-solution-library"
       TERRAFORM_REPO_REF: "${{ github.event.inputs.terraform_repo_ref || github.ref_name }}"
+      SOPERATOR_E2E_REPO: "${{ github.repository }}"
+      SOPERATOR_E2E_REPO_BRANCH: "${{ inputs.soperator_e2e_repo_branch || 'main' }}"
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
       PROFILE_ENV_VAR: ${{ inputs.profile_env_var || vars.PROFILE_ENV_VAR }}
       E2E_PROFILE: ${{ vars[inputs.profile_env_var || vars.PROFILE_ENV_VAR] }}
@@ -192,16 +201,18 @@ jobs:
       - name: Build e2e binary
         run: go build -o bin/e2e ./cmd/e2e
 
-      - name: Checkout main acceptance source
-        # Keep acceptance execution on the canonical E2E source. When E2E moves
-        # to a separate repository, this checkout/build pair should point there.
+      - name: Checkout Soperator E2E source
+        # For now the Soperator E2E source still lives in this repository. When
+        # it moves to a separate repository, this checkout/build pair should
+        # point there and keep using SOPERATOR_E2E_REPO_BRANCH.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
-          path: soperator-main
+          repository: ${{ env.SOPERATOR_E2E_REPO }}
+          ref: ${{ env.SOPERATOR_E2E_REPO_BRANCH }}
+          path: soperator-e2e
 
       - name: Build acceptance binary
-        working-directory: "${{ github.workspace }}/soperator-main/e2e"
+        working-directory: "${{ github.workspace }}/soperator-e2e/e2e"
         run: go build -o "${{ github.workspace }}/bin/acceptance" ./cmd/acceptance
 
       - name: Export profile outputs
@@ -445,7 +456,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          json="e2e-reports/acceptance/acceptance.cucumber.json"
+          json="e2e-reports/acceptance/soperator.cucumber.json"
           if [[ ! -f "$json" ]]; then
             echo "no cucumber report at $json"
             exit 0
@@ -800,13 +811,15 @@ jobs:
     name: Notify Slack on E2E failure
     needs: [resolve-profile, e2e-test]
     # Only fire when the run targeted the default terraform branch (empty input
-    # falls back to github.ref_name in e2e-test). Custom terraform branches are
-    # usually experiments and shouldn't page e2e owners on failure.
+    # falls back to github.ref_name in e2e-test) and default Soperator E2E
+    # branch. Custom branches are usually experiments and shouldn't page e2e
+    # owners on failure.
     if: |
       always() &&
       (needs.resolve-profile.result == 'failure' || needs.e2e-test.result == 'failure') &&
       (github.ref_name == 'main' || startsWith(github.ref_name, 'soperator-release-')) &&
-      (inputs.terraform_repo_ref == '' || inputs.terraform_repo_ref == github.ref_name)
+      (inputs.terraform_repo_ref == '' || inputs.terraform_repo_ref == github.ref_name) &&
+      (inputs.soperator_e2e_repo_branch == '' || inputs.soperator_e2e_repo_branch == 'main')
     runs-on: ubuntu-latest
     environment: e2e
     steps:
