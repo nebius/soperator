@@ -10,8 +10,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"nebius.ai/slurm-operator/e2e/acceptance/framework"
-	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/soperator-e2e/acceptance/framework"
+	"nebius.ai/soperator-e2e/acceptance/kubeobjects"
 )
 
 const (
@@ -170,7 +170,7 @@ func (s *ActiveChecks) waitForK8sJobCompleteSuccessfully(ctx context.Context, jo
 
 func (s *ActiveChecks) waitForActiveCheckSlurmRunComplete(ctx context.Context, checkName, firstJobID string, timeout time.Duration) error {
 	return s.exec.WaitFor(ctx, fmt.Sprintf("ActiveCheck %s Slurm run %s complete", checkName, firstJobID), timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		var check activeCheckStatus
+		var check kubeobjects.ActiveCheck
 		if err := kubectlJSON(waitCtx, s.exec, &check, "get", "activecheck", "-n", clusterCreationNamespace, checkName, "-o", "json"); err != nil {
 			return false, err
 		}
@@ -179,12 +179,12 @@ func (s *ActiveChecks) waitForActiveCheckSlurmRunComplete(ctx context.Context, c
 			return false, nil
 		}
 		switch status.LastRunStatus {
-		case consts.ActiveCheckSlurmRunStatusComplete:
+		case kubeobjects.ActiveCheckSlurmRunStatusComplete:
 			return true, nil
-		case consts.ActiveCheckSlurmRunStatusFailed,
-			consts.ActiveCheckSlurmRunStatusCancelled,
-			consts.ActiveCheckSlurmRunStatusError,
-			consts.ActiveCheckSlurmRunStatusSkipped:
+		case kubeobjects.ActiveCheckSlurmRunStatusFailed,
+			kubeobjects.ActiveCheckSlurmRunStatusCancelled,
+			kubeobjects.ActiveCheckSlurmRunStatusError,
+			kubeobjects.ActiveCheckSlurmRunStatusSkipped:
 			return false, fmt.Errorf("ActiveCheck %s finished with status=%s fail_jobs=%+v error_jobs=%+v cancelled_jobs=%v",
 				checkName, status.LastRunStatus, status.LastRunFailJobsAndReasons, status.LastRunErrorJobsAndReasons, status.LastRunCancelledJobs)
 		default:
@@ -388,18 +388,6 @@ type activeCheckSlurmJobRecord struct {
 	State    string
 	ExitCode string
 	NodeList string
-}
-
-type activeCheckStatus struct {
-	Status struct {
-		SlurmJobsStatus struct {
-			LastRunID                  string                           `json:"lastRunId"`
-			LastRunStatus              consts.ActiveCheckSlurmRunStatus `json:"lastRunStatus"`
-			LastRunFailJobsAndReasons  []any                            `json:"lastRunFailJobsAndReasons"`
-			LastRunErrorJobsAndReasons []any                            `json:"lastRunErrorJobsAndReasons"`
-			LastRunCancelledJobs       []string                         `json:"lastRunCancelledJobs"`
-		} `json:"slurmJobsStatus"`
-	} `json:"status"`
 }
 
 func activeCheckSlurmJobOutputPath(record activeCheckSlurmJobRecord) string {

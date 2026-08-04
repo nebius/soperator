@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"nebius.ai/slurm-operator/e2e/cmd/acceptance/cli"
+	"nebius.ai/soperator-e2e/cmd/acceptance/cli"
 )
 
 func main() {

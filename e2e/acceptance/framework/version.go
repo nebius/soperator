@@ -3,7 +3,7 @@ package framework
 import (
 	"fmt"
 
-	"nebius.ai/slurm-operator/e2e/versionfilter"
+	"nebius.ai/soperator-e2e/versionfilter"
 )
 
 func NormalizeSoperatorVersion(raw string) (string, error) {

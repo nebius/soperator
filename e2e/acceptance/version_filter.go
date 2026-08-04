@@ -1,6 +1,6 @@
 package acceptance
 
-import "nebius.ai/slurm-operator/e2e/versionfilter"
+import "nebius.ai/soperator-e2e/versionfilter"
 
 const soperatorVersionTagPrefix = "@soperator_version_"
 
