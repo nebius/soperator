@@ -192,8 +192,17 @@ jobs:
       - name: Build e2e binary
         run: go build -o bin/e2e ./cmd/e2e
 
+      - name: Checkout main acceptance source
+        # Keep acceptance execution on the canonical E2E source. When E2E moves
+        # to a separate repository, this checkout/build pair should point there.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: soperator-main
+
       - name: Build acceptance binary
-        run: go build -o bin/acceptance ./e2e/cmd/acceptance
+        working-directory: "${{ github.workspace }}/soperator-main"
+        run: go build -o "${{ github.workspace }}/bin/acceptance" ./e2e/cmd/acceptance
 
       - name: Export profile outputs
         shell: bash
