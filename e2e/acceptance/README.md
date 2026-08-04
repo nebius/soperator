@@ -34,12 +34,14 @@ The CLI resolves it in this order:
 2. Flux HelmRelease discovery through the provided kubectl context
 
 Use `--soperator-version` for a manual override, for example
-`--soperator-version 4.2.0`. If the flag is omitted, the CLI uses kubectl to
+`--soperator-version 5.0.0`. If the flag is omitted, the CLI uses kubectl to
 discover the version from the target cluster.
 
-Flux discovery reads `status.lastAttemptedRevision` from the standard Soperator
-HelmRelease: `flux-system/flux-system-soperator-fluxcd-soperator`. If
-discovery cannot do that, the CLI fails before running scenarios and asks for
+Flux discovery reads the standard Soperator HelmRelease
+`flux-system/flux-system-soperator-fluxcd-soperator`. It uses
+`status.lastAppliedRevision` when present and falls back to
+`status.lastAttemptedRevision` when the applied revision is empty. If discovery
+cannot resolve a version, the CLI fails before running scenarios and asks for
 `--soperator-version`.
 
 All flags:
@@ -103,7 +105,7 @@ func run(ctx context.Context, kubectlContext string) error {
 		SuiteName:                 "custom-soperator-acceptance",
 		KubectlContext:            kubectlContext,
 		SlurmClusterName:          "soperator",
-		TargetSoperatorVersion:    "4.2.0",
+		TargetSoperatorVersion:    "5.0.0",
 		Features:                  features,
 		Tags:                      "~@unstable",
 		ExcludeMissingWorkerKinds: true,
@@ -127,11 +129,12 @@ The caller controls scenario selection through `FeatureSource.Paths` and Godog
 tag filtering through `Options.Tags`. The runner always pre-filters scenarios
 by `TargetSoperatorVersion` before invoking Godog.
 
-Every scenario must have exactly one `@soperator_version_...` tag. Version tags
-must be on the scenario itself and use full patch versions only, for example
-`@soperator_version_>=4.2.0`; shorthand forms such as
-`@soperator_version_>=4.2` are intentionally rejected. Comma means AND and `||`
-means OR, for example
+Every scenario must have exactly one `@soperator_version_...` tag. Put the tag
+on the scenario itself and use an explicit full patch-version constraint such as
+`@soperator_version_>=5.0.0`. This tag means the scenario runs only when the
+normalized target Soperator version satisfies the constraint. Shorthand forms
+such as `@soperator_version_>=5.0` are intentionally rejected. Comma means AND
+and `||` means OR, for example
 `@soperator_version_>=4.1.0,<4.4.0||>=5.0.0,<6.0.0`.
 
 The runner stores and uses a normalized target version for filtering. Suffixes
@@ -149,6 +152,6 @@ GitHub Actions keeps two refs separate:
 The workflow reads the target Soperator version from the selected build artifact
 and uses it for Terraform deployment and scenario filtering. When new tests or
 behavior are added, the scenarios must be tagged with the full version lower
-bound where that behavior exists, for example `@soperator_version_>=4.2.0`.
+bound where that behavior exists, for example `@soperator_version_>=5.0.0`.
 
 The shared steps currently assume the Soperator namespace is `soperator`.

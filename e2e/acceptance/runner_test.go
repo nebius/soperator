@@ -14,7 +14,7 @@ import (
 	"nebius.ai/soperator-e2e/acceptance/kubeobjects"
 )
 
-const testTargetSoperatorVersion = "4.2.0"
+const testTargetSoperatorVersion = "5.0.0"
 
 func TestRunnerTagFilter(t *testing.T) {
 	cpuAndGPUState := &framework.ClusterState{
@@ -79,7 +79,7 @@ func TestRunnerFeaturePaths(t *testing.T) {
   Scenario: old scenario
     Then old behavior works
 
-  @soperator_version_>=4.2.0
+  @soperator_version_>=5.0.0
   Scenario: new scenario
     Then new behavior works
 `)},

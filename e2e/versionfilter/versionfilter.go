@@ -58,7 +58,7 @@ func NormalizeVersion(raw string) (string, error) {
 }
 
 // ParseBaseVersion accepts full major.minor.patch versions and strips suffixes
-// from target versions such as 4.2.0-reb85d0e5.
+// from target versions such as 5.0.0-reb85d0e5.
 func ParseBaseVersion(raw string) (*semver.Version, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
@@ -287,6 +287,8 @@ func validateVersionTags(scenarios []featureScenario, axes []preparedAxis) error
 					len(versionTags),
 				)
 			}
+			// Validate tags while parsing the feature, so malformed tags fail even
+			// when the scenario is incompatible with the current target version.
 			if err := validateVersionConstraintExpression(strings.TrimPrefix(versionTags[0], axis.tagPrefix)); err != nil {
 				return fmt.Errorf("scenario %q at %s:%d has invalid version tag %s: %w",
 					scenario.name,
@@ -355,7 +357,7 @@ func versionConstraintMatches(expression string, target *semver.Version) (bool, 
 	if err := validateVersionConstraintExpression(expression); err != nil {
 		return false, err
 	}
-	constraint, err := semver.NewConstraint(semverConstraintExpression(expression))
+	constraint, err := semver.NewConstraint(expression)
 	if err != nil {
 		return false, err
 	}
@@ -383,16 +385,4 @@ func validateVersionConstraintExpression(expression string) error {
 		}
 	}
 	return nil
-}
-
-func semverConstraintExpression(expression string) string {
-	groups := strings.Split(expression, "||")
-	for i, group := range groups {
-		constraints := strings.Split(group, ",")
-		for j, constraint := range constraints {
-			constraints[j] = strings.TrimSpace(constraint)
-		}
-		groups[i] = strings.Join(constraints, " ")
-	}
-	return strings.Join(groups, " || ")
 }

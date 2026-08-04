@@ -17,15 +17,15 @@ const (
 	versionDiscoveryCommandTimeout = time.Minute
 )
 
-// discoverFluxSoperatorVersion reads the deployed Soperator chart version from
-// the standard Flux HelmRelease installed on Soperator clusters.
+// discoverFluxSoperatorVersion reads the Soperator chart revision from the
+// standard Flux HelmRelease installed on Soperator clusters.
 func discoverFluxSoperatorVersion(ctx context.Context, kubectlContext string) (string, error) {
 	version, err := kubectlGetSoperatorHelmReleaseRevision(ctx, kubectlContext)
 	if err != nil {
 		return "", fmt.Errorf("get Soperator HelmRelease revision: %w", err)
 	}
 
-	return soperatorVersionFromHelmReleaseRevision(version)
+	return soperatorVersionFromHelmReleaseRevisions(version)
 }
 
 func kubectlGetSoperatorHelmReleaseRevision(ctx context.Context, kubectlContext string) (string, error) {
@@ -36,7 +36,7 @@ func kubectlGetSoperatorHelmReleaseRevision(ctx context.Context, kubectlContext 
 		kubectlContext,
 		"-n", soperatorHelmReleaseNamespace,
 		"get", "helmrelease", soperatorHelmReleaseName,
-		"-o", "jsonpath={.status.lastAttemptedRevision}",
+		"-o", "jsonpath={.status.lastAppliedRevision}{\"\\n\"}{.status.lastAttemptedRevision}",
 	)
 	cmd := exec.CommandContext(cmdCtx, "kubectl", args...)
 
@@ -66,10 +66,33 @@ func appendKubectlContext(kubectlContext string, args ...string) []string {
 	return out
 }
 
-func soperatorVersionFromHelmReleaseRevision(raw string) (string, error) {
-	version := strings.TrimSpace(raw)
+func soperatorVersionFromHelmReleaseRevisions(raw string) (string, error) {
+	lines := strings.Split(raw, "\n")
+	var appliedRevision string
+	if len(lines) > 0 {
+		appliedRevision = strings.TrimSpace(lines[0])
+	}
+	if appliedRevision != "" {
+		return validateSoperatorHelmReleaseVersion(appliedRevision)
+	}
+
+	var attemptedRevision string
+	if len(lines) > 1 {
+		attemptedRevision = strings.TrimSpace(lines[1])
+	}
+	if attemptedRevision != "" {
+		return validateSoperatorHelmReleaseVersion(attemptedRevision)
+	}
+
+	return "", fmt.Errorf("Flux HelmRelease %s/%s has empty status.lastAppliedRevision and status.lastAttemptedRevision",
+		soperatorHelmReleaseNamespace,
+		soperatorHelmReleaseName,
+	)
+}
+
+func validateSoperatorHelmReleaseVersion(version string) (string, error) {
 	if version == "" {
-		return "", fmt.Errorf("Flux HelmRelease %s/%s has empty status.lastAttemptedRevision",
+		return "", fmt.Errorf("Flux HelmRelease %s/%s has empty revision",
 			soperatorHelmReleaseNamespace,
 			soperatorHelmReleaseName,
 		)

@@ -24,7 +24,7 @@ func TestSharedFeaturesParseWithGherkin(t *testing.T) {
 }
 
 func TestSharedFeaturesHaveValidVersionTags(t *testing.T) {
-	paths, err := selectCompatibleFeaturePaths(SharedFeatureSource(), "4.2.0")
+	paths, err := selectCompatibleFeaturePaths(SharedFeatureSource(), "5.0.0")
 	require.NoError(t, err)
 	assert.NotEmpty(t, paths)
 }

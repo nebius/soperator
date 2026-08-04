@@ -23,6 +23,9 @@ spec:
       version: {{ .Values.observability.vmStack.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- if and .Values.observability.publicEndpointEnabled (eq .Values.observability.publicEndpointTokenKind "secret") (include "soperator-fluxcd.o11yTsaTokenWriterEnabled" .) }}
+  - name: {{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}
+  {{- end }}
   {{- if .Values.certManager.enabled }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
   {{- end }}
@@ -410,12 +413,11 @@ spec:
           {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
           {{- $tokenKind := .Values.observability.publicEndpointTokenKind }}
           {{- $hasVmagentSpec := .Values.observability.vmStack.values.vmagent.spec }}
-          {{- $tsaToken := .Values.observability.vmStack.tsaToken | default dict }}
-          {{- $tokenSecretName := $tsaToken.secretName | default "o11y-writer-sa-token" }}
-          {{- $tokenSecretKey := $tsaToken.secretKey | default "accessToken" }}
-          {{- $tokenHostPath := $tsaToken.hostPath | default "/mnt/cloud-metadata" }}
-          {{- $tokenMountPath := $tsaToken.mountPath | default "/o11ytoken" }}
-          {{- $tokenHostPathFilename := $tsaToken.hostPathFilename | default "tsa-token" }}
+          {{- $tokenSecretName := include "soperator-fluxcd.o11yTsaTokenSecretName" . }}
+          {{- $tokenSecretKey := include "soperator-fluxcd.o11yTsaTokenSecretKey" . }}
+          {{- $tokenHostPath := include "soperator-fluxcd.o11yTsaTokenHostPath" . }}
+          {{- $tokenMountPath := include "soperator-fluxcd.o11yTsaTokenMountPath" . }}
+          {{- $tokenHostPathFilename := include "soperator-fluxcd.o11yTsaTokenHostPathFilename" . }}
           {{- $useHostPathToken := and $hasPublicEndpoint (eq $tokenKind "hostPath") }}
           {{- $hasHostNetwork := and $hasVmagentSpec (hasKey $hasVmagentSpec "hostNetwork") }}
           {{- $hasDnsPolicy := and $hasVmagentSpec (hasKey $hasVmagentSpec "dnsPolicy") }}
