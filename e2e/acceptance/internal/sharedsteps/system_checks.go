@@ -82,7 +82,28 @@ func (s *SystemChecks) RegisterSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *SystemChecks) CleanupAndReset(ctx context.Context) {
-	s.cleanupAndReset(ctx)
+	if s.kubeletDebugPodName != "" {
+		if _, err := s.exec.Kubectl().Run(ctx, "delete", "pod", s.kubeletDebugPodName, "--ignore-not-found"); err != nil {
+			s.exec.Logf("cleanup: delete kubelet debug pod %s: %v", s.kubeletDebugPodName, err)
+		}
+	}
+	if s.workerPod.Name != "" {
+		if _, err := s.exec.WorkerPod(s.worker).Run(ctx, fmt.Sprintf("rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(systemEphemeralFillPath))); err != nil {
+			s.exec.Logf("cleanup: remove ephemeral fill file from %s: %v", s.workerPod.Name, err)
+		}
+	}
+	if s.worker.Name != "" {
+		if err := s.slurm.ResumeNodeIfDrainedByReason(ctx, s.worker.Name, systemEphemeralReason); err != nil {
+			s.exec.Logf("cleanup: resume %s after pod_ephemeral_storage: %v", s.worker.Name, err)
+		}
+	}
+	s.worker = framework.WorkerRef{}
+	s.workerPod = corev1.Pod{}
+	s.kubeletWorker = framework.WorkerRef{}
+	s.kubeletK8sNodeName = ""
+	s.kubeletK8sNodeUID = ""
+	s.kubeletWorkerPodUID = ""
+	s.kubeletDebugPodName = ""
 }
 
 func (s *SystemChecks) aHealthyWorkerPodIsSelected(ctx context.Context) error {
@@ -296,31 +317,6 @@ func (s *SystemChecks) theSelectedSlurmWorkerIsUsableAfterKubeletReplacement(ctx
 	s.kubeletK8sNodeUID = ""
 	s.kubeletWorkerPodUID = ""
 	return nil
-}
-
-func (s *SystemChecks) cleanupAndReset(ctx context.Context) {
-	if s.kubeletDebugPodName != "" {
-		if _, err := s.exec.Kubectl().Run(ctx, "delete", "pod", s.kubeletDebugPodName, "--ignore-not-found"); err != nil {
-			s.exec.Logf("cleanup: delete kubelet debug pod %s: %v", s.kubeletDebugPodName, err)
-		}
-	}
-	if s.workerPod.Name != "" {
-		if _, err := s.exec.WorkerPod(s.worker).Run(ctx, fmt.Sprintf("rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(systemEphemeralFillPath))); err != nil {
-			s.exec.Logf("cleanup: remove ephemeral fill file from %s: %v", s.workerPod.Name, err)
-		}
-	}
-	if s.worker.Name != "" {
-		if err := s.slurm.ResumeNodeIfDrainedByReason(ctx, s.worker.Name, systemEphemeralReason); err != nil {
-			s.exec.Logf("cleanup: resume %s after pod_ephemeral_storage: %v", s.worker.Name, err)
-		}
-	}
-	s.worker = framework.WorkerRef{}
-	s.workerPod = corev1.Pod{}
-	s.kubeletWorker = framework.WorkerRef{}
-	s.kubeletK8sNodeName = ""
-	s.kubeletK8sNodeUID = ""
-	s.kubeletWorkerPodUID = ""
-	s.kubeletDebugPodName = ""
 }
 
 func (s *SystemChecks) ephemeralInfo(ctx context.Context, pod corev1.Pod) (workerEphemeralInfo, error) {
