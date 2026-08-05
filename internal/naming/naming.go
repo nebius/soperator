@@ -176,6 +176,14 @@ func BuildConfigMapSecurityLimitsName(componentType consts.ComponentType, cluste
 	}.String()
 }
 
+func BuildConfigMapUserIsolationName(clusterName string) string {
+	return namedEntity{
+		componentType: &consts.ComponentTypeLogin,
+		clusterName:   clusterName,
+		entity:        consts.ConfigMapNameUserIsolation,
+	}.String()
+}
+
 func BuildConfigMapSecurityLimitsForNodeSetName(clusterName, nodeSetName string) string {
 	return namedEntity{
 		clusterName:        clusterName,

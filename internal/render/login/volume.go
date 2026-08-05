@@ -6,6 +6,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -25,6 +26,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeInMemory(login.ContainerSshd.Resources.Memory()),
 		common.RenderVolumeTmpDisk(),
 		renderVolumeSshdConfigs(login.SSHDConfigMapName),
+		renderVolumeUserIsolation(clusterName),
 	}
 	if login.ContainerSSSD != nil {
 		volumes = append(volumes,
@@ -110,6 +112,31 @@ func renderVolumeMountSshdConfigs() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameSSHDConfigsLogin,
 		MountPath: consts.VolumeMountPathSSHConfigs,
+		ReadOnly:  true,
+	}
+}
+
+// renderVolumeUserIsolation renders [corev1.Volume] containing per-user isolation config contents
+func renderVolumeUserIsolation(clusterName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameUserIsolation,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: naming.BuildConfigMapUserIsolationName(clusterName),
+				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
+			},
+		},
+	}
+}
+
+// renderVolumeMountUserIsolation renders [corev1.VolumeMount] defining the mounting path for the per-user isolation config
+func renderVolumeMountUserIsolation() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameUserIsolation,
+		MountPath: consts.VolumeMountPathUserIsolation,
+		SubPath:   consts.VolumeMountSubPathUserIsolation,
 		ReadOnly:  true,
 	}
 }

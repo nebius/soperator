@@ -32,6 +32,8 @@ type SlurmLogin struct {
 	JailSubMounts      []slurmv1.NodeVolumeMount
 	CustomVolumeMounts []slurmv1.NodeVolumeMount
 
+	UserIsolation *slurmv1.LoginUserIsolation
+
 	UseDefaultAppArmorProfile bool
 	Maintenance               *consts.MaintenanceMode
 }
@@ -85,6 +87,7 @@ func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.Mai
 		VolumeJail:                *login.Volumes.Jail.DeepCopy(),
 		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
 		Maintenance:               maintenance,
+		UserIsolation:             login.UserIsolation.DeepCopy(),
 	}
 	if login.Sssd != nil {
 		containerSSSD := buildContainerFrom(

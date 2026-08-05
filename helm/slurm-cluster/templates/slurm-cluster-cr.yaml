@@ -478,6 +478,19 @@ spec:
           {{- if .Values.slurmNodes.login.volumes.customMounts }}
           {{- .Values.slurmNodes.login.volumes.customMounts | toYaml | nindent 10 }}
           {{- end }}
+      {{- with .Values.slurmNodes.login.userIsolation }}
+      userIsolation:
+        enabled: {{ default false .enabled }}
+        {{- if .memoryHigh }}
+        memoryHigh: {{ .memoryHigh | quote }}
+        {{- end }}
+        {{- if .memoryMax }}
+        memoryMax: {{ .memoryMax | quote }}
+        {{- end }}
+        {{- if .cpuWeight }}
+        cpuWeight: {{ .cpuWeight }}
+        {{- end }}
+      {{- end }}
     exporter:
       enabled: {{ .Values.slurmNodes.exporter.enabled }}
       size: {{ required ".Values.slurmNodes.exporter.size must be provided." .Values.slurmNodes.exporter.size }}

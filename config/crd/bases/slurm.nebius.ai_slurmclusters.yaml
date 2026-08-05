@@ -20044,6 +20044,49 @@ spec:
                         description: SSSDLdapCAConfigMapRefName is the name of the
                           ConfigMap containing LDAP CA certificates for the sssd sidecar.
                         type: string
+                      userIsolation:
+                        description: UserIsolation defines per-user cgroup resource
+                          isolation for SSH sessions on login nodes
+                        properties:
+                          cpuWeight:
+                            default: 100
+                            description: |-
+                              CPUWeight is the per-user CPU weight (cgroup v2 cpu.weight).
+                              CPU is shared proportionally between users under contention; idle CPU stays fully usable
+                            format: int64
+                            maximum: 10000
+                            minimum: 1
+                            type: integer
+                          enabled:
+                            default: false
+                            description: Enabled turns on placement of each SSH session
+                              into a per-user cgroup
+                            type: boolean
+                          memoryHigh:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: |-
+                              MemoryHigh is the per-user memory throttling threshold (cgroup v2 memory.high).
+                              The kernel throttles and reclaims a user's memory above this value before OOM.
+                              Must be lower than the sshd container memory limit.
+                              When unset, it is derived as 80% of the sshd container memory limit
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                          memoryMax:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: |-
+                              MemoryMax is the per-user hard memory limit (cgroup v2 memory.max).
+                              The OOM killer is scoped to the user's own cgroup when this limit is hit.
+                              Must be lower than the sshd container memory limit.
+                              When unset, it is derived as 90% of the sshd container memory limit,
+                              which keeps OOM events scoped to a single user without restricting
+                              how much of the container's memory a lone user may use
+                            pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                            x-kubernetes-int-or-string: true
+                        type: object
                       volumes:
                         description: Volumes represents the volume configurations
                           for the login node

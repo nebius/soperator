@@ -3,6 +3,7 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
@@ -1044,6 +1045,50 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeLoginVolumes `json:"volumes"`
+
+	// UserIsolation defines per-user cgroup resource isolation for SSH sessions on login nodes
+	//
+	// +kubebuilder:validation:Optional
+	UserIsolation *LoginUserIsolation `json:"userIsolation,omitempty"`
+}
+
+// LoginUserIsolation defines per-user cgroup v2 limits applied to each SSH session on login nodes.
+// Each user's session processes are placed into a dedicated child cgroup of the sshd container,
+// so one user cannot exhaust the memory or monopolize the CPU of the whole login node.
+// Requires cgroup v2 on the Kubernetes node; silently disabled otherwise.
+type LoginUserIsolation struct {
+	// Enabled turns on placement of each SSH session into a per-user cgroup
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
+
+	// MemoryHigh is the per-user memory throttling threshold (cgroup v2 memory.high).
+	// The kernel throttles and reclaims a user's memory above this value before OOM.
+	// Must be lower than the sshd container memory limit.
+	// When unset, it is derived as 80% of the sshd container memory limit
+	//
+	// +kubebuilder:validation:Optional
+	MemoryHigh *resource.Quantity `json:"memoryHigh,omitempty"`
+
+	// MemoryMax is the per-user hard memory limit (cgroup v2 memory.max).
+	// The OOM killer is scoped to the user's own cgroup when this limit is hit.
+	// Must be lower than the sshd container memory limit.
+	// When unset, it is derived as 90% of the sshd container memory limit,
+	// which keeps OOM events scoped to a single user without restricting
+	// how much of the container's memory a lone user may use
+	//
+	// +kubebuilder:validation:Optional
+	MemoryMax *resource.Quantity `json:"memoryMax,omitempty"`
+
+	// CPUWeight is the per-user CPU weight (cgroup v2 cpu.weight).
+	// CPU is shared proportionally between users under contention; idle CPU stays fully usable
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=10000
+	// +kubebuilder:default=100
+	CPUWeight int64 `json:"cpuWeight,omitempty"`
 }
 
 // SidecarSSSD defines the shared SSSD sidecar configuration for Slurm node pods.
