@@ -14,7 +14,7 @@ on:
         default: ""
         type: string
       soperator_e2e_repo_branch:
-        description: "Soperator E2E repo branch used to build acceptance (defaults to main)"
+        description: "E2E repo branch"
         required: false
         default: "main"
         type: string
