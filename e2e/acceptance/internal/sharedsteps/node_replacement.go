@@ -1,9 +1,8 @@
-package steps
+package sharedsteps
 
 import (
 	"context"
 	"fmt"
-	"path"
 	"strings"
 	"time"
 
@@ -13,8 +12,6 @@ import (
 )
 
 const (
-	nodeReplacementFeatureFile = "node_replacement.feature"
-
 	// These timeouts intentionally leave slack for slower replacement flows; tune
 	// them together with the CI step budget when this scenario evolves.
 	nodeReplacementJobTimeout    = 5 * time.Minute
@@ -40,17 +37,7 @@ func NewNodeReplacement(exec framework.Exec, slurm *framework.SlurmClient) *Node
 	}
 }
 
-func (s *NodeReplacement) Register(sc *godog.ScenarioContext) {
-	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
-		if path.Base(scenario.Uri) != nodeReplacementFeatureFile || s.maintenanceJob.IsZero() {
-			return ctx, nil
-		}
-		if cancelErr := s.cancelJob(context.Background(), s.maintenanceJob.ID); cancelErr != nil {
-			s.exec.Logf("cleanup: cancel maintenance job: %v", cancelErr)
-		}
-		return ctx, nil
-	})
-
+func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a test job is submitted and running on a (CPU|GPU) worker node$`, s.aTestJobIsSubmittedAndRunningOnWorkerNode)
 	sc.Step(`^a maintenance event is triggered for that node$`, s.aMaintenanceEventIsTriggeredForThatNode)
 	sc.Step(`^the node is drained with a maintenance reason$`, s.theNodeIsDrainedWithAMaintenanceReason)
@@ -59,6 +46,19 @@ func (s *NodeReplacement) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^a replacement node joins the cluster$`, s.aReplacementNodeJoinsTheCluster)
 	sc.Step(`^the replacement node passes GPU validation$`, s.theReplacementNodePassesGPUValidation)
 	sc.Step(`^all pre-existing worker nodes are operational$`, s.allPreExistingWorkerNodesAreOperational)
+}
+
+func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
+	if !s.maintenanceJob.IsZero() {
+		if cancelErr := s.cancelJob(ctx, s.maintenanceJob.ID); cancelErr != nil {
+			s.exec.Logf("cleanup: cancel maintenance job: %v", cancelErr)
+		}
+	}
+	s.replacementWorker = framework.WorkerRef{}
+	s.originalInstanceID = ""
+	s.maintenanceJob = framework.SbatchJob{}
+	s.preExistingWorkers = nil
+	s.gpuWorkers = nil
 }
 
 func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnWorkerNode(ctx context.Context, workerType string) error {

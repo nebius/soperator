@@ -1,22 +1,22 @@
 package acceptance
 
 import (
-	"path/filepath"
+	"context"
+	"errors"
 	"testing"
 	"testing/fstest"
 
+	"github.com/cucumber/godog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"nebius.ai/soperator-e2e/acceptance/framework"
-	"nebius.ai/soperator-e2e/acceptance/kubeobjects"
+	"nebius.ai/soperator-e2e/versionfilter"
 )
 
 const testTargetSoperatorVersion = "5.0.0"
 
-func TestRunnerTagFilter(t *testing.T) {
+func TestRunnerSuiteTagFilter(t *testing.T) {
 	cpuAndGPUState := &framework.ClusterState{
 		CPUWorkers: []framework.WorkerRef{{Name: "worker-cpu-0"}},
 		GPUWorkers: []framework.WorkerRef{{Name: "worker-gpu-0"}},
@@ -27,52 +27,335 @@ func TestRunnerTagFilter(t *testing.T) {
 	}
 
 	tests := []struct {
-		name             string
-		state            *framework.ClusterState
-		runUnstableTests bool
-		want             string
+		name          string
+		state         *framework.ClusterState
+		tags          string
+		filterOptions SuiteFilterOptions
+		want          string
 	}{
 		{
-			name:  "default excludes unstable",
+			name:  "default shared filters exclude unstable",
 			state: cpuAndGPUState,
-			want:  "~@unstable",
+			filterOptions: SuiteFilterOptions{
+				ExcludeUnstable:           true,
+				ExcludeMissingWorkerKinds: true,
+			},
+			want: "~@unstable",
 		},
 		{
-			name:             "run unstable has no tag filter when CPU and GPU workers exist",
-			state:            cpuAndGPUState,
-			runUnstableTests: true,
-			want:             "",
+			name:          "no filters when CPU and GPU workers exist and filters are disabled",
+			state:         cpuAndGPUState,
+			filterOptions: SuiteFilterOptions{},
+			want:          "",
 		},
 		{
-			name:  "without GPU workers also excludes GPU",
+			name:  "without workers also excludes GPU and CPU",
 			state: noGPUState,
-			want:  "~@unstable && ~@gpu && ~@cpu",
+			filterOptions: SuiteFilterOptions{
+				ExcludeUnstable:           true,
+				ExcludeMissingWorkerKinds: true,
+			},
+			want: "~@unstable && ~@gpu && ~@cpu",
 		},
 		{
-			name:             "without CPU workers excludes CPU",
-			state:            gpuOnlyState,
-			runUnstableTests: true,
-			want:             "~@cpu",
+			name:  "without CPU workers excludes CPU",
+			state: gpuOnlyState,
+			filterOptions: SuiteFilterOptions{
+				ExcludeMissingWorkerKinds: true,
+			},
+			want: "~@cpu",
+		},
+		{
+			name:  "custom suite tags are combined with option-driven filters",
+			state: cpuAndGPUState,
+			tags:  "@smoke && ~@slow",
+			filterOptions: SuiteFilterOptions{
+				ExcludeUnstable:           true,
+				ExcludeMissingWorkerKinds: true,
+			},
+			want: "@smoke && ~@slow && ~@unstable",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			suite := testSampleSuite()
+			suite.Tags = tt.tags
+			suite.FilterOptions = tt.filterOptions
 			runner, err := NewRunner(Options{
-				KubectlContext:            "dev-context",
-				TargetSoperatorVersion:    testTargetSoperatorVersion,
-				State:                     tt.state,
-				ExcludeUnstable:           !tt.runUnstableTests,
-				ExcludeMissingWorkerKinds: true,
+				KubectlContext:         "dev-context",
+				TargetSoperatorVersion: testTargetSoperatorVersion,
+				Suites:                 []SuiteConfig{suite},
+				State:                  tt.state,
 			})
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, runner.tagFilter())
+			assert.Equal(t, tt.want, runner.suiteTagFilter(runner.suites[0]))
 		})
 	}
 }
 
-func TestRunnerFeaturePaths(t *testing.T) {
-	features := FeatureSource{
+func TestRunnerSuiteFeaturePaths(t *testing.T) {
+	source := testFeatureSource()
+
+	runner, err := NewRunner(Options{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: "4.1.5-reb85d0e5",
+		Suites: []SuiteConfig{
+			{
+				Name:        "sample",
+				Source:      source,
+				VersionAxes: []versionfilter.Axis{SoperatorVersionAxis("4.1.5-reb85d0e5")},
+			},
+		},
+	})
+	require.NoError(t, err)
+	paths, err := runner.suiteFeaturePaths(runner.suites[0])
+	require.NoError(t, err)
+	assert.Equal(t, []string{"features/sample.feature:3"}, paths)
+
+	source.Paths = []string{"features/sample.feature:3", "features/sample.feature:7"}
+	runner, err = NewRunner(Options{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: testTargetSoperatorVersion,
+		Suites: []SuiteConfig{
+			{
+				Name:        "sample",
+				Source:      source,
+				VersionAxes: []versionfilter.Axis{SoperatorVersionAxis(testTargetSoperatorVersion)},
+			},
+		},
+	})
+	require.NoError(t, err)
+	paths, err = runner.suiteFeaturePaths(runner.suites[0])
+	require.NoError(t, err)
+	assert.Equal(t, []string{"features/sample.feature:3", "features/sample.feature:7"}, paths)
+}
+
+func TestRunnerSuiteFeaturePathsAllowsUnversionedSuites(t *testing.T) {
+	runner, err := NewRunner(Options{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: testTargetSoperatorVersion,
+		Suites: []SuiteConfig{
+			{Name: "custom", Source: testFeatureSource()},
+		},
+	})
+	require.NoError(t, err)
+
+	paths, err := runner.suiteFeaturePaths(runner.suites[0])
+	require.NoError(t, err)
+	assert.Equal(t, []string{"features/sample.feature"}, paths)
+}
+
+func TestNewRunnerSuiteValidation(t *testing.T) {
+	tests := []struct {
+		name   string
+		suites []SuiteConfig
+		want   string
+	}{
+		{
+			name: "requires at least one suite",
+			want: "at least one suite is required",
+		},
+		{
+			name:   "requires suite name",
+			suites: []SuiteConfig{{Source: testFeatureSource()}},
+			want:   "suite name is required",
+		},
+		{
+			name:   "requires filename-safe suite name",
+			suites: []SuiteConfig{{Name: "sample suite", Source: testFeatureSource()}},
+			want:   `suite name "sample suite" must match ^[A-Za-z0-9._-]+$`,
+		},
+		{
+			name:   "rejects duplicate suite name",
+			suites: []SuiteConfig{testSampleSuite(), testSampleSuite()},
+			want:   `duplicate suite name "sample"`,
+		},
+		{
+			name:   "requires source FS",
+			suites: []SuiteConfig{{Name: "sample", Source: FeatureSource{Paths: []string{"features/sample.feature"}}}},
+			want:   `suite "sample" source FS is required`,
+		},
+		{
+			name:   "requires source paths",
+			suites: []SuiteConfig{{Name: "sample", Source: FeatureSource{FS: fstest.MapFS{}}}},
+			want:   `suite "sample" must include at least one feature path`,
+		},
+		{
+			name: "rejects empty source path",
+			suites: []SuiteConfig{
+				{Name: "sample", Source: FeatureSource{FS: fstest.MapFS{}, Paths: []string{"features/sample.feature", " "}}},
+			},
+			want: `suite "sample" feature path cannot be empty`,
+		},
+		{
+			name: "rejects nil step registrar",
+			suites: []SuiteConfig{
+				{
+					Name:           "sample",
+					Source:         testFeatureSource(),
+					StepRegistrars: []StepRegistrar{nil},
+				},
+			},
+			want: `suite "sample" step registrar 0 is nil`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewRunner(Options{
+				KubectlContext:         "dev-context",
+				TargetSoperatorVersion: testTargetSoperatorVersion,
+				Suites:                 tt.suites,
+			})
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tt.want)
+		})
+	}
+}
+
+func TestNewRunnerRequiresTargetSoperatorVersion(t *testing.T) {
+	_, err := NewRunner(Options{
+		KubectlContext: "dev-context",
+		Suites:         []SuiteConfig{testSampleSuite()},
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "target Soperator version is required")
+}
+
+func TestRunnerRunsDiscoveryHooks(t *testing.T) {
+	state := &framework.ClusterState{}
+	runner, err := NewRunner(Options{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: testTargetSoperatorVersion,
+		Suites:                 []SuiteConfig{testSampleSuite()},
+		State:                  state,
+		DiscoveryHooks: []DiscoveryHook{
+			func(ctx context.Context, state *framework.ClusterState, exec framework.Exec) error {
+				state.Workers = []framework.WorkerRef{{Name: "worker-from-hook"}}
+				return nil
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, runner.runDiscoveryHooks(context.Background(), nil))
+	assert.Equal(t, []framework.WorkerRef{{Name: "worker-from-hook"}}, state.Workers)
+}
+
+func TestRunnerDiscoveryHookErrors(t *testing.T) {
+	hookErr := errors.New("boom")
+	runner, err := NewRunner(Options{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: testTargetSoperatorVersion,
+		Suites:                 []SuiteConfig{testSampleSuite()},
+		DiscoveryHooks: []DiscoveryHook{
+			func(ctx context.Context, state *framework.ClusterState, exec framework.Exec) error {
+				return hookErr
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	err = runner.runDiscoveryHooks(context.Background(), nil)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, hookErr)
+	assert.ErrorContains(t, err, "run discovery hook 0")
+}
+
+func TestRunnerRejectsNilDiscoveryHook(t *testing.T) {
+	runner, err := NewRunner(Options{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: testTargetSoperatorVersion,
+		Suites:                 []SuiteConfig{testSampleSuite()},
+		DiscoveryHooks:         []DiscoveryHook{nil},
+	})
+	require.NoError(t, err)
+
+	err = runner.runDiscoveryHooks(context.Background(), nil)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "discovery hook 0 is nil")
+}
+
+func TestRunnerRunConfiguredSuitesRunsAllSuitesAndAggregatesFailures(t *testing.T) {
+	var passingRuns int
+	runner, err := NewRunner(Options{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: testTargetSoperatorVersion,
+		Suites: []SuiteConfig{
+			{
+				Name:           "failing",
+				Source:         testRunnableFeatureSource("features/failing.feature", "a failing step runs"),
+				StepRegistrars: []StepRegistrar{testRunnableStepRegistrar(&passingRuns)},
+			},
+			{
+				Name:           "passing",
+				Source:         testRunnableFeatureSource("features/passing.feature", "a passing step runs"),
+				StepRegistrars: []StepRegistrar{testRunnableStepRegistrar(&passingRuns)},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	err = runner.runConfiguredSuites(context.Background(), nil)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `suite "failing": godog exited with status 1`)
+	assert.Equal(t, 1, passingRuns)
+}
+
+func TestRunnerRunConfiguredSuitesSkipsEmptySuites(t *testing.T) {
+	var passingRuns int
+	runner, err := NewRunner(Options{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: testTargetSoperatorVersion,
+		Suites: []SuiteConfig{
+			{
+				Name:        "empty",
+				Source:      testFeatureSource(),
+				VersionAxes: []versionfilter.Axis{SoperatorVersionAxis("3.0.0")},
+			},
+			{
+				Name:           "passing",
+				Source:         testRunnableFeatureSource("features/passing.feature", "a passing step runs"),
+				StepRegistrars: []StepRegistrar{testRunnableStepRegistrar(&passingRuns)},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, runner.runConfiguredSuites(context.Background(), nil))
+	assert.Equal(t, 1, passingRuns)
+}
+
+func TestRunnerRunConfiguredSuitesErrorsWhenAllSuitesAreEmpty(t *testing.T) {
+	runner, err := NewRunner(Options{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: testTargetSoperatorVersion,
+		Suites: []SuiteConfig{
+			{
+				Name:        "empty",
+				Source:      testFeatureSource(),
+				VersionAxes: []versionfilter.Axis{SoperatorVersionAxis("3.0.0")},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	err = runner.runConfiguredSuites(context.Background(), nil)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "no acceptance scenarios compatible with Soperator version 5.0.0")
+}
+
+func testSampleSuite() SuiteConfig {
+	return SuiteConfig{
+		Name:        "sample",
+		Source:      testFeatureSource(),
+		VersionAxes: []versionfilter.Axis{SoperatorVersionAxis(testTargetSoperatorVersion)},
+	}
+}
+
+func testFeatureSource() FeatureSource {
+	return FeatureSource{
 		FS: fstest.MapFS{
 			"features/sample.feature": {Data: []byte(`Feature: Sample
   @soperator_version_>=4.0.0
@@ -86,178 +369,28 @@ func TestRunnerFeaturePaths(t *testing.T) {
 		},
 		Paths: []string{"features/sample.feature"},
 	}
-
-	runner, err := NewRunner(Options{
-		KubectlContext:         "dev-context",
-		TargetSoperatorVersion: "4.1.5-reb85d0e5",
-		Features:               features,
-	})
-	require.NoError(t, err)
-	paths, err := runner.featurePaths()
-	require.NoError(t, err)
-	assert.Equal(t, []string{"features/sample.feature:3"}, paths)
-
-	scenarios := []string{"features/sample.feature:3", "features/sample.feature:7"}
-	features.Paths = scenarios
-	runner, err = NewRunner(Options{
-		KubectlContext:         "dev-context",
-		TargetSoperatorVersion: testTargetSoperatorVersion,
-		Features:               features,
-	})
-	require.NoError(t, err)
-	paths, err = runner.featurePaths()
-	require.NoError(t, err)
-	assert.Equal(t, []string{"features/sample.feature:3", "features/sample.feature:7"}, paths)
 }
 
-func TestNewRunnerRequiresTargetSoperatorVersion(t *testing.T) {
-	_, err := NewRunner(Options{KubectlContext: "dev-context"})
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "target Soperator version is required")
-}
-
-func TestDiscoveredNodeSetsFromLiveList(t *testing.T) {
-	nodeSets := kubeobjects.NodeSetList{
-		Items: []kubeobjects.NodeSet{
-			{
-				Metadata: kubeobjects.ObjectMeta{Name: "worker-gpu"},
-				Spec: kubeobjects.NodeSetSpec{
-					ClusterName: "soperator",
-					Replicas:    2,
-					GPU:         kubeobjects.NodeSetGPUSpec{Enabled: true},
-				},
-			},
-			{
-				Metadata: kubeobjects.ObjectMeta{Name: "worker-cpu"},
-				Spec: kubeobjects.NodeSetSpec{
-					ClusterName: "soperator",
-					Replicas:    3,
-				},
-			},
-			{
-				Metadata: kubeobjects.ObjectMeta{Name: "other-worker"},
-				Spec: kubeobjects.NodeSetSpec{
-					ClusterName: "other",
-					Replicas:    4,
-					GPU:         kubeobjects.NodeSetGPUSpec{Enabled: true},
-				},
-			},
+func testRunnableFeatureSource(path, step string) FeatureSource {
+	return FeatureSource{
+		FS: fstest.MapFS{
+			path: {Data: []byte(`Feature: Runnable
+  Scenario: runs
+    Then ` + step + `
+`)},
 		},
+		Paths: []string{path},
 	}
-
-	discovered := discoveredNodeSetsFromLiveList(nodeSets, "soperator")
-	require.Len(t, discovered, 2)
-
-	assert.Equal(t, "worker-cpu", discovered[0].Name)
-	assert.Equal(t, 3, discovered[0].Size)
-	assert.False(t, discovered[0].HasGPU)
-
-	assert.Equal(t, "worker-gpu", discovered[1].Name)
-	assert.Equal(t, 2, discovered[1].Size)
-	assert.True(t, discovered[1].HasGPU)
 }
 
-func TestDiscoveredNodeSetsFromLiveListDoesNotFilterWhenClusterNameIsEmpty(t *testing.T) {
-	nodeSets := kubeobjects.NodeSetList{
-		Items: []kubeobjects.NodeSet{
-			{
-				Metadata: kubeobjects.ObjectMeta{Name: "worker-gpu"},
-				Spec: kubeobjects.NodeSetSpec{
-					ClusterName: "soperator",
-					Replicas:    2,
-					GPU:         kubeobjects.NodeSetGPUSpec{Enabled: true},
-				},
-			},
-			{
-				Metadata: kubeobjects.ObjectMeta{Name: "worker-cpu"},
-				Spec: kubeobjects.NodeSetSpec{
-					ClusterName: "soperator",
-					Replicas:    3,
-				},
-			},
-		},
+func testRunnableStepRegistrar(passingRuns *int) StepRegistrar {
+	return func(sc *godog.ScenarioContext, state *framework.ClusterState, exec framework.Exec) {
+		sc.Step(`^a passing step runs$`, func() error {
+			*passingRuns = *passingRuns + 1
+			return nil
+		})
+		sc.Step(`^a failing step runs$`, func() error {
+			return errors.New("expected failure")
+		})
 	}
-
-	discovered := discoveredNodeSetsFromLiveList(nodeSets, "")
-	require.Len(t, discovered, 2)
-
-	assert.Equal(t, "worker-cpu", discovered[0].Name)
-	assert.Equal(t, "worker-gpu", discovered[1].Name)
-}
-
-func TestWorkerPodsBySlurmNodeName(t *testing.T) {
-	pods := corev1.PodList{
-		Items: []corev1.Pod{
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "kube-worker-a"},
-				Spec:       corev1.PodSpec{Hostname: "worker-a"},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "kube-worker-b"},
-				Spec:       corev1.PodSpec{Hostname: "worker-b"},
-			},
-		},
-	}
-
-	discovered, err := workerPodsBySlurmNodeName(pods)
-	require.NoError(t, err)
-	assert.Equal(t, map[string]string{
-		"worker-a": "kube-worker-a",
-		"worker-b": "kube-worker-b",
-	}, discovered)
-}
-
-func TestWorkerPodsBySlurmNodeNameRejectsMissingHostname(t *testing.T) {
-	_, err := workerPodsBySlurmNodeName(corev1.PodList{
-		Items: []corev1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "worker-0"}}},
-	})
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "empty spec.hostname")
-}
-
-func TestWorkerPodsBySlurmNodeNameRejectsDuplicateHostname(t *testing.T) {
-	_, err := workerPodsBySlurmNodeName(corev1.PodList{
-		Items: []corev1.Pod{
-			{ObjectMeta: metav1.ObjectMeta{Name: "worker-a-0"}, Spec: corev1.PodSpec{Hostname: "worker-0"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "worker-b-0"}, Spec: corev1.PodSpec{Hostname: "worker-0"}},
-		},
-	})
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "both declare spec.hostname=worker-0")
-}
-
-func TestClassifyWorkersSeparatesCPUAndGPU(t *testing.T) {
-	state := &framework.ClusterState{
-		Workers: []framework.WorkerRef{
-			{Name: "worker-gpu-0"},
-			{Name: "worker-cpu-0"},
-			{Name: "worker-gpu-1"},
-		},
-		DiscoveredNodeSets: []framework.DiscoveredNodeSet{
-			{Name: "worker-gpu", Size: 2, HasGPU: true},
-			{Name: "worker-cpu", Size: 1, HasGPU: false},
-		},
-	}
-
-	classifyWorkers(state)
-
-	assert.ElementsMatch(t, []framework.WorkerRef{{Name: "worker-cpu-0"}}, state.CPUWorkers)
-	assert.ElementsMatch(t, []framework.WorkerRef{{Name: "worker-gpu-0"}, {Name: "worker-gpu-1"}}, state.GPUWorkers)
-	assert.ElementsMatch(t, []framework.WorkerRef{{Name: "worker-cpu-0"}}, state.WorkersByNodeSet["worker-cpu"])
-	assert.ElementsMatch(t, []framework.WorkerRef{{Name: "worker-gpu-0"}, {Name: "worker-gpu-1"}}, state.WorkersByNodeSet["worker-gpu"])
-}
-
-func TestReportFormat(t *testing.T) {
-	format, err := reportFormat("")
-	require.NoError(t, err)
-	assert.Equal(t, "pretty", format)
-
-	dir := t.TempDir()
-	format, err = reportFormat(dir)
-	require.NoError(t, err)
-	assert.Equal(t,
-		"pretty,cucumber:"+filepath.Join(dir, "acceptance.cucumber.json")+
-			",junit:"+filepath.Join(dir, "acceptance.junit.xml"),
-		format,
-	)
 }

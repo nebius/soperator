@@ -1,4 +1,4 @@
-package steps
+package sharedsteps
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"nebius.ai/soperator-e2e/acceptance/framework"
-	"nebius.ai/soperator-e2e/acceptance/kubeobjects"
+	"nebius.ai/soperator-e2e/acceptance/internal/kubeobjects"
 )
 
 const (
@@ -37,7 +37,7 @@ func NewClusterCreation(state *framework.ClusterState, exec framework.Exec) *Clu
 	return &ClusterCreation{state: state, exec: exec}
 }
 
-func (s *ClusterCreation) Register(sc *godog.ScenarioContext) {
+func (s *ClusterCreation) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^all non-job pods in soperator are Running and Ready$`, s.checkPodsReady)
 	sc.Step(`^all HelmReleases are Ready$`, s.checkHelmReleasesReady)
 	sc.Step(`^all SlurmCluster CRs are available$`, s.checkSlurmClustersReady)
@@ -53,6 +53,8 @@ func (s *ClusterCreation) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^hidden partition smoke job succeeds$`, s.checkHiddenSmokeJob)
 	sc.Step(`^each discovered nodeset accepts a targeted smoke job$`, s.checkNodeSetSmokeJobs)
 }
+
+func (s *ClusterCreation) CleanupAndReset(ctx context.Context) {}
 
 func (s *ClusterCreation) checkPodsReady(ctx context.Context) error {
 	var pods corev1.PodList

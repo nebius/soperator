@@ -1,4 +1,4 @@
-package steps
+package sharedsteps
 
 import (
 	"context"
@@ -20,9 +20,11 @@ func NewObservability(exec framework.Exec) *Observability {
 	return &Observability{exec: exec}
 }
 
-func (s *Observability) Register(sc *godog.ScenarioContext) {
+func (s *Observability) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the kube-state-metrics VMServiceScrape carries the soperator scrape endpoints$`, s.checkKubeStateMetricsScrape)
 }
+
+func (s *Observability) CleanupAndReset(ctx context.Context) {}
 
 // The soperator-fluxcd chart passes the kube-state-metrics scrape config to the
 // victoria-metrics-k8s-stack chart under the `vmScrape` values key. Keys the

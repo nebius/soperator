@@ -1,4 +1,4 @@
-package steps
+package sharedsteps
 
 import (
 	"context"
@@ -13,8 +13,6 @@ import (
 )
 
 const (
-	dockerContainersFeatureFile = "docker_containers.feature"
-
 	// Small mirrored image; Docker lifecycle only needs sh/sleep and storage population.
 	dockerLifecycleImage   = "cr.eu-north1.nebius.cloud/soperator/busybox"
 	dockerLifecycleCommand = "echo ready; sleep 3600"
@@ -45,23 +43,7 @@ func NewDockerContainers(exec framework.Exec, slurm *framework.SlurmClient) *Doc
 	}
 }
 
-func (s *DockerContainers) Register(sc *godog.ScenarioContext) {
-	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
-		if path.Base(scenario.Uri) != dockerContainersFeatureFile {
-			return ctx, nil
-		}
-
-		if cleanupErr := s.requestCurrentJobCancellation(context.Background()); cleanupErr != nil {
-			s.exec.Logf("cleanup: cancel Docker job: %v", cleanupErr)
-		}
-		s.stopContainersByNamePrefix(context.Background())
-		s.removeContainersByNamePrefix(context.Background())
-		if cleanupErr := s.waitForCurrentJobGone(context.Background()); cleanupErr != nil {
-			s.exec.Logf("cleanup: wait for Docker job to finish: %v", cleanupErr)
-		}
-		return ctx, nil
-	})
-
+func (s *DockerContainers) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a long-running Docker container job is submitted on two workers$`, s.aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers)
 	sc.Step(`^the Docker container job is running$`, s.theDockerContainerJobIsRunning)
 	sc.Step(`^Docker image and runtime storage is populated on a worker$`, s.dockerImageAndRuntimeStorageIsPopulatedOnAWorker)
@@ -71,6 +53,21 @@ func (s *DockerContainers) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^Docker containers from the job are no longer running$`, s.dockerContainersFromTheJobAreNoLongerRunning)
 	sc.Step(`^a Docker GPU smoke job is submitted on one GPU worker$`, s.aDockerGPUSmokeJobIsSubmittedOnOneGPUWorker)
 	sc.Step(`^the Docker GPU smoke job succeeds and reports visible GPUs$`, s.theDockerGPUSmokeJobSucceedsAndReportsVisibleGPUs)
+}
+
+func (s *DockerContainers) CleanupAndReset(ctx context.Context) {
+	if cleanupErr := s.requestCurrentJobCancellation(ctx); cleanupErr != nil {
+		s.exec.Logf("cleanup: cancel Docker job: %v", cleanupErr)
+	}
+	s.stopContainersByNamePrefix(ctx)
+	s.removeContainersByNamePrefix(ctx)
+	if cleanupErr := s.waitForCurrentJobGone(ctx); cleanupErr != nil {
+		s.exec.Logf("cleanup: wait for Docker job to finish: %v", cleanupErr)
+	}
+	s.workers = nil
+	s.job = framework.SbatchJob{}
+	s.containerNamePrefix = ""
+	s.connectionWorker = framework.WorkerRef{}
 }
 
 func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers(ctx context.Context) error {
@@ -278,7 +275,6 @@ func (s *DockerContainers) waitForCurrentJobGone(ctx context.Context) error {
 	if err := s.slurm.WaitForJobGone(ctx, s.job.ID, dockerJobCancelTimeout); err != nil {
 		return fmt.Errorf("wait for Docker job %s to finish: %w", s.job.ID, err)
 	}
-	s.job = framework.SbatchJob{}
 	return nil
 }
 

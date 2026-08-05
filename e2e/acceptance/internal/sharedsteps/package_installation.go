@@ -1,4 +1,4 @@
-package steps
+package sharedsteps
 
 import (
 	"context"
@@ -21,11 +21,15 @@ func NewPackageInstallation(exec framework.Exec, slurm *framework.SlurmClient) *
 	return &PackageInstallation{exec: exec, slurm: slurm}
 }
 
-func (s *PackageInstallation) Register(sc *godog.ScenarioContext) {
+func (s *PackageInstallation) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the NVIDIA driver is working on a worker node$`, s.theNVIDIADriverIsWorkingOnAWorkerNode)
 	sc.Step(`^jq is installed on the worker node$`, s.jqIsInstalledOnTheWorkerNode)
 	sc.Step(`^the NVIDIA driver is still working on the worker node$`, s.theNVIDIADriverIsStillWorkingOnTheWorkerNode)
 	sc.Step(`^jq is available on the worker node$`, s.jqIsAvailableOnTheWorkerNode)
+}
+
+func (s *PackageInstallation) CleanupAndReset(ctx context.Context) {
+	s.packageWorker = framework.WorkerRef{}
 }
 
 func (s *PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.Context) error {

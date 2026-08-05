@@ -1,4 +1,4 @@
-package steps
+package sharedsteps
 
 import (
 	"context"
@@ -23,10 +23,15 @@ func NewInternalSSH(exec framework.Exec, slurm *framework.SlurmClient) *Internal
 	return &InternalSSH{exec: exec, slurm: slurm}
 }
 
-func (s *InternalSSH) Register(sc *godog.ScenarioContext) {
+func (s *InternalSSH) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a regular user account exists on the login node$`, s.aRegularUserAccountExistsOnTheLoginNode)
 	sc.Step(`^the user SSHs from the login node to a worker$`, s.theUserSSHsFromTheLoginNodeToAWorker)
 	sc.Step(`^the connection succeeds without extra SSH options$`, s.theConnectionSucceedsWithoutExtraSSHOptions)
+}
+
+func (s *InternalSSH) CleanupAndReset(ctx context.Context) {
+	s.targetWorker = framework.WorkerRef{}
+	s.sshOutput = ""
 }
 
 func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Context) error {

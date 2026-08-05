@@ -9,6 +9,8 @@ import (
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"nebius.ai/soperator-e2e/versionfilter"
 )
 
 func TestSharedFeaturesParseWithGherkin(t *testing.T) {
@@ -24,7 +26,14 @@ func TestSharedFeaturesParseWithGherkin(t *testing.T) {
 }
 
 func TestSharedFeaturesHaveValidVersionTags(t *testing.T) {
-	paths, err := selectCompatibleFeaturePaths(SharedFeatureSource(), "5.0.0")
+	suite := SoperatorSuite("5.0.0")
+	paths, err := versionfilter.SelectScenarios(
+		versionfilter.FeatureSource{
+			FS:    suite.Source.FS,
+			Paths: suite.Source.Paths,
+		},
+		suite.VersionAxes...,
+	)
 	require.NoError(t, err)
 	assert.NotEmpty(t, paths)
 }

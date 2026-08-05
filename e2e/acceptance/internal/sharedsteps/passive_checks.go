@@ -1,4 +1,4 @@
-package steps
+package sharedsteps
 
 import (
 	"context"
@@ -70,12 +70,7 @@ func NewPassiveChecks(exec framework.Exec, slurm *framework.SlurmClient) *Passiv
 	}
 }
 
-func (s *PassiveChecks) Register(sc *godog.ScenarioContext) {
-	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
-		s.cleanup(context.Background())
-		return ctx, nil
-	})
-
+func (s *PassiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a worker is selected$`, s.aWorkerIsSelected)
 	sc.Step(`^a CPU-only Slurm job runs on the selected worker$`, s.aCPUOnlySlurmJobRunsOnTheSelectedWorker)
 	sc.Step(`^the CPU job Prolog check runner output is fresh and healthy$`, s.theCPUJobPrologCheckRunnerOutputIsFreshAndHealthy)
@@ -103,6 +98,21 @@ func (s *PassiveChecks) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^the unmanaged GPU workload is stopped$`, s.theUnmanagedGPUWorkloadIsStopped)
 	sc.Step(`^the selected GPU worker no longer has alloc_gpus_busy reason$`, s.theSelectedGPUWorkerNoLongerHasAllocGPUsBusyReason)
 	sc.Step(`^the selected GPU worker is usable after alloc_gpus_busy$`, s.theSelectedGPUWorkerIsUsableAfterAllocGPUsBusy)
+}
+
+func (s *PassiveChecks) CleanupAndReset(ctx context.Context) {
+	s.cleanupAndResetAllocMem(ctx)
+	s.cleanupAndResetAllocGPU(ctx)
+	s.cleanupAndResetTmpfs(ctx)
+
+	s.worker = framework.WorkerRef{}
+	s.gpuWorker = framework.WorkerRef{}
+	s.cpuPrologOutput = ""
+	s.cpuEpilogOutput = ""
+	s.cpuHooksJob = framework.SbatchJob{}
+	s.gpuHooksJob = framework.SbatchJob{}
+	s.gpuHealthRunIDs = nil
+	s.gpuCount = 0
 }
 
 func (s *PassiveChecks) aWorkerIsSelected(ctx context.Context) error {
@@ -535,7 +545,11 @@ func (s *PassiveChecks) theSelectedGPUWorkerIsDrainedByAllocGPUsBusy(ctx context
 }
 
 func (s *PassiveChecks) theUnmanagedGPUWorkloadIsStopped(ctx context.Context) error {
-	return s.stopUnmanagedGPUWorkload(ctx)
+	if err := s.stopUnmanagedGPUWorkload(ctx); err != nil {
+		return err
+	}
+	s.unmanagedGPUPID = ""
+	return nil
 }
 
 func (s *PassiveChecks) theSelectedGPUWorkerNoLongerHasAllocGPUsBusyReason(ctx context.Context) error {
@@ -556,19 +570,12 @@ func (s *PassiveChecks) theSelectedGPUWorkerIsUsableAfterAllocGPUsBusy(ctx conte
 	return nil
 }
 
-func (s *PassiveChecks) cleanup(ctx context.Context) {
-	s.cleanupAllocMem(ctx)
-	s.cleanupAllocGPU(ctx)
-	s.cleanupTmpfs(ctx)
-}
-
-func (s *PassiveChecks) cleanupAllocMem(ctx context.Context) {
+func (s *PassiveChecks) cleanupAndResetAllocMem(ctx context.Context) {
 	if s.allocMemScenarioActive {
 		if !s.allocMemJob.IsZero() {
 			if err := s.slurm.CancelJob(ctx, s.allocMemJob.ID, passiveAllocMemJobTimeout); err != nil {
 				s.exec.Logf("cleanup: cancel alloc_mem_used trigger job %s: %v", s.allocMemJob.ID, err)
 			}
-			s.allocMemJob = framework.SbatchJob{}
 		}
 		if err := s.removeMemoryPressure(ctx); err != nil {
 			s.exec.Logf("cleanup: remove alloc_mem_used memory pressure: %v", err)
@@ -581,17 +588,17 @@ func (s *PassiveChecks) cleanupAllocMem(ctx context.Context) {
 				s.exec.Logf("cleanup: resume %s after alloc_mem_used: %v", s.worker.Name, err)
 			}
 		}
-		s.allocMemScenarioActive = false
 	}
+	s.allocMemScenarioActive = false
+	s.allocMemJob = framework.SbatchJob{}
 }
 
-func (s *PassiveChecks) cleanupAllocGPU(ctx context.Context) {
+func (s *PassiveChecks) cleanupAndResetAllocGPU(ctx context.Context) {
 	if s.allocGPUScenarioActive {
 		if !s.allocGPUJob.IsZero() {
 			if err := s.slurm.CancelJob(ctx, s.allocGPUJob.ID, passiveAllocGPUJobTimeout); err != nil {
 				s.exec.Logf("cleanup: cancel alloc_gpus_busy trigger job %s: %v", s.allocGPUJob.ID, err)
 			}
-			s.allocGPUJob = framework.SbatchJob{}
 		}
 		if err := s.stopUnmanagedGPUWorkload(ctx); err != nil {
 			s.exec.Logf("cleanup: stop unmanaged GPU workload: %v", err)
@@ -604,11 +611,13 @@ func (s *PassiveChecks) cleanupAllocGPU(ctx context.Context) {
 				s.exec.Logf("cleanup: resume %s after alloc_gpus_busy: %v", s.gpuWorker.Name, err)
 			}
 		}
-		s.allocGPUScenarioActive = false
 	}
+	s.allocGPUScenarioActive = false
+	s.unmanagedGPUPID = ""
+	s.allocGPUJob = framework.SbatchJob{}
 }
 
-func (s *PassiveChecks) cleanupTmpfs(ctx context.Context) {
+func (s *PassiveChecks) cleanupAndResetTmpfs(ctx context.Context) {
 	if s.worker.Name != "" && s.tmpfsJobID != "" {
 		for _, target := range []string{
 			"/mnt/memory/job_" + s.tmpfsJobID,
@@ -618,9 +627,9 @@ func (s *PassiveChecks) cleanupTmpfs(ctx context.Context) {
 				s.exec.Logf("cleanup: remove job tmpfs %s on %s: %v", target, s.worker.Name, err)
 			}
 		}
-		s.tmpfsJobID = ""
-		s.tmpfsExisted = false
 	}
+	s.tmpfsJobID = ""
+	s.tmpfsExisted = false
 }
 
 func (s *PassiveChecks) ensureWorkerSelected(ctx context.Context) error {
@@ -761,7 +770,6 @@ func (s *PassiveChecks) stopUnmanagedGPUWorkload(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("stop unmanaged GPU workload on %s: %w", worker.Name, err)
 	}
-	s.unmanagedGPUPID = ""
 	return nil
 }
 
