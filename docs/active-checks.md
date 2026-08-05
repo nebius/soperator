@@ -28,60 +28,52 @@ Slurm cluster customers may apply custom Active Check CRs to the cluster (indepe
 
 This section explains the main building blocks of the Active Checks framework, following the architecture diagram.
 
-- **Flux**
-  GitOps tool that deploys the [soperator-activechecks Helm chart](https://github.com/nebius/soperator/tree/main/helm/soperator-activechecks).
-  Through this chart, Flux ensures that ActiveCheck CRs and packaged check scripts are consistently deployed across clusters.
+- **Flux**  
+  GitOps tool that deploys the [soperator-activechecks Helm chart](https://github.com/nebius/soperator/tree/main/helm/soperator-activechecks).  
+  Through this chart, Flux ensures that ActiveCheck CRs and controllers are consistently deployed across clusters.
 
-- **Active Check CRs**
+- **Active Check CRs**  
   The core custom resources used to define checks.
     - A single CR with a `checkType` field that can be either `k8sJob` or `slurmJob`.
       (See [ActiveCheck CRD](#activecheck-crd) for details.)
 
-- **Active Check Controller**
-  Watches Active Check CRs and creates Kubernetes **CronJobs** for each of them (1:1 mapping).
+- **Active Check Controller**  
+  Watches Active Check CRs and creates Kubernetes **CronJobs** for each of them (1:1 mapping).  
   For details of reconciliation logic, see [Controllers](#controllers).
 
-- **Active Check Jobs (K8s or Slurm)**
+- **Active Check Jobs (K8s or Slurm)**  
   Standard Kubernetes Job resources created by CronJobs.
     - K8s Active Check Jobs: run directly inside Kubernetes.
     - Slurm Active Check Jobs: submit one Slurm Job batch per Active Check Job.
 
-- **Active Check Jobs Controller**
+- **Active Check Jobs Controller**  
   Watches Active Check Jobs (K8s and Slurm).
     - Collects job results (for Slurm-based jobs via the [Slurm API client](https://github.com/nebius/soperator/blob/main/internal/slurmapi/client.go)).
     - Updates statuses of the parent Active Check CRs (see [Status fields](#status-fields)).
     - Executes reactions based on the outcome of the checks (see [Reactions fields (spec)](#reactions-fields-spec)).
 
-- **Slurm Jobs**
+- **Slurm Jobs**  
   Real Slurm jobs created by a Slurm Active Check K8s Job.
     - A batch may consist of one or many Slurm jobs.
     - Job output is written to `/opt/soperator-outputs/local/slurm_jobs/` inside the jail. The directory is node-local (worker boot disk), so each output file is only visible on the worker that ran the job; the observability stack collects it with a per-node collector.
 
-- **Slurm Workers**
-  Compute nodes in the Slurm cluster where Slurm jobs execute.
+- **Slurm Workers**  
+  Compute nodes in the Slurm cluster where Slurm jobs execute.  
   These are the targets for most hardware acceptance and performance tests.
 
 - **Slurm Nodes Controller**
   Watches Slurm nodes and drained workers.
     - Sets the unhealthy flag for nodes drained with health-check reason prefixes when node replacement is enabled.
 
-- **ServiceAccount Controller**
-  Watches ActiveCheck CRs and reconciles the ServiceAccount, Role, and RoleBinding used by Active Check pods.
-
-- **Active Check Prolog Controller**
-  Publishes `activecheck-prolog.sh` into the jail through a ConfigMap and JailedConfig.
-
 - **Image Storage**
   Stores container images that provide the environments needed for running checks.
     - **K8s Check Job Image** – environment for checks executed as Kubernetes Jobs.
     - **Slurm Check Job Image** – environment for submitting Slurm jobs.
-    - **Munge Image** – init container used for Slurm authentication.
-    - **Sansible Image** – environment for jail state management checks.
 
 ## ActiveCheck CRD
 
-The **ActiveCheck** resource (`slurm.nebius.ai/v1alpha1`) defines one health check.
-The **[Active Check Controller](#1-active-check-controller)** ensures each `ActiveCheck` CR corresponds to exactly one **Kubernetes CronJob**.
+The **ActiveCheck** resource (`slurm.nebius.ai/v1alpha1`) defines one health check.  
+The **[Active Check Controller](#1-active-check-controller)** ensures each `ActiveCheck` CR corresponds to exactly one **Kubernetes CronJob**.  
 CronJobs create Kubernetes Jobs on schedule, which either run the check directly (K8s mode) or submit a Slurm batch (Slurm mode).
 
 ### Top-level `spec` fields
@@ -91,15 +83,12 @@ CronJobs create Kubernetes Jobs on schedule, which either run the check directly
 - **`spec.checkType`** *(enum: `k8sJob`|`slurmJob`)* — Selects execution mode.
 - **`spec.schedule`** *(string)* — Cron schedule in standard Kubernetes Cron format.
 - **`spec.suspend`** *(bool)* — If `true`, pauses scheduling without deleting resources.
-- **`spec.activeDeadlineSeconds`** *(int64)* — Timeout for each check pod.
+- **`spec.activeDeadlineSeconds`** *(int64)* — Timeout for each *CronJob-run*.
 - **`spec.successfulJobsHistoryLimit`** *(int32)* — How many successful Job objects to retain.
 - **`spec.failedJobsHistoryLimit`** *(int32)* — How many failed Job objects to retain.
 - **`spec.runAfterCreation`** *(bool)* — Run once immediately after the CronJob is created.
-- **`spec.dependsOn`** *(string[])* — Names of other ActiveChecks (same namespace) that must complete before this one runs.
+- **`spec.dependsOn`** *(string[])* — Names of other ActiveChecks (same namespace) that must complete before this one runs.  
   A check will not run until dependencies with `runAfterCreation: true` have reached **Complete** status. For Slurm checks, **Skipped** is also treated as ready.
-- **`spec.nodeSelector`**, **`spec.affinity`**, **`spec.tolerations`** — Optional pod placement settings for check pods.
-- **`spec.podTemplateNameRef`** *(string)* — Optional PodTemplate to merge into the generated pod template.
-- **`spec.hostUsers`** *(bool)* — Optional value rendered to `pod.spec.hostUsers`; the Helm chart auto-detects a value when omitted.
 
 #### Mode-specific options
 
@@ -125,7 +114,7 @@ CronJobs create Kubernetes Jobs on schedule, which either run the check directly
 - **`drainSlurmNode`** — Drain affected Slurm nodes.
 - **`commentSlurmNode`** — Add a failure comment to affected nodes.
 
-Reactions are evaluated by the **Active Check Jobs Controller** after Slurm runs.
+Reactions are evaluated by the **Active Check Jobs Controller** after Slurm runs.  
 Affected nodes are derived from the Slurm job’s node list (`GetNodeList()`).
 
 ### `status` fields
@@ -161,7 +150,7 @@ Affected nodes are derived from the Slurm job’s node list (`GetNodeList()`).
 
 ## Execution Modes
 
-Execution depends on `spec.checkType`.
+Execution depends on `spec.checkType`.  
 In both cases, the Active Check Controller creates a CronJob (1:1 with CR) which then spawns Jobs.
 
 ### Shared concepts
@@ -170,8 +159,6 @@ In both cases, the Active Check Controller creates a CronJob (1:1 with CR) which
 - **Images**:
     - *K8s Check Job Image* → used in `k8sJob`.
     - *Slurm Check Job Image* → used in `slurmJob` for submitting.
-    - *Munge Image* → used by checks that need Slurm authentication.
-    - *Sansible Image* → used by jail state management checks.
 
 ### Kubernetes Jobs (`k8sJob`)
 - The CronJob spawns a Kubernetes Job that runs the check inside the cluster.
@@ -212,7 +199,7 @@ This repository does not expose a separate ActiveCheck-specific metrics surface.
 
 ## Controllers
 
-Active Checks are managed by soperatorchecks controllers. Together they implement a GitOps-friendly flow:
+Active Checks are primarily managed by three controllers. Together they implement a GitOps-friendly flow:
 **ActiveCheck CR → CronJob (1:1) → Jobs → Status & (if Slurm) Reactions**.
 
 ### 1. Active Check Controller
@@ -269,13 +256,6 @@ Active Checks are managed by soperatorchecks controllers. Together they implemen
 1. Periodically list Slurm nodes and filter **drained** nodes with well-known health check reasons.
 2. For `[node_problem]` health check failures:
     - Mark the node unhealthy **when node replacement is enabled**; otherwise no-op.
-3. For `[hardware_problem]` failures:
-    - Mark the node unhealthy **when node replacement is enabled**; otherwise no-op.
-
-### 4. Supporting controllers
-
-- **ServiceAccount Controller** reconciles ServiceAccount/RBAC resources for Active Check pods.
-- **Active Check Prolog Controller** publishes the active check prolog script into the jail.
 
 ## Roadmap & Limitations
 
