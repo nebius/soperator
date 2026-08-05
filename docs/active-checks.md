@@ -1,26 +1,24 @@
-# Active Checks - health and system checks framework
+# Active Checks – Health and system checks framework
 
-This document describes the current Active Checks framework in soperator.
+This doc describes the Active Checks framework in soperator.
 
 ## Overview
 
-Active Checks run cluster checks from Kubernetes while optionally submitting work into Slurm. The framework is built around the `ActiveCheck` custom resource (`slurm.nebius.ai/v1alpha1`) and supports two check types:
+Active Checks is a framework for running benchmarks and system tests across Kubernetes and Slurm environments.
 
-- `k8sJob` - a Kubernetes Job runs the check logic directly.
-- `slurmJob` - a Kubernetes Job prepares the jail/Slurm environment and submits one or more Slurm jobs.
+The framework helps to:
+- Verify node health and overall cluster stability.
+- Validate and accept new hardware in data centers.
+- Apply and confirm system changes (e.g., package updates).
+- Run GPU/CPU, network/IB, filesystem, and other targeted checks.
 
-Active Checks are used for:
+Active Checks supports two execution modes:
+- **Kubernetes Jobs** – checks running as scheduled or one-time jobs inside Kubernetes.
+- **Slurm Jobs** – checks running on some or all Slurm nodes to validate compute hardware and environment.
 
-- GPU health checks on Slurm workers.
-- Bootstrap and readiness checks, such as creating users, preparing the jail, waiting for topology, and verifying that `srun` works.
-- Scheduled maintenance tasks, such as dry-run jail state management and NCCL profile cleanup.
-- Custom operator or customer checks applied as additional `ActiveCheck` CRs.
+Deployment follows a **GitOps model**: Flux deploys ActiveCheck CRs to clusters. The `soperatorActiveChecks` HelmRelease is enabled by default in `helm/soperator-fluxcd` and deploys the `helm-soperator-activechecks` chart after the Slurm cluster and `soperatorchecks` controller release.
 
-There is no separate "extensive check" resource or execution path in the current framework.
-
-Deployment is GitOps-oriented. The `helm-soperator-activechecks` chart renders `ActiveCheck` CRs, packaged scripts, and a Helm hook job that waits for initial checks. In `helm/soperator-fluxcd`, `soperatorActiveChecks.enabled` is `true` by default, and Flux deploys the chart after the Slurm cluster and `soperatorchecks` controller release.
-
-Slurm cluster users can also apply custom `ActiveCheck` CRs directly, outside the Flux-managed chart.
+Slurm cluster customers may apply custom Active Check CRs to the cluster (independently of Flux) too.
 
 ## Architecture diagram
 
@@ -28,205 +26,259 @@ Slurm cluster users can also apply custom `ActiveCheck` CRs directly, outside th
 
 ## Components
 
-- **Flux / Helm**
-  Flux deploys the `helm-soperator-activechecks` chart through a HelmRelease. The chart renders default checks from `helm/soperator-activechecks/values.yaml` and can be customized with values from optional ConfigMaps.
+This section explains the main building blocks of the Active Checks framework, following the architecture diagram.
 
-- **ActiveCheck CRs**
-  `ActiveCheck` resources define the desired check type, schedule, pod placement, job container, optional Slurm submission script, dependencies, and reactions.
+- **Flux**
+  GitOps tool that deploys the [soperator-activechecks Helm chart](https://github.com/nebius/soperator/tree/main/helm/soperator-activechecks).
+  Through this chart, Flux ensures that ActiveCheck CRs and packaged check scripts are consistently deployed across clusters.
 
-- **ServiceAccount Controller**
-  Watches `ActiveCheck` creation and reconciles a ServiceAccount, Role, and RoleBinding for the target Slurm cluster. Active Check pods use this ServiceAccount.
+- **Active Check CRs**
+  The core custom resources used to define checks.
+    - A single CR with a `checkType` field that can be either `k8sJob` or `slurmJob`.
+      (See [ActiveCheck CRD](#activecheck-crd) for details.)
 
 - **Active Check Controller**
-  Watches `ActiveCheck` CRs and reconciles each CR into a Kubernetes CronJob. It also creates an inline sbatch ConfigMap when `spec.slurmJobSpec.sbatchScript` is used.
+  Watches Active Check CRs and creates Kubernetes **CronJobs** for each of them (1:1 mapping).
+  For details of reconciliation logic, see [Controllers](#controllers).
 
-- **Active Check CronJobs and Kubernetes Jobs**
-  Every `ActiveCheck` is executed by Kubernetes Jobs created from a CronJob. If `runAfterCreation` is enabled, the controller also creates one immediate Job named from `spec.name`.
-
-- **Kubernetes check jobs (`k8sJob`)**
-  These jobs run command/script logic directly in the Kubernetes pod. They can optionally include a Munge init container and Slurm config mounts when the check needs Slurm authentication.
-
-- **Slurm submission jobs (`slurmJob`)**
-  These Kubernetes Jobs run the `slurm_check_job` image. The entrypoint prepares the jail view, mounts the sbatch script, submits Slurm jobs to the `hidden` partition, and annotates the Kubernetes Job with the Slurm job IDs.
-
-- **Slurm jobs**
-  The actual Slurm workloads. In regular mode there is one sbatch submission per Active Check run. In `eachWorkerJobs` mode the submitter creates separate one-node Slurm jobs for selected worker nodes.
+- **Active Check Jobs (K8s or Slurm)**
+  Standard Kubernetes Job resources created by CronJobs.
+    - K8s Active Check Jobs: run directly inside Kubernetes.
+    - Slurm Active Check Jobs: submit one Slurm Job batch per Active Check Job.
 
 - **Active Check Jobs Controller**
-  Watches Active Check Kubernetes Jobs, maps them back to their owning `ActiveCheck`, updates CR status, polls Slurm accounting for Slurm job results, and executes Slurm node reactions.
+  Watches Active Check Jobs (K8s and Slurm).
+    - Collects job results (for Slurm-based jobs via the [Slurm API client](https://github.com/nebius/soperator/blob/main/internal/slurmapi/client.go)).
+    - Updates statuses of the parent Active Check CRs (see [Status fields](#status-fields)).
+    - Executes reactions based on the outcome of the checks (see [Reactions fields (spec)](#reactions-fields-spec)).
+
+- **Slurm Jobs**
+  Real Slurm jobs created by a Slurm Active Check K8s Job.
+    - A batch may consist of one or many Slurm jobs.
+    - Job output is written to `/opt/soperator-outputs/local/slurm_jobs/` inside the jail. The directory is node-local (worker boot disk), so each output file is only visible on the worker that ran the job; the observability stack collects it with a per-node collector.
+
+- **Slurm Workers**
+  Compute nodes in the Slurm cluster where Slurm jobs execute.
+  These are the targets for most hardware acceptance and performance tests.
+
+- **Slurm Nodes Controller**
+  Watches Slurm nodes and drained workers.
+    - Sets the unhealthy flag for nodes drained with health-check reason prefixes when node replacement is enabled.
+
+- **ServiceAccount Controller**
+  Watches ActiveCheck CRs and reconciles the ServiceAccount, Role, and RoleBinding used by Active Check pods.
 
 - **Active Check Prolog Controller**
-  Watches Slurm clusters and publishes `activecheck-prolog.sh` into the jail through a ConfigMap and `JailedConfig`. The script removes the active check name from the current Slurm node's `Extra` JSON field under a node-local lock.
+  Publishes `activecheck-prolog.sh` into the jail through a ConfigMap and JailedConfig.
 
-- **Slurm Nodes and K8s Nodes Controllers**
-  These are part of the broader `soperatorchecks` controller manager. They process Slurm drain reasons such as `[node_problem]` and `[hardware_problem]`, set Kubernetes node conditions such as `HardwareIssuesSuspected`, and coordinate drain/reboot/replacement flows when node replacement is enabled.
-
-- **Images and packaged scripts**
-  The active checks chart uses `k8sJob`, `slurmJob`, `munge`, and `sansible` images. Packaged scripts live in `helm/soperator-activechecks/scripts/`.
+- **Image Storage**
+  Stores container images that provide the environments needed for running checks.
+    - **K8s Check Job Image** – environment for checks executed as Kubernetes Jobs.
+    - **Slurm Check Job Image** – environment for submitting Slurm jobs.
+    - **Munge Image** – init container used for Slurm authentication.
+    - **Sansible Image** – environment for jail state management checks.
 
 ## ActiveCheck CRD
 
-The `ActiveCheck` resource defines one check. In generated chart resources, `metadata.name` and `spec.name` are kept the same. Custom CRs should do the same because different implementation paths use both names: the CronJob uses `metadata.name`, the initial run Job uses `spec.name`, the inline sbatch ConfigMap uses `spec.name`, and Slurm submission uses the ActiveCheck metadata name as `ACTIVE_CHECK_NAME`.
+The **ActiveCheck** resource (`slurm.nebius.ai/v1alpha1`) defines one health check.
+The **[Active Check Controller](#1-active-check-controller)** ensures each `ActiveCheck` CR corresponds to exactly one **Kubernetes CronJob**.
+CronJobs create Kubernetes Jobs on schedule, which either run the check directly (K8s mode) or submit a Slurm batch (Slurm mode).
 
 ### Top-level `spec` fields
 
-- `spec.name` *(string, required)* - Logical check name used for generated resources such as the initial run Job and inline sbatch ConfigMap.
-- `spec.slurmClusterRefName` *(string, required)* - Target `SlurmCluster` name in the same namespace.
-- `spec.checkType` *(enum: `k8sJob` or `slurmJob`, default `k8sJob`)* - Selects the execution mode.
-- `spec.schedule` *(string, default `0 0 1 1 *`)* - Kubernetes CronJob schedule.
-- `spec.suspend` *(bool pointer, API default `true`)* - Passed to the CronJob. The Helm chart renders `false` when a chart check omits this value, so chart defaults are check-specific rather than pure CRD defaults.
-- `spec.activeDeadlineSeconds` *(int64, default `1800`)* - Rendered as `pod.spec.activeDeadlineSeconds` for each check pod.
-- `spec.successfulJobsHistoryLimit` *(int32, default `3`)* - Successful Kubernetes Jobs retained by the CronJob.
-- `spec.failedJobsHistoryLimit` *(int32, default `16`)* - Failed Kubernetes Jobs retained by the CronJob.
-- `spec.runAfterCreation` *(bool pointer, API default `true`)* - Creates one immediate Job after the CronJob exists and before any status transition has been recorded. The Helm chart renders `false` when a chart check omits this value.
-- `spec.dependsOn` *(string array)* - Names of prerequisite ActiveChecks in the same namespace. A dependent check waits until each prerequisite with `runAfterCreation: true` has completed. `k8sJob` prerequisites require `Complete`; `slurmJob` prerequisites require `Complete` or `Skipped`.
-- `spec.nodeSelector`, `spec.affinity`, `spec.tolerations` - Passed through to the check pod template.
-- `spec.podTemplateNameRef` *(string pointer)* - Optional `PodTemplate` whose template is merged into the generated pod template.
-- `spec.hostUsers` *(bool pointer)* - Passed to `pod.spec.hostUsers` when rendered. The Helm chart auto-detects this value from Kubernetes version unless `.Values.hostUsers` is explicitly set.
-- `spec.successReactions` / `spec.failureReactions` - Slurm node reactions executed for terminal Slurm jobs.
+- **`spec.name`** *(string)* — Logical name used for generated CronJob/Jobs.
+- **`spec.slurmClusterRefName`** *(string)* — Name of the SlurmCluster to target.
+- **`spec.checkType`** *(enum: `k8sJob`|`slurmJob`)* — Selects execution mode.
+- **`spec.schedule`** *(string)* — Cron schedule in standard Kubernetes Cron format.
+- **`spec.suspend`** *(bool)* — If `true`, pauses scheduling without deleting resources.
+- **`spec.activeDeadlineSeconds`** *(int64)* — Timeout for each check pod.
+- **`spec.successfulJobsHistoryLimit`** *(int32)* — How many successful Job objects to retain.
+- **`spec.failedJobsHistoryLimit`** *(int32)* — How many failed Job objects to retain.
+- **`spec.runAfterCreation`** *(bool)* — Run once immediately after the CronJob is created.
+- **`spec.dependsOn`** *(string[])* — Names of other ActiveChecks (same namespace) that must complete before this one runs.
+  A check will not run until dependencies with `runAfterCreation: true` have reached **Complete** status. For Slurm checks, **Skipped** is also treated as ready.
+- **`spec.nodeSelector`**, **`spec.affinity`**, **`spec.tolerations`** — Optional pod placement settings for check pods.
+- **`spec.podTemplateNameRef`** *(string)* — Optional PodTemplate to merge into the generated pod template.
+- **`spec.hostUsers`** *(bool)* — Optional value rendered to `pod.spec.hostUsers`; the Helm chart auto-detects a value when omitted.
 
-The generated CronJob uses `ForbidConcurrent`, `parallelism: 1`, `completions: 1`, `restartPolicy: Never`, and `backoffLimit: 0`.
+#### Mode-specific options
 
-### `spec.k8sJobSpec`
+**`spec.k8sJobSpec` (Kubernetes checks)**
+- **`spec.k8sJobSpec.jobContainer`** *(ContainerSpec)* — Container image and command/args for the check.
+- **`spec.k8sJobSpec.mungeContainer`** *(ContainerSpec)* — Optional Munge sidecar for Slurm auth.
+- **`spec.k8sJobSpec.scriptRefName`** *(string)* — Name of a `ConfigMap` containing a custom script at key `script.sh`.
 
-- `jobContainer` *(ContainerSpec)* - Image, command, args, working directory, environment, volumes, mounts, pull policy, pull secrets, and AppArmor profile for the main check container.
-- `mungeContainer` *(ContainerSpec pointer)* - Optional Munge init container. When present, the pod also receives Slurm config, Munge key/socket volumes, and related mounts.
-- `scriptRefName` *(string pointer)* - Optional ConfigMap name. The ConfigMap must contain `script.sh`; it is mounted as `/opt/bin/entrypoint.sh`, and the container command becomes `/bin/bash /opt/bin/entrypoint.sh`.
+**`spec.slurmJobSpec` (Slurm checks)**
+- **`spec.slurmJobSpec.jobContainer`** *(ContainerSpec)* — Container image and command/args for Slurm submission.
+- **`spec.slurmJobSpec.mungeContainer`** *(ContainerSpec)* — Munge sidecar for Slurm auth.
+- **`spec.slurmJobSpec.sbatchScriptRefName`** *(string)* — Name of a `ConfigMap` containing an sbatch script at key `sbatch.sh`.
+- **`spec.slurmJobSpec.sbatchScript`** *(string, multiline)* — Inline sbatch script. May contain `#SBATCH` directives and shell logic; can invoke `srun`.
+- **`spec.slurmJobSpec.eachWorkerJobs`** *(bool)* — Run on **each worker** using **separate Slurm jobs**.
+- **`spec.slurmJobSpec.maxNumberOfJobs`** *(int64)* — Maximum number of simultaneous jobs. If less than the number of workers, only a subset runs. `0` = no limit.
 
-The activechecks Helm chart usually renders packaged K8s scripts directly as the container command instead of using `scriptRefName`.
+### Reactions fields (spec)
 
-### `spec.slurmJobSpec`
+- **`spec.successReactions`** *(Reactions)* — Actions to take when a Slurm run **succeeds**.
+- **`spec.failureReactions`** *(Reactions)* — Actions to take when a Slurm run **fails**.
 
-- `jobContainer` *(ContainerSpec)* - Main Kubernetes container that submits Slurm work. Chart defaults use the `slurmJob` image and common jail PVC mount.
-- `mungeContainer` *(ContainerSpec)* - Munge init container for Slurm authentication.
-- `sbatchScriptRefName` *(string pointer)* - Optional ConfigMap name containing key `sbatch.sh`.
-- `sbatchScript` *(string pointer)* - Inline sbatch script. The Active Check Controller writes it to a ConfigMap named `sbatch-script-<spec.name>` under key `sbatch.sh`.
-- `eachWorkerJobs` *(bool, default `false`)* - Submit one separate one-node Slurm job per selected worker.
-- `maxNumberOfJobs` *(int64 pointer, default `0`)* - Limit for `eachWorkerJobs`. `0` or unset means no limit; a positive value randomly selects up to that many candidate nodes.
+`Reactions` supports:
+- **`drainSlurmNode`** — Drain affected Slurm nodes.
+- **`commentSlurmNode`** — Add a failure comment to affected nodes.
 
-Slurm submission details:
+Reactions are evaluated by the **Active Check Jobs Controller** after Slurm runs.
+Affected nodes are derived from the Slurm job’s node list (`GetNodeList()`).
 
-- Jobs are submitted to the `hidden` partition.
-- Jobs run as user `soperatorchecks` with working directory `/opt/soperator-home/soperatorchecks`.
-- Output and error are written to `/opt/soperator-outputs/local/slurm_jobs/%N.%x.%j.out`.
-- `eachWorkerJobs` cancels active jobs with the same name in the `hidden` partition before submitting new per-node jobs.
-- Candidate nodes exclude Slurm states such as `DOWN`, `DRAIN`, `ERROR`, `RESERVED`, `NOT_RESPONDING`, and reboot/power-down states.
-- If the sbatch script contains GPU directives (`--gpus-per-node`, `--gpus`, `--gres=gpu`, or `-G`), the submitter treats the check as GPU-required. It skips the whole check when `slurm_base.conf.noedit` exists and declares no GPU nodes, and in `eachWorkerJobs` mode it submits only to GPU-capable nodes.
+### `status` fields
 
-## Reactions
+#### `status.k8sJobsStatus`
+- **`lastTransitionTime`** *(time)* — Last status change.
+- **`lastJobScheduleTime`** *(time)* — Last CronJob schedule event.
+- **`lastJobSuccessfulTime`** *(time)* — Time of last successful Job.
+- **`lastJobName`** *(string)* — Name of the last Job.
+- **`lastJobStatus`** *(enum)* — One of:
+    - `Active` — Job currently running.
+    - `Complete` — Job finished successfully.
+    - `Failed` — Job failed (reactions do **not** apply for K8s jobs).
+    - `Suspended` — Job was suspended.
+    - `Pending` — Job created but not yet started.
+    - `Unknown` — State could not be determined.
 
-Reactions are evaluated only for `slurmJob` checks, per terminal Slurm job observed in accounting:
+#### `status.slurmJobsStatus`
+- **`lastTransitionTime`** *(time)* — Last status change.
+- **`lastRunId`** *(string)* — Identifier of the last Slurm batch run.
+- **`lastRunName`** *(string)* — Name of the last Slurm run.
+- **`lastRunStatus`** *(enum)* — One of:
+    - `InProgress` — Run is still ongoing.
+    - `Complete` — Run finished successfully (**success reactions may apply**).
+    - `Failed` — Check failed (**failure reactions may apply**).
+    - `Error` — Error in job submission or check implementation.
+    - `Cancelled` — Check was cancelled.
+    - `Skipped` — Check intentionally did not submit a Slurm job (currently used for GPU-required checks on clusters without GPU nodes).
+- **`lastRunFailJobsAndReasons`** *(array)* — List of `{ jobID, reason }` for failed jobs in the last run.
+- **`lastRunErrorJobsAndReasons`** *(array)* — List of `{ jobID, reason }` for error jobs in the last run.
+- **`lastRunCancelledJobs`** *(array)* — List of job IDs for cancelled jobs in the last run.
+- **`lastRunSubmitTime`** *(time)* — Submission time of the last run.
 
-- `spec.failureReactions` is executed for failed Slurm jobs.
-- `spec.successReactions` is executed for completed Slurm jobs.
-- Cancelled and unhandled terminal states update status but do not execute reactions.
+## Execution Modes
 
-Supported reaction fields:
+Execution depends on `spec.checkType`.
+In both cases, the Active Check Controller creates a CronJob (1:1 with CR) which then spawns Jobs.
 
-- `drainSlurmNode.drainReasonPrefix` - Drains each node from the Slurm job node list. The reason is `<prefix> <activeCheckName>: job <jobID> [slurm_job]`.
-- `commentSlurmNode.commentPrefix` - Updates each node from the Slurm job node list with comment `<prefix> <activeCheckName>: job <jobID> [slurm_job]`.
+### Shared concepts
+- **Kubernetes CronJob** → schedules the runs.
+- **Kubernetes Job** → executes a single run.
+- **Images**:
+    - *K8s Check Job Image* → used in `k8sJob`.
+    - *Slurm Check Job Image* → used in `slurmJob` for submitting.
+    - *Munge Image* → used by checks that need Slurm authentication.
+    - *Sansible Image* → used by jail state management checks.
 
-The API can represent both drain and comment reactions. The activechecks Helm chart rejects a single check that sets both `failureReactions.commentSlurmNode.commentPrefix` and `failureReactions.drainSlurmNode.drainReasonPrefix`.
+### Kubernetes Jobs (`k8sJob`)
+- The CronJob spawns a Kubernetes Job that runs the check inside the cluster.
+- Logs are available directly in the Job’s Pod.
+- No reactions are applied; only status is updated.
 
-## Status
+### Slurm Jobs (`slurmJob`)
+- The CronJob spawns a Kubernetes Job that **submits a Slurm batch job**.
+- Batch may contain one or many Slurm jobs.
+- Logs are written under `/opt/soperator-outputs/local/slurm_jobs/` — node-local on the worker that ran the job.
+- GPU-required Slurm checks are skipped before `sbatch` when the Slurm base config exists and declares no GPU nodes.
+- After the run completes, the Jobs Controller may apply success/failure reactions (see [Reactions fields (spec)](#reactions-fields-spec)); affected nodes come from Slurm’s `GetNodeList()`.
 
-### `status.k8sJobsStatus`
+#### Slurm job submission modes
+- **Default** — One Slurm batch per run.
+- **eachWorkerJobs** — Run once per worker using separate Slurm jobs. `maxNumberOfJobs` param may be used together with it to limit the number of jobs (if less than the number of workers, only a subset executes).
 
-- `lastTransitionTime` - Last time the stored K8s job status changed.
-- `lastJobScheduleTime` - CronJob last schedule time.
-- `lastJobSuccessfulTime` - CronJob last successful time.
-- `lastJobName` - Last Kubernetes Job name.
-- `lastJobStatus` - One of:
-  - `Active` - Job has active pods.
-  - `Complete` - Job has `Complete` or `SuccessCriteriaMet`.
-  - `Failed` - Job has `Failed` or `FailureTarget`.
-  - `Suspended` - Job has `Suspended`.
-  - `Pending` - Job has no active pods and no conditions.
-  - `Unknown` - State could not be classified.
+#### Slurm partitions (defaults)
+There are two partitions by default:
+- **main** — used for clients’ jobs.
+- **hidden** — hidden partition with the same priority as `main`.
 
-### `status.slurmJobsStatus`
+Active checks always use hidden partition for job submission.
 
-- `lastTransitionTime` - Last time the stored Slurm run status changed.
-- `lastRunId` - First Slurm job ID in the run, or `No slurm job` for skipped/submission-error paths.
-- `lastRunName` - Slurm job name from accounting, or the Kubernetes Job name when no Slurm job was submitted.
-- `lastRunStatus` - One of:
-  - `InProgress` - At least one Slurm job is still running, missing from accounting, or has no end time yet.
-  - `Complete` - All observed Slurm jobs completed successfully.
-  - `Failed` - At least one Slurm job failed after all jobs reached terminal accounting state.
-  - `Error` - Slurm submission failed before job IDs were available, or accounting returned an unhandled terminal state.
-  - `Cancelled` - At least one Slurm job was cancelled and there were no failed or error jobs.
-  - `Skipped` - The submitter intentionally did not call `sbatch`, currently used when a GPU-required check sees a Slurm base config with no GPU nodes.
-- `lastRunFailJobsAndReasons` - Failed Slurm jobs and reasons.
-- `lastRunErrorJobsAndReasons` - Jobs in unhandled terminal states and reasons.
-- `lastRunCancelledJobs` - Cancelled Slurm job IDs.
-- `lastRunSubmitTime` - Slurm submit time from accounting when available.
-
-While any Slurm job still needs polling, the aggregate status remains `InProgress`. Once all jobs are terminal, status precedence is `Failed`, then `Error`, then `Cancelled`, then `Complete`.
-
-## Execution modes
-
-### Shared flow
-
-1. The ServiceAccount Controller creates RBAC for the target Slurm cluster.
-2. The Active Check Controller waits until the `SlurmCluster` exists, is `Available`, and is not in maintenance.
-3. The controller checks `dependsOn` prerequisites.
-4. The controller reconciles a CronJob and, for inline Slurm scripts, an sbatch ConfigMap.
-5. The CronJob creates Kubernetes Jobs on schedule. If `runAfterCreation` is true and no status transition exists yet, the controller creates `<spec.name>-initial-run`.
-6. The Active Check Jobs Controller watches Jobs with the soperatorchecks component label and updates the owning `ActiveCheck` status.
-
-### Kubernetes jobs (`k8sJob`)
-
-The Kubernetes Job runs the configured container command directly. Logs are available from the Job pod. No Slurm reactions are executed for `k8sJob` checks.
-
-### Slurm jobs (`slurmJob`)
-
-The Kubernetes Job submits Slurm work and annotates itself with:
-
-- `slurm-job-id` - comma-separated Slurm job IDs for the run.
-- `unhandled-slurm-job-id` - IDs that still need to be observed in terminal accounting state.
-
-If a GPU-required check is skipped before submission, the Job is annotated with `slurm-skipped-reason` and the ActiveCheck status becomes `Skipped` after the Kubernetes Job reaches a terminal state.
-
-The Active Check Jobs Controller queries Slurm accounting through the Slurm API client. It requeues while jobs are not visible in accounting, are not terminal, or have no end time. It records a `soperator-checks-final-state-time` annotation on the Kubernetes Job to avoid reprocessing already handled terminal Slurm jobs.
-
-## Packaged chart checks
-
-The default `helm-soperator-activechecks` values currently define these checks:
-
-- `gpu-checks` - enabled `slurmJob`, runs twice daily and after creation, uses `eachWorkerJobs` with `maxNumberOfJobs: 200`, and drains failed nodes with `[node_problem]`.
-- `ensure-healthy-nodes` - enabled `slurmJob`, suspended except initial run, verifies that Slurm nodes have no reason and are not in bad states.
-- `dcgmi-diag-r3` - disabled `slurmJob` template for DCGM diagnostics.
-- `create-user-soperatorchecks` and `create-user-nebius` - enabled `k8sJob` bootstrap checks.
-- `manage-jail-state` - enabled `k8sJob` initial Ansible run for jail state.
-- `manage-jail-state-force` - enabled but not run after creation by default; forces reinstall/upgrade paths when triggered.
-- `manage-jail-state-dry-run` - enabled scheduled Ansible dry run.
-- `wait-for-topology` and `wait-for-soperatorchecks-srun-ready` - enabled readiness checks used as dependencies.
-- `nccl-profiles-cleaner` - enabled scheduled cleanup of shared NCCL profile dumps.
-- `retrigger-checks` - enabled helper check for retriggering ActiveChecks.
-
-The chart also creates a Helm hook Job named `<slurmClusterRefName>-wait-for-active-checks`. It waits for `runAfterCreation: true` checks for the target cluster, excluding checks that define `failureReactions.commentSlurmNode`. It treats K8s `Complete` as success, Slurm `Complete`, `Skipped`, and `Cancelled` as terminal success for the Helm release, and fails the release on K8s `Failed` or Slurm `Failed`.
-
-## Node health and replacement
-
-Active Check failure reactions can drain Slurm nodes with reason prefixes such as `[node_problem]` or `[hardware_problem]`. The Slurm Nodes Controller periodically lists drained Slurm nodes and processes well-known reasons:
-
-- `[node_problem]` - Parsed as a health check failure. If node replacement is enabled, the controller sets `HardwareIssuesSuspected=True` on the corresponding Kubernetes node after confirming the Slurm nodes on that Kubernetes node are fully drained.
-- `[hardware_problem]` - Also sets `HardwareIssuesSuspected=True` when node replacement is enabled.
-- `Kill task failed`, node reboot, and maintenance replacement reasons are handled by the same controller family but are not ActiveCheck-specific.
-
-Before marking a Kubernetes node unhealthy, the controller avoids acting on stale Slurm drain reasons from a previous worker assignment. If the current worker pod was assigned after the drain reason changed, it undrains the Slurm node instead.
+If `eachWorkerJobs` is not specified the job is running in the default submission mode.
 
 ## Observability
 
-- K8s check logs are available from the Kubernetes Job pods.
-- Slurm check stdout/stderr is written under `/opt/soperator-outputs/local/slurm_jobs/`. This is node-local storage in the jail, backed by the worker boot disk.
-- The jail logs OpenTelemetry collector ships `slurm_jobs` logs and extracts labels such as `slurm_node_name`, `job_name`, `job_id`, and `job_array_id` from filenames.
-- Current check result state is available in `ActiveCheck` status and in the Kubernetes Job annotations used by the controller.
-- These controllers do not expose a separate ActiveCheck-specific metrics surface in this repository. Use CR status, Kubernetes Job/Pod state, Slurm accounting, and centralized logs for troubleshooting.
+The Active Checks framework integrates with the cluster observability stack.
 
-## Limitations
+### Logging
+- **K8s jobs** → logs are available from the Pods of the Kubernetes Jobs.
+- **Slurm jobs** → logs are written under `/opt/soperator-outputs/local/slurm_jobs/`, node-local on the worker that ran the job, and shipped by the per-node jail-logs collector.
+- Other logs (e.g., passive checks) also exist under the broader `/soperator-outputs/` path, but are out of scope for this doc.
 
-- Active Check Kubernetes Jobs use `backoffLimit: 0`; failed runs are not retried by the Job controller.
-- Dependency handling is based on the latest stored status. Dependencies only gate checks whose prerequisite CRs have `runAfterCreation: true`; prerequisites without that flag are skipped by dependency evaluation.
-- Slurm result aggregation depends on Slurm accounting. A submitted job that is not yet visible in accounting keeps the ActiveCheck status `InProgress` and causes the controller to requeue.
-- Job object retention is limited to the CronJob history limits. Long-term Slurm output retention depends on the centralized logging pipeline, not on ActiveCheck CR status.
+### Dashboards
+This repository does not expose a separate ActiveCheck-specific metrics surface. Use ActiveCheck status, Kubernetes Job/Pod state, Slurm accounting, and centralized logs for troubleshooting.
+
+## Controllers
+
+Active Checks are managed by soperatorchecks controllers. Together they implement a GitOps-friendly flow:
+**ActiveCheck CR → CronJob (1:1) → Jobs → Status & (if Slurm) Reactions**.
+
+### 1. Active Check Controller
+
+**Purpose**
+- Watches `ActiveCheck` CRs and reconciles each CR **into exactly one Kubernetes CronJob**.
+- Encodes CronJob settings from the CR (`schedule`, `suspend`, `activeDeadlineSeconds`, history limits, `runAfterCreation`).
+- Ensures optional script sources are wired (e.g., inline `slurmJobSpec.sbatchScript` via ConfigMap).
+- Adds/removes the `slurm.nebius.ai/activecheck-finalizer` to support safe teardown.
+
+**High-level flow**
+1. On create/update:
+    - Requeues reconciliation until Slurm cluster is available, not in maintenance, and all required checks from `dependsOn` have finished successfully.
+    - Render and reconcile the CronJob (and ConfigMap if needed).
+    - Optionally trigger an immediate run if `runAfterCreation` is set and no prior transition exists.
+2. On delete:
+    - Clean up the CronJob and inline-script ConfigMap (if any).
+    - Remove the finalizer.
+
+### 2. Active Check Jobs Controller
+
+**Purpose**
+- Observes **Jobs** created by CronJobs (K8s and Slurm).
+- Aggregates results and **updates status on the owning CRs** (see [Status fields](#status-fields)).
+- Applies **reactions** for Slurm runs according to `successReactions` / `failureReactions` (see [Reactions fields (spec)](#reactions-fields-spec)).
+
+**High-level flow**
+1. Map each Kubernetes Job back to its owning `ActiveCheck`.
+2. **Kubernetes mode**
+    - Compute `lastJobStatus` (`Active`, `Complete`, `Failed`, `Suspended`, `Pending`, `Unknown`) and update `k8sJobsStatus`.
+    - No reactions applied.
+3. **Slurm mode**
+    - Parse Slurm job IDs from Kubernetes Job annotations.
+    - Query the [Slurm API client](https://github.com/nebius/soperator/blob/main/internal/slurmapi/client.go) for job states from accounting.
+    - Aggregate results into `slurmJobsStatus` (run ID/name/status, failed/error jobs with reasons, submit time).
+    - Mark the run **Skipped** when the Kubernetes Job has the `slurm-skipped-reason` annotation.
+    - If terminal:
+        - On **Failed** → apply **failureReactions** (e.g., drain/comment).
+        - On **Complete** → apply **successReactions** (e.g., comment updates).
+    - Requeue while jobs are in progress.
+4. Patch Job annotations with a “final state” timestamp to avoid reprocessing.
+
+**Error handling & GC (high level)**
+- Requeues on transient errors (API reads/patches).
+- Job history is pruned by CronJob’s `successfulJobsHistoryLimit` / `failedJobsHistoryLimit`.
+
+### 3. Slurm Nodes Controller
+
+**Purpose**
+- Watches Slurm nodes, focusing on drained workers.
+- Sets the unhealthy flag on the corresponding Kubernetes nodes for workers drained with health-check reason prefixes to mark them for replacement.
+
+**High-level flow**
+1. Periodically list Slurm nodes and filter **drained** nodes with well-known health check reasons.
+2. For `[node_problem]` health check failures:
+    - Mark the node unhealthy **when node replacement is enabled**; otherwise no-op.
+3. For `[hardware_problem]` failures:
+    - Mark the node unhealthy **when node replacement is enabled**; otherwise no-op.
+
+### 4. Supporting controllers
+
+- **ServiceAccount Controller** reconciles ServiceAccount/RBAC resources for Active Check pods.
+- **Active Check Prolog Controller** publishes the active check prolog script into the jail.
+
+## Roadmap & Limitations
+
+### Current limitations
+- **No retries for active checks**: generated Jobs use `backoffLimit: 0`; if a run fails, dependent checks won’t proceed until manual intervention or a later successful run.
+- **Job history pruning**: limited to CronJob’s `successfulJobsHistoryLimit` and `failedJobsHistoryLimit`; no long-term archival.
