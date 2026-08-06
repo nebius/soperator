@@ -310,6 +310,86 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 	}
 }
 
+func TestRenderNodeSetStatefulSet_PodNetworking(t *testing.T) {
+	tests := []struct {
+		name              string
+		hostNetwork       bool
+		dnsPolicy         corev1.DNSPolicy
+		expectedDNSPolicy corev1.DNSPolicy
+	}{
+		{
+			name:              "defaults to cluster first",
+			expectedDNSPolicy: corev1.DNSClusterFirst,
+		},
+		{
+			name:              "host network defaults to cluster first with host net",
+			hostNetwork:       true,
+			expectedDNSPolicy: corev1.DNSClusterFirstWithHostNet,
+		},
+		{
+			name:              "explicit dns policy is preserved",
+			hostNetwork:       true,
+			dnsPolicy:         corev1.DNSDefault,
+			expectedDNSPolicy: corev1.DNSDefault,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeSet := &values.SlurmNodeSet{
+				Name: "test-nodeset",
+				ParentalCluster: client.ObjectKey{
+					Namespace: "test-namespace",
+					Name:      "test-cluster",
+				},
+				ContainerSlurmd: values.Container{
+					NodeContainer: slurmv1.NodeContainer{
+						Image:           "test-image",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						Resources: corev1.ResourceList{
+							corev1.ResourceMemory:           resource.MustParse("1Gi"),
+							corev1.ResourceCPU:              resource.MustParse("100m"),
+							corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+				ContainerMunge: values.Container{
+					NodeContainer: slurmv1.NodeContainer{
+						Image: "munge-image",
+					},
+				},
+				VolumeSpool: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+				},
+				VolumeJail: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+				},
+				StatefulSet:              values.StatefulSet{Replicas: 1},
+				ServiceUmbrella:          values.Service{Name: "test-umbrella"},
+				SupervisorDConfigMapName: "supervisord-config",
+				SSHDConfigMapName:        "sshd-config",
+				GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+				HostNetwork:              tt.hostNetwork,
+				DNSPolicy:                tt.dnsPolicy,
+			}
+
+			result, err := worker.RenderNodeSetStatefulSet(
+				"test-cluster",
+				nodeSet,
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				false,
+				false,
+				"",
+			)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.hostNetwork, result.Spec.Template.Spec.HostNetwork)
+			assert.Equal(t, tt.expectedDNSPolicy, result.Spec.Template.Spec.DNSPolicy)
+		})
+	}
+}
+
 func TestRenderNodeSetStatefulSet_NvidiaIMEXCLIMount(t *testing.T) {
 	nodeSet := &values.SlurmNodeSet{
 		Name: "test-nodeset",

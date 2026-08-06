@@ -189,6 +189,21 @@ type NodeSetSpec struct {
 	// +kubebuilder:default=false
 	EnableHostUserNamespace bool `json:"enableHostUserNamespace,omitempty"`
 
+	// HostNetwork controls whether worker pods use the host network namespace.
+	// Defaults to false.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	HostNetwork bool `json:"hostNetwork,omitempty"`
+
+	// DNSPolicy controls the DNS policy for worker pods.
+	// When HostNetwork is true and DNSPolicy is omitted, the worker pod uses ClusterFirstWithHostNet.
+	// Otherwise, it defaults to ClusterFirst.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=ClusterFirstWithHostNet;ClusterFirst;Default;None
+	DNSPolicy corev1.DNSPolicy `json:"dnsPolicy,omitempty"`
+
 	// WorkerInitRandomDelaySeconds is the upper bound (in seconds) of a random delay the
 	// worker-init container sleeps before running its readiness checks. The actual delay is
 	// picked uniformly from [0, WorkerInitRandomDelaySeconds]. It spreads slurmd registrations

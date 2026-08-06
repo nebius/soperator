@@ -17762,6 +17762,17 @@ spec:
                   - name
                   type: object
                 type: array
+              dnsPolicy:
+                description: |-
+                  DNSPolicy controls the DNS policy for worker pods.
+                  When HostNetwork is true and DNSPolicy is omitted, the worker pod uses ClusterFirstWithHostNet.
+                  Otherwise, it defaults to ClusterFirst.
+                enum:
+                - ClusterFirstWithHostNet
+                - ClusterFirst
+                - Default
+                - None
+                type: string
               docker:
                 description: Docker defines the settings related to Docker support
                   for Slurm workers.
@@ -17819,6 +17830,12 @@ spec:
                         type: boolean
                     type: object
                 type: object
+              hostNetwork:
+                default: false
+                description: |-
+                  HostNetwork controls whether worker pods use the host network namespace.
+                  Defaults to false.
+                type: boolean
               imagePullSecrets:
                 description: ImagePullSecrets is a list of secret names in the same
                   namespace used for pulling worker pod images.

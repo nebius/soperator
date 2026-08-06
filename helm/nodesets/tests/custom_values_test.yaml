@@ -8,6 +8,8 @@ tests:
         - name: custom-workers
           replicas: 10
           priorityClass: "custom-priority"
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
           slurmd:
             image:
               repository: "custom/slurm"
@@ -48,6 +50,12 @@ tests:
       - equal:
           path: spec.priorityClass
           value: "custom-priority"
+      - equal:
+          path: spec.hostNetwork
+          value: true
+      - equal:
+          path: spec.dnsPolicy
+          value: ClusterFirstWithHostNet
       - equal:
           path: spec.slurmd.image.repository
           value: "custom/slurm"
@@ -101,6 +109,10 @@ tests:
           value: 1  # default value
       - notExists:
           path: spec.priorityClass
+      - notExists:
+          path: spec.hostNetwork
+      - notExists:
+          path: spec.dnsPolicy
       - notExists:
           path: spec.affinity
       - notExists:
