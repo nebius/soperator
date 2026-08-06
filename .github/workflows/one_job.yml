@@ -190,34 +190,13 @@ jobs:
       - name: Install GO
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: "e2e/go.mod"
+          go-version-file: "go.mod"
           cache: false
 
-      - name: Check E2E module tidy
-        shell: bash
-        run: |
-          go -C e2e mod tidy
-          git diff --exit-code -- e2e/go.mod e2e/go.sum
-
-      - name: Test E2E module
-        shell: bash
-        run: go -C e2e test ./...
-
-      - name: Vet E2E module
-        shell: bash
-        run: go -C e2e vet ./...
-
-      - name: golangci-lint E2E module
-        uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
-        with:
-          version: v2.12.2 # version of golangci-lint, should be in sync with Makefile.
-          working-directory: e2e
-
-      - name: Build E2E commands
+      - name: Build E2E command
         shell: bash
         run: |
           mkdir -p bin
-          go -C e2e build -o ../bin/acceptance ./cmd/acceptance
           go build -o bin/e2e ./cmd/e2e
 
   build-soperator-images:
