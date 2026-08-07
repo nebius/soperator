@@ -42,6 +42,14 @@ spec:
   maintenance: {{ default "none" .Values.maintenance | quote  }}
   crVersion: {{ .Chart.Version }}
   useDefaultAppArmorProfile: {{ .Values.useDefaultAppArmorProfile }}
+  {{- with (.Values.extraLabels | default dict) }}
+  extraLabels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with (.Values.extraAnnotations | default dict) }}
+  extraAnnotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   partitionConfiguration:
     configType: {{ (default "default" .Values.partitionConfiguration.configType) }}
     {{- if and .Values.partitionConfiguration.rawConfig (eq .Values.partitionConfiguration.configType "custom") }}

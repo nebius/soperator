@@ -1106,6 +1106,13 @@ func (in *NodeSetSpec) DeepCopyInto(out *NodeSetSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.WorkerLabels != nil {
+		in, out := &in.WorkerLabels, &out.WorkerLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.CustomInitContainers != nil {
 		in, out := &in.CustomInitContainers, &out.CustomInitContainers
 		*out = make([]v1.Container, len(*in))

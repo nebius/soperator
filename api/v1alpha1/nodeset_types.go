@@ -299,6 +299,11 @@ type NodeSetSpec struct {
 	// +kubebuilder:validation:Optional
 	WorkerAnnotations map[string]string `json:"workerAnnotations,omitempty"`
 
+	// WorkerLabels represent K8S labels that should be added to the worker pods.
+	//
+	// +kubebuilder:validation:Optional
+	WorkerLabels map[string]string `json:"workerLabels,omitempty"`
+
 	// CustomInitContainers represent additional init containers which will be added to worker pods.
 	//
 	// +kubebuilder:validation:Optional

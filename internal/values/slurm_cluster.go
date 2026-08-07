@@ -3,6 +3,7 @@ package values
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -86,12 +87,39 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster, n
 		UseDefaultAppArmorProfile: cluster.Spec.UseDefaultAppArmorProfile,
 	}
 
+	// Apply cluster-wide ExtraLabels/ExtraAnnotations to every component.
+	for _, m := range []*map[string]string{
+		&res.NodeController.Labels, &res.NodeAccounting.Labels, &res.NodeRest.Labels,
+		&res.NodeLogin.Labels, &res.SlurmExporter.Labels, &res.SConfigController.Labels,
+		&res.PopulateJail.Labels,
+	} {
+		*m = mergeClusterExtra(cluster.Spec.ExtraLabels, *m)
+	}
+	for _, m := range []*map[string]string{
+		&res.NodeController.Annotations, &res.NodeAccounting.Annotations, &res.NodeRest.Annotations,
+		&res.NodeLogin.Annotations, &res.SlurmExporter.Annotations, &res.SConfigController.Annotations,
+		&res.PopulateJail.Annotations,
+	} {
+		*m = mergeClusterExtra(cluster.Spec.ExtraAnnotations, *m)
+	}
+
 	if err := res.Validate(ctx); err != nil {
 		logger.Error(err, "SlurmCluster validation failed")
 		return res, fmt.Errorf("failed to validate SlurmCluster: %w", err)
 	}
 
 	return res, nil
+}
+
+// mergeClusterExtra merges cluster-wide extra key/value pairs with component-specific ones,
+// with the component-specific values taking precedence on conflicting keys.
+func mergeClusterExtra(clusterWide, componentSpecific map[string]string) map[string]string {
+	if len(clusterWide) == 0 {
+		return componentSpecific
+	}
+	merged := maps.Clone(clusterWide)
+	maps.Copy(merged, componentSpecific)
+	return merged
 }
 
 func BuildClusterWithGPUFromNodeSets(nodeSets []slurmav1alpha1.NodeSet) bool {

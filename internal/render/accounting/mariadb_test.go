@@ -3,8 +3,11 @@ package accounting
 import (
 	"testing"
 
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -115,4 +118,32 @@ func Test_RenderMariaDb(t *testing.T) {
 	assert.Equal(t, true, mariaDb.Spec.PasswordSecretKeyRef.Generate)
 	assert.Equal(t, consts.MariaDbSecretRootName, mariaDb.Spec.RootPasswordSecretKeyRef.SecretKeySelector.Name)
 	assert.Equal(t, consts.MariaDbPasswordKey, mariaDb.Spec.RootPasswordSecretKeyRef.SecretKeySelector.Key)
+}
+
+func Test_RenderMariaDb_CustomLabelsAndAnnotations(t *testing.T) {
+	acc := &values.SlurmAccounting{
+		SlurmNode: slurmv1.SlurmNode{
+			K8sNodeFilterName: "test-filter",
+		},
+		Labels:      map[string]string{"gcore.com/project-id": "123"},
+		Annotations: map[string]string{"gcore.com/note": "abc"},
+		MariaDb: slurmv1.MariaDbOperator{
+			Enabled: true,
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "mariadb:10.5",
+			},
+			Storage: mariadbv1alpha1.Storage{
+				Size: ptr.To(resource.MustParse("1Gi")),
+			},
+		},
+	}
+
+	nodeFilters := []slurmv1.K8sNodeFilter{{Name: "test-filter"}}
+
+	result, err := RenderMariaDb("test-namespace", "test-cluster", acc, nodeFilters)
+	assert.NoError(t, err)
+
+	assert.NotNil(t, result.Spec.PodTemplate.PodMetadata)
+	assert.Equal(t, "123", result.Spec.PodTemplate.PodMetadata.Labels["gcore.com/project-id"])
+	assert.Equal(t, "abc", result.Spec.PodTemplate.PodMetadata.Annotations["gcore.com/note"])
 }

@@ -36,6 +36,7 @@ func RenderNodeSetStatefulSet(
 	labels := common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	labels[consts.LabelNodeSetKey] = nodeSet.Name
 	labels[consts.LabelWorkerKey] = consts.LabelWorkerValue
+	maps.Copy(labels, nodeSet.Labels)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	matchLabels[consts.LabelNodeSetKey] = nodeSet.Name
 
