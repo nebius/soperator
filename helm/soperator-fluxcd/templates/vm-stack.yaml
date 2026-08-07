@@ -23,6 +23,9 @@ spec:
       version: {{ .Values.observability.vmStack.version }}
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- if and .Values.observability.publicEndpointEnabled (eq .Values.observability.publicEndpointTokenKind "secret") (include "soperator-fluxcd.o11yTsaTokenWriterEnabled" .) }}
+  - name: {{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}
+  {{- end }}
   {{- if .Values.certManager.enabled }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
   {{- end }}
@@ -41,6 +44,7 @@ spec:
   {{- if .Values.observability.vmStack.overrideValues }}
     {{- toYaml .Values.observability.vmStack.overrideValues | nindent 4 }}
   {{- else }}
+  {{- $kubeStateMetrics := .Values.observability.vmStack.values.kubeStateMetrics | default dict }}
       alertmanager:
         enabled: false
       crds:
@@ -67,7 +71,7 @@ spec:
         {{- end }}
         assertNoLeakedSecrets: false
         plugins:
-          - https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
+          - grafana-lokiexplore-app@1.0.14@https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip
           - victoriametrics-logs-datasource
         sidecar:
           dashboards:
@@ -75,6 +79,18 @@ spec:
           datasources:
             searchNamespace: {{- toYaml .Values.observability.vmStack.values.dashboardNamespaces | nindent 12 }}
       kube-state-metrics:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: slurm.nebius.ai/nodeset
+                      operator: In
+                      values:
+                        - system
+        {{- with $kubeStateMetrics.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
         extraArgs:
           - '--metric-allowlist=kube_pod_info'
           - '--metric-allowlist=kube_pod_created'
@@ -207,10 +223,16 @@ spec:
         collectors:
           - pods
           - nodes
-        vmServiceScrape:
+        # The victoria-metrics-k8s-stack chart reads this scrape config from the `vmScrape` key,
+        # see https://github.com/VictoriaMetrics/helm-charts/blob/victoria-metrics-k8s-stack-0.80.0/charts/victoria-metrics-k8s-stack/templates/servicemonitors.yaml
+        # Endpoints here fully replace the chart's default list.
+        vmScrape:
           spec:
             endpoints:
               - honorLabels: true
+                {{- if $kubeStateMetrics.maxScrapeSize }}
+                max_scrape_size: {{ $kubeStateMetrics.maxScrapeSize | quote }}
+                {{- end }}
                 metricRelabelConfigs:
                   - action: labeldrop
                     regex: (uid|container_id|image_id)
@@ -391,12 +413,11 @@ spec:
           {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
           {{- $tokenKind := .Values.observability.publicEndpointTokenKind }}
           {{- $hasVmagentSpec := .Values.observability.vmStack.values.vmagent.spec }}
-          {{- $tsaToken := .Values.observability.vmStack.tsaToken | default dict }}
-          {{- $tokenSecretName := $tsaToken.secretName | default "o11y-writer-sa-token" }}
-          {{- $tokenSecretKey := $tsaToken.secretKey | default "accessToken" }}
-          {{- $tokenHostPath := $tsaToken.hostPath | default "/mnt/cloud-metadata" }}
-          {{- $tokenMountPath := $tsaToken.mountPath | default "/o11ytoken" }}
-          {{- $tokenHostPathFilename := $tsaToken.hostPathFilename | default "tsa-token" }}
+          {{- $tokenSecretName := include "soperator-fluxcd.o11yTsaTokenSecretName" . }}
+          {{- $tokenSecretKey := include "soperator-fluxcd.o11yTsaTokenSecretKey" . }}
+          {{- $tokenHostPath := include "soperator-fluxcd.o11yTsaTokenHostPath" . }}
+          {{- $tokenMountPath := include "soperator-fluxcd.o11yTsaTokenMountPath" . }}
+          {{- $tokenHostPathFilename := include "soperator-fluxcd.o11yTsaTokenHostPathFilename" . }}
           {{- $useHostPathToken := and $hasPublicEndpoint (eq $tokenKind "hostPath") }}
           {{- $hasHostNetwork := and $hasVmagentSpec (hasKey $hasVmagentSpec "hostNetwork") }}
           {{- $hasDnsPolicy := and $hasVmagentSpec (hasKey $hasVmagentSpec "dnsPolicy") }}

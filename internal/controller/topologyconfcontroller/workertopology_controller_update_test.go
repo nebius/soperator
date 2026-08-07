@@ -162,7 +162,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			err := reconciler.updateTopologyConfigMap(ctx, namespace, "new-topology-config")
+			err := reconciler.updateTopologyConfigMap(ctx, namespace, consts.ConfigMapNameTopologyConfig, "new-topology-config", "test-cluster")
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -177,7 +177,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 					Namespace: namespace,
 				}, &updatedConfigMap)
 				assert.NoError(t, err)
-				assert.Equal(t, "new-topology-config", updatedConfigMap.Data[consts.ConfigMapKeyTopologyConfig])
+				assert.Equal(t, renderManagedTopologyConfig("new-topology-config"), updatedConfigMap.Data[consts.ConfigMapKeyTopologyConfig])
 
 				// Verify JailedConfig exists and has correct spec
 				var updatedJailedConfig v1alpha1.JailedConfig
@@ -209,11 +209,11 @@ func TestWorkerTopologyReconciler_renderTopologyConfigMap(t *testing.T) {
 	namespace := "test-namespace"
 	config := "SwitchName=root"
 
-	cm := r.renderTopologyConfigMap(namespace, config)
+	cm := r.renderTopologyConfigMap(namespace, consts.ConfigMapNameTopologyConfig, config)
 
 	assert.Equal(t, consts.ConfigMapNameTopologyConfig, cm.Name)
 	assert.Equal(t, namespace, cm.Namespace)
 	assert.Equal(t, corev1.SchemeGroupVersion.String(), cm.APIVersion)
 	assert.Equal(t, "ConfigMap", cm.Kind)
-	assert.Equal(t, config, cm.Data[consts.ConfigMapKeyTopologyConfig])
+	assert.Equal(t, renderManagedTopologyConfig(config), cm.Data[consts.ConfigMapKeyTopologyConfig])
 }

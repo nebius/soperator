@@ -8,6 +8,9 @@ import sys
 import time
 import typing
 
+SOPERATOR_NODE_METADATA_FILE = "/run/soperator/node_metadata.env"
+SOPERATOR_NODE_REAL_MEMORY_BYTES = "SOPERATOR_NODE_REAL_MEMORY_BYTES"
+
 # Set up logging
 try:
     log_stdout = "/dev/stdout"
@@ -52,10 +55,6 @@ class Check(typing.NamedTuple):
     # Whether to skip this check for jobs that don't allocate all available GPUs.
     # CPU-only jobs are not considered "partial GPU"
     skip_for_partial_gpu_jobs: bool = False
-
-    # Whether to skip this checks for nodes reserved with specific prefixes.
-    # Empty list means don't skip for any reservation.
-    skip_for_reservation_prefixes: list[str] = []
 
     # What contexts this check should run in.
     # Supported values:
@@ -118,14 +117,13 @@ class Check(typing.NamedTuple):
     # - CHECKS_NODE_COMMENT - comment field of the Slurm node
     # - CHECKS_NODE_REAL_MEM_BYTES - total allocatable memory in bytes for the Slurm node
     # - CHECKS_JOB_ALLOC_MEM_BYTES - memory in bytes, allocated for this Slurm job on this node
-    # These values are extracted from long-running commands, that's why they aren't exported by default
+    # Some values are extracted from long-running commands, so they aren't exported by default.
     need_env: list[str] = []
 
 class NodeInfo(typing.NamedTuple):
     state_flags: list[str] = []
     reason: str = ""
     comment: str = ""
-    reservation: str = ""
     real_memory_bytes: int = 0
 
 class JobInfo(typing.NamedTuple):
@@ -204,8 +202,6 @@ def filter_applicable_checks(checks: list[Check]) -> list[Check]:
     checks = filter_by_skip_for_partial_gpu_jobs(checks)
     # Filter by node_state (needs node info)
     checks = filter_by_node_state(checks)
-    # Filter by skip_for_reservation_prefixes (needs node info)
-    checks = filter_by_skip_for_reservation_prefixes(checks)
     return checks
 
 def filter_by_context(checks: list[Check]) -> list[Check]:
@@ -277,19 +273,6 @@ def filter_by_node_state(checks: list[Check]) -> list[Check]:
         )
     ]
 
-def filter_by_skip_for_reservation_prefixes(checks: list[Check]) -> list[Check]:
-    # Skip if all checks don't care
-    if all(len(check.skip_for_reservation_prefixes) == 0 for check in checks):
-        return checks
-    node_info = get_node_info()
-    return [
-        check for check in checks
-        if (
-            len(check.skip_for_reservation_prefixes) == 0 or
-            not node_info.reservation.startswith(tuple(check.skip_for_reservation_prefixes))
-        )
-    ]
-
 # Run a specific check
 def run_check(check: Check, in_jail=False):
     # Export environment variables requested by this check
@@ -348,6 +331,11 @@ def run_check(check: Check, in_jail=False):
 
     logging.info(f"Check {check.name}: OK")
 
+    # Please note that "undrain" and "uncomment" actions can be issues only from "hc_program" context.
+    if check.on_ok in ("undrain", "uncomment") and CHECKS_CONTEXT != "hc_program":
+        logging.info(f"Skipping on_ok={check.on_ok} in unsupported context {CHECKS_CONTEXT}")
+        return
+
     # Undrain / uncomment the Slurm node, if it was marked with the same reason
     if check.on_ok == "undrain" and "DRAIN" in get_node_info().state_flags:
         if get_node_info().reason and get_node_info().reason.startswith(reason_base):
@@ -371,9 +359,38 @@ def export_needed_env(check: Check):
         if env == "CHECKS_NODE_COMMENT":
             os.environ["CHECKS_NODE_COMMENT"] = get_node_info().comment
         if env == "CHECKS_NODE_REAL_MEM_BYTES":
-            os.environ["CHECKS_NODE_REAL_MEM_BYTES"] = str(get_node_info().real_memory_bytes)
+            os.environ["CHECKS_NODE_REAL_MEM_BYTES"] = str(get_node_real_memory_bytes())
         if env == "CHECKS_JOB_ALLOC_MEM_BYTES":
             os.environ["CHECKS_JOB_ALLOC_MEM_BYTES"] = str(get_job_info().allocated_memory_bytes)
+
+# Get node RealMemory from node-local metadata, avoiding a controller RPC in the normal path.
+# Fall back to Slurm node info for compatibility with workers that have not yet been restarted
+# with an image and pod specification that publish the metadata file.
+@functools.lru_cache(maxsize=1)
+def get_node_real_memory_bytes() -> int:
+    try:
+        with open(SOPERATOR_NODE_METADATA_FILE, encoding="utf-8") as metadata_file:
+            for raw_line in metadata_file:
+                key, separator, value = raw_line.rstrip("\n").partition("=")
+                if key != SOPERATOR_NODE_REAL_MEMORY_BYTES:
+                    continue
+                if separator == "" or not value.isdecimal() or int(value) <= 0:
+                    raise ValueError(f"Invalid {SOPERATOR_NODE_REAL_MEMORY_BYTES} value")
+
+                real_memory_bytes = int(value)
+                logging.info(
+                    f"Node RealMemory from {SOPERATOR_NODE_METADATA_FILE}: "
+                    f"{real_memory_bytes} bytes"
+                )
+                return real_memory_bytes
+
+        raise ValueError(f"Missing {SOPERATOR_NODE_REAL_MEMORY_BYTES} value")
+    except Exception as e:
+        logging.warning(
+            f"Failed to get node RealMemory from {SOPERATOR_NODE_METADATA_FILE}: {e}; "
+            "falling back to Slurm node info"
+        )
+        return get_node_info().real_memory_bytes
 
 # Get GPU platform tags, e.g. ["8xH200", "8xGPU] from "nvidia-smi"
 # Please note, this command can be executed from both jail or host rootfs
@@ -443,7 +460,6 @@ def get_node_info() -> NodeInfo:
             state_flags=node.get("state", []),
             reason=node.get("reason", ""),
             comment=node.get("comment", ""),
-            reservation=node.get("reservation", ""),
             real_memory_bytes=(real_memory_mib * 1024 * 1024)
         )
         logging.info(f"Slurm node info: {json.dumps(info._asdict(), indent=2)}")

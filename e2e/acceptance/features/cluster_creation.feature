@@ -1,0 +1,17 @@
+Feature: Cluster creation
+  @soperator_version_>=5.0.0
+  Scenario: The provisioned cluster is ready for acceptance tests
+    Then all non-job pods in soperator are Running and Ready
+    And all HelmReleases are Ready
+    And all SlurmCluster CRs are available
+    And all NodeSet CRs are ready
+    And main and hidden partitions are present and sane
+    And all Slurm nodes are healthy
+    And HealthCheckProgram outputs are healthy
+    And all ActiveChecks completed successfully
+    And nebius user is present
+    And soperatorchecks user is present and configured
+    And login welcome output shows cluster information
+    And main partition smoke job succeeds
+    And hidden partition smoke job succeeds
+    And each discovered nodeset accepts a targeted smoke job

@@ -70,7 +70,7 @@ func RenderStatefulSet(
 		slurmctldContainer = renderContainerSlurmctldWithSSSD(&controller.ContainerSlurmctld, controller.CustomVolumeMounts)
 	}
 
-	return kruisev1b1.StatefulSet{
+	res := kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      controller.StatefulSet.Name,
 			Namespace: namespace,
@@ -112,6 +112,7 @@ func RenderStatefulSet(
 						},
 					},
 					HostUsers:                     controller.HostUsers,
+					ImagePullSecrets:              controller.ContainerSlurmctld.ImagePullSecrets,
 					Affinity:                      nodeFilter.Affinity,
 					NodeSelector:                  nodeFilter.NodeSelector,
 					Tolerations:                   nodeFilter.Tolerations,
@@ -128,5 +129,7 @@ func RenderStatefulSet(
 				},
 			},
 		},
-	}, nil
+	}
+
+	return res, nil
 }

@@ -41,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v0041 "github.com/SlinkyProject/slurm-client/api/v0041"
+	v0044 "github.com/SlinkyProject/slurm-client/api/v0044"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -62,6 +62,7 @@ type JailedConfigReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
+	clusterName             string
 	slurmAPIClient          slurmapi.Client
 	clock                   Clock
 	fs                      Fs
@@ -188,6 +189,10 @@ func (r *JailedConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig) (ctrl.Result, error) {
 	logger := logf.FromContext(ctx)
+
+	if jailedConfig.Labels[consts.LabelInstanceKey] != r.clusterName {
+		return ctrl.Result{}, nil
+	}
 
 	err := r.shouldInitializeConditions(ctx, jailedConfig)
 	if err != nil {
@@ -327,11 +332,14 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig, aggregationKey string) (ctrl.Result, error) {
 	logger := logf.FromContext(ctx)
 
-	// Get all JailedConfigs with the same aggregation key in the same namespace
+	// Get all JailedConfigs with the same aggregation key and cluster name
 	jailedConfigs := &slurmv1alpha1.JailedConfigList{}
 	err := r.Client.List(ctx, jailedConfigs,
 		client.InNamespace(jailedConfig.Namespace),
-		client.MatchingLabels{consts.LabelJailedAggregationKey: aggregationKey},
+		client.MatchingLabels{
+			consts.LabelJailedAggregationKey: aggregationKey,
+			consts.LabelInstanceKey:          r.clusterName,
+		},
 	)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("listing JailedConfigs with aggregation key %q: %w", aggregationKey, err)
@@ -557,6 +565,7 @@ func (r *JailedConfigReconciler) shouldInitializeConditions(ctx context.Context,
 func NewJailedConfigReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
+	clusterName string,
 	slurmAPIClient slurmapi.Client,
 	fs Fs,
 	reconfigurePollInterval time.Duration,
@@ -571,6 +580,7 @@ func NewJailedConfigReconciler(
 	return &JailedConfigReconciler{
 		Client:                  client,
 		Scheme:                  scheme,
+		clusterName:             clusterName,
 		slurmAPIClient:          slurmAPIClient,
 		fs:                      fs,
 		reconfigurePollInterval: reconfigurePollInterval,
@@ -639,7 +649,7 @@ func checkStatus[R hasStatusCode](response R) error {
 	return nil
 }
 
-func checkApiErrors(responseErrors *v0041.V0041OpenapiErrors) error {
+func checkApiErrors(responseErrors *v0044.V0044OpenapiErrors) error {
 	if len(*responseErrors) > 0 {
 		errs := make([]error, 0)
 		for _, err := range *responseErrors {
@@ -651,8 +661,8 @@ func checkApiErrors(responseErrors *v0041.V0041OpenapiErrors) error {
 	return nil
 }
 
-func (r *JailedConfigReconciler) getNodes(ctx context.Context) (*v0041.V0041OpenapiNodesResp, error) {
-	nodesBefore, err := r.slurmAPIClient.SlurmV0041GetNodesWithResponse(ctx, nil)
+func (r *JailedConfigReconciler) getNodes(ctx context.Context) (*v0044.V0044OpenapiNodesResp, error) {
+	nodesBefore, err := r.slurmAPIClient.SlurmV0044GetNodesWithResponse(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("listing workers via Slurm API: %w", err)
 	}
@@ -681,9 +691,9 @@ func (r *JailedConfigReconciler) getNodesStartTime(ctx context.Context) (map[str
 
 		var skip bool
 		for _, state := range *node.State {
-			if state == v0041.V0041NodeStateNOTRESPONDING ||
-				state == v0041.V0041NodeStatePOWERINGDOWN ||
-				state == v0041.V0041NodeStatePOWEREDDOWN {
+			if state == v0044.V0044NodeStateNOTRESPONDING ||
+				state == v0044.V0044NodeStatePOWERINGDOWN ||
+				state == v0044.V0044NodeStatePOWEREDDOWN {
 				// Ignore NOT_RESPONDING, POWERING_DOWN and POWERED_DOWN nodes, since their start time doesn't change after reconfigure.
 				skip = true
 			}
@@ -785,7 +795,7 @@ func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 	}
 
 	logger.V(1).Info("Requesting Slurm API to reconfigure nodes")
-	reconfigureResponse, err := r.slurmAPIClient.SlurmV0041GetReconfigureWithResponse(ctx)
+	reconfigureResponse, err := r.slurmAPIClient.SlurmV0044GetReconfigureWithResponse(ctx)
 	if err != nil {
 		return fmt.Errorf("requesting Slurm API to reconfigure nodes: %w", err)
 	}

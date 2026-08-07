@@ -41,6 +41,11 @@ storage:
     #   - key: nvidia.com/gpu
     #     operator: Exists
     #     effect: NoSchedule
+    # Update strategy for the mount DaemonSet
+    updateStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 20%
 
   controllerSpool:
     matchExpressions: []
@@ -54,6 +59,11 @@ storage:
     #   - key: nvidia.com/gpu
     #     operator: Exists
     #     effect: NoSchedule
+    # Update strategy for the mount DaemonSet
+    updateStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 20%
 
   jail:
     matchExpressions: []
@@ -67,3 +77,8 @@ storage:
     #   - key: nvidia.com/gpu
     #     operator: Exists
     #     effect: NoSchedule
+    # Update strategy for the jail and jail-submounts mount DaemonSets
+    updateStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 20%

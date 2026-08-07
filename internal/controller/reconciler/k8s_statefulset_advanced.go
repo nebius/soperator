@@ -57,6 +57,7 @@ func (r *AdvancedStatefulSetReconciler) patch(existing, desired client.Object) (
 		}
 		dst.Spec.Replicas = src.Spec.Replicas
 		dst.Spec.UpdateStrategy = src.Spec.UpdateStrategy
+		dst.Spec.ScaleStrategy = src.Spec.ScaleStrategy
 		dst.Spec.Template.Spec = src.Spec.Template.Spec
 		dst.Spec.ReserveOrdinals = src.Spec.ReserveOrdinals
 		dst.Spec.PersistentVolumeClaimRetentionPolicy = src.Spec.PersistentVolumeClaimRetentionPolicy
