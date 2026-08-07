@@ -31,14 +31,6 @@ on:
           - MDC_B200
           - KCS_CPU
           - KCS_MIXED
-      # Ignored. Declared only so dispatches from a scheduler that still sends it
-      # are accepted instead of rejected as an unexpected input. Drop once main
-      # runs the scheduler that stopped sending it.
-      profile_env_var:
-        description: "[deprecated] ignored"
-        required: false
-        default: ""
-        type: string
       run_unstable_tests:
         description: "Run acceptance scenarios tagged @unstable"
         required: false
