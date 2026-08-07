@@ -31,14 +31,14 @@ on:
           - MDC_B200
           - KCS_CPU
           - KCS_MIXED
-      # Ignored. Declared only so dispatches from a scheduler that still sends it
-      # are accepted instead of rejected as an unexpected input. Drop once main
-      # runs the scheduler that stopped sending it.
       soperator_e2e_repo_branch:
         description: "E2E repo branch"
         required: false
         default: "main"
         type: string
+      # Ignored. Declared only so dispatches from a scheduler that still sends it
+      # are accepted instead of rejected as an unexpected input. Drop once main
+      # runs the scheduler that stopped sending it.
       profile_env_var:
         description: "[deprecated] ignored"
         required: false
@@ -155,7 +155,7 @@ jobs:
       group: e2e-${{ needs.resolve-profile.outputs.nebius_project_id }}
     runs-on: ubuntu-latest
 
-    environment: e2
+    environment: e2e
 
     env:
       PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/soperator/installations/example"
