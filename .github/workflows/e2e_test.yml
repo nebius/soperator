@@ -155,7 +155,7 @@ jobs:
       group: e2e-${{ needs.resolve-profile.outputs.nebius_project_id }}
     runs-on: ubuntu-latest
 
-    environment: e2
+    environment: e2e
 
     env:
       PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/soperator/installations/example"
