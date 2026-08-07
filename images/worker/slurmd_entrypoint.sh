@@ -59,6 +59,12 @@ slurmd_args=(
   -b
 )
 
+if [[ -n "${SLURM_NODE_NAME:-}" ]]; then
+  slurmd_args+=(
+    -N "${SLURM_NODE_NAME}"
+  )
+fi
+
 if [ "${evaluated_extra}" != "" ]; then
   slurmd_args+=(
     --extra "${evaluated_extra}"
