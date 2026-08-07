@@ -29,6 +29,7 @@ func renderContainerSshd(
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
 		renderVolumeMountSshdConfigs(),
+		renderVolumeMountUserIsolation(),
 	}
 	if containerSSSD != nil {
 		volumeMounts = append(volumeMounts,

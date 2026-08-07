@@ -181,6 +181,25 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 				},
 			},
 			utils.MultiStepExecutionStep{
+				Name: "Slurm Login User Isolation ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					desired := login.RenderConfigMapUserIsolation(clusterValues)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return fmt.Errorf("reconciling login user isolation configmap: %w", err)
+					}
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
 				Name: "Slurm Login Service",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
@@ -384,6 +403,19 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 		return []metav1.Object{}, err
 	}
 	res = append(res, sshConfigsConfigMap)
+
+	userIsolationConfigMap := &corev1.ConfigMap{}
+	if err := r.Get(
+		ctx,
+		types.NamespacedName{
+			Namespace: clusterValues.Namespace,
+			Name:      naming.BuildConfigMapUserIsolationName(clusterValues.Name),
+		},
+		userIsolationConfigMap,
+	); err != nil {
+		return []metav1.Object{}, err
+	}
+	res = append(res, userIsolationConfigMap)
 
 	if clusterValues.NodeAccounting.Enabled {
 		slurmdbdSecret := &corev1.Secret{}
