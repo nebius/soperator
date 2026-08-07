@@ -359,6 +359,31 @@ class TestGetEnvironmentVariables(unittest.TestCase):
             with self.assertRaises(KeyError):
                 worker_init.get_node_name()
 
+    def test_get_slurm_node_name_set(self):
+        """Get Slurm node name when environment variable is set."""
+        with mock.patch.dict(os.environ, {"SLURM_NODE_NAME": "worker-0"}):
+            result = worker_init.get_slurm_node_name()
+        self.assertEqual(result, "worker-0")
+
+    def test_get_slurm_node_name_falls_back_to_hostname(self):
+        """Get Slurm node name from HOSTNAME for older pod manifests."""
+        env = os.environ.copy()
+        env.pop("SLURM_NODE_NAME", None)
+        env["HOSTNAME"] = "worker-0"
+        with mock.patch.dict(os.environ, env, clear=True):
+            result = worker_init.get_slurm_node_name()
+        self.assertEqual(result, "worker-0")
+
+    def test_get_slurm_node_name_not_set(self):
+        """Get Slurm node name when no name environment variable is set exits."""
+        env = os.environ.copy()
+        env.pop("SLURM_NODE_NAME", None)
+        env.pop("HOSTNAME", None)
+        with mock.patch.dict(os.environ, env, clear=True):
+            with self.assertRaises(SystemExit) as ctx:
+                worker_init.get_slurm_node_name()
+            self.assertEqual(ctx.exception.code, 1)
+
     def test_get_topology_fabric_default(self):
         """Get fabric returns "root" when the env var is not set."""
         env = os.environ.copy()
@@ -836,12 +861,12 @@ class TestIsGpuEnabled(unittest.TestCase):
 class TestWaitForTopologyNonGpu(unittest.TestCase):
     """Tests for wait_for_topology non-GPU fast path."""
 
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
+    @mock.patch("worker_init.wait_for_node_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
-    @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
+    @mock.patch.dict(os.environ, {"SLURM_NODE_NAME": "worker-0"})
     def test_non_gpu_applies_unknown_topology(
-        self, mock_gpu, mock_apply, mock_wait_hostname
+        self, mock_gpu, mock_apply, mock_wait_node
     ):
         """Non-GPU node immediately applies topology=default:root:unknown."""
         with mock.patch(
@@ -850,19 +875,19 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
         ):
             worker_init.wait_for_topology()
 
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
+        mock_wait_node.assert_called_once_with("worker-0", 180, 5)
         mock_apply.assert_called_once_with(
             "worker-0",
             "topology=default:root:unknown",
             worker_init.TOPOLOGY_PLUGIN_TREE,
         )
 
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
+    @mock.patch("worker_init.wait_for_node_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
-    @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
+    @mock.patch.dict(os.environ, {"SLURM_NODE_NAME": "worker-0"})
     def test_non_gpu_applies_unknown_block_topology(
-        self, mock_gpu, mock_apply, mock_wait_hostname
+        self, mock_gpu, mock_apply, mock_wait_node
     ):
         """Non-GPU node in block mode applies topology=default:unknown."""
         with mock.patch(
@@ -871,21 +896,21 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
         ):
             worker_init.wait_for_topology()
 
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
+        mock_wait_node.assert_called_once_with("worker-0", 180, 5)
         mock_apply.assert_called_once_with(
             "worker-0",
             "topology=default:unknown",
             worker_init.TOPOLOGY_PLUGIN_BLOCK,
         )
 
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
+    @mock.patch("worker_init.wait_for_node_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
     @mock.patch.dict(
-        os.environ, {"HOSTNAME": "worker-0", "SLURM_TOPOLOGY_FABRIC": "fab-a"}
+        os.environ, {"SLURM_NODE_NAME": "worker-0", "SLURM_TOPOLOGY_FABRIC": "fab-a"}
     )
     def test_non_gpu_applies_per_fabric_unknown_topology(
-        self, mock_gpu, mock_apply, mock_wait_hostname
+        self, mock_gpu, mock_apply, mock_wait_node
     ):
         """Non-GPU node with a fabric joins <fabric>:<fabric>.unknown."""
         with mock.patch(
@@ -894,18 +919,21 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
         ):
             worker_init.wait_for_topology()
 
+        mock_wait_node.assert_called_once_with("worker-0", 180, 5)
         mock_apply.assert_called_once_with(
-            "worker-0", "topology=default:fab-a:fab-a.unknown"
+            "worker-0",
+            "topology=default:fab-a:fab-a.unknown",
+            worker_init.TOPOLOGY_PLUGIN_TREE,
         )
 
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
+    @mock.patch("worker_init.wait_for_node_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
     @mock.patch.dict(
-        os.environ, {"HOSTNAME": "worker-0", "SLURM_TOPOLOGY_FABRIC": "fab-a"}
+        os.environ, {"SLURM_NODE_NAME": "worker-0", "SLURM_TOPOLOGY_FABRIC": "fab-a"}
     )
     def test_non_gpu_applies_per_fabric_unknown_block(
-        self, mock_gpu, mock_apply, mock_wait_hostname
+        self, mock_gpu, mock_apply, mock_wait_node
     ):
         """Non-GPU node with a fabric in block mode joins the <fabric>.unknown block."""
         with mock.patch(
@@ -914,16 +942,19 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
         ):
             worker_init.wait_for_topology()
 
+        mock_wait_node.assert_called_once_with("worker-0", 180, 5)
         mock_apply.assert_called_once_with(
-            "worker-0", "topology=default:fab-a.unknown"
+            "worker-0",
+            "topology=default:fab-a.unknown",
+            worker_init.TOPOLOGY_PLUGIN_BLOCK,
         )
 
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
+    @mock.patch("worker_init.wait_for_node_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
-    @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
+    @mock.patch.dict(os.environ, {"SLURM_NODE_NAME": "worker-0"})
     def test_non_gpu_does_not_read_configmap(
-        self, mock_gpu, mock_apply, mock_wait_hostname
+        self, mock_gpu, mock_apply, mock_wait_node
     ):
         """Non-GPU node does not wait for ConfigMap at all."""
         with mock.patch(
@@ -932,22 +963,23 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
         ), mock.patch("worker_init.read_topology_for_node") as mock_read:
             worker_init.wait_for_topology()
             mock_read.assert_not_called()
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
+        mock_wait_node.assert_called_once_with("worker-0", 180, 5)
 
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
+    @mock.patch("worker_init.wait_for_node_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
-    def test_non_gpu_exits_if_hostname_not_set(
-        self, mock_gpu, mock_apply, mock_wait_hostname
+    def test_non_gpu_exits_if_slurm_node_name_not_set(
+        self, mock_gpu, mock_apply, mock_wait_node
     ):
-        """Non-GPU node exits if HOSTNAME is not set."""
+        """Non-GPU node exits if no Slurm node name can be resolved."""
         env = os.environ.copy()
+        env.pop("SLURM_NODE_NAME", None)
         env.pop("HOSTNAME", None)
         with mock.patch.dict(os.environ, env, clear=True):
             with self.assertRaises(SystemExit) as ctx:
                 worker_init.wait_for_topology()
             self.assertEqual(ctx.exception.code, 1)
-        mock_wait_hostname.assert_not_called()
+        mock_wait_node.assert_not_called()
         mock_apply.assert_not_called()
 
 
@@ -1137,10 +1169,10 @@ class TestTopologyIntegration(unittest.TestCase):
         formatted = worker_init.format_slurm_topology(result)
         self.assertEqual(formatted, "topology=default:root:spine01:leaf01")
 
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
+    @mock.patch("worker_init.wait_for_node_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
     def test_wait_for_topology_block_json_applies_tier_zero(
-        self, mock_apply, mock_wait_hostname
+        self, mock_apply, mock_wait_node
     ):
         """Block mode applies tier-0 as the dynamic topology unit."""
         node_name = "gpu-node-003"
@@ -1151,7 +1183,7 @@ class TestTopologyIntegration(unittest.TestCase):
             f.write(topology)
 
         env = {
-            "HOSTNAME": "worker-0",
+            "SLURM_NODE_NAME": "worker-0",
             "K8S_NODE_NAME": node_name,
             "TOPOLOGY_CONFIGMAP_PATH": self.configmap_dir,
             "NODESET_GPU_ENABLED": "true",
@@ -1162,7 +1194,7 @@ class TestTopologyIntegration(unittest.TestCase):
         ):
             worker_init.wait_for_topology()
 
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
+        mock_wait_node.assert_called_once_with("worker-0", 180, 5)
         mock_apply.assert_called_once_with(
             "worker-0",
             "topology=default:block1",
