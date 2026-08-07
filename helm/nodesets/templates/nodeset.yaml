@@ -279,6 +279,14 @@ spec:
   enableHostUserNamespace: {{ . }}
   {{- end }}
 
+  {{- if hasKey . "hostNetwork" }}
+  hostNetwork: {{ .hostNetwork }}
+  {{- end }}
+
+  {{- with (.dnsPolicy | default "") }}
+  dnsPolicy: {{ . | quote }}
+  {{- end }}
+
   {{- if hasKey . "workerInitRandomDelaySeconds" }}
   workerInitRandomDelaySeconds: {{ .workerInitRandomDelaySeconds }}
   {{- end }}

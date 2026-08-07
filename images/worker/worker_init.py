@@ -18,6 +18,7 @@ Environment Variables (wait-controller):
 
 Environment Variables (wait-topology):
     K8S_NODE_NAME: Kubernetes node name (required, from Downward API)
+    SLURM_NODE_NAME: Slurm worker node name (from pod metadata.name; falls back to HOSTNAME)
     TOPOLOGY_CONFIGMAP_PATH: Path to mounted ConfigMap (default: /tmp/slurm/topology-node-labels)
     TOPOLOGY_WAIT_TIMEOUT: Max wait time in seconds (default: 180)
     TOPOLOGY_POLL_INTERVAL: Poll interval in seconds (default: 5)
@@ -216,6 +217,15 @@ def get_node_name() -> str:
     return os.environ["K8S_NODE_NAME"]
 
 
+def get_slurm_node_name() -> str:
+    """Get the Slurm node name from environment variable."""
+    slurm_node_name: str | None = os.environ.get("SLURM_NODE_NAME")
+    if slurm_node_name:
+        return slurm_node_name
+
+    return get_from_env_required("HOSTNAME")
+
+
 def get_topology_path() -> Path:
     """Get the path to the topology ConfigMap mount."""
     return Path(
@@ -279,8 +289,8 @@ def get_topology_plugin(slurm_config_path: Path = SLURM_CONFIG_PATH) -> str:
     return TOPOLOGY_PLUGIN_TREE
 
 
-def topology_conf_contains_hostname(topology_conf_path: Path, hostname: str) -> bool:
-    """Check whether topology.conf contains the given hostname in a nodes list."""
+def topology_conf_contains_node(topology_conf_path: Path, node_name: str) -> bool:
+    """Check whether topology.conf contains the given Slurm node name in a nodes list."""
     topology_conf_path: Path = Path(topology_conf_path)
     if not topology_conf_path.is_file():
         return False
@@ -292,9 +302,14 @@ def topology_conf_contains_hostname(topology_conf_path: Path, hostname: str) -> 
         return False
 
     return any(
-        nodes == "ALL" or _slurm_hostlist_contains(nodes, hostname)
+        nodes == "ALL" or _slurm_hostlist_contains(nodes, node_name)
         for nodes in _topology_nodes_values(content)
     )
+
+
+def topology_conf_contains_hostname(topology_conf_path: Path, hostname: str) -> bool:
+    """Backward-compatible wrapper for topology_conf_contains_node."""
+    return topology_conf_contains_node(topology_conf_path, hostname)
 
 
 def _topology_nodes_values(content: str) -> list[str]:
@@ -435,16 +450,16 @@ def _has_leading_zero_padding(value: str) -> bool:
     return len(value) > 1 and value.startswith("0")
 
 
-def wait_for_hostname_in_topology_conf(
-    hostname: str,
+def wait_for_node_in_topology_conf(
+    node_name: str,
     wait_timeout: int,
     poll_interval: int,
     topology_conf_path: Path = SLURM_TOPOLOGY_CONFIG_PATH,
 ) -> None:
-    """Wait until topology.conf contains hostname, otherwise exit on timeout."""
+    """Wait until topology.conf contains Slurm node name, otherwise exit on timeout."""
     logger.info(
-        "Waiting for hostname %s to appear in %s (timeout=%ds, poll=%ds)",
-        hostname,
+        "Waiting for Slurm node %s to appear in %s (timeout=%ds, poll=%ds)",
+        node_name,
         topology_conf_path,
         wait_timeout,
         poll_interval,
@@ -454,24 +469,39 @@ def wait_for_hostname_in_topology_conf(
         elapsed: float = time.monotonic() - start_time
         if elapsed >= wait_timeout:
             logger.error(
-                "Hostname %s not found in %s after %ds",
-                hostname,
+                "Slurm node %s not found in %s after %ds",
+                node_name,
                 topology_conf_path,
                 wait_timeout,
             )
             sys.exit(1)
 
-        if topology_conf_contains_hostname(topology_conf_path, hostname):
-            logger.info("Hostname %s found in %s", hostname, topology_conf_path)
+        if topology_conf_contains_node(topology_conf_path, node_name):
+            logger.info("Slurm node %s found in %s", node_name, topology_conf_path)
             return
 
         logger.info(
-            "Hostname %s is not in %s yet, retrying... (%ds elapsed)",
-            hostname,
+            "Slurm node %s is not in %s yet, retrying... (%ds elapsed)",
+            node_name,
             topology_conf_path,
             int(elapsed),
         )
         time.sleep(poll_interval)
+
+
+def wait_for_hostname_in_topology_conf(
+    hostname: str,
+    wait_timeout: int,
+    poll_interval: int,
+    topology_conf_path: Path = SLURM_TOPOLOGY_CONFIG_PATH,
+) -> None:
+    """Backward-compatible wrapper for wait_for_node_in_topology_conf."""
+    wait_for_node_in_topology_conf(
+        hostname,
+        wait_timeout,
+        poll_interval,
+        topology_conf_path,
+    )
 
 
 def read_topology_for_node(topology_path: Path, node_name: str) -> str:
@@ -656,7 +686,7 @@ def _format_tier_topology(parts: dict[str, str], fabric: str = "root") -> str:
 
 
 def apply_node_topology(
-    hostname: str, topology: str, topology_plugin: str | None = None
+    slurm_node_name: str, topology: str, topology_plugin: str | None = None
 ) -> None:
     """Apply topology and clear manual drain state for a resumed worker.
 
@@ -669,7 +699,7 @@ def apply_node_topology(
         cmd = [
             "scontrol",
             "update",
-            f"nodename={hostname}",
+            f"nodename={slurm_node_name}",
             f"{node_addr}",
         ]
         topology_plugin = topology_plugin or get_topology_plugin()
@@ -694,7 +724,7 @@ def apply_node_topology(
             if "Invalid node name" in output:
                 logger.warning(
                     "scontrol update: node %s not yet registered (dynamic node first start), skipping: %s",
-                    hostname,
+                    slurm_node_name,
                     output,
                 )
                 return
@@ -703,7 +733,7 @@ def apply_node_topology(
             )
             sys.exit(1)
 
-        logger.info("Topology applied successfully for worker %s", hostname)
+        logger.info("Topology applied successfully for worker %s", slurm_node_name)
     except subprocess.TimeoutExpired:
         logger.error("scontrol update timed out")
         sys.exit(1)
@@ -724,7 +754,7 @@ def wait_for_topology() -> None:
     immediately assigns the node to the generic 'unknown' topology unit defined
     in topology.conf.
     """
-    hostname: str = get_from_env_required("HOSTNAME")
+    slurm_node_name: str = get_slurm_node_name()
 
     wait_timeout: int = get_topology_wait_timeout()
     poll_interval: int = get_topology_poll_interval()
@@ -741,11 +771,11 @@ def wait_for_topology() -> None:
         logger.info(
             "NODESET_GPU_ENABLED is not set to 'true', "
             "assigning node %s to %s topology",
-            hostname,
+            slurm_node_name,
             topology,
         )
-        wait_for_hostname_in_topology_conf(hostname, wait_timeout, poll_interval)
-        apply_node_topology(hostname, topology, topology_plugin)
+        wait_for_node_in_topology_conf(slurm_node_name, wait_timeout, poll_interval)
+        apply_node_topology(slurm_node_name, topology, topology_plugin)
         return
 
     node_name: str = get_node_name()
@@ -809,8 +839,8 @@ def wait_for_topology() -> None:
         logger.error("Failed to format topology from raw data: %s", raw_topology)
         sys.exit(1)
 
-    wait_for_hostname_in_topology_conf(hostname, wait_timeout, poll_interval)
-    apply_node_topology(hostname, topology, topology_plugin)
+    wait_for_node_in_topology_conf(slurm_node_name, wait_timeout, poll_interval)
+    apply_node_topology(slurm_node_name, topology, topology_plugin)
 
 
 # endregion Topology functions
