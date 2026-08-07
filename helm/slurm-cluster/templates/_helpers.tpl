@@ -26,7 +26,18 @@
 
 {{/* Name of the slurm-scripts ConfigMap */}}
 {{- define "slurm-cluster.slurmScriptsCMName" -}}
+{{- if .Values.slurmScriptsConfigMapName -}}
+{{- .Values.slurmScriptsConfigMapName -}}
+{{- else -}}
 {{- printf "%s-slurm-scripts" (include "slurm-cluster.name" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{/* True if list has an entry with the given name. Usage: include "slurm-cluster.hasMountName" (dict "list" .volumeSources "name" "x") */}}
+{{- define "slurm-cluster.hasMountName" -}}
+{{- $found := false -}}
+{{- range .list }}{{- if eq .name $.name }}{{ $found = true }}{{- end }}{{- end -}}
+{{- $found -}}
 {{- end -}}
 
 {{- define "validateAccountingConfig" -}}
