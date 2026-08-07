@@ -24,46 +24,76 @@ jobs:
         with:
           version: v4.44.6
 
-      - name: Trigger E2E tests for all profiles
+      - name: Trigger E2E tests
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SCHEDULING_YAML: ${{ vars.SCHEDULING_YAML }}
-          DEFAULT_PROFILE_ENV_VAR: ${{ vars.PROFILE_ENV_VAR }}
+          E2E_CONFIG: ${{ vars.E2E_CONFIG }}
         shell: bash
         run: |
+          if [[ -z "$E2E_CONFIG" ]]; then
+            echo "::error::E2E_CONFIG variable is not set"
+            exit 1
+          fi
+
           readarray -t RELEASE_BRANCHES < <(yq -r '.e2e_release_branches[]' .github/branch-config.yaml)
           BRANCHES=("main" "${RELEASE_BRANCHES[@]}")
           BRANCH_COUNT=${#BRANCHES[@]}
 
           RUN_NUMBER=${{ github.run_number }}
 
-          # Parse profiles from SCHEDULING_YAML, falling back to the default profile variable
-          if [[ -n "$SCHEDULING_YAML" ]]; then
-            readarray -t PROFILES < <(echo "$SCHEDULING_YAML" | yq -r '.profiles[]')
-          else
-            PROFILES=("${DEFAULT_PROFILE_ENV_VAR:-E2E_PROFILE}")
-          fi
-
-          echo "Profiles: ${PROFILES[*]}"
           echo "Branches: ${BRANCHES[*]}"
           echo "Run number: $RUN_NUMBER"
 
-          for i in "${!PROFILES[@]}"; do
-            PROFILE_NAME="${PROFILES[$i]}"
+          # Defaults duplicated from defaultRunsPerTick / defaultMaxInFlight in
+          # internal/e2e/config.go — keep the two in sync.
+          RUNS_PER_TICK=$(echo "$E2E_CONFIG" | yq -r '.scheduler.runs_per_tick // 1')
+          MAX_IN_FLIGHT=$(echo "$E2E_CONFIG" | yq -r '.scheduler.max_in_flight // 2')
+
+          # A run that finds no free profile waits, then fails. Dispatching on every
+          # tick regardless would turn a stretch of tight capacity into a stream of
+          # timed-out runs, so stop adding to the pile once enough are in flight.
+          # Runs still waiting for a profile count: they are the ones at risk.
+          #
+          # Only scheduled runs count. A manual run occupies a project, which the
+          # selector already accounts for, but it must not switch off the schedule.
+          IN_FLIGHT=$(gh api "repos/${{ github.repository }}/actions/workflows/e2e_test.yml/runs?per_page=100" \
+            --jq '[.workflow_runs[]
+                   | select(.status != "completed")
+                   | select(.actor.login == "github-actions[bot]")] | length')
+
+          DISPATCHES=$(( MAX_IN_FLIGHT - IN_FLIGHT ))
+          if (( DISPATCHES > RUNS_PER_TICK )); then
+            DISPATCHES=$RUNS_PER_TICK
+          fi
+
+          echo "In flight: $IN_FLIGHT (max $MAX_IN_FLIGHT), per tick: $RUNS_PER_TICK -> dispatching $DISPATCHES"
+
+          if (( DISPATCHES <= 0 )); then
+            echo "::notice::$IN_FLIGHT e2e run(s) already in flight, dispatching none this tick"
+            {
+              echo "### No dispatch"
+              echo "$IN_FLIGHT scheduled e2e run(s) already in flight, at the cap of $MAX_IN_FLIGHT."
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            # Cancel rather than pass: a green run that dispatched nothing is
+            # indistinguishable from a normal tick in the run list. exit 1 is the
+            # fallback for a cancellation that has not landed by the time the step
+            # ends — a red tick is still better than a silent one.
+            gh run cancel "$GITHUB_RUN_ID" -R "${{ github.repository }}"
+            exit 1
+          fi
+
+          for (( i = 0; i < DISPATCHES; i++ )); do
             BRANCH_INDEX=$(( (RUN_NUMBER + i) % BRANCH_COUNT ))
             REF="${BRANCHES[$BRANCH_INDEX]}"
-            TERRAFORM_REF="$REF"
 
-            echo "---"
-            echo "Profile: $PROFILE_NAME"
-            echo "Branch: $REF (index $BRANCH_INDEX)"
-            echo "Terraform ref: $TERRAFORM_REF"
-
+            # No profile input on purpose: the default declared on e2e_test.yml's profile input applies,
+            # so what scheduled runs select by is decided there, not here.
+            # Omitting the input also keeps this dispatch valid against branches that predate it.
             gh workflow run e2e_test.yml \
               --ref "$REF" \
-              -f profile_env_var="$PROFILE_NAME" \
-              -f terraform_repo_ref="$TERRAFORM_REF" \
+              -f terraform_repo_ref="$REF" \
               -f is_scheduled=true
 
-            echo "Triggered E2E test for profile $PROFILE_NAME on branch $REF"
+            echo "Triggered E2E test on branch $REF (index $BRANCH_INDEX)"
           done

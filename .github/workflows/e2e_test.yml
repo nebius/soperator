@@ -1,5 +1,7 @@
 name: E2E test soperator
 
+run-name: "E2E ${{ inputs.profile }}"
+
 on:
   workflow_dispatch:
     inputs:
@@ -13,13 +15,32 @@ on:
         required: false
         default: ""
         type: string
+      # Keep the options in sync with the profiles and labels in E2E_CONFIG.
+      # The default is what scheduler dispatches resolve with too — they omit
+      # this input, and the code refuses an empty profile rather than assuming one.
+      profile:
+        description: "Profile name or @label, see E2E_CONFIG"
+        required: false
+        default: "@auto-select"
+        type: choice
+        options:
+          - "@auto-select"
+          - MAN_H100
+          - MAN_H200
+          - KCS_B200
+          - MDC_B200
+          - KCS_CPU
+          - KCS_MIXED
+      # Ignored. Declared only so dispatches from a scheduler that still sends it
+      # are accepted instead of rejected as an unexpected input. Drop once main
+      # runs the scheduler that stopped sending it.
       soperator_e2e_repo_branch:
         description: "E2E repo branch"
         required: false
         default: "main"
         type: string
       profile_env_var:
-        description: "Name of the GitHub variable containing the profile YAML (defaults to env setting)"
+        description: "[deprecated] ignored"
         required: false
         default: ""
         type: string
@@ -37,41 +58,77 @@ jobs:
   resolve-profile:
     runs-on: ubuntu-latest
     environment: e2e
+    # The selector waits here, outside the e2e-test concurrency group, until a
+    # project frees up. Keep this above selector.timeout_minutes in E2E_CONFIG.
+    timeout-minutes: 70
     outputs:
+      profile_name: ${{ steps.resolve.outputs.profile_name }}
+      profile_yaml: ${{ steps.resolve.outputs.profile_yaml }}
       nebius_project_id: ${{ steps.resolve.outputs.nebius_project_id }}
       nebius_region: ${{ steps.resolve.outputs.nebius_region }}
       nebius_tenant_id: ${{ steps.resolve.outputs.nebius_tenant_id }}
     env:
-      E2E_PROFILE: ${{ vars[inputs.profile_env_var || vars.PROFILE_ENV_VAR] }}
+      E2E_CONFIG: ${{ vars.E2E_CONFIG }}
+      E2E_PROFILE_NAME: ${{ inputs.profile }}
+      E2E_IS_SCHEDULED: ${{ inputs.is_scheduled }}
+      E2E_RUN_METADATA_PATH: /tmp/e2e-run-metadata.json
     steps:
-      - name: Install yq
-        uses: frenck/action-setup-yq@c4b5be8b4a215c536a41d436757d9feb92836d4f # v1.0.2
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Install GO
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
-          version: v4.44.6
+          go-version-file: "go.mod"
+          cache: false
+
+      - name: Build e2e binary
+        run: go build -o bin/e2e ./cmd/e2e
+
+      - name: Configure Nebius credentials
+        shell: bash
+        env:
+          NEBIUS_CLI_CONFIG: ${{ vars.NEBIUS_CLI_CONFIG }}
+          NEBIUS_PRIVATE_KEY: ${{ secrets.NEBIUS_PRIVATE_KEY }}
+        run: |
+          mkdir -p "$HOME/.nebius"
+          echo "$NEBIUS_CLI_CONFIG" > "$HOME/.nebius/config.yaml"
+          yq -i '.profiles.default.private-key = strenv(NEBIUS_PRIVATE_KEY)' "$HOME/.nebius/config.yaml"
+          chmod 600 "$HOME/.nebius/config.yaml"
 
       - name: Resolve profile
         id: resolve
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [[ -z "$E2E_PROFILE" ]]; then
-            echo "::error::E2E_PROFILE is empty or not set"
-            exit 1
-          fi
-          echo "nebius_project_id=$(echo "$E2E_PROFILE" | yq -r '.nebius_project_id')" >> "$GITHUB_OUTPUT"
-          echo "nebius_region=$(echo "$E2E_PROFILE" | yq -r '.nebius_region')" >> "$GITHUB_OUTPUT"
-          echo "nebius_tenant_id=$(echo "$E2E_PROFILE" | yq -r '.nebius_tenant_id')" >> "$GITHUB_OUTPUT"
+          rc=0
+          bin/e2e select-profile 2>&1 | tee /tmp/select-profile.log || rc=$?
 
-          # Write metadata for conflict detection
-          jq -n \
-            --arg project_id "$(echo "$E2E_PROFILE" | yq -r '.nebius_project_id')" \
-            --argjson is_scheduled "${{ inputs.is_scheduled == 'true' }}" \
-            '{project_id: $project_id, is_scheduled: $is_scheduled}' \
-            > /tmp/e2e-run-metadata.json
+          # The console log keeps every attempt; the summary shows only the last
+          # one, so a long wait cannot flood the summary page.
+          {
+            echo "### Profile Selection"
+            echo '```'
+            awk '/^Attempt [0-9]+:/{buf=""} {buf=buf $0 ORS} END{printf "%s", buf}' /tmp/select-profile.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      # Published right after selection: this is how other runs see the project as
+      # taken before any instance exists to show up in capacity block usage.
+      - name: Upload run metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-run-metadata
+          path: /tmp/e2e-run-metadata.json
+          retention-days: 1
 
       - name: Print run parameters
         shell: bash
         env:
-          PROFILE_ENV_VAR: ${{ inputs.profile_env_var || vars.PROFILE_ENV_VAR }}
+          PROFILE_NAME: ${{ steps.resolve.outputs.profile_name }}
+          PROFILE_YAML: ${{ steps.resolve.outputs.profile_yaml }}
           TERRAFORM_REPO_REF: ${{ github.event.inputs.terraform_repo_ref || github.ref_name }}
           SOPERATOR_E2E_REPO_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
         run: |
@@ -81,81 +138,16 @@ jobs:
             echo "- Branch: \`${{ github.ref_name }}\`"
             echo "- Terraform branch: \`$TERRAFORM_REPO_REF\`"
             echo "- Soperator E2E repo branch: \`$SOPERATOR_E2E_REPO_BRANCH\`"
-            echo "- Profile variable: \`$PROFILE_ENV_VAR\`"
+            echo "- Profile: \`$PROFILE_NAME\`"
             echo ""
             echo '```yaml'
-            echo "$E2E_PROFILE"
+            echo "$PROFILE_YAML"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload run metadata
-        uses: actions/upload-artifact@v7
-        with:
-          name: e2e-run-metadata
-          path: /tmp/e2e-run-metadata.json
-          retention-days: 1
-
-      - name: Check for same-project conflicts
-        if: inputs.is_scheduled == 'true'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CURRENT_RUN_ID: ${{ github.run_id }}
-          PROJECT_ID: ${{ steps.resolve.outputs.nebius_project_id }}
-        run: |
-          echo "Checking for pending e2e runs on project $PROJECT_ID..."
-
-          # Only check for pending runs — not in_progress.
-          # One in_progress + one pending is fine (concurrency group handles that).
-          # We self-cancel only to avoid being the 3rd run that would bump an existing pending run.
-          #
-          # Note: there is no global lock on resolve-profile (was removed because GitHub's
-          # 1-pending limit caused queued runs to cancel each other with 3+ runs).
-          # This means two concurrent resolve-profile jobs could both pass this check
-          # before either becomes "pending" in e2e-test. This race requires a manual
-          # and a scheduled run to overlap within the ~6s resolve-profile window,
-          # giving a probability of ~0.05%. If it happens, GitHub bumps the older
-          # pending run from the e2e-test queue — the user just re-triggers.
-          pending_run_ids=$(gh api "repos/${{ github.repository }}/actions/workflows/e2e_test.yml/runs?status=pending" \
-            --jq ".workflow_runs[] | select(.id != $CURRENT_RUN_ID) | .id") || true
-
-          repo_url="https://github.com/${{ github.repository }}"
-
-          if [ -z "$pending_run_ids" ]; then
-            echo "No other pending e2e runs found. Proceeding."
-            echo "### Conflict Check" >> "$GITHUB_STEP_SUMMARY"
-            echo "No other pending e2e runs on project \`$PROJECT_ID\`. Proceeding." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          for run_id in $pending_run_ids; do
-            echo "Checking run $run_id..."
-            tmpdir=$(mktemp -d)
-            if gh run download "$run_id" -n e2e-run-metadata -D "$tmpdir" -R "${{ github.repository }}"; then
-              other_project=$(jq -r '.project_id' "$tmpdir/e2e-run-metadata.json")
-              if [ "$other_project" == "$PROJECT_ID" ]; then
-                echo "::warning::Conflict: run $run_id is already pending on project $PROJECT_ID. Cancelling this scheduled run."
-                {
-                  echo "### Conflict Check"
-                  echo "Run [$run_id]($repo_url/actions/runs/$run_id) is already pending on project \`$PROJECT_ID\`."
-                  echo "Cancelled this scheduled run to avoid bumping it from the queue."
-                } >> "$GITHUB_STEP_SUMMARY"
-                gh run cancel "$CURRENT_RUN_ID" -R "${{ github.repository }}"
-                exit 1
-              fi
-              echo "Run $run_id targets project $other_project (no conflict)"
-            else
-              echo "Run $run_id has no metadata artifact yet, skipping"
-            fi
-            rm -rf "$tmpdir"
-          done
-
-          echo "No conflicting runs found. Proceeding."
-          echo "### Conflict Check" >> "$GITHUB_STEP_SUMMARY"
-          echo "No conflicting pending runs on project \`$PROJECT_ID\`. Proceeding." >> "$GITHUB_STEP_SUMMARY"
-
   e2e-test:
     needs: resolve-profile
+    name: e2e-test (${{ needs.resolve-profile.outputs.profile_name }})
     concurrency:
       # Per-project mutex: runs targeting the same Nebius project are serialized,
       # different projects can run concurrently. Queued runs wait, never cancel in-progress ones.
@@ -163,7 +155,7 @@ jobs:
       group: e2e-${{ needs.resolve-profile.outputs.nebius_project_id }}
     runs-on: ubuntu-latest
 
-    environment: e2e
+    environment: e2
 
     env:
       PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/soperator/installations/example"
@@ -172,8 +164,8 @@ jobs:
       SOPERATOR_E2E_REPO: "${{ github.repository }}"
       SOPERATOR_E2E_REPO_BRANCH: "${{ inputs.soperator_e2e_repo_branch || 'main' }}"
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
-      PROFILE_ENV_VAR: ${{ inputs.profile_env_var || vars.PROFILE_ENV_VAR }}
-      E2E_PROFILE: ${{ vars[inputs.profile_env_var || vars.PROFILE_ENV_VAR] }}
+      PROFILE_NAME: ${{ needs.resolve-profile.outputs.profile_name }}
+      E2E_PROFILE_YAML: ${{ needs.resolve-profile.outputs.profile_yaml }}
       RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
       SLURM_CLUSTER_NAME: "soperator"
 
@@ -827,7 +819,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.E2E_SLACK_WEBHOOK_URL }}
           BRANCH: ${{ github.ref_name }}
-          PROFILE: ${{ inputs.profile_env_var || vars.PROFILE_ENV_VAR }}
+          PROFILE: ${{ needs.resolve-profile.outputs.profile_name || inputs.profile }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
