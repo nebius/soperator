@@ -18,6 +18,7 @@ package v1
 
 import (
 	"context"
+	"fmt"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -51,14 +52,42 @@ var _ admission.Validator[*slurmv1.SlurmCluster] = &SlurmClusterCustomValidator{
 func (v *SlurmClusterCustomValidator) ValidateCreate(_ context.Context, slurmCluster *slurmv1.SlurmCluster) (admission.Warnings, error) {
 	slurmClusterLog.Info("Validation for SlurmCluster upon creation", "name", slurmCluster.GetName())
 
-	return nil, nil
+	return nil, validateLoginUserIsolation(slurmCluster)
 }
 
 // ValidateUpdate implements admission.Validator so a webhook will be registered for the type SlurmCluster.
 func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, _, newSlurmCluster *slurmv1.SlurmCluster) (admission.Warnings, error) {
 	slurmClusterLog.Info("Validation for SlurmCluster upon update", "name", newSlurmCluster.GetName())
 
-	return nil, nil
+	return nil, validateLoginUserIsolation(newSlurmCluster)
+}
+
+// validateLoginUserIsolation checks that explicit per-user memory limits stay
+// below the sshd container memory limit.
+func validateLoginUserIsolation(cluster *slurmv1.SlurmCluster) error {
+	isolation := cluster.Spec.SlurmNodes.Login.UserIsolation
+	if isolation == nil || !isolation.Enabled {
+		return nil
+	}
+
+	containerMemory := cluster.Spec.SlurmNodes.Login.Sshd.Resources.Memory()
+	if containerMemory == nil || containerMemory.IsZero() {
+		return nil
+	}
+
+	if isolation.MemoryHigh != nil && isolation.MemoryHigh.Cmp(*containerMemory) >= 0 {
+		return fmt.Errorf(
+			"login.userIsolation.memoryHigh (%s) must be lower than the sshd container memory limit (%s)",
+			isolation.MemoryHigh.String(), containerMemory.String(),
+		)
+	}
+	if isolation.MemoryMax != nil && isolation.MemoryMax.Cmp(*containerMemory) >= 0 {
+		return fmt.Errorf(
+			"login.userIsolation.memoryMax (%s) must be lower than the sshd container memory limit (%s)",
+			isolation.MemoryMax.String(), containerMemory.String(),
+		)
+	}
+	return nil
 }
 
 // ValidateDelete implements admission.Validator so a webhook will be registered for the type SlurmCluster.

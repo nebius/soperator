@@ -586,8 +586,10 @@ slurmNodes:
     # without restricting how much a lone user may use. Set explicit values
     # to give users tighter budgets; they must stay below
     # sshd.resources.memory.
+    # Disabled by default for the initial release; planned to default to
+    # enabled in a future release.
     userIsolation:
-      enabled: true
+      enabled: false
       # Throttling threshold per user (cgroup v2 memory.high), e.g. "2Gi".
       # Unset = derived (80% of sshd.resources.memory).
       # memoryHigh: "2Gi"

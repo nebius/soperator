@@ -50,11 +50,8 @@ setup_user_isolation() {
         return 0
     fi
 
-    # Operate on this container's OWN cgroup, never on the mount root: with a host
-    # cgroup namespace (used by some runtimes for privileged pods), /sys/fs/cgroup
-    # is the node's root tree, and touching it would affect the whole node. In a
-    # private cgroup namespace /proc/self/cgroup is "0::/" and the base resolves
-    # to the mount root, which is then genuinely ours.
+    # Resolve this container's own cgroup: with a host cgroup namespace,
+    # /sys/fs/cgroup is the node's root tree and must not be touched directly.
     local cgroup_base
     cgroup_base="${cgroup_mount}$(sed -n 's/^0:://p' /proc/self/cgroup)"
     cgroup_base="${cgroup_base%/}"
@@ -63,20 +60,35 @@ setup_user_isolation() {
         return 0
     fi
 
-    # cgroup v2 forbids a cgroup from having both processes and controller-enabled
-    # children ("no internal processes" rule): park this shell (and thus sshd,
-    # exec'ed later) in init/ before enabling controllers for the users/ subtree.
+    # cgroup v2 "no internal processes" rule: move all processes into init/
+    # before enabling controllers. Retry until empty — a leftover PID makes
+    # the subtree_control writes fail with EBUSY.
     mkdir -p "${cgroup_base}/init" "${cgroup_base}/users"
-    local pid
-    while read -r pid; do
-        echo "${pid}" > "${cgroup_base}/init/cgroup.procs" 2>/dev/null || true
-    done < "${cgroup_base}/cgroup.procs"
+    local attempt pid
+    for attempt in 1 2 3 4 5; do
+        while read -r pid; do
+            echo "${pid}" > "${cgroup_base}/init/cgroup.procs" 2>/dev/null || true
+        done < "${cgroup_base}/cgroup.procs"
+        [ -s "${cgroup_base}/cgroup.procs" ] || break
+    done
 
-    echo "+memory +cpu" > "${cgroup_base}/cgroup.subtree_control"
-    echo "+memory +cpu" > "${cgroup_base}/users/cgroup.subtree_control"
+    # Enable controllers separately: a combined write is atomic and one
+    # unavailable controller would fail the other too.
+    local controller
+    for controller in memory cpu; do
+        echo "+${controller}" > "${cgroup_base}/cgroup.subtree_control" 2>/dev/null \
+            || echo "User isolation: cannot enable ${controller} controller at ${cgroup_base}"
+        echo "+${controller}" > "${cgroup_base}/users/cgroup.subtree_control" 2>/dev/null \
+            || echo "User isolation: cannot enable ${controller} controller for users/"
+    done
 
-    # The PAM session hook only starts placing sessions once this sentinel exists;
-    # its content tells the hook which cgroup subtree to place them into.
+    # Without the memory controller the limits would be unenforced: fail closed.
+    if ! grep -qw memory "${cgroup_base}/users/cgroup.subtree_control"; then
+        echo "User isolation: memory controller not enabled, feature disabled"
+        return 0
+    fi
+
+    # The sentinel activates the PAM hook; its content is the cgroup base path.
     echo "${cgroup_base}" > /run/soperator-user-isolation.ready
     echo "User isolation: per-user cgroup delegation is ready at ${cgroup_base}"
 }

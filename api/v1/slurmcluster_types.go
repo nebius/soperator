@@ -1056,6 +1056,7 @@ type SlurmNodeLogin struct {
 // Each user's session processes are placed into a dedicated child cgroup of the sshd container,
 // so one user cannot exhaust the memory or monopolize the CPU of the whole login node.
 // Requires cgroup v2 on the Kubernetes node; silently disabled otherwise.
+// +kubebuilder:validation:XValidation:rule="!has(self.memoryHigh) || !has(self.memoryMax) || quantity(self.memoryHigh).compareTo(quantity(self.memoryMax)) <= 0",message="memoryHigh must not exceed memoryMax"
 type LoginUserIsolation struct {
 	// Enabled turns on placement of each SSH session into a per-user cgroup
 	//

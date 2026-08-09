@@ -96,7 +96,7 @@ RUN rm -rf /etc/update-motd.d
 # It is a no-op unless enabled via the SlurmCluster `login.userIsolation` field.
 COPY images/login/user_isolation_pam_hook.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/user_isolation_pam_hook.sh && \
-    echo "session optional pam_exec.so quiet /opt/bin/slurm/user_isolation_pam_hook.sh" >> /etc/pam.d/sshd
+    echo "session optional pam_exec.so quiet log=/proc/1/fd/1 /opt/bin/slurm/user_isolation_pam_hook.sh" >> /etc/pam.d/sshd
 
 # Expose the port used for accessing sshd
 EXPOSE 22
