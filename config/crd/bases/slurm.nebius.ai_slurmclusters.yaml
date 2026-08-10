@@ -3899,6 +3899,18 @@ spec:
                     description: Defines specific file to run the prolog when job
                       starts. Default value is no prolog
                     type: string
+                  resumeTimeout:
+                    default: 1800
+                    description: |-
+                      ResumeTimeout is the number of seconds Slurm waits for an ephemeral (CLOUD) node to become
+                      available after a resume request. When it expires before slurmd registers, Slurm marks the
+                      node DOWN and calls ResumeFailProgram, which powers the node back down: the ordinal is
+                      removed from NodeSetPowerState.spec.activeNodes and its worker pod is deleted. Raise it
+                      above the time a worker pod needs to become Ready, otherwise pods are torn down and
+                      recreated while jobs are requeued.
+                    format: int32
+                    minimum: 1
+                    type: integer
                   suspendTime:
                     default: 1000000000
                     description: |-

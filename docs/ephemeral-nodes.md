@@ -58,6 +58,58 @@ controller and, when enabled, topology data before starting `slurmd`. When
 `slurmd` registers, Slurm can move the node through `POWER_UP` / configuring
 toward usable node states and then start the job.
 
+If `slurmd` does not register in time, see Resume Failure Flow below.
+
+## Resume Failure Flow
+
+A resume is not open-ended. Slurm gives the node `ResumeTimeout` seconds to register
+`slurmd`, and when that expires it marks the node
+
+```text
+State=DOWN+CLOUD+POWERED_DOWN
+Reason=... : ResumeTimeout reached
+```
+
+and calls:
+
+```text
+ResumeFailProgram=/opt/soperator/bin/power_resume_fail.sh
+```
+
+The script runs the same power-down path as a normal suspend:
+
+```bash
+/opt/soperator/bin/power-manager suspend -nodes "$1"
+```
+
+So `ResumeTimeout` is terminal for that attempt: the ordinals are removed from
+`NodeSetPowerState.spec.activeNodes` and the NodeSet controller deletes the worker pods that
+did not become ready in time. Kubernetes then agrees with what Slurm already decided, instead
+of leaving a pod running behind a node Slurm considers powered down.
+
+The pending job is not lost. Soperator renders `JobRequeue=1`, so Slurm requeues it and can
+resume the nodes again, which starts a fresh pod.
+
+`ResumeTimeout` is configurable:
+
+```yaml
+slurmConfig:
+  resumeTimeout: 1800
+```
+
+The default is 1800 seconds. Set it above the time a worker pod needs to go from creation to
+`Ready` in your environment — image pull, jail population, and, when the topology plugin is
+enabled, the wait for topology data. If it is too low, every resume ends in a torn-down pod and
+a requeued job, and the cluster never converges. Slurm's own default is 60 seconds, which no
+worker pod can meet; Soperator always renders an explicit value so that default never applies.
+
+To see whether this path is being taken:
+
+```bash
+kubectl logs -n <namespace> <controller-pod> | grep power_resume_fail
+sinfo -N -o "%N %t %E"
+```
+
 ## Suspend Flow
 
 Slurm calls:

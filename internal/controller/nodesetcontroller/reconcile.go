@@ -502,20 +502,22 @@ func (r NodeSetReconciler) validateResources(
 
 		var (
 			condition metav1.Condition
+			expected  = expectedReplicas(nodeSetValues)
 		)
-		if existing.Status.AvailableReplicas == nodeSetValues.StatefulSet.Replicas {
+		if existing.Status.AvailableReplicas == expected {
 			condition = metav1.Condition{
 				Type:    slurmv1alpha1.ConditionNodeSetPodsReady,
 				Status:  metav1.ConditionTrue,
 				Reason:  "NodeSetReady",
-				Message: "NodeSet is ready",
+				Message: fmt.Sprintf("All %d worker pods are available", expected),
 			}
 		} else {
 			condition = metav1.Condition{
-				Type:    slurmv1alpha1.ConditionNodeSetPodsReady,
-				Status:  metav1.ConditionFalse,
-				Message: "NodeSet is not ready",
-				Reason:  "NodeSetNotReady",
+				Type:   slurmv1alpha1.ConditionNodeSetPodsReady,
+				Status: metav1.ConditionFalse,
+				Message: fmt.Sprintf("%d of %d worker pods are available",
+					existing.Status.AvailableReplicas, expected),
+				Reason: "NodeSetNotReady",
 			}
 			res.RequeueAfter += requeueDuration
 		}
@@ -528,6 +530,17 @@ func (r NodeSetReconciler) validateResources(
 	}
 
 	return res, nil
+}
+
+// expectedReplicas returns the number of worker pods the StatefulSet is supposed to run.
+// For ephemeral NodeSets that is the number of active ordinals — spec.replicas only bounds the
+// Slurm node range rendered into slurm.conf, so comparing against it would keep PodsReady False
+// forever whenever fewer than all ordinals are powered on.
+func expectedReplicas(nodeSet *values.SlurmNodeSet) int32 {
+	if nodeSet.EphemeralNodes != nil && *nodeSet.EphemeralNodes {
+		return int32(len(nodeSet.ActiveNodes))
+	}
+	return nodeSet.StatefulSet.Replicas
 }
 
 func (r NodeSetReconciler) getWorkersStatefulSetDependencies(

@@ -357,6 +357,27 @@ func TestRenderSlurmConfigMapWithLargeSuspendTime(t *testing.T) {
 	assert.NotContains(t, slurmConfig, "SuspendTime=INFINITE")
 }
 
+func TestRenderSlurmConfigMapResumeTimeout(t *testing.T) {
+	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{
+		SlurmConfig: slurmv1.SlurmConfig{ResumeTimeout: ptr.To[int32](3600)},
+	})
+
+	slurmConfig := result.Data[consts.ConfigMapKeySlurmBaseConfig]
+	assert.Contains(t, slurmConfig, "ResumeTimeout=3600")
+	assert.Equal(t, 1, strings.Count(slurmConfig, "ResumeTimeout="),
+		"ResumeTimeout must be rendered once, from SlurmConfig")
+}
+
+func TestRenderSlurmConfigMapResumeFailProgram(t *testing.T) {
+	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{})
+
+	slurmConfig := result.Data[consts.ConfigMapKeySlurmBaseConfig]
+	assert.Contains(t, slurmConfig, "ResumeFailProgram=/opt/soperator/bin/power_resume_fail.sh",
+		"without it Slurm leaves the pod running after ResumeTimeout")
+	assert.Contains(t, slurmConfig, "ResumeProgram=/opt/soperator/bin/power_resume.sh")
+	assert.Contains(t, slurmConfig, "SuspendProgram=/opt/soperator/bin/power_suspend.sh")
+}
+
 func TestRenderConfigMapSlurmConfigs_FileNamesAndWarnings(t *testing.T) {
 	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{})
 

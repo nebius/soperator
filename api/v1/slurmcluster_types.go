@@ -196,6 +196,18 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=1000000000
 	SuspendTime *int32 `json:"suspendTime,omitempty"`
+
+	// ResumeTimeout is the number of seconds Slurm waits for an ephemeral (CLOUD) node to become
+	// available after a resume request. When it expires before slurmd registers, Slurm marks the
+	// node DOWN and calls ResumeFailProgram, which powers the node back down: the ordinal is
+	// removed from NodeSetPowerState.spec.activeNodes and its worker pod is deleted. Raise it
+	// above the time a worker pod needs to become Ready, otherwise pods are torn down and
+	// recreated while jobs are requeued.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1800
+	ResumeTimeout *int32 `json:"resumeTimeout,omitempty"`
 }
 
 // Topology contains topology-related parameters for Slurm.

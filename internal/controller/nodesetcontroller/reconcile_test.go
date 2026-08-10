@@ -10,11 +10,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
+	"nebius.ai/slurm-operator/internal/values"
 )
 
 func makeNodeSetWithConditions(conditions ...metav1.Condition) *slurmv1alpha1.NodeSet {
@@ -153,4 +155,54 @@ func TestReconcileNodeSetPowerState_AllowsZeroInitialEphemeralNodes(t *testing.T
 	readyCondition := meta.FindStatusCondition(powerState.Status.Conditions, slurmv1alpha1.ConditionNodeSetPowerStateReady)
 	require.NotNil(t, readyCondition)
 	assert.Equal(t, metav1.ConditionTrue, readyCondition.Status)
+}
+
+func TestExpectedReplicas(t *testing.T) {
+	tests := []struct {
+		name    string
+		nodeSet values.SlurmNodeSet
+		want    int32
+	}{
+		{
+			name: "non-ephemeral uses spec.replicas",
+			nodeSet: values.SlurmNodeSet{
+				StatefulSet: values.StatefulSet{Replicas: 10},
+			},
+			want: 10,
+		},
+		{
+			// spec.replicas only bounds the Slurm node range; comparing against it kept
+			// PodsReady False forever whenever fewer than all ordinals were powered on.
+			name: "ephemeral uses the number of active ordinals",
+			nodeSet: values.SlurmNodeSet{
+				EphemeralNodes: ptr.To(true),
+				StatefulSet:    values.StatefulSet{Replicas: 10},
+				ActiveNodes:    []int32{0, 4},
+			},
+			want: 2,
+		},
+		{
+			name: "ephemeral with no active ordinals expects no pods",
+			nodeSet: values.SlurmNodeSet{
+				EphemeralNodes: ptr.To(true),
+				StatefulSet:    values.StatefulSet{Replicas: 10},
+			},
+			want: 0,
+		},
+		{
+			name: "ephemeralNodes=false falls back to spec.replicas",
+			nodeSet: values.SlurmNodeSet{
+				EphemeralNodes: ptr.To(false),
+				StatefulSet:    values.StatefulSet{Replicas: 3},
+				ActiveNodes:    []int32{0},
+			},
+			want: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, expectedReplicas(&tt.nodeSet))
+		})
+	}
 }
