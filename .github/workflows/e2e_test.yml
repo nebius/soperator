@@ -15,6 +15,11 @@ on:
         required: false
         default: ""
         type: string
+      soperator_e2e_repo_branch:
+        description: "E2E repo branch"
+        required: false
+        default: "main"
+        type: string
       # Keep the options in sync with the profiles and labels in E2E_CONFIG.
       # The default is what scheduler dispatches resolve with too — they omit
       # this input, and the code refuses an empty profile rather than assuming one.
@@ -61,10 +66,10 @@ jobs:
       E2E_RUN_METADATA_PATH: /tmp/e2e-run-metadata.json
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install GO
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: false
@@ -117,12 +122,14 @@ jobs:
           PROFILE_NAME: ${{ steps.resolve.outputs.profile_name }}
           PROFILE_YAML: ${{ steps.resolve.outputs.profile_yaml }}
           TERRAFORM_REPO_REF: ${{ github.event.inputs.terraform_repo_ref || github.ref_name }}
+          SOPERATOR_E2E_REPO_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
         run: |
           {
             echo "### Run Parameters"
             echo ""
             echo "- Branch: \`${{ github.ref_name }}\`"
             echo "- Terraform branch: \`$TERRAFORM_REPO_REF\`"
+            echo "- Soperator E2E repo branch: \`$SOPERATOR_E2E_REPO_BRANCH\`"
             echo "- Profile: \`$PROFILE_NAME\`"
             echo ""
             echo '```yaml'
@@ -146,19 +153,22 @@ jobs:
       PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/soperator/installations/example"
       TERRAFORM_REPO: "nebius/nebius-solution-library"
       TERRAFORM_REPO_REF: "${{ github.event.inputs.terraform_repo_ref || github.ref_name }}"
+      SOPERATOR_E2E_REPO: "${{ github.repository }}"
+      SOPERATOR_E2E_REPO_BRANCH: "${{ inputs.soperator_e2e_repo_branch || 'main' }}"
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
       PROFILE_NAME: ${{ needs.resolve-profile.outputs.profile_name }}
       E2E_PROFILE_YAML: ${{ needs.resolve-profile.outputs.profile_yaml }}
       RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
+      SLURM_CLUSTER_NAME: "soperator"
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Install GO
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: false
@@ -174,6 +184,20 @@ jobs:
 
       - name: Build e2e binary
         run: go build -o bin/e2e ./cmd/e2e
+
+      - name: Checkout Soperator E2E source
+        # For now the Soperator E2E source still lives in this repository. When
+        # it moves to a separate repository, this checkout/build pair should
+        # point there and keep using SOPERATOR_E2E_REPO_BRANCH.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.SOPERATOR_E2E_REPO }}
+          ref: ${{ env.SOPERATOR_E2E_REPO_BRANCH }}
+          path: soperator-e2e
+
+      - name: Build acceptance binary
+        working-directory: "${{ github.workspace }}/soperator-e2e/e2e"
+        run: go build -o "${{ github.workspace }}/bin/acceptance" ./cmd/acceptance
 
       - name: Export profile outputs
         shell: bash
@@ -306,7 +330,7 @@ jobs:
           echo "SOPERATOR_UNSTABLE=$SOPERATOR_UNSTABLE" >> $GITHUB_ENV
 
       - name: Checkout Terraform repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.TERRAFORM_REPO }}
           ref: ${{ env.TERRAFORM_REPO_REF }}
@@ -397,17 +421,26 @@ jobs:
           pkill -9 -f terraform-provider || true
 
       - name: Acceptance Tests
-        timeout-minutes: 90
-        env:
-          E2E_REPORT_DIR: e2e-reports/acceptance
+        timeout-minutes: 120
+        shell: bash
         run: |
-          bin/e2e acceptance
+          kubectl_context="$(kubectl config current-context)"
+          args=(
+            --kubectl-context "$kubectl_context"
+            --slurm-cluster-name "$SLURM_CLUSTER_NAME"
+            --soperator-version "$SOPERATOR_VERSION"
+            --report-dir e2e-reports/acceptance
+          )
+          if [[ "$RUN_UNSTABLE_TESTS" == "true" ]]; then
+            args+=(--run-unstable)
+          fi
+          bin/acceptance "${args[@]}"
 
       - name: Acceptance Summary
         if: always()
         shell: bash
         run: |
-          json="e2e-reports/acceptance/acceptance.cucumber.json"
+          json="e2e-reports/acceptance/soperator.cucumber.json"
           if [[ ! -f "$json" ]]; then
             echo "no cucumber report at $json"
             exit 0
@@ -529,11 +562,11 @@ jobs:
         if: always()
         shell: bash
         run: |
-          kubectl exec -n soperator controller-0 -- sinfo -N || true
-          kubectl exec -n soperator controller-0 -- squeue || true
-          kubectl exec -n soperator controller-0 -- sdiag || true
-          kubectl exec -n soperator controller-0 -- sacct --format=JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode -S now-6hours || true
-          kubectl exec -n soperator controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sinfo -N || true
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- squeue || true
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sdiag || true
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sacct --format=JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode -S now-6hours || true
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
 
       - name: Collect Full Kubernetes Cluster Info
         if: always()
@@ -569,6 +602,19 @@ jobs:
           else
             echo "No running sconfigcontroller pod found, skipping jail files collection"
           fi
+          # soperator-outputs/local is node-local (worker boot disk), invisible through the
+          # shared jail — collect it from every worker pod via its host mount.
+          WORKER_PODS=$(kubectl get pods -n soperator \
+            -l slurm.nebius.ai/worker=true \
+            --field-selector=status.phase=Running \
+            -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)
+          for pod in $WORKER_PODS; do
+            echo "Copying node-local soperator-outputs from $pod"
+            mkdir -p "./jail/workers/$pod"
+            kubectl cp -c slurmd \
+              "soperator/$pod:/mnt/jail.upper/opt/soperator-outputs/local" \
+              "./jail/workers/$pod" || true
+          done
 
       - name: Zip Jail
         if: always()
@@ -609,7 +655,7 @@ jobs:
 
       - name: Upload Terraform Destroy debug log
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: tf-destroy-debug-log
           path: ${{ runner.temp }}/tf-destroy.log
@@ -749,13 +795,15 @@ jobs:
     name: Notify Slack on E2E failure
     needs: [resolve-profile, e2e-test]
     # Only fire when the run targeted the default terraform branch (empty input
-    # falls back to github.ref_name in e2e-test). Custom terraform branches are
-    # usually experiments and shouldn't page e2e owners on failure.
+    # falls back to github.ref_name in e2e-test) and default Soperator E2E
+    # branch. Custom branches are usually experiments and shouldn't page e2e
+    # owners on failure.
     if: |
       always() &&
       (needs.resolve-profile.result == 'failure' || needs.e2e-test.result == 'failure') &&
       (github.ref_name == 'main' || startsWith(github.ref_name, 'soperator-release-')) &&
-      (inputs.terraform_repo_ref == '' || inputs.terraform_repo_ref == github.ref_name)
+      (inputs.terraform_repo_ref == '' || inputs.terraform_repo_ref == github.ref_name) &&
+      (inputs.soperator_e2e_repo_branch == '' || inputs.soperator_e2e_repo_branch == 'main')
     runs-on: ubuntu-latest
     environment: e2e
     steps:

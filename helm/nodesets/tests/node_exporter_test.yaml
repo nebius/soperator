@@ -1,0 +1,116 @@
+suite: test nodesets node-exporter rendering
+capabilities:
+  apiVersions:
+    - monitoring.coreos.com/v1/PodMonitor
+templates:
+  - templates/nodeset.yaml
+  - templates/node-exporter-podmonitor.yaml
+
+tests:
+  - it: should not render node-exporter custom init container by default
+    template: templates/nodeset.yaml
+    set:
+      nodesets:
+        - name: worker
+          slurmd:
+            image:
+              repository: test/slurmd
+            resources:
+              cpu: "1"
+              memory: "1Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+          munge:
+            image:
+              repository: test/munge
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+    asserts:
+      - notExists:
+          path: spec.customInitContainers
+
+  - it: should render node-exporter custom init container when enabled
+    template: templates/nodeset.yaml
+    set:
+      nodesets:
+        - name: worker
+          slurmd:
+            image:
+              repository: test/slurmd
+            resources:
+              cpu: "1"
+              memory: "1Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+          munge:
+            image:
+              repository: test/munge
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+          nodeExporter:
+            enabled: true
+    asserts:
+      - equal:
+          path: spec.customInitContainers[0].name
+          value: pod-node-exporter
+      - equal:
+          path: spec.customInitContainers[0].restartPolicy
+          value: Always
+      - contains:
+          path: spec.customInitContainers[0].args
+          content: --collector.netdev
+      - contains:
+          path: spec.customInitContainers[0].args
+          content: --web.listen-address=:9100
+
+  - it: should render PodMonitor for enabled nodesets
+    template: templates/node-exporter-podmonitor.yaml
+    set:
+      clusterName: slurm1
+      nodesets:
+        - name: worker
+          slurmd:
+            image:
+              repository: test/slurmd
+            resources:
+              cpu: "1"
+              memory: "1Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+          munge:
+            image:
+              repository: test/munge
+            resources:
+              cpu: "100m"
+              memory: "128Mi"
+          nodeExporter:
+            enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PodMonitor
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: slurm1
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/component"]
+          value: nodeset
+      - equal:
+          path: spec.selector.matchExpressions[0].values
+          value:
+            - worker
+      - equal:
+          path: spec.podMetricsEndpoints[0].port
+          value: node-exporter

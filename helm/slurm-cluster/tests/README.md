@@ -39,9 +39,10 @@ These tests verify the following kubebuilder default values:
 - `completeWait: 5`
 - `epilog: ""`
 - `prolog: ""`
+- `taskProlog: ""`
 - `taskPluginParam: ""`
 - `maxJobCount: 20000`
-- `minJobAge: 28800`
+- `minJobAge: 1800`
 - `messageTimeout: 60`
 - `topologyPlugin: "topology/tree"`
 - `topologyParam: "SwitchAsNodeRank"`
@@ -51,13 +52,14 @@ These tests verify the following kubebuilder default values:
 
 ### PlugStackConfig
 - `pyxis.required: true`
+- `pyxis.useSquashfuse: false`
 - `pyxis.importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh"`
 - `ncclDebug.required: false`
 - `ncclDebug.enabled: false`
 - `ncclDebug.logLevel: "INFO"`
 - `ncclDebug.outputToFile: true`
 - `ncclDebug.outputToStdOut: false`
-- `ncclDebug.outputDirectory: "/opt/soperator-outputs/nccl_logs"`
+- `ncclDebug.outputDirectory: "/opt/soperator-outputs/local/nccl_logs"`
 - `customPlugins: []`
 
 ### PartitionConfiguration
@@ -78,7 +80,7 @@ These tests verify the following kubebuilder default values:
 ### Accounting
 - `enabled: false`
 - `slurmConfig.accountingStorageTRES: "CPU,Mem,Node,VMem,Gres/gpu"`
-- `slurmConfig.jobAcctGatherType: "jobacct_gather/cgroup"`
+- `slurmConfig.jobAcctGatherType: "jobacct_gather/none"`
 - `slurmConfig.jobAcctGatherFrequency: 30`
 - `slurmConfig.priorityWeightAge: 0`
 - `slurmConfig.priorityWeightFairshare: 0`

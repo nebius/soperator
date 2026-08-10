@@ -1,6 +1,6 @@
 ansible==13.4.0
 ansible-compat==25.12.1
-ansible-core==2.20.4
+ansible-core==2.20.7rc1
 ansible-lint==26.3.0
 argcomplete==3.6.3
 attrs==26.1.0
@@ -9,7 +9,7 @@ bracex==2.6
 cffi==2.0.0
 charset-normalizer==3.4.6
 click==8.3.1
-cryptography==46.0.6
+cryptography==48.0.1
 distro==1.9.0
 filelock==3.25.2
 importlib_metadata==9.0.0

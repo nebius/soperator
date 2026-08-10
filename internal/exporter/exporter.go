@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -25,7 +27,9 @@ type Params struct {
 	// SlurmClusterID is the namespaced name of the SlurmCluster resource
 	SlurmClusterID types.NamespacedName
 	// CollectionInterval specifies how often to collect metrics from SLURM APIs
-	CollectionInterval time.Duration
+	CollectionInterval   time.Duration
+	MaxCollectorInflight int
+	JobListParams        slurmapi.ListJobsParams
 }
 
 // Exporter collects metrics from a SLURM cluster and exports them in Prometheus format
@@ -50,11 +54,34 @@ type Exporter struct {
 	monitoringServer *http.Server
 }
 
+type asyncSubCollector struct {
+	name     string
+	inflight atomic.Int32
+	sequence atomic.Uint64
+	run      func(context.Context, uint64) error
+}
+
+func (c *asyncSubCollector) tryStart(maxInflight int32) (uint64, int32, bool) {
+	for {
+		current := c.inflight.Load()
+		if current >= maxInflight {
+			return 0, current, false
+		}
+		if c.inflight.CompareAndSwap(current, current+1) {
+			return c.sequence.Add(1), current + 1, true
+		}
+	}
+}
+
+func (c *asyncSubCollector) finish() int32 {
+	return c.inflight.Add(-1)
+}
+
 // NewClusterExporter creates a new SLURM cluster exporter
 func NewClusterExporter(slurmAPIClient slurmapi.Client, params Params) *Exporter {
 	registry := prometheus.NewRegistry()
 	monitoringRegistry := prometheus.NewRegistry()
-	collector := NewMetricsCollector(slurmAPIClient)
+	collector := NewMetricsCollector(slurmAPIClient, params.JobListParams)
 
 	return &Exporter{
 		params:             params,
@@ -99,14 +126,70 @@ func (e *Exporter) Start(ctx context.Context, addr string) error {
 // collectionLoop runs in the background and periodically collects metrics
 func (e *Exporter) collectionLoop(ctx context.Context) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
-	logger.Info("Starting metrics collection loop", "interval", e.params.CollectionInterval)
+	maxCollectorInflight := int32(e.params.MaxCollectorInflight)
+	if maxCollectorInflight < 1 {
+		maxCollectorInflight = 1
+	}
+	logger.Info("Starting metrics collection loop", "interval", e.params.CollectionInterval, "max_collector_inflight", maxCollectorInflight)
+
+	loopCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	ticker := time.NewTicker(e.params.CollectionInterval)
 	defer ticker.Stop()
 
-	if err := e.collector.updateState(ctx); err != nil {
-		logger.Error(err, "Initial metrics collection failed")
+	collectors := []*asyncSubCollector{
+		{name: "nodes", run: e.collector.refreshNodes},
+		{name: "jobs", run: e.collector.refreshJobs},
+		{name: "diag", run: e.collector.refreshDiag},
 	}
+
+	startCollectors := func() {
+		start := time.Now()
+		var wg sync.WaitGroup
+		var failed atomic.Bool
+		started := false
+
+		for _, col := range collectors {
+			sequence, inflight, startedCollector := col.tryStart(maxCollectorInflight)
+			if !startedCollector {
+				e.monitoringMetrics.RecordCollectorSkipped(col.name)
+				logger.Info("Skipping sub-collector; too many runs in progress", "collector", col.name, "inflight", inflight, "max_inflight", maxCollectorInflight)
+				continue
+			}
+
+			started = true
+			wg.Add(1)
+			e.monitoringMetrics.SetCollectorInflight(col.name, inflight)
+			go func(col *asyncSubCollector, sequence uint64) {
+				defer wg.Done()
+				defer func() {
+					e.monitoringMetrics.SetCollectorInflight(col.name, col.finish())
+				}()
+
+				if err := col.run(loopCtx, sequence); err != nil {
+					if loopCtx.Err() == nil {
+						logger.Error(err, "Sub-collector failed", "collector", col.name)
+						failed.Store(true)
+					}
+				}
+			}(col, sequence)
+		}
+
+		if !started {
+			return
+		}
+		go func() {
+			wg.Wait()
+			var err error
+			if failed.Load() {
+				err = errors.New("sub-collector failed")
+			}
+			e.monitoringMetrics.RecordCollection(time.Since(start).Seconds(), err)
+		}()
+	}
+
+	startCollectors()
 
 	for {
 		select {
@@ -117,9 +200,7 @@ func (e *Exporter) collectionLoop(ctx context.Context) {
 			logger.Info("Stopping metrics collection loop via stop channel")
 			return
 		case <-ticker.C:
-			if err := e.collector.updateState(ctx); err != nil {
-				logger.Error(err, "Metrics collection failed")
-			}
+			startCollectors()
 		}
 	}
 }

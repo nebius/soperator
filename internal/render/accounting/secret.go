@@ -54,8 +54,8 @@ func RenderSecret(
 	secretName := naming.BuildSecretSlurmdbdConfigsName(clusterName)
 	labels := common.RenderLabels(consts.ComponentTypeAccounting, clusterName)
 	data := map[string][]byte{
-		consts.ConfigMapKeySlurmdbdConfig: []byte(generateSlurmdbdConfig(
-			clusterName, accounting, passwordName, isRestEnabled).Render(),
+		consts.ConfigMapKeySlurmdbdConfig: []byte(common.WithManagedSlurmConfigWarning(generateSlurmdbdConfig(
+			clusterName, accounting, passwordName, isRestEnabled)).Render(),
 		),
 		consts.SecretSlurmdbdConfigStorageHost: []byte(utils.Ternary(
 			accounting.MariaDb.Enabled,

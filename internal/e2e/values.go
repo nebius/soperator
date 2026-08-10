@@ -71,7 +71,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	tfVars["filestore_jail_submounts"] = []interface{}{
 		map[string]interface{}{
 			"name":       "data",
-			"mount_path": "/mnt/data",
+			"mount_path": "/data",
 			"spec": map[string]interface{}{
 				"size_gibibytes":       2048,
 				"block_size_kibibytes": 4,
@@ -84,6 +84,9 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 		entry := map[string]interface{}{
 			"name": ns.Name,
 			"size": ns.Size,
+			"autoscaling": map[string]interface{}{
+				"enabled": false,
+			},
 			"resource": map[string]interface{}{
 				"platform": ns.Platform,
 				"preset":   ns.Preset,
@@ -100,7 +103,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"node_local_jail_submounts": []map[string]interface{}{
 				{
 					"name":            "local-data",
-					"mount_path":      "/mnt/local-data",
+					"mount_path":      "/scratch",
 					"size_gibibytes":  1024,
 					"disk_type":       "NETWORK_SSD",
 					"filesystem_type": "ext4",

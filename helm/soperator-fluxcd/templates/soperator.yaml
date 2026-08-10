@@ -45,10 +45,6 @@ spec:
       enabled: true
     {{- end }}
     controllerManager:
-      kubeRbacProxy:
-        image:
-          repository: registry.k8s.io/kubebuilder/kube-rbac-proxy
-          tag: v0.15.0
       manager:
         {{- if and .Values.soperator.values .Values.soperator.values.manager .Values.soperator.values.manager.resources }}
         resources: {{- toYaml .Values.soperator.values.manager.resources | nindent 10 }}

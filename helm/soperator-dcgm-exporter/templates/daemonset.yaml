@@ -36,7 +36,7 @@ spec:
         image: {{ .Values.daemonSet.nvidiaDcgmExporter.image.repository }}:{{
           .Values.daemonSet.nvidiaDcgmExporter.image.tag | default .Chart.AppVersion
           }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: {{ .Values.daemonSet.nvidiaDcgmExporter.image.pullPolicy | default "IfNotPresent" }}
         name: nvidia-dcgm-exporter
         ports:
         - containerPort: {{ .Values.metricsPort }}
@@ -69,8 +69,8 @@ spec:
         env:
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
-        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
-        imagePullPolicy: IfNotPresent
+        image: {{ .Values.daemonSet.createHpcJobsDir.image.repository }}:{{ .Values.daemonSet.createHpcJobsDir.image.tag }}
+        imagePullPolicy: {{ .Values.daemonSet.createHpcJobsDir.image.pullPolicy | default "IfNotPresent" }}
         resources: {}
         securityContext:
           privileged: true
@@ -89,7 +89,7 @@ spec:
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
         image: {{ .Values.daemonSet.toolkitValidation.image.repository }}:{{ .Values.daemonSet.toolkitValidation.image.tag | default .Chart.AppVersion }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: {{ .Values.daemonSet.toolkitValidation.image.pullPolicy | default "IfNotPresent" }}
         resources: {}
         securityContext:
           privileged: true
@@ -106,6 +106,10 @@ spec:
       schedulerName: default-scheduler
       securityContext: {}
       serviceAccountName: {{ include "soperator-dcgm-exporter.name" . }}-sa
+      {{- with .Values.daemonSet.nvidiaDcgmExporter.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
       terminationGracePeriodSeconds: 30
       tolerations:
       - effect: NoSchedule
