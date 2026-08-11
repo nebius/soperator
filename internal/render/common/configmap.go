@@ -361,12 +361,13 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 
 	res.AddProperty("RebootProgram", "/opt/bin/slurm/reboot.sh")
-	res.AddProperty("ResumeTimeout", 1800)
 	res.AddComment("")
 
-	// Power management for ephemeral nodes
+	// Power management for ephemeral nodes.
+	// ResumeTimeout is rendered from SlurmConfig above, next to SuspendTime.
 	res.AddComment("POWER MANAGEMENT (ephemeral nodes)")
 	res.AddProperty("ResumeProgram", "/opt/soperator/bin/power_resume.sh")
+	res.AddProperty("ResumeFailProgram", "/opt/soperator/bin/power_resume_fail.sh")
 	res.AddProperty("SuspendProgram", "/opt/soperator/bin/power_suspend.sh")
 	res.AddProperty("SuspendTimeout", 90)
 	res.AddProperty("ResumeRate", 100)
