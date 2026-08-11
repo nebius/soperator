@@ -1008,11 +1008,24 @@ func TestAddNodeSetsToSlurmConfig(t *testing.T) {
 	}
 }
 
+func nodeSetWithReplicas(name string, replicas int32) slurmv1alpha1.NodeSet {
+	return slurmv1alpha1.NodeSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "soperator",
+		},
+		Spec: slurmv1alpha1.NodeSetSpec{
+			Replicas: replicas,
+		},
+	}
+}
+
 func TestAddPartitionsToSlurmConfig(t *testing.T) {
 	tests := []struct {
-		name     string
-		cluster  *values.SlurmCluster
-		expected string
+		name        string
+		cluster     *values.SlurmCluster
+		expected    []string
+		notExpected []string
 	}{
 		{
 			name: "Single partition with isAll",
@@ -1032,7 +1045,7 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "PartitionName=main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP",
+			expected: []string{"PartitionName=main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP"},
 		},
 		{
 			name: "Single partition with nodeset refs",
@@ -1040,6 +1053,10 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 				NamespacedName: types.NamespacedName{
 					Namespace: "soperator",
 					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					nodeSetWithReplicas("nodeA", 1),
+					nodeSetWithReplicas("nodeB", 3),
 				},
 				PartitionConfiguration: values.PartitionConfiguration{
 					ConfigType: "structured",
@@ -1052,7 +1069,7 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "PartitionName=gpu Nodes=nodeA,nodeB Default=NO PriorityTier=5 State=UP",
+			expected: []string{"PartitionName=gpu Nodes=nodeA,nodeB Default=NO PriorityTier=5 State=UP"},
 		},
 		{
 			name: "Multiple partitions with varying configurations",
@@ -1060,6 +1077,9 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 				NamespacedName: types.NamespacedName{
 					Namespace: "soperator",
 					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					nodeSetWithReplicas("nodeC", 2),
 				},
 				PartitionConfiguration: values.PartitionConfiguration{
 					ConfigType: "structured",
@@ -1077,7 +1097,10 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "PartitionName=all-nodes Nodes=ALL Default=NO PriorityTier=1 State=UP",
+			expected: []string{
+				"PartitionName=high-priority Nodes=nodeC Default=YES PriorityTier=10 State=UP",
+				"PartitionName=all-nodes Nodes=ALL Default=NO PriorityTier=1 State=UP",
+			},
 		},
 		{
 			name: "Partition with no nodeset refs and not isAll",
@@ -1096,7 +1119,96 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "#WARNING: Partition invalid has no nodeset refs and is not 'all', skipping",
+			expected: []string{"#WARNING: Partition invalid has no nodeset refs and is not 'all', skipping"},
+		},
+		{
+			name: "Partition referencing a nodeset that does not exist yet",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					nodeSetWithReplicas("nodeA", 1),
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "gpu",
+							NodeSetRefs: []string{"nodeA", "missing"},
+							Config:      "Default=NO State=UP",
+						},
+					},
+				},
+			},
+			expected: []string{
+				"#WARNING: Partition gpu references NodeSet missing ignored: NodeSet does not exist",
+				"PartitionName=gpu Nodes=nodeA Default=NO State=UP",
+			},
+			notExpected: []string{"Nodes=nodeA,missing"},
+		},
+		{
+			name: "Partition referencing a nodeset with zero replicas",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					nodeSetWithReplicas("nodeA", 2),
+					nodeSetWithReplicas("scaled-down", 0),
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "gpu",
+							NodeSetRefs: []string{"scaled-down", "nodeA"},
+							Config:      "Default=NO State=UP",
+						},
+					},
+				},
+			},
+			expected: []string{
+				"#WARNING: Partition gpu references NodeSet scaled-down ignored: NodeSet has no replicas",
+				"PartitionName=gpu Nodes=nodeA Default=NO State=UP",
+			},
+		},
+		{
+			name: "Partition losing all of its nodeset refs keeps an empty node list",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					nodeSetWithReplicas("nodeA", 1),
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "gpu",
+							NodeSetRefs: []string{"missing", "also-missing"},
+							Config:      "Default=NO State=UP",
+						},
+						{
+							Name:        "cpu",
+							NodeSetRefs: []string{"nodeA"},
+							Config:      "Default=YES State=UP",
+						},
+					},
+				},
+			},
+			expected: []string{
+				"#WARNING: Partition gpu references NodeSet missing ignored: NodeSet does not exist",
+				"#WARNING: Partition gpu references NodeSet also-missing ignored: NodeSet does not exist",
+				"#WARNING: Partition gpu has no usable nodeset refs, rendering it without nodes",
+				`PartitionName=gpu Nodes="" Default=NO State=UP`,
+				"PartitionName=cpu Nodes=nodeA Default=YES State=UP",
+			},
+			notExpected: []string{"Nodes=missing"},
 		},
 		{
 			name: "No partitions defined",
@@ -1110,7 +1222,7 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 					Partitions: []slurmv1.Partition{},
 				},
 			},
-			expected: "#WARNING: No partitions defined in structured configuration!",
+			expected: []string{"#WARNING: No partitions defined in structured configuration!"},
 		},
 	}
 
@@ -1120,9 +1232,11 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 			AddPartitionsToSlurmConfig(res, tt.cluster)
 			result := res.Render()
 
-			// Check if the expected string is present in the result
-			if !strings.Contains(result, tt.expected) {
-				t.Errorf("Expected string not found in result.\nExpected to contain:\n%s\n\nGot:\n%s", tt.expected, result)
+			for _, expected := range tt.expected {
+				assert.Contains(t, result, expected)
+			}
+			for _, notExpected := range tt.notExpected {
+				assert.NotContains(t, result, notExpected)
 			}
 		})
 	}

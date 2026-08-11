@@ -1449,6 +1449,7 @@ const (
 	ConditionClusterAccountingAvailable        = "AccountingAvailable"
 	ConditionClusterSConfigControllerAvailable = "SConfigControllerAvailable"
 	ConditionClusterPopulateJailMode           = "PopulateJailMode"
+	ConditionClusterNodeSetRefsResolved        = "NodeSetRefsResolved"
 
 	PhaseClusterPending = "Pending"
 	// PhaseClusterReconciling
