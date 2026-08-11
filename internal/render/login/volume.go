@@ -26,7 +26,9 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeInMemory(login.ContainerSshd.Resources.Memory()),
 		common.RenderVolumeTmpDisk(),
 		renderVolumeSshdConfigs(login.SSHDConfigMapName),
-		renderVolumeUserIsolation(clusterName),
+	}
+	if login.UserIsolation != nil && ptr.Deref(login.UserIsolation.Enabled, false) {
+		volumes = append(volumes, renderVolumeUserIsolation(clusterName))
 	}
 	if login.ContainerSSSD != nil {
 		volumes = append(volumes,

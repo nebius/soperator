@@ -10,6 +10,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -404,18 +405,21 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 	}
 	res = append(res, sshConfigsConfigMap)
 
-	userIsolationConfigMap := &corev1.ConfigMap{}
-	if err := r.Get(
-		ctx,
-		types.NamespacedName{
-			Namespace: clusterValues.Namespace,
-			Name:      naming.BuildConfigMapUserIsolationName(clusterValues.Name),
-		},
-		userIsolationConfigMap,
-	); err != nil {
-		return []metav1.Object{}, err
+	userIsolation := clusterValues.NodeLogin.UserIsolation
+	if userIsolation != nil && ptr.Deref(userIsolation.Enabled, false) {
+		userIsolationConfigMap := &corev1.ConfigMap{}
+		if err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: clusterValues.Namespace,
+				Name:      naming.BuildConfigMapUserIsolationName(clusterValues.Name),
+			},
+			userIsolationConfigMap,
+		); err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, userIsolationConfigMap)
 	}
-	res = append(res, userIsolationConfigMap)
 
 	if clusterValues.NodeAccounting.Enabled {
 		slurmdbdSecret := &corev1.Secret{}
