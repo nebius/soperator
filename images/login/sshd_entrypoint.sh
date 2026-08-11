@@ -66,11 +66,23 @@ setup_user_isolation() {
     mkdir -p "${cgroup_base}/init" "${cgroup_base}/users"
     local attempt pid
     for attempt in 1 2 3 4 5; do
-        while read -r pid; do
+        while IFS= read -r pid; do
             echo "${pid}" > "${cgroup_base}/init/cgroup.procs" 2>/dev/null || true
         done < "${cgroup_base}/cgroup.procs"
-        [ -s "${cgroup_base}/cgroup.procs" ] || break
+
+        # cgroup control files do not expose a reliable file size, so check
+        # emptiness by reading the file.
+        if ! IFS= read -r pid < "${cgroup_base}/cgroup.procs"; then
+            break
+        fi
     done
+
+    # Do not attempt to enable domain controllers while processes remain in
+    # the parent cgroup.
+    if IFS= read -r pid < "${cgroup_base}/cgroup.procs"; then
+        echo "User isolation: processes remain in container cgroup after retries, feature disabled"
+        return 0
+    fi
 
     # Enable controllers separately: a combined write is atomic and one
     # unavailable controller would fail the other too.
@@ -82,7 +94,7 @@ setup_user_isolation() {
             || echo "User isolation: cannot enable ${controller} controller for users/"
     done
 
-    # Without the memory controller the limits would be unenforced: fail closed.
+    # Without the memory controller, limits would be unenforced, so do not activate isolation.
     if ! grep -qw memory "${cgroup_base}/users/cgroup.subtree_control"; then
         echo "User isolation: memory controller not enabled, feature disabled"
         return 0

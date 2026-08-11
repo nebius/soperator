@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/values"
 )
 
 // nolint:unused
@@ -62,16 +63,36 @@ func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, _, newSl
 	return nil, validateLoginUserIsolation(newSlurmCluster)
 }
 
-// validateLoginUserIsolation checks that explicit per-user memory limits stay
-// below the sshd container memory limit.
+// validateLoginUserIsolation checks the effective per-user memory limits.
 func validateLoginUserIsolation(cluster *slurmv1.SlurmCluster) error {
 	isolation := cluster.Spec.SlurmNodes.Login.UserIsolation
 	if isolation == nil || !isolation.Enabled {
 		return nil
 	}
 
+	if isolation.MemoryHigh != nil && isolation.MemoryHigh.Sign() <= 0 {
+		return fmt.Errorf(
+			"login.userIsolation.memoryHigh (%s) must be greater than zero",
+			isolation.MemoryHigh.String(),
+		)
+	}
+	if isolation.MemoryMax != nil && isolation.MemoryMax.Sign() <= 0 {
+		return fmt.Errorf(
+			"login.userIsolation.memoryMax (%s) must be greater than zero",
+			isolation.MemoryMax.String(),
+		)
+	}
+
 	containerMemory := cluster.Spec.SlurmNodes.Login.Sshd.Resources.Memory()
-	if containerMemory == nil || containerMemory.IsZero() {
+	memoryHigh, memoryMax := values.ResolveLoginUserIsolationMemoryLimits(isolation, containerMemory)
+	if memoryHigh != nil && memoryMax != nil && memoryHigh.Cmp(*memoryMax) > 0 {
+		return fmt.Errorf(
+			"effective login.userIsolation.memoryHigh (%s) must not exceed memoryMax (%s)",
+			memoryHigh.String(), memoryMax.String(),
+		)
+	}
+
+	if containerMemory == nil || containerMemory.Sign() <= 0 {
 		return nil
 	}
 

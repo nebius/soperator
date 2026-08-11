@@ -92,6 +92,33 @@ func TestValidateSlurmClusterUserIsolation(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("admits explicit memoryHigh below derived memoryMax", func(t *testing.T) {
+		memoryHigh := resource.MustParse("8Gi")
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
+			Enabled:    true,
+			MemoryHigh: &memoryHigh,
+		}))
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects explicit memoryMax below derived memoryHigh", func(t *testing.T) {
+		memoryMax := resource.MustParse("7Gi")
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
+			Enabled:   true,
+			MemoryMax: &memoryMax,
+		}))
+		assert.ErrorContains(t, err, "must not exceed memoryMax")
+	})
+
+	t.Run("rejects explicit memoryHigh above derived memoryMax", func(t *testing.T) {
+		memoryHigh := resource.MustParse("8500Mi")
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
+			Enabled:    true,
+			MemoryHigh: &memoryHigh,
+		}))
+		assert.ErrorContains(t, err, "must not exceed memoryMax")
+	})
+
 	t.Run("rejects memoryMax at or above the container memory limit", func(t *testing.T) {
 		memoryMax := resource.MustParse("9Gi")
 		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
@@ -109,6 +136,22 @@ func TestValidateSlurmClusterUserIsolation(t *testing.T) {
 		}))
 		assert.ErrorContains(t, err, "memoryHigh")
 	})
+
+	for _, field := range []string{"memoryHigh", "memoryMax"} {
+		t.Run("rejects non-positive "+field, func(t *testing.T) {
+			quantity := resource.MustParse("-1Gi")
+			isolation := &slurmv1.LoginUserIsolation{Enabled: true}
+			switch field {
+			case "memoryHigh":
+				isolation.MemoryHigh = &quantity
+			case "memoryMax":
+				isolation.MemoryMax = &quantity
+			}
+
+			_, err := validator.ValidateCreate(context.Background(), clusterWith(isolation))
+			assert.ErrorContains(t, err, "must be greater than zero")
+		})
+	}
 
 	t.Run("ignores limits when isolation is disabled", func(t *testing.T) {
 		memoryMax := resource.MustParse("100Gi")

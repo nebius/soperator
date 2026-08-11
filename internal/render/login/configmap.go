@@ -113,15 +113,6 @@ func RenderConfigMapUserIsolation(cluster *values.SlurmCluster) corev1.ConfigMap
 	}
 }
 
-const (
-	// Derived per-user memory defaults, applied when the corresponding limit is not set
-	// explicitly. They are fractions of the sshd container memory limit, so they stay
-	// right-sized on any login node size. memory.max below the container limit keeps the
-	// OOM killer scoped to a single user's cgroup instead of the whole container.
-	derivedMemoryHighPercent = 80
-	derivedMemoryMaxPercent  = 90
-)
-
 func generateUserIsolationConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 	res.AddComment(" Managed by soperator. Consumed by sshd_entrypoint.sh and the PAM session hook.")
@@ -133,20 +124,17 @@ func generateUserIsolationConfig(cluster *values.SlurmCluster) renderutils.Confi
 		return res
 	}
 
-	containerMemory := cluster.NodeLogin.ContainerSshd.Resources.Memory().Value()
+	memoryHigh, memoryMax := values.ResolveLoginUserIsolationMemoryLimits(
+		isolation,
+		cluster.NodeLogin.ContainerSshd.Resources.Memory(),
+	)
 
 	res.AddProperty("SOPERATOR_USER_ISOLATION_ENABLED", true)
-	switch {
-	case isolation.MemoryHigh != nil:
-		res.AddProperty("SOPERATOR_USER_ISOLATION_MEMORY_HIGH", isolation.MemoryHigh.Value())
-	case containerMemory > 0:
-		res.AddProperty("SOPERATOR_USER_ISOLATION_MEMORY_HIGH", containerMemory*derivedMemoryHighPercent/100)
+	if memoryHigh != nil {
+		res.AddProperty("SOPERATOR_USER_ISOLATION_MEMORY_HIGH", memoryHigh.Value())
 	}
-	switch {
-	case isolation.MemoryMax != nil:
-		res.AddProperty("SOPERATOR_USER_ISOLATION_MEMORY_MAX", isolation.MemoryMax.Value())
-	case containerMemory > 0:
-		res.AddProperty("SOPERATOR_USER_ISOLATION_MEMORY_MAX", containerMemory*derivedMemoryMaxPercent/100)
+	if memoryMax != nil {
+		res.AddProperty("SOPERATOR_USER_ISOLATION_MEMORY_MAX", memoryMax.Value())
 	}
 	cpuWeight := isolation.CPUWeight
 	if cpuWeight == 0 {
