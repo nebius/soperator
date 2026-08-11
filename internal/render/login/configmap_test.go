@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/values"
@@ -43,7 +44,12 @@ func TestGenerateUserIsolationConfig_Disabled(t *testing.T) {
 	assert.NotContains(t, rendered, "SOPERATOR_USER_ISOLATION_CPU_WEIGHT")
 
 	// Configured but explicitly disabled.
-	cluster.NodeLogin.UserIsolation = &slurmv1.LoginUserIsolation{Enabled: false}
+	cluster.NodeLogin.UserIsolation = &slurmv1.LoginUserIsolation{Enabled: ptr.To(false)}
+	rendered = generateUserIsolationConfig(cluster).Render()
+	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_ENABLED=false")
+
+	// Configured without an enabled value (for objects not processed by API defaulting).
+	cluster.NodeLogin.UserIsolation = &slurmv1.LoginUserIsolation{}
 	rendered = generateUserIsolationConfig(cluster).Render()
 	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_ENABLED=false")
 }
@@ -54,7 +60,7 @@ func TestGenerateUserIsolationConfig_Enabled(t *testing.T) {
 	cluster := &values.SlurmCluster{
 		NodeLogin: values.SlurmLogin{
 			UserIsolation: &slurmv1.LoginUserIsolation{
-				Enabled:    true,
+				Enabled:    ptr.To(true),
 				MemoryHigh: &memoryHigh,
 				MemoryMax:  &memoryMax,
 				CPUWeight:  250,
@@ -79,7 +85,7 @@ func TestGenerateUserIsolationConfig_DerivedMemoryDefaults(t *testing.T) {
 					},
 				},
 			},
-			UserIsolation: &slurmv1.LoginUserIsolation{Enabled: true},
+			UserIsolation: &slurmv1.LoginUserIsolation{Enabled: ptr.To(true)},
 		},
 	}
 
@@ -96,7 +102,7 @@ func TestGenerateUserIsolationConfig_DerivedMemoryDefaults(t *testing.T) {
 func TestGenerateUserIsolationConfig_EnabledWithoutContainerMemory(t *testing.T) {
 	cluster := &values.SlurmCluster{
 		NodeLogin: values.SlurmLogin{
-			UserIsolation: &slurmv1.LoginUserIsolation{Enabled: true},
+			UserIsolation: &slurmv1.LoginUserIsolation{Enabled: ptr.To(true)},
 		},
 	}
 

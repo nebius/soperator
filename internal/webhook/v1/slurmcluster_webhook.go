@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -66,7 +67,7 @@ func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, _, newSl
 // validateLoginUserIsolation checks the effective per-user memory limits.
 func validateLoginUserIsolation(cluster *slurmv1.SlurmCluster) error {
 	isolation := cluster.Spec.SlurmNodes.Login.UserIsolation
-	if isolation == nil || !isolation.Enabled {
+	if isolation == nil || !ptr.Deref(isolation.Enabled, false) {
 		return nil
 	}
 

@@ -5,6 +5,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -119,7 +120,7 @@ func generateUserIsolationConfig(cluster *values.SlurmCluster) renderutils.Confi
 	res.AddComment(" Memory values are in bytes (cgroup v2 memory.high / memory.max).")
 
 	isolation := cluster.NodeLogin.UserIsolation
-	if isolation == nil || !isolation.Enabled {
+	if isolation == nil || !ptr.Deref(isolation.Enabled, false) {
 		res.AddProperty("SOPERATOR_USER_ISOLATION_ENABLED", false)
 		return res
 	}

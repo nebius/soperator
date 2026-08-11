@@ -1055,14 +1055,14 @@ type SlurmNodeLogin struct {
 // LoginUserIsolation defines per-user cgroup v2 limits applied to each SSH session on login nodes.
 // Each user's session processes are placed into a dedicated child cgroup of the sshd container,
 // so one user cannot exhaust the memory or monopolize the CPU of the whole login node.
-// Requires cgroup v2 on the Kubernetes node; silently disabled otherwise.
+// Requires cgroup v2 on the Kubernetes node.
 // +kubebuilder:validation:XValidation:rule="!has(self.memoryHigh) || !has(self.memoryMax) || quantity(self.memoryHigh).compareTo(quantity(self.memoryMax)) <= 0",message="memoryHigh must not exceed memoryMax"
 type LoginUserIsolation struct {
 	// Enabled turns on placement of each SSH session into a per-user cgroup
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// MemoryHigh is the per-user memory throttling threshold (cgroup v2 memory.high).
 	// The kernel throttles and reclaims a user's memory above this value before OOM.

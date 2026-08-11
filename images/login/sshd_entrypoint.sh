@@ -46,8 +46,8 @@ setup_user_isolation() {
 
     # The feature requires a writable cgroup v2 mount (cgroup v1 hosts are not supported).
     if [ "$(stat -f -c %T "${cgroup_mount}" 2>/dev/null)" != "cgroup2fs" ]; then
-        echo "User isolation: no cgroup v2 mount at ${cgroup_mount}, feature disabled"
-        return 0
+        echo "User isolation: no cgroup v2 mount at ${cgroup_mount}"
+        return 1
     fi
 
     # Resolve this container's own cgroup: with a host cgroup namespace,
@@ -56,16 +56,16 @@ setup_user_isolation() {
     cgroup_base="${cgroup_mount}$(sed -n 's/^0:://p' /proc/self/cgroup)"
     cgroup_base="${cgroup_base%/}"
     if [ ! -d "${cgroup_base}" ] || [ ! -w "${cgroup_base}/cgroup.procs" ]; then
-        echo "User isolation: container cgroup ${cgroup_base} is not writable, feature disabled"
-        return 0
+        echo "User isolation: container cgroup ${cgroup_base} is not writable"
+        return 1
     fi
 
     # cgroup v2 "no internal processes" rule: move all processes into init/
     # before enabling controllers. Retry until empty — a leftover PID makes
     # the subtree_control writes fail with EBUSY.
     mkdir -p "${cgroup_base}/init" "${cgroup_base}/users"
-    local attempt pid
-    for attempt in 1 2 3 4 5; do
+    local pid
+    for _ in 1 2 3 4 5; do
         while IFS= read -r pid; do
             echo "${pid}" > "${cgroup_base}/init/cgroup.procs" 2>/dev/null || true
         done < "${cgroup_base}/cgroup.procs"
@@ -80,31 +80,33 @@ setup_user_isolation() {
     # Do not attempt to enable domain controllers while processes remain in
     # the parent cgroup.
     if IFS= read -r pid < "${cgroup_base}/cgroup.procs"; then
-        echo "User isolation: processes remain in container cgroup after retries, feature disabled"
-        return 0
+        echo "User isolation: processes remain in container cgroup after retries"
+        return 1
     fi
 
     # Enable controllers separately: a combined write is atomic and one
     # unavailable controller would fail the other too.
     local controller
     for controller in memory cpu; do
-        echo "+${controller}" > "${cgroup_base}/cgroup.subtree_control" 2>/dev/null \
-            || echo "User isolation: cannot enable ${controller} controller at ${cgroup_base}"
-        echo "+${controller}" > "${cgroup_base}/users/cgroup.subtree_control" 2>/dev/null \
-            || echo "User isolation: cannot enable ${controller} controller for users/"
+        if ! echo "+${controller}" > "${cgroup_base}/cgroup.subtree_control" 2>/dev/null; then
+            echo "User isolation: cannot enable ${controller} controller at ${cgroup_base}"
+            return 1
+        fi
+        if ! echo "+${controller}" > "${cgroup_base}/users/cgroup.subtree_control" 2>/dev/null; then
+            echo "User isolation: cannot enable ${controller} controller for users/"
+            return 1
+        fi
+        if ! grep -qw "${controller}" "${cgroup_base}/users/cgroup.subtree_control"; then
+            echo "User isolation: ${controller} controller not enabled for users/"
+            return 1
+        fi
     done
-
-    # Without the memory controller, limits would be unenforced, so do not activate isolation.
-    if ! grep -qw memory "${cgroup_base}/users/cgroup.subtree_control"; then
-        echo "User isolation: memory controller not enabled, feature disabled"
-        return 0
-    fi
 
     # The sentinel activates the PAM hook; its content is the cgroup base path.
     echo "${cgroup_base}" > /run/soperator-user-isolation.ready
     echo "User isolation: per-user cgroup delegation is ready at ${cgroup_base}"
 }
-setup_user_isolation || echo "User isolation: setup failed, continuing without isolation"
+setup_user_isolation
 
 # TODO: Since 1.29 kubernetes supports native sidecar containers. We can remove it in feature releases
 echo "Waiting until munge started"

@@ -579,7 +579,7 @@ slurmNodes:
     # Per-user cgroup v2 resource isolation for SSH sessions on login nodes.
     # Each user's session processes are placed into a dedicated cgroup, so one
     # user cannot exhaust the memory or monopolize the CPU of the login node.
-    # Requires cgroup v2 on the Kubernetes node; silently disabled otherwise.
+    # Requires cgroup v2 on the Kubernetes node.
     # When memory values are unset, safe defaults are derived from
     # sshd.resources.memory: memoryHigh = 80%, memoryMax = 90% of it. The
     # derived memoryMax keeps OOM events scoped to a single user's cgroup
