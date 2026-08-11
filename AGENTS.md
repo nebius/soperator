@@ -25,7 +25,8 @@ Kubernetes operator for Slurm, built with kubebuilder. Manages Slurm cluster lif
 - `test/integration/` — Helm deployment integration tests
 - `images/` — Dockerfiles for component images
 - `ansible/` — operational playbooks
-- `fluxcd/` — FluxCD configuration
+- `fluxcd/` — FluxCD configuration. This is legacy configuration and will be removed in the future. Please ignore it when making changes.
+
 
 ## Style Guide
 
