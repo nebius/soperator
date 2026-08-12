@@ -25,7 +25,9 @@ on:
       - "**" # Trigger on any tag
 
   # pull_request_target runs in base branch context, giving fork PRs access to secrets.
-  # The "authorize" job gates fork PRs behind environment approval.
+  # The "authorize" job gates fork PRs behind environment approval, which is what makes
+  # the checkout steps' allow-unsafe-pr-checkout opt-in safe: fork code is only fetched
+  # after a maintainer approves the run.
   pull_request_target:
     types: [opened, synchronize, reopened]
 
@@ -59,9 +61,10 @@ jobs:
     outputs:
       should_build: ${{ steps.filter.outputs.has_code_changes == 'true' || github.event_name != 'pull_request_target' }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -93,6 +96,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
           fetch-depth: 0 # Fetch git history for the VERSION file changes detection
 
       - name: Install GO
@@ -146,6 +150,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
 
       - name: Install GO
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -186,6 +191,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
 
       # This job always runs with the default-branch definition, including for PRs
       # into release branches, which check out a tree where the e2e code still
@@ -277,6 +283,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
 
       - name: Install GO
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -394,6 +401,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
 
       - name: Install GO
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -533,6 +541,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
 
       - name: Install GO
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -612,6 +621,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
 
       - name: Install Nebius CLI
         shell: bash
@@ -726,6 +736,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
 
       - name: Install Nebius CLI
         shell: bash
@@ -777,6 +788,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
 
       - name: Install GO
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -819,9 +831,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
 
       - name: Set up Go
         uses: actions/setup-go@v7.0.0
