@@ -5,6 +5,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -95,3 +96,54 @@ func generateSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 }
 
 // endregion SSHD config
+
+// region User isolation config
+
+// RenderConfigMapUserIsolation renders new [corev1.ConfigMap] containing per-user cgroup
+// isolation settings consumed by the login sshd entrypoint and the PAM session hook
+func RenderConfigMapUserIsolation(cluster *values.SlurmCluster) corev1.ConfigMap {
+	return corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      naming.BuildConfigMapUserIsolationName(cluster.Name),
+			Namespace: cluster.Namespace,
+			Labels:    common.RenderLabels(consts.ComponentTypeLogin, cluster.Name),
+		},
+		Data: map[string]string{
+			consts.ConfigMapKeyUserIsolation: generateUserIsolationConfig(cluster).Render(),
+		},
+	}
+}
+
+func generateUserIsolationConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
+	res := &renderutils.PropertiesConfig{}
+	res.AddComment(" Managed by soperator. Consumed by sshd_entrypoint.sh and the PAM session hook.")
+	res.AddComment(" Memory values are in bytes (cgroup v2 memory.high / memory.max).")
+
+	isolation := cluster.NodeLogin.UserIsolation
+	if isolation == nil || !ptr.Deref(isolation.Enabled, false) {
+		res.AddProperty("SOPERATOR_USER_ISOLATION_ENABLED", false)
+		return res
+	}
+
+	memoryHigh, memoryMax := values.ResolveLoginUserIsolationMemoryLimits(
+		isolation,
+		cluster.NodeLogin.ContainerSshd.Resources.Memory(),
+	)
+
+	res.AddProperty("SOPERATOR_USER_ISOLATION_ENABLED", true)
+	if memoryHigh != nil {
+		res.AddProperty("SOPERATOR_USER_ISOLATION_MEMORY_HIGH", memoryHigh.Value())
+	}
+	if memoryMax != nil {
+		res.AddProperty("SOPERATOR_USER_ISOLATION_MEMORY_MAX", memoryMax.Value())
+	}
+	cpuWeight := isolation.CPUWeight
+	if cpuWeight == 0 {
+		// The CRD defaults cpuWeight to 100 on admission; guard for objects built in code.
+		cpuWeight = 100
+	}
+	res.AddProperty("SOPERATOR_USER_ISOLATION_CPU_WEIGHT", cpuWeight)
+	return res
+}
+
+// endregion User isolation config

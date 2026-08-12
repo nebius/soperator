@@ -576,6 +576,29 @@ slurmNodes:
     customInitContainers: []
     nodeExporter:
       enabled: false
+    # Per-user cgroup v2 resource isolation for SSH sessions on login nodes.
+    # Each user's session processes are placed into a dedicated cgroup, so one
+    # user cannot exhaust the memory or monopolize the CPU of the login node.
+    # Requires cgroup v2 on the Kubernetes node.
+    # When memory values are unset, safe defaults are derived from
+    # sshd.resources.memory: memoryHigh = 80%, memoryMax = 90% of it. The
+    # derived memoryMax keeps OOM events scoped to a single user's cgroup
+    # without restricting how much a lone user may use. Set explicit values
+    # to give users tighter budgets; they must stay below
+    # sshd.resources.memory.
+    # Disabled by default for the initial release; planned to default to
+    # enabled in a future release.
+    userIsolation:
+      enabled: false
+      # Throttling threshold per user (cgroup v2 memory.high), e.g. "2Gi".
+      # Unset = derived (80% of sshd.resources.memory).
+      # memoryHigh: "2Gi"
+      # Hard memory limit per user (cgroup v2 memory.max), e.g. "3Gi".
+      # Unset = derived (90% of sshd.resources.memory).
+      # memoryMax: "3Gi"
+      # CPU weight per user (cgroup v2 cpu.weight, 1-10000). CPU is shared
+      # proportionally between users under contention; idle CPU stays usable.
+      cpuWeight: 100
     volumes:
       jail:
         volumeSourceName: "jail"

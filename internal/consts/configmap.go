@@ -10,6 +10,7 @@ const (
 	ConfigMapNameSSHDConfigsWorker = sshConfigsWorker
 	ConfigMapNameSshRootPublicKeys = sshRootKeys
 	ConfigMapNameSecurityLimits    = securityLimits
+	ConfigMapNameUserIsolation     = userIsolation
 	ConfigMapNameSysctl            = sysctl
 	ConfigMapNameSupervisord       = supervisord
 
@@ -28,6 +29,7 @@ const (
 	ConfigMapKeySshdConfig              = SshdName + "_config"
 	ConfigMapKeySshRootPublicKeysConfig = authorizedKeys
 	ConfigMapKeySecurityLimits          = securityLimitsConfFile
+	ConfigMapKeyUserIsolation           = userIsolationConfFile
 	ConfigMapKeySysctl                  = sysctlConfFile
 	ConfigMapKeySupervisord             = supervisordConfFile
 	ConfigMapKeySoperatorcheckSbatch    = "sbatch.sh"

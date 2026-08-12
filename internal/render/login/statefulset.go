@@ -114,6 +114,7 @@ func RenderStatefulSet(
 							login.JailSubMounts,
 							login.CustomVolumeMounts,
 							login.ContainerSSSD,
+							login.UserIsolation,
 							sshAppArmorProfile,
 						),
 					},

@@ -25,6 +25,8 @@ const (
 	authorizedKeys         = "authorized_keys"
 	securityLimits         = "security-limits"
 	securityLimitsConfFile = "limits.conf"
+	userIsolation          = "user-isolation"
+	userIsolationConfFile  = userIsolation + ".conf"
 
 	sysctl              = "sysctl"
 	sysctlConfFile      = sysctl + ".conf"
@@ -60,6 +62,7 @@ const (
 	VolumeNameSSSDSocket               = "sssd-socket"
 	VolumeMountPathSSHDKeys            = "/etc/ssh/sshd_keys"
 	VolumeNameSecurityLimits           = securityLimits
+	VolumeNameUserIsolation            = userIsolation
 	VolumeNameSharedMemory             = "dev-shm"
 	VolumeNameSysctl                   = sysctl
 	VolumeNameSupervisordConfigMap     = "supervisord-config"
@@ -90,6 +93,8 @@ const (
 	VolumeMountSubPathSSHRootKeys           = authorizedKeys
 	VolumeMountPathSecurityLimits           = "/etc/security/" + securityLimitsConfFile
 	VolumeMountSubPathSecurityLimits        = securityLimitsConfFile
+	VolumeMountPathUserIsolation            = "/etc/soperator/" + userIsolationConfFile
+	VolumeMountSubPathUserIsolation         = userIsolationConfFile
 	VolumeMountPathSharedMemory             = "/dev/shm"
 	VolumeMountPathSysctl                   = "/etc/" + sysctlConfFile
 	VolumeMountSubPathSysctl                = sysctlConfFile

@@ -10,6 +10,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -174,6 +175,25 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling login security limits configmap: %w", err)
+					}
+					stepLogger.V(1).Info("Reconciled")
+
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Login User Isolation ConfigMap",
+				Func: func(stepCtx context.Context) error {
+					stepLogger := log.FromContext(stepCtx)
+					stepLogger.V(1).Info("Reconciling")
+
+					desired := login.RenderConfigMapUserIsolation(clusterValues)
+					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+					stepLogger.V(1).Info("Rendered")
+
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile")
+						return fmt.Errorf("reconciling login user isolation configmap: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -384,6 +404,22 @@ func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(
 		return []metav1.Object{}, err
 	}
 	res = append(res, sshConfigsConfigMap)
+
+	userIsolation := clusterValues.NodeLogin.UserIsolation
+	if userIsolation != nil && ptr.Deref(userIsolation.Enabled, false) {
+		userIsolationConfigMap := &corev1.ConfigMap{}
+		if err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: clusterValues.Namespace,
+				Name:      naming.BuildConfigMapUserIsolationName(clusterValues.Name),
+			},
+			userIsolationConfigMap,
+		); err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, userIsolationConfigMap)
+	}
 
 	if clusterValues.NodeAccounting.Enabled {
 		slurmdbdSecret := &corev1.Secret{}
