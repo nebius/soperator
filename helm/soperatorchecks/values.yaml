@@ -23,7 +23,6 @@ checks:
       activecheck: true
       activecheckjob: true
       serviceaccount: true
-      activecheckprolog: true
       podephemeralstoragecheck: true
     containerSecurityContext:
       allowPrivilegeEscalation: false

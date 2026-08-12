@@ -187,7 +187,6 @@ func main() {
 		"activecheck",
 		"activecheckjob",
 		"serviceaccount",
-		"activecheckprolog",
 		"podephemeralstoragecheck",
 	}
 	controllersSet, err := controllersenabled.New(
@@ -342,16 +341,6 @@ func main() {
 			cli.Fail(setupLog, err, "unable to create soperatorchecks serviceaccount controller", "controller", "ServiceAccount")
 		}
 	}
-	if controllersSet.Enabled("activecheckprolog") {
-		if err = soperatorchecks.NewActiveCheckPrologController(
-			mgr.GetClient(),
-			mgr.GetScheme(),
-			mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckPrologControllerName),
-		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-			cli.Fail(setupLog, err, "unable to create soperatorchecks prolog controller", "controller", "Prolog")
-		}
-	}
-
 	if controllersSet.Enabled("podephemeralstoragecheck") {
 		podEphemeralStorageCheck, err := soperatorchecks.NewPodEphemeralStorageCheck(
 			mgr.GetClient(),

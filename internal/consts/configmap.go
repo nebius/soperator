@@ -14,17 +14,16 @@ const (
 	ConfigMapNameSysctl            = sysctl
 	ConfigMapNameSupervisord       = supervisord
 
-	ConfigMapKeySlurmConfig             = "slurm.conf"
-	ConfigMapKeySlurmBaseConfig         = "slurm_base.conf.noedit"
-	ConfigMapKeyRESTConfig              = "slurm_rest.conf"
-	ConfigMapKeySlurmK8sExtraConfig     = "slurm_k8s_extra.conf.noedit"
-	ConfigMapKeyCGroupConfig            = "cgroup.conf"
-	ConfigMapKeySpankConfig             = "plugstack.conf"
-	ConfigMapKeyGresConfig              = "gres.conf"
-	ConfigMapKeyMPIConfig               = "mpi.conf"
-	ConfigMapKeySlurmdbdConfig          = "slurmdbd.conf"
-	ConfigMapKeyTopologyConfig          = "topology.conf"
-	ConfigMapKeyActiveCheckPrologScript = "activecheck-prolog.sh"
+	ConfigMapKeySlurmConfig         = "slurm.conf"
+	ConfigMapKeySlurmBaseConfig     = "slurm_base.conf.noedit"
+	ConfigMapKeyRESTConfig          = "slurm_rest.conf"
+	ConfigMapKeySlurmK8sExtraConfig = "slurm_k8s_extra.conf.noedit"
+	ConfigMapKeyCGroupConfig        = "cgroup.conf"
+	ConfigMapKeySpankConfig         = "plugstack.conf"
+	ConfigMapKeyGresConfig          = "gres.conf"
+	ConfigMapKeyMPIConfig           = "mpi.conf"
+	ConfigMapKeySlurmdbdConfig      = "slurmdbd.conf"
+	ConfigMapKeyTopologyConfig      = "topology.conf"
 
 	ConfigMapKeySshdConfig              = SshdName + "_config"
 	ConfigMapKeySshRootPublicKeysConfig = authorizedKeys
@@ -34,9 +33,8 @@ const (
 	ConfigMapKeySupervisord             = supervisordConfFile
 	ConfigMapKeySoperatorcheckSbatch    = "sbatch.sh"
 
-	ConfigMapNameTopologyNodeLabels      = "topology-node-labels"
-	ConfigMapNameTopologyConfig          = "topology-config"
-	ConfigMapNameActiveCheckPrologScript = "activecheck-prolog"
+	ConfigMapNameTopologyNodeLabels = "topology-node-labels"
+	ConfigMapNameTopologyConfig     = "topology-config"
 
 	// ResourceDistribution names
 	ResourceDistributionNameTopology = "topology-soperator"
