@@ -189,7 +189,13 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 	}
 }
 
-// AddPartitionsToSlurmConfig adds structured partition configuration to the slurm config
+// AddPartitionsToSlurmConfig adds structured partition configuration to the slurm config.
+//
+// NodeSetRefs pointing to NodeSets that are absent from the NodeSet section are dropped: such a
+// reference makes slurmctld reject the whole config, and it shows up routinely during upgrades,
+// when NodeSets and SlurmCluster are applied one after another. A partition losing all of its refs
+// this way is rendered with a blank node list, which keeps it alive without resources until the
+// NodeSets show up.
 //
 // Example output:
 // PartitionName=main Nodes=ALL AllowGroups=mleng CpuBind=verbose Default=YES DefaultTime=1:00:00 MaxTime=4:00:00 DefCpuPerGPU=8 Hidden=NO OverSubscribe=YES PreemptMode=OFF PriorityTier=10 State=UP
@@ -202,18 +208,36 @@ func AddPartitionsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *valu
 		return
 	}
 
+	replicas := nodeSetReplicas(cluster)
+
 	for _, partition := range cluster.PartitionConfiguration.Partitions {
-		switch {
-		case partition.IsAll:
+		if partition.IsAll {
 			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=ALL %s", partition.Name, partition.Config))
-		case len(partition.NodeSetRefs) > 0:
-			nodes := strings.Join(partition.NodeSetRefs, ",")
+			continue
+		}
+
+		resolved, ignored := resolvePartitionNodeSetRefs(partition, replicas)
+		for _, ref := range ignored {
+			res.AddComment(fmt.Sprintf(
+				"WARNING: Partition %s references NodeSet %s ignored: %s",
+				ref.Partition, ref.NodeSet, ref.Reason,
+			))
+		}
+
+		switch {
+		case len(resolved) > 0:
+			nodes := strings.Join(resolved, ",")
 			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=%s %s", partition.Name, nodes, partition.Config))
+		case len(ignored) > 0:
+			// Keeping the partition without resources is better than dropping it: dropping would
+			// delete it from a running cluster on reconfigure, together with its pending jobs, and
+			// would take the cluster's default partition down with it.
+			res.AddComment(fmt.Sprintf("WARNING: Partition %s has no usable nodeset refs, rendering it without nodes", partition.Name))
+			res.AddProperty("PartitionName", fmt.Sprintf(`%s Nodes="" %s`, partition.Name, partition.Config))
 		default:
 			res.AddComment(fmt.Sprintf("WARNING: Partition %s has no nodeset refs and is not 'all', skipping", partition.Name))
 		}
 	}
-
 }
 
 // AddNodesToGresConfig adds node-scoped settings to the slurm config
