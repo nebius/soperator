@@ -8,4 +8,6 @@ const (
 	AnnotationActiveCheckName      = K8sGroupNameSoperator + "/activecheck"
 
 	AnnotationParentalClusterRefName = K8sGroupNameSoperator + "/parental-cluster-ref"
+
+	AnnotationSoperatorRollingUpdateMaxUnavailable = K8sGroupNameSoperator + "/rolling-update-max-unavailable"
 )

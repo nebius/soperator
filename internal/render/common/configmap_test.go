@@ -700,7 +700,7 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "Single nodeset with 1 replica",
+			name: "Single nodeset with 1 replica and auto resume disabled",
 			cluster: &values.SlurmCluster{
 				NamespacedName: types.NamespacedName{
 					Namespace: "soperator",

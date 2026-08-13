@@ -28,4 +28,5 @@ const (
 	ContainerPortNameMonitoring = "monitoring"
 	ContainerPortMonitoring     = 8081
 	ContainerPathMonitoring     = "/metrics"
+	ContainerPathHealthz        = "/healthz"
 )
