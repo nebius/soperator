@@ -37,7 +37,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -126,8 +126,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "fe5bb007f2ec39"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -164,7 +164,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -254,8 +254,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "fe5bb007f2ec39"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -277,7 +277,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -341,8 +341,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "fe5bb007f2ec39"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -364,7 +364,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -438,8 +438,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "fe5bb007f2ec39"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -475,7 +475,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -563,8 +563,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "fe5bb007f2ec39"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -586,7 +586,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -648,8 +648,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "fe5bb007f2ec39"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -672,7 +672,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -734,8 +734,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "fe5bb007f2ec39"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -757,7 +757,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -840,8 +840,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "fe5bb007f2ec39"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -876,7 +876,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -963,8 +963,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "fe5bb007f2ec39"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -999,7 +999,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1085,8 +1085,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "fe5bb007f2ec39"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "code",
@@ -1115,6 +1115,24 @@
   "templating": {
     "list": [
       {
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics",
+          "value": "VictoriaMetrics"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
         "allValue": ".*",
         "current": {
           "text": "All",
@@ -1122,7 +1140,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "P4169E866C3094E38"
+          "uid": "${datasource}"
         },
         "definition": "label_values({__name__=~\"nccl.*\", rank!=\"\"}, rank)",
         "includeAll": true,
@@ -1147,7 +1165,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "P4169E866C3094E38"
+          "uid": "${datasource}"
         },
         "definition": "label_values({__name__=~\"nccl.*\", nranks!=\"\"}, nranks)",
         "includeAll": true,
@@ -1172,7 +1190,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "P4169E866C3094E38"
+          "uid": "${datasource}"
         },
         "definition": "label_values({__name__=~\"nccl.*\", collective!=\"\"}, collective)",
         "includeAll": true,
@@ -1198,6 +1216,10 @@
             "746"
           ]
         },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
         "definition": "label_values({__name__=~\"nccl.*\", slurm_job_id!=\"\"}, slurm_job_id)",
         "includeAll": true,
         "label": "Slurm Job ID",
@@ -1221,6 +1243,10 @@
           "value": [
             "$__all"
           ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
         },
         "definition": "label_values({__name__=~\"nccl.*\", hostname!=\"\"}, hostname)",
         "includeAll": true,
