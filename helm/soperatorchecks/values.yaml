@@ -47,6 +47,9 @@ checks:
   replicas: 1
   serviceAccount:
     annotations: {}
+  affinity: {}
+  nodeSelector: {}
+  tolerations: []
 kubernetesClusterDomain: cluster.local
 serviceMonitor:
   enabled: true

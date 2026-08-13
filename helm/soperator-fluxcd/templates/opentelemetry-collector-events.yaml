@@ -96,6 +96,14 @@ spec:
       tag: 2.0.10
 
     mode: deployment
+    {{- with $eventsValues.nodeSelector }}
+    nodeSelector:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $eventsValues.affinity }}
+    affinity:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
 
     rollout:
       rollingUpdate:

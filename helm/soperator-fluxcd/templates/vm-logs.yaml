@@ -35,6 +35,14 @@ spec:
       labels:
         grafana_dashboard: "1"
     server:
+      {{- with .Values.observability.vmLogs.values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.observability.vmLogs.values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- if .Values.observability.vmLogs.values.resources }}
       resources:
         {{- toYaml .Values.observability.vmLogs.values.resources | nindent 8 }}

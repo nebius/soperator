@@ -68,4 +68,13 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 6 }}
       {{- end }}
+      {{- if .Values.checks.tolerations }}
+      tolerations: {{- toYaml .Values.checks.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.checks.affinity }}
+      affinity: {{- toYaml .Values.checks.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.checks.nodeSelector }}
+      nodeSelector: {{- toYaml .Values.checks.nodeSelector | nindent 8 }}
+      {{- end }}
       terminationGracePeriodSeconds: 10

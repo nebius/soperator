@@ -53,6 +53,14 @@ spec:
     resources:
       {{- toYaml .Values.securityProfilesOperator.values.resources | nindent 6 }}
     {{- end }}
+    {{- with .Values.securityProfilesOperator.values.nodeSelector }}
+    nodeSelector:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.securityProfilesOperator.values.affinity }}
+    affinity:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
   {{- end }}
   valuesFrom:
   - kind: ConfigMap

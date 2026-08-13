@@ -114,6 +114,19 @@ spec:
             hostNetwork: true
             dnsPolicy: ClusterFirstWithHostNet
             {{- end }}
+            {{- with $writer.nodeSelector }}
+            nodeSelector:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            affinity:
+              podAntiAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 100
+                    podAffinityTerm:
+                      topologyKey: kubernetes.io/hostname
+                      labelSelector:
+                        matchLabels:
+                          app.kubernetes.io/name: {{ $name }}
             containers:
               - name: tsa-token-writer
                 image: {{ printf "%s:%s" $repo $tag | quote }}

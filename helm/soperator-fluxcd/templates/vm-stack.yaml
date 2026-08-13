@@ -44,7 +44,8 @@ spec:
   {{- if .Values.observability.vmStack.overrideValues }}
     {{- toYaml .Values.observability.vmStack.overrideValues | nindent 4 }}
   {{- else }}
-  {{- $kubeStateMetrics := .Values.observability.vmStack.values.kubeStateMetrics | default dict }}
+  {{- $vmStackValues := .Values.observability.vmStack.values | default dict }}
+  {{- $kubeStateMetrics := $vmStackValues.kubeStateMetrics | default dict }}
       alertmanager:
         enabled: false
       crds:
@@ -66,6 +67,9 @@ spec:
             create: false
       grafana:
         enabled: true
+        {{- with $vmStackValues.grafana }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- if .Values.observability.vmStack.values.grafanaIni }}
         grafana.ini: {{- toYaml .Values.observability.vmStack.values.grafanaIni | nindent 10 }}
         {{- end }}
@@ -79,15 +83,10 @@ spec:
           datasources:
             searchNamespace: {{- toYaml .Values.observability.vmStack.values.dashboardNamespaces | nindent 12 }}
       kube-state-metrics:
+        {{- with $kubeStateMetrics.affinity }}
         affinity:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: slurm.nebius.ai/nodeset
-                      operator: In
-                      values:
-                        - system
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         {{- with $kubeStateMetrics.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
@@ -399,6 +398,9 @@ spec:
         extraArgs:
           {{- toYaml .Values.observability.vmStack.values.prometheusNodeExporter.extraArgs | nindent 10 }}
       victoria-metrics-operator:
+        {{- with $vmStackValues.victoriaMetricsOperator }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         admissionWebhooks:
           enable: true
         crd:
@@ -421,6 +423,14 @@ spec:
           {{- $useHostPathToken := and $hasPublicEndpoint (eq $tokenKind "hostPath") }}
           {{- $hasHostNetwork := and $hasVmagentSpec (hasKey $hasVmagentSpec "hostNetwork") }}
           {{- $hasDnsPolicy := and $hasVmagentSpec (hasKey $hasVmagentSpec "dnsPolicy") }}
+          {{- with $hasVmagentSpec.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $hasVmagentSpec.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- if $hasHostNetwork }}
           hostNetwork: {{ $hasVmagentSpec.hostNetwork }}
           {{- end }}
