@@ -53,6 +53,7 @@ spec:
   {{- $tokenMountPath := include "soperator-fluxcd.o11yTsaTokenMountPath" . }}
   {{- $tokenHostPathFilename := include "soperator-fluxcd.o11yTsaTokenHostPathFilename" . }}
   {{- $batch := .Values.observability.opentelemetry.batch | default dict }}
+  {{- $publicBatch := .Values.observability.opentelemetry.publicBatch | default dict }}
   {{- $sendingQueue := .Values.observability.opentelemetry.sendingQueue | default dict }}
   {{- $logsValues := .Values.observability.opentelemetry.logs.values | default dict }}
   {{- $jailLogsValues := $logsValues.jailLogs | default dict }}
@@ -530,7 +531,7 @@ spec:
             initial_interval: 200ms
             max_elapsed_time: 0
           timeout: 5s
-{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $batch "queue" $sendingQueue "storage" $jailQueueStorage) | indent 10 }}
+{{ include "soperator-fluxcd.otelExporterSendingQueue" (dict "batch" $publicBatch "queue" $sendingQueue "storage" $jailQueueStorage) | indent 10 }}
           headers:
             iam-container: {{ .Values.observability.logsProjectId }}
             {{- $extraHeaders := .Values.observability.opentelemetry.extraHeaders }}

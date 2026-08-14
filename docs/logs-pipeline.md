@@ -194,10 +194,18 @@ observability:
   opentelemetry:
     # Optional. Defaults to dns:///write.logging.eu-north1.nebius.cloud.:443
     publicEndpoint: "dns:///write.logging.eu-north1.nebius.cloud.:443"
+    # Exporter batching for the in-cluster (VictoriaLogs) exporters
     batch:
       timeout: 1s
       sendBatchSize: 2000
       sendBatchMaxSize: 5000
+    # Exporter batching for the public Cloud Logging exporter;
+    # Cloud Logging rejects requests with more than 1000 log records and the collector drops rejected batches,
+    # so keep sendBatchMaxSize <= 1000
+    publicBatch:
+      timeout: 1s
+      sendBatchSize: 500
+      sendBatchMaxSize: 1000
   
   # Storage
   vmLogs:
