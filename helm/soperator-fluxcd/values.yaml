@@ -308,13 +308,20 @@ observability:
     publicEndpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
     namespace: logs-system
     extraHeaders: {}
-    # These values are rendered as exporter sending_queue.batch settings.
+    # These values are rendered as sending_queue.batch settings for the in-cluster (VictoriaLogs) exporters.
     # The chart intentionally does not use the batch processor for collector pipelines.
     # https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/44845#issuecomment-3877056774
     batch:
       timeout: 1s
       sendBatchSize: 2000
       sendBatchMaxSize: 5000
+    # Batch settings for the public Cloud Logging exporter only.
+    # Cloud Logging rejects requests with more than 1000 log records and the
+    # collector drops rejected batches, so keep sendBatchMaxSize <= 1000.
+    publicBatch:
+      timeout: 1s
+      sendBatchSize: 500
+      sendBatchMaxSize: 1000
     # Exporter queue sizing shared by logs, events, and jail logs collectors.
     # queueSize is measured in telemetry items because exporter queues use sizer: items
     # (log records for logs/events), and it applies separately to each exporter.
