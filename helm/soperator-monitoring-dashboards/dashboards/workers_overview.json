@@ -4287,6 +4287,7 @@
         "definition": "label_values(kube_node_labels{label_nebius_com_gpu_name=~\"GB.*\"},label_slurm_nebius_ai_nodeset_name)",
         "description": "For GB platforms",
         "includeAll": true,
+        "allValue": ".*",
         "label": "Rack",
         "multi": true,
         "name": "rack",
@@ -4301,7 +4302,7 @@
         "type": "query"
       },
       {
-        "allValue": "",
+        "allValue": ".*",
         "allowCustomValue": false,
         "current": {
           "text": ["worker-rack0-0"],
@@ -4340,6 +4341,7 @@
         "definition": "label_values(kube_pod_info{pod=~\"$worker\"},node)",
         "hide": 2,
         "includeAll": true,
+        "allValue": ".*",
         "label": "instance",
         "multi": true,
         "name": "hostname",
@@ -4366,6 +4368,7 @@
         "definition": "label_values(node_uname_info{container=\"node-exporter\", nodename=~\"$hostname\"},instance)",
         "hide": 2,
         "includeAll": true,
+        "allValue": ".*",
         "label": "ip",
         "multi": true,
         "name": "ip",
