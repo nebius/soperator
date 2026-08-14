@@ -17,6 +17,8 @@ type metricsCollectorState struct {
 	jobsCollectionSequence       uint64
 	diag                         *api.V0044OpenapiDiagResp
 	diagCollectionSequence       uint64
+	nodeTopologies               map[string]NodeTopology
+	topologyCollectionSequence   uint64
 	nodeUnavailabilityStartTimes map[string]time.Time
 	nodeDrainingStartTimes       map[string]time.Time
 }
@@ -26,6 +28,7 @@ func newMetricsCollectorState() *metricsCollectorState {
 	return &metricsCollectorState{
 		lastGPUSecondsUpdate:         time.Now(),
 		nodes:                        nil,
+		nodeTopologies:               make(map[string]NodeTopology),
 		nodeUnavailabilityStartTimes: make(map[string]time.Time),
 		nodeDrainingStartTimes:       make(map[string]time.Time),
 	}

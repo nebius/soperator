@@ -24,7 +24,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -111,8 +111,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "${ds}"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "nccl_algorithm_bandwidth_gbs{hostname=~\"$hostname\", slurm_job_id=~\"$jobid\"}",
@@ -130,7 +130,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -217,8 +217,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "${ds}"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "nccl_bus_bandwidth_gbs{hostname=~\"$hostname\", slurm_job_id=~\"$jobid\"}",
@@ -236,7 +236,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -323,8 +323,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "${ds}"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "nccl_collective_exec_time_microseconds{hostname=~\"$hostname\", slurm_job_id=~\"$jobid\"}",
@@ -342,7 +342,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -429,8 +429,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
-            "uid": "${ds}"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "nccl_message_size_bytes{hostname=~\"$hostname\", slurm_job_id=~\"$jobid\"}",
@@ -455,6 +455,24 @@
   "templating": {
     "list": [
       {
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics",
+          "value": "VictoriaMetrics"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
         "allowCustomValue": false,
         "current": {
           "text": [
@@ -463,6 +481,10 @@
           "value": [
             "$__all"
           ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
         },
         "definition": "label_values({__name__=~\"nccl.*\", slurm_job_id!=\"\"}, slurm_job_id)",
         "includeAll": true,
@@ -491,7 +513,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "P4169E866C3094E38"
+          "uid": "${datasource}"
         },
         "definition": "label_values({__name__=~\"nccl.*\", hostname!=\"\"}, hostname)",
         "includeAll": true,

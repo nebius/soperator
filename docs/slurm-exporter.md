@@ -108,11 +108,37 @@ Boolean state flag label convention:
 | **slurm_node_memory_free_bytes**<br>*Gauge* | Free memory on the node in bytes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node |
 | **slurm_node_memory_effective_bytes**<br>*Gauge* | Effective memory on the node in bytes (total minus specialized memory reserved for system daemons)<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node |
 | **slurm_node_partition**<br>*Gauge* | Maps nodes to their partitions, enabling partition-level aggregation via PromQL joins<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `partition` - Name of the SLURM partition |
+| **slurm_node_nvlink_instance_group**<br>*Gauge* | Maps Slurm nodes to their NVLink instance group. Emitted only for nodes with the `topology.nebius.com/nvl-instance-group-id` Kubernetes label.<br><br>**Labels:**<br>• `node_name` - Name of the Slurm node and worker Pod<br>• `instance_id` - Compute instance identifier reported by Slurm<br>• `nvlink_instance_group` - Value of the Kubernetes Node's `topology.nebius.com/nvl-instance-group-id` label<br>• `nodeset_name` - Value of the Kubernetes Node's `slurm.nebius.ai/nodeset-name` label |
 | **slurm_job_info**<br>*Gauge* | Detailed information about SLURM jobs<br><br>**Labels:**<br>• `job_id` - SLURM job identifier<br>• `job_state` - Current job state (PENDING, RUNNING, COMPLETED, FAILED, etc.)<br>• `job_state_reason` - Reason for current job state<br>• `slurm_partition` - SLURM partition name<br>• `job_name` - User-defined job name<br>• `user_name` - Username who submitted the job<br>• `user_id` - Numeric user ID who submitted the job<br>• `standard_error` - Path to stderr file<br>• `standard_output` - Path to stdout file<br>• `array_job_id` - Array job ID (if applicable)<br>• `array_task_id` - Array task identity. Either a single task index (e.g. `3`) for an exploded task or a range expression (e.g. `1-5`, `1,3,5-9:2`) for a collapsed array master record on the accounting path. Empty for non-array jobs.<br>• `submit_time` - When the job was submitted (Unix timestamp seconds, empty if not available or zero)<br>• `start_time` - When the job started execution (Unix timestamp seconds, empty if not available or zero)<br>• `end_time` - When the job completed (Unix timestamp seconds, empty if not available or zero). **Warning:** For non-terminal states like RUNNING, this may contain a future timestamp representing the forecasted end time based on the job's time limit<br>• `finished_time` - When the job actually finished for terminal states only (Unix timestamp seconds, empty for non-terminal states or if end_time is zero). Unlike `end_time`, this field only contains actual completion times, never forecasted values |
-| **slurm_node_job**<br>*Gauge* | Mapping between jobs and the nodes they're running on<br><br>**Labels:**<br>• `job_id` - SLURM job identifier<br>• `node_name` - Name of the node running the job |
+| **slurm_node_job**<br>*Gauge* | Mapping between jobs and the nodes they're running on<br><br>**Labels:**<br>• `job_id` - SLURM job identifier<br>• `node_name` - Name of the node running the job<br>• `nvlink_instance_group` - NVLink instance group of the node, or empty when unavailable<br>• `nodeset_name` - Slurm NodeSet name of the node, or empty when unavailable |
 | **slurm_job_duration_seconds**<br>*Gauge* | Job duration in seconds. For running jobs, this is the time elapsed since the job started. For completed jobs, this is the total execution time.<br><br>**Labels:**<br>• `job_id` - SLURM job identifier<br><br>**Notes:**<br>• Only exported for jobs with a valid start time<br>• For non-terminal states (RUNNING, etc.): duration = current_time - start_time<br>• For terminal states (COMPLETED, FAILED, etc.): duration = end_time - start_time (only if end_time is valid) |
 | **slurm_job_cpus**<br>*Gauge* | Number of CPUs allocated to the job<br><br>**Labels:**<br>• `job_id` - SLURM job identifier |
 | **slurm_job_memory_bytes**<br>*Gauge* | Memory allocated to the job in bytes<br><br>**Labels:**<br>• `job_id` - SLURM job identifier |
+
+### NVLink topology joins
+
+The node mapping is the canonical topology metric. Job, partition, and user relationships can be derived without duplicating job-level resource metrics.
+
+```promql
+# Jobs to NVLink instance groups
+max by (job_id, nvlink_instance_group, nodeset_name) (
+  slurm_node_job{nvlink_instance_group!=""}
+)
+
+# Partitions to NVLink instance groups
+max by (partition, nvlink_instance_group, nodeset_name) (
+  slurm_node_partition
+    * on (node_name) group_left(nvlink_instance_group, nodeset_name)
+  slurm_node_nvlink_instance_group
+)
+
+# Users with running jobs on NVLink instance groups
+max by (user_name, nvlink_instance_group, nodeset_name) (
+  slurm_node_job{nvlink_instance_group!=""}
+    * on (job_id) group_left(user_name)
+  slurm_job_info{job_state="RUNNING"}
+)
+```
 
 ### Controller RPC Metrics
 
@@ -135,10 +161,10 @@ The exporter provides self-monitoring metrics to track its own health and perfor
 | **slurm_exporter_collection_duration_seconds**<br>*Gauge* | Duration of the most recent metrics collection from SLURM APIs<br><br>**Labels:** None |
 | **slurm_exporter_collection_attempts_total**<br>*Counter* | Total number of metrics collection attempts<br><br>**Labels:** None |
 | **slurm_exporter_collection_failures_total**<br>*Counter* | Total number of failed metrics collection attempts<br><br>**Labels:** None |
-| **slurm_exporter_collector_duration_seconds**<br>*Gauge* | Duration of the most recent sub-collector run during metrics collection<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`) |
-| **slurm_exporter_collector_errors_total**<br>*Counter* | Total number of errors per sub-collector during metrics collection. Sub-collectors are isolated, so a failure in one does not drop the others' metrics for that cycle; the failed collector keeps exporting its last successfully collected data until it recovers.<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`) |
-| **slurm_exporter_collector_inflight**<br>*Gauge* | Number of sub-collector runs currently in progress<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`) |
-| **slurm_exporter_collector_skipped_total**<br>*Counter* | Total number of skipped sub-collector runs because the configured in-flight limit was reached<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`) |
+| **slurm_exporter_collector_duration_seconds**<br>*Gauge* | Duration of the most recent sub-collector run during metrics collection<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`, `topology`) |
+| **slurm_exporter_collector_errors_total**<br>*Counter* | Total number of errors per sub-collector during metrics collection. Sub-collectors are isolated, so a failure in one does not drop the others' metrics for that cycle; the failed collector keeps exporting its last successfully collected data until it recovers.<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`, `topology`) |
+| **slurm_exporter_collector_inflight**<br>*Gauge* | Number of sub-collector runs currently in progress<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`, `topology`) |
+| **slurm_exporter_collector_skipped_total**<br>*Counter* | Total number of skipped sub-collector runs because the configured in-flight limit was reached<br><br>**Labels:** `collector` (one of `nodes`, `jobs`, `diag`, `topology`) |
 | **slurm_exporter_metrics_requests_total**<br>*Counter* | Total number of requests to the `/metrics` endpoint<br><br>**Labels:** None |
 | **slurm_exporter_metrics_exported**<br>*Gauge* | Number of metrics exported in the last scrape<br><br>**Labels:** None |
 

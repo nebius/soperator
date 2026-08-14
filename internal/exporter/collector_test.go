@@ -223,8 +223,9 @@ func TestMetricsCollector_Describe(t *testing.T) {
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_free_bytes", help: "Free memory on the node in bytes", constLabels: {}, variableLabels: {node_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_effective_bytes", help: "Effective memory on the node in bytes", constLabels: {}, variableLabels: {node_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_partition", help: "Slurm node partition mapping", constLabels: {}, variableLabels: {node_name,partition}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_nvlink_instance_group", help: "Mapping between Slurm nodes and NVLink instance groups", constLabels: {}, variableLabels: {node_name,instance_id,nvlink_instance_group,nodeset_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,user_mail,user_id,standard_error,standard_output,array_job_id,array_task_id,submit_time,start_time,end_time,finished_time}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", constLabels: {}, variableLabels: {job_id,node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", constLabels: {}, variableLabels: {job_id,node_name,nvlink_instance_group,nodeset_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_job_duration_seconds", help: "Slurm job duration in seconds", constLabels: {}, variableLabels: {job_id}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_job_cpus", help: "CPUs allocated to a Slurm job", constLabels: {}, variableLabels: {job_id}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_job_memory_bytes", help: "Memory allocated to a Slurm job in bytes", constLabels: {}, variableLabels: {job_id}}`)
@@ -237,6 +238,76 @@ func TestMetricsCollector_Describe(t *testing.T) {
 
 	// Controller metrics
 	assert.Contains(t, found, `Desc{fqName: "slurm_controller_server_thread_count", help: "Number of server threads", constLabels: {}, variableLabels: {}}`)
+}
+
+func TestMetricsCollector_NodeTopologyMetrics(t *testing.T) {
+	mockClient := &fake.MockClient{}
+	source := nodeTopologySourceFunc(func(context.Context) (map[string]NodeTopology, error) {
+		return map[string]NodeTopology{
+			"worker-0": {
+				KubernetesNode:      "k8s-node-1",
+				NVLinkInstanceGroup: "nvlig-1",
+				SlurmNodeSetName:    "gpu-workers",
+			},
+		}, nil
+	})
+	collector := newMetricsCollector(mockClient, slurmapi.ListJobsParams{}, source)
+
+	mockClient.EXPECT().ListNodes(mock.Anything).Return([]slurmapi.Node{testNode("worker-0")}, nil).Once()
+	mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return([]slurmapi.Job{
+		{ID: 123, State: "RUNNING", Nodes: "worker-0"},
+	}, nil).Once()
+	mockClient.EXPECT().GetDiag(mock.Anything).Return(nil, nil).Once()
+
+	require.NoError(t, collectOnce(context.Background(), collector))
+	require.NoError(t, collector.refreshNodeTopologies(context.Background(), 1))
+
+	ch := make(chan prometheus.Metric, 50)
+	go func() {
+		collector.Collect(ch)
+		close(ch)
+	}()
+
+	var metricsText []string
+	for metric := range ch {
+		metricsText = append(metricsText, toPrometheusLikeString(t, metric))
+	}
+
+	assert.Contains(t, metricsText, `GAUGE; slurm_node_nvlink_instance_group{instance_id="worker-0-instance",node_name="worker-0",nodeset_name="gpu-workers",nvlink_instance_group="nvlig-1"} 1`)
+	assert.Contains(t, metricsText, `GAUGE; slurm_node_job{job_id="123",node_name="worker-0",nodeset_name="gpu-workers",nvlink_instance_group="nvlig-1"} 1`)
+}
+
+func TestMetricsCollector_NodeTopologyRefreshRetriesAfterTimeout(t *testing.T) {
+	calls := 0
+	source := nodeTopologySourceFunc(func(ctx context.Context) (map[string]NodeTopology, error) {
+		calls++
+		if calls == 1 {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+		return map[string]NodeTopology{
+			"worker-0": {
+				KubernetesNode:      "k8s-node-1",
+				NVLinkInstanceGroup: "nvlig-1",
+				SlurmNodeSetName:    "gpu-workers",
+			},
+		}, nil
+	})
+	collector := newMetricsCollector(&fake.MockClient{}, slurmapi.ListJobsParams{}, source)
+	collector.nodeTopologyTimeout = 10 * time.Millisecond
+
+	err := collector.refreshNodeTopologies(context.Background(), 1)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.NoError(t, collector.refreshNodeTopologies(context.Background(), 2))
+
+	assert.Equal(t, 2, calls)
+	assert.Equal(t, map[string]NodeTopology{
+		"worker-0": {
+			KubernetesNode:      "k8s-node-1",
+			NVLinkInstanceGroup: "nvlig-1",
+			SlurmNodeSetName:    "gpu-workers",
+		},
+	}, collector.state.Load().nodeTopologies)
 }
 
 func TestMetricsCollector_Collect_Success(t *testing.T) {
@@ -372,8 +443,8 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-1",state_base="ALLOCATED",state_is_drain="false",state_is_maintenance="false",state_is_reserved="false"} 20`,
 			`COUNTER; slurm_node_gpu_seconds_total{node_name="node-2",state_base="IDLE",state_is_drain="true",state_is_maintenance="false",state_is_reserved="false"} 10`,
 			`GAUGE; slurm_job_info{array_job_id="",array_task_id="42",end_time="",finished_time="",job_id="12345",job_name="test_job",job_state="RUNNING",job_state_reason="None",slurm_partition="gpu",standard_error="/path/to/stderr",standard_output="/path/to/stdout",start_time="1722697230",submit_time="1722697200",user_id="1000",user_mail="testuser@example.com",user_name="testuser"} 1`,
-			`GAUGE; slurm_node_job{job_id="12345",node_name="node-1"} 1`,
-			`GAUGE; slurm_node_job{job_id="12345",node_name="node-2"} 1`,
+			`GAUGE; slurm_node_job{job_id="12345",node_name="node-1",nodeset_name="",nvlink_instance_group=""} 1`,
+			`GAUGE; slurm_node_job{job_id="12345",node_name="node-2",nodeset_name="",nvlink_instance_group=""} 1`,
 			`GAUGE; slurm_job_cpus{job_id="12345"} 4`,
 			`GAUGE; slurm_job_memory_bytes{job_id="12345"} 6.7108864e+10`,
 			`GAUGE; slurm_controller_server_thread_count 1`,

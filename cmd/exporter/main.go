@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -285,11 +286,22 @@ func main() {
 		}
 	}
 	var ctrlClient client.Client
+	var topologyCache ctrlcache.Cache
 	if cfg != nil {
 		ctrlClient, err = client.New(cfg, client.Options{})
 		if err != nil {
 			log.Error(err, "Failed to create Kubernetes client, continuing in standalone mode")
 			ctrlClient = nil
+		} else {
+			topologyCache, err = exporter.NewKubernetesNodeTopologyCache(
+				cfg,
+				flags.clusterNamespace,
+				flags.clusterName,
+			)
+			if err != nil {
+				log.Error(err, "Failed to create Kubernetes topology cache, topology metrics will be unavailable")
+				topologyCache = nil
+			}
 		}
 	}
 
@@ -315,6 +327,25 @@ func main() {
 		cli.Fail(log, err, "Failed to parse job collection configuration")
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	var nodeTopologySource exporter.NodeTopologySource
+	if topologyCache != nil {
+		if err := exporter.RegisterKubernetesNodeTopologyInformers(ctx, topologyCache); err != nil {
+			log.Error(err, "Failed to register Kubernetes topology informers, collection will retry lazily")
+		}
+		go func() {
+			if err := topologyCache.Start(ctx); err != nil && ctx.Err() == nil {
+				log.Error(err, "Kubernetes topology cache stopped unexpectedly")
+			}
+		}()
+		nodeTopologySource = exporter.NewKubernetesNodeTopologySource(
+			topologyCache,
+			flags.clusterNamespace,
+			flags.clusterName,
+		)
+	}
+
 	clusterExporter := exporter.NewClusterExporter(
 		slurmAPIClient,
 		exporter.Params{
@@ -323,11 +354,9 @@ func main() {
 			CollectionInterval:   interval,
 			MaxCollectorInflight: maxCollectorInflight,
 			JobListParams:        jobListParams,
+			NodeTopologySource:   nodeTopologySource,
 		},
 	)
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	if flags.standalone {
 		log.Info("Using standalone token issuer", "scontrol_path", flags.scontrolPath, "rotation_interval", flags.keyRotationInterval)

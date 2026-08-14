@@ -34,11 +34,14 @@ type MetricsCollector struct {
 	nodeMemoryFreeBytes        *prometheus.Desc
 	nodeMemoryEffectiveBytes   *prometheus.Desc
 	nodePartition              *prometheus.Desc
+	nodeNVLinkInstanceGroup    *prometheus.Desc
 	jobInfo                    *prometheus.Desc
 	jobNode                    *prometheus.Desc
 	jobDuration                *prometheus.Desc
 	jobCPUs                    *prometheus.Desc
 	jobMemoryBytes             *prometheus.Desc
+	nodeTopologySource         NodeTopologySource
+	nodeTopologyTimeout        time.Duration
 	nodeGPUSeconds             *prometheus.CounterVec
 	nodeFails                  *prometheus.CounterVec
 	nodeUnavailabilityDuration *prometheus.HistogramVec
@@ -57,6 +60,8 @@ type MetricsCollector struct {
 	// Monitoring contains self-monitoring metrics
 	Monitoring *MonitoringMetrics
 }
+
+const defaultNodeTopologyCollectionTimeout = time.Minute
 
 // durationBuckets defines histogram buckets for duration metrics ranging from 30 seconds to 30 days
 var durationBuckets = []float64{
@@ -80,6 +85,14 @@ var durationBuckets = []float64{
 
 // NewMetricsCollector creates a new MetricsCollector
 func NewMetricsCollector(slurmAPIClient slurmapi.Client, jobListParams slurmapi.ListJobsParams) *MetricsCollector {
+	return newMetricsCollector(slurmAPIClient, jobListParams, nil)
+}
+
+func newMetricsCollector(
+	slurmAPIClient slurmapi.Client,
+	jobListParams slurmapi.ListJobsParams,
+	nodeTopologySource NodeTopologySource,
+) *MetricsCollector {
 	var nodeInfoLabels = []string{
 		"node_name",
 		"instance_id",
@@ -124,9 +137,11 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client, jobListParams slurmapi.
 		"finished_time",
 	}
 	collector := &MetricsCollector{
-		slurmAPIClient: slurmAPIClient,
-		jobListParams:  jobListParams,
-		Monitoring:     NewMonitoringMetrics(),
+		slurmAPIClient:      slurmAPIClient,
+		jobListParams:       jobListParams,
+		nodeTopologySource:  nodeTopologySource,
+		nodeTopologyTimeout: defaultNodeTopologyCollectionTimeout,
+		Monitoring:          NewMonitoringMetrics(),
 
 		nodeInfo:                 prometheus.NewDesc("slurm_node_info", "Slurm node info", nodeInfoLabels, nil),
 		nodeCPUTotal:             prometheus.NewDesc("slurm_node_cpus_total", "Total CPUs on the node", []string{"node_name"}, nil),
@@ -138,9 +153,20 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client, jobListParams slurmapi.
 		nodeMemoryFreeBytes:      prometheus.NewDesc("slurm_node_memory_free_bytes", "Free memory on the node in bytes", []string{"node_name"}, nil),
 		nodeMemoryEffectiveBytes: prometheus.NewDesc("slurm_node_memory_effective_bytes", "Effective memory on the node in bytes", []string{"node_name"}, nil),
 		nodePartition:            prometheus.NewDesc("slurm_node_partition", "Slurm node partition mapping", []string{"node_name", "partition"}, nil),
+		nodeNVLinkInstanceGroup: prometheus.NewDesc(
+			"slurm_node_nvlink_instance_group",
+			"Mapping between Slurm nodes and NVLink instance groups",
+			[]string{"node_name", "instance_id", "nvlink_instance_group", "nodeset_name"},
+			nil,
+		),
 		jobInfo: prometheus.NewDesc(
 			"slurm_job_info", "Slurm job detail information", jobInfoLabels, nil),
-		jobNode:        prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
+		jobNode: prometheus.NewDesc(
+			"slurm_node_job",
+			"Slurm job node information",
+			[]string{"job_id", "node_name", "nvlink_instance_group", "nodeset_name"},
+			nil,
+		),
 		jobDuration:    prometheus.NewDesc("slurm_job_duration_seconds", "Slurm job duration in seconds", []string{"job_id"}, nil),
 		jobCPUs:        prometheus.NewDesc("slurm_job_cpus", "CPUs allocated to a Slurm job", []string{"job_id"}, nil),
 		jobMemoryBytes: prometheus.NewDesc("slurm_job_memory_bytes", "Memory allocated to a Slurm job in bytes", []string{"job_id"}, nil),
@@ -315,6 +341,7 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.nodeMemoryFreeBytes
 	ch <- c.nodeMemoryEffectiveBytes
 	ch <- c.nodePartition
+	ch <- c.nodeNVLinkInstanceGroup
 	ch <- c.jobInfo
 	ch <- c.jobNode
 	ch <- c.jobDuration
@@ -373,9 +400,46 @@ func cloneMetricsCollectorState(previousState *metricsCollectorState) *metricsCo
 	newState.jobsCollectionSequence = previousState.jobsCollectionSequence
 	newState.diag = previousState.diag
 	newState.diagCollectionSequence = previousState.diagCollectionSequence
+	newState.nodeTopologies = previousState.nodeTopologies
+	newState.topologyCollectionSequence = previousState.topologyCollectionSequence
 	maps.Copy(newState.nodeUnavailabilityStartTimes, previousState.nodeUnavailabilityStartTimes)
 	maps.Copy(newState.nodeDrainingStartTimes, previousState.nodeDrainingStartTimes)
 	return newState
+}
+
+func (c *MetricsCollector) refreshNodeTopologies(ctx context.Context, sequence uint64) (err error) {
+	start := time.Now()
+	defer func() {
+		c.recordCollectorRun(ctx, "topology", start, err)
+	}()
+
+	if c.nodeTopologySource == nil {
+		return nil
+	}
+	topologyCtx, cancel := context.WithTimeout(ctx, c.nodeTopologyTimeout)
+	defer cancel()
+	topologies, err := c.nodeTopologySource.ListNodeTopologies(topologyCtx)
+	if err != nil {
+		return fmt.Errorf("get Kubernetes node topology: %w", err)
+	}
+
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+
+	previousState := c.state.Load()
+	if previousState == nil {
+		previousState = newMetricsCollectorState()
+	}
+	if sequence != 0 && sequence <= previousState.topologyCollectionSequence {
+		return nil
+	}
+	newState := cloneMetricsCollectorState(previousState)
+	newState.nodeTopologies = topologies
+	if sequence != 0 {
+		newState.topologyCollectionSequence = sequence
+	}
+	c.state.Store(newState)
+	return nil
 }
 
 func (c *MetricsCollector) refreshNodes(ctx context.Context, sequence uint64) (err error) {
@@ -525,7 +589,7 @@ func (c *MetricsCollector) collectImpl(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	for slurmNodeMetric := range c.slurmNodeMetrics(state.nodes) {
+	for slurmNodeMetric := range c.slurmNodeMetrics(state.nodes, state.nodeTopologies) {
 		ch <- slurmNodeMetric
 	}
 
@@ -534,7 +598,7 @@ func (c *MetricsCollector) collectImpl(ch chan<- prometheus.Metric) {
 	c.nodeUnavailabilityDuration.Collect(ch)
 	c.nodeDrainingDuration.Collect(ch)
 
-	for slurmJobMetric := range c.slurmJobMetrics(ctx, state.jobs) {
+	for slurmJobMetric := range c.slurmJobMetrics(ctx, state.jobs, state.nodeTopologies) {
 		ch <- slurmJobMetric
 	}
 
@@ -543,9 +607,26 @@ func (c *MetricsCollector) collectImpl(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq[prometheus.Metric] {
+func (c *MetricsCollector) slurmNodeMetrics(
+	slurmNodes []slurmapi.Node,
+	nodeTopologies map[string]NodeTopology,
+) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
 		for _, node := range slurmNodes {
+			topology := nodeTopologies[node.Name]
+			if topology.NVLinkInstanceGroup != "" {
+				if !yield(prometheus.MustNewConstMetric(
+					c.nodeNVLinkInstanceGroup,
+					prometheus.GaugeValue,
+					1,
+					node.Name,
+					node.InstanceID,
+					topology.NVLinkInstanceGroup,
+					topology.SlurmNodeSetName,
+				)) {
+					return
+				}
+			}
 			var reason string
 			if node.Reason != nil {
 				reason = node.Reason.Reason
@@ -645,7 +726,11 @@ func boolToLabelValue(b bool) string {
 	return ""
 }
 
-func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slurmapi.Job) iter.Seq[prometheus.Metric] {
+func (c *MetricsCollector) slurmJobMetrics(
+	ctx context.Context,
+	slurmJobs []slurmapi.Job,
+	nodeTopologies map[string]NodeTopology,
+) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
 		logger := log.FromContext(ctx).WithName(ControllerName)
 		for _, job := range slurmJobs {
@@ -718,7 +803,13 @@ func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slur
 				continue
 			}
 			for _, nodeName := range nodeList {
-				jobNodeLabels := []string{job.GetIDString(), nodeName}
+				topology := nodeTopologies[nodeName]
+				jobNodeLabels := []string{
+					job.GetIDString(),
+					nodeName,
+					topology.NVLinkInstanceGroup,
+					topology.SlurmNodeSetName,
+				}
 				if !yield(prometheus.MustNewConstMetric(c.jobNode, prometheus.GaugeValue, 1, jobNodeLabels...)) {
 					return
 				}

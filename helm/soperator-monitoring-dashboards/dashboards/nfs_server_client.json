@@ -29,7 +29,8 @@
   "panels": [
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -80,7 +81,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "node_nfsd_server_threads{   namespace=\"nfs-system\"}",
@@ -97,7 +99,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -156,7 +158,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
+            "type": "prometheus",
             "uid": "${datasource}"
           },
           "editorMode": "code",
@@ -173,7 +175,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -233,7 +235,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource",
+            "type": "prometheus",
             "uid": "${datasource}"
           },
           "editorMode": "code",
@@ -250,7 +252,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -310,7 +312,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "sum by (cluster) (rate(node_nfs_rpc_retransmissions_total{  }[$__rate_interval]))",
@@ -344,7 +347,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -439,7 +442,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "rate(node_nfs_rpcs_total{  }[$__rate_interval])\n* on(cluster, pod) group_left(node)\nkube_pod_info{  node=~\"$compute_instance\"}",
@@ -460,7 +464,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -555,7 +559,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "rate(node_nfs_rpc_retransmissions_total{  }[$__rate_interval])\n* on(cluster, pod) group_left(node)\nkube_pod_info{  node=~\"$compute_instance\"}",
@@ -576,7 +581,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -673,7 +678,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "sum(\n  rate(node_nfs_requests_total{  proto=\"4\"}[$__rate_interval])\n  * on(cluster, pod) group_left(node)\n  kube_pod_info{  node=~\"$compute_instance\"}\n) by (method)",
@@ -707,7 +713,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -861,7 +867,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "rate(node_nfsd_disk_bytes_read_total{   namespace=\"nfs-system\"}[$__rate_interval])",
@@ -876,7 +883,8 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "rate(node_nfsd_disk_bytes_written_total{   namespace=\"nfs-system\"}[$__rate_interval])",
@@ -896,7 +904,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1039,7 +1047,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "rate(node_nfsd_packets_total{proto=\"tcp\",   namespace=\"nfs-system\"}[$__rate_interval])",
@@ -1054,7 +1063,8 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "rate(node_nfsd_packets_total{proto=\"udp\",   namespace=\"nfs-system\"}[$__rate_interval])",
@@ -1074,7 +1084,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1156,7 +1166,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "expr": "rate(node_nfsd_read_ahead_cache_not_found_total{ namespace=\"nfs-system\" }[$__rate_interval])",
           "format": "time_series",
@@ -1169,7 +1180,8 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "expr": "rate(node_nfsd_reply_cache_hits_total{ namespace=\"nfs-system\" }[$__rate_interval])",
           "format": "time_series",
@@ -1182,7 +1194,8 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "expr": "rate(node_nfsd_reply_cache_misses_total{ namespace=\"nfs-system\" }[$__rate_interval])",
           "format": "time_series",
@@ -1195,7 +1208,8 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "expr": "rate(node_nfsd_reply_cache_nocache_total{ namespace=\"nfs-system\" }[$__rate_interval])",
           "format": "time_series",
@@ -1213,7 +1227,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1307,7 +1321,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "expr": "rate(node_nfsd_rpc_errors_total{ namespace=\"nfs-system\" }[$__rate_interval])",
           "format": "time_series",
@@ -1320,7 +1335,8 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "expr": "rate(node_nfsd_server_rpcs_total{ namespace=\"nfs-system\" }[$__rate_interval])",
           "format": "time_series",
@@ -1338,7 +1354,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1419,7 +1435,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-datasource"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "rate(node_nfsd_requests_total{proto=\"4\",  namespace=\"nfs-system\" }[$__rate_interval])",
@@ -1443,6 +1460,24 @@
   "templating": {
     "list": [
       {
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics",
+          "value": "VictoriaMetrics"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
         "allValue": ".*",
         "allowCustomValue": true,
         "current": {
@@ -1451,7 +1486,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "P4169E866C3094E38"
+          "uid": "${datasource}"
         },
         "definition": "label_values(kube_pod_info{}, node)",
         "description": "NFS client compute instance",

@@ -620,7 +620,7 @@ slurmNodes:
       scrapeTimeout: "28s"
     # RBAC settings for exporter
     rbac:
-      # Specifies whether RBAC resources (Role/RoleBinding) should be created
+      # Specifies whether RBAC resources for Secrets, worker Pods, and Kubernetes Nodes should be created
       create: true
     # ServiceAccount settings for exporter
     serviceAccount:

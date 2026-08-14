@@ -30,6 +30,7 @@ type Params struct {
 	CollectionInterval   time.Duration
 	MaxCollectorInflight int
 	JobListParams        slurmapi.ListJobsParams
+	NodeTopologySource   NodeTopologySource
 }
 
 // Exporter collects metrics from a SLURM cluster and exports them in Prometheus format
@@ -81,7 +82,7 @@ func (c *asyncSubCollector) finish() int32 {
 func NewClusterExporter(slurmAPIClient slurmapi.Client, params Params) *Exporter {
 	registry := prometheus.NewRegistry()
 	monitoringRegistry := prometheus.NewRegistry()
-	collector := NewMetricsCollector(slurmAPIClient, params.JobListParams)
+	collector := newMetricsCollector(slurmAPIClient, params.JobListParams, params.NodeTopologySource)
 
 	return &Exporter{
 		params:             params,
@@ -142,6 +143,9 @@ func (e *Exporter) collectionLoop(ctx context.Context) {
 		{name: "nodes", run: e.collector.refreshNodes},
 		{name: "jobs", run: e.collector.refreshJobs},
 		{name: "diag", run: e.collector.refreshDiag},
+	}
+	if e.collector.nodeTopologySource != nil {
+		collectors = append(collectors, &asyncSubCollector{name: "topology", run: e.collector.refreshNodeTopologies})
 	}
 
 	startCollectors := func() {
