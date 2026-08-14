@@ -179,7 +179,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			// is still running; processing it too early would be premature.
 			if status := getK8sJobStatus(k8sJob); status != consts.ActiveCheckK8sJobStatusComplete &&
 				status != consts.ActiveCheckK8sJobStatusFailed {
-				return ctrl.Result{Requeue: true, RequeueAfter: r.requeueAfter}, nil
+				return ctrl.Result{RequeueAfter: r.requeueAfter}, nil
 			}
 
 			activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
@@ -394,7 +394,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		}
 
 		if requeue {
-			return ctrl.Result{Requeue: true, RequeueAfter: r.requeueAfter}, nil
+			return ctrl.Result{RequeueAfter: r.requeueAfter}, nil
 		}
 
 	} else if activeCheck.Spec.CheckType == "k8sJob" {

@@ -144,7 +144,7 @@ func (r *SlurmClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		// Error reading the object - requeue the request.
 		logger.Error(err, "Failed to get SlurmCluster")
-		return ctrl.Result{Requeue: true}, fmt.Errorf("getting SlurmCluster: %w", err)
+		return ctrl.Result{}, fmt.Errorf("getting SlurmCluster: %w", err)
 	}
 
 	slurmCluster.Spec.PlugStackConfig.Pyxis.SetDefaults()
@@ -490,7 +490,7 @@ func (r *SlurmClusterReconciler) reconcile(ctx context.Context, cluster *slurmv1
 
 	logger.Info("Finished reconciliation of Slurm Cluster")
 
-	if populateJailRes.RequeueAfter > 0 && res.RequeueAfter == 0 && !res.Requeue {
+	if populateJailRes.RequeueAfter > 0 && res.RequeueAfter == 0 {
 		res.RequeueAfter = populateJailRes.RequeueAfter
 	}
 

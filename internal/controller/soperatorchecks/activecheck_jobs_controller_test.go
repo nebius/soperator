@@ -162,7 +162,7 @@ func TestActiveCheckJobReconciler_Reconcile_DoesNotFinalizeUntilAllSlurmJobsFini
 
 	firstResult, err := reconciler.Reconcile(ctx, req)
 	require.NoError(t, err)
-	assert.True(t, firstResult.Requeue)
+	assert.Equal(t, time.Minute, firstResult.RequeueAfter)
 
 	updatedJob := &batchv1.Job{}
 	require.NoError(t, fakeClient.Get(ctx, req.NamespacedName, updatedJob))
@@ -184,7 +184,7 @@ func TestActiveCheckJobReconciler_Reconcile_DoesNotFinalizeUntilAllSlurmJobsFini
 
 	secondResult, err := reconciler.Reconcile(ctx, req)
 	require.NoError(t, err)
-	assert.False(t, secondResult.Requeue)
+	assert.Zero(t, secondResult.RequeueAfter)
 
 	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
@@ -285,7 +285,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobSubmissionFailureSetsErrorSt
 
 	result, err := reconciler.Reconcile(ctx, newActiveCheckJobRequest(k8sJob))
 	require.NoError(t, err)
-	assert.False(t, result.Requeue)
+	assert.Zero(t, result.RequeueAfter)
 
 	updatedCheck := &slurmv1alpha1.ActiveCheck{}
 	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
@@ -349,7 +349,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAggregatesTerminalResultsInS
 
 	result, err := reconciler.Reconcile(ctx, newActiveCheckJobRequest(k8sJob))
 	require.NoError(t, err)
-	assert.False(t, result.Requeue)
+	assert.Zero(t, result.RequeueAfter)
 
 	updatedCheck := &slurmv1alpha1.ActiveCheck{}
 	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
@@ -431,7 +431,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAccumulatesTerminalResultsAc
 
 	firstResult, err := reconciler.Reconcile(ctx, req)
 	require.NoError(t, err)
-	assert.True(t, firstResult.Requeue)
+	assert.Equal(t, time.Minute, firstResult.RequeueAfter)
 
 	updatedCheck := &slurmv1alpha1.ActiveCheck{}
 	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
@@ -445,7 +445,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobAccumulatesTerminalResultsAc
 
 	secondResult, err := reconciler.Reconcile(ctx, req)
 	require.NoError(t, err)
-	assert.False(t, secondResult.Requeue)
+	assert.Zero(t, secondResult.RequeueAfter)
 
 	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
 	assert.Equal(t, consts.ActiveCheckSlurmRunStatusFailed, updatedCheck.Status.SlurmJobsStatus.LastRunStatus)
@@ -488,7 +488,7 @@ func TestActiveCheckJobReconciler_Reconcile_FailedSlurmJobWithoutReactionsOnlyUp
 
 	result, err := reconciler.Reconcile(ctx, newActiveCheckJobRequest(k8sJob))
 	require.NoError(t, err)
-	assert.False(t, result.Requeue)
+	assert.Zero(t, result.RequeueAfter)
 
 	updatedCheck := &slurmv1alpha1.ActiveCheck{}
 	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
@@ -519,7 +519,7 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobNotYetVisibleInAccountingReq
 
 	result, err := reconciler.Reconcile(ctx, newActiveCheckJobRequest(k8sJob))
 	require.NoError(t, err)
-	assert.True(t, result.Requeue)
+	assert.Equal(t, time.Minute, result.RequeueAfter)
 
 	updatedCheck := &slurmv1alpha1.ActiveCheck{}
 	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
@@ -582,7 +582,7 @@ func TestActiveCheckJobReconciler_Reconcile_FailedSlurmJobExecutesCommentReactio
 
 	result, err := reconciler.Reconcile(ctx, newActiveCheckJobRequest(k8sJob))
 	require.NoError(t, err)
-	assert.False(t, result.Requeue)
+	assert.Zero(t, result.RequeueAfter)
 
 	updatedCheck := &slurmv1alpha1.ActiveCheck{}
 	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
@@ -613,7 +613,7 @@ func TestActiveCheckJobReconciler_Reconcile_K8sJobUpdatesStatus(t *testing.T) {
 
 	result, err := reconciler.Reconcile(ctx, newActiveCheckJobRequest(k8sJob))
 	require.NoError(t, err)
-	assert.False(t, result.Requeue)
+	assert.Zero(t, result.RequeueAfter)
 
 	updatedCheck := &slurmv1alpha1.ActiveCheck{}
 	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
@@ -644,7 +644,7 @@ func TestActiveCheckJobReconciler_Reconcile_K8sJobNoopWhenStatusDidNotChange(t *
 
 	result, err := reconciler.Reconcile(ctx, newActiveCheckJobRequest(k8sJob))
 	require.NoError(t, err)
-	assert.False(t, result.Requeue)
+	assert.Zero(t, result.RequeueAfter)
 
 	updatedCheck := &slurmv1alpha1.ActiveCheck{}
 	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))

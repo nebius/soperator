@@ -39,7 +39,6 @@ var (
 	WorkerTopologyReconcilerName = "workerTopologyReconciler"
 	DefaultRequeueResult         = ctrl.Result{
 		RequeueAfter: 1 * time.Minute,
-		Requeue:      true,
 	}
 )
 

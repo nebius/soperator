@@ -564,7 +564,7 @@ func (r SlurmClusterReconciler) updateAccountingAvailabilityStatus(
 		return ctrl.Result{}, err
 	}
 	if conditionStatus != metav1.ConditionTrue {
-		return ctrl.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
+		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
 
 	return ctrl.Result{}, nil

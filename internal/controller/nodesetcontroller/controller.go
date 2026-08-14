@@ -170,7 +170,7 @@ func (r *NodeSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		// Error reading the object - requeue the request.
 		logger.Error(err, "Failed to get resource")
-		return ctrl.Result{Requeue: true}, fmt.Errorf("getting %s: %w", slurmv1alpha1.KindNodeSet, err)
+		return ctrl.Result{}, fmt.Errorf("getting %s: %w", slurmv1alpha1.KindNodeSet, err)
 	}
 
 	// If nodeset is marked for deletion, we have nothing to do
