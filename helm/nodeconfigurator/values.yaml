@@ -36,7 +36,17 @@ rebooter:
   readinessProbe: {}
   tolerations: []
   affinity: {}
+  # Set to the chart's own class name to let the rebooter preempt the unprioritised infrastructure
+  # Deployments competing for a node's spare CPU. Leave empty to run at priority 0.
   priorityClassName: ""
+  # The rebooter is a DaemonSet on every node, so its value sits below every Slurm pod class
+  # (the lowest is slurm-login at 100002) and above the unprioritised Deployments at 0.
+  priorityClass:
+    create: true
+    # Defaults to "<release>-rebooter".
+    name: ""
+    value: 100000
+    description: "Priority class for the soperator rebooter DaemonSet. Above unprioritised infrastructure Deployments, below every Slurm pod."
   serviceAccountName: ""
 initContainers:
   - name: node-sysctl-params

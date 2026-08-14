@@ -716,6 +716,9 @@ KIND_CLUSTER_NAME	?= soperator-dev
 KIND_NODES			?= 2
 KIND_K8S_VERSION	?= v1.31.0
 KIND_CONTEXT		?= kind-$(KIND_CLUSTER_NAME)
+# The soperator-fluxcd chart pins its control-plane workloads to the system nodeset, so every kind
+# node carries the label - otherwise those pods stay Pending and their HelmReleases never go Ready.
+KIND_NODESET_LABEL	?= slurm.nebius.ai/nodeset: system
 KUBECTL_CTX			= $(KUBECTL) --context $(KIND_CONTEXT)
 
 .PHONY: kind-create
@@ -729,8 +732,12 @@ kind-create: install-kind ## Create kind cluster with specified number of nodes
 	@echo "apiVersion: kind.x-k8s.io/v1alpha4" >> /tmp/kind-config.yaml
 	@echo "nodes:" >> /tmp/kind-config.yaml
 	@echo "- role: control-plane" >> /tmp/kind-config.yaml
+	@echo "  labels:" >> /tmp/kind-config.yaml
+	@echo "    $(KIND_NODESET_LABEL)" >> /tmp/kind-config.yaml
 	@for i in $$(seq 1 $$(($(KIND_NODES) - 1))); do \
 		echo "- role: worker" >> /tmp/kind-config.yaml; \
+		echo "  labels:" >> /tmp/kind-config.yaml; \
+		echo "    $(KIND_NODESET_LABEL)" >> /tmp/kind-config.yaml; \
 	done
 	@$(KIND) create cluster --name $(KIND_CLUSTER_NAME) --config /tmp/kind-config.yaml --image kindest/node:$(KIND_K8S_VERSION)
 	@rm /tmp/kind-config.yaml
