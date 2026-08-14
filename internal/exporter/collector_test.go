@@ -213,7 +213,7 @@ func TestMetricsCollector_Describe(t *testing.T) {
 	}
 
 	// Base metrics
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,state_base,state_is_drain,state_is_maintenance,state_is_reserved,state_is_completing,state_is_fail,state_is_planned,state_is_not_responding,state_is_invalid,state_is_cloud,state_is_power_down,state_is_power_drain,state_is_powered_down,state_is_powering_down,state_is_powering_up,state_is_power_up,is_unavailable,reservation_name,address,reason,comment}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,nodeset_name,state_base,state_is_drain,state_is_maintenance,state_is_reserved,state_is_completing,state_is_fail,state_is_planned,state_is_not_responding,state_is_invalid,state_is_cloud,state_is_power_down,state_is_power_drain,state_is_powered_down,state_is_powering_down,state_is_powering_up,state_is_power_up,is_unavailable,reservation_name,address,reason,comment}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_total", help: "Total CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_allocated", help: "CPUs allocated on the node", constLabels: {}, variableLabels: {node_name}}`)
 	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_idle", help: "Idle CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
@@ -253,7 +253,10 @@ func TestMetricsCollector_NodeTopologyMetrics(t *testing.T) {
 	})
 	collector := newMetricsCollector(mockClient, slurmapi.ListJobsParams{}, source)
 
-	mockClient.EXPECT().ListNodes(mock.Anything).Return([]slurmapi.Node{testNode("worker-0")}, nil).Once()
+	mockClient.EXPECT().ListNodes(mock.Anything).Return([]slurmapi.Node{
+		testNode("worker-0"),
+		testNode("worker-without-topology"),
+	}, nil).Once()
 	mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return([]slurmapi.Job{
 		{ID: 123, State: "RUNNING", Nodes: "worker-0"},
 	}, nil).Once()
@@ -275,6 +278,8 @@ func TestMetricsCollector_NodeTopologyMetrics(t *testing.T) {
 
 	assert.Contains(t, metricsText, `GAUGE; slurm_node_nvlink_instance_group{instance_id="worker-0-instance",node_name="worker-0",nodeset_name="gpu-workers",nvlink_instance_group="nvlig-1"} 1`)
 	assert.Contains(t, metricsText, `GAUGE; slurm_node_job{job_id="123",node_name="worker-0",nodeset_name="gpu-workers",nvlink_instance_group="nvlig-1"} 1`)
+	assertMetricHasLabels(t, metricsText, []string{`node_name="worker-0"`, `nodeset_name="gpu-workers"`})
+	assertMetricHasLabels(t, metricsText, []string{`node_name="worker-without-topology"`, `nodeset_name=""`})
 }
 
 func TestMetricsCollector_NodeTopologyRefreshRetriesAfterTimeout(t *testing.T) {
