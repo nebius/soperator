@@ -15,7 +15,7 @@ require (
 	github.com/mackerelio/go-osstat v0.2.8
 	github.com/mariadb-operator/mariadb-operator/v25 v25.10.4
 	github.com/nebius/gosdk v0.2.48
-	github.com/onsi/ginkgo/v2 v2.32.0
+	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/gomega v1.42.1
 	github.com/openkruise/kruise-api v1.8.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.93.1
