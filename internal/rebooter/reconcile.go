@@ -11,7 +11,6 @@ import (
 	"github.com/mackerelio/go-osstat/uptime"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -108,10 +107,6 @@ func (r *RebooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	logger.V(1).Info("Starting handling node reboot")
 	if err := r.handleNodeReboot(ctx, node, nodeActions); err != nil {
-		if apierrors.IsConflict(err) {
-			logger.V(1).Info("Conflict during reboot handling, requeueing")
-			return ctrl.Result{Requeue: true}, nil
-		}
 		return ctrl.Result{}, err
 	}
 
@@ -188,6 +183,8 @@ func (r *RebooterReconciler) handleNodeDrain(ctx context.Context, node *corev1.N
 }
 
 // handleDrainError handles the error that occurred during the node draining process.
+// Only failed pod eviction gets a fixed retry cadence; any other error, conflicts included,
+// is returned so the request is re-enqueued through the rate limiter's backoff.
 func (r *RebooterReconciler) handleDrainError(ctx context.Context, err error) (ctrl.Result, error) {
 	var podErr *PodNotEvictableError
 	// If some pods are not evicted, requeue the reconciliation.
@@ -195,10 +192,6 @@ func (r *RebooterReconciler) handleDrainError(ctx context.Context, err error) (c
 	if errors.As(err, &podErr) {
 		log.FromContext(ctx).V(1).Info("Reenqueueing reconciliation due to failed pod eviction")
 		return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
-	}
-	if apierrors.IsConflict(err) {
-		log.FromContext(ctx).V(1).Info("Conflict during drain handling, requeueing")
-		return ctrl.Result{Requeue: true}, nil
 	}
 	return ctrl.Result{}, fmt.Errorf("failed to drain node: %w", err)
 }
