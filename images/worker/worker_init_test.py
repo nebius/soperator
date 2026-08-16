@@ -895,7 +895,9 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
             worker_init.wait_for_topology()
 
         mock_apply.assert_called_once_with(
-            "worker-0", "topology=default:fab-a:fab-a.unknown"
+            "worker-0",
+            "topology=default:fab-a:fab-a.unknown",
+            worker_init.TOPOLOGY_PLUGIN_TREE,
         )
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
@@ -915,7 +917,9 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
             worker_init.wait_for_topology()
 
         mock_apply.assert_called_once_with(
-            "worker-0", "topology=default:fab-a.unknown"
+            "worker-0",
+            "topology=default:fab-a.unknown",
+            worker_init.TOPOLOGY_PLUGIN_BLOCK,
         )
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
