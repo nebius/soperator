@@ -111,6 +111,19 @@ func (r *RollingUpdateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	if sts.Status.UpdatedReplicas == replicas {
+		podList, err := r.getPodList(ctx, sts)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		undrainedNodes, err := r.cleanupStaleRollingUpdateDrains(ctx, clusterName, sts, podList)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if undrainedNodes > 0 {
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+
 		logger.Info("statefulset is up to date", "namespace", req.Namespace, "name", req.Name)
 		return ctrl.Result{}, nil
 	}
@@ -131,6 +144,30 @@ func (r *RollingUpdateReconciler) getOutdatedPodList(
 	ctx context.Context,
 	sts *kruisev1b1.StatefulSet,
 ) ([]corev1.Pod, error) {
+	podList, err := r.getPodList(ctx, sts)
+	if err != nil {
+		return nil, err
+	}
+
+	var res []corev1.Pod
+
+	for _, pod := range podList {
+		// TODO: REVISION
+		podControllerRevisionHash := pod.Labels["controller-revision-hash"]
+		if podControllerRevisionHash == sts.Status.UpdateRevision {
+			continue
+		}
+
+		res = append(res, pod)
+	}
+
+	return res, nil
+}
+
+func (r *RollingUpdateReconciler) getPodList(
+	ctx context.Context,
+	sts *kruisev1b1.StatefulSet,
+) ([]corev1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(sts.Spec.Selector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert label selector: %w", err)
@@ -144,19 +181,7 @@ func (r *RollingUpdateReconciler) getOutdatedPodList(
 		return nil, fmt.Errorf("failed to list pods: %w", err)
 	}
 
-	var res []corev1.Pod
-
-	for _, pod := range podList.Items {
-		// TODO: REVISION
-		podControllerRevisionHash := pod.Labels["controller-revision-hash"]
-		if podControllerRevisionHash == sts.Status.UpdateRevision {
-			continue
-		}
-
-		res = append(res, pod)
-	}
-
-	return res, nil
+	return podList.Items, nil
 }
 
 func (r *RollingUpdateReconciler) processRollingUpdate(
@@ -225,6 +250,7 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 	}
 
 	candidates := make([]rebootCandidate, 0, len(podsToStop))
+	var undrainedNodes []string
 	inFlightReady := 0
 	for _, pod := range podsToStop {
 		slurmNode, err := slurmClient.GetNode(ctx, pod.Name)
@@ -239,6 +265,13 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 		rebootInProgress := slurmNode.IsRebootIssuedState() || slurmNode.IsRebootRequestedState()
 		rebootHandoffInProgress := rebootInProgress &&
 			pod.Labels[consts.LabelSoperatorDeleteCandidate] == consts.LabelSoperatorDeleteCandidateValueStopping
+		if staleRollingUpdateDrain(&slurmNode) {
+			if err := slurmClient.UndrainNode(ctx, slurmNode.Name); err != nil {
+				return fmt.Errorf("undrain stale rolling update node %s: %w", slurmNode.Name, err)
+			}
+			undrainedNodes = append(undrainedNodes, slurmNode.Name)
+			continue
+		}
 
 		// Supervisord can keep the Pod Ready while repeatedly restarting slurmd.
 		// Slurm state is the source of truth for safely completing an in-flight handoff.
@@ -277,6 +310,10 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 		}
 
 		candidates = append(candidates, rebootCandidate{pod: pod, slurmNode: slurmNode})
+	}
+	if len(undrainedNodes) > 0 {
+		logger.Info("undrained stale rolling update nodes before reboot", "nodes", undrainedNodes)
+		return nil
 	}
 
 	budget := rebootBudget(sts)
@@ -330,6 +367,55 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 	logger.Info("scheduled slurm reboot through rest api", "nodes", slurmNodesToReboot)
 
 	return nil
+}
+
+func (r *RollingUpdateReconciler) cleanupStaleRollingUpdateDrains(
+	ctx context.Context,
+	clusterName string,
+	sts *kruisev1b1.StatefulSet,
+	pods []corev1.Pod,
+) (int, error) {
+	logger := log.FromContext(ctx).WithName("rolling-update-reconciler")
+	eligibleNodeNames := make(map[string]struct{}, len(pods))
+	for _, pod := range pods {
+		if pod.Labels["controller-revision-hash"] == sts.Status.UpdateRevision && podReady(&pod) {
+			eligibleNodeNames[pod.Name] = struct{}{}
+		}
+	}
+	if len(eligibleNodeNames) == 0 {
+		return 0, nil
+	}
+
+	slurmClient, ok := r.slurmAPIClients.GetClient(types.NamespacedName{
+		Namespace: sts.Namespace,
+		Name:      clusterName,
+	})
+	if !ok {
+		return 0, fmt.Errorf("no slurm api client for %s/%s", sts.Namespace, clusterName)
+	}
+	slurmNodes, err := slurmClient.ListNodes(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	var undrainedNodes []string
+	for _, slurmNode := range slurmNodes {
+		if _, ok := eligibleNodeNames[slurmNode.Name]; !ok {
+			continue
+		}
+		if !staleRollingUpdateDrain(&slurmNode) {
+			continue
+		}
+		if err := slurmClient.UndrainNode(ctx, slurmNode.Name); err != nil {
+			return 0, fmt.Errorf("undrain stale rolling update node %s: %w", slurmNode.Name, err)
+		}
+		undrainedNodes = append(undrainedNodes, slurmNode.Name)
+	}
+
+	if len(undrainedNodes) > 0 {
+		logger.Info("undrained stale rolling update nodes after update", "nodes", undrainedNodes)
+	}
+	return len(undrainedNodes), nil
 }
 
 func rebootBudget(sts *kruisev1b1.StatefulSet) int {
@@ -386,6 +472,19 @@ func containerCrashLoopBackOff(statuses []corev1.ContainerStatus, containerName 
 		}
 	}
 	return false
+}
+
+func staleRollingUpdateDrain(node *slurmapi.Node) bool {
+	if !node.IsDrainState() || !node.IsIdleState() || node.IsNotRespondingState() ||
+		node.IsInvalidState() || node.IsCompletingState() {
+		return false
+	}
+	if node.IsRebootIssuedState() || node.IsRebootRequestedState() || node.Reason == nil {
+		return false
+	}
+
+	reason := node.Reason.Reason
+	return reason == defaultRebootReason || strings.HasPrefix(reason, defaultRebootReason+" : ")
 }
 
 // safeToDeleteOfflineSlurmNode requires both zero known allocations and

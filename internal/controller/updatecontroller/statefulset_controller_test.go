@@ -3,6 +3,7 @@ package updatecontroller
 import (
 	"context"
 	"testing"
+	"time"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	clientfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -120,6 +122,65 @@ func TestSafeToDeleteOfflineSlurmNode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, safeToDeleteOfflineSlurmNode(&tt.node))
+		})
+	}
+}
+
+func TestStaleRollingUpdateDrain(t *testing.T) {
+	tests := []struct {
+		name    string
+		node    slurmapi.Node
+		isStale bool
+	}{
+		{
+			name: "exact rolling update reason",
+			node: slurmapi.Node{
+				States: nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN),
+				Reason: &slurmapi.NodeReason{Reason: defaultRebootReason},
+			},
+			isStale: true,
+		},
+		{
+			name: "slurm reboot suffix",
+			node: slurmapi.Node{
+				States: nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN),
+				Reason: &slurmapi.NodeReason{Reason: defaultRebootReason + " : reboot issued [root@timestamp]"},
+			},
+			isStale: true,
+		},
+		{
+			name: "manual drain",
+			node: slurmapi.Node{
+				States: nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN),
+				Reason: &slurmapi.NodeReason{Reason: "hardware maintenance"},
+			},
+		},
+		{
+			name: "reboot still in progress",
+			node: slurmapi.Node{
+				States: nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN, api.V0044NodeStateREBOOTISSUED),
+				Reason: &slurmapi.NodeReason{Reason: defaultRebootReason},
+			},
+		},
+		{
+			name: "node not responding",
+			node: slurmapi.Node{
+				States: nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN, api.V0044NodeStateNOTRESPONDING),
+				Reason: &slurmapi.NodeReason{Reason: defaultRebootReason},
+			},
+		},
+		{
+			name: "jobs still completing",
+			node: slurmapi.Node{
+				States: nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN, api.V0044NodeStateCOMPLETING),
+				Reason: &slurmapi.NodeReason{Reason: defaultRebootReason},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.isStale, staleRollingUpdateDrain(&tt.node))
 		})
 	}
 }
@@ -261,6 +322,79 @@ func TestProcessRollingUpdateKeepsCrashLoopingSlurmdWithAllocations(t *testing.T
 
 	got := &corev1.Pod{}
 	require.NoError(t, kubeClient.Get(context.Background(), client.ObjectKeyFromObject(&pod), got))
+	slurmClient.AssertExpectations(t)
+}
+
+func TestProcessRollingUpdateUndrainsStaleDrainBeforeReboot(t *testing.T) {
+	pod := testOutdatedPod()
+	slurmClient := &slurmapifake.MockClient{}
+	slurmClient.On("GetNode", mock.Anything, pod.Name).Return(slurmapi.Node{
+		Name:   pod.Name,
+		States: nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN),
+		Reason: &slurmapi.NodeReason{Reason: defaultRebootReason + " : reboot issued [root@timestamp]"},
+	}, nil).Once()
+	slurmClient.On("UndrainNode", mock.Anything, pod.Name).Return(nil).Once()
+
+	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
+	err := reconciler.processRollingUpdate(
+		context.Background(),
+		"cluster",
+		testStatefulSet(),
+		[]corev1.Pod{pod},
+	)
+	require.NoError(t, err)
+
+	got := &corev1.Pod{}
+	require.NoError(t, kubeClient.Get(context.Background(), client.ObjectKeyFromObject(&pod), got))
+	slurmClient.AssertNotCalled(t, "RebootNodes", mock.Anything, mock.Anything)
+	slurmClient.AssertExpectations(t)
+}
+
+func TestReconcileUndrainsStaleDrainAfterUpdate(t *testing.T) {
+	sts := testStatefulSet()
+	sts.Labels = map[string]string{
+		consts.LabelSoperatorRollingUpdateEnabled: consts.LabelSoperatorRollingUpdateValue,
+		consts.LabelInstanceKey:                   "cluster",
+	}
+	sts.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"app": "worker"}}
+	sts.Status.UpdateRevision = "new-revision"
+	sts.Status.UpdatedReplicas = 1
+
+	pod := testOutdatedPod()
+	pod.Labels = map[string]string{
+		"app":                      "worker",
+		"controller-revision-hash": sts.Status.UpdateRevision,
+	}
+	pod.Status.Conditions = []corev1.PodCondition{
+		{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+	}
+
+	slurmClient := &slurmapifake.MockClient{}
+	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{{
+		Name:   pod.Name,
+		States: nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN),
+		Reason: &slurmapi.NodeReason{Reason: defaultRebootReason + " : reboot issued [root@timestamp]"},
+	}}, nil).Once()
+	slurmClient.On("UndrainNode", mock.Anything, pod.Name).Return(nil).Once()
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kruisev1b1.AddToScheme(scheme))
+	kubeClient := clientfake.NewClientBuilder().WithScheme(scheme).WithObjects(sts, &pod).Build()
+	slurmClients := slurmapi.NewClientSet(context.Background())
+	slurmClients.AddClient(types.NamespacedName{Namespace: "default", Name: "cluster"}, slurmClient)
+	reconciler := NewRollingUpdateReconciler(
+		kubeClient,
+		scheme,
+		record.NewFakeRecorder(1),
+		slurmClients,
+	)
+
+	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: client.ObjectKeyFromObject(sts),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, time.Second, result.RequeueAfter)
 	slurmClient.AssertExpectations(t)
 }
 
