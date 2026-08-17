@@ -145,6 +145,11 @@ func (n *Node) IsFailState() bool {
 	return exists
 }
 
+func (n *Node) IsIdleState() bool {
+	_, exists := n.States[api.V0044NodeStateIDLE]
+	return exists
+}
+
 func (n *Node) IsPlannedState() bool {
 	_, exists := n.States[api.V0044NodeStatePLANNED]
 	return exists

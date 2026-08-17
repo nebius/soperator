@@ -194,6 +194,22 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 		return nil
 	}
 
+	for _, pod := range podsToStop {
+		if !containerCrashLoopBackOff(pod.Status.InitContainerStatuses, consts.ContainerNameWorkerInit) {
+			continue
+		}
+
+		if err := r.Delete(ctx, &pod); client.IgnoreNotFound(err) != nil {
+			return fmt.Errorf("delete outdated pod %s/%s with crash-looping worker init: %w", pod.Namespace, pod.Name, err)
+		}
+		logger.Info(
+			"deleted outdated pod with crash-looping worker init",
+			"namespace", pod.Namespace,
+			"pod", pod.Name,
+		)
+		return nil
+	}
+
 	slurmClient, ok := r.slurmAPIClients.GetClient(types.NamespacedName{
 		Namespace: sts.Namespace,
 		Name:      clusterName,
@@ -214,6 +230,32 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 		slurmNode, err := slurmClient.GetNode(ctx, pod.Name)
 		if err != nil {
 			return err
+		}
+
+		// Handle the crash loop before reboot flags: a dead slurmd cannot finish
+		// its PowerAction, even when Slurm has already requested the reboot.
+		if containerCrashLoopBackOff(pod.Status.ContainerStatuses, consts.ContainerNameSlurmd) {
+			if safeToDeleteCrashLoopingSlurmdPod(&slurmNode) {
+				if err := r.Delete(ctx, &pod); client.IgnoreNotFound(err) != nil {
+					return fmt.Errorf("delete outdated pod %s/%s with crash-looping slurmd: %w", pod.Namespace, pod.Name, err)
+				}
+				logger.Info(
+					"deleted outdated pod with crash-looping slurmd and no allocations",
+					"namespace", pod.Namespace,
+					"pod", pod.Name,
+					"slurmNode", slurmNode.Name,
+				)
+				return nil
+			}
+
+			logger.Info(
+				"waiting to replace outdated pod with crash-looping slurmd",
+				"namespace", pod.Namespace,
+				"pod", pod.Name,
+				"slurmNode", slurmNode.Name,
+				"reason", "node is not safely offline with zero known allocations",
+			)
+			continue
 		}
 
 		if slurmNode.IsRebootIssuedState() || slurmNode.IsRebootRequestedState() {
@@ -322,6 +364,33 @@ func podReady(pod *corev1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func containerCrashLoopBackOff(statuses []corev1.ContainerStatus, containerName string) bool {
+	for _, status := range statuses {
+		if status.Name == containerName &&
+			status.State.Waiting != nil &&
+			status.State.Waiting.Reason == "CrashLoopBackOff" {
+			return true
+		}
+	}
+	return false
+}
+
+// safeToDeleteCrashLoopingSlurmdPod requires both zero known allocations and
+// an offline Slurm state, so deleting the Pod cannot race with new scheduling.
+func safeToDeleteCrashLoopingSlurmdPod(node *slurmapi.Node) bool {
+	allocatedCPUs, cpusKnown := node.CPUAllocated()
+	if !cpusKnown || allocatedCPUs != 0 {
+		return false
+	}
+	if node.AllocMemoryMB == nil || *node.AllocMemoryMB != 0 {
+		return false
+	}
+	if node.IsCompletingState() {
+		return false
+	}
+	return node.IsDownState() || (node.IsIdleState() && node.IsNotRespondingState())
 }
 
 // SetupWithManager sets up the controller with the Manager.
