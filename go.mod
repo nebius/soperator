@@ -20,7 +20,7 @@ require (
 	github.com/openkruise/kruise-api v1.8.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.93.1
 	github.com/sethvargo/go-password v0.4.0
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.0
 	github.com/zclconf/go-cty v1.19.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.54.0
@@ -90,7 +90,7 @@ require (
 	github.com/sethvargo/go-envconfig v1.3.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
-	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0 // indirect
