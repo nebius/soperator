@@ -2,8 +2,8 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/99
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260816173636 AS slurm_check_job
+# https://github.com/nebius/ml-containers/pull/98
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260819104842 AS slurm_check_job
 
 # Install slurm сhroot plugin
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
@@ -42,12 +42,12 @@ RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
 
 # Install NCCL Inspector PreConf SPANK plugin
-COPY ansible/spank-nccl-inspector-preconf.yml /opt/ansible/spank-nccl-inspector-preconf.yml
-COPY ansible/roles/spank-nccl-inspector-preconf /opt/ansible/roles/spank-nccl-inspector-preconf
+COPY ansible/spank_nccl_inspector_preconf.yml /opt/ansible/spank_nccl_inspector_preconf.yml
+COPY ansible/roles/spank_nccl_inspector_preconf /opt/ansible/roles/spank_nccl_inspector_preconf
 RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local \
       -e spank_nccl_inspector_preconf_dump_dir_create=false \
-      spank-nccl-inspector-preconf.yml
+      spank_nccl_inspector_preconf.yml
 
 # Install kubectl
 RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \

@@ -158,7 +158,7 @@ checks:
           - local
           - run.yml
           - -t
-          - run-all-upgrade
+          - run_all_upgrade
           - --diff
   manage-jail-state-force:
     enabled: true
@@ -182,7 +182,7 @@ checks:
           - local
           - run.yml
           - -t
-          - run-all-upgrade
+          - run_all_upgrade
           - -e
           - "common_packages_force_reinstall=true"
           - -e
@@ -219,7 +219,7 @@ checks:
           - local
           - run.yml
           - -t
-          - run-all-upgrade
+          - run_all_upgrade
           - --diff
           - --check
         env:
