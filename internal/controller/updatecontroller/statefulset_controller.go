@@ -232,21 +232,32 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 			return err
 		}
 
-		// Handle the crash loop before reboot flags: a dead slurmd cannot finish
-		// its PowerAction, even when Slurm has already requested the reboot.
-		if containerCrashLoopBackOff(pod.Status.ContainerStatuses, consts.ContainerNameSlurmd) {
-			if safeToDeleteCrashLoopingSlurmdPod(&slurmNode) {
-				if err := r.Delete(ctx, &pod); client.IgnoreNotFound(err) != nil {
-					return fmt.Errorf("delete outdated pod %s/%s with crash-looping slurmd: %w", pod.Namespace, pod.Name, err)
-				}
-				logger.Info(
-					"deleted outdated pod with crash-looping slurmd and no allocations",
-					"namespace", pod.Namespace,
-					"pod", pod.Name,
-					"slurmNode", slurmNode.Name,
-				)
-				return nil
+		slurmdCrashLooping := containerCrashLoopBackOff(
+			pod.Status.ContainerStatuses,
+			consts.ContainerNameSlurmd,
+		)
+		rebootInProgress := slurmNode.IsRebootIssuedState() || slurmNode.IsRebootRequestedState()
+		rebootHandoffInProgress := rebootInProgress &&
+			pod.Labels[consts.LabelSoperatorDeleteCandidate] == consts.LabelSoperatorDeleteCandidateValueStopping
+
+		// Supervisord can keep the Pod Ready while repeatedly restarting slurmd.
+		// Slurm state is the source of truth for safely completing an in-flight handoff.
+		if (slurmdCrashLooping || rebootHandoffInProgress) && safeToDeleteOfflineSlurmNode(&slurmNode) {
+			if err := r.Delete(ctx, &pod); client.IgnoreNotFound(err) != nil {
+				return fmt.Errorf("delete safely offline outdated pod %s/%s: %w", pod.Namespace, pod.Name, err)
 			}
+			logger.Info(
+				"deleted safely offline outdated pod with no allocations",
+				"namespace", pod.Namespace,
+				"pod", pod.Name,
+				"slurmNode", slurmNode.Name,
+				"slurmdCrashLooping", slurmdCrashLooping,
+				"rebootHandoffInProgress", rebootHandoffInProgress,
+			)
+			return nil
+		}
+
+		if slurmdCrashLooping {
 
 			logger.Info(
 				"waiting to replace outdated pod with crash-looping slurmd",
@@ -258,7 +269,7 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 			continue
 		}
 
-		if slurmNode.IsRebootIssuedState() || slurmNode.IsRebootRequestedState() {
+		if rebootInProgress {
 			if podReady(&pod) {
 				inFlightReady++
 			}
@@ -377,9 +388,9 @@ func containerCrashLoopBackOff(statuses []corev1.ContainerStatus, containerName 
 	return false
 }
 
-// safeToDeleteCrashLoopingSlurmdPod requires both zero known allocations and
+// safeToDeleteOfflineSlurmNode requires both zero known allocations and
 // an offline Slurm state, so deleting the Pod cannot race with new scheduling.
-func safeToDeleteCrashLoopingSlurmdPod(node *slurmapi.Node) bool {
+func safeToDeleteOfflineSlurmNode(node *slurmapi.Node) bool {
 	allocatedCPUs, cpusKnown := node.CPUAllocated()
 	if !cpusKnown || allocatedCPUs != 0 {
 		return false

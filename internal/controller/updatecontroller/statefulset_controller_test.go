@@ -45,7 +45,7 @@ func TestContainerCrashLoopBackOff(t *testing.T) {
 	assert.False(t, containerCrashLoopBackOff(statuses, "missing"))
 }
 
-func TestSafeToDeleteCrashLoopingSlurmdPod(t *testing.T) {
+func TestSafeToDeleteOfflineSlurmNode(t *testing.T) {
 	tests := []struct {
 		name string
 		node slurmapi.Node
@@ -119,7 +119,7 @@ func TestSafeToDeleteCrashLoopingSlurmdPod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, safeToDeleteCrashLoopingSlurmdPod(&tt.node))
+			assert.Equal(t, tt.want, safeToDeleteOfflineSlurmNode(&tt.node))
 		})
 	}
 }
@@ -168,6 +168,71 @@ func TestProcessRollingUpdateDeletesSafelyOfflineCrashLoopingSlurmd(t *testing.T
 	)
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &pod)
+	slurmClient.AssertExpectations(t)
+}
+
+func TestProcessRollingUpdateDeletesSafelyOfflineRebootHandoff(t *testing.T) {
+	pod := testOutdatedPod()
+	pod.Labels = map[string]string{
+		consts.LabelSoperatorDeleteCandidate: consts.LabelSoperatorDeleteCandidateValueStopping,
+	}
+	pod.Status.Conditions = []corev1.PodCondition{
+		{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+	}
+
+	slurmClient := &slurmapifake.MockClient{}
+	slurmClient.On("GetNode", mock.Anything, pod.Name).Return(slurmapi.Node{
+		Name: pod.Name,
+		States: nodeStates(
+			api.V0044NodeStateDOWN,
+			api.V0044NodeStateNOTRESPONDING,
+			api.V0044NodeStateREBOOTISSUED,
+		),
+		AllocCPUs:     ptr.To(int32(0)),
+		AllocMemoryMB: ptr.To(int64(0)),
+	}, nil).Once()
+
+	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
+	err := reconciler.processRollingUpdate(
+		context.Background(),
+		"cluster",
+		testStatefulSet(),
+		[]corev1.Pod{pod},
+	)
+	require.NoError(t, err)
+	assertPodDeleted(t, kubeClient, &pod)
+	slurmClient.AssertExpectations(t)
+}
+
+func TestProcessRollingUpdateKeepsSafelyOfflineRebootWithoutHandoff(t *testing.T) {
+	pod := testOutdatedPod()
+	pod.Status.Conditions = []corev1.PodCondition{
+		{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+	}
+
+	slurmClient := &slurmapifake.MockClient{}
+	slurmClient.On("GetNode", mock.Anything, pod.Name).Return(slurmapi.Node{
+		Name: pod.Name,
+		States: nodeStates(
+			api.V0044NodeStateDOWN,
+			api.V0044NodeStateNOTRESPONDING,
+			api.V0044NodeStateREBOOTISSUED,
+		),
+		AllocCPUs:     ptr.To(int32(0)),
+		AllocMemoryMB: ptr.To(int64(0)),
+	}, nil).Once()
+
+	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
+	err := reconciler.processRollingUpdate(
+		context.Background(),
+		"cluster",
+		testStatefulSet(),
+		[]corev1.Pod{pod},
+	)
+	require.NoError(t, err)
+
+	got := &corev1.Pod{}
+	require.NoError(t, kubeClient.Get(context.Background(), client.ObjectKeyFromObject(&pod), got))
 	slurmClient.AssertExpectations(t)
 }
 
