@@ -11,69 +11,31 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"nebius.ai/soperator-e2e/acceptance/framework"
-	"nebius.ai/soperator-e2e/versionfilter"
 )
 
 const testTargetSoperatorVersion = "5.0.0"
 
 func TestRunnerSuiteTagFilter(t *testing.T) {
-	cpuAndGPUState := &framework.ClusterState{
-		CPUWorkers: []framework.WorkerRef{{Name: "worker-cpu-0"}},
-		GPUWorkers: []framework.WorkerRef{{Name: "worker-gpu-0"}},
-	}
-	noGPUState := &framework.ClusterState{}
-	gpuOnlyState := &framework.ClusterState{
-		GPUWorkers: []framework.WorkerRef{{Name: "worker-gpu-0"}},
-	}
-
 	tests := []struct {
-		name          string
-		state         *framework.ClusterState
-		tags          string
-		filterOptions SuiteFilterOptions
-		want          string
+		name            string
+		tags            string
+		excludeUnstable bool
+		want            string
 	}{
 		{
-			name:  "default shared filters exclude unstable",
-			state: cpuAndGPUState,
-			filterOptions: SuiteFilterOptions{
-				ExcludeUnstable:           true,
-				ExcludeMissingWorkerKinds: true,
-			},
-			want: "~@unstable",
+			name:            "default shared filters exclude unstable",
+			excludeUnstable: true,
+			want:            "~@unstable",
 		},
 		{
-			name:          "no filters when CPU and GPU workers exist and filters are disabled",
-			state:         cpuAndGPUState,
-			filterOptions: SuiteFilterOptions{},
-			want:          "",
+			name: "no filters when filters are disabled",
+			want: "",
 		},
 		{
-			name:  "without workers also excludes GPU and CPU",
-			state: noGPUState,
-			filterOptions: SuiteFilterOptions{
-				ExcludeUnstable:           true,
-				ExcludeMissingWorkerKinds: true,
-			},
-			want: "~@unstable && ~@gpu && ~@cpu",
-		},
-		{
-			name:  "without CPU workers excludes CPU",
-			state: gpuOnlyState,
-			filterOptions: SuiteFilterOptions{
-				ExcludeMissingWorkerKinds: true,
-			},
-			want: "~@cpu",
-		},
-		{
-			name:  "custom suite tags are combined with option-driven filters",
-			state: cpuAndGPUState,
-			tags:  "@smoke && ~@slow",
-			filterOptions: SuiteFilterOptions{
-				ExcludeUnstable:           true,
-				ExcludeMissingWorkerKinds: true,
-			},
-			want: "@smoke && ~@slow && ~@unstable",
+			name:            "custom suite tags are combined with option-driven filters",
+			tags:            "@smoke && ~@slow",
+			excludeUnstable: true,
+			want:            "@smoke && ~@slow && ~@unstable",
 		},
 	}
 
@@ -81,12 +43,11 @@ func TestRunnerSuiteTagFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			suite := testSampleSuite()
 			suite.Tags = tt.tags
-			suite.FilterOptions = tt.filterOptions
-			runner, err := NewRunner(Options{
+			suite.ExcludeUnstable = tt.excludeUnstable
+			runner, err := NewRunner(RunnerConfig{
 				KubectlContext:         "dev-context",
 				TargetSoperatorVersion: testTargetSoperatorVersion,
 				Suites:                 []SuiteConfig{suite},
-				State:                  tt.state,
 			})
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, runner.suiteTagFilter(runner.suites[0]))
@@ -97,42 +58,42 @@ func TestRunnerSuiteTagFilter(t *testing.T) {
 func TestRunnerSuiteFeaturePaths(t *testing.T) {
 	source := testFeatureSource()
 
-	runner, err := NewRunner(Options{
+	runner, err := NewRunner(RunnerConfig{
 		KubectlContext:         "dev-context",
 		TargetSoperatorVersion: "4.1.5-reb85d0e5",
 		Suites: []SuiteConfig{
 			{
 				Name:        "sample",
 				Source:      source,
-				VersionAxes: []versionfilter.Axis{SoperatorVersionAxis("4.1.5-reb85d0e5")},
+				VersionAxes: []ScenarioVersionAxis{SoperatorVersionAxis("4.1.5-reb85d0e5")},
 			},
 		},
 	})
 	require.NoError(t, err)
-	paths, err := runner.suiteFeaturePaths(runner.suites[0])
+	paths, err := runner.suiteFeaturePaths(&framework.ClusterInfo{TargetSoperatorVersion: "4.1.5"}, runner.suites[0])
 	require.NoError(t, err)
 	assert.Equal(t, []string{"features/sample.feature:3"}, paths)
 
 	source.Paths = []string{"features/sample.feature:3", "features/sample.feature:7"}
-	runner, err = NewRunner(Options{
+	runner, err = NewRunner(RunnerConfig{
 		KubectlContext:         "dev-context",
 		TargetSoperatorVersion: testTargetSoperatorVersion,
 		Suites: []SuiteConfig{
 			{
 				Name:        "sample",
 				Source:      source,
-				VersionAxes: []versionfilter.Axis{SoperatorVersionAxis(testTargetSoperatorVersion)},
+				VersionAxes: []ScenarioVersionAxis{SoperatorVersionAxis(testTargetSoperatorVersion)},
 			},
 		},
 	})
 	require.NoError(t, err)
-	paths, err = runner.suiteFeaturePaths(runner.suites[0])
+	paths, err = runner.suiteFeaturePaths(testClusterInfo(), runner.suites[0])
 	require.NoError(t, err)
 	assert.Equal(t, []string{"features/sample.feature:3", "features/sample.feature:7"}, paths)
 }
 
 func TestRunnerSuiteFeaturePathsAllowsUnversionedSuites(t *testing.T) {
-	runner, err := NewRunner(Options{
+	runner, err := NewRunner(RunnerConfig{
 		KubectlContext:         "dev-context",
 		TargetSoperatorVersion: testTargetSoperatorVersion,
 		Suites: []SuiteConfig{
@@ -141,7 +102,7 @@ func TestRunnerSuiteFeaturePathsAllowsUnversionedSuites(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	paths, err := runner.suiteFeaturePaths(runner.suites[0])
+	paths, err := runner.suiteFeaturePaths(testClusterInfo(), runner.suites[0])
 	require.NoError(t, err)
 	assert.Equal(t, []string{"features/sample.feature"}, paths)
 }
@@ -203,7 +164,7 @@ func TestNewRunnerSuiteValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewRunner(Options{
+			_, err := NewRunner(RunnerConfig{
 				KubectlContext:         "dev-context",
 				TargetSoperatorVersion: testTargetSoperatorVersion,
 				Suites:                 tt.suites,
@@ -215,7 +176,7 @@ func TestNewRunnerSuiteValidation(t *testing.T) {
 }
 
 func TestNewRunnerRequiresTargetSoperatorVersion(t *testing.T) {
-	_, err := NewRunner(Options{
+	_, err := NewRunner(RunnerConfig{
 		KubectlContext: "dev-context",
 		Suites:         []SuiteConfig{testSampleSuite()},
 	})
@@ -223,63 +184,9 @@ func TestNewRunnerRequiresTargetSoperatorVersion(t *testing.T) {
 	assert.ErrorContains(t, err, "target Soperator version is required")
 }
 
-func TestRunnerRunsDiscoveryHooks(t *testing.T) {
-	state := &framework.ClusterState{}
-	runner, err := NewRunner(Options{
-		KubectlContext:         "dev-context",
-		TargetSoperatorVersion: testTargetSoperatorVersion,
-		Suites:                 []SuiteConfig{testSampleSuite()},
-		State:                  state,
-		DiscoveryHooks: []DiscoveryHook{
-			func(ctx context.Context, state *framework.ClusterState, exec framework.Exec) error {
-				state.Workers = []framework.WorkerRef{{Name: "worker-from-hook"}}
-				return nil
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	require.NoError(t, runner.runDiscoveryHooks(context.Background(), nil))
-	assert.Equal(t, []framework.WorkerRef{{Name: "worker-from-hook"}}, state.Workers)
-}
-
-func TestRunnerDiscoveryHookErrors(t *testing.T) {
-	hookErr := errors.New("boom")
-	runner, err := NewRunner(Options{
-		KubectlContext:         "dev-context",
-		TargetSoperatorVersion: testTargetSoperatorVersion,
-		Suites:                 []SuiteConfig{testSampleSuite()},
-		DiscoveryHooks: []DiscoveryHook{
-			func(ctx context.Context, state *framework.ClusterState, exec framework.Exec) error {
-				return hookErr
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	err = runner.runDiscoveryHooks(context.Background(), nil)
-	require.Error(t, err)
-	assert.ErrorIs(t, err, hookErr)
-	assert.ErrorContains(t, err, "run discovery hook 0")
-}
-
-func TestRunnerRejectsNilDiscoveryHook(t *testing.T) {
-	runner, err := NewRunner(Options{
-		KubectlContext:         "dev-context",
-		TargetSoperatorVersion: testTargetSoperatorVersion,
-		Suites:                 []SuiteConfig{testSampleSuite()},
-		DiscoveryHooks:         []DiscoveryHook{nil},
-	})
-	require.NoError(t, err)
-
-	err = runner.runDiscoveryHooks(context.Background(), nil)
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "discovery hook 0 is nil")
-}
-
 func TestRunnerRunConfiguredSuitesRunsAllSuitesAndAggregatesFailures(t *testing.T) {
 	var passingRuns int
-	runner, err := NewRunner(Options{
+	runner, err := NewRunner(RunnerConfig{
 		KubectlContext:         "dev-context",
 		TargetSoperatorVersion: testTargetSoperatorVersion,
 		Suites: []SuiteConfig{
@@ -297,7 +204,7 @@ func TestRunnerRunConfiguredSuitesRunsAllSuitesAndAggregatesFailures(t *testing.
 	})
 	require.NoError(t, err)
 
-	err = runner.runConfiguredSuites(context.Background(), nil)
+	err = runner.runConfiguredSuites(context.Background(), testClusterInfo(), nil, runner.suites)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, `suite "failing": godog exited with status 1`)
 	assert.Equal(t, 1, passingRuns)
@@ -305,14 +212,14 @@ func TestRunnerRunConfiguredSuitesRunsAllSuitesAndAggregatesFailures(t *testing.
 
 func TestRunnerRunConfiguredSuitesSkipsEmptySuites(t *testing.T) {
 	var passingRuns int
-	runner, err := NewRunner(Options{
+	runner, err := NewRunner(RunnerConfig{
 		KubectlContext:         "dev-context",
 		TargetSoperatorVersion: testTargetSoperatorVersion,
 		Suites: []SuiteConfig{
 			{
 				Name:        "empty",
 				Source:      testFeatureSource(),
-				VersionAxes: []versionfilter.Axis{SoperatorVersionAxis("3.0.0")},
+				VersionAxes: []ScenarioVersionAxis{SoperatorVersionAxis("3.0.0")},
 			},
 			{
 				Name:           "passing",
@@ -323,25 +230,25 @@ func TestRunnerRunConfiguredSuitesSkipsEmptySuites(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.NoError(t, runner.runConfiguredSuites(context.Background(), nil))
+	require.NoError(t, runner.runConfiguredSuites(context.Background(), testClusterInfo(), nil, runner.suites))
 	assert.Equal(t, 1, passingRuns)
 }
 
 func TestRunnerRunConfiguredSuitesErrorsWhenAllSuitesAreEmpty(t *testing.T) {
-	runner, err := NewRunner(Options{
+	runner, err := NewRunner(RunnerConfig{
 		KubectlContext:         "dev-context",
 		TargetSoperatorVersion: testTargetSoperatorVersion,
 		Suites: []SuiteConfig{
 			{
 				Name:        "empty",
 				Source:      testFeatureSource(),
-				VersionAxes: []versionfilter.Axis{SoperatorVersionAxis("3.0.0")},
+				VersionAxes: []ScenarioVersionAxis{SoperatorVersionAxis("3.0.0")},
 			},
 		},
 	})
 	require.NoError(t, err)
 
-	err = runner.runConfiguredSuites(context.Background(), nil)
+	err = runner.runConfiguredSuites(context.Background(), testClusterInfo(), nil, runner.suites)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "no acceptance scenarios compatible with Soperator version 5.0.0")
 }
@@ -350,7 +257,7 @@ func testSampleSuite() SuiteConfig {
 	return SuiteConfig{
 		Name:        "sample",
 		Source:      testFeatureSource(),
-		VersionAxes: []versionfilter.Axis{SoperatorVersionAxis(testTargetSoperatorVersion)},
+		VersionAxes: []ScenarioVersionAxis{SoperatorVersionAxis(testTargetSoperatorVersion)},
 	}
 }
 
@@ -384,7 +291,7 @@ func testRunnableFeatureSource(path, step string) FeatureSource {
 }
 
 func testRunnableStepRegistrar(passingRuns *int) StepRegistrar {
-	return func(sc *godog.ScenarioContext, state *framework.ClusterState, exec framework.Exec) {
+	return func(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime framework.Runtime) {
 		sc.Step(`^a passing step runs$`, func() error {
 			*passingRuns = *passingRuns + 1
 			return nil
@@ -392,5 +299,11 @@ func testRunnableStepRegistrar(passingRuns *int) StepRegistrar {
 		sc.Step(`^a failing step runs$`, func() error {
 			return errors.New("expected failure")
 		})
+	}
+}
+
+func testClusterInfo() *framework.ClusterInfo {
+	return &framework.ClusterInfo{
+		TargetSoperatorVersion: testTargetSoperatorVersion,
 	}
 }

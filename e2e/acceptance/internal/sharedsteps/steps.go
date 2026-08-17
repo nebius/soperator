@@ -16,20 +16,22 @@ type scenarioScopedStepFamily interface {
 }
 
 // RegisterAll registers every shared Soperator step family.
-func RegisterAll(sc *godog.ScenarioContext, state *framework.ClusterState, exec framework.Exec) {
-	slurm := framework.NewSlurmClient(exec)
+func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime framework.Runtime) {
+	slurm := framework.NewSlurmClient(runtime)
+	kubectl := framework.NewKubectlClient(runtime)
+	selector := framework.NewWorkerSelector(kubectl, slurm, info.SlurmClusterName)
 	for _, family := range []scenarioScopedStepFamily{
-		NewClusterCreation(state, exec),
-		NewObservability(exec),
-		NewInternalSSH(exec, slurm),
-		NewPackageInstallation(exec, slurm),
-		NewNodeReplacement(exec, slurm),
-		NewDockerContainers(exec, slurm),
-		NewEnrootContainers(exec, slurm),
-		NewTopology(state, exec),
-		NewPassiveChecks(exec, slurm),
-		NewActiveChecks(state, exec, slurm),
-		NewSystemChecks(exec, slurm),
+		NewClusterCreation(info, runtime, kubectl, selector),
+		NewObservability(kubectl),
+		NewInternalSSH(runtime, selector),
+		NewPackageInstallation(runtime, selector),
+		NewNodeReplacement(runtime, slurm, selector),
+		NewDockerContainers(runtime, slurm, selector),
+		NewEnrootContainers(runtime, slurm, selector),
+		NewTopology(runtime, selector),
+		NewPassiveChecks(info, runtime, slurm, selector),
+		NewActiveChecks(info, runtime, slurm, kubectl, selector),
+		NewSystemChecks(runtime, slurm, kubectl, selector),
 	} {
 		registerScenarioScoped(sc, family)
 	}

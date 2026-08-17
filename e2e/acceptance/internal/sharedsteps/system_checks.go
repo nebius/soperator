@@ -29,16 +29,20 @@ const (
 )
 
 type SystemChecks struct {
-	exec  framework.Exec
-	slurm *framework.SlurmClient
+	runtime  framework.Runtime
+	slurm    *framework.SlurmClient
+	kubectl  *framework.KubectlClient
+	selector *framework.WorkerSelector
 
-	worker              framework.WorkerRef
-	workerPod           corev1.Pod
-	kubeletWorker       framework.WorkerRef
-	kubeletK8sNodeName  string
-	kubeletK8sNodeUID   string
-	kubeletWorkerPodUID string
-	kubeletDebugPodName string
+	worker               framework.WorkerInfo
+	workerPodInfo        framework.WorkerPodInfo
+	workerPod            corev1.Pod
+	kubeletWorker        framework.WorkerInfo
+	kubeletWorkerPodName string
+	kubeletK8sNodeName   string
+	kubeletK8sNodeUID    string
+	kubeletWorkerPodUID  string
+	kubeletDebugPodName  string
 }
 
 type workerEphemeralInfo struct {
@@ -60,10 +64,12 @@ type kubeletStatsSummary struct {
 
 var kubectlDebugPodPattern = regexp.MustCompile(`Creating debugging pod ([^\s]+) `)
 
-func NewSystemChecks(exec framework.Exec, slurm *framework.SlurmClient) *SystemChecks {
+func NewSystemChecks(runtime framework.Runtime, slurm *framework.SlurmClient, kubectl *framework.KubectlClient, selector *framework.WorkerSelector) *SystemChecks {
 	return &SystemChecks{
-		exec:  exec,
-		slurm: slurm,
+		runtime:  runtime,
+		slurm:    slurm,
+		kubectl:  kubectl,
+		selector: selector,
 	}
 }
 
@@ -83,23 +89,25 @@ func (s *SystemChecks) RegisterSteps(sc *godog.ScenarioContext) {
 
 func (s *SystemChecks) CleanupAndReset(ctx context.Context) {
 	if s.kubeletDebugPodName != "" {
-		if _, err := s.exec.Kubectl().Run(ctx, "delete", "pod", s.kubeletDebugPodName, "--ignore-not-found"); err != nil {
-			s.exec.Logf("cleanup: delete kubelet debug pod %s: %v", s.kubeletDebugPodName, err)
+		if _, err := s.runtime.Kubectl().Run(ctx, "delete", "pod", "-n", framework.SoperatorNamespace, s.kubeletDebugPodName, "--ignore-not-found"); err != nil {
+			s.runtime.Logf("cleanup: delete kubelet debug pod %s: %v", s.kubeletDebugPodName, err)
 		}
 	}
 	if s.workerPod.Name != "" {
-		if _, err := s.exec.WorkerPod(s.worker).Run(ctx, fmt.Sprintf("rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(systemEphemeralFillPath))); err != nil {
-			s.exec.Logf("cleanup: remove ephemeral fill file from %s: %v", s.workerPod.Name, err)
+		if _, err := s.runtime.WorkerPod(s.workerPodInfo).Run(ctx, fmt.Sprintf("rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(systemEphemeralFillPath))); err != nil {
+			s.runtime.Logf("cleanup: remove ephemeral fill file from %s: %v", s.workerPod.Name, err)
 		}
 	}
 	if s.worker.Name != "" {
 		if err := s.slurm.ResumeNodeIfDrainedByReason(ctx, s.worker.Name, systemEphemeralReason); err != nil {
-			s.exec.Logf("cleanup: resume %s after pod_ephemeral_storage: %v", s.worker.Name, err)
+			s.runtime.Logf("cleanup: resume %s after pod_ephemeral_storage: %v", s.worker.Name, err)
 		}
 	}
-	s.worker = framework.WorkerRef{}
+	s.worker = framework.WorkerInfo{}
+	s.workerPodInfo = framework.WorkerPodInfo{}
 	s.workerPod = corev1.Pod{}
-	s.kubeletWorker = framework.WorkerRef{}
+	s.kubeletWorker = framework.WorkerInfo{}
+	s.kubeletWorkerPodName = ""
 	s.kubeletK8sNodeName = ""
 	s.kubeletK8sNodeUID = ""
 	s.kubeletWorkerPodUID = ""
@@ -107,8 +115,12 @@ func (s *SystemChecks) CleanupAndReset(ctx context.Context) {
 }
 
 func (s *SystemChecks) aHealthyWorkerPodIsSelected(ctx context.Context) error {
+	workers, err := s.selector.Workers(ctx)
+	if err != nil {
+		return err
+	}
 	var problems []string
-	for _, worker := range s.exec.AvailableWorkers(framework.WorkerAny) {
+	for _, worker := range workers {
 		node, err := s.slurm.NodeInfo(ctx, worker.Name)
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", worker.Name, err))
@@ -118,12 +130,13 @@ func (s *SystemChecks) aHealthyWorkerPodIsSelected(ctx context.Context) error {
 			problems = append(problems, fmt.Sprintf("%s: Slurm node is not usable", worker.Name))
 			continue
 		}
-		if worker.PodName == "" {
-			problems = append(problems, fmt.Sprintf("%s: Kubernetes worker pod was not discovered", worker.Name))
+
+		podInfo, err := s.kubectl.WorkerPodForSlurmNode(ctx, worker.Name)
+		if err != nil {
+			problems = append(problems, fmt.Sprintf("%s: %v", worker.Name, err))
 			continue
 		}
-
-		pod, err := s.workerPodByName(ctx, worker.PodName)
+		pod, err := s.workerPodByName(ctx, podInfo.PodName)
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", worker.Name, err))
 			continue
@@ -143,10 +156,14 @@ func (s *SystemChecks) aHealthyWorkerPodIsSelected(ctx context.Context) error {
 		}
 
 		s.worker = worker
+		s.workerPodInfo = podInfo
 		s.workerPod = pod
-		s.exec.Logf("system checks: selected worker=%s pod=%s k8s_node=%s",
+		s.runtime.Logf("system checks: selected worker=%s pod=%s k8s_node=%s",
 			s.worker.Name, pod.Name, pod.Spec.NodeName)
 		return nil
+	}
+	if len(problems) == 0 {
+		return fmt.Errorf("no usable workers found")
 	}
 	return fmt.Errorf("no healthy worker pod found: %s", strings.Join(problems, "; "))
 }
@@ -174,10 +191,10 @@ func (s *SystemChecks) podLocalEphemeralStorageIsFilledAboveTheWarningThreshold(
 		framework.ShellQuote(systemEphemeralFillPath),
 		framework.ShellQuote(systemEphemeralFillPath),
 	)
-	if _, err := s.exec.WorkerPod(s.worker).Run(ctx, cmd); err != nil {
+	if _, err := s.runtime.WorkerPod(s.workerPodInfo).Run(ctx, cmd); err != nil {
 		return fmt.Errorf("fill ephemeral storage in worker pod %s: %w", s.workerPod.Name, err)
 	}
-	s.exec.Logf("system checks: filled %d bytes in %s:%s", fillSizeByte, s.workerPod.Name, systemEphemeralFillPath)
+	s.runtime.Logf("system checks: filled %d bytes in %s:%s", fillSizeByte, s.workerPod.Name, systemEphemeralFillPath)
 	return nil
 }
 
@@ -192,7 +209,7 @@ func (s *SystemChecks) thePodLocalEphemeralStorageFillFileIsRemoved(ctx context.
 	if s.worker.Name == "" {
 		return fmt.Errorf("worker is not selected")
 	}
-	if _, err := s.exec.WorkerPod(s.worker).Run(ctx, fmt.Sprintf("rm -f %s", framework.ShellQuote(systemEphemeralFillPath))); err != nil {
+	if _, err := s.runtime.WorkerPod(s.workerPodInfo).Run(ctx, fmt.Sprintf("rm -f %s", framework.ShellQuote(systemEphemeralFillPath))); err != nil {
 		return fmt.Errorf("remove ephemeral fill file from worker pod %s: %w", s.workerPod.Name, err)
 	}
 	return nil
@@ -212,16 +229,17 @@ func (s *SystemChecks) theSelectedWorkerIsUsableAfterPodEphemeralStorage(ctx con
 	if err := s.slurm.WaitForNodeUsable(ctx, s.worker.Name, systemEphemeralRecoverTimeout); err != nil {
 		return err
 	}
-	s.worker = framework.WorkerRef{}
+	s.worker = framework.WorkerInfo{}
+	s.workerPodInfo = framework.WorkerPodInfo{}
 	s.workerPod = corev1.Pod{}
 	return nil
 }
 
 func (s *SystemChecks) kubeletIsStoppedOnTheSelectedWorkerKubernetesNode(ctx context.Context) error {
-	if s.worker.Name == "" || s.workerPod.Name == "" {
+	if s.worker.Name == "" || s.workerPodInfo.PodName == "" {
 		return fmt.Errorf("worker pod is not selected")
 	}
-	pod, err := s.workerPodByName(ctx, s.worker.PodName)
+	pod, err := s.workerPodByName(ctx, s.workerPodInfo.PodName)
 	if err != nil {
 		return err
 	}
@@ -237,13 +255,14 @@ func (s *SystemChecks) kubeletIsStoppedOnTheSelectedWorkerKubernetesNode(ctx con
 		return fmt.Errorf("selected Kubernetes node %s is not Ready", k8sNode.Name)
 	}
 	s.kubeletWorker = s.worker
+	s.kubeletWorkerPodName = pod.Name
 	s.kubeletK8sNodeName = k8sNode.Name
 	s.kubeletK8sNodeUID = string(k8sNode.UID)
 	s.kubeletWorkerPodUID = string(pod.UID)
-	s.exec.Logf("system checks: kubelet target worker=%s pod=%s pod_uid=%s k8s_node=%s k8s_node_uid=%s",
+	s.runtime.Logf("system checks: kubelet target worker=%s pod=%s pod_uid=%s k8s_node=%s k8s_node_uid=%s",
 		s.kubeletWorker.Name, pod.Name, s.kubeletWorkerPodUID, s.kubeletK8sNodeName, s.kubeletK8sNodeUID)
 
-	out, err := s.exec.Kubectl().Run(ctx,
+	out, err := s.runtime.Kubectl().Run(ctx,
 		"debug", "node/"+s.kubeletK8sNodeName,
 		"--image="+systemKubeletDebugImage,
 		"--profile=sysadmin",
@@ -254,7 +273,7 @@ func (s *SystemChecks) kubeletIsStoppedOnTheSelectedWorkerKubernetesNode(ctx con
 	}
 	s.kubeletDebugPodName = parseKubectlDebugPodName(out)
 	if s.kubeletDebugPodName != "" {
-		s.exec.Logf("system checks: kubelet stop debug pod=%s", s.kubeletDebugPodName)
+		s.runtime.Logf("system checks: kubelet stop debug pod=%s", s.kubeletDebugPodName)
 	}
 	return nil
 }
@@ -263,7 +282,7 @@ func (s *SystemChecks) theSelectedWorkerKubernetesNodeIsRecreated(ctx context.Co
 	if s.kubeletK8sNodeName == "" || s.kubeletK8sNodeUID == "" {
 		return fmt.Errorf("worker Kubernetes node is not captured")
 	}
-	return s.exec.WaitFor(ctx, fmt.Sprintf("Kubernetes node %s recreated", s.kubeletK8sNodeName), systemKubeletNodeRecreateTimeout, 30*time.Second, func(waitCtx context.Context) (bool, error) {
+	return s.runtime.WaitFor(ctx, fmt.Sprintf("Kubernetes node %s recreated", s.kubeletK8sNodeName), systemKubeletNodeRecreateTimeout, 30*time.Second, func(waitCtx context.Context) (bool, error) {
 		node, found, err := s.k8sNodeByNameOnce(waitCtx, s.kubeletK8sNodeName)
 		if err != nil {
 			return false, err
@@ -276,11 +295,11 @@ func (s *SystemChecks) theSelectedWorkerKubernetesNodeIsRecreated(ctx context.Co
 }
 
 func (s *SystemChecks) theSelectedWorkerPodIsRecreatedAndReady(ctx context.Context) error {
-	if s.kubeletWorker.PodName == "" || s.kubeletWorkerPodUID == "" {
+	if s.kubeletWorkerPodName == "" || s.kubeletWorkerPodUID == "" {
 		return fmt.Errorf("worker pod is not captured")
 	}
-	return s.exec.WaitFor(ctx, fmt.Sprintf("worker pod %s recreated and ready", s.kubeletWorker.PodName), systemKubeletWorkerReadyTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		pod, err := s.workerPodByName(waitCtx, s.kubeletWorker.PodName)
+	return s.runtime.WaitFor(ctx, fmt.Sprintf("worker pod %s recreated and ready", s.kubeletWorkerPodName), systemKubeletWorkerReadyTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+		pod, err := s.workerPodByName(waitCtx, s.kubeletWorkerPodName)
 		if err != nil {
 			return false, err
 		}
@@ -292,7 +311,7 @@ func (s *SystemChecks) theSelectedSlurmWorkerIsPresentAfterKubeletReplacement(ct
 	if s.kubeletWorker.Name == "" {
 		return fmt.Errorf("worker is not selected")
 	}
-	return s.exec.WaitFor(ctx, fmt.Sprintf("Slurm node %s present after kubelet replacement", s.kubeletWorker.Name), systemKubeletSlurmRecoverTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.runtime.WaitFor(ctx, fmt.Sprintf("Slurm node %s present after kubelet replacement", s.kubeletWorker.Name), systemKubeletSlurmRecoverTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		_, err := s.slurm.NodeInfoOnce(waitCtx, s.kubeletWorker.Name)
 		ready := err == nil
 		return ready, nil
@@ -303,7 +322,7 @@ func (s *SystemChecks) theSelectedSlurmWorkerIsUsableAfterKubeletReplacement(ctx
 	if s.kubeletWorker.Name == "" {
 		return fmt.Errorf("worker is not selected")
 	}
-	if err := s.exec.WaitFor(ctx, fmt.Sprintf("Slurm node %s usable after kubelet replacement", s.kubeletWorker.Name), systemKubeletSlurmRecoverTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	if err := s.runtime.WaitFor(ctx, fmt.Sprintf("Slurm node %s usable after kubelet replacement", s.kubeletWorker.Name), systemKubeletSlurmRecoverTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		node, err := s.slurm.NodeInfo(waitCtx, s.kubeletWorker.Name)
 		if err != nil {
 			return false, err
@@ -312,7 +331,8 @@ func (s *SystemChecks) theSelectedSlurmWorkerIsUsableAfterKubeletReplacement(ctx
 	}); err != nil {
 		return err
 	}
-	s.kubeletWorker = framework.WorkerRef{}
+	s.kubeletWorker = framework.WorkerInfo{}
+	s.kubeletWorkerPodName = ""
 	s.kubeletK8sNodeName = ""
 	s.kubeletK8sNodeUID = ""
 	s.kubeletWorkerPodUID = ""
@@ -325,7 +345,7 @@ func (s *SystemChecks) ephemeralInfo(ctx context.Context, pod corev1.Pod) (worke
 		return workerEphemeralInfo{}, fmt.Errorf("pod %s has no ephemeral-storage limit", pod.Name)
 	}
 
-	raw, err := s.exec.Kubectl().RunWithDefaultRetry(ctx, "get", "--raw", fmt.Sprintf("/api/v1/nodes/%s/proxy/stats/summary", pod.Spec.NodeName))
+	raw, err := s.runtime.Kubectl().RunWithDefaultRetry(ctx, "get", "--raw", fmt.Sprintf("/api/v1/nodes/%s/proxy/stats/summary", pod.Spec.NodeName))
 	if err != nil {
 		return workerEphemeralInfo{}, fmt.Errorf("query kubelet stats for node %s: %w", pod.Spec.NodeName, err)
 	}
@@ -353,7 +373,7 @@ func (s *SystemChecks) ephemeralInfo(ctx context.Context, pod corev1.Pod) (worke
 
 func (s *SystemChecks) workerPodByName(ctx context.Context, name string) (corev1.Pod, error) {
 	var pod corev1.Pod
-	if err := kubectlJSON(ctx, s.exec, &pod, "get", "pod", "-n", clusterCreationNamespace, name, "-o", "json"); err != nil {
+	if err := s.kubectl.GetJSON(ctx, &pod, "get", "pod", "-n", framework.SoperatorNamespace, name, "-o", "json"); err != nil {
 		return corev1.Pod{}, fmt.Errorf("get worker pod %s: %w", name, err)
 	}
 	return pod, nil
@@ -361,14 +381,14 @@ func (s *SystemChecks) workerPodByName(ctx context.Context, name string) (corev1
 
 func (s *SystemChecks) k8sNodeByName(ctx context.Context, name string) (corev1.Node, error) {
 	var node corev1.Node
-	if err := kubectlJSON(ctx, s.exec, &node, "get", "node", name, "-o", "json"); err != nil {
+	if err := s.kubectl.GetJSON(ctx, &node, "get", "node", name, "-o", "json"); err != nil {
 		return corev1.Node{}, fmt.Errorf("get Kubernetes node %s: %w", name, err)
 	}
 	return node, nil
 }
 
 func (s *SystemChecks) k8sNodeByNameOnce(ctx context.Context, name string) (corev1.Node, bool, error) {
-	output, err := s.exec.Kubectl().Run(ctx, "get", "node", name, "-o", "json")
+	output, err := s.runtime.Kubectl().Run(ctx, "get", "node", name, "-o", "json")
 	if err != nil {
 		if isKubectlNotFound(err) {
 			return corev1.Node{}, false, nil

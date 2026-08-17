@@ -24,6 +24,31 @@ func TestLoggedCheckOutputPathsNormalizesJailPrefix(t *testing.T) {
 	}, loggedCheckOutputPaths(output))
 }
 
+func TestVersionAwareCheckOutputPaths(t *testing.T) {
+	assert.Equal(t,
+		"/opt/soperator-outputs/slurm_scripts/worker-0.check_runner.prolog.out",
+		checkRunnerOutputPath("4.0.2", "worker-0", "prolog"),
+	)
+	assert.Equal(t,
+		"/opt/soperator-outputs/local/slurm_scripts/worker-0.check_runner.prolog.out",
+		checkRunnerOutputPath("5.0.0", "worker-0", "prolog"),
+	)
+	assert.Equal(t,
+		"/opt/soperator-outputs/slurm_scripts/worker-0.gpu_health_check.epilog.out",
+		gpuHealthCheckOutputPath("4.0.2", "worker-0", "epilog"),
+	)
+	assert.Equal(t,
+		"/opt/soperator-outputs/local/slurm_scripts/worker-0.gpu_health_check.epilog.out",
+		gpuHealthCheckOutputPath("5.0.0", "worker-0", "epilog"),
+	)
+}
+
+func TestVersionAwareHealthCheckerStdoutOutputDir(t *testing.T) {
+	assert.Equal(t, "/opt/soperator-outputs/health_checker_cmd_stdout", healthCheckerStdoutOutputDir("4.0.2"))
+	assert.Equal(t, "/opt/soperator-outputs/local/health_checker_cmd_stdout", healthCheckerStdoutOutputDir("5.0.0"))
+	assert.Equal(t, "/opt/soperator-outputs/local/health_checker_cmd_stdout", healthCheckerStdoutOutputDir(""))
+}
+
 func TestAssertCheckRunnerHealthy(t *testing.T) {
 	healthy := `
 	[2026-01-01 00:00:00.000 UTC] INFO: Started
@@ -86,7 +111,7 @@ func TestAssertGPUActiveCheckSlurmRecords(t *testing.T) {
 102|soperator-gpu-checks|COMPLETED|0:0|worker-1
 102.batch|batch|COMPLETED|0:0|worker-1
 `)
-	expected := []framework.WorkerRef{
+	expected := []framework.WorkerInfo{
 		{Name: "worker-0"},
 		{Name: "worker-1"},
 	}
@@ -101,7 +126,7 @@ func TestAssertGPUActiveCheckSlurmRecordsTargetExpectedWorkers(t *testing.T) {
 		"101": {ID: "101", State: "RUNNING", NodeList: "worker-0"},
 		"102": {ID: "102", State: "RUNNING", NodeList: "worker-1"},
 	}
-	expected := []framework.WorkerRef{
+	expected := []framework.WorkerInfo{
 		{Name: "worker-0"},
 		{Name: "worker-1"},
 	}

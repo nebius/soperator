@@ -1,14 +1,17 @@
-package acceptance
+package framework
 
 import (
 	"context"
 	"time"
-
-	"nebius.ai/soperator-e2e/acceptance/framework"
 )
 
 type argsScope struct {
 	run func(context.Context, ...string) (string, error)
+}
+
+// NewArgsScope returns an ArgsScope backed by the provided command runner.
+func NewArgsScope(run func(context.Context, ...string) (string, error)) ArgsScope {
+	return argsScope{run: run}
 }
 
 func (s argsScope) Run(ctx context.Context, args ...string) (string, error) {
@@ -22,11 +25,16 @@ func (s argsScope) RunWithRetry(ctx context.Context, attempts int, delay time.Du
 }
 
 func (s argsScope) RunWithDefaultRetry(ctx context.Context, args ...string) (string, error) {
-	return s.RunWithRetry(ctx, framework.DefaultRetryAttempts, framework.DefaultRetryDelay, args...)
+	return s.RunWithRetry(ctx, DefaultRetryAttempts, DefaultRetryDelay, args...)
 }
 
 type commandScope struct {
 	run func(context.Context, string) (string, error)
+}
+
+// NewCommandScope returns a CommandScope backed by the provided command runner.
+func NewCommandScope(run func(context.Context, string) (string, error)) CommandScope {
+	return commandScope{run: run}
 }
 
 func (s commandScope) Run(ctx context.Context, command string) (string, error) {
@@ -40,7 +48,7 @@ func (s commandScope) RunWithRetry(ctx context.Context, command string, attempts
 }
 
 func (s commandScope) RunWithDefaultRetry(ctx context.Context, command string) (string, error) {
-	return s.RunWithRetry(ctx, command, framework.DefaultRetryAttempts, framework.DefaultRetryDelay)
+	return s.RunWithRetry(ctx, command, DefaultRetryAttempts, DefaultRetryDelay)
 }
 
 func retry(ctx context.Context, attempts int, delay time.Duration, run func(context.Context) (string, error)) (string, error) {

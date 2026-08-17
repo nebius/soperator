@@ -13,9 +13,8 @@ import (
 	"github.com/cucumber/godog"
 
 	"nebius.ai/soperator-e2e/acceptance/framework"
-	"nebius.ai/soperator-e2e/acceptance/internal/discovery"
 	"nebius.ai/soperator-e2e/acceptance/internal/reports"
-	"nebius.ai/soperator-e2e/versionfilter"
+	"nebius.ai/soperator-e2e/acceptance/internal/versionfilter"
 )
 
 type timingCtxKey string
@@ -30,61 +29,35 @@ var suiteNamePattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 // Runner executes a configured Godog acceptance suite against a Soperator cluster.
 type Runner struct {
-	state          *framework.ClusterState
-	suites         []SuiteConfig
-	kubectlContext string
-	reportDir      string
-	discoveryHooks []DiscoveryHook
+	suites                 []SuiteConfig
+	kubectlContext         string
+	slurmClusterName       string
+	targetSoperatorVersion string
+	reportDir              string
 }
 
-// DiscoveryHook discovers external runner-specific cluster data after base Soperator discovery.
-type DiscoveryHook func(context.Context, *framework.ClusterState, framework.Exec) error
-
-// Options configures an acceptance suite run.
-type Options struct {
+// RunnerConfig configures an acceptance suite run.
+type RunnerConfig struct {
 	KubectlContext         string
 	SlurmClusterName       string
 	TargetSoperatorVersion string
 	ReportDir              string
 	Suites                 []SuiteConfig
-	DiscoveryHooks         []DiscoveryHook
-	State                  *framework.ClusterState
-}
-
-// RegisterDefaultHooks registers common timing and skip hooks.
-func RegisterDefaultHooks(sc *godog.ScenarioContext) {
-	registerTimingHooks(sc)
-	registerSkipHook(sc)
 }
 
 // NewRunner constructs an acceptance runner.
-func NewRunner(opts Options) (*Runner, error) {
-	kubectlContext := strings.TrimSpace(opts.KubectlContext)
+func NewRunner(config RunnerConfig) (*Runner, error) {
+	kubectlContext := strings.TrimSpace(config.KubectlContext)
 	if kubectlContext == "" {
 		return nil, fmt.Errorf("kubectl context is required")
 	}
 
-	state := opts.State
-	if state == nil {
-		state = &framework.ClusterState{}
-	}
-
-	slurmClusterName := strings.TrimSpace(opts.SlurmClusterName)
-	if state.SlurmClusterName != "" {
-		if slurmClusterName != "" && slurmClusterName != state.SlurmClusterName {
-			return nil, fmt.Errorf("slurm cluster name mismatch: options=%q state=%q", slurmClusterName, state.SlurmClusterName)
-		}
-		slurmClusterName = state.SlurmClusterName
-	}
+	slurmClusterName := strings.TrimSpace(config.SlurmClusterName)
 	if slurmClusterName == "" {
 		slurmClusterName = defaultSlurmClusterName
 	}
-	state.SlurmClusterName = slurmClusterName
 
-	if state.WorkersByNodeSet == nil {
-		state.WorkersByNodeSet = make(map[string][]framework.WorkerRef)
-	}
-	targetVersion := strings.TrimSpace(opts.TargetSoperatorVersion)
+	targetVersion := strings.TrimSpace(config.TargetSoperatorVersion)
 	if targetVersion == "" {
 		return nil, fmt.Errorf("target Soperator version is required")
 	}
@@ -92,39 +65,39 @@ func NewRunner(opts Options) (*Runner, error) {
 	if err != nil {
 		return nil, fmt.Errorf("target Soperator version: %w", err)
 	}
-	state.TargetSoperatorVersion = normalizedTargetVersion
-	suites, err := normalizeSuites(opts.Suites)
+	suites, err := normalizeSuites(config.Suites)
 	if err != nil {
 		return nil, err
 	}
+	if len(suites) == 0 {
+		return nil, fmt.Errorf("at least one suite is required")
+	}
 
 	return &Runner{
-		state:          state,
-		suites:         suites,
-		kubectlContext: kubectlContext,
-		reportDir:      strings.TrimSpace(opts.ReportDir),
-		discoveryHooks: slices.Clone(opts.DiscoveryHooks),
+		suites:                 suites,
+		kubectlContext:         kubectlContext,
+		slurmClusterName:       slurmClusterName,
+		targetSoperatorVersion: normalizedTargetVersion,
+		reportDir:              strings.TrimSpace(config.ReportDir),
 	}, nil
 }
 
 // Run executes the configured acceptance suite.
 func (r *Runner) Run(ctx context.Context) error {
-	w := newWorld(r.state, r.kubectlContext)
-	if err := discovery.DiscoverCluster(ctx, w, r.state); err != nil {
-		return fmt.Errorf("discover cluster before suite: %w", err)
-	}
-	if err := r.runDiscoveryHooks(ctx, w); err != nil {
-		return err
+	w := newWorld(r.kubectlContext, r.slurmClusterName, r.targetSoperatorVersion)
+	info := &framework.ClusterInfo{
+		SlurmClusterName:       r.slurmClusterName,
+		TargetSoperatorVersion: r.targetSoperatorVersion,
 	}
 
-	return r.runConfiguredSuites(ctx, w)
+	return r.runConfiguredSuites(ctx, info, w, r.suites)
 }
 
-func (r *Runner) runConfiguredSuites(ctx context.Context, exec framework.Exec) error {
+func (r *Runner) runConfiguredSuites(ctx context.Context, info *framework.ClusterInfo, runtime framework.Runtime, suites []SuiteConfig) error {
 	selectedSuites := 0
 	var failures []error
-	for _, suite := range r.suites {
-		features, err := r.suiteFeaturePaths(suite)
+	for _, suite := range suites {
+		features, err := r.suiteFeaturePaths(info, suite)
 		if err != nil {
 			failures = append(failures, fmt.Errorf("select suite %q scenarios: %w", suite.Name, err))
 			continue
@@ -134,27 +107,15 @@ func (r *Runner) runConfiguredSuites(ctx context.Context, exec framework.Exec) e
 			continue
 		}
 		selectedSuites++
-		if err := r.runSuite(ctx, exec, suite, features); err != nil {
+		if err := r.runSuite(ctx, info, runtime, suite, features); err != nil {
 			failures = append(failures, err)
 		}
 	}
 	if selectedSuites == 0 && len(failures) == 0 {
-		failures = append(failures, fmt.Errorf("no acceptance scenarios compatible with Soperator version %s", r.state.TargetSoperatorVersion))
+		failures = append(failures, fmt.Errorf("no acceptance scenarios compatible with Soperator version %s", info.TargetSoperatorVersion))
 	}
 
 	return errors.Join(failures...)
-}
-
-func (r *Runner) runDiscoveryHooks(ctx context.Context, exec framework.Exec) error {
-	for i, hook := range r.discoveryHooks {
-		if hook == nil {
-			return fmt.Errorf("discovery hook %d is nil", i)
-		}
-		if err := hook(ctx, r.state, exec); err != nil {
-			return fmt.Errorf("run discovery hook %d: %w", i, err)
-		}
-	}
-	return nil
 }
 
 func (r *Runner) suiteTagFilter(suite SuiteConfig) string {
@@ -163,17 +124,9 @@ func (r *Runner) suiteTagFilter(suite SuiteConfig) string {
 	if suite.Tags != "" {
 		filters = append(filters, suite.Tags)
 	}
-	if suite.FilterOptions.ExcludeUnstable {
+	if suite.ExcludeUnstable {
 		log.Printf("acceptance: suite %s excluding @unstable scenarios", suite.Name)
 		filters = append(filters, "~@unstable")
-	}
-	if suite.FilterOptions.ExcludeMissingWorkerKinds && !r.state.HasGPUWorkers() {
-		log.Printf("acceptance: suite %s found no GPU workers, excluding @gpu scenarios", suite.Name)
-		filters = append(filters, "~@gpu")
-	}
-	if suite.FilterOptions.ExcludeMissingWorkerKinds && !r.state.HasCPUWorkers() {
-		log.Printf("acceptance: suite %s found no CPU workers, excluding @cpu scenarios", suite.Name)
-		filters = append(filters, "~@cpu")
 	}
 
 	return strings.Join(filters, " && ")
@@ -181,7 +134,7 @@ func (r *Runner) suiteTagFilter(suite SuiteConfig) string {
 
 func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 	if len(suites) == 0 {
-		return nil, fmt.Errorf("at least one suite is required")
+		return nil, nil
 	}
 
 	out := make([]SuiteConfig, 0, len(suites))
@@ -225,33 +178,37 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 				FS:    suite.Source.FS,
 				Paths: paths,
 			},
-			VersionAxes:    slices.Clone(suite.VersionAxes),
-			Tags:           strings.TrimSpace(suite.Tags),
-			StepRegistrars: registrars,
-			FilterOptions:  suite.FilterOptions,
+			VersionAxes:     slices.Clone(suite.VersionAxes),
+			Tags:            strings.TrimSpace(suite.Tags),
+			StepRegistrars:  registrars,
+			ExcludeUnstable: suite.ExcludeUnstable,
 		})
 	}
 	return out, nil
 }
 
-func (r *Runner) suiteFeaturePaths(suite SuiteConfig) ([]string, error) {
+func (r *Runner) suiteFeaturePaths(info *framework.ClusterInfo, suite SuiteConfig) ([]string, error) {
 	paths := slices.Clone(suite.Source.Paths)
 	if len(suite.VersionAxes) > 0 {
 		var err error
+		axes := make([]versionfilter.Axis, 0, len(suite.VersionAxes))
+		for _, axis := range suite.VersionAxes {
+			axes = append(axes, axis.versionFilterAxis())
+		}
 		paths, err = versionfilter.SelectScenarios(
 			versionfilter.FeatureSource{FS: suite.Source.FS, Paths: suite.Source.Paths},
-			suite.VersionAxes...,
+			axes...,
 		)
 		if err != nil {
 			return nil, err
 		}
 	}
-	log.Printf("acceptance: target Soperator version=%s", r.state.TargetSoperatorVersion)
+	log.Printf("acceptance: target Soperator version=%s", info.TargetSoperatorVersion)
 	log.Printf("acceptance: suite %s running scenarios: %s", suite.Name, strings.Join(paths, ", "))
 	return paths, nil
 }
 
-func (r *Runner) runSuite(ctx context.Context, exec framework.Exec, suite SuiteConfig, features []string) error {
+func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runtime framework.Runtime, suite SuiteConfig, features []string) error {
 	format, err := reports.Format(r.reportDir, suite.Name)
 	if err != nil {
 		return fmt.Errorf("suite %q report format: %w", suite.Name, err)
@@ -261,7 +218,7 @@ func (r *Runner) runSuite(ctx context.Context, exec framework.Exec, suite SuiteC
 	godogSuite := godog.TestSuite{
 		Name: suite.Name,
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
-			r.initializeSuiteScenario(sc, exec, suite)
+			r.initializeSuiteScenario(sc, info, runtime, suite)
 		},
 		Options: &godog.Options{
 			Format:         format,
@@ -283,10 +240,11 @@ func (r *Runner) runSuite(ctx context.Context, exec framework.Exec, suite SuiteC
 	return nil
 }
 
-func (r *Runner) initializeSuiteScenario(sc *godog.ScenarioContext, exec framework.Exec, suite SuiteConfig) {
-	RegisterDefaultHooks(sc)
+func (r *Runner) initializeSuiteScenario(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime framework.Runtime, suite SuiteConfig) {
+	registerTimingHooks(sc)
+	registerSkipHook(sc)
 	for _, register := range suite.StepRegistrars {
-		register(sc, r.state, exec)
+		register(sc, info, runtime)
 	}
 }
 
@@ -339,11 +297,12 @@ func registerTimingHooks(sc *godog.ScenarioContext) {
 	})
 }
 
-func newWorld(state *framework.ClusterState, kubectlContext string) *world {
+func newWorld(kubectlContext, slurmClusterName, soperatorVersion string) *world {
 	return &world{
-		logPrefix:      "acceptance",
-		state:          state,
-		kubectlContext: kubectlContext,
+		logPrefix:        "acceptance",
+		kubectlContext:   kubectlContext,
+		slurmClusterName: slurmClusterName,
+		soperatorVersion: soperatorVersion,
 	}
 }
 

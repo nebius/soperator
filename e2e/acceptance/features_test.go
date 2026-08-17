@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"nebius.ai/soperator-e2e/versionfilter"
+	"nebius.ai/soperator-e2e/acceptance/framework"
 )
 
 func TestSharedFeaturesParseWithGherkin(t *testing.T) {
@@ -27,13 +27,14 @@ func TestSharedFeaturesParseWithGherkin(t *testing.T) {
 
 func TestSharedFeaturesHaveValidVersionTags(t *testing.T) {
 	suite := SoperatorSuite("5.0.0")
-	paths, err := versionfilter.SelectScenarios(
-		versionfilter.FeatureSource{
-			FS:    suite.Source.FS,
-			Paths: suite.Source.Paths,
-		},
-		suite.VersionAxes...,
-	)
+	runner, err := NewRunner(RunnerConfig{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: "5.0.0",
+		Suites:                 []SuiteConfig{suite},
+	})
+	require.NoError(t, err)
+
+	paths, err := runner.suiteFeaturePaths(&framework.ClusterInfo{TargetSoperatorVersion: "5.0.0"}, runner.suites[0])
 	require.NoError(t, err)
 	assert.NotEmpty(t, paths)
 }

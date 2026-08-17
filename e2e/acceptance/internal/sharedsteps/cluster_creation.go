@@ -2,10 +2,8 @@ package sharedsteps
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -19,7 +17,6 @@ import (
 )
 
 const (
-	clusterCreationNamespace           = "soperator"
 	clusterCreationHelmNamespace       = "flux-system"
 	clusterCreationSmokeJobTimeout     = 2 * time.Minute
 	clusterCreationPerNodeSmokeTimeout = 3 * time.Minute
@@ -29,12 +26,14 @@ const (
 var nodeStatePattern = regexp.MustCompile(`State=([^\s]+)`)
 
 type ClusterCreation struct {
-	state *framework.ClusterState
-	exec  framework.Exec
+	info     *framework.ClusterInfo
+	runtime  framework.Runtime
+	kubectl  *framework.KubectlClient
+	selector *framework.WorkerSelector
 }
 
-func NewClusterCreation(state *framework.ClusterState, exec framework.Exec) *ClusterCreation {
-	return &ClusterCreation{state: state, exec: exec}
+func NewClusterCreation(info *framework.ClusterInfo, runtime framework.Runtime, kubectl *framework.KubectlClient, selector *framework.WorkerSelector) *ClusterCreation {
+	return &ClusterCreation{info: info, runtime: runtime, kubectl: kubectl, selector: selector}
 }
 
 func (s *ClusterCreation) RegisterSteps(sc *godog.ScenarioContext) {
@@ -58,11 +57,11 @@ func (s *ClusterCreation) CleanupAndReset(ctx context.Context) {}
 
 func (s *ClusterCreation) checkPodsReady(ctx context.Context) error {
 	var pods corev1.PodList
-	if err := kubectlJSON(ctx, s.exec, &pods, "get", "pods", "-n", clusterCreationNamespace, "-o", "json"); err != nil {
+	if err := s.kubectl.GetJSON(ctx, &pods, "get", "pods", "-n", framework.SoperatorNamespace, "-o", "json"); err != nil {
 		return fmt.Errorf("list pods: %w", err)
 	}
 	if len(pods.Items) == 0 {
-		return fmt.Errorf("no pods found in namespace %s", clusterCreationNamespace)
+		return fmt.Errorf("no pods found in namespace %s", framework.SoperatorNamespace)
 	}
 
 	var problems []string
@@ -87,7 +86,7 @@ func (s *ClusterCreation) checkPodsReady(ctx context.Context) error {
 
 func (s *ClusterCreation) checkHelmReleasesReady(ctx context.Context) error {
 	var releases helmReleaseList
-	if err := kubectlJSON(ctx, s.exec, &releases, "get", "helmreleases", "-n", clusterCreationHelmNamespace, "-o", "json"); err != nil {
+	if err := s.kubectl.GetJSON(ctx, &releases, "get", "helmreleases", "-n", clusterCreationHelmNamespace, "-o", "json"); err != nil {
 		return fmt.Errorf("list HelmReleases: %w", err)
 	}
 	if len(releases.Items) == 0 {
@@ -114,7 +113,7 @@ func (s *ClusterCreation) checkHelmReleasesReady(ctx context.Context) error {
 
 func (s *ClusterCreation) checkSlurmClustersReady(ctx context.Context) error {
 	var clusters kubeobjects.SlurmClusterList
-	if err := kubectlJSON(ctx, s.exec, &clusters, "get", "slurmclusters", "-A", "-o", "json"); err != nil {
+	if err := s.kubectl.GetJSON(ctx, &clusters, "get", "slurmclusters", "-n", framework.SoperatorNamespace, "-o", "json"); err != nil {
 		return fmt.Errorf("list SlurmClusters: %w", err)
 	}
 	if len(clusters.Items) == 0 {
@@ -168,22 +167,22 @@ func (s *ClusterCreation) checkSlurmClustersReady(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkNodeSetsReady(ctx context.Context) error {
-	var nodeSets kubeobjects.NodeSetList
-	if err := kubectlJSON(ctx, s.exec, &nodeSets, "get", "nodesets", "-A", "-o", "json"); err != nil {
-		return fmt.Errorf("list NodeSets: %w", err)
+	nodeSets, err := s.kubectl.NodeSets(ctx, s.info.SlurmClusterName)
+	if err != nil {
+		return err
 	}
-	if len(nodeSets.Items) == 0 {
+	if len(nodeSets) == 0 {
 		return fmt.Errorf("no NodeSets found")
 	}
 
 	var problems []string
-	for _, nodeSet := range nodeSets.Items {
-		if nodeSet.Status.Phase != kubeobjects.NodeSetPhaseReady {
-			problems = append(problems, fmt.Sprintf("%s/%s phase=%s", nodeSet.Metadata.Namespace, nodeSet.Metadata.Name, nodeSet.Status.Phase))
+	for _, nodeSet := range nodeSets {
+		if nodeSet.Phase != kubeobjects.NodeSetPhaseReady {
+			problems = append(problems, fmt.Sprintf("%s/%s phase=%s", nodeSet.Namespace, nodeSet.Name, nodeSet.Phase))
 			continue
 		}
-		if nodeSet.Status.Replicas != nodeSet.Spec.Replicas {
-			problems = append(problems, fmt.Sprintf("%s/%s ready=%d desired=%d", nodeSet.Metadata.Namespace, nodeSet.Metadata.Name, nodeSet.Status.Replicas, nodeSet.Spec.Replicas))
+		if nodeSet.ReadyReplicas != nodeSet.Replicas {
+			problems = append(problems, fmt.Sprintf("%s/%s ready=%d desired=%d", nodeSet.Namespace, nodeSet.Name, nodeSet.ReadyReplicas, nodeSet.Replicas))
 		}
 	}
 
@@ -195,11 +194,11 @@ func (s *ClusterCreation) checkNodeSetsReady(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkPartitions(ctx context.Context) error {
-	allPartitions, err := s.exec.Controller().RunWithDefaultRetry(ctx, "scontrol show partitions --oneliner")
+	allPartitions, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "scontrol show partitions --oneliner")
 	if err != nil {
 		return fmt.Errorf("show partitions: %w", err)
 	}
-	if _, err := s.exec.Controller().RunWithDefaultRetry(ctx, "sinfo -Nel >/dev/null"); err != nil {
+	if _, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "sinfo -Nel >/dev/null"); err != nil {
 		return fmt.Errorf("sinfo -Nel: %w", err)
 	}
 	if !strings.Contains(allPartitions, "PartitionName=main") {
@@ -209,11 +208,11 @@ func (s *ClusterCreation) checkPartitions(ctx context.Context) error {
 		return fmt.Errorf("partition hidden is missing from scontrol output")
 	}
 
-	mainPartition, err := s.exec.Controller().RunWithDefaultRetry(ctx, "scontrol show partition main")
+	mainPartition, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "scontrol show partition main")
 	if err != nil {
 		return fmt.Errorf("show partition main: %w", err)
 	}
-	hiddenPartition, err := s.exec.Controller().RunWithDefaultRetry(ctx, "scontrol show partition hidden")
+	hiddenPartition, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "scontrol show partition hidden")
 	if err != nil {
 		return fmt.Errorf("show partition hidden: %w", err)
 	}
@@ -236,7 +235,7 @@ func (s *ClusterCreation) checkPartitions(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkSlurmNodeHealth(ctx context.Context) error {
-	nodesOutput, err := s.exec.Controller().RunWithDefaultRetry(ctx, "scontrol show nodes --oneliner")
+	nodesOutput, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "scontrol show nodes --oneliner")
 	if err != nil {
 		return fmt.Errorf("show nodes: %w", err)
 	}
@@ -269,18 +268,22 @@ func (s *ClusterCreation) checkSlurmNodeHealth(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkHealthCheckProgramOutputs(ctx context.Context) error {
-	if err := assertHealthCheckProgramConfigured(ctx, s.exec); err != nil {
+	if err := assertHealthCheckProgramConfigured(ctx, s.runtime); err != nil {
 		return err
 	}
-	if len(s.state.Workers) == 0 {
-		return fmt.Errorf("no workers discovered for HealthCheckProgram output validation")
+	workers, err := s.selector.Workers(ctx)
+	if err != nil {
+		return err
+	}
+	if len(workers) == 0 {
+		return fmt.Errorf("no workers found for HealthCheckProgram output validation")
 	}
 
 	var outputs map[string]string
-	if err := s.exec.WaitFor(ctx, "HealthCheckProgram outputs healthy", clusterCreationHCProgramTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		next := make(map[string]string, len(s.state.Workers))
-		for _, worker := range s.state.Workers {
-			output, exists, err := readWorkerFileIfExists(waitCtx, s.exec, worker, checkRunnerOutputPath(worker.Name, "hc_program"))
+	if err := s.runtime.WaitFor(ctx, "HealthCheckProgram outputs healthy", clusterCreationHCProgramTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+		next := make(map[string]string, len(workers))
+		for _, worker := range workers {
+			output, exists, err := readWorkerFileIfExists(waitCtx, s.runtime, worker, checkRunnerOutputPath(s.info.TargetSoperatorVersion, worker.Name, "hc_program"))
 			if err != nil {
 				return false, err
 			}
@@ -300,7 +303,7 @@ func (s *ClusterCreation) checkHealthCheckProgramOutputs(ctx context.Context) er
 
 	var problems []string
 	for worker, output := range outputs {
-		if err := assertLoggedCheckOutputsExist(ctx, s.exec, framework.WorkerRef{Name: worker}, output); err != nil {
+		if err := assertLoggedCheckOutputsExist(ctx, s.runtime, framework.WorkerInfo{Name: worker}, output); err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", worker, err))
 		}
 	}
@@ -313,7 +316,7 @@ func (s *ClusterCreation) checkHealthCheckProgramOutputs(ctx context.Context) er
 
 func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 	var checks kubeobjects.ActiveCheckList
-	if err := kubectlJSON(ctx, s.exec, &checks, "get", "activechecks", "-A", "-o", "json"); err != nil {
+	if err := s.kubectl.GetJSON(ctx, &checks, "get", "activechecks", "-n", framework.SoperatorNamespace, "-o", "json"); err != nil {
 		return fmt.Errorf("list ActiveChecks: %w", err)
 	}
 	if len(checks.Items) == 0 {
@@ -374,11 +377,11 @@ func (s *ClusterCreation) checkSoperatorchecksUserPresentAndConfigured(ctx conte
 	pub := key + ".pub"
 	authorized := "/opt/soperator-home/soperatorchecks/.ssh/authorized_keys"
 	for _, path := range []string{key, pub, authorized} {
-		if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("test -s %s", framework.ShellQuote(path))); err != nil {
+		if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("test -s %s", framework.ShellQuote(path))); err != nil {
 			return fmt.Errorf("expected soperatorchecks SSH file %s to exist and be non-empty: %w", path, err)
 		}
 	}
-	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("grep -Fxf %s %s >/dev/null",
+	if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("grep -Fxf %s %s >/dev/null",
 		framework.ShellQuote(pub),
 		framework.ShellQuote(authorized),
 	)); err != nil {
@@ -389,7 +392,7 @@ func (s *ClusterCreation) checkSoperatorchecksUserPresentAndConfigured(ctx conte
 
 func (s *ClusterCreation) checkJailUserHome(ctx context.Context, user string) error {
 	home := "/opt/soperator-home/" + user
-	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("id %s >/dev/null && test -d %s",
+	if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("id %s >/dev/null && test -d %s",
 		framework.ShellQuote(user),
 		framework.ShellQuote(home),
 	)); err != nil {
@@ -399,8 +402,8 @@ func (s *ClusterCreation) checkJailUserHome(ctx context.Context, user string) er
 }
 
 func (s *ClusterCreation) checkWelcomeOutput(ctx context.Context) error {
-	output, err := s.exec.Kubectl().RunWithDefaultRetry(ctx,
-		"exec", "-n", clusterCreationNamespace, s.state.PodName("login-0"), "--", "sh", "-lc",
+	output, err := s.runtime.Kubectl().RunWithDefaultRetry(ctx,
+		"exec", "-n", framework.SoperatorNamespace, s.info.PodName("login-0"), "--", "sh", "-lc",
 		"/etc/update-motd.d/00-welcome && /etc/update-motd.d/20-slurm-stats")
 	if err != nil {
 		return fmt.Errorf("render welcome output: %w", err)
@@ -423,7 +426,7 @@ func (s *ClusterCreation) checkWelcomeOutput(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkMainSmokeJob(ctx context.Context) error {
-	output, err := s.exec.Jail().Run(ctx, fmt.Sprintf("timeout %.0f srun -N 1 hostname", clusterCreationSmokeJobTimeout.Seconds()))
+	output, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("timeout %.0f srun -N 1 hostname", clusterCreationSmokeJobTimeout.Seconds()))
 	if err != nil {
 		return fmt.Errorf("run srun on default partition: %w", err)
 	}
@@ -434,7 +437,7 @@ func (s *ClusterCreation) checkMainSmokeJob(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkHiddenSmokeJob(ctx context.Context) error {
-	output, err := s.exec.Jail().Run(ctx, fmt.Sprintf("timeout %.0f srun -p hidden -N 1 hostname", clusterCreationSmokeJobTimeout.Seconds()))
+	output, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("timeout %.0f srun -p hidden -N 1 hostname", clusterCreationSmokeJobTimeout.Seconds()))
 	if err != nil {
 		return fmt.Errorf("run srun on hidden partition: %w", err)
 	}
@@ -445,16 +448,20 @@ func (s *ClusterCreation) checkHiddenSmokeJob(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkNodeSetSmokeJobs(ctx context.Context) error {
-	if len(s.state.DiscoveredNodeSets) == 0 {
-		s.exec.Logf("cluster creation: no discovered nodesets configured, skipping per-nodeset smoke jobs")
+	snapshot, err := s.selector.Snapshot(ctx)
+	if err != nil {
+		return err
+	}
+	if len(snapshot.NodeSets) == 0 {
+		s.runtime.Logf("cluster creation: no live nodesets configured, skipping per-nodeset smoke jobs")
 		return nil
 	}
 
 	var problems []string
-	for _, nodeSet := range s.state.DiscoveredNodeSets {
-		workers := slices.Clone(s.state.WorkersByNodeSet[nodeSet.Name])
+	for _, nodeSet := range snapshot.NodeSets {
+		workers := append([]framework.WorkerInfo(nil), snapshot.WorkersByNodeSet[nodeSet.Name]...)
 		if len(workers) == 0 {
-			problems = append(problems, fmt.Sprintf("%s has no discovered workers", nodeSet.Name))
+			problems = append(problems, fmt.Sprintf("%s has no live workers", nodeSet.Name))
 			continue
 		}
 		worker := workers[0]
@@ -464,7 +471,7 @@ func (s *ClusterCreation) checkNodeSetSmokeJobs(ctx context.Context) error {
 			command = fmt.Sprintf("timeout %.0f srun -w %s nvidia-smi -L >/dev/null", clusterCreationPerNodeSmokeTimeout.Seconds(), framework.ShellQuote(worker.Name))
 		}
 
-		if _, err := s.exec.Jail().Run(ctx, command); err != nil {
+		if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
 			problems = append(problems, fmt.Sprintf("%s worker %s smoke job failed: %v", nodeSet.Name, worker.Name, err))
 		}
 	}
@@ -489,17 +496,6 @@ type helmRelease struct {
 
 type helmReleaseStatusRef struct {
 	Conditions []metav1.Condition `json:"conditions"`
-}
-
-func kubectlJSON(ctx context.Context, exec framework.Exec, out any, args ...string) error {
-	output, err := exec.Kubectl().RunWithDefaultRetry(ctx, args...)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal([]byte(output), out); err != nil {
-		return fmt.Errorf("decode kubectl %s output: %w", strings.Join(args, " "), err)
-	}
-	return nil
 }
 
 func podReady(pod corev1.Pod) bool {

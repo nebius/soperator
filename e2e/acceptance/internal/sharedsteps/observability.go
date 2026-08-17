@@ -13,11 +13,11 @@ import (
 const observabilityNamespace = "monitoring-system"
 
 type Observability struct {
-	exec framework.Exec
+	kubectl *framework.KubectlClient
 }
 
-func NewObservability(exec framework.Exec) *Observability {
-	return &Observability{exec: exec}
+func NewObservability(kubectl *framework.KubectlClient) *Observability {
+	return &Observability{kubectl: kubectl}
 }
 
 func (s *Observability) RegisterSteps(sc *godog.ScenarioContext) {
@@ -35,7 +35,7 @@ func (s *Observability) CleanupAndReset(ctx context.Context) {}
 // values reached the rendered object.
 func (s *Observability) checkKubeStateMetricsScrape(ctx context.Context) error {
 	var scrapes vmServiceScrapeList
-	if err := kubectlJSON(ctx, s.exec, &scrapes, "get", "vmservicescrapes", "-n", observabilityNamespace, "-o", "json"); err != nil {
+	if err := s.kubectl.GetJSON(ctx, &scrapes, "get", "vmservicescrapes", "-n", observabilityNamespace, "-o", "json"); err != nil {
 		return fmt.Errorf("list VMServiceScrapes: %w", err)
 	}
 	if len(scrapes.Items) == 0 {

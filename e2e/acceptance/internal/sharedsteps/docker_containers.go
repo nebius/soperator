@@ -27,19 +27,21 @@ const (
 )
 
 type DockerContainers struct {
-	exec    framework.Exec
-	slurm   *framework.SlurmClient
-	workers []framework.WorkerRef
-	job     framework.SbatchJob
+	runtime  framework.Runtime
+	slurm    *framework.SlurmClient
+	selector *framework.WorkerSelector
+	workers  []framework.WorkerInfo
+	job      framework.SbatchJob
 
 	containerNamePrefix string
-	connectionWorker    framework.WorkerRef
+	connectionWorker    framework.WorkerInfo
 }
 
-func NewDockerContainers(exec framework.Exec, slurm *framework.SlurmClient) *DockerContainers {
+func NewDockerContainers(runtime framework.Runtime, slurm *framework.SlurmClient, selector *framework.WorkerSelector) *DockerContainers {
 	return &DockerContainers{
-		exec:  exec,
-		slurm: slurm,
+		runtime:  runtime,
+		slurm:    slurm,
+		selector: selector,
 	}
 }
 
@@ -57,23 +59,23 @@ func (s *DockerContainers) RegisterSteps(sc *godog.ScenarioContext) {
 
 func (s *DockerContainers) CleanupAndReset(ctx context.Context) {
 	if cleanupErr := s.requestCurrentJobCancellation(ctx); cleanupErr != nil {
-		s.exec.Logf("cleanup: cancel Docker job: %v", cleanupErr)
+		s.runtime.Logf("cleanup: cancel Docker job: %v", cleanupErr)
 	}
 	s.stopContainersByNamePrefix(ctx)
 	s.removeContainersByNamePrefix(ctx)
 	if cleanupErr := s.waitForCurrentJobGone(ctx); cleanupErr != nil {
-		s.exec.Logf("cleanup: wait for Docker job to finish: %v", cleanupErr)
+		s.runtime.Logf("cleanup: wait for Docker job to finish: %v", cleanupErr)
 	}
 	s.workers = nil
 	s.job = framework.SbatchJob{}
 	s.containerNamePrefix = ""
-	s.connectionWorker = framework.WorkerRef{}
+	s.connectionWorker = framework.WorkerInfo{}
 }
 
 func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers(ctx context.Context) error {
-	workers, err := s.slurm.AnyWorkers(2)
+	workers, err := s.selector.PickWorkers(ctx, 2)
 	if err != nil {
-		return err
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	s.workers = workers
 	s.connectionWorker = workers[0]
@@ -94,7 +96,7 @@ func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers
 	}
 	s.job = job
 	s.containerNamePrefix = fmt.Sprintf("e2e-docker-%s-", job.ID)
-	s.exec.Logf("Docker containers: selected workers=%s job_id=%s stdout=%s stderr=%s",
+	s.runtime.Logf("Docker containers: selected workers=%s job_id=%s stdout=%s stderr=%s",
 		strings.Join(framework.WorkerNames(s.workers), ","), job.ID, job.StdoutPath, job.StderrPath)
 	return nil
 }
@@ -103,7 +105,7 @@ func (s *DockerContainers) theDockerContainerJobIsRunning(ctx context.Context) e
 	if s.job.IsZero() {
 		return fmt.Errorf("Docker job ID is empty")
 	}
-	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job,
+	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job,
 		s.slurm.WaitForJobRunning(ctx, s.job.ID, dockerJobStartTimeout))
 }
 
@@ -112,7 +114,7 @@ func (s *DockerContainers) dockerImageAndRuntimeStorageIsPopulatedOnAWorker(ctx 
 		return fmt.Errorf("Docker connection worker is not selected")
 	}
 
-	err := framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "Docker image and runtime storage on local disk",
+	err := framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, s.job, "Docker image and runtime storage on local disk",
 		dockerProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 			rootDir, err := s.dockerRootDir(waitCtx, s.connectionWorker)
 			if err != nil {
@@ -149,11 +151,11 @@ func (s *DockerContainers) dockerImageAndRuntimeStorageIsPopulatedOnAWorker(ctx 
 			}
 			return false, nil
 		})
-	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
+	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job, err)
 }
 
 func (s *DockerContainers) dockerContainersFromTheJobAreRunningOnSelectedWorkers(ctx context.Context) error {
-	err := framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "Docker containers running on selected workers",
+	err := framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, s.job, "Docker containers running on selected workers",
 		dockerProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 			for _, worker := range s.workers {
 				currentIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, worker)
@@ -166,7 +168,7 @@ func (s *DockerContainers) dockerContainersFromTheJobAreRunningOnSelectedWorkers
 			}
 			return true, nil
 		})
-	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
+	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job, err)
 }
 
 func (s *DockerContainers) theDockerContainerJobIsCancelled(ctx context.Context) error {
@@ -188,9 +190,9 @@ func (s *DockerContainers) dockerContainersFromTheJobAreNoLongerRunning(ctx cont
 func (s *DockerContainers) aDockerGPUSmokeJobIsSubmittedOnOneGPUWorker(ctx context.Context) error {
 	// Future option: omit --nodelist and discover the allocated worker after
 	// submission, letting Slurm avoid busy nodes before Docker log collection.
-	workers, err := s.slurm.AnyGPUWorkers(1)
+	workers, err := s.selector.PickGPUWorkers(ctx, 1)
 	if err != nil {
-		return err
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	s.workers = workers
 	s.connectionWorker = workers[0]
@@ -211,7 +213,7 @@ func (s *DockerContainers) aDockerGPUSmokeJobIsSubmittedOnOneGPUWorker(ctx conte
 	}
 	s.job = job
 	s.containerNamePrefix = fmt.Sprintf("e2e-docker-gpu-%s-", job.ID)
-	s.exec.Logf("Docker GPU smoke: selected worker=%s job_id=%s stdout=%s stderr=%s",
+	s.runtime.Logf("Docker GPU smoke: selected worker=%s job_id=%s stdout=%s stderr=%s",
 		s.connectionWorker.Name, job.ID, job.StdoutPath, job.StderrPath)
 	return nil
 }
@@ -223,7 +225,7 @@ func (s *DockerContainers) theDockerGPUSmokeJobSucceedsAndReportsVisibleGPUs(ctx
 	job := s.job
 	// A sacct-only wait would let us read Docker logs earlier, but it can hide
 	// Slurm cleanup time and transfer resource-release waits to later scenarios.
-	if err := waitForJobSucceeded(ctx, s.exec, s.slurm, job, dockerGPUSmokeTimeout); err != nil {
+	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, job, dockerGPUSmokeTimeout); err != nil {
 		return err
 	}
 	logs, err := s.dockerContainerLogsByNamePrefix(ctx, s.connectionWorker)
@@ -242,7 +244,7 @@ func (s *DockerContainers) waitForTrackedContainersGone(ctx context.Context, tim
 	if len(s.workers) == 0 {
 		return fmt.Errorf("Docker workers are not selected")
 	}
-	return s.exec.WaitFor(ctx, "Docker containers stopped on selected workers", timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.runtime.WaitFor(ctx, "Docker containers stopped on selected workers", timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		for _, worker := range s.workers {
 			currentIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, worker)
 			if err != nil {
@@ -278,12 +280,12 @@ func (s *DockerContainers) waitForCurrentJobGone(ctx context.Context) error {
 	return nil
 }
 
-func (s *DockerContainers) dockerContainerIDsByNamePrefix(ctx context.Context, worker framework.WorkerRef) (map[string]struct{}, error) {
+func (s *DockerContainers) dockerContainerIDsByNamePrefix(ctx context.Context, worker framework.WorkerInfo) (map[string]struct{}, error) {
 	if s.containerNamePrefix == "" {
 		return nil, fmt.Errorf("Docker container name prefix is empty")
 	}
 
-	out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx,
+	out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx,
 		fmt.Sprintf("sudo docker ps --filter name=%s --format '{{.ID}}'", framework.ShellQuote(s.containerNamePrefix)))
 	if err != nil {
 		return nil, err
@@ -291,16 +293,16 @@ func (s *DockerContainers) dockerContainerIDsByNamePrefix(ctx context.Context, w
 	return parseIDSet(out), nil
 }
 
-func (s *DockerContainers) dockerRootDir(ctx context.Context, worker framework.WorkerRef) (string, error) {
-	out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx, "sudo docker info --format '{{.DockerRootDir}}'")
+func (s *DockerContainers) dockerRootDir(ctx context.Context, worker framework.WorkerInfo) (string, error) {
+	out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx, "sudo docker info --format '{{.DockerRootDir}}'")
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(out), nil
 }
 
-func (s *DockerContainers) dockerImageID(ctx context.Context, worker framework.WorkerRef, image string) (string, error) {
-	out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx,
+func (s *DockerContainers) dockerImageID(ctx context.Context, worker framework.WorkerInfo, image string) (string, error) {
+	out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx,
 		fmt.Sprintf("sudo docker image inspect --format '{{.Id}}' %s", framework.ShellQuote(image)))
 	if err != nil {
 		return "", err
@@ -308,8 +310,8 @@ func (s *DockerContainers) dockerImageID(ctx context.Context, worker framework.W
 	return strings.TrimSpace(out), nil
 }
 
-func (s *DockerContainers) dockerContainerGraphDriverPaths(ctx context.Context, worker framework.WorkerRef, containerID string) (string, error) {
-	out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx,
+func (s *DockerContainers) dockerContainerGraphDriverPaths(ctx context.Context, worker framework.WorkerInfo, containerID string) (string, error) {
+	out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx,
 		fmt.Sprintf("sudo docker inspect --format '{{range $key, $value := .GraphDriver.Data}}{{println $value}}{{end}}' %s", framework.ShellQuote(containerID)))
 	if err != nil {
 		return "", err
@@ -317,12 +319,12 @@ func (s *DockerContainers) dockerContainerGraphDriverPaths(ctx context.Context, 
 	return strings.TrimSpace(out), nil
 }
 
-func (s *DockerContainers) dockerContainerIDsByNamePrefixAll(ctx context.Context, worker framework.WorkerRef) (map[string]struct{}, error) {
+func (s *DockerContainers) dockerContainerIDsByNamePrefixAll(ctx context.Context, worker framework.WorkerInfo) (map[string]struct{}, error) {
 	if s.containerNamePrefix == "" {
 		return nil, fmt.Errorf("Docker container name prefix is empty")
 	}
 
-	out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx,
+	out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx,
 		fmt.Sprintf("sudo docker ps -a --filter name=%s --format '{{.ID}}'", framework.ShellQuote(s.containerNamePrefix)))
 	if err != nil {
 		return nil, err
@@ -330,7 +332,7 @@ func (s *DockerContainers) dockerContainerIDsByNamePrefixAll(ctx context.Context
 	return parseIDSet(out), nil
 }
 
-func (s *DockerContainers) dockerContainerLogsByNamePrefix(ctx context.Context, worker framework.WorkerRef) (string, error) {
+func (s *DockerContainers) dockerContainerLogsByNamePrefix(ctx context.Context, worker framework.WorkerInfo) (string, error) {
 	ids, err := s.dockerContainerIDsByNamePrefixAll(ctx, worker)
 	if err != nil {
 		return "", err
@@ -341,7 +343,7 @@ func (s *DockerContainers) dockerContainerLogsByNamePrefix(ctx context.Context, 
 
 	logs := make([]string, 0, len(ids))
 	for id := range ids {
-		out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx,
+		out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx,
 			fmt.Sprintf("sudo docker logs %s 2>&1", framework.ShellQuote(id)))
 		if err != nil {
 			return "", err
@@ -396,15 +398,15 @@ func (s *DockerContainers) stopContainersByNamePrefix(ctx context.Context) {
 	}
 
 	for _, worker := range s.workers {
-		out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx,
+		out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx,
 			fmt.Sprintf("sudo docker ps --filter name=%s --format '{{.ID}}'", framework.ShellQuote(s.containerNamePrefix)))
 		if err != nil {
-			s.exec.Logf("Docker cleanup: list containers on worker %s failed: %v", worker.Name, err)
+			s.runtime.Logf("Docker cleanup: list containers on worker %s failed: %v", worker.Name, err)
 			continue
 		}
 		for id := range parseIDSet(out) {
-			if _, err := s.exec.Worker(worker).Run(ctx, fmt.Sprintf("sudo docker stop %s >/dev/null 2>&1 || true", framework.ShellQuote(id))); err != nil {
-				s.exec.Logf("Docker cleanup: stop container %s on worker %s failed: %v", id, worker.Name, err)
+			if _, err := s.runtime.Worker(worker).Run(ctx, fmt.Sprintf("sudo docker stop %s >/dev/null 2>&1 || true", framework.ShellQuote(id))); err != nil {
+				s.runtime.Logf("Docker cleanup: stop container %s on worker %s failed: %v", id, worker.Name, err)
 			}
 		}
 	}
@@ -418,12 +420,12 @@ func (s *DockerContainers) removeContainersByNamePrefix(ctx context.Context) {
 	for _, worker := range s.workers {
 		ids, err := s.dockerContainerIDsByNamePrefixAll(ctx, worker)
 		if err != nil {
-			s.exec.Logf("Docker cleanup: list all containers on worker %s failed: %v", worker.Name, err)
+			s.runtime.Logf("Docker cleanup: list all containers on worker %s failed: %v", worker.Name, err)
 			continue
 		}
 		for id := range ids {
-			if _, err := s.exec.Worker(worker).Run(ctx, fmt.Sprintf("sudo docker rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(id))); err != nil {
-				s.exec.Logf("Docker cleanup: remove container %s on worker %s failed: %v", id, worker.Name, err)
+			if _, err := s.runtime.Worker(worker).Run(ctx, fmt.Sprintf("sudo docker rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(id))); err != nil {
+				s.runtime.Logf("Docker cleanup: remove container %s on worker %s failed: %v", id, worker.Name, err)
 			}
 		}
 	}

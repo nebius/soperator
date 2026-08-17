@@ -28,11 +28,12 @@ const (
 )
 
 type EnrootContainers struct {
-	exec  framework.Exec
-	slurm *framework.SlurmClient
+	runtime  framework.Runtime
+	slurm    *framework.SlurmClient
+	selector *framework.WorkerSelector
 
-	workers          []framework.WorkerRef
-	connectionWorker framework.WorkerRef
+	workers          []framework.WorkerInfo
+	connectionWorker framework.WorkerInfo
 	job              framework.SbatchJob
 
 	squashPath         string
@@ -43,10 +44,11 @@ type EnrootContainers struct {
 	directSquashFS *bool
 }
 
-func NewEnrootContainers(exec framework.Exec, slurm *framework.SlurmClient) *EnrootContainers {
+func NewEnrootContainers(runtime framework.Runtime, slurm *framework.SlurmClient, selector *framework.WorkerSelector) *EnrootContainers {
 	return &EnrootContainers{
-		exec:  exec,
-		slurm: slurm,
+		runtime:  runtime,
+		slurm:    slurm,
+		selector: selector,
 	}
 }
 
@@ -67,10 +69,10 @@ func (s *EnrootContainers) RegisterSteps(sc *godog.ScenarioContext) {
 
 func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
 	if cleanupErr := s.cancelCurrentJob(ctx); cleanupErr != nil {
-		s.exec.Logf("cleanup: cancel enroot job: %v", cleanupErr)
+		s.runtime.Logf("cleanup: cancel enroot job: %v", cleanupErr)
 	}
 	s.workers = nil
-	s.connectionWorker = framework.WorkerRef{}
+	s.connectionWorker = framework.WorkerInfo{}
 	s.job = framework.SbatchJob{}
 	s.squashPath = ""
 	s.expectedSquashPath = ""
@@ -81,13 +83,13 @@ func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
 
 func (s *EnrootContainers) aLongRunningEnrootContainerJobIsSubmittedOnTwoWorkers(ctx context.Context) error {
 	if len(s.workers) == 0 {
-		workers, err := s.slurm.AnyWorkers(2)
+		workers, err := s.selector.PickWorkers(ctx, 2)
 		if err != nil {
-			return err
+			return framework.SkipIfInsufficientWorkers(s.runtime, err)
 		}
 		s.workers = workers
 		s.connectionWorker = workers[0]
-		s.exec.Logf("enroot containers: selected workers=%s", strings.Join(framework.WorkerNames(s.workers), ","))
+		s.runtime.Logf("enroot containers: selected workers=%s", strings.Join(framework.WorkerNames(s.workers), ","))
 	}
 	s.squashPath = ""
 	s.expectedSquashPath = ""
@@ -107,7 +109,7 @@ func (s *EnrootContainers) theEnrootContainerJobIsRunning(ctx context.Context) e
 	if s.job.IsZero() {
 		return fmt.Errorf("enroot job id is empty")
 	}
-	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job,
+	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job,
 		s.slurm.WaitForJobRunning(ctx, s.job.ID, enrootJobStartTimeout))
 }
 
@@ -116,7 +118,7 @@ func (s *EnrootContainers) anEnrootImageArtifactIsPresentOnAWorker(ctx context.C
 		return fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	err := framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "enroot image artifact present",
+	err := framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, s.job, "enroot image artifact present",
 		enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 			found, err := s.expectedSquashArtifactExists(waitCtx)
 			if err != nil {
@@ -126,10 +128,10 @@ func (s *EnrootContainers) anEnrootImageArtifactIsPresentOnAWorker(ctx context.C
 				return false, nil
 			}
 			s.squashPath = s.expectedSquashPath
-			s.exec.Logf("enroot containers: tracked squashfs path=%s", s.squashPath)
+			s.runtime.Logf("enroot containers: tracked squashfs path=%s", s.squashPath)
 			return true, nil
 		})
-	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
+	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job, err)
 }
 
 func (s *EnrootContainers) enrootRuntimeStateIsVisibleWhileTheJobIsRunning(ctx context.Context) error {
@@ -169,7 +171,7 @@ func (s *EnrootContainers) theSameEnrootContainerJobIsSubmittedAgain(ctx context
 	if err := s.submitEnrootLifecycleJob(ctx, "e2e-enroot-repeated"); err != nil {
 		return err
 	}
-	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job,
+	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job,
 		s.slurm.WaitForJobRunning(ctx, s.job.ID, enrootJobStartTimeout))
 }
 
@@ -201,9 +203,9 @@ func (s *EnrootContainers) enrootRuntimeStateIsCleanedUp(ctx context.Context) er
 
 func (s *EnrootContainers) anEnrootGPUSmokeJobIsSubmittedOnOneGPUWorker(ctx context.Context) error {
 	// Future option: omit --nodelist and let Slurm choose the GPU worker.
-	workers, err := s.slurm.AnyGPUWorkers(1)
+	workers, err := s.selector.PickGPUWorkers(ctx, 1)
 	if err != nil {
-		return err
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	s.workers = workers
 	s.connectionWorker = workers[0]
@@ -223,7 +225,7 @@ func (s *EnrootContainers) anEnrootGPUSmokeJobIsSubmittedOnOneGPUWorker(ctx cont
 		return err
 	}
 	s.job = job
-	s.exec.Logf("enroot GPU smoke: selected worker=%s job_id=%s stdout=%s stderr=%s",
+	s.runtime.Logf("enroot GPU smoke: selected worker=%s job_id=%s stdout=%s stderr=%s",
 		s.connectionWorker.Name, job.ID, job.StdoutPath, job.StderrPath)
 	return nil
 }
@@ -233,10 +235,10 @@ func (s *EnrootContainers) theEnrootGPUSmokeJobSucceedsAndReportsVisibleGPUs(ctx
 		return fmt.Errorf("enroot GPU smoke job ID is empty")
 	}
 	job := s.job
-	if err := waitForJobSucceeded(ctx, s.exec, s.slurm, job, enrootGPUSmokeTimeout); err != nil {
+	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, job, enrootGPUSmokeTimeout); err != nil {
 		return err
 	}
-	if err := assertJobStdoutReportsVisibleGPUs(ctx, s.exec, job); err != nil {
+	if err := assertJobStdoutReportsVisibleGPUs(ctx, s.runtime, job); err != nil {
 		return err
 	}
 	s.job = framework.SbatchJob{}
@@ -267,7 +269,7 @@ func (s *EnrootContainers) submitEnrootLifecycleJob(ctx context.Context, jobName
 	}
 	s.job = job
 	s.runtimeNamePrefix = fmt.Sprintf("pyxis_%s.", job.ID)
-	s.exec.Logf("enroot containers: submitted job=%s id=%s stdout=%s stderr=%s",
+	s.runtime.Logf("enroot containers: submitted job=%s id=%s stdout=%s stderr=%s",
 		job.JobName, job.ID, job.StdoutPath, job.StderrPath)
 	return nil
 }
@@ -295,7 +297,7 @@ func (s *EnrootContainers) waitForMaterializedRuntimeCleanedUpAndArtifactRemains
 	if err != nil {
 		return err
 	}
-	return s.exec.WaitFor(ctx, "enroot runtime data cleaned and image artifact remains", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.runtime.WaitFor(ctx, "enroot runtime data cleaned and image artifact remains", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		treeOutput, err := s.legacyEnrootDataTree(waitCtx, s.connectionWorker)
 		if err != nil {
 			return false, err
@@ -312,7 +314,7 @@ func (s *EnrootContainers) waitForMaterializedRuntimeCleanedUpAndArtifactRemains
 }
 
 func (s *EnrootContainers) waitForDirectRuntimeCleanedUpAndArtifactRemains(ctx context.Context) error {
-	return s.exec.WaitFor(ctx, "enroot direct squashfs unmounted and image artifact remains", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.runtime.WaitFor(ctx, "enroot direct squashfs unmounted and image artifact remains", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		mounted, err := s.squashfsMountProcessExists(waitCtx)
 		if err != nil {
 			return false, err
@@ -337,9 +339,9 @@ func (s *EnrootContainers) enrootRuntimeContainerDataIsVisibleWhileTheJobIsRunni
 		return err
 	}
 
-	err = framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "enroot runtime container visible",
+	err = framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, s.job, "enroot runtime container visible",
 		enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-			listOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo enroot list || true")
+			listOutput, err := s.runtime.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx, "sudo enroot list || true")
 			if err != nil {
 				return false, err
 			}
@@ -355,7 +357,7 @@ func (s *EnrootContainers) enrootRuntimeContainerDataIsVisibleWhileTheJobIsRunni
 			}
 			return true, nil
 		})
-	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
+	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job, err)
 }
 
 func (s *EnrootContainers) enrootSquashfsImageIsMountedDirectlyWhileTheJobIsRunning(ctx context.Context) error {
@@ -366,7 +368,7 @@ func (s *EnrootContainers) enrootSquashfsImageIsMountedDirectlyWhileTheJobIsRunn
 		return fmt.Errorf("squashfs path is not captured")
 	}
 
-	err := framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "enroot squashfs mounted directly",
+	err := framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, s.job, "enroot squashfs mounted directly",
 		enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 			mounted, err := s.squashfsMountProcessExists(waitCtx)
 			if err != nil {
@@ -374,7 +376,7 @@ func (s *EnrootContainers) enrootSquashfsImageIsMountedDirectlyWhileTheJobIsRunn
 			}
 			return mounted, nil
 		})
-	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
+	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job, err)
 }
 
 func (s *EnrootContainers) enrootSquashfsArtifactIsReusedWithMaterializedRuntime(ctx context.Context) error {
@@ -382,7 +384,7 @@ func (s *EnrootContainers) enrootSquashfsArtifactIsReusedWithMaterializedRuntime
 	if err != nil {
 		return err
 	}
-	err = framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "enroot image artifact reused with materialized runtime",
+	err = framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, s.job, "enroot image artifact reused with materialized runtime",
 		enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 			treeOutput, err := s.legacyEnrootDataTree(waitCtx, s.connectionWorker)
 			if err != nil {
@@ -397,11 +399,11 @@ func (s *EnrootContainers) enrootSquashfsArtifactIsReusedWithMaterializedRuntime
 			}
 			return statOutput == s.squashStatBefore, nil
 		})
-	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
+	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job, err)
 }
 
 func (s *EnrootContainers) enrootSquashfsArtifactIsReusedWithDirectMount(ctx context.Context) error {
-	err := framework.WaitForWithJobAlive(ctx, s.exec, s.slurm, s.job, "enroot image artifact reused with direct squashfs mount",
+	err := framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, s.job, "enroot image artifact reused with direct squashfs mount",
 		enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 			mounted, err := s.squashfsMountProcessExists(waitCtx)
 			if err != nil {
@@ -416,7 +418,7 @@ func (s *EnrootContainers) enrootSquashfsArtifactIsReusedWithDirectMount(ctx con
 			}
 			return statOutput == s.squashStatBefore, nil
 		})
-	return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, s.job, err)
+	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job, err)
 }
 
 func (s *EnrootContainers) cancelCurrentJob(ctx context.Context) error {
@@ -460,7 +462,7 @@ func (s *EnrootContainers) enrootImageDigest(ctx context.Context, image string) 
 		return "", fmt.Errorf("enroot connection worker is not selected")
 	}
 
-	output, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(ctx,
+	output, err := s.runtime.Worker(s.connectionWorker).RunWithDefaultRetry(ctx,
 		fmt.Sprintf("enroot digest %s", framework.ShellQuote(image)))
 	if err != nil {
 		return "", err
@@ -475,7 +477,7 @@ func (s *EnrootContainers) enrootImageDigest(ctx context.Context, image string) 
 }
 
 func (s *EnrootContainers) pathExists(ctx context.Context, targetPath string) (bool, error) {
-	output, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(ctx,
+	output, err := s.runtime.Worker(s.connectionWorker).RunWithDefaultRetry(ctx,
 		fmt.Sprintf("sudo test -f %s && echo exists || true", framework.ShellQuote(targetPath)))
 	if err != nil {
 		return false, err
@@ -484,7 +486,7 @@ func (s *EnrootContainers) pathExists(ctx context.Context, targetPath string) (b
 }
 
 func (s *EnrootContainers) squashfsMountProcessExists(ctx context.Context) (bool, error) {
-	output, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(ctx,
+	output, err := s.runtime.Worker(s.connectionWorker).RunWithDefaultRetry(ctx,
 		fmt.Sprintf("sudo ps -eww -o args= | grep -F -- %s | grep -F -- squashfuse | grep -v grep || true", framework.ShellQuote(s.squashPath)))
 	if err != nil {
 		return false, err
@@ -497,7 +499,7 @@ func (s *EnrootContainers) enrootDirectSquashFSEnabled(ctx context.Context) (boo
 		return *s.directSquashFS, nil
 	}
 
-	output, err := s.exec.Jail().RunWithDefaultRetry(ctx, "grep -E 'spank_pyxis\\.so.*use_squashfuse=1' /etc/slurm/plugstack.conf /etc/slurm/plugstack.conf.d/*.conf 2>/dev/null || true")
+	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, "grep -E 'spank_pyxis\\.so.*use_squashfuse=1' /etc/slurm/plugstack.conf /etc/slurm/plugstack.conf.d/*.conf 2>/dev/null || true")
 	if err != nil {
 		return false, err
 	}
@@ -511,15 +513,15 @@ func (s *EnrootContainers) squashStat(ctx context.Context) (string, error) {
 }
 
 func (s *EnrootContainers) squashStatForPath(ctx context.Context, squashPath string) (string, error) {
-	statOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(ctx, fmt.Sprintf("sudo stat -c '%%Y:%%s' %s", framework.ShellQuote(squashPath)))
+	statOutput, err := s.runtime.Worker(s.connectionWorker).RunWithDefaultRetry(ctx, fmt.Sprintf("sudo stat -c '%%Y:%%s' %s", framework.ShellQuote(squashPath)))
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(statOutput), nil
 }
 
-func (s *EnrootContainers) legacyEnrootDataTree(ctx context.Context, worker framework.WorkerRef) (string, error) {
-	return s.exec.Worker(worker).RunWithDefaultRetry(ctx, fmt.Sprintf("sudo tree -L 1 %s", framework.ShellQuote(enrootDedicatedDataPath)))
+func (s *EnrootContainers) legacyEnrootDataTree(ctx context.Context, worker framework.WorkerInfo) (string, error) {
+	return s.runtime.Worker(worker).RunWithDefaultRetry(ctx, fmt.Sprintf("sudo tree -L 1 %s", framework.ShellQuote(enrootDedicatedDataPath)))
 }
 
 func (s *EnrootContainers) enrootRuntimeNamePrefix() (string, error) {

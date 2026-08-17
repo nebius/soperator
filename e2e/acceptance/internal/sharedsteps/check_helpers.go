@@ -12,9 +12,11 @@ import (
 )
 
 const (
-	slurmScriptsOutputDir        = "/opt/soperator-outputs/local/slurm_scripts"
-	healthCheckerStdoutOutputDir = "/opt/soperator-outputs/local/health_checker_cmd_stdout"
-	gpuHealthCheckName           = "gpu_health_check"
+	currentSlurmScriptsOutputDir        = "/opt/soperator-outputs/local/slurm_scripts"
+	legacySlurmScriptsOutputDir         = "/opt/soperator-outputs/slurm_scripts"
+	currentHealthCheckerStdoutOutputDir = "/opt/soperator-outputs/local/health_checker_cmd_stdout"
+	legacyHealthCheckerStdoutOutputDir  = "/opt/soperator-outputs/health_checker_cmd_stdout"
+	gpuHealthCheckName                  = "gpu_health_check"
 )
 
 var (
@@ -51,10 +53,10 @@ func assertHealthCheckProgramConfigured(ctx context.Context, exec framework.Exec
 	return nil
 }
 
-func waitForHealthyCheckRunnerOutputForJob(ctx context.Context, exec framework.Exec, worker framework.WorkerRef, targetPath, jobID string, timeout time.Duration) (string, error) {
+func waitForHealthyCheckRunnerOutputForJob(ctx context.Context, runtime framework.Runtime, worker framework.WorkerInfo, targetPath, jobID string, timeout time.Duration) (string, error) {
 	var content string
-	err := exec.WaitFor(ctx, fmt.Sprintf("healthy check_runner output %s", targetPath), timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		out, exists, err := readWorkerFileIfExists(waitCtx, exec, worker, targetPath)
+	err := runtime.WaitFor(ctx, fmt.Sprintf("healthy check_runner output %s", targetPath), timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+		out, exists, err := readWorkerFileIfExists(waitCtx, runtime, worker, targetPath)
 		if err != nil {
 			return false, err
 		}
@@ -82,11 +84,11 @@ func waitForHealthyCheckRunnerOutputForJob(ctx context.Context, exec framework.E
 	return content, nil
 }
 
-func waitForPassingHealthCheckReportsForJob(ctx context.Context, exec framework.Exec, worker framework.WorkerRef, targetPath, jobID string, timeout time.Duration) ([]string, error) {
+func waitForPassingHealthCheckReportsForJob(ctx context.Context, runtime framework.Runtime, worker framework.WorkerInfo, targetPath, jobID string, timeout time.Duration) ([]string, error) {
 	var content string
 	var runIDs []string
-	err := exec.WaitFor(ctx, fmt.Sprintf("passing health-check reports %s", targetPath), timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		out, exists, err := readWorkerFileIfExists(waitCtx, exec, worker, targetPath)
+	err := runtime.WaitFor(ctx, fmt.Sprintf("passing health-check reports %s", targetPath), timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+		out, exists, err := readWorkerFileIfExists(waitCtx, runtime, worker, targetPath)
 		if err != nil {
 			return false, err
 		}
@@ -118,10 +120,9 @@ func waitForPassingHealthCheckReportsForJob(ctx context.Context, exec framework.
 	return runIDs, nil
 }
 
-// readWorkerFileIfExists reads a file from the given worker's jail view. Check outputs under
-// /opt/soperator-outputs/local are node-local (worker boot disk), so they are only visible on
-// the worker that wrote them, not through the shared jail on login nodes.
-func readWorkerFileIfExists(ctx context.Context, exec framework.Exec, worker framework.WorkerRef, targetPath string) (string, bool, error) {
+// readWorkerFileIfExists reads a file from the given worker's jail view. Check outputs can be
+// node-local, so they are only guaranteed to be visible on the worker that wrote them.
+func readWorkerFileIfExists(ctx context.Context, exec framework.Exec, worker framework.WorkerInfo, targetPath string) (string, bool, error) {
 	quotedPath := framework.ShellQuote(targetPath)
 	out, err := exec.Worker(worker).RunWithDefaultRetry(ctx, fmt.Sprintf("test -f %s && cat %s || true", quotedPath, quotedPath))
 	if err != nil {
@@ -133,12 +134,26 @@ func readWorkerFileIfExists(ctx context.Context, exec framework.Exec, worker fra
 	return out, true, nil
 }
 
-func checkRunnerOutputPath(worker, contextName string) string {
-	return fmt.Sprintf("%s/%s.check_runner.%s.out", slurmScriptsOutputDir, worker, contextName)
+func checkRunnerOutputPath(soperatorVersion, worker, contextName string) string {
+	return fmt.Sprintf("%s/%s.check_runner.%s.out", slurmScriptsOutputDir(soperatorVersion), worker, contextName)
 }
 
-func gpuHealthCheckOutputPath(worker, contextName string) string {
-	return fmt.Sprintf("%s/%s.%s.%s.out", slurmScriptsOutputDir, worker, gpuHealthCheckName, contextName)
+func gpuHealthCheckOutputPath(soperatorVersion, worker, contextName string) string {
+	return fmt.Sprintf("%s/%s.%s.%s.out", slurmScriptsOutputDir(soperatorVersion), worker, gpuHealthCheckName, contextName)
+}
+
+func slurmScriptsOutputDir(soperatorVersion string) string {
+	if framework.SoperatorVersionBeforeFive(soperatorVersion) {
+		return legacySlurmScriptsOutputDir
+	}
+	return currentSlurmScriptsOutputDir
+}
+
+func healthCheckerStdoutOutputDir(soperatorVersion string) string {
+	if framework.SoperatorVersionBeforeFive(soperatorVersion) {
+		return legacyHealthCheckerStdoutOutputDir
+	}
+	return currentHealthCheckerStdoutOutputDir
 }
 
 func assertCheckRunnerHealthy(output string) error {
@@ -217,7 +232,7 @@ func loggedCheckOutputPaths(checkRunnerOutput string) []string {
 	return paths
 }
 
-func assertLoggedCheckOutputsExist(ctx context.Context, exec framework.Exec, worker framework.WorkerRef, checkRunnerOutput string) error {
+func assertLoggedCheckOutputsExist(ctx context.Context, exec framework.Exec, worker framework.WorkerInfo, checkRunnerOutput string) error {
 	paths := loggedCheckOutputPaths(checkRunnerOutput)
 	if len(paths) == 0 {
 		return fmt.Errorf("check_runner output has no check log paths:\n%s", strings.TrimSpace(checkRunnerOutput))
@@ -301,11 +316,12 @@ func environmentHasKeyValue(environment, key, value string) bool {
 	return false
 }
 
-func assertHealthCheckRawOutputsPresent(ctx context.Context, exec framework.Exec, worker framework.WorkerRef, runIDs []string) error {
+func assertHealthCheckRawOutputsPresent(ctx context.Context, exec framework.Exec, worker framework.WorkerInfo, soperatorVersion string, runIDs []string) error {
+	outputDir := healthCheckerStdoutOutputDir(soperatorVersion)
 	for _, runID := range runIDs {
 		pattern := "*." + runID + ".out"
 		cmd := fmt.Sprintf("find %s -type f -name %s -print -quit",
-			framework.ShellQuote(healthCheckerStdoutOutputDir),
+			framework.ShellQuote(outputDir),
 			framework.ShellQuote(pattern),
 		)
 		out, err := exec.Worker(worker).RunWithDefaultRetry(ctx, cmd)
@@ -313,13 +329,13 @@ func assertHealthCheckRawOutputsPresent(ctx context.Context, exec framework.Exec
 			return fmt.Errorf("find raw health-check outputs for run_id %s: %w", runID, err)
 		}
 		if strings.TrimSpace(out) == "" {
-			return fmt.Errorf("raw health-check output for run_id %s was not found in %s", runID, healthCheckerStdoutOutputDir)
+			return fmt.Errorf("raw health-check output for run_id %s was not found in %s", runID, outputDir)
 		}
 	}
 	return nil
 }
 
-func runManualHCProgram(ctx context.Context, exec framework.Exec, worker framework.WorkerRef) error {
+func runManualHCProgram(ctx context.Context, exec framework.Exec, worker framework.WorkerInfo) error {
 	_, err := exec.Worker(worker).RunWithDefaultRetry(ctx,
 		fmt.Sprintf("SLURMD_NODENAME=%s /opt/slurm_scripts/hc_program.sh", framework.ShellQuote(worker.Name)))
 	if err != nil {

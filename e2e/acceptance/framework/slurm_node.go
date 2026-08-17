@@ -46,7 +46,7 @@ func ParseSlurmNodeInfo(name, output string) SlurmNodeInfo {
 }
 
 func (s *SlurmClient) NodeInfo(ctx context.Context, worker string) (SlurmNodeInfo, error) {
-	out, err := s.exec.Controller().RunWithDefaultRetry(ctx,
+	out, err := s.runtime.Controller().RunWithDefaultRetry(ctx,
 		fmt.Sprintf("scontrol show node %s", ShellQuote(worker)))
 	if err != nil {
 		return SlurmNodeInfo{}, fmt.Errorf("show Slurm node %s: %w", worker, err)
@@ -55,12 +55,38 @@ func (s *SlurmClient) NodeInfo(ctx context.Context, worker string) (SlurmNodeInf
 }
 
 func (s *SlurmClient) NodeInfoOnce(ctx context.Context, worker string) (SlurmNodeInfo, error) {
-	out, err := s.exec.Controller().Run(ctx,
+	out, err := s.runtime.Controller().Run(ctx,
 		fmt.Sprintf("scontrol show node %s", ShellQuote(worker)))
 	if err != nil {
 		return SlurmNodeInfo{}, fmt.Errorf("show Slurm node %s: %w", worker, err)
 	}
 	return ParseSlurmNodeInfo(worker, out), nil
+}
+
+func (s *SlurmClient) MainPartitionNodeNames(ctx context.Context) ([]string, error) {
+	out, err := s.runtime.Controller().RunWithDefaultRetry(ctx, `sinfo -hN -p main -o '%N'`)
+	if err != nil {
+		return nil, fmt.Errorf("list Slurm main partition nodes: %w", err)
+	}
+	return ParseSlurmNodeNames(out), nil
+}
+
+func ParseSlurmNodeNames(output string) []string {
+	seen := make(map[string]struct{})
+	var names []string
+
+	for _, line := range strings.Split(output, "\n") {
+		name := strings.TrimSpace(line)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		names = append(names, name)
+	}
+	return names
 }
 
 func (n SlurmNodeInfo) HasStateFlag(flag string) bool {
@@ -86,7 +112,7 @@ func (n SlurmNodeInfo) IsUsable() bool {
 }
 
 func (s *SlurmClient) WaitForNodeReasonContains(ctx context.Context, worker, reasonPart string, timeout time.Duration) error {
-	return s.exec.WaitFor(ctx, fmt.Sprintf("Slurm node %s reason contains %q", worker, reasonPart), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.runtime.WaitFor(ctx, fmt.Sprintf("Slurm node %s reason contains %q", worker, reasonPart), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		node, err := s.NodeInfo(waitCtx, worker)
 		if err != nil {
 			return false, err
@@ -96,7 +122,7 @@ func (s *SlurmClient) WaitForNodeReasonContains(ctx context.Context, worker, rea
 }
 
 func (s *SlurmClient) WaitForNodeReasonCleared(ctx context.Context, worker, reasonPart string, timeout time.Duration) error {
-	return s.exec.WaitFor(ctx, fmt.Sprintf("Slurm node %s reason does not contain %q", worker, reasonPart), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.runtime.WaitFor(ctx, fmt.Sprintf("Slurm node %s reason does not contain %q", worker, reasonPart), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		node, err := s.NodeInfo(waitCtx, worker)
 		if err != nil {
 			return false, err
@@ -106,7 +132,7 @@ func (s *SlurmClient) WaitForNodeReasonCleared(ctx context.Context, worker, reas
 }
 
 func (s *SlurmClient) WaitForNodeUsable(ctx context.Context, worker string, timeout time.Duration) error {
-	return s.exec.WaitFor(ctx, fmt.Sprintf("Slurm node %s usable", worker), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	return s.runtime.WaitFor(ctx, fmt.Sprintf("Slurm node %s usable", worker), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		node, err := s.NodeInfo(waitCtx, worker)
 		if err != nil {
 			return false, err
@@ -121,15 +147,15 @@ func (s *SlurmClient) ResumeNodeIfDrainedByReason(ctx context.Context, worker, r
 		return err
 	}
 	if !node.HasStateFlag("DRAIN") {
-		s.exec.Logf("cleanup: not resuming Slurm node %s; state=%s reason=%s", worker, node.State, node.Reason)
+		s.runtime.Logf("cleanup: not resuming Slurm node %s; state=%s reason=%s", worker, node.State, node.Reason)
 		return nil
 	}
 	if !node.ReasonContains(reasonPart) {
-		s.exec.Logf("cleanup: not resuming Slurm node %s drained for different reason; state=%s reason=%s expected_reason_part=%s",
+		s.runtime.Logf("cleanup: not resuming Slurm node %s drained for different reason; state=%s reason=%s expected_reason_part=%s",
 			worker, node.State, node.Reason, reasonPart)
 		return nil
 	}
-	_, err = s.exec.Controller().RunWithDefaultRetry(ctx,
+	_, err = s.runtime.Controller().RunWithDefaultRetry(ctx,
 		fmt.Sprintf("scontrol update nodename=%s state=resume", ShellQuote(worker)))
 	if err != nil {
 		return fmt.Errorf("resume Slurm node %s after %s: %w", worker, reasonPart, err)

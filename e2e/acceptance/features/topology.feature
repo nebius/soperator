@@ -1,5 +1,5 @@
 Feature: Slurm network topology
-  @soperator_version_>=5.0.0
+  @soperator_version_>=4.0.0
   Scenario: scontrol topology and SLURM_TOPOLOGY_ADDR agree across workers
     Given the Slurm topology plugin is topology/tree
     When scontrol show topology is parsed into a switch tree

@@ -12,13 +12,13 @@ import (
 )
 
 type PackageInstallation struct {
-	exec          framework.Exec
-	slurm         *framework.SlurmClient
-	packageWorker framework.WorkerRef
+	runtime       framework.Runtime
+	selector      *framework.WorkerSelector
+	packageWorker framework.WorkerInfo
 }
 
-func NewPackageInstallation(exec framework.Exec, slurm *framework.SlurmClient) *PackageInstallation {
-	return &PackageInstallation{exec: exec, slurm: slurm}
+func NewPackageInstallation(runtime framework.Runtime, selector *framework.WorkerSelector) *PackageInstallation {
+	return &PackageInstallation{runtime: runtime, selector: selector}
 }
 
 func (s *PackageInstallation) RegisterSteps(sc *godog.ScenarioContext) {
@@ -29,18 +29,18 @@ func (s *PackageInstallation) RegisterSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *PackageInstallation) CleanupAndReset(ctx context.Context) {
-	s.packageWorker = framework.WorkerRef{}
+	s.packageWorker = framework.WorkerInfo{}
 }
 
 func (s *PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.Context) error {
-	workers, err := s.slurm.AnyGPUWorkers(1)
+	workers, err := s.selector.PickGPUWorkers(ctx, 1)
 	if err != nil {
-		return err
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	s.packageWorker = workers[0]
 
 	cmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(s.packageWorker.Name))
-	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
+	if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, s.packageWorker.Name)
 		return fmt.Errorf("verify nvidia-smi before install: %w", err)
 	}
@@ -53,13 +53,13 @@ func (s *PackageInstallation) jqIsInstalledOnTheWorkerNode(ctx context.Context) 
 	// with "Invalid cross-device link" when creating backup hardlinks during package replacement.
 	workerName := s.packageWorker.Name
 	updateCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get update'", framework.ShellQuote(workerName))
-	if _, err := s.exec.Jail().Run(ctx, updateCmd); err != nil {
+	if _, err := s.runtime.Jail().Run(ctx, updateCmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
 		return fmt.Errorf("apt-get update: %w", err)
 	}
 
 	installCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq'", framework.ShellQuote(workerName))
-	if _, err := s.exec.Jail().Run(ctx, installCmd); err != nil {
+	if _, err := s.runtime.Jail().Run(ctx, installCmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
 		return fmt.Errorf("apt-get install jq: %w", err)
 	}
@@ -69,7 +69,7 @@ func (s *PackageInstallation) jqIsInstalledOnTheWorkerNode(ctx context.Context) 
 func (s *PackageInstallation) theNVIDIADriverIsStillWorkingOnTheWorkerNode(ctx context.Context) error {
 	workerName := s.packageWorker.Name
 	cmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(workerName))
-	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
+	if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
 		return fmt.Errorf("verify nvidia-smi after install: %w", err)
 	}
@@ -79,7 +79,7 @@ func (s *PackageInstallation) theNVIDIADriverIsStillWorkingOnTheWorkerNode(ctx c
 func (s *PackageInstallation) jqIsAvailableOnTheWorkerNode(ctx context.Context) error {
 	workerName := s.packageWorker.Name
 	cmd := fmt.Sprintf("ssh %s 'jq --version >/dev/null'", framework.ShellQuote(workerName))
-	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
+	if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
 		s.logInstallFailureDiagnostics(ctx, workerName)
 		return fmt.Errorf("verify jq after install: %w", err)
 	}
@@ -95,11 +95,11 @@ func (s *PackageInstallation) logInstallFailureDiagnostics(ctx context.Context, 
 	}
 
 	for _, command := range commands {
-		output, err := s.exec.Jail().RunWithRetry(ctx, command, 2, 10*time.Second)
+		output, err := s.runtime.Jail().RunWithRetry(ctx, command, 2, 10*time.Second)
 		if err != nil {
-			s.exec.Logf("package installation debug command failed (%s): %v", command, err)
+			s.runtime.Logf("package installation debug command failed (%s): %v", command, err)
 			continue
 		}
-		s.exec.Logf("package installation debug output (%s):\n%s", command, strings.TrimSpace(output))
+		s.runtime.Logf("package installation debug output (%s):\n%s", command, strings.TrimSpace(output))
 	}
 }

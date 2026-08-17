@@ -23,7 +23,7 @@ func (s *SlurmClient) JobInfo(ctx context.Context, jobID string) (SlurmJobInfo, 
 	if id == "" {
 		return SlurmJobInfo{}, fmt.Errorf("job id is empty")
 	}
-	rawState, queueErr := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("squeue -h -j %s -o '%%T' 2>/dev/null || true", ShellQuote(id)))
+	rawState, queueErr := s.runtime.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("squeue -h -j %s -o '%%T' 2>/dev/null || true", ShellQuote(id)))
 	if queueErr != nil {
 		return SlurmJobInfo{}, fmt.Errorf("query squeue for job %s: %w", id, queueErr)
 	}
@@ -36,7 +36,7 @@ func (s *SlurmClient) JobInfo(ctx context.Context, jobID string) (SlurmJobInfo, 
 }
 
 func (s *SlurmClient) addBestEffortSacctInfo(ctx context.Context, info *SlurmJobInfo) {
-	rawDump, err := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf(
+	rawDump, err := s.runtime.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf(
 		"sacct -j %s --noheader --parsable2 --format=JobID,State,ExitCode,Reason,Start,End 2>/dev/null || true",
 		ShellQuote(info.ID),
 	))

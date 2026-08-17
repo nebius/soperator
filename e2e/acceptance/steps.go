@@ -8,7 +8,7 @@ import (
 )
 
 // StepRegistrar registers step definitions and scenario hooks for a suite.
-type StepRegistrar func(*godog.ScenarioContext, *framework.ClusterState, framework.Exec)
+type StepRegistrar func(*godog.ScenarioContext, *framework.ClusterInfo, framework.Runtime)
 
 // SharedStepRegistrar returns a registrar for the shared Soperator step definitions.
 func SharedStepRegistrar() StepRegistrar {
@@ -16,6 +16,6 @@ func SharedStepRegistrar() StepRegistrar {
 }
 
 // RegisterSharedSteps registers the shared Soperator step definitions.
-func RegisterSharedSteps(sc *godog.ScenarioContext, state *framework.ClusterState, exec framework.Exec) {
-	sharedsteps.RegisterAll(sc, state, exec)
+func RegisterSharedSteps(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime framework.Runtime) {
+	sharedsteps.RegisterAll(sc, info, runtime)
 }
