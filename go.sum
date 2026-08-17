@@ -218,8 +218,8 @@ github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee h1:W5t00kpgFd
 github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-github.com/nebius/gosdk v0.2.49 h1:jL2zg9LiIjosUQmsfuDKafuNInyUQ/tV6tf4CbmslA4=
-github.com/nebius/gosdk v0.2.49/go.mod h1:M25m7hhesvpkwuj5UFUMtlmI2vHK7e5rrYBl7QgeZaM=
+github.com/nebius/gosdk v0.2.51 h1:tNDtL3HvKfbb0IqzVnZAPnsp+Sv3tZhzlLYigSdFthg=
+github.com/nebius/gosdk v0.2.51/go.mod h1:M25m7hhesvpkwuj5UFUMtlmI2vHK7e5rrYBl7QgeZaM=
 github.com/oapi-codegen/runtime v1.2.0 h1:RvKc1CVS1QeKSNzO97FBQbSMZyQ8s6rZd+LpmzwHMP4=
 github.com/oapi-codegen/runtime v1.2.0/go.mod h1:Y7ZhmmlE8ikZOmuHRRndiIm7nf3xcVv+YMweKgG1DT0=
 github.com/oasdiff/yaml v0.1.1 h1:6nHx+pn9gBRM6YpBlFZFQGCCd1nuvqOBtTD3KKTgGxY=
