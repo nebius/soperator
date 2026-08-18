@@ -388,6 +388,13 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 
 	res.AddProperty("RebootProgram", "/opt/bin/slurm/reboot.sh")
+	res.AddProperty(
+		"PowerAction",
+		fmt.Sprintf(
+			"%s Location=slurmd Program=/opt/bin/slurm/worker_handoff.py",
+			consts.SlurmPowerActionWorkerHandoff,
+		),
+	)
 	res.AddComment("")
 
 	// Power management for ephemeral nodes.

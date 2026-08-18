@@ -14,6 +14,8 @@ const (
 
 	// SlurmDefaultResumeTimeout mirrors the CRD default of SlurmConfig.ResumeTimeout, in seconds.
 	SlurmDefaultResumeTimeout = 1800
+
+	SlurmPowerActionWorkerHandoff = "soperator-worker-handoff"
 )
 
 var (

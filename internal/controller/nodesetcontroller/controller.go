@@ -24,6 +24,7 @@ import (
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -67,9 +68,12 @@ type NodeSetReconciler struct {
 
 	AdvancedStatefulSet *reconciler.AdvancedStatefulSetReconciler
 	Service             *reconciler.ServiceReconciler
+	ServiceAccount      *reconciler.ServiceAccountReconciler
 	Secret              *reconciler.SecretReconciler
 	ConfigMap           *reconciler.ConfigMapReconciler
 	NodeSetPowerState   *reconciler.NodeSetPowerStateReconciler
+	Role                *reconciler.RoleReconciler
+	RoleBinding         *reconciler.RoleBindingReconciler
 }
 
 func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *NodeSetReconciler {
@@ -78,9 +82,12 @@ func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder
 		Reconciler:          r,
 		AdvancedStatefulSet: reconciler.NewAdvancedStatefulSetReconciler(r),
 		Service:             reconciler.NewServiceReconciler(r),
+		ServiceAccount:      reconciler.NewServiceAccountReconciler(r),
 		Secret:              reconciler.NewSecretReconciler(r),
 		ConfigMap:           reconciler.NewConfigMapReconciler(r),
 		NodeSetPowerState:   reconciler.NewNodeSetPowerStateReconciler(r),
+		Role:                reconciler.NewRoleReconciler(r),
+		RoleBinding:         reconciler.NewRoleBindingReconciler(r),
 	}
 }
 
@@ -137,6 +144,8 @@ func (r *NodeSetReconciler) createResourceChecks(saPredicate predicate.Funcs) []
 			Objects: []client.Object{
 				&corev1.ConfigMap{},
 				&corev1.Service{},
+				&rbacv1.Role{},
+				&rbacv1.RoleBinding{},
 				&kruisev1b1.StatefulSet{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
