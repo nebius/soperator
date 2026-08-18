@@ -14,28 +14,15 @@ import (
 )
 
 const (
-	commandTimeout     = 10 * time.Minute
-	soperatorNamespace = "soperator"
+	commandTimeout = 10 * time.Minute
 )
 
 type world struct {
 	logPrefix string
 
-	state          *framework.ClusterState
-	kubectlContext string
-}
-
-func (w *world) AvailableWorkers(kind framework.WorkerKind) []framework.WorkerRef {
-	switch kind {
-	case framework.WorkerAny:
-		return append([]framework.WorkerRef(nil), w.state.Workers...)
-	case framework.WorkerCPU:
-		return append([]framework.WorkerRef(nil), w.state.CPUWorkers...)
-	case framework.WorkerGPU:
-		return append([]framework.WorkerRef(nil), w.state.GPUWorkers...)
-	default:
-		return nil
-	}
+	kubectlContext   string
+	slurmClusterName string
+	soperatorVersion string
 }
 
 func (w *world) Logf(format string, args ...any) {
@@ -43,63 +30,51 @@ func (w *world) Logf(format string, args ...any) {
 }
 
 func (w *world) Kubectl() framework.ArgsScope {
-	return argsScope{
-		run: func(ctx context.Context, args ...string) (string, error) {
-			return w.Run(ctx, "kubectl", kubectlArgs(w.kubectlContext, args)...)
-		},
-	}
+	return framework.NewArgsScope(func(ctx context.Context, args ...string) (string, error) {
+		return w.Run(ctx, "kubectl", kubectlArgs(w.kubectlContext, args)...)
+	})
 }
 
 func (w *world) Local() framework.ArgsScope {
-	return argsScope{
-		run: func(ctx context.Context, args ...string) (string, error) {
-			if len(args) == 0 {
-				return "", fmt.Errorf("local command requires executable name")
-			}
-			return w.Run(ctx, args[0], args[1:]...)
-		},
-	}
+	return framework.NewArgsScope(func(ctx context.Context, args ...string) (string, error) {
+		if len(args) == 0 {
+			return "", fmt.Errorf("local command requires executable name")
+		}
+		return w.Run(ctx, args[0], args[1:]...)
+	})
 }
 
 func (w *world) Controller() framework.CommandScope {
-	return commandScope{
-		run: func(ctx context.Context, command string) (string, error) {
-			return w.Kubectl().Run(ctx, "exec", "-n", soperatorNamespace, w.state.PodName("controller-0"), "--", "bash", "-lc", command)
-		},
-	}
+	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+		return w.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, framework.SoperatorPodName(w.slurmClusterName, w.soperatorVersion, "controller-0"), "--", "bash", "-lc", command)
+	})
 }
 
 func (w *world) Jail() framework.CommandScope {
-	return commandScope{
-		run: func(ctx context.Context, command string) (string, error) {
-			return w.Kubectl().Run(ctx, "exec", "-n", soperatorNamespace, w.state.PodName("login-0"), "--", "chroot", "/mnt/jail", "bash", "-lc", command)
-		},
-	}
+	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+		return w.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, framework.SoperatorPodName(w.slurmClusterName, w.soperatorVersion, "login-0"), "--", "chroot", "/mnt/jail", "bash", "-lc", command)
+	})
 }
 
-func (w *world) Worker(worker framework.WorkerRef) framework.CommandScope {
-	return commandScope{
-		run: func(ctx context.Context, command string) (string, error) {
-			if strings.TrimSpace(worker.Name) == "" {
-				return "", fmt.Errorf("Slurm worker name is empty")
-			}
-			return w.Jail().Run(ctx, fmt.Sprintf("ssh %s %s", framework.ShellQuote(worker.Name), framework.ShellQuote(command)))
-		},
-	}
+func (w *world) Worker(worker framework.WorkerInfo) framework.CommandScope {
+	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+		if strings.TrimSpace(worker.Name) == "" {
+			return "", fmt.Errorf("Slurm worker name is empty")
+		}
+		return w.Jail().Run(ctx, fmt.Sprintf("ssh %s %s", framework.ShellQuote(worker.Name), framework.ShellQuote(command)))
+	})
 }
 
-func (w *world) WorkerPod(worker framework.WorkerRef) framework.CommandScope {
-	return commandScope{
-		run: func(ctx context.Context, command string) (string, error) {
-			if strings.TrimSpace(worker.PodName) == "" {
-				return "", fmt.Errorf("Kubernetes worker pod for Slurm node %s was not discovered", worker.Name)
-			}
-			return w.Kubectl().Run(ctx,
-				"exec", "-n", soperatorNamespace, worker.PodName, "-c", "slurmd",
-				"--", "bash", "-lc", command,
-			)
-		},
-	}
+func (w *world) WorkerPod(pod framework.WorkerPodInfo) framework.CommandScope {
+	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+		if strings.TrimSpace(pod.PodName) == "" {
+			return "", fmt.Errorf("Kubernetes worker pod for Slurm node %s is empty", pod.SlurmNodeName)
+		}
+		return w.Kubectl().Run(ctx,
+			"exec", "-n", framework.SoperatorNamespace, pod.PodName, "-c", "slurmd",
+			"--", "bash", "-lc", command,
+		)
+	})
 }
 
 func (w *world) Run(ctx context.Context, name string, args ...string) (string, error) {

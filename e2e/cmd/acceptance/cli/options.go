@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"nebius.ai/soperator-e2e/acceptance"
-	"nebius.ai/soperator-e2e/acceptance/framework"
 )
 
 const defaultSlurmClusterName = "soperator"
@@ -48,10 +47,6 @@ func Run(ctx context.Context, args []string) error {
 		return fmt.Errorf("parse acceptance args: %w", err)
 	}
 
-	state := &framework.ClusterState{
-		SlurmClusterName: opts.SlurmClusterName,
-		WorkersByNodeSet: make(map[string][]framework.WorkerRef),
-	}
 	targetSoperatorVersion, err := resolveTargetSoperatorVersion(ctx, opts)
 	if err != nil {
 		return err
@@ -62,16 +57,15 @@ func Run(ctx context.Context, args []string) error {
 		suite.Source.Paths = opts.ScenarioPaths
 	}
 	if opts.RunUnstableTests {
-		suite.FilterOptions.ExcludeUnstable = false
+		suite.ExcludeUnstable = false
 	}
 
-	runner, err := acceptance.NewRunner(acceptance.Options{
+	runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 		KubectlContext:         opts.KubectlContext,
 		SlurmClusterName:       opts.SlurmClusterName,
 		TargetSoperatorVersion: targetSoperatorVersion,
 		ReportDir:              opts.ReportDir,
 		Suites:                 []acceptance.SuiteConfig{suite},
-		State:                  state,
 	})
 	if err != nil {
 		return err

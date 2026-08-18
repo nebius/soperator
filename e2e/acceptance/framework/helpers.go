@@ -3,20 +3,11 @@ package framework
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 )
 
 const DefaultPollInterval = 10 * time.Second
-
-func RequiredEnv(key string) (string, error) {
-	value := strings.TrimSpace(os.Getenv(key))
-	if value == "" {
-		return "", fmt.Errorf("required environment variable %s is not set", key)
-	}
-	return value, nil
-}
 
 func ParseSbatchJobID(output string) (string, error) {
 	firstLine := strings.TrimSpace(strings.SplitN(output, "\n", 2)[0])
@@ -33,15 +24,15 @@ func ParseSbatchJobID(output string) (string, error) {
 	return jobID, nil
 }
 
-// WaitForWithJobAlive is Exec.WaitFor with an added short‑circuit on job death. On each tick:
-//   - if Slurm still considers the job alive (PENDING / RUNNING / COMPLETING / …), probe runs exactly
-//     as it would under a plain Exec.WaitFor; the tick result — ready / not‑ready / error — is passed through;
-//   - if the job has left the queue or transitioned to a terminal state (COMPLETED / FAILED / CANCELLED / TIMEOUT / …),
+// WaitForWithJobAlive is Runtime.WaitFor with an added short-circuit on job death. On each tick:
+//   - if Slurm still considers the job alive (PENDING / RUNNING / COMPLETING / ...), probe runs exactly
+//     as it would under a plain Runtime.WaitFor; the tick result - ready / not-ready / error - is passed through;
+//   - if the job has left the queue or transitioned to a terminal state (COMPLETED / FAILED / CANCELLED / TIMEOUT / ...),
 //     the wait aborts immediately with an error carrying the observed state and the sacct dump,
 //     so we don't burn the full timeout once the job can no longer possibly satisfy the probe.
 func WaitForWithJobAlive(
 	ctx context.Context,
-	exec Exec,
+	runtime Runtime,
 	slurm *SlurmClient,
 	job SbatchJob,
 	description string,
@@ -52,7 +43,7 @@ func WaitForWithJobAlive(
 		return fmt.Errorf("%s: job id is empty", description)
 	}
 
-	return exec.WaitFor(ctx, description, timeout, pollInterval, func(waitCtx context.Context) (bool, error) {
+	return runtime.WaitFor(ctx, description, timeout, pollInterval, func(waitCtx context.Context) (bool, error) {
 		// Only the queue state is inlined here; the sacct dump + log tails come
 		// from AnnotateWithJobLog at the outer call site, to keep the message
 		// single-sourced.

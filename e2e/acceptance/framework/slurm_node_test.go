@@ -22,3 +22,7 @@ func TestParseSlurmNodeInfo(t *testing.T) {
 	assert.True(t, info.ReasonContains("alloc_gpus_busy"))
 	assert.False(t, info.IsUsable())
 }
+
+func TestParseSlurmNodeNames(t *testing.T) {
+	assert.Equal(t, []string{"worker-0", "worker-1"}, ParseSlurmNodeNames("\nworker-0\nworker-1\nworker-0\n"))
+}

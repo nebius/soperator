@@ -3,7 +3,6 @@ package framework
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 )
@@ -14,11 +13,11 @@ import (
 const AcceptanceJobOutputDir = "/opt/soperator-outputs/shared/acceptance"
 
 type SlurmClient struct {
-	exec Exec
+	runtime Runtime
 }
 
-func NewSlurmClient(exec Exec) *SlurmClient {
-	return &SlurmClient{exec: exec}
+func NewSlurmClient(runtime Runtime) *SlurmClient {
+	return &SlurmClient{runtime: runtime}
 }
 
 // SbatchOptions describes a Slurm batch submission from an acceptance test.
@@ -64,7 +63,7 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 
 	var args []string
 	args = append(args, "--parsable")
-	args = append(args, fmt.Sprintf("--job-name=%s", jobName))
+	args = append(args, fmt.Sprintf("--job-name=%s", ShellQuote(jobName)))
 	args = append(args, fmt.Sprintf("-o %s/%%x-%%j.out", AcceptanceJobOutputDir))
 	args = append(args, fmt.Sprintf("-e %s/%%x-%%j.err", AcceptanceJobOutputDir))
 	if opts.Nodes > 0 {
@@ -90,7 +89,7 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	)
 
 	// TODO: Add safe retries for sbatch without creating duplicate jobs.
-	out, err := s.exec.Jail().Run(ctx, command)
+	out, err := s.runtime.Jail().Run(ctx, command)
 	if err != nil {
 		return SbatchJob{}, fmt.Errorf("submit sbatch job %q: %w", jobName, err)
 	}
@@ -106,21 +105,9 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	}, nil
 }
 
-func (s *SlurmClient) AnyWorkers(count int) ([]WorkerRef, error) {
-	return pickAnyWorkerRefs(s.exec.AvailableWorkers(WorkerAny), count, "workers")
-}
-
-func (s *SlurmClient) AnyCPUWorkers(count int) ([]WorkerRef, error) {
-	return pickAnyWorkerRefs(s.exec.AvailableWorkers(WorkerCPU), count, "CPU workers")
-}
-
-func (s *SlurmClient) AnyGPUWorkers(count int) ([]WorkerRef, error) {
-	return pickAnyWorkerRefs(s.exec.AvailableWorkers(WorkerGPU), count, "GPU workers")
-}
-
 func (s *SlurmClient) WaitForJobRunning(ctx context.Context, jobID string, timeout time.Duration) error {
-	return s.exec.WaitFor(ctx, fmt.Sprintf("job %s running", jobID), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		status, err := s.exec.Jail().RunWithDefaultRetry(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", ShellQuote(jobID)))
+	return s.runtime.WaitFor(ctx, fmt.Sprintf("job %s running", jobID), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+		status, err := s.runtime.Jail().RunWithDefaultRetry(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", ShellQuote(jobID)))
 		if err != nil {
 			return false, err
 		}
@@ -129,8 +116,8 @@ func (s *SlurmClient) WaitForJobRunning(ctx context.Context, jobID string, timeo
 }
 
 func (s *SlurmClient) WaitForJobGone(ctx context.Context, jobID string, timeout time.Duration) error {
-	return s.exec.WaitFor(ctx, fmt.Sprintf("job %s gone from queue", jobID), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		status, err := s.exec.Jail().RunWithDefaultRetry(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", ShellQuote(jobID)))
+	return s.runtime.WaitFor(ctx, fmt.Sprintf("job %s gone from queue", jobID), timeout, DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+		status, err := s.runtime.Jail().RunWithDefaultRetry(waitCtx, fmt.Sprintf("squeue -h -j %s -o '%%T'", ShellQuote(jobID)))
 		if err != nil {
 			// Some Slurm deployments exit non‑zero with "Invalid job id specified"
 			// once a job has left the active queue. Treat that as "gone" so this
@@ -149,7 +136,7 @@ func (s *SlurmClient) CancelJob(ctx context.Context, jobID string, waitTimeout t
 		return nil
 	}
 
-	if _, err := s.exec.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("scancel %s", ShellQuote(jobID))); err != nil {
+	if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("scancel %s", ShellQuote(jobID))); err != nil {
 		if !isMissingJobError(err) {
 			return fmt.Errorf("scancel job %s: %w", jobID, err)
 		}
@@ -162,22 +149,6 @@ func (s *SlurmClient) CancelJob(ctx context.Context, jobID string, waitTimeout t
 		return fmt.Errorf("wait for job %s to finish: %w", jobID, err)
 	}
 	return nil
-}
-
-func pickAnyWorkerRefs(pool []WorkerRef, count int, label string) ([]WorkerRef, error) {
-	if count < 1 {
-		return nil, fmt.Errorf("invalid %s count %d", label, count)
-	}
-	if len(pool) < count {
-		return nil, fmt.Errorf("found %d %s, need %d", len(pool), label, count)
-	}
-
-	indices := rand.Perm(len(pool))[:count]
-	out := make([]WorkerRef, 0, count)
-	for _, i := range indices {
-		out = append(out, pool[i])
-	}
-	return out, nil
 }
 
 func isMissingJobError(err error) bool {

@@ -1,5 +1,5 @@
 Feature: Internal SSH
-  @soperator_version_>=5.0.0
+  @soperator_version_>=4.0.0
   Scenario: A regular user can SSH to a worker without extra options
     Given a regular user account exists on the login node
     When the user SSHs from the login node to a worker

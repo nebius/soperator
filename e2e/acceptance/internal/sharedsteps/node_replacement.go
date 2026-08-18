@@ -21,19 +21,21 @@ const (
 )
 
 type NodeReplacement struct {
-	exec               framework.Exec
+	runtime            framework.Runtime
 	slurm              *framework.SlurmClient
-	replacementWorker  framework.WorkerRef
+	selector           *framework.WorkerSelector
+	replacementWorker  framework.WorkerInfo
 	originalInstanceID string
 	maintenanceJob     framework.SbatchJob
 	preExistingWorkers []string
 	gpuWorkers         map[string]struct{}
 }
 
-func NewNodeReplacement(exec framework.Exec, slurm *framework.SlurmClient) *NodeReplacement {
+func NewNodeReplacement(runtime framework.Runtime, slurm *framework.SlurmClient, selector *framework.WorkerSelector) *NodeReplacement {
 	return &NodeReplacement{
-		exec:  exec,
-		slurm: slurm,
+		runtime:  runtime,
+		slurm:    slurm,
+		selector: selector,
 	}
 }
 
@@ -51,10 +53,10 @@ func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
 func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
 	if !s.maintenanceJob.IsZero() {
 		if cancelErr := s.cancelJob(ctx, s.maintenanceJob.ID); cancelErr != nil {
-			s.exec.Logf("cleanup: cancel maintenance job: %v", cancelErr)
+			s.runtime.Logf("cleanup: cancel maintenance job: %v", cancelErr)
 		}
 	}
-	s.replacementWorker = framework.WorkerRef{}
+	s.replacementWorker = framework.WorkerInfo{}
 	s.originalInstanceID = ""
 	s.maintenanceJob = framework.SbatchJob{}
 	s.preExistingWorkers = nil
@@ -62,28 +64,32 @@ func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
 }
 
 func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnWorkerNode(ctx context.Context, workerType string) error {
-	workers, err := s.anyWorkersByType(workerType, 1)
+	snapshot, err := s.selector.Snapshot(ctx)
 	if err != nil {
 		return err
 	}
-	return s.submitTestJobOnWorker(ctx, workers[0])
+	workers, err := s.anyWorkersByType(snapshot, workerType, 1)
+	if err != nil {
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
+	}
+	return s.submitTestJobOnWorker(ctx, workers[0], snapshot)
 }
 
-func (s *NodeReplacement) anyWorkersByType(workerType string, count int) ([]framework.WorkerRef, error) {
+func (s *NodeReplacement) anyWorkersByType(snapshot framework.WorkerSnapshot, workerType string, count int) ([]framework.WorkerInfo, error) {
 	switch strings.ToUpper(workerType) {
 	case "CPU":
-		return s.slurm.AnyCPUWorkers(count)
+		return snapshot.PickCPUWorkers(count)
 	case "GPU":
-		return s.slurm.AnyGPUWorkers(count)
+		return snapshot.PickGPUWorkers(count)
 	default:
 		return nil, fmt.Errorf("unsupported worker type %q", workerType)
 	}
 }
 
-func (s *NodeReplacement) submitTestJobOnWorker(ctx context.Context, worker framework.WorkerRef) error {
+func (s *NodeReplacement) submitTestJobOnWorker(ctx context.Context, worker framework.WorkerInfo, snapshot framework.WorkerSnapshot) error {
 	s.replacementWorker = worker
-	s.preExistingWorkers = workerNamesFromRefs(s.exec.AvailableWorkers(framework.WorkerAny))
-	s.gpuWorkers = workerNameSet(s.exec.AvailableWorkers(framework.WorkerGPU))
+	s.preExistingWorkers = framework.WorkerNames(snapshot.Workers)
+	s.gpuWorkers = workerNameSet(snapshot.GPUWorkers)
 
 	node, err := s.slurm.NodeInfo(ctx, s.replacementWorker.Name)
 	if err != nil {
@@ -104,7 +110,7 @@ func (s *NodeReplacement) submitTestJobOnWorker(ctx context.Context, worker fram
 		return err
 	}
 	s.maintenanceJob = job
-	s.exec.Logf("node replacement: submitted maintenance job id=%s stdout=%s stderr=%s",
+	s.runtime.Logf("node replacement: submitted maintenance job id=%s stdout=%s stderr=%s",
 		job.ID, job.StdoutPath, job.StderrPath)
 
 	return s.slurm.WaitForJobRunning(ctx, job.ID, nodeReplacementJobTimeout)
@@ -114,7 +120,7 @@ func (s *NodeReplacement) aMaintenanceEventIsTriggeredForThatNode(ctx context.Co
 	patch := fmt.Sprintf(
 		`{"status":{"conditions":[{"type":"NebiusMaintenanceScheduled","status":"True","reason":"AcceptanceTest","message":"Maintenance scheduled for node","lastTransitionTime":"%s"}]}}`,
 		time.Now().UTC().Format(time.RFC3339))
-	if _, err := s.exec.Kubectl().Run(ctx, "patch", "node", s.originalInstanceID,
+	if _, err := s.runtime.Kubectl().Run(ctx, "patch", "node", s.originalInstanceID,
 		"--subresource=status", "--type=strategic", "-p", patch); err != nil {
 		return fmt.Errorf("patch maintenance condition: %w", err)
 	}
@@ -123,7 +129,7 @@ func (s *NodeReplacement) aMaintenanceEventIsTriggeredForThatNode(ctx context.Co
 
 func (s *NodeReplacement) theNodeIsDrainedWithAMaintenanceReason(ctx context.Context) error {
 	workerName := s.replacementWorker.Name
-	return s.exec.WaitFor(ctx, "node drain reason", nodeReplacementDrainTimeout, 15*time.Second, func(waitCtx context.Context) (bool, error) {
+	return s.runtime.WaitFor(ctx, "node drain reason", nodeReplacementDrainTimeout, 15*time.Second, func(waitCtx context.Context) (bool, error) {
 		node, err := s.slurm.NodeInfo(waitCtx, workerName)
 		if err != nil {
 			return false, err
@@ -142,8 +148,8 @@ func (s *NodeReplacement) theTestJobIsCancelled(ctx context.Context) error {
 
 func (s *NodeReplacement) theOldInstanceIsRemoved(ctx context.Context) error {
 	originalInstanceID := s.originalInstanceID
-	return s.exec.WaitFor(ctx, "old instance removal", nodeReplacementRemoveTimeout, 30*time.Second, func(waitCtx context.Context) (bool, error) {
-		_, err := s.exec.Local().Run(waitCtx, "nebius", "compute", "instance", "get", "--id", originalInstanceID, "--format", "json")
+	return s.runtime.WaitFor(ctx, "old instance removal", nodeReplacementRemoveTimeout, 30*time.Second, func(waitCtx context.Context) (bool, error) {
+		_, err := s.runtime.Local().Run(waitCtx, "nebius", "compute", "instance", "get", "--id", originalInstanceID, "--format", "json")
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
 				return true, nil
@@ -157,7 +163,7 @@ func (s *NodeReplacement) theOldInstanceIsRemoved(ctx context.Context) error {
 func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) error {
 	workerName := s.replacementWorker.Name
 	originalInstanceID := s.originalInstanceID
-	return s.exec.WaitFor(ctx, "replacement node ready", nodeReplacementReadyTimeout, 60*time.Second, func(waitCtx context.Context) (bool, error) {
+	return s.runtime.WaitFor(ctx, "replacement node ready", nodeReplacementReadyTimeout, 60*time.Second, func(waitCtx context.Context) (bool, error) {
 		node, err := s.slurm.NodeInfo(waitCtx, workerName)
 		if err != nil {
 			return false, err
@@ -180,10 +186,10 @@ func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) e
 
 func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Context) error {
 	workerName := s.replacementWorker.Name
-	if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=1 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
+	if _, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=1 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
 		node, stateErr := s.slurm.NodeInfo(ctx, workerName)
 		if stateErr == nil {
-			s.exec.Logf("replacement worker state after failed final validation: name=%s state=%s reason=%s instance_id=%s",
+			s.runtime.Logf("replacement worker state after failed final validation: name=%s state=%s reason=%s instance_id=%s",
 				node.Name, node.State, node.Reason, node.InstanceID)
 		}
 		return fmt.Errorf("validate replacement worker is operational from login node: %w", err)
@@ -228,14 +234,14 @@ func (s *NodeReplacement) validateWorkerNodeState(ctx context.Context, workerNam
 }
 
 func (s *NodeReplacement) validateCPUWorker(ctx context.Context, workerName string) error {
-	if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("srun -w %s true", framework.ShellQuote(workerName))); err != nil {
+	if _, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("srun -w %s true", framework.ShellQuote(workerName))); err != nil {
 		return fmt.Errorf("validate worker accepts a targeted Slurm job: %w", err)
 	}
 	return nil
 }
 
 func (s *NodeReplacement) validateGPUWorker(ctx context.Context, workerName string) error {
-	if _, err := s.exec.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=1 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
+	if _, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=1 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
 		return fmt.Errorf("validate worker GPU from login node: %w", err)
 	}
 	return nil
@@ -252,18 +258,7 @@ func (s *NodeReplacement) cancelJob(ctx context.Context, maintenanceJobID string
 	return nil
 }
 
-func workerNamesFromRefs(workers []framework.WorkerRef) []string {
-	names := make([]string, 0, len(workers))
-	for _, worker := range workers {
-		if strings.TrimSpace(worker.Name) == "" {
-			continue
-		}
-		names = append(names, worker.Name)
-	}
-	return names
-}
-
-func workerNameSet(workers []framework.WorkerRef) map[string]struct{} {
+func workerNameSet(workers []framework.WorkerInfo) map[string]struct{} {
 	names := make(map[string]struct{}, len(workers))
 	for _, worker := range workers {
 		if strings.TrimSpace(worker.Name) == "" {

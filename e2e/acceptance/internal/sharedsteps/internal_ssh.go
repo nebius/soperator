@@ -13,14 +13,14 @@ import (
 const sshUserName = "bob"
 
 type InternalSSH struct {
-	exec         framework.Exec
-	slurm        *framework.SlurmClient
-	targetWorker framework.WorkerRef
+	runtime      framework.Runtime
+	selector     *framework.WorkerSelector
+	targetWorker framework.WorkerInfo
 	sshOutput    string
 }
 
-func NewInternalSSH(exec framework.Exec, slurm *framework.SlurmClient) *InternalSSH {
-	return &InternalSSH{exec: exec, slurm: slurm}
+func NewInternalSSH(runtime framework.Runtime, selector *framework.WorkerSelector) *InternalSSH {
+	return &InternalSSH{runtime: runtime, selector: selector}
 }
 
 func (s *InternalSSH) RegisterSteps(sc *godog.ScenarioContext) {
@@ -30,20 +30,20 @@ func (s *InternalSSH) RegisterSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *InternalSSH) CleanupAndReset(ctx context.Context) {
-	s.targetWorker = framework.WorkerRef{}
+	s.targetWorker = framework.WorkerInfo{}
 	s.sshOutput = ""
 }
 
 func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Context) error {
-	workers, err := s.slurm.AnyWorkers(1)
+	workers, err := s.selector.PickWorkers(ctx, 1)
 	if err != nil {
-		return err
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	s.targetWorker = workers[0]
 
 	cmd := fmt.Sprintf("id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s",
 		framework.ShellQuote(sshUserName), framework.ShellQuote(sshUserName))
-	if _, err := s.exec.Jail().Run(ctx, cmd); err != nil {
+	if _, err := s.runtime.Jail().Run(ctx, cmd); err != nil {
 		return fmt.Errorf("create user %s: %w", sshUserName, err)
 	}
 
@@ -62,7 +62,7 @@ func (s *InternalSSH) theUserSSHsFromTheLoginNodeToAWorker(ctx context.Context) 
 			worker,
 		)),
 	)
-	out, err := s.exec.Jail().RunWithDefaultRetry(ctx, cmd)
+	out, err := s.runtime.Jail().RunWithDefaultRetry(ctx, cmd)
 	if err != nil {
 		return fmt.Errorf("ssh from login to worker as %s: %w", sshUserName, err)
 	}

@@ -36,15 +36,16 @@ type topologyGraph struct {
 }
 
 type Topology struct {
-	exec  framework.Exec
-	state *framework.ClusterState
+	runtime  framework.Runtime
+	selector *framework.WorkerSelector
 
+	workers       []framework.WorkerInfo
 	graph         *topologyGraph
 	reportedAddrs map[string]string
 }
 
-func NewTopology(state *framework.ClusterState, exec framework.Exec) *Topology {
-	return &Topology{exec: exec, state: state}
+func NewTopology(runtime framework.Runtime, selector *framework.WorkerSelector) *Topology {
+	return &Topology{runtime: runtime, selector: selector}
 }
 
 func (s *Topology) RegisterSteps(sc *godog.ScenarioContext) {
@@ -56,39 +57,48 @@ func (s *Topology) RegisterSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *Topology) CleanupAndReset(ctx context.Context) {
+	s.workers = nil
 	s.graph = nil
 	s.reportedAddrs = nil
 }
 
 func (s *Topology) theSlurmTopologyPluginIsTree(ctx context.Context) error {
-	out, err := s.exec.Controller().RunWithDefaultRetry(ctx,
+	out, err := s.runtime.Controller().RunWithDefaultRetry(ctx,
 		`scontrol show config | awk -F'= *' '/^TopologyPlugin /{print $2; exit}'`)
 	if err != nil {
 		return fmt.Errorf("read TopologyPlugin from scontrol: %w", err)
 	}
 	plugin := strings.TrimSpace(out)
 	if plugin != "topology/tree" {
-		s.exec.Logf("topology plugin is %q, skipping scenario", plugin)
+		s.runtime.Logf("topology plugin is %q, skipping scenario", plugin)
 		return godog.ErrSkip
 	}
 	return nil
 }
 
 func (s *Topology) scontrolTopologyIsParsedIntoASwitchTree(ctx context.Context) error {
-	raw, err := s.exec.Controller().RunWithDefaultRetry(ctx, "scontrol show topology")
+	raw, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "scontrol show topology")
 	if err != nil {
 		return fmt.Errorf("scontrol show topology: %w", err)
 	}
-	s.exec.Logf("scontrol show topology:\n%s", strings.TrimSpace(raw))
+	s.runtime.Logf("scontrol show topology:\n%s", strings.TrimSpace(raw))
 
-	workerNames := make([]string, 0, len(s.state.Workers))
-	for _, w := range s.state.Workers {
+	snapshot, err := s.selector.Snapshot(ctx)
+	if err != nil {
+		return err
+	}
+	workers := snapshot.Workers
+	if len(workers) == 0 {
+		return fmt.Errorf("no workers found")
+	}
+	workerNames := make([]string, 0, len(workers))
+	for _, w := range workers {
 		workerNames = append(workerNames, w.Name)
 	}
 
 	expand := func(hostlist string) ([]string, error) {
 		cmd := fmt.Sprintf("scontrol show hostnames %s", framework.ShellQuote(hostlist))
-		out, err := s.exec.Controller().RunWithDefaultRetry(ctx, cmd)
+		out, err := s.runtime.Controller().RunWithDefaultRetry(ctx, cmd)
 		if err != nil {
 			return nil, err
 		}
@@ -106,6 +116,7 @@ func (s *Topology) scontrolTopologyIsParsedIntoASwitchTree(ctx context.Context) 
 	if err != nil {
 		return fmt.Errorf("parse topology: %w", err)
 	}
+	s.workers = workers
 	s.graph = graph
 	return nil
 }
@@ -115,7 +126,7 @@ func (s *Topology) everyWorkerIsPresentInTheTopology() error {
 		return fmt.Errorf("topology graph not parsed yet")
 	}
 	var missing []string
-	for _, worker := range s.state.Workers {
+	for _, worker := range s.workers {
 		n := s.graph.nodes[worker.Name]
 		if n == nil || !n.isWorker {
 			missing = append(missing, worker.Name)
@@ -131,17 +142,22 @@ func (s *Topology) aJobRunsOnAllAvailableWorkers(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, topologyJobTimeout)
 	defer cancel()
 
-	if len(s.state.Workers) == 0 {
-		return fmt.Errorf("no workers discovered")
+	snapshot, err := s.selector.Snapshot(ctx)
+	if err != nil {
+		return err
 	}
-	// We target every discovered worker without re-filtering by Slurm state.
-	// The acceptance suite expects the cluster it owns to have all nodes
-	// IDLE at this point; a drained/down/suspended node would be a symptom
-	// of a prior failure worth surfacing, not something to silently skip.
-	// If the cluster is genuinely in a bad state, the srun call fails within
-	// the 10-minute context timeout rather than hanging.
-	names := make([]string, 0, len(s.state.Workers))
-	for _, w := range s.state.Workers {
+	if err := snapshot.RequireAllWorkersUsable(); err != nil {
+		return fmt.Errorf("validate topology workers: %w", err)
+	}
+	s.workers = snapshot.Workers
+	if len(s.workers) == 0 {
+		return fmt.Errorf("no workers found")
+	}
+	// Target every configured worker. Degraded or missing workers are rejected
+	// above so a prior failure is surfaced immediately instead of being skipped
+	// or left to fail through the srun timeout.
+	names := make([]string, 0, len(s.workers))
+	for _, w := range s.workers {
 		names = append(names, w.Name)
 	}
 
@@ -150,8 +166,8 @@ func (s *Topology) aJobRunsOnAllAvailableWorkers(ctx context.Context) error {
 		len(names),
 		framework.ShellQuote(strings.Join(names, ",")),
 		framework.ShellQuote(inner))
-	out, err := s.exec.Jail().Run(ctx, cmd)
-	s.exec.Logf("srun topology addrs output:\n%s", strings.TrimSpace(out))
+	out, err := s.runtime.Jail().Run(ctx, cmd)
+	s.runtime.Logf("srun topology addrs output:\n%s", strings.TrimSpace(out))
 	if err != nil {
 		return fmt.Errorf("srun for topology addrs: %w", err)
 	}

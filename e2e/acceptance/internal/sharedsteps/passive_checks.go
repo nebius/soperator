@@ -38,11 +38,13 @@ var (
 )
 
 type PassiveChecks struct {
-	exec  framework.Exec
-	slurm *framework.SlurmClient
+	info     *framework.ClusterInfo
+	runtime  framework.Runtime
+	slurm    *framework.SlurmClient
+	selector *framework.WorkerSelector
 
-	worker    framework.WorkerRef
-	gpuWorker framework.WorkerRef
+	worker    framework.WorkerInfo
+	gpuWorker framework.WorkerInfo
 
 	cpuPrologOutput string
 	cpuEpilogOutput string
@@ -63,10 +65,12 @@ type PassiveChecks struct {
 	allocMemJob            framework.SbatchJob
 }
 
-func NewPassiveChecks(exec framework.Exec, slurm *framework.SlurmClient) *PassiveChecks {
+func NewPassiveChecks(info *framework.ClusterInfo, runtime framework.Runtime, slurm *framework.SlurmClient, selector *framework.WorkerSelector) *PassiveChecks {
 	return &PassiveChecks{
-		exec:  exec,
-		slurm: slurm,
+		info:     info,
+		runtime:  runtime,
+		slurm:    slurm,
+		selector: selector,
 	}
 }
 
@@ -105,8 +109,8 @@ func (s *PassiveChecks) CleanupAndReset(ctx context.Context) {
 	s.cleanupAndResetAllocGPU(ctx)
 	s.cleanupAndResetTmpfs(ctx)
 
-	s.worker = framework.WorkerRef{}
-	s.gpuWorker = framework.WorkerRef{}
+	s.worker = framework.WorkerInfo{}
+	s.gpuWorker = framework.WorkerInfo{}
 	s.cpuPrologOutput = ""
 	s.cpuEpilogOutput = ""
 	s.cpuHooksJob = framework.SbatchJob{}
@@ -119,12 +123,12 @@ func (s *PassiveChecks) aWorkerIsSelected(ctx context.Context) error {
 	if s.worker.Name != "" {
 		return nil
 	}
-	workers, err := s.slurm.AnyWorkers(1)
+	workers, err := s.selector.PickWorkers(ctx, 1)
 	if err != nil {
-		return err
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	s.worker = workers[0]
-	s.exec.Logf("passive checks: selected worker=%s", s.worker.Name)
+	s.runtime.Logf("passive checks: selected worker=%s", s.worker.Name)
 	return nil
 }
 
@@ -144,7 +148,7 @@ func (s *PassiveChecks) aCPUOnlySlurmJobRunsOnTheSelectedWorker(ctx context.Cont
 	if err != nil {
 		return err
 	}
-	if err := waitForJobSucceeded(ctx, s.exec, s.slurm, job, passiveCPUJobTimeout); err != nil {
+	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, job, passiveCPUJobTimeout); err != nil {
 		return err
 	}
 	s.cpuHooksJob = job
@@ -157,7 +161,7 @@ func (s *PassiveChecks) theCPUJobPrologCheckRunnerOutputIsFreshAndHealthy(ctx co
 		return err
 	}
 	s.cpuPrologOutput = output
-	return assertLoggedCheckOutputsExist(ctx, s.exec, s.worker, output)
+	return assertLoggedCheckOutputsExist(ctx, s.runtime, s.worker, output)
 }
 
 func (s *PassiveChecks) theCPUJobEpilogCheckRunnerOutputIsFreshAndHealthy(ctx context.Context) error {
@@ -166,14 +170,14 @@ func (s *PassiveChecks) theCPUJobEpilogCheckRunnerOutputIsFreshAndHealthy(ctx co
 		return err
 	}
 	s.cpuEpilogOutput = output
-	return assertLoggedCheckOutputsExist(ctx, s.exec, s.worker, output)
+	return assertLoggedCheckOutputsExist(ctx, s.runtime, s.worker, output)
 }
 
 func (s *PassiveChecks) cpuCheckRunnerOutput(ctx context.Context, hook string) (string, error) {
 	if s.cpuHooksJob.IsZero() {
 		return "", fmt.Errorf("CPU hook job is not captured")
 	}
-	output, err := waitForHealthyCheckRunnerOutputForJob(ctx, s.exec, s.worker, checkRunnerOutputPath(s.worker.Name, hook), s.cpuHooksJob.ID, passiveCPUJobTimeout)
+	output, err := waitForHealthyCheckRunnerOutputForJob(ctx, s.runtime, s.worker, checkRunnerOutputPath(s.info.TargetSoperatorVersion, s.worker.Name, hook), s.cpuHooksJob.ID, passiveCPUJobTimeout)
 	if err != nil {
 		return "", fmt.Errorf("%s check_runner output: %w", hook, err)
 	}
@@ -200,14 +204,14 @@ func (s *PassiveChecks) theDropPageCachePassiveCheckCompletedInEpilog(ctx contex
 	if s.cpuHooksJob.IsZero() {
 		return fmt.Errorf("CPU hook job is not captured")
 	}
-	epilog, err := waitForHealthyCheckRunnerOutputForJob(ctx, s.exec, s.worker, checkRunnerOutputPath(s.worker.Name, "epilog"), s.cpuHooksJob.ID, passiveCPUJobTimeout)
+	epilog, err := waitForHealthyCheckRunnerOutputForJob(ctx, s.runtime, s.worker, checkRunnerOutputPath(s.info.TargetSoperatorVersion, s.worker.Name, "epilog"), s.cpuHooksJob.ID, passiveCPUJobTimeout)
 	if err != nil {
 		return err
 	}
 	if err := assertCheckRunnerCheckOK(epilog, "drop_page_cache"); err != nil {
 		return err
 	}
-	return assertLoggedCheckOutputsExist(ctx, s.exec, s.worker, epilog)
+	return assertLoggedCheckOutputsExist(ctx, s.runtime, s.worker, epilog)
 }
 
 func (s *PassiveChecks) memoryPressureIsCreatedOnTheSelectedWorker(ctx context.Context) error {
@@ -234,10 +238,10 @@ func (s *PassiveChecks) memoryPressureIsCreatedOnTheSelectedWorker(ctx context.C
 		framework.ShellQuote(passiveAllocMemPressurePath),
 		framework.ShellQuote(passiveAllocMemPressurePath),
 	)
-	if _, err := s.exec.Worker(s.worker).RunWithDefaultRetry(ctx, cmd); err != nil {
+	if _, err := s.runtime.Worker(s.worker).RunWithDefaultRetry(ctx, cmd); err != nil {
 		return fmt.Errorf("create memory pressure on %s: %w", s.worker.Name, err)
 	}
-	s.exec.Logf("alloc_mem_used: created %d bytes of memory pressure on %s", pressureBytes, s.worker.Name)
+	s.runtime.Logf("alloc_mem_used: created %d bytes of memory pressure on %s", pressureBytes, s.worker.Name)
 	return nil
 }
 
@@ -260,27 +264,27 @@ func (s *PassiveChecks) anAllMemorySlurmJobIsSubmittedToTheSelectedWorker(ctx co
 
 	// alloc_mem_used should reject the allocation in Prolog while the node has
 	// less available memory than the job requested, then drain the node.
-	if err := framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, job, s.slurm.WaitForJobGone(ctx, job.ID, passiveAllocMemJobTimeout)); err != nil {
+	if err := framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, s.slurm.WaitForJobGone(ctx, job.ID, passiveAllocMemJobTimeout)); err != nil {
 		return err
 	}
 
 	info, err := s.slurm.JobInfo(ctx, job.ID)
 	if err != nil {
-		return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, job, err)
+		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, err)
 	}
 	if !info.SacctFound {
-		return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, job,
+		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
 			fmt.Errorf("expected Slurm job %s to be recorded in sacct after Prolog failure, got:\n%s", job.ID, info.SacctDump))
 	}
 	if info.CompletedSuccessfully() {
-		return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, job,
+		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
 			fmt.Errorf("expected Slurm job %s to fail in Prolog due to alloc_mem_used, got state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit))
 	}
 	if info.IsAlive() {
-		return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, job,
+		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
 			fmt.Errorf("expected Slurm job %s to be finished after leaving squeue, got state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit))
 	}
-	s.exec.Logf("alloc_mem_used trigger job %s finished as expected: state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit)
+	s.runtime.Logf("alloc_mem_used trigger job %s finished as expected: state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit)
 	s.allocMemJob = framework.SbatchJob{}
 	return nil
 }
@@ -300,7 +304,7 @@ func (s *PassiveChecks) healthCheckProgramRunsOnTheSelectedWorker(ctx context.Co
 	if s.worker.Name == "" {
 		return fmt.Errorf("worker is not selected")
 	}
-	return runManualHCProgram(ctx, s.exec, s.worker)
+	return runManualHCProgram(ctx, s.runtime, s.worker)
 }
 
 func (s *PassiveChecks) theSelectedWorkerNoLongerHasAllocMemUsedReason(ctx context.Context) error {
@@ -325,13 +329,13 @@ func (s *PassiveChecks) aGPUWorkerIsSelected(ctx context.Context) error {
 	if s.gpuWorker.Name != "" {
 		return nil
 	}
-	workers, err := s.slurm.AnyGPUWorkers(1)
+	workers, err := s.selector.PickGPUWorkers(ctx, 1)
 	if err != nil {
-		return err
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	s.gpuWorker = workers[0]
 	s.worker = s.gpuWorker
-	s.exec.Logf("passive checks: selected GPU worker=%s", s.gpuWorker.Name)
+	s.runtime.Logf("passive checks: selected GPU worker=%s", s.gpuWorker.Name)
 	return nil
 }
 
@@ -352,7 +356,7 @@ func (s *PassiveChecks) aSmallGPUSlurmJobRunsOnTheSelectedGPUWorker(ctx context.
 	if err != nil {
 		return err
 	}
-	if err := waitForJobSucceeded(ctx, s.exec, s.slurm, job, passiveGPUJobTimeout); err != nil {
+	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, job, passiveGPUJobTimeout); err != nil {
 		return err
 	}
 	s.gpuHooksJob = job
@@ -374,7 +378,7 @@ func (s *PassiveChecks) gpuJobHealthCheckReportIsFreshAndPassing(ctx context.Con
 	if s.gpuHooksJob.IsZero() {
 		return fmt.Errorf("GPU hook job is not captured")
 	}
-	ids, err := waitForPassingHealthCheckReportsForJob(ctx, s.exec, s.gpuWorker, gpuHealthCheckOutputPath(s.gpuWorker.Name, hook), s.gpuHooksJob.ID, passiveGPUJobTimeout)
+	ids, err := waitForPassingHealthCheckReportsForJob(ctx, s.runtime, s.gpuWorker, gpuHealthCheckOutputPath(s.info.TargetSoperatorVersion, s.gpuWorker.Name, hook), s.gpuHooksJob.ID, passiveGPUJobTimeout)
 	if err != nil {
 		return fmt.Errorf("%s %s report: %w", hook, gpuHealthCheckName, err)
 	}
@@ -386,7 +390,7 @@ func (s *PassiveChecks) rawGPUHealthCheckCommandOutputsArePresent(ctx context.Co
 	if len(s.gpuHealthRunIDs) == 0 {
 		return fmt.Errorf("GPU health-check run IDs are not captured")
 	}
-	return assertHealthCheckRawOutputsPresent(ctx, s.exec, s.gpuWorker, s.gpuHealthRunIDs)
+	return assertHealthCheckRawOutputsPresent(ctx, s.runtime, s.gpuWorker, s.info.TargetSoperatorVersion, s.gpuHealthRunIDs)
 }
 
 func (s *PassiveChecks) aSlurmJobChecksItsJobTmpfsDirectoryOnTheSelectedWorker(ctx context.Context) error {
@@ -404,10 +408,10 @@ func (s *PassiveChecks) aSlurmJobChecksItsJobTmpfsDirectoryOnTheSelectedWorker(c
 	if err != nil {
 		return err
 	}
-	if err := waitForJobSucceeded(ctx, s.exec, s.slurm, job, passiveCPUJobTimeout); err != nil {
+	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, job, passiveCPUJobTimeout); err != nil {
 		return err
 	}
-	stdout, err := readJobFile(ctx, s.exec, job.StdoutPath)
+	stdout, err := readJobFile(ctx, s.runtime, job.StdoutPath)
 	if err != nil {
 		return err
 	}
@@ -435,13 +439,13 @@ func (s *PassiveChecks) theJobTmpfsDirectoryIsRemovedAfterTheJobExits(ctx contex
 		"/mnt/memory/job_" + s.tmpfsJobID,
 		"/mnt/jail/mnt/memory/job_" + s.tmpfsJobID,
 	}
-	if err := s.exec.WaitFor(ctx, "job tmpfs directory removed", passiveTmpfsCleanupTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	if err := s.runtime.WaitFor(ctx, "job tmpfs directory removed", passiveTmpfsCleanupTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		var checks []string
 		for _, target := range targets {
 			checks = append(checks, fmt.Sprintf("test ! -e %s", framework.ShellQuote(target)))
 		}
 		probe := fmt.Sprintf("if %s; then echo gone; else echo exists; fi", strings.Join(checks, " && "))
-		out, err := s.exec.Worker(s.worker).Run(waitCtx, probe)
+		out, err := s.runtime.Worker(s.worker).Run(waitCtx, probe)
 		if err != nil {
 			return false, fmt.Errorf("check job tmpfs directory removal: %w", err)
 		}
@@ -468,7 +472,7 @@ func (s *PassiveChecks) anUnmanagedGPUWorkloadIsStartedOnTheSelectedGPUWorker(ct
 	s.allocGPUScenarioActive = true
 	script := "CUDA_VISIBLE_DEVICES=0 nohup all_reduce_perf -b 1 -e 1 -g 1 -N 0 >/dev/null 2>&1 & echo $!"
 
-	out, err := s.exec.Worker(s.gpuWorker).RunWithDefaultRetry(ctx, framework.BashLC(script))
+	out, err := s.runtime.Worker(s.gpuWorker).RunWithDefaultRetry(ctx, framework.BashLC(script))
 	if err != nil {
 		return fmt.Errorf("start unmanaged GPU workload on %s: %w", s.gpuWorker.Name, err)
 	}
@@ -509,7 +513,7 @@ func (s *PassiveChecks) aFullNodeGPUSlurmJobIsSubmittedToTheSelectedGPUWorker(ct
 	// Prolog failure still runs Slurm/Epilog cleanup and can keep the job in
 	// COMPLETING for a few minutes. Wait for squeue to clear so later scenarios
 	// do not inherit unfinished cleanup from this disruptive check.
-	if err := framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, job, s.slurm.WaitForJobGone(ctx, job.ID, passiveAllocGPUJobTimeout)); err != nil {
+	if err := framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, s.slurm.WaitForJobGone(ctx, job.ID, passiveAllocGPUJobTimeout)); err != nil {
 		return err
 	}
 
@@ -518,21 +522,21 @@ func (s *PassiveChecks) aFullNodeGPUSlurmJobIsSubmittedToTheSelectedGPUWorker(ct
 	// unmanaged GPU process.
 	info, err := s.slurm.JobInfo(ctx, job.ID)
 	if err != nil {
-		return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, job, err)
+		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, err)
 	}
 	if !info.SacctFound {
-		return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, job,
+		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
 			fmt.Errorf("expected Slurm job %s to be recorded in sacct after Prolog failure, got:\n%s", job.ID, info.SacctDump))
 	}
 	if info.CompletedSuccessfully() {
-		return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, job,
+		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
 			fmt.Errorf("expected Slurm job %s to fail in Prolog due to alloc_gpus_busy, got state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit))
 	}
 	if info.IsAlive() {
-		return framework.AnnotateWithJobLog(ctx, s.exec, s.slurm, job,
+		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
 			fmt.Errorf("expected Slurm job %s to be finished after leaving squeue, got state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit))
 	}
-	s.exec.Logf("alloc_gpus_busy trigger job %s finished as expected: state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit)
+	s.runtime.Logf("alloc_gpus_busy trigger job %s finished as expected: state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit)
 	s.allocGPUJob = framework.SbatchJob{}
 	return nil
 }
@@ -574,18 +578,18 @@ func (s *PassiveChecks) cleanupAndResetAllocMem(ctx context.Context) {
 	if s.allocMemScenarioActive {
 		if !s.allocMemJob.IsZero() {
 			if err := s.slurm.CancelJob(ctx, s.allocMemJob.ID, passiveAllocMemJobTimeout); err != nil {
-				s.exec.Logf("cleanup: cancel alloc_mem_used trigger job %s: %v", s.allocMemJob.ID, err)
+				s.runtime.Logf("cleanup: cancel alloc_mem_used trigger job %s: %v", s.allocMemJob.ID, err)
 			}
 		}
 		if err := s.removeMemoryPressure(ctx); err != nil {
-			s.exec.Logf("cleanup: remove alloc_mem_used memory pressure: %v", err)
+			s.runtime.Logf("cleanup: remove alloc_mem_used memory pressure: %v", err)
 		}
 		if s.worker.Name != "" {
-			if err := runManualHCProgram(ctx, s.exec, s.worker); err != nil {
-				s.exec.Logf("cleanup: run hc_program on %s: %v", s.worker.Name, err)
+			if err := runManualHCProgram(ctx, s.runtime, s.worker); err != nil {
+				s.runtime.Logf("cleanup: run hc_program on %s: %v", s.worker.Name, err)
 			}
 			if err := s.slurm.ResumeNodeIfDrainedByReason(ctx, s.worker.Name, passiveAllocMemReason); err != nil {
-				s.exec.Logf("cleanup: resume %s after alloc_mem_used: %v", s.worker.Name, err)
+				s.runtime.Logf("cleanup: resume %s after alloc_mem_used: %v", s.worker.Name, err)
 			}
 		}
 	}
@@ -597,18 +601,18 @@ func (s *PassiveChecks) cleanupAndResetAllocGPU(ctx context.Context) {
 	if s.allocGPUScenarioActive {
 		if !s.allocGPUJob.IsZero() {
 			if err := s.slurm.CancelJob(ctx, s.allocGPUJob.ID, passiveAllocGPUJobTimeout); err != nil {
-				s.exec.Logf("cleanup: cancel alloc_gpus_busy trigger job %s: %v", s.allocGPUJob.ID, err)
+				s.runtime.Logf("cleanup: cancel alloc_gpus_busy trigger job %s: %v", s.allocGPUJob.ID, err)
 			}
 		}
 		if err := s.stopUnmanagedGPUWorkload(ctx); err != nil {
-			s.exec.Logf("cleanup: stop unmanaged GPU workload: %v", err)
+			s.runtime.Logf("cleanup: stop unmanaged GPU workload: %v", err)
 		}
 		if s.gpuWorker.Name != "" {
-			if err := runManualHCProgram(ctx, s.exec, s.gpuWorker); err != nil {
-				s.exec.Logf("cleanup: run hc_program on %s: %v", s.gpuWorker.Name, err)
+			if err := runManualHCProgram(ctx, s.runtime, s.gpuWorker); err != nil {
+				s.runtime.Logf("cleanup: run hc_program on %s: %v", s.gpuWorker.Name, err)
 			}
 			if err := s.slurm.ResumeNodeIfDrainedByReason(ctx, s.gpuWorker.Name, passiveAllocGPUReason); err != nil {
-				s.exec.Logf("cleanup: resume %s after alloc_gpus_busy: %v", s.gpuWorker.Name, err)
+				s.runtime.Logf("cleanup: resume %s after alloc_gpus_busy: %v", s.gpuWorker.Name, err)
 			}
 		}
 	}
@@ -623,8 +627,8 @@ func (s *PassiveChecks) cleanupAndResetTmpfs(ctx context.Context) {
 			"/mnt/memory/job_" + s.tmpfsJobID,
 			"/mnt/jail/mnt/memory/job_" + s.tmpfsJobID,
 		} {
-			if _, err := s.exec.Worker(s.worker).Run(ctx, fmt.Sprintf("rm -rf %s >/dev/null 2>&1 || true", framework.ShellQuote(target))); err != nil {
-				s.exec.Logf("cleanup: remove job tmpfs %s on %s: %v", target, s.worker.Name, err)
+			if _, err := s.runtime.Worker(s.worker).Run(ctx, fmt.Sprintf("rm -rf %s >/dev/null 2>&1 || true", framework.ShellQuote(target))); err != nil {
+				s.runtime.Logf("cleanup: remove job tmpfs %s on %s: %v", target, s.worker.Name, err)
 			}
 		}
 	}
@@ -653,7 +657,7 @@ func (s *PassiveChecks) ensureGPUCountDiscovered(ctx context.Context) error {
 	if s.gpuCount > 0 {
 		return nil
 	}
-	out, err := s.exec.Worker(s.gpuWorker).RunWithDefaultRetry(ctx, framework.BashLC(gpuCountCommand))
+	out, err := s.runtime.Worker(s.gpuWorker).RunWithDefaultRetry(ctx, framework.BashLC(gpuCountCommand))
 	if err != nil {
 		return fmt.Errorf("count GPUs on %s: %w", s.gpuWorker.Name, err)
 	}
@@ -662,7 +666,7 @@ func (s *PassiveChecks) ensureGPUCountDiscovered(ctx context.Context) error {
 		return err
 	}
 	s.gpuCount = count
-	s.exec.Logf("passive checks: discovered GPU count worker=%s gpu_count=%d", s.gpuWorker.Name, s.gpuCount)
+	s.runtime.Logf("passive checks: discovered GPU count worker=%s gpu_count=%d", s.gpuWorker.Name, s.gpuCount)
 	return nil
 }
 
@@ -674,8 +678,8 @@ func parseGPUCount(workerName, output string) (int, error) {
 	return count, nil
 }
 
-func (s *PassiveChecks) availableMemoryBytes(ctx context.Context, worker framework.WorkerRef) (uint64, error) {
-	out, err := s.exec.Worker(worker).RunWithDefaultRetry(ctx, "free -b | awk '/^Mem:/ {print $7}'")
+func (s *PassiveChecks) availableMemoryBytes(ctx context.Context, worker framework.WorkerInfo) (uint64, error) {
+	out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx, "free -b | awk '/^Mem:/ {print $7}'")
 	if err != nil {
 		return 0, fmt.Errorf("read available memory on %s: %w", worker.Name, err)
 	}
@@ -686,7 +690,7 @@ func (s *PassiveChecks) availableMemoryBytes(ctx context.Context, worker framewo
 	return value, nil
 }
 
-func (s *PassiveChecks) realMemoryBytes(ctx context.Context, worker framework.WorkerRef) (uint64, error) {
+func (s *PassiveChecks) realMemoryBytes(ctx context.Context, worker framework.WorkerInfo) (uint64, error) {
 	node, err := s.slurm.NodeInfo(ctx, worker.Name)
 	if err != nil {
 		return 0, err
@@ -726,7 +730,7 @@ func (s *PassiveChecks) removeMemoryPressure(ctx context.Context) error {
 	if s.worker.Name == "" {
 		return nil
 	}
-	if _, err := s.exec.Worker(s.worker).Run(ctx, fmt.Sprintf("rm -f %s", framework.ShellQuote(passiveAllocMemPressurePath))); err != nil {
+	if _, err := s.runtime.Worker(s.worker).Run(ctx, fmt.Sprintf("rm -f %s", framework.ShellQuote(passiveAllocMemPressurePath))); err != nil {
 		return fmt.Errorf("remove memory pressure on %s: %w", s.worker.Name, err)
 	}
 	return nil
@@ -741,8 +745,8 @@ func (s *PassiveChecks) waitForGPUComputeProcess(ctx context.Context) error {
 	}
 	command := fmt.Sprintf("nvidia-smi -i 0 --query-compute-apps=pid --format=csv,noheader 2>/dev/null | awk 'NF' | grep -Fx %s >/dev/null && echo found || true",
 		framework.ShellQuote(s.unmanagedGPUPID))
-	return s.exec.WaitFor(ctx, "unmanaged GPU compute process visible", 2*time.Minute, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		out, err := s.exec.Worker(s.gpuWorker).RunWithDefaultRetry(waitCtx, command)
+	return s.runtime.WaitFor(ctx, "unmanaged GPU compute process visible", 2*time.Minute, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+		out, err := s.runtime.Worker(s.gpuWorker).RunWithDefaultRetry(waitCtx, command)
 		if err != nil {
 			return false, err
 		}
@@ -766,7 +770,7 @@ func (s *PassiveChecks) stopUnmanagedGPUWorkload(ctx context.Context) error {
 		framework.ShellQuote(pid),
 		framework.ShellQuote(pid),
 	)
-	_, err := s.exec.Worker(worker).Run(ctx, command)
+	_, err := s.runtime.Worker(worker).Run(ctx, command)
 	if err != nil {
 		return fmt.Errorf("stop unmanaged GPU workload on %s: %w", worker.Name, err)
 	}

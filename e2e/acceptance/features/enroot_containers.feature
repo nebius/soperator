@@ -1,5 +1,5 @@
 Feature: Enroot containers
-  @soperator_version_>=5.0.0
+  @soperator_version_>=4.0.0
   Scenario: Enroot and Pyxis cache images and clean up runtime state
     Given a long-running Enroot container job is submitted on two workers
     When the Enroot container job is running

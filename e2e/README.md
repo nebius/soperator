@@ -1,21 +1,23 @@
 # Acceptance Tests
 
-This package contains the reusable Soperator acceptance runtime: embedded
-Godog feature files, shared step definitions, and a runner for executing those
-checks against an existing Soperator cluster.
+This module contains the reusable Soperator acceptance runtime: embedded Godog
+feature files, shared step definitions, and a runner for executing checks
+against an existing Soperator cluster. It supports open-source Soperator
+validation and external runners that reuse public Soperator scenarios against
+another Soperator-based environment.
 
-Cluster lifecycle is intentionally outside this package. Create, select,
-update, and delete the target cluster in the caller, then pass Kubernetes
-access to the runner through a kube context.
+Cluster lifecycle is intentionally outside this module. Create, select, update,
+and delete the target cluster in the caller, then pass Kubernetes access to the
+runner through a kube context.
+
+## Standalone CLI
 
 > !!! WARNING !!!
 > These tests mutate the target cluster. Run them only against a dev cluster
 > or another environment that is safe to change.
 > !!! WARNING !!!
 
-## Standalone CLI
-
-Build the standalone acceptance binary from the repository root:
+Build the standalone acceptance binary from the Soperator repository root:
 
 ```bash
 go -C e2e build -o ../bin/acceptance ./cmd/acceptance
@@ -59,11 +61,11 @@ All flags:
 - `--report-dir`: optional. When set, the runner writes Cucumber and JUnit
   reports into that directory.
 
-GPU scenarios are selected automatically. If no GPU workers are discovered,
-scenarios tagged `@gpu` are excluded.
-
-CPU scenarios are selected automatically. If no CPU workers are discovered,
-scenarios tagged `@cpu` are excluded.
+CPU/GPU scenarios are selected by tags like other scenarios. Steps that need a
+specific worker kind query live Slurm and NodeSet state at scenario time. They
+skip when the required capacity is not configured, but fail when it is
+configured and too few workers are usable. Scenarios that cover all workers
+also fail on partial degradation.
 
 For focused manual runs on a dev cluster, pass the scenario location:
 
@@ -87,22 +89,21 @@ type.
 suite := acceptance.SoperatorSuite("5.0.0")
 suite.Source.Paths = []string{"features/internal_ssh.feature:3"}
 suite.Tags = "~@custom_only"
-suite.FilterOptions.ExcludeUnstable = false
-suite.FilterOptions.ExcludeMissingWorkerKinds = true
+suite.ExcludeUnstable = false
 
-runner, err := acceptance.NewRunner(acceptance.Options{
+runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 	KubectlContext:         kubectlContext,
 	SlurmClusterName:       "soperator",
 	TargetSoperatorVersion: "5.0.0",
 	Suites:                 []acceptance.SuiteConfig{suite},
-	State:                  &framework.ClusterState{},
 })
 ```
 
 `KubectlContext` is required and is the normal way to point the runner at the
-target cluster. `SlurmClusterName` defaults to `soperator` when omitted. The
-caller controls scenario selection through `SuiteConfig.Source.Paths` and Godog
-tag filtering through `SuiteConfig.Tags`.
+target cluster. `SlurmClusterName` defaults to `soperator` when omitted.
+`TargetSoperatorVersion` is normalized once and stored in static
+`framework.ClusterInfo`. The caller controls scenario selection through
+`SuiteConfig.Source.Paths` and Godog tag filtering through `SuiteConfig.Tags`.
 
 `acceptance.SoperatorSuite(targetSoperatorVersion)` embeds the public Soperator
 feature files, registers public Soperator steps, enables the default shared
@@ -112,6 +113,16 @@ source, tag expression, step registrars, version axes, and report files. Suite
 names are required, must be unique, and must match `^[A-Za-z0-9._-]+$`; reports
 are written as `<suite>.cucumber.json` and `<suite>.junit.xml`.
 
+Step registrars receive static `framework.ClusterInfo` and the shared
+`framework.Runtime` interface:
+
+```go
+func registerProductSteps(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime framework.Runtime) {
+	productSteps := newProductSteps(info, runtime)
+	productSteps.RegisterSteps(sc)
+}
+```
+
 Suites with no version axes are passed through unchanged. Suites with axes are
 filtered before Godog starts:
 
@@ -120,15 +131,15 @@ productSuite := acceptance.SuiteConfig{
 	Name:   "product",
 	Source: productFeatures,
 	Tags:   "@smoke && ~@slow",
-	VersionAxes: []versionfilter.Axis{
+	VersionAxes: []acceptance.ScenarioVersionAxis{
 		acceptance.SoperatorVersionAxis("5.0.0"),
-		{TagPrefix: "@product_version_", TargetVersion: "1.8.2"},
+		acceptance.VersionAxis("@product_version_", "1.8.2"),
 	},
 	StepRegistrars: []acceptance.StepRegistrar{
 		acceptance.SharedStepRegistrar(),
 		registerProductSteps,
 	},
-	FilterOptions: acceptance.SuiteFilterOptions{ExcludeUnstable: true},
+	ExcludeUnstable: true,
 }
 ```
 
@@ -147,53 +158,60 @@ Suffixes and build metadata are stripped before comparison, so
 Custom suites that also depend on Soperator behavior should include both the
 custom product axis and the Soperator axis. Custom scenarios can reuse public
 Soperator step definitions by registering `acceptance.SharedStepRegistrar()` in
-that suite. All suites share one `framework.ClusterState`, while scenario-local
+that suite. All suites are configured before the run starts. Scenario-local
 fields such as selected workers, Slurm job IDs, and ActiveCheck job IDs are
 owned by the shared step objects and reset before and after every shared
 scenario.
 
-## Discovery Hooks
+## Static Suites
 
-The shared runner always performs base Soperator discovery before running
-scenarios. It verifies the controller/login pods, discovers NodeSets, discovers
-Slurm workers, classifies CPU/GPU workers, and stores that data in
-`framework.ClusterState`.
-
-External runners can add discovery hooks for caller-specific state. Hooks share
-the same `framework.ClusterState` and `framework.Exec` as the suites:
+External runners should build all suites before constructing the runner:
 
 ```go
-discoverProduct := func(ctx context.Context, state *framework.ClusterState, exec framework.Exec) error {
-	// discover product-specific cluster data and store it in caller-owned state
-	return nil
+productSuite := acceptance.SuiteConfig{
+	Name: "product",
+	Source: productFeatures,
+	VersionAxes: []acceptance.ScenarioVersionAxis{
+		acceptance.SoperatorVersionAxis("5.0.0"),
+		acceptance.VersionAxis("@product_version_", "1.8.2"),
+	},
+	StepRegistrars: []acceptance.StepRegistrar{
+		registerProductSteps,
+	},
 }
 
-runner, err := acceptance.NewRunner(acceptance.Options{
+runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 	KubectlContext:         kubectlContext,
 	TargetSoperatorVersion: "5.0.0",
 	Suites: []acceptance.SuiteConfig{
 		acceptance.SoperatorSuite("5.0.0"),
 		productSuite,
 	},
-	DiscoveryHooks: []acceptance.DiscoveryHook{discoverProduct},
-	State:          &framework.ClusterState{},
 })
 ```
 
-Hooks run once after base discovery and before feature selection/Godog
-execution. Per-scenario checks that need fresh state should still use Godog
-`Before` hooks inside the caller's own step registrar.
+The runner does not perform run-level cluster discovery. Per-scenario checks
+that need fresh cluster state should query Kubernetes or Slurm through
+`framework.KubectlClient`, `framework.SlurmClient`, or a caller-owned client.
 
 ## Framework Helpers
 
 External runners can use `nebius.ai/soperator-e2e/acceptance/framework` for
 common Kubernetes, Slurm, and worker primitives:
 
-- `Exec`: command execution interface used by shared steps and hooks.
-- `ClusterState`, `WorkerRef`, and discovered worker/node-set fields.
+- `Exec`: command execution interface.
+- `Runtime`: `Exec` plus polling and logging, used by shared steps and external suites.
+- `ClusterInfo`: static SlurmCluster name and target Soperator version.
+- `KubectlClient`, including `GetJSON`, `NodeSets`, `WorkerPods`, and
+  `WorkerPodForSlurmNode`.
 - `SlurmClient`, including `NodeInfo`, `NodeInfoOnce`, `JobInfo`,
-  `WaitForJobRunning`, `WaitForJobGone`, and worker selection helpers.
-- `SbatchJob`, `SbatchOptions`, `ShellQuote`, `BashLC`, `WorkerNames`.
+  `MainPartitionNodeNames`, `WaitForJobRunning`, and `WaitForJobGone`.
+- `WorkerSelector`, `WorkerSnapshot`, and `WorkerInfo` for retaining live Slurm
+  state and configured NodeSet capacity, plus
+  `PickWorkers`/`PickCPUWorkers`/`PickGPUWorkers` for selecting usable workers.
+- `SkipIfInsufficientWorkers` for mapping insufficient-worker selections to
+  skipped Godog scenarios.
+- `SbatchJob`, `SbatchOptions`, `ShellQuote`, `BashLC`, and `WorkerNames`.
 - `WaitForWithJobAlive` and `AnnotateWithJobLog` for polling while a Slurm job
   is still alive and attaching useful job logs to failures.
 
@@ -204,16 +222,22 @@ through additional `StepRegistrar` values.
 ## Package Layout
 
 - `acceptance`: public runner API, embedded feature files, suite configs,
-  discovery hooks, and shared step registrar.
-- `acceptance/framework`: public helper types for command execution, cluster
-  state, Slurm jobs, workers, retries, and shell quoting.
+  and shared step registrar.
+- `acceptance/framework`: public helper types for command execution, static
+  cluster info, Kubernetes JSON queries, Slurm jobs, worker selection, retries,
+  and shell quoting.
 - `acceptance/internal/sharedsteps`: concrete public Soperator step
   implementations and scenario cleanup/reset.
-- `acceptance/internal/discovery`: base Soperator cluster discovery.
 - `acceptance/internal/kubeobjects`: Kubernetes object shapes used by shared
-  discovery and steps.
+  framework helpers and steps.
 - `acceptance/internal/reports`: Godog report format construction.
 - `cmd/acceptance`: standalone runner for an already deployed cluster.
+
+## Synchronization
+
+The acceptance implementation mirrors the standalone `soperator-e2e`
+repository. Keep shared source and tests synchronized, while treating this
+README, module manifests, and repository-level metadata as location-specific.
 
 GitHub Actions keeps two refs separate:
 
@@ -227,5 +251,3 @@ The workflow reads the target Soperator version from the selected build artifact
 and uses it for Terraform deployment and scenario filtering. When new tests or
 behavior are added, the scenarios must be tagged with the full version lower
 bound where that behavior exists, for example `@soperator_version_>=5.0.0`.
-
-The shared steps currently assume the Soperator namespace is `soperator`.

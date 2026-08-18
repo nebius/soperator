@@ -1,7 +1,6 @@
 package acceptance_test
 
 import (
-	"context"
 	"testing"
 	"testing/fstest"
 
@@ -9,8 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"nebius.ai/soperator-e2e/acceptance"
-	"nebius.ai/soperator-e2e/acceptance/framework"
-	"nebius.ai/soperator-e2e/versionfilter"
 )
 
 func TestPublicRunnerAPIIsImportable(t *testing.T) {
@@ -22,17 +19,16 @@ func TestPublicRunnerAPIIsImportable(t *testing.T) {
 	suite := acceptance.SoperatorSuite("5.0.0")
 	suite.Tags = "~@custom_only"
 
-	runner, err := acceptance.NewRunner(acceptance.Options{
+	runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 		KubectlContext:         "dev-context",
 		TargetSoperatorVersion: "5.0.0",
 		Suites:                 []acceptance.SuiteConfig{suite},
-		State:                  &framework.ClusterState{},
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, runner)
 }
 
-func TestPublicRunnerAPIAcceptsExternalSuitesAndDiscoveryHooks(t *testing.T) {
+func TestPublicRunnerAPIAcceptsCallerOwnedStaticSuites(t *testing.T) {
 	productFeatures := acceptance.FeatureSource{
 		FS: fstest.MapFS{
 			"features/product.feature": {Data: []byte(`Feature: Product
@@ -45,7 +41,7 @@ func TestPublicRunnerAPIAcceptsExternalSuitesAndDiscoveryHooks(t *testing.T) {
 		Paths: []string{"features/product.feature"},
 	}
 
-	runner, err := acceptance.NewRunner(acceptance.Options{
+	runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 		KubectlContext:         "dev-context",
 		TargetSoperatorVersion: "5.0.0",
 		Suites: []acceptance.SuiteConfig{
@@ -54,16 +50,10 @@ func TestPublicRunnerAPIAcceptsExternalSuitesAndDiscoveryHooks(t *testing.T) {
 				Name:           "product",
 				Source:         productFeatures,
 				StepRegistrars: []acceptance.StepRegistrar{acceptance.SharedStepRegistrar()},
-				VersionAxes: []versionfilter.Axis{
+				VersionAxes: []acceptance.ScenarioVersionAxis{
 					acceptance.SoperatorVersionAxis("5.0.0"),
-					{TagPrefix: "@product_version_", TargetVersion: "1.2.3"},
+					acceptance.VersionAxis("@product_version_", "1.2.3"),
 				},
-			},
-		},
-		DiscoveryHooks: []acceptance.DiscoveryHook{
-			func(ctx context.Context, state *framework.ClusterState, exec framework.Exec) error {
-				state.Workers = append(state.Workers, framework.WorkerRef{Name: "custom-worker"})
-				return nil
 			},
 		},
 	})

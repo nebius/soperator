@@ -1,47 +1,36 @@
 package framework
 
-type WorkerRef struct {
-	Name    string
-	PodName string
+type WorkerInfo struct {
+	Name        string
+	NodeSetName string
+	HasGPU      bool
+	SlurmNode   SlurmNodeInfo
 }
 
-type DiscoveredNodeSet struct {
-	Name   string
-	Size   int
-	HasGPU bool
+func (w WorkerInfo) IsUsable() bool {
+	return w.SlurmNode.IsUsable()
 }
 
-type ClusterState struct {
+// ClusterInfo holds static runner metadata. It intentionally contains no
+// discovered cluster topology; steps should query live state at scenario time.
+type ClusterInfo struct {
 	SlurmClusterName       string
 	TargetSoperatorVersion string
-	Workers                []WorkerRef
-	CPUWorkers             []WorkerRef
-	GPUWorkers             []WorkerRef
-	WorkersByNodeSet       map[string][]WorkerRef
-	DiscoveredNodeSets     []DiscoveredNodeSet
 }
 
-func (s *ClusterState) PodName(podName string) string {
-	return ClusterPrefixedName(s.SlurmClusterName, podName)
+func (s *ClusterInfo) PodName(podName string) string {
+	return SoperatorPodName(s.SlurmClusterName, s.TargetSoperatorVersion, podName)
 }
 
-func (s *ClusterState) DesiredWorkerCount() int {
-	total := 0
-	for _, nodeSet := range s.DiscoveredNodeSets {
-		total += nodeSet.Size
+func SoperatorPodName(slurmClusterName, soperatorVersion, podName string) string {
+	if SoperatorVersionBeforeFive(soperatorVersion) {
+		return podName
 	}
-	return total
+
+	return ClusterPrefixedName(slurmClusterName, podName)
 }
 
-func (s *ClusterState) HasGPUWorkers() bool {
-	return len(s.GPUWorkers) > 0
-}
-
-func (s *ClusterState) HasCPUWorkers() bool {
-	return len(s.CPUWorkers) > 0
-}
-
-func WorkerNames(workers []WorkerRef) []string {
+func WorkerNames(workers []WorkerInfo) []string {
 	names := make([]string, 0, len(workers))
 	for _, worker := range workers {
 		names = append(names, worker.Name)
