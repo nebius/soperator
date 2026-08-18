@@ -127,7 +127,8 @@ func RenderNodeSetStatefulSet(
 		Containers:         containers,
 		Volumes:            volumes,
 		Subdomain:          nodeSet.ServiceUmbrella.Name,
-		DNSPolicy:          corev1.DNSClusterFirst,
+		HostNetwork:        nodeSet.HostNetwork,
+		DNSPolicy:          resolveNodeSetDNSPolicy(nodeSet),
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
 				naming.BuildServiceFQDN(nodeSet.ServiceUmbrella.Name, nodeSet.ParentalCluster.Namespace),
@@ -205,6 +206,16 @@ func RenderNodeSetStatefulSet(
 	}
 
 	return res, nil
+}
+
+func resolveNodeSetDNSPolicy(nodeSet *values.SlurmNodeSet) corev1.DNSPolicy {
+	if nodeSet.DNSPolicy != "" {
+		return nodeSet.DNSPolicy
+	}
+	if nodeSet.HostNetwork {
+		return corev1.DNSClusterFirstWithHostNet
+	}
+	return corev1.DNSClusterFirst
 }
 
 func renderNodeSetAnnotations(nodeSet *values.SlurmNodeSet) map[string]string {

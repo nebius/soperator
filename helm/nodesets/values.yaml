@@ -271,6 +271,13 @@ nodesets:
     # Whether the worker pod containers can use the host user namespace
     # Optional, defaults to false
     enableHostUserNamespace: false
+    # Whether worker pods use the host network namespace.
+    # Optional, defaults to false
+    hostNetwork: false
+    # DNS policy for worker pods.
+    # Optional. If omitted, the operator uses ClusterFirst, or ClusterFirstWithHostNet
+    # when hostNetwork is true.
+    dnsPolicy: "ClusterFirst"
     # Upper bound (in seconds) of a random delay the worker-init container sleeps before
     # running its readiness checks. The actual delay is picked uniformly from
     # [0, workerInitRandomDelaySeconds]. Spreads slurmd registrations across workers to avoid

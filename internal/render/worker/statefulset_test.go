@@ -32,6 +32,22 @@ func assertEnvValue(t *testing.T, envs []corev1.EnvVar, name, expectedValue stri
 	t.Fatalf("env var %s not found", name)
 }
 
+func assertEnvFieldPath(t *testing.T, envs []corev1.EnvVar, name, expectedFieldPath string) {
+	t.Helper()
+
+	for _, env := range envs {
+		if env.Name == name {
+			if assert.NotNil(t, env.ValueFrom, "env var %s should use valueFrom", name) &&
+				assert.NotNil(t, env.ValueFrom.FieldRef, "env var %s should use fieldRef", name) {
+				assert.Equal(t, expectedFieldPath, env.ValueFrom.FieldRef.FieldPath)
+			}
+			return
+		}
+	}
+
+	t.Fatalf("env var %s not found", name)
+}
+
 func Test_RenderContainerWorkerInit(t *testing.T) {
 	container := &values.Container{
 		NodeContainer: slurmv1.NodeContainer{
@@ -56,8 +72,9 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 		assert.Equal(t, container.Image, result.Image)
 		assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller", "wait-topology"}, result.Command)
-		assert.Equal(t, 12, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 5 topology
+		assert.Equal(t, 13, len(result.Env)) // 7 base + 1 NODESET_GPU_ENABLED + 5 topology
 		assert.Equal(t, 3, len(result.VolumeMounts))
+		assertEnvFieldPath(t, result.Env, consts.EnvSlurmNodeName, "metadata.name")
 		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
 		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_FABRIC", "fab-test")
 
@@ -91,7 +108,8 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 		assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller"}, result.Command,
 			"wait-topology should not be present when topology is disabled")
-		assert.Equal(t, 6, len(result.Env), "only controller-related env vars expected")
+		assert.Equal(t, 7, len(result.Env), "only controller-related env vars expected")
+		assertEnvFieldPath(t, result.Env, consts.EnvSlurmNodeName, "metadata.name")
 		assert.Equal(t, 2, len(result.VolumeMounts), "topology volume mount should not be present")
 
 		expectedMounts := map[string]string{
@@ -304,8 +322,89 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 			)
 			assert.NoError(t, err)
 
+			assertEnvFieldPath(t, result.Spec.Template.Spec.Containers[0].Env, consts.EnvSlurmNodeName, "metadata.name")
 			assertEnvValue(t, result.Spec.Template.Spec.Containers[0].Env, "SLURM_CLUSTER_WITH_GPU", tt.expectedClusterWithGPUFlag)
 			assertEnvValue(t, result.Spec.Template.Spec.Containers[0].Env, "NODESET_GPU_ENABLED", tt.expectedNodeSetGPUFlag)
+		})
+	}
+}
+
+func TestRenderNodeSetStatefulSet_PodNetworking(t *testing.T) {
+	tests := []struct {
+		name              string
+		hostNetwork       bool
+		dnsPolicy         corev1.DNSPolicy
+		expectedDNSPolicy corev1.DNSPolicy
+	}{
+		{
+			name:              "defaults to cluster first",
+			expectedDNSPolicy: corev1.DNSClusterFirst,
+		},
+		{
+			name:              "host network defaults to cluster first with host net",
+			hostNetwork:       true,
+			expectedDNSPolicy: corev1.DNSClusterFirstWithHostNet,
+		},
+		{
+			name:              "explicit dns policy is preserved",
+			hostNetwork:       true,
+			dnsPolicy:         corev1.DNSDefault,
+			expectedDNSPolicy: corev1.DNSDefault,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeSet := &values.SlurmNodeSet{
+				Name: "test-nodeset",
+				ParentalCluster: client.ObjectKey{
+					Namespace: "test-namespace",
+					Name:      "test-cluster",
+				},
+				ContainerSlurmd: values.Container{
+					NodeContainer: slurmv1.NodeContainer{
+						Image:           "test-image",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						Resources: corev1.ResourceList{
+							corev1.ResourceMemory:           resource.MustParse("1Gi"),
+							corev1.ResourceCPU:              resource.MustParse("100m"),
+							corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+				ContainerMunge: values.Container{
+					NodeContainer: slurmv1.NodeContainer{
+						Image: "munge-image",
+					},
+				},
+				VolumeSpool: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+				},
+				VolumeJail: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+				},
+				StatefulSet:              values.StatefulSet{Replicas: 1},
+				ServiceUmbrella:          values.Service{Name: "test-umbrella"},
+				SupervisorDConfigMapName: "supervisord-config",
+				SSHDConfigMapName:        "sshd-config",
+				GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+				HostNetwork:              tt.hostNetwork,
+				DNSPolicy:                tt.dnsPolicy,
+			}
+
+			result, err := worker.RenderNodeSetStatefulSet(
+				"test-cluster",
+				nodeSet,
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				false,
+				false,
+				"",
+			)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.hostNetwork, result.Spec.Template.Spec.HostNetwork)
+			assert.Equal(t, tt.expectedDNSPolicy, result.Spec.Template.Spec.DNSPolicy)
 		})
 	}
 }
@@ -925,22 +1024,29 @@ func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 	})
 
 	t.Run("rejects a custom override of Soperator metadata", func(t *testing.T) {
-		nodeSet := createNodeSet()
-		nodeSet.ContainerSlurmd.CustomEnv = []corev1.EnvVar{{
-			Name:  consts.EnvNodeRealMemoryBytes,
-			Value: "1",
-		}}
+		for _, envName := range []string{
+			consts.EnvNodeRealMemoryBytes,
+			consts.EnvSlurmNodeName,
+		} {
+			t.Run(envName, func(t *testing.T) {
+				nodeSet := createNodeSet()
+				nodeSet.ContainerSlurmd.CustomEnv = []corev1.EnvVar{{
+					Name:  envName,
+					Value: "1",
+				}}
 
-		_, err := worker.RenderNodeSetStatefulSet(
-			"test-cluster",
-			nodeSet,
-			&slurmv1.Secrets{},
-			consts.CGroupV2,
-			false,
-			false,
-			"",
-		)
-		assert.ErrorContains(t, err, "is managed by Soperator")
+				_, err := worker.RenderNodeSetStatefulSet(
+					"test-cluster",
+					nodeSet,
+					&slurmv1.Secrets{},
+					consts.CGroupV2,
+					false,
+					false,
+					"",
+				)
+				assert.ErrorContains(t, err, "is managed by Soperator")
+			})
+		}
 	})
 }
 

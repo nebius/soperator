@@ -71,6 +71,15 @@ func RenderContainerWorkerInit(
 			},
 		},
 		{
+			Name: consts.EnvSlurmNodeName,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
 			Name: "K8S_POD_NAMESPACE",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
@@ -245,9 +254,13 @@ func renderContainerNodeSetSlurmd(
 		return corev1.Container{}, fmt.Errorf("checking resource requests: %w", err)
 	}
 
+	managedEnvNames := map[string]struct{}{
+		consts.EnvNodeRealMemoryBytes: {},
+		consts.EnvSlurmNodeName:       {},
+	}
 	for _, env := range nodeSet.ContainerSlurmd.CustomEnv {
-		if env.Name == consts.EnvNodeRealMemoryBytes {
-			return corev1.Container{}, fmt.Errorf("environment variable %q is managed by Soperator", consts.EnvNodeRealMemoryBytes)
+		if _, managed := managedEnvNames[env.Name]; managed {
+			return corev1.Container{}, fmt.Errorf("environment variable %q is managed by Soperator", env.Name)
 		}
 	}
 
@@ -357,6 +370,15 @@ func renderNodeSetSlurmdEnv(
 				FieldRef: &corev1.ObjectFieldSelector{
 					APIVersion: corev1.SchemeGroupVersion.Version,
 					FieldPath:  "spec.nodeName",
+				},
+			},
+		},
+		{
+			Name: consts.EnvSlurmNodeName,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "metadata.name",
 				},
 			},
 		},

@@ -4,9 +4,12 @@ set -e # Exit immediately if any command returns a non-zero error code
 
 feature_conf() {
     local current_host
-    if ! current_host=$(hostname); then
-        echo "Error: Failed to determine hostname" >&2
-        return 1
+    current_host=${SLURM_NODE_NAME:-}
+    if [[ -z "$current_host" ]]; then
+        if ! current_host=$(hostname); then
+            echo "Error: Failed to determine Slurm node name" >&2
+            return 1
+        fi
     fi
     local features=()
 
@@ -55,6 +58,12 @@ slurmd_args=(
   --instance-id "${INSTANCE_ID}"
   -b
 )
+
+if [[ -n "${SLURM_NODE_NAME:-}" ]]; then
+  slurmd_args+=(
+    -N "${SLURM_NODE_NAME}"
+  )
+fi
 
 if [ "${evaluated_extra}" != "" ]; then
   slurmd_args+=(
