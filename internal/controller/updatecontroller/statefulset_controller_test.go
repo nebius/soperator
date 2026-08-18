@@ -195,6 +195,26 @@ func TestProcessRollingUpdateDeletesCrashLoopingWorkerInit(t *testing.T) {
 	err := reconciler.processRollingUpdate(
 		context.Background(),
 		"cluster",
+		"new-revision",
+		testStatefulSet(),
+		[]corev1.Pod{pod},
+	)
+	require.NoError(t, err)
+	assertPodDeleted(t, kubeClient, &pod)
+}
+
+func TestProcessRollingUpdateDeletesPodWithCompletedWorkerHandoff(t *testing.T) {
+	pod := testOutdatedPod()
+	pod.Labels = map[string]string{
+		consts.LabelSoperatorWorkerOperationID:    "new-revision",
+		consts.LabelSoperatorWorkerOperationPhase: consts.LabelSoperatorWorkerOperationPhaseReady,
+	}
+
+	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, nil)
+	err := reconciler.processRollingUpdate(
+		context.Background(),
+		"cluster",
+		"new-revision",
 		testStatefulSet(),
 		[]corev1.Pod{pod},
 	)
@@ -224,6 +244,7 @@ func TestProcessRollingUpdateDeletesSafelyOfflineCrashLoopingSlurmd(t *testing.T
 	err := reconciler.processRollingUpdate(
 		context.Background(),
 		"cluster",
+		"new-revision",
 		testStatefulSet(),
 		[]corev1.Pod{pod},
 	)
@@ -235,7 +256,8 @@ func TestProcessRollingUpdateDeletesSafelyOfflineCrashLoopingSlurmd(t *testing.T
 func TestProcessRollingUpdateDeletesSafelyOfflineRebootHandoff(t *testing.T) {
 	pod := testOutdatedPod()
 	pod.Labels = map[string]string{
-		consts.LabelSoperatorDeleteCandidate: consts.LabelSoperatorDeleteCandidateValueStopping,
+		consts.LabelSoperatorWorkerOperationID:    "new-revision",
+		consts.LabelSoperatorWorkerOperationPhase: consts.LabelSoperatorWorkerOperationPhaseStopping,
 	}
 	pod.Status.Conditions = []corev1.PodCondition{
 		{Type: corev1.PodReady, Status: corev1.ConditionTrue},
@@ -257,6 +279,7 @@ func TestProcessRollingUpdateDeletesSafelyOfflineRebootHandoff(t *testing.T) {
 	err := reconciler.processRollingUpdate(
 		context.Background(),
 		"cluster",
+		"new-revision",
 		testStatefulSet(),
 		[]corev1.Pod{pod},
 	)
@@ -265,7 +288,7 @@ func TestProcessRollingUpdateDeletesSafelyOfflineRebootHandoff(t *testing.T) {
 	slurmClient.AssertExpectations(t)
 }
 
-func TestProcessRollingUpdateKeepsSafelyOfflineRebootWithoutHandoff(t *testing.T) {
+func TestProcessRollingUpdateKeepsSafelyOfflineUnmanagedRebootWithoutHandoff(t *testing.T) {
 	pod := testOutdatedPod()
 	pod.Status.Conditions = []corev1.PodCondition{
 		{Type: corev1.PodReady, Status: corev1.ConditionTrue},
@@ -287,6 +310,7 @@ func TestProcessRollingUpdateKeepsSafelyOfflineRebootWithoutHandoff(t *testing.T
 	err := reconciler.processRollingUpdate(
 		context.Background(),
 		"cluster",
+		"new-revision",
 		testStatefulSet(),
 		[]corev1.Pod{pod},
 	)
@@ -294,6 +318,38 @@ func TestProcessRollingUpdateKeepsSafelyOfflineRebootWithoutHandoff(t *testing.T
 
 	got := &corev1.Pod{}
 	require.NoError(t, kubeClient.Get(context.Background(), client.ObjectKeyFromObject(&pod), got))
+	slurmClient.AssertExpectations(t)
+}
+
+func TestProcessRollingUpdateDeletesSafelyOfflineManagedRebootWithoutHandoff(t *testing.T) {
+	pod := testOutdatedPod()
+	pod.Status.Conditions = []corev1.PodCondition{
+		{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+	}
+
+	slurmClient := &slurmapifake.MockClient{}
+	slurmClient.On("GetNode", mock.Anything, pod.Name).Return(slurmapi.Node{
+		Name: pod.Name,
+		States: nodeStates(
+			api.V0044NodeStateDOWN,
+			api.V0044NodeStateNOTRESPONDING,
+			api.V0044NodeStateREBOOTISSUED,
+		),
+		Reason:        &slurmapi.NodeReason{Reason: defaultRebootReason + " : reboot issued [root@timestamp]"},
+		AllocCPUs:     ptr.To(int32(0)),
+		AllocMemoryMB: ptr.To(int64(0)),
+	}, nil).Once()
+
+	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
+	err := reconciler.processRollingUpdate(
+		context.Background(),
+		"cluster",
+		"new-revision",
+		testStatefulSet(),
+		[]corev1.Pod{pod},
+	)
+	require.NoError(t, err)
+	assertPodDeleted(t, kubeClient, &pod)
 	slurmClient.AssertExpectations(t)
 }
 
@@ -315,6 +371,7 @@ func TestProcessRollingUpdateKeepsCrashLoopingSlurmdWithAllocations(t *testing.T
 	err := reconciler.processRollingUpdate(
 		context.Background(),
 		"cluster",
+		"new-revision",
 		testStatefulSet(),
 		[]corev1.Pod{pod},
 	)
@@ -322,6 +379,47 @@ func TestProcessRollingUpdateKeepsCrashLoopingSlurmdWithAllocations(t *testing.T
 
 	got := &corev1.Pod{}
 	require.NoError(t, kubeClient.Get(context.Background(), client.ObjectKeyFromObject(&pod), got))
+	slurmClient.AssertExpectations(t)
+}
+
+func TestProcessRollingUpdateStartsRevisionScopedWorkerOperation(t *testing.T) {
+	pod := testOutdatedPod()
+	pod.Labels = map[string]string{
+		consts.LabelSoperatorWorkerOperationID:    "old-revision",
+		consts.LabelSoperatorWorkerOperationPhase: consts.LabelSoperatorWorkerOperationPhaseReady,
+	}
+	sts := testStatefulSet()
+	sts.Status.ReadyReplicas = 1
+
+	slurmClient := &slurmapifake.MockClient{}
+	slurmClient.On("GetNode", mock.Anything, pod.Name).Return(slurmapi.Node{
+		Name:   pod.Name,
+		States: nodeStates(api.V0044NodeStateIDLE),
+	}, nil).Once()
+	slurmClient.On("RebootNodes", mock.Anything, slurmapi.RebootNodesRequest{
+		NodeList:    pod.Name,
+		ASAP:        true,
+		Reason:      defaultRebootReason,
+		PowerAction: consts.SlurmPowerActionWorkerHandoff,
+	}).Return(nil).Once()
+
+	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
+	err := reconciler.processRollingUpdate(
+		context.Background(),
+		"cluster",
+		"new-revision",
+		sts,
+		[]corev1.Pod{pod},
+	)
+	require.NoError(t, err)
+
+	got := &corev1.Pod{}
+	require.NoError(t, kubeClient.Get(context.Background(), client.ObjectKeyFromObject(&pod), got))
+	assert.Equal(t, "new-revision", got.Labels[consts.LabelSoperatorWorkerOperationID])
+	assert.Equal(t,
+		consts.LabelSoperatorWorkerOperationPhaseStopping,
+		got.Labels[consts.LabelSoperatorWorkerOperationPhase],
+	)
 	slurmClient.AssertExpectations(t)
 }
 
@@ -339,6 +437,7 @@ func TestProcessRollingUpdateUndrainsStaleDrainBeforeReboot(t *testing.T) {
 	err := reconciler.processRollingUpdate(
 		context.Background(),
 		"cluster",
+		"new-revision",
 		testStatefulSet(),
 		[]corev1.Pod{pod},
 	)
@@ -407,7 +506,11 @@ func nodeStates(states ...api.V0044NodeState) map[api.V0044NodeState]struct{} {
 }
 
 func testOutdatedPod() corev1.Pod {
-	return corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "worker-0", Namespace: "default"}}
+	return corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+		Name:            "worker-0",
+		Namespace:       "default",
+		ResourceVersion: "1",
+	}}
 }
 
 func crashLoopingContainerStatus(name string) corev1.ContainerStatus {

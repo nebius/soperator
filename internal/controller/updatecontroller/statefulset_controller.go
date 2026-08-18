@@ -133,7 +133,12 @@ func (r *RollingUpdateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	if err := r.processRollingUpdate(ctx, clusterName, sts, outdatedPodList); err != nil {
+	operationID := sts.Status.UpdateRevision
+	if operationID == "" {
+		return ctrl.Result{}, fmt.Errorf("missing update revision on statefulset %s/%s", sts.Namespace, sts.Name)
+	}
+
+	if err := r.processRollingUpdate(ctx, clusterName, operationID, sts, outdatedPodList); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -187,6 +192,7 @@ func (r *RollingUpdateReconciler) getPodList(
 func (r *RollingUpdateReconciler) processRollingUpdate(
 	ctx context.Context,
 	clusterName string,
+	operationID string,
 	sts *kruisev1b1.StatefulSet,
 	outdatedPods []corev1.Pod,
 ) error {
@@ -204,18 +210,18 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 	podsToStop := make([]corev1.Pod, 0, len(outdatedPods))
 	deletedPods := 0
 	for _, pod := range outdatedPods {
-		if pod.Labels[consts.LabelSoperatorDeleteCandidate] != consts.LabelSoperatorDeleteCandidateValueDeleting {
+		if workerOperationPhase(&pod, operationID) != consts.LabelSoperatorWorkerOperationPhaseReady {
 			podsToStop = append(podsToStop, pod)
 			continue
 		}
 
 		if err := r.Delete(ctx, &pod); client.IgnoreNotFound(err) != nil {
-			return fmt.Errorf("delete pod %s/%s marked as delete candidate: %w", pod.Namespace, pod.Name, err)
+			return fmt.Errorf("delete pod %s/%s with completed worker handoff: %w", pod.Namespace, pod.Name, err)
 		}
 		deletedPods++
 	}
 	if deletedPods > 0 {
-		logger.Info("deleted outdated pods marked as delete candidates", "count", deletedPods)
+		logger.Info("deleted outdated pods with completed worker handoffs", "count", deletedPods, "operationID", operationID)
 		return nil
 	}
 
@@ -263,8 +269,10 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 			consts.ContainerNameSlurmd,
 		)
 		rebootInProgress := slurmNode.IsRebootIssuedState() || slurmNode.IsRebootRequestedState()
+		operationPhase := workerOperationPhase(&pod, operationID)
 		rebootHandoffInProgress := rebootInProgress &&
-			pod.Labels[consts.LabelSoperatorDeleteCandidate] == consts.LabelSoperatorDeleteCandidateValueStopping
+			operationPhase == consts.LabelSoperatorWorkerOperationPhaseStopping
+		managedRebootInProgress := rebootInProgress && hasRollingUpdateReason(&slurmNode)
 		if staleRollingUpdateDrain(&slurmNode) {
 			if err := slurmClient.UndrainNode(ctx, slurmNode.Name); err != nil {
 				return fmt.Errorf("undrain stale rolling update node %s: %w", slurmNode.Name, err)
@@ -275,7 +283,8 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 
 		// Supervisord can keep the Pod Ready while repeatedly restarting slurmd.
 		// Slurm state is the source of truth for safely completing an in-flight handoff.
-		if (slurmdCrashLooping || rebootHandoffInProgress) && safeToDeleteOfflineSlurmNode(&slurmNode) {
+		if (slurmdCrashLooping || rebootHandoffInProgress || managedRebootInProgress) &&
+			safeToDeleteOfflineSlurmNode(&slurmNode) {
 			if err := r.Delete(ctx, &pod); client.IgnoreNotFound(err) != nil {
 				return fmt.Errorf("delete safely offline outdated pod %s/%s: %w", pod.Namespace, pod.Name, err)
 			}
@@ -286,6 +295,9 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 				"slurmNode", slurmNode.Name,
 				"slurmdCrashLooping", slurmdCrashLooping,
 				"rebootHandoffInProgress", rebootHandoffInProgress,
+				"managedRebootInProgress", managedRebootInProgress,
+				"operationID", operationID,
+				"operationPhase", operationPhase,
 			)
 			return nil
 		}
@@ -336,14 +348,20 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 		}
 
 		pod := candidate.pod
-		if pod.Labels[consts.LabelSoperatorDeleteCandidate] != consts.LabelSoperatorDeleteCandidateValueStopping {
+		if workerOperationPhase(&pod, operationID) != consts.LabelSoperatorWorkerOperationPhaseStopping {
 			patchBase := pod.DeepCopy()
 			if pod.Labels == nil {
 				pod.Labels = map[string]string{}
 			}
-			pod.Labels[consts.LabelSoperatorDeleteCandidate] = consts.LabelSoperatorDeleteCandidateValueStopping
-			if err := r.Patch(ctx, &pod, client.MergeFrom(patchBase)); err != nil {
-				return fmt.Errorf("label pod %s/%s for reboot handoff: %w", pod.Namespace, pod.Name, err)
+			pod.Labels[consts.LabelSoperatorWorkerOperationID] = operationID
+			pod.Labels[consts.LabelSoperatorWorkerOperationPhase] =
+				consts.LabelSoperatorWorkerOperationPhaseStopping
+			if err := r.Patch(
+				ctx,
+				&pod,
+				client.StrategicMergeFrom(patchBase, client.MergeFromWithOptimisticLock{}),
+			); err != nil {
+				return fmt.Errorf("start worker operation %s on pod %s/%s: %w", operationID, pod.Namespace, pod.Name, err)
 			}
 		}
 
@@ -474,17 +492,30 @@ func containerCrashLoopBackOff(statuses []corev1.ContainerStatus, containerName 
 	return false
 }
 
+func workerOperationPhase(pod *corev1.Pod, operationID string) string {
+	if pod.Labels[consts.LabelSoperatorWorkerOperationID] != operationID {
+		return ""
+	}
+	return pod.Labels[consts.LabelSoperatorWorkerOperationPhase]
+}
+
+func hasRollingUpdateReason(node *slurmapi.Node) bool {
+	if node.Reason == nil {
+		return false
+	}
+	reason := node.Reason.Reason
+	return reason == defaultRebootReason || strings.HasPrefix(reason, defaultRebootReason+" : ")
+}
+
 func staleRollingUpdateDrain(node *slurmapi.Node) bool {
 	if !node.IsDrainState() || !node.IsIdleState() || node.IsNotRespondingState() ||
 		node.IsInvalidState() || node.IsCompletingState() {
 		return false
 	}
-	if node.IsRebootIssuedState() || node.IsRebootRequestedState() || node.Reason == nil {
+	if node.IsRebootIssuedState() || node.IsRebootRequestedState() {
 		return false
 	}
-
-	reason := node.Reason.Reason
-	return reason == defaultRebootReason || strings.HasPrefix(reason, defaultRebootReason+" : ")
+	return hasRollingUpdateReason(node)
 }
 
 // safeToDeleteOfflineSlurmNode requires both zero known allocations and
