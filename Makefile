@@ -37,7 +37,8 @@ CHART_FLUXCD_BOOTSTRAP_PATH					= $(CHART_PATH)/soperator-fluxcd-bootstrap
 CHART_STORAGECLASSES						= $(CHART_PATH)/storageclasses
 CHART_BACKUP_CONFIG							= $(CHART_PATH)/soperator-backup-config
 
-SLURM_VERSION		= 25.11.5
+SLURM_VERSION		= 26.05.3-nebius-2
+SLURM_DEB_VERSION	= 26.05.3-nebius-2
 NFS_VERSION_BASE	= $(shell cat VERSION_NFS)
 VERSION_BASE		= $(shell cat VERSION)
 
@@ -425,6 +426,7 @@ endif
 		-t "$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)-$(ARCH)" \
 		-f images/$(DOCKERFILE) \
 		--build-arg SLURM_VERSION="$(SLURM_VERSION)" \
+		--build-arg SLURM_DEB_VERSION="$(SLURM_DEB_VERSION)" \
 		--progress=plain \
 		--push \
 		--cache-from=type=registry,ref=$${CACHE_REF} \

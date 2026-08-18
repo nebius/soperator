@@ -2,8 +2,8 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/90
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260624085500 AS login_sshd
+# https://github.com/nebius/ml-containers/pull/99
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260816173636 AS login_sshd
 
 # Install OpenSSH server
 # Create root .ssh directory
@@ -65,11 +65,11 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
     chown 0:0 /etc/enroot/enroot.conf.d/custom-dirs.conf && \
     chmod 644 /etc/enroot/enroot.conf.d/custom-dirs.conf
 
-ARG SLURM_VERSION
+ARG SLURM_DEB_VERSION
 ARG PYXIS_VERSION=0.24.0
 # Install slurm pyxis plugin
 RUN apt-get update && \
-    apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
+    apt -y install nvslurm-plugin-pyxis=${SLURM_DEB_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

@@ -171,9 +171,9 @@ def wait_for_controller() -> None:
                 try:
                     data: Any = json.loads(result.stdout)
                     pings: list[dict[str, Any]] = data.get("pings", [])
+                    # The deprecated "pinged" field is absent in Slurm 26.05.
                     if pings and all(
-                        p.get("responding") is True and p.get("pinged") == "UP"
-                        for p in pings
+                        p.get("responding") is True for p in pings
                     ):
                         logger.info("Controller is ready!")
                         logger.info(

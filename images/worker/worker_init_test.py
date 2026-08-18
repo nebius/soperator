@@ -548,9 +548,10 @@ class TestWaitForController(unittest.TestCase):
             "pings": [
                 {
                     "hostname": "controller-0",
-                    "pinged": "UP",
                     "responding": True,
-                    "mode": "primary",
+                    "latency": 1912,
+                    "primary": True,
+                    "status": "No error",
                 }
             ],
             "errors": [],
@@ -563,9 +564,10 @@ class TestWaitForController(unittest.TestCase):
             "pings": [
                 {
                     "hostname": "controller-0",
-                    "pinged": "DOWN",
                     "responding": False,
-                    "mode": "primary",
+                    "latency": 30_000_000,
+                    "primary": True,
+                    "status": "Connection timed out",
                 }
             ],
             "errors": [],
@@ -704,15 +706,15 @@ class TestWaitForController(unittest.TestCase):
     @mock.patch("worker_init.create_slurm_config_symlink")
     @mock.patch("subprocess.run")
     @mock.patch("time.sleep")
-    def test_controller_multiple_pings_all_must_be_up(
+    def test_controller_multiple_pings_all_must_respond(
         self, mock_sleep, mock_run, mock_symlink
     ):
-        """All controllers in pings array must be UP and responding."""
+        """All controllers in pings array must be responding."""
         partial_json = json.dumps(
             {
                 "pings": [
-                    {"hostname": "ctrl-0", "pinged": "UP", "responding": True},
-                    {"hostname": "ctrl-1", "pinged": "DOWN", "responding": False},
+                    {"hostname": "ctrl-0", "responding": True, "primary": True},
+                    {"hostname": "ctrl-1", "responding": False, "primary": False},
                 ],
                 "errors": [],
                 "warnings": [],
@@ -721,8 +723,8 @@ class TestWaitForController(unittest.TestCase):
         all_up_json = json.dumps(
             {
                 "pings": [
-                    {"hostname": "ctrl-0", "pinged": "UP", "responding": True},
-                    {"hostname": "ctrl-1", "pinged": "UP", "responding": True},
+                    {"hostname": "ctrl-0", "responding": True, "primary": True},
+                    {"hostname": "ctrl-1", "responding": True, "primary": False},
                 ],
                 "errors": [],
                 "warnings": [],
