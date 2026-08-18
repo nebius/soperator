@@ -4,6 +4,11 @@ type WorkerInfo struct {
 	Name        string
 	NodeSetName string
 	HasGPU      bool
+	SlurmNode   SlurmNodeInfo
+}
+
+func (w WorkerInfo) IsUsable() bool {
+	return w.SlurmNode.IsUsable()
 }
 
 // ClusterInfo holds static runner metadata. It intentionally contains no

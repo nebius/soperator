@@ -102,7 +102,7 @@ func (c *KubectlClient) WorkerPods(ctx context.Context) ([]WorkerPodInfo, error)
 			SlurmNodeName:      slurmNodeName,
 			PodName:            pod.Name,
 			KubernetesNodeName: pod.Spec.NodeName,
-			Ready:              podReady(pod),
+			Ready:              kubeobjects.PodReady(pod),
 		})
 	}
 
@@ -128,13 +128,4 @@ func (c *KubectlClient) WorkerPodForSlurmNode(ctx context.Context, slurmNodeName
 		}
 	}
 	return WorkerPodInfo{}, fmt.Errorf("worker pod for Slurm node %q was not found", target)
-}
-
-func podReady(pod corev1.Pod) bool {
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-	return false
 }

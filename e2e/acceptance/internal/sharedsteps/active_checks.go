@@ -65,15 +65,17 @@ func (s *ActiveChecks) CleanupAndReset(ctx context.Context) {
 }
 
 func (s *ActiveChecks) healthyGPUWorkersAreAvailableForActiveChecks(ctx context.Context) error {
-	gpuWorkers, err := s.selector.GPUWorkers(ctx)
+	snapshot, err := s.selector.Snapshot(ctx)
 	if err != nil {
 		return err
 	}
-	if len(gpuWorkers) == 0 {
-		s.runtime.Logf("acceptance: no GPU workers found for GPU ActiveCheck validation, skipping scenario")
+	if err := snapshot.RequireGPUWorkersUsable(); framework.IsInsufficientWorkers(err) {
+		s.runtime.Logf("acceptance: no GPU workers configured for GPU ActiveCheck validation, skipping scenario")
 		return godog.ErrSkip
+	} else if err != nil {
+		return fmt.Errorf("validate GPU workers for active checks: %w", err)
 	}
-	s.gpuWorkers = gpuWorkers
+	s.gpuWorkers = snapshot.GPUWorkers
 	return nil
 }
 

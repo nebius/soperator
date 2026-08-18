@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"nebius.ai/soperator-e2e/acceptance/framework"
+	"nebius.ai/soperator-e2e/acceptance/internal/kubeobjects"
 )
 
 const (
@@ -141,8 +142,8 @@ func (s *SystemChecks) aHealthyWorkerPodIsSelected(ctx context.Context) error {
 			problems = append(problems, fmt.Sprintf("%s: %v", worker.Name, err))
 			continue
 		}
-		if pod.Status.Phase != corev1.PodRunning || !podReady(pod) || pod.Spec.NodeName == "" {
-			problems = append(problems, fmt.Sprintf("%s: pod phase=%s ready=%t node=%q", worker.Name, pod.Status.Phase, podReady(pod), pod.Spec.NodeName))
+		if pod.Status.Phase != corev1.PodRunning || !kubeobjects.PodReady(pod) || pod.Spec.NodeName == "" {
+			problems = append(problems, fmt.Sprintf("%s: pod phase=%s ready=%t node=%q", worker.Name, pod.Status.Phase, kubeobjects.PodReady(pod), pod.Spec.NodeName))
 			continue
 		}
 		k8sNode, err := s.k8sNodeByName(ctx, pod.Spec.NodeName)
@@ -243,9 +244,9 @@ func (s *SystemChecks) kubeletIsStoppedOnTheSelectedWorkerKubernetesNode(ctx con
 	if err != nil {
 		return err
 	}
-	if pod.Status.Phase != corev1.PodRunning || !podReady(pod) || pod.Spec.NodeName == "" {
+	if pod.Status.Phase != corev1.PodRunning || !kubeobjects.PodReady(pod) || pod.Spec.NodeName == "" {
 		return fmt.Errorf("selected worker pod %s is not healthy: phase=%s ready=%t node=%q",
-			pod.Name, pod.Status.Phase, podReady(pod), pod.Spec.NodeName)
+			pod.Name, pod.Status.Phase, kubeobjects.PodReady(pod), pod.Spec.NodeName)
 	}
 	k8sNode, err := s.k8sNodeByName(ctx, pod.Spec.NodeName)
 	if err != nil {
@@ -303,7 +304,7 @@ func (s *SystemChecks) theSelectedWorkerPodIsRecreatedAndReady(ctx context.Conte
 		if err != nil {
 			return false, err
 		}
-		return string(pod.UID) != s.kubeletWorkerPodUID && pod.Status.Phase == corev1.PodRunning && podReady(pod), nil
+		return string(pod.UID) != s.kubeletWorkerPodUID && pod.Status.Phase == corev1.PodRunning && kubeobjects.PodReady(pod), nil
 	})
 }
 

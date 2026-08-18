@@ -1,10 +1,26 @@
 package framework
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestSubmitBatchQuotesJobName(t *testing.T) {
+	runtime := &submitBatchRuntime{}
+	jobName := `job name ' $(echo unsafe)`
+
+	job, err := NewSlurmClient(runtime).SubmitBatch(t.Context(), SbatchOptions{
+		JobName: jobName,
+		Wrap:    "true",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, jobName, job.JobName)
+	assert.Contains(t, runtime.jailCommand, "--job-name="+ShellQuote(jobName))
+}
 
 func TestParseSacctJob(t *testing.T) {
 	dump := `
@@ -29,4 +45,16 @@ func TestSlurmJobInfoCompletedSuccessfully(t *testing.T) {
 
 	assert.True(t, info.CompletedSuccessfully())
 	assert.False(t, info.IsAlive())
+}
+
+type submitBatchRuntime struct {
+	Runtime
+	jailCommand string
+}
+
+func (r *submitBatchRuntime) Jail() CommandScope {
+	return NewCommandScope(func(ctx context.Context, command string) (string, error) {
+		r.jailCommand = command
+		return "123", nil
+	})
 }

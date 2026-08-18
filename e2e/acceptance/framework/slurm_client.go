@@ -63,7 +63,7 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 
 	var args []string
 	args = append(args, "--parsable")
-	args = append(args, fmt.Sprintf("--job-name=%s", jobName))
+	args = append(args, fmt.Sprintf("--job-name=%s", ShellQuote(jobName)))
 	args = append(args, fmt.Sprintf("-o %s/%%x-%%j.out", AcceptanceJobOutputDir))
 	args = append(args, fmt.Sprintf("-e %s/%%x-%%j.err", AcceptanceJobOutputDir))
 	if opts.Nodes > 0 {

@@ -73,7 +73,7 @@ func (s *ClusterCreation) checkPodsReady(ctx context.Context) error {
 			problems = append(problems, fmt.Sprintf("%s phase=%s", pod.Name, pod.Status.Phase))
 			continue
 		}
-		if !podReady(pod) {
+		if !kubeobjects.PodReady(pod) {
 			problems = append(problems, fmt.Sprintf("%s not Ready", pod.Name))
 		}
 	}
@@ -456,6 +456,9 @@ func (s *ClusterCreation) checkNodeSetSmokeJobs(ctx context.Context) error {
 		s.runtime.Logf("cluster creation: no live nodesets configured, skipping per-nodeset smoke jobs")
 		return nil
 	}
+	if err := snapshot.RequireAllWorkersUsable(); err != nil {
+		return fmt.Errorf("validate workers for per-NodeSet smoke jobs: %w", err)
+	}
 
 	var problems []string
 	for _, nodeSet := range snapshot.NodeSets {
@@ -496,15 +499,6 @@ type helmRelease struct {
 
 type helmReleaseStatusRef struct {
 	Conditions []metav1.Condition `json:"conditions"`
-}
-
-func podReady(pod corev1.Pod) bool {
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-	return false
 }
 
 func ownedByJob(pod corev1.Pod) bool {

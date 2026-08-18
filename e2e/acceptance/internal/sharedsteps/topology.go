@@ -83,10 +83,11 @@ func (s *Topology) scontrolTopologyIsParsedIntoASwitchTree(ctx context.Context) 
 	}
 	s.runtime.Logf("scontrol show topology:\n%s", strings.TrimSpace(raw))
 
-	workers, err := s.selector.Workers(ctx)
+	snapshot, err := s.selector.Snapshot(ctx)
 	if err != nil {
 		return err
 	}
+	workers := snapshot.Workers
 	if len(workers) == 0 {
 		return fmt.Errorf("no workers found")
 	}
@@ -141,22 +142,20 @@ func (s *Topology) aJobRunsOnAllAvailableWorkers(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, topologyJobTimeout)
 	defer cancel()
 
-	if len(s.workers) == 0 {
-		workers, err := s.selector.Workers(ctx)
-		if err != nil {
-			return err
-		}
-		s.workers = workers
+	snapshot, err := s.selector.Snapshot(ctx)
+	if err != nil {
+		return err
 	}
+	if err := snapshot.RequireAllWorkersUsable(); err != nil {
+		return fmt.Errorf("validate topology workers: %w", err)
+	}
+	s.workers = snapshot.Workers
 	if len(s.workers) == 0 {
 		return fmt.Errorf("no workers found")
 	}
-	// We target every discovered worker without re-filtering by Slurm state.
-	// The acceptance suite expects the cluster it owns to have all nodes
-	// IDLE at this point; a drained/down/suspended node would be a symptom
-	// of a prior failure worth surfacing, not something to silently skip.
-	// If the cluster is genuinely in a bad state, the srun call fails within
-	// the 10-minute context timeout rather than hanging.
+	// Target every configured worker. Degraded or missing workers are rejected
+	// above so a prior failure is surfaced immediately instead of being skipped
+	// or left to fail through the srun timeout.
 	names := make([]string, 0, len(s.workers))
 	for _, w := range s.workers {
 		names = append(names, w.Name)

@@ -1,21 +1,14 @@
-# Soperator E2E
+# Acceptance Tests
 
-Soperator E2E contains the reusable Soperator acceptance runtime: embedded
-Godog feature files, shared step definitions, and a runner for executing checks
-against an existing Soperator cluster. It is intended for open-source Soperator
-validation and for external runners that need to reuse public Soperator
-scenarios against another Soperator-based environment. Cluster lifecycle is
-intentionally outside this repository. Create, select, update, and delete the
-target cluster in the caller, then pass Kubernetes access to the runner through
-a kube context.
+This module contains the reusable Soperator acceptance runtime: embedded Godog
+feature files, shared step definitions, and a runner for executing checks
+against an existing Soperator cluster. It supports open-source Soperator
+validation and external runners that reuse public Soperator scenarios against
+another Soperator-based environment.
 
-This repository is separate from the Soperator source tree on purpose:
-
-- Acceptance should validate Soperator as a black box: use public Kubernetes/Slurm
-behavior only and avoid depending on Soperator implementation details.
-- Acceptance does not need Soperator's release-branch model: keeping it separate
-avoids unnecessary branching and backporting of test code, while version tags let
-one suite cover multiple Soperator versions.
+Cluster lifecycle is intentionally outside this module. Create, select, update,
+and delete the target cluster in the caller, then pass Kubernetes access to the
+runner through a kube context.
 
 ## Standalone CLI
 
@@ -24,11 +17,10 @@ one suite cover multiple Soperator versions.
 > or another environment that is safe to change.
 > !!! WARNING !!!
 
-Build the standalone acceptance binary from the repository root:
+Build the standalone acceptance binary from the Soperator repository root:
 
 ```bash
-mkdir -p bin
-go build -o bin/acceptance ./cmd/acceptance
+go -C e2e build -o ../bin/acceptance ./cmd/acceptance
 ```
 
 Run the shared suite against an existing cluster:
@@ -70,8 +62,10 @@ All flags:
   reports into that directory.
 
 CPU/GPU scenarios are selected by tags like other scenarios. Steps that need a
-specific worker kind query live Slurm and NodeSet state at scenario time and
-skip the scenario if the required worker kind is unavailable.
+specific worker kind query live Slurm and NodeSet state at scenario time. They
+skip when the required capacity is not configured, but fail when it is
+configured and too few workers are usable. Scenarios that cover all workers
+also fail on partial degradation.
 
 For focused manual runs on a dev cluster, pass the scenario location:
 
@@ -212,9 +206,9 @@ common Kubernetes, Slurm, and worker primitives:
   `WorkerPodForSlurmNode`.
 - `SlurmClient`, including `NodeInfo`, `NodeInfoOnce`, `JobInfo`,
   `MainPartitionNodeNames`, `WaitForJobRunning`, and `WaitForJobGone`.
-- `WorkerSelector`, `WorkerSnapshot`, `WorkerInfo`, and
-  `PickWorkers`/`PickCPUWorkers`/`PickGPUWorkers` methods for selecting live
-  usable workers.
+- `WorkerSelector`, `WorkerSnapshot`, and `WorkerInfo` for retaining live Slurm
+  state and configured NodeSet capacity, plus
+  `PickWorkers`/`PickCPUWorkers`/`PickGPUWorkers` for selecting usable workers.
 - `SkipIfInsufficientWorkers` for mapping insufficient-worker selections to
   skipped Godog scenarios.
 - `SbatchJob`, `SbatchOptions`, `ShellQuote`, `BashLC`, and `WorkerNames`.
@@ -239,6 +233,12 @@ through additional `StepRegistrar` values.
 - `acceptance/internal/reports`: Godog report format construction.
 - `cmd/acceptance`: standalone runner for an already deployed cluster.
 
+## Synchronization
+
+The acceptance implementation mirrors the standalone `soperator-e2e`
+repository. Keep shared source and tests synchronized, while treating this
+README, module manifests, and repository-level metadata as location-specific.
+
 GitHub Actions keeps two refs separate:
 
 1. Soperator/workflow ref: the Soperator repository ref used to run the E2E
@@ -251,19 +251,3 @@ The workflow reads the target Soperator version from the selected build artifact
 and uses it for Terraform deployment and scenario filtering. When new tests or
 behavior are added, the scenarios must be tagged with the full version lower
 bound where that behavior exists, for example `@soperator_version_>=5.0.0`.
-
-## License
-
-Copyright 2026 Nebius B.V.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
