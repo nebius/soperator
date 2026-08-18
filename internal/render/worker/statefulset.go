@@ -156,6 +156,10 @@ func RenderNodeSetStatefulSet(
 			WhenScaled:  kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
 		}
 	}
+	updateStrategy, volumeClaimUpdateStrategy, err := renderUpdateStrategies(nodeSet)
+	if err != nil {
+		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering update strategies: %w", err)
+	}
 
 	res := kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -172,15 +176,7 @@ func RenderNodeSetStatefulSet(
 			ScaleStrategy: &kruisev1b1.StatefulSetScaleStrategy{
 				MaxUnavailable: &nodeSet.StatefulSet.MaxConcurrentStartup,
 			},
-			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
-				Type: appsv1.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
-					MaxUnavailable:  &nodeSet.StatefulSet.MaxUnavailable,
-					PodUpdatePolicy: kruisev1b1.InPlaceIfPossiblePodUpdateStrategyType,
-					Partition:       ptr.To(int32(0)),
-					MinReadySeconds: ptr.To(int32(0)),
-				},
-			},
+			UpdateStrategy: updateStrategy,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: matchLabels,
 			},
@@ -190,9 +186,7 @@ func RenderNodeSetStatefulSet(
 				nodeSet.ParentalCluster.Name,
 				pvcTemplateSpecs,
 			),
-			VolumeClaimUpdateStrategy: kruisev1b1.VolumeClaimUpdateStrategy{
-				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
-			},
+			VolumeClaimUpdateStrategy: volumeClaimUpdateStrategy,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
@@ -205,6 +199,35 @@ func RenderNodeSetStatefulSet(
 	}
 
 	return res, nil
+}
+
+func renderUpdateStrategies(nodeSet *values.SlurmNodeSet) (kruisev1b1.StatefulSetUpdateStrategy, kruisev1b1.VolumeClaimUpdateStrategy, error) {
+	switch nodeSet.UpdateStrategy {
+	case "", consts.UpdateStrategyRollingUpdate:
+		return kruisev1b1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
+					MaxUnavailable:  &nodeSet.StatefulSet.MaxUnavailable,
+					PodUpdatePolicy: kruisev1b1.InPlaceIfPossiblePodUpdateStrategyType,
+					Partition:       ptr.To(int32(0)),
+					MinReadySeconds: ptr.To(int32(0)),
+				},
+			},
+			kruisev1b1.VolumeClaimUpdateStrategy{
+				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+			},
+			nil
+	case consts.UpdateStrategyOnDelete:
+		return kruisev1b1.StatefulSetUpdateStrategy{
+				Type: appsv1.OnDeleteStatefulSetStrategyType,
+			},
+			kruisev1b1.VolumeClaimUpdateStrategy{
+				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+			},
+			nil
+	default:
+		return kruisev1b1.StatefulSetUpdateStrategy{}, kruisev1b1.VolumeClaimUpdateStrategy{}, fmt.Errorf("unsupported update strategy %q", nodeSet.UpdateStrategy)
+	}
 }
 
 func renderNodeSetAnnotations(nodeSet *values.SlurmNodeSet) map[string]string {

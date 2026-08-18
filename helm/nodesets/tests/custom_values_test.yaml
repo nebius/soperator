@@ -8,6 +8,7 @@ tests:
         - name: custom-workers
           replicas: 10
           priorityClass: "custom-priority"
+          updateStrategy: onDelete
           slurmd:
             image:
               repository: "custom/slurm"
@@ -48,6 +49,9 @@ tests:
       - equal:
           path: spec.priorityClass
           value: "custom-priority"
+      - equal:
+          path: spec.updateStrategy
+          value: "onDelete"
       - equal:
           path: spec.slurmd.image.repository
           value: "custom/slurm"
@@ -99,6 +103,9 @@ tests:
       - equal:
           path: spec.replicas
           value: 1  # default value
+      - equal:
+          path: spec.updateStrategy
+          value: "rollingUpdate"
       - notExists:
           path: spec.priorityClass
       - notExists:
