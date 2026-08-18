@@ -859,6 +859,20 @@ func (in *SlurmClusterSpec) DeepCopyInto(out *SlurmClusterSpec) {
 	}
 	out.Secrets = in.Secrets
 	in.SlurmNodes.DeepCopyInto(&out.SlurmNodes)
+	if in.ExtraLabels != nil {
+		in, out := &in.ExtraLabels, &out.ExtraLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.ExtraAnnotations != nil {
+		in, out := &in.ExtraAnnotations, &out.ExtraAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	in.PartitionConfiguration.DeepCopyInto(&out.PartitionConfiguration)
 	in.SlurmConfig.DeepCopyInto(&out.SlurmConfig)
 	if in.Topology != nil {

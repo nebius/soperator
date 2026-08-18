@@ -39,7 +39,7 @@ func TestBuildSlurmNodeSetFrom_SSSD(t *testing.T) {
 			Image: slurmv1alpha1.Image{Repository: "sssd", Tag: "latest"},
 		}
 
-		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil, false)
+		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil, false, nil, nil)
 
 		if assert.NotNil(t, result.ContainerSSSD) {
 			assert.Equal(t, "sssd:latest", result.ContainerSSSD.Image)
@@ -56,7 +56,7 @@ func TestBuildSlurmNodeSetFrom_SSSD(t *testing.T) {
 		}
 		nodeSet.Spec.SSSDConfSecretRefName = "custom-worker-sssd"
 
-		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil, false)
+		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil, false, nil, nil)
 
 		assert.False(t, result.IsSSSDSecretDefault)
 		assert.Equal(t, "custom-worker-sssd", result.SSSDConfSecretName)
@@ -65,11 +65,58 @@ func TestBuildSlurmNodeSetFrom_SSSD(t *testing.T) {
 	t.Run("keeps sssd disabled when container is not configured", func(t *testing.T) {
 		nodeSet := makeNodeSet()
 
-		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil, false)
+		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil, false, nil, nil)
 
 		assert.Nil(t, result.ContainerSSSD)
 		assert.Empty(t, result.SSSDConfSecretName)
 		assert.False(t, result.IsSSSDSecretDefault)
+	})
+}
+
+func TestBuildSlurmNodeSetFrom_ExtraLabelsAndAnnotations(t *testing.T) {
+	makeNodeSet := func() *slurmv1alpha1.NodeSet {
+		return &slurmv1alpha1.NodeSet{
+			ObjectMeta: metav1ObjectMeta("worker-a", "test-ns"),
+			Spec: slurmv1alpha1.NodeSetSpec{
+				Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+					Image: slurmv1alpha1.Image{Repository: "slurmd", Tag: "latest"},
+					Volumes: slurmv1alpha1.WorkerVolumesSpec{
+						Spool: corev1.VolumeSource{},
+						Jail:  corev1.VolumeSource{},
+					},
+				},
+				Munge: slurmv1alpha1.ContainerMungeSpec{
+					Image: slurmv1alpha1.Image{Repository: "munge", Tag: "latest"},
+				},
+			},
+		}
+	}
+
+	t.Run("cluster-wide labels/annotations flow through when NodeSet sets none", func(t *testing.T) {
+		nodeSet := makeNodeSet()
+
+		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil, false,
+			map[string]string{"gcore.com/project-id": "proj-1"},
+			map[string]string{"gcore.com/note": "cluster-wide"},
+		)
+
+		assert.Equal(t, "proj-1", result.Labels["gcore.com/project-id"])
+		assert.Equal(t, "cluster-wide", result.Annotations["gcore.com/note"])
+	})
+
+	t.Run("NodeSet WorkerLabels/WorkerAnnotations take precedence on conflicting keys", func(t *testing.T) {
+		nodeSet := makeNodeSet()
+		nodeSet.Spec.WorkerLabels = map[string]string{"gcore.com/project-id": "override", "gcore.com/flavor": "gpu-8x-h100"}
+		nodeSet.Spec.WorkerAnnotations = map[string]string{"gcore.com/note": "override"}
+
+		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil, false,
+			map[string]string{"gcore.com/project-id": "proj-1"},
+			map[string]string{"gcore.com/note": "cluster-wide"},
+		)
+
+		assert.Equal(t, "override", result.Labels["gcore.com/project-id"])
+		assert.Equal(t, "gpu-8x-h100", result.Labels["gcore.com/flavor"])
+		assert.Equal(t, "override", result.Annotations["gcore.com/note"])
 	})
 }
 

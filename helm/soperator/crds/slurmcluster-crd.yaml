@@ -27454,6 +27454,12 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              workerLabels:
+                additionalProperties:
+                  type: string
+                description: WorkerLabels represent K8S labels that should be added
+                  to the worker pods.
+                type: object
             required:
             - munge
             - slurmd
@@ -27644,6 +27650,18 @@ spec:
                   Soperator does not guarantee the validity of the raw configuration.
                   Raw config is merged with existing SlurmConfig values.
                 type: string
+              extraAnnotations:
+                additionalProperties:
+                  type: string
+                description: ExtraAnnotations are custom K8s annotations added to
+                  every Pod and the spool PVC of this cluster.
+                type: object
+              extraLabels:
+                additionalProperties:
+                  type: string
+                description: ExtraLabels are custom K8s labels added to every Pod
+                  and the spool PVC of this cluster.
+                type: object
               healthCheckConfig:
                 description: HealthCheckConfig defines Slurm health check configuration.
                 properties:

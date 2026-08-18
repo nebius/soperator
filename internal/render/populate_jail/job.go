@@ -1,6 +1,8 @@
 package populate_jail
 
 import (
+	"maps"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +23,10 @@ func RenderPopulateJailJob(
 	populateJail *values.PopulateJail,
 ) batchv1.Job {
 	labels := common.RenderLabels(consts.ComponentTypePopulateJail, clusterName)
+	maps.Copy(labels, populateJail.Labels)
+
+	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNamePopulateJail)
+	maps.Copy(annotations, populateJail.Annotations)
 
 	nodeFilter := utils.MustGetBy(
 		nodeFilters,
@@ -50,7 +56,7 @@ func RenderPopulateJailJob(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
-					Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNamePopulateJail),
+					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
 					HostUsers:         populateJail.HostUsers,

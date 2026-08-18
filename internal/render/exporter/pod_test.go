@@ -129,3 +129,30 @@ func Test_renderPodTemplateSpec_PriorityClass(t *testing.T) {
 		})
 	}
 }
+
+func Test_renderPodTemplateSpec_CustomLabelsAndAnnotations(t *testing.T) {
+	clusterValues := &values.SlurmCluster{
+		SlurmExporter: values.SlurmExporter{
+			SlurmNode: slurmv1.SlurmNode{
+				K8sNodeFilterName: "test-filter",
+			},
+			Labels:      map[string]string{"gcore.com/project-id": "123"},
+			Annotations: map[string]string{"gcore.com/note": "abc"},
+			Container: slurmv1.NodeContainer{
+				Image: "test-image",
+			},
+		},
+		NodeFilters: []slurmv1.K8sNodeFilter{
+			{Name: "test-filter"},
+		},
+	}
+
+	initContainers := []corev1.Container{}
+	matchLabels := map[string]string{"app": "test"}
+
+	result := renderPodTemplateSpec(clusterValues, initContainers, matchLabels)
+
+	assert.Equal(t, "123", result.Labels["gcore.com/project-id"])
+	assert.Equal(t, "test", result.Labels["app"]) // matchLabels preserved
+	assert.Equal(t, "abc", result.Annotations["gcore.com/note"])
+}

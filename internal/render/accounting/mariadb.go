@@ -102,6 +102,10 @@ func RenderMariaDb(
 				SecurityContext: mariaDb.SecurityContext,
 			},
 			PodTemplate: mariadbv1alpha1.PodTemplate{
+				PodMetadata: &mariadbv1alpha1.Metadata{
+					Labels:      accounting.Labels,
+					Annotations: accounting.Annotations,
+				},
 				NodeSelector:       nodeFilter.NodeSelector,
 				Affinity:           affinityConfig,
 				Tolerations:        nodeFilter.Tolerations,
