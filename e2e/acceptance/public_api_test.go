@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"nebius.ai/soperator-e2e/acceptance"
+	"github.com/nebius/soperator/e2e/acceptance"
 )
 
 func TestPublicRunnerAPIIsImportable(t *testing.T) {

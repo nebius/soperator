@@ -10,8 +10,8 @@ import (
 
 	"github.com/cucumber/godog"
 
-	"nebius.ai/soperator-e2e/acceptance/framework"
-	"nebius.ai/soperator-e2e/acceptance/internal/kubeobjects"
+	"github.com/nebius/soperator/e2e/acceptance/framework"
+	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
 
 const (

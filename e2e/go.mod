@@ -1,4 +1,4 @@
-module nebius.ai/soperator-e2e
+module github.com/nebius/soperator/e2e
 
 go 1.26.4
 

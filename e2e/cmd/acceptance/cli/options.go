@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"nebius.ai/soperator-e2e/acceptance"
+	"github.com/nebius/soperator/e2e/acceptance"
 )
 
 const defaultSlurmClusterName = "soperator"
