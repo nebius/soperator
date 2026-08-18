@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"strings"
 	"time"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0044"
@@ -91,6 +92,9 @@ type client struct {
 	 */
 	api.ClientWithResponsesInterface
 
+	server     string
+	httpClient *http.Client
+
 	tokenIssuer tokenIssuer
 }
 
@@ -107,6 +111,8 @@ func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) 
 	}
 
 	apiClient := &client{
+		server:      strings.TrimRight(server, "/"),
+		httpClient:  httpClient,
 		tokenIssuer: normalizeIssuer(tokenIssuer),
 	}
 
