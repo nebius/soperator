@@ -6,6 +6,7 @@ import (
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1136,6 +1137,41 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("onDelete strategy is propagated", func(t *testing.T) {
+		nodeSet := makeNodeSet(intstr.FromInt32(500), intstr.FromString("20%"))
+		nodeSet.UpdateStrategy = consts.UpdateStrategyOnDelete
+
+		result, err := worker.RenderNodeSetStatefulSet(
+			"test-cluster",
+			nodeSet,
+			&slurmv1.Secrets{},
+			consts.CGroupV2,
+			true,
+			false,
+			"",
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, appsv1.OnDeleteStatefulSetStrategyType, result.Spec.UpdateStrategy.Type)
+		assert.Nil(t, result.Spec.UpdateStrategy.RollingUpdate)
+		assert.Equal(t, kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, result.Spec.VolumeClaimUpdateStrategy.Type)
+	})
+
+	t.Run("unsupported strategy returns an error", func(t *testing.T) {
+		nodeSet := makeNodeSet(intstr.FromInt32(500), intstr.FromString("20%"))
+		nodeSet.UpdateStrategy = consts.UpdateStrategy("unsupported")
+
+		_, err := worker.RenderNodeSetStatefulSet(
+			"test-cluster",
+			nodeSet,
+			&slurmv1.Secrets{},
+			consts.CGroupV2,
+			true,
+			false,
+			"",
+		)
+		assert.ErrorContains(t, err, `unsupported update strategy "unsupported"`)
+	})
 }
 
 func TestRenderNodeSetStatefulSet_EphemeralNodesReserveOrdinals(t *testing.T) {

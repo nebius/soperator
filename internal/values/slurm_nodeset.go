@@ -48,6 +48,7 @@ type SlurmNodeSet struct {
 	DockerEnabled bool
 
 	StatefulSet     StatefulSet
+	UpdateStrategy  consts.UpdateStrategy
 	Service         Service
 	ServiceUmbrella Service
 
@@ -135,6 +136,7 @@ func BuildSlurmNodeSetFrom(
 			nsSpec.MaxUnavailable,
 			nsSpec.MaxConcurrentStartup,
 		),
+		UpdateStrategy:  nsSpec.UpdateStrategy,
 		Service:         buildServiceFrom(naming.BuildNodeSetServiceName(clusterName, nodeSet.Name)),
 		ServiceUmbrella: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName)),
 		//

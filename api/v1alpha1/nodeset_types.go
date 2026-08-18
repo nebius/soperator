@@ -7,6 +7,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"nebius.ai/slurm-operator/internal/consts"
 )
 
 // +kubebuilder:object:root=true
@@ -310,6 +312,12 @@ type NodeSetSpec struct {
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
 	// endregion Scheduling
+
+	// UpdateStrategy controls how the advanced StatefulSet updates worker pods.
+	//
+	// +kubebuilder:validation:Enum=rollingUpdate;onDelete
+	// +kubebuilder:default="rollingUpdate"
+	UpdateStrategy consts.UpdateStrategy `json:"updateStrategy"`
 }
 
 // ContainerSlurmdSpec defines the Slurm worker daemon configuration
