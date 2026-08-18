@@ -6895,6 +6895,53 @@ func (_c *MockClient_SlurmdbV0044PostWckeysWithResponse_Call) RunAndReturn(run f
 	return _c
 }
 
+// UndrainNode provides a mock function with given fields: ctx, nodeName
+func (_m *MockClient) UndrainNode(ctx context.Context, nodeName string) error {
+	ret := _m.Called(ctx, nodeName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UndrainNode")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, nodeName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClient_UndrainNode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UndrainNode'
+type MockClient_UndrainNode_Call struct {
+	*mock.Call
+}
+
+// UndrainNode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nodeName string
+func (_e *MockClient_Expecter) UndrainNode(ctx interface{}, nodeName interface{}) *MockClient_UndrainNode_Call {
+	return &MockClient_UndrainNode_Call{Call: _e.mock.On("UndrainNode", ctx, nodeName)}
+}
+
+func (_c *MockClient_UndrainNode_Call) Run(run func(ctx context.Context, nodeName string)) *MockClient_UndrainNode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockClient_UndrainNode_Call) Return(_a0 error) *MockClient_UndrainNode_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClient_UndrainNode_Call) RunAndReturn(run func(context.Context, string) error) *MockClient_UndrainNode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockClient creates a new instance of MockClient. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockClient(t interface {
