@@ -154,6 +154,9 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 			fmt.Sprintf("NodeAddr=%s", nodeAddr),
 			fmt.Sprintf("RealMemory=%s", realMemory),
 		)
+		if nodeSet.Spec.NodeConfig.AutoResume != nil && !*nodeSet.Spec.NodeConfig.AutoResume {
+			nodeConfigParts = append(nodeConfigParts, "AutoResume=Off")
+		}
 		if nodeSet.Spec.Slurmd.Port != 0 {
 			nodeConfigParts = append(nodeConfigParts, fmt.Sprintf("Port=%d", nodeSet.Spec.Slurmd.Port))
 		}

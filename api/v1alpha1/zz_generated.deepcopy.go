@@ -760,6 +760,11 @@ func (in *NodeConfig) DeepCopyInto(out *NodeConfig) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.AutoResume != nil {
+		in, out := &in.AutoResume, &out.AutoResume
+		*out = new(bool)
+		**out = **in
+	}
 	if in.GRESConfig != nil {
 		in, out := &in.GRESConfig, &out.GRESConfig
 		*out = make([]string, len(*in))

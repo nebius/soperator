@@ -124,6 +124,10 @@ nodesets:
       features:
         - "gpu"
         - "cuda"
+      # Whether Slurm automatically resumes the nodes.
+      # Set to false to render AutoResume=Off in the NodeName configuration.
+      # Optional, defaults to true
+      autoResume: true
       # Static string to be added to the Node's configuration
       # Optional
       static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=1"

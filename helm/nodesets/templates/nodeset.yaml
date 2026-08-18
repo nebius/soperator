@@ -83,6 +83,10 @@ spec:
       {{- toYaml . | nindent 6 }}
     {{- end }}
 
+    {{- if hasKey . "autoResume" }}
+    autoResume: {{ .autoResume }}
+    {{- end }}
+
     {{- with .static }}
     static: {{ . | quote }}
     {{- end }}

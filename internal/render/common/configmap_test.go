@@ -711,14 +711,15 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 								},
 							},
 							NodeConfig: slurmv1alpha1.NodeConfig{
-								Features: []string{"a", "b"},
-								Static:   "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1 Feature=c,d",
+								Features:   []string{"a", "b"},
+								AutoResume: ptr.To(false),
+								Static:     "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1 Feature=c,d",
 							},
 						},
 					},
 				},
 			},
-			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=a,b Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 AutoResume=Off Feature=a,b Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Single nodeset with multiple replicas",

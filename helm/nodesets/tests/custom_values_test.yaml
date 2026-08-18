@@ -35,6 +35,7 @@ tests:
           gpu:
             enabled: false
           nodeConfig:
+            autoResume: false
             features:
               - "custom"
     asserts:
@@ -52,6 +53,9 @@ tests:
       - equal:
           path: spec.updateStrategy
           value: "onDelete"
+      - equal:
+          path: spec.nodeConfig.autoResume
+          value: false
       - equal:
           path: spec.slurmd.image.repository
           value: "custom/slurm"
