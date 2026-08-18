@@ -378,6 +378,15 @@ func TestRenderSlurmConfigMapResumeFailProgram(t *testing.T) {
 	assert.Contains(t, slurmConfig, "SuspendProgram=/opt/soperator/bin/power_suspend.sh")
 }
 
+func TestRenderSlurmConfigMapRebootPrograms(t *testing.T) {
+	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{})
+
+	slurmConfig := result.Data[consts.ConfigMapKeySlurmBaseConfig]
+	assert.Contains(t, slurmConfig, "RebootProgram=/opt/bin/slurm/reboot.sh")
+	assert.Contains(t, slurmConfig,
+		"PowerAction=soperator-worker-handoff Location=slurmd Program=/opt/bin/slurm/worker_handoff.py")
+}
+
 func TestRenderConfigMapSlurmConfigs_FileNamesAndWarnings(t *testing.T) {
 	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{})
 

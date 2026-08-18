@@ -124,12 +124,14 @@ COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
 # Copy script for bind-mounting slurm into the jail
 COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
-# Copy script for rebooting K8s nodes
+# Copy scripts for rebooting K8s nodes and handing off worker operations
 COPY images/common/scripts/reboot.sh /opt/bin/slurm/
+COPY images/common/scripts/worker_handoff.py /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh && \
-    chmod +x /opt/bin/slurm/reboot.sh
+    chmod +x /opt/bin/slurm/reboot.sh && \
+    chmod +x /opt/bin/slurm/worker_handoff.py
 
 # Create single folder with slurm plugins for all architectures
 RUN mkdir -p /usr/lib/slurm && \
