@@ -2,10 +2,12 @@ package accounting
 
 import (
 	"errors"
+	"fmt"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
@@ -17,6 +19,24 @@ import (
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
+
+const (
+	mariaDbBufferPoolPercent        int64 = 50
+	mariaDbFallbackBufferPoolSizeMi int64 = 32768
+)
+
+// deriveMariaDbBufferPoolSizeMi sizes the InnoDB buffer pool as a share of the container
+// memory allocation, falling back to the legacy fixed size when no allocation is known.
+func deriveMariaDbBufferPoolSizeMi(memory *resource.Quantity) int64 {
+	if memory == nil || memory.Sign() <= 0 {
+		return mariaDbFallbackBufferPoolSizeMi
+	}
+	derived := memory.Value() * mariaDbBufferPoolPercent / 100 / (1 << 20)
+	if derived <= 0 {
+		return mariaDbFallbackBufferPoolSizeMi
+	}
+	return derived
+}
 
 func RenderMariaDb(
 	namespace,
@@ -112,7 +132,7 @@ func RenderMariaDb(
 			Metrics: &mariadbv1alpha1.MariadbMetrics{
 				Enabled: mariaDb.Metrics.Enabled,
 			},
-			MyCnf: ptr.To(consts.MariaDbDefaultMyCnf),
+			MyCnf: ptr.To(fmt.Sprintf(consts.MariaDbMyCnfTemplate, deriveMariaDbBufferPoolSizeMi(mariaDb.Resources.Memory()))),
 		},
 	}, nil
 }
