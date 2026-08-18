@@ -81,7 +81,7 @@ instance removal.
 
 ## Reusable Runner API
 
-Use `nebius.ai/soperator-e2e/acceptance` from another Go runner when you
+Use `github.com/nebius/soperator/e2e/acceptance` from another Go runner when you
 want to reuse the shared Soperator scenarios for a different Soperator cluster
 type.
 
@@ -196,7 +196,7 @@ that need fresh cluster state should query Kubernetes or Slurm through
 
 ## Framework Helpers
 
-External runners can use `nebius.ai/soperator-e2e/acceptance/framework` for
+External runners can use `github.com/nebius/soperator/e2e/acceptance/framework` for
 common Kubernetes, Slurm, and worker primitives:
 
 - `Exec`: command execution interface.

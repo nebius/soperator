@@ -3,8 +3,8 @@ package acceptance
 import (
 	"github.com/cucumber/godog"
 
-	"nebius.ai/soperator-e2e/acceptance/framework"
-	"nebius.ai/soperator-e2e/acceptance/internal/sharedsteps"
+	"github.com/nebius/soperator/e2e/acceptance/framework"
+	"github.com/nebius/soperator/e2e/acceptance/internal/sharedsteps"
 )
 
 // StepRegistrar registers step definitions and scenario hooks for a suite.

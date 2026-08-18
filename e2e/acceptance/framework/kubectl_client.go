@@ -9,7 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"nebius.ai/soperator-e2e/acceptance/internal/kubeobjects"
+	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
 
 const SoperatorNamespace = "soperator"

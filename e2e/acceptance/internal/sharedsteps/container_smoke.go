@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"nebius.ai/soperator-e2e/acceptance/framework"
+	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
 const (
