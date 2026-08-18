@@ -303,7 +303,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  count by (label_slurm_nebius_ai_nodeset_name) (\n    kube_node_labels{\n      label_nebius_com_gpu_name=~\"GB.*\",\n      label_slurm_nebius_ai_nodeset_name!=\"\"\n    }\n  )\n)",
+          "expr": "count(\n  count by (label_slurm_nebius_ai_nodeset_name) (\n    kube_node_labels{\n      label_slurm_nebius_ai_nodeset_name!=\"\"\n    }\n  )\n)",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -2650,7 +2650,7 @@
               "useDashValues": false
             }
           ],
-          "title": "Cluster Power usage",
+          "title": "Rack Power usage",
           "type": "timeseries"
         }
       ],
@@ -6401,7 +6401,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_node_labels{label_nebius_com_gpu_name=~\"GB.*\"},label_slurm_nebius_ai_nodeset_name)",
+        "definition": "label_values(kube_node_labels,label_slurm_nebius_ai_nodeset_name)",
         "description": "For GB platforms",
         "includeAll": true,
         "allValue": ".*",
@@ -6411,7 +6411,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(kube_node_labels{label_nebius_com_gpu_name=~\"GB.*\"},label_slurm_nebius_ai_nodeset_name)",
+          "query": "label_values(kube_node_labelslabel_slurm_nebius_ai_nodeset_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
