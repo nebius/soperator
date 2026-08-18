@@ -1,6 +1,6 @@
 package acceptance
 
-import "nebius.ai/soperator-e2e/acceptance/internal/versionfilter"
+import "github.com/nebius/soperator/e2e/acceptance/internal/versionfilter"
 
 const SoperatorVersionTagPrefix = "@soperator_version_"
 

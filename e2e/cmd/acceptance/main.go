@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"nebius.ai/soperator-e2e/cmd/acceptance/cli"
+	"github.com/nebius/soperator/e2e/cmd/acceptance/cli"
 )
 
 func main() {

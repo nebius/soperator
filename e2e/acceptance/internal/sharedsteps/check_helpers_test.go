@@ -9,7 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"nebius.ai/soperator-e2e/acceptance/framework"
+	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
 func TestLoggedCheckOutputPathsNormalizesJailPrefix(t *testing.T) {

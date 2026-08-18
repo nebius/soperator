@@ -5,7 +5,7 @@ import (
 
 	semver "github.com/Masterminds/semver/v3"
 
-	"nebius.ai/soperator-e2e/acceptance/internal/versionfilter"
+	"github.com/nebius/soperator/e2e/acceptance/internal/versionfilter"
 )
 
 var soperatorFive = semver.MustParse("5.0.0")
