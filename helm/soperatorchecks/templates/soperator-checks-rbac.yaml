@@ -31,12 +31,9 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - nodes/proxy
-  - pods
+  - nodes/stats
   verbs:
   - get
-  - list
-  - watch
 - apiGroups:
   - ""
   resources:
@@ -46,6 +43,14 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - ""

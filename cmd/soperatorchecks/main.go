@@ -127,6 +127,13 @@ func main() {
 		cacheSyncTimeout                       time.Duration
 		ephemeralStorageThreshold              float64
 		ephemeralStorageResumeThreshold        float64
+
+		kubeletPort                  int
+		kubeletTimeout               time.Duration
+		kubeletMaxIdleConns          int
+		kubeletInsecureSkipTLSVerify bool
+		kubeletCAFile                string
+		kubeletTLSServerName         string
 	)
 
 	var watchNsCacheByName = make(map[string]cache.Config)
@@ -153,7 +160,7 @@ func main() {
 	flag.DurationVar(&requeueAfterActiveCheckJob, "requeue-after-activecheckjob", time.Minute, "The duration after which ActiveCheckJob will be requeued for reconciliation.")
 	flag.DurationVar(&requeueAfterPodEphemeralStorageCheck, "requeue-after-pod-ephemeral-storage-check", time.Minute, "The duration after which Pod Ephemeral Storage Check will be requeued for reconciliation.")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
-	flag.IntVar(&maxConcurrencyPodEphemeralStorageCheck, "pod-ephemeral-max-concurrent-reconciles", 10, "Configures number of concurrent reconciles for Pod Ephemeral Storage Check. It should improve performance for clusters with many pods.")
+	flag.IntVar(&maxConcurrencyPodEphemeralStorageCheck, "pod-ephemeral-max-concurrent-reconciles", 50, "Configures number of concurrent reconciles for Pod Ephemeral Storage Check. It should improve performance for clusters with many pods.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.BoolVar(&enabledNodeReplacement, "enable-node-replacement", true, "Enable node replacement controller")
 	flag.DurationVar(&notReadyTimeout, "not-ready-timeout", 15*time.Minute, "The timeout after which a NotReady node will be deleted. Nodes can be NotReady for more than 10 minutes when GPU operator is starting.")
@@ -162,6 +169,12 @@ func main() {
 	flag.Float64Var(&ephemeralStorageResumeThreshold, "ephemeral-storage-resume-threshold", 80.0, "The threshold percentage below which a drained node is resumed (default 80%). Must be less than ephemeral-storage-threshold to avoid flapping.")
 	flag.StringVar(&maintenanceConditionType, "maintenance-condition-type", string(consts.DefaultMaintenanceConditionType), "The condition type for scheduled maintenance")
 	flag.StringVar(&maintenanceIgnoreNodeLabels, "maintenance-ignore-node-labels", os.Getenv("MAINTENANCE_IGNORE_NODE_LABELS"), "Comma-separated list of node label key=value pairs to ignore during maintenance (e.g., 'env=prod,tier=critical')")
+	flag.IntVar(&kubeletPort, "kubelet-port", soperatorchecks.DefaultKubeletPort, "The kubelet port used for pod ephemeral storage stats on nodes that do not advertise a kubelet endpoint.")
+	flag.DurationVar(&kubeletTimeout, "kubelet-request-timeout", 10*time.Second, "The timeout for a single kubelet stats request. Kubelet builds the summary from cAdvisor, which is slow on busy nodes.")
+	flag.IntVar(&kubeletMaxIdleConns, "kubelet-max-idle-conns", 1024, "The maximum number of pooled kubelet connections. One connection is kept per node, so values below the node count make most requests pay a fresh TLS handshake.")
+	flag.BoolVar(&kubeletInsecureSkipTLSVerify, "kubelet-insecure-skip-tls-verify", true, "If set, the kubelet serving certificate is not verified. Kubelet serving certificates are self-signed unless the cluster enables serverTLSBootstrap.")
+	flag.StringVar(&kubeletCAFile, "kubelet-ca-file", "", "The CA bundle used to verify kubelet serving certificates. Only used when kubelet-insecure-skip-tls-verify is false.")
+	flag.StringVar(&kubeletTLSServerName, "kubelet-tls-server-name", "", "The server name used to verify kubelet serving certificates. Only used when kubelet-insecure-skip-tls-verify is false.")
 	flag.StringVar(&controllersFlag, "controllers", "", "A comma-separated list of controllers to enable or disable. Use '*' for all, and '-name' to disable. Overrides SLURM_OPERATOR_CONTROLLERS if set.")
 	flag.Parse()
 
@@ -350,6 +363,14 @@ func main() {
 			ephemeralStorageThreshold,
 			ephemeralStorageResumeThreshold,
 			slurmAPIClients,
+			soperatorchecks.KubeletClientConfig{
+				Port:                  int32(kubeletPort),
+				Timeout:               kubeletTimeout,
+				MaxIdleConns:          kubeletMaxIdleConns,
+				InsecureSkipTLSVerify: kubeletInsecureSkipTLSVerify,
+				CAFile:                kubeletCAFile,
+				TLSServerName:         kubeletTLSServerName,
+			},
 		)
 		if err != nil {
 			cli.Fail(setupLog, err, "unable to create pod ephemeral storage check", "controller", "PodEphemeralStorageCheck")
