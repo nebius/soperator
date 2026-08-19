@@ -23,6 +23,11 @@ controllerManager:
       isPrometheusCrdInstalled: "false"
       slurmOperatorWatchNamespaces: '*'
       topologyLabelPrefix: "topology.nebius.com"
+      # Renders spec.topology.topologies of a SlurmCluster into topology.yaml. This flag alone
+      # picks the format: with it on, a cluster that uses a topology but defines no
+      # spec.topology.topologies fails reconciliation with an explicit error instead of silently
+      # falling back. Set to "false" to keep every cluster on the legacy single topology.conf.
+      enableMultiTopology: "true"
     image:
       repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
       tag: 5.0.0

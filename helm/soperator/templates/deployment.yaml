@@ -49,6 +49,8 @@ spec:
         {{- end }}
         - name: TOPOLOGY_LABEL_PREFIX
           value: {{ quote .Values.controllerManager.manager.env.topologyLabelPrefix }}
+        - name: SLURM_OPERATOR_ENABLE_MULTI_TOPOLOGY
+          value: {{ quote .Values.controllerManager.manager.env.enableMultiTopology }}
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag

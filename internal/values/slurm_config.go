@@ -1,10 +1,14 @@
 package values
 
 import (
+	"fmt"
+	"strings"
+
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	topologyrefs "nebius.ai/slurm-operator/internal/utils/slurm/topology"
 )
 
 // buildSlurmConfigFrom copies the SlurmConfig spec and fills in defaults that Slurm must not be
@@ -52,4 +56,23 @@ func buildHealthCheckConfig(healthCheckConfig *slurmv1.HealthCheckConfig) *Healt
 		HealthCheckProgram:   healthCheckConfig.HealthCheckProgram,
 		HealthCheckNodeState: healthCheckConfig.HealthCheckNodeState,
 	}
+}
+
+// BuildNodeSetTopologyBindings encodes the named topologies covering a NodeSet as a comma-separated
+// "name=kind" list for the worker init container. Slurm lets a node belong to several topologies at
+// once, so every topology referencing the NodeSet is listed.
+func BuildNodeSetTopologyBindings(topology *slurmv1.Topology, nodeSetName string) string {
+	if topology == nil {
+		return ""
+	}
+
+	var bindings []string
+	for _, named := range topology.Topologies {
+		if !topologyrefs.CoversNodeSet(named.NodeSetRefs, nodeSetName) {
+			continue
+		}
+		bindings = append(bindings, fmt.Sprintf("%s=%s", named.Name, named.Topo.Type))
+	}
+
+	return strings.Join(bindings, ",")
 }

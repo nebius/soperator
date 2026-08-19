@@ -19,3 +19,101 @@ tests:
       - equal:
           path: spec.topology.blockSize
           value: 18
+
+  - it: should render several named topologies
+    set:
+      topology:
+        topologies:
+          - name: topo1
+            clusterDefault: true
+            topo:
+              type: tree
+            nodeSetRefs:
+              - ALL
+          - name: topo2
+            topo:
+              type: block
+              blockSizes:
+                - 4
+                - 16
+            nodeSetRefs:
+              - h100
+              - h200
+    asserts:
+      - isKind:
+          of: SlurmCluster
+      - equal:
+          path: spec.topology.topologies[0].name
+          value: topo1
+      - equal:
+          path: spec.topology.topologies[0].clusterDefault
+          value: true
+      - equal:
+          path: spec.topology.topologies[0].topo.type
+          value: tree
+      - equal:
+          path: spec.topology.topologies[0].nodeSetRefs
+          value:
+            - ALL
+      - equal:
+          path: spec.topology.topologies[1].topo.type
+          value: block
+      - equal:
+          path: spec.topology.topologies[1].topo.blockSizes
+          value:
+            - 4
+            - 16
+      - equal:
+          path: spec.topology.topologies[1].nodeSetRefs
+          value:
+            - h100
+            - h200
+
+  - it: should keep the deprecated blockSize alongside named topologies
+    set:
+      topology:
+        blockSize: 18
+        topologies:
+          - name: topo1
+            clusterDefault: true
+            topo:
+              type: block
+    asserts:
+      - equal:
+          path: spec.topology.blockSize
+          value: 18
+      - equal:
+          path: spec.topology.topologies[0].topo.type
+          value: block
+
+  - it: should bind a partition to a named topology
+    set:
+      partitionConfiguration:
+        configType: structured
+        partitions:
+          - name: gpu
+            nodeSetRefs:
+              - h100
+            topologyRef: topo2
+            config: "Default=YES State=UP"
+      topology:
+        topologies:
+          - name: topo2
+            topo:
+              type: block
+    asserts:
+      - equal:
+          path: spec.partitionConfiguration.partitions[0].topologyRef
+          value: topo2
+
+  - it: should not render topologyRef when the partition does not set one
+    set:
+      partitionConfiguration:
+        configType: structured
+        partitions:
+          - name: gpu
+            isAll: true
+            config: "Default=YES State=UP"
+    asserts:
+      - notExists:
+          path: spec.partitionConfiguration.partitions[0].topologyRef

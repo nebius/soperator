@@ -28,6 +28,7 @@ func RenderContainerWorkerInit(
 	waitTimeoutSeconds int32,
 	topologyPlugin string,
 	topologyFabric string,
+	topologyBindings string,
 	randomDelaySeconds int32,
 ) corev1.Container {
 	command := []string{
@@ -142,6 +143,14 @@ func RenderContainerWorkerInit(
 				Value: fabric,
 			},
 		)
+		if topologyBindings != "" {
+			env = append(env,
+				corev1.EnvVar{
+					Name:  "SLURM_TOPOLOGY_BINDINGS",
+					Value: topologyBindings,
+				},
+			)
+		}
 	}
 
 	return corev1.Container{

@@ -165,9 +165,34 @@ slurmConfig:
   topologyPlugin: "topology/tree"
   topologyParam: "SwitchAsNodeRank"
 # Topology contains topology-related parameters for Slurm.
-# Example for topology/block plugin:
+#
+# blockSize is deprecated and will be removed: it configures the single topology.conf together with
+# slurmConfig.topologyPlugin. Example:
 # topology:
 #   blockSize: 18
+#
+# topologies describes several named topologies rendered into topology.yaml, so heterogeneous
+# fabrics can be described separately instead of being squeezed into one flat topology. Partitions
+# bind to one by name via partitionConfiguration.partitions[].topologyRef; those that don't use the
+# topology marked clusterDefault. nodeSetRefs names the NodeSets a topology covers, "ALL" (like an
+# empty list) covers every NodeSet, and topologies may overlap. Example:
+# topology:
+#   topologies:
+#     - name: topo1
+#       clusterDefault: true
+#       topo:
+#         type: tree
+#       nodeSetRefs:
+#         - ALL
+#     - name: topo2
+#       topo:
+#         type: block
+#         blockSizes:
+#           - 4
+#           - 16
+#       nodeSetRefs:
+#         - h100
+#         - h200
 topology: null
 customSlurmConfig: ""
 customCgroupConfig: ""

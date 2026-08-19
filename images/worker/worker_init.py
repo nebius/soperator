@@ -50,9 +50,18 @@ SLURM_CONFIG_LINK_SOURCE: Path = Path("/mnt/jail/etc/slurm")
 SLURM_CONFIG_LINK_TARGET: Path = Path("/etc/slurm")
 SLURM_CONFIG_PATH: Path = Path("/etc/slurm/slurm_base.conf.noedit")
 SLURM_TOPOLOGY_CONFIG_PATH: Path = Path("/etc/slurm/topology.conf")
+SLURM_TOPOLOGY_YAML_PATH: Path = Path("/etc/slurm/topology.yaml")
 
 TOPOLOGY_PLUGIN_TREE: str = "topology/tree"
 TOPOLOGY_PLUGIN_BLOCK: str = "topology/block"
+
+# Plugin kinds of a named topology in topology.yaml, as sent by the operator in
+# SLURM_TOPOLOGY_BINDINGS.
+TOPOLOGY_TYPE_TREE: str = "tree"
+TOPOLOGY_TYPE_BLOCK: str = "block"
+
+# Name of the topology defined by topology.conf. Slurm hardcodes it.
+DEFAULT_TOPOLOGY_NAME: str = "default"
 
 
 # region Common env functions
@@ -233,6 +242,42 @@ def get_topology_poll_interval() -> int:
     return int(os.environ.get("TOPOLOGY_POLL_INTERVAL", "5"))
 
 
+def resolve_topology_config_path(
+    conf_path: Path = SLURM_TOPOLOGY_CONFIG_PATH,
+    yaml_path: Path = SLURM_TOPOLOGY_YAML_PATH,
+) -> Path:
+    """Return the topology file slurmctld actually reads.
+
+    Slurm checks for topology.yaml first and ignores topology.conf when it exists, so a worker
+    that waits on topology.conf in a multi-topology cluster would wait forever.
+    """
+    if yaml_path.is_file():
+        return yaml_path
+    return conf_path
+
+
+def get_topology_bindings() -> list[tuple[str, str]]:
+    """Parse SLURM_TOPOLOGY_BINDINGS into (topology name, plugin kind) pairs.
+
+    The operator sets it to a comma-separated "name=kind" list naming every topology.yaml entry
+    that covers this node's NodeSet. Empty when the cluster still uses a single topology.conf.
+    """
+    raw: str = os.environ.get("SLURM_TOPOLOGY_BINDINGS", "").strip()
+    if not raw:
+        return []
+
+    bindings: list[tuple[str, str]] = []
+    for item in raw.split(","):
+        name, _, kind = item.partition("=")
+        name = name.strip()
+        kind = kind.strip().lower()
+        if not name or not kind:
+            logger.warning("Skipping malformed topology binding: %r", item)
+            continue
+        bindings.append((name, kind))
+    return bindings
+
+
 def get_topology_fabric() -> str:
     """Get the IB fabric / top-of-tree switch name for this node's NodeSet.
 
@@ -298,13 +343,14 @@ def topology_conf_contains_hostname(topology_conf_path: Path, hostname: str) -> 
 
 
 def _topology_nodes_values(content: str) -> list[str]:
-    """Extract Nodes= values from topology.conf content."""
+    """Extract node lists from topology.conf ("Nodes=x") or topology.yaml ("nodes: x") content."""
     values: list[str] = []
-    pattern: re.Pattern[str] = re.compile(r"(?:^|\s)Nodes=(\S+)")
+    conf_pattern: re.Pattern[str] = re.compile(r"(?:^|\s)Nodes=(\S+)")
+    yaml_pattern: re.Pattern[str] = re.compile(r"(?:^|\s|-)\s*nodes:\s*(\S+)")
 
     for raw_line in content.splitlines():
         line: str = raw_line.split("#", 1)[0].strip()
-        match: re.Match[str] | None = pattern.search(line)
+        match: re.Match[str] | None = conf_pattern.search(line) or yaml_pattern.search(line)
         if match:
             values.append(match.group(1))
 
@@ -495,7 +541,10 @@ def read_topology_for_node(topology_path: Path, node_name: str) -> str:
 
 
 def format_slurm_topology(
-    topology: str, topology_plugin: str = TOPOLOGY_PLUGIN_TREE, fabric: str = "root"
+    topology: str,
+    topology_plugin: str = TOPOLOGY_PLUGIN_TREE,
+    fabric: str = "root",
+    topology_name: str = DEFAULT_TOPOLOGY_NAME,
 ) -> str:
     """
     Format topology string for Slurm --conf option.
@@ -505,7 +554,7 @@ def format_slurm_topology(
         (builds full switch hierarchy: highest tier first, leaf last)
       - "default:switch1" -> "topology=default:root:switch1"
       - "default:sw_root:s1:s2" -> "topology=default:sw_root:s1:s2" (intermediate switches already present)
-      - "tier-0=block1,tier-1=rack1" -> "topology=default:root:rack1:block1"
+      - "tier-0=block1,tier-1=rack1" -> "topology=default:root:rack1" (tier-0 names a block)
       - "switch1" -> "topology=default:root:switch1"
 
     Input formats for topology/block:
@@ -538,9 +587,9 @@ def format_slurm_topology(
             parts: dict[str, str] = json.loads(topology)
 
             if block_topology:
-                return _format_block_topology(parts)
+                return _format_block_topology(parts, topology_name)
 
-            return _format_tier_topology(parts, fabric)
+            return _format_tier_topology(parts, fabric, topology_name)
         except json.JSONDecodeError:
             logger.warning("Failed to parse topology as JSON: %s", topology)
 
@@ -563,14 +612,14 @@ def format_slurm_topology(
         parts: dict[str, str] = _parse_key_value_topology(topology)
 
         if block_topology:
-            return _format_block_topology(parts)
+            return _format_block_topology(parts, topology_name)
 
-        return _format_tier_topology(parts, fabric)
+        return _format_tier_topology(parts, fabric, topology_name)
 
     if block_topology:
-        return f"topology=default:{topology}"
+        return f"topology={topology_name}:{topology}"
 
-    return f"topology=default:{fabric}:{topology}"
+    return f"topology={topology_name}:{fabric}:{topology}"
 
 
 def _parse_key_value_topology(topology: str) -> dict[str, str]:
@@ -586,7 +635,9 @@ def _parse_key_value_topology(topology: str) -> dict[str, str]:
     return parts
 
 
-def _format_block_topology(parts: dict[str, str]) -> str:
+def _format_block_topology(
+    parts: dict[str, str], topology_name: str = DEFAULT_TOPOLOGY_NAME
+) -> str:
     """
     Format tier-based topology for topology/block.
 
@@ -603,10 +654,14 @@ def _format_block_topology(parts: dict[str, str]) -> str:
         logger.warning("Failed to find tier-0 block name in topology data: %s", parts)
         return ""
 
-    return f"topology=default:{block_name}"
+    return f"topology={topology_name}:{block_name}"
 
 
-def _format_tier_topology(parts: dict[str, str], fabric: str = "root") -> str:
+def _format_tier_topology(
+    parts: dict[str, str],
+    fabric: str = "root",
+    topology_name: str = DEFAULT_TOPOLOGY_NAME,
+) -> str:
     """
     Format tier-based topology from a dictionary.
 
@@ -625,15 +680,17 @@ def _format_tier_topology(parts: dict[str, str], fabric: str = "root") -> str:
     Example:
       - {"tier-1": "leaf00"} -> "topology=default:root:leaf00"
       - {"tier-1": "leaf00", "tier-2": "spine00"} -> "topology=default:root:spine00:leaf00"
-      - {"tier-0": "block1", "tier-1": "rack1"} -> "topology=default:root:rack1:block1"
+      - {"tier-0": "block1", "tier-1": "rack1"} -> "topology=default:root:rack1"
     """
     if not parts:
         return ""
 
-    # Find all tier keys and their numbers
+    # Find all tier keys and their numbers. tier-0 is skipped: it names a block, not a switch,
+    # and the operator leaves it out of the tree it writes into the topology config. Including it
+    # here would register the node one switch below where the config places it.
     tier_keys: list[tuple[int, str]] = []
     for k in parts.keys():
-        if k.startswith("tier-"):
+        if k.startswith("tier-") and k != "tier-0":
             try:
                 tier_num: int = int(k.split("-")[1])
                 tier_keys.append((tier_num, k))
@@ -646,18 +703,16 @@ def _format_tier_topology(parts: dict[str, str], fabric: str = "root") -> str:
         # Sort descending: highest tier first (spine/root-side), lowest last (leaf)
         tier_keys.sort(key=lambda x: x[0], reverse=True)
         switches: list[str] = [parts[k] for _, k in tier_keys]
-        return f"topology=default:{fabric}:{':'.join(switches)}"
+        return f"topology={topology_name}:{fabric}:{':'.join(switches)}"
 
     if parts:
         first_value: str = next(iter(parts.values()))
-        return f"topology=default:{fabric}:{first_value}"
+        return f"topology={topology_name}:{fabric}:{first_value}"
 
     return ""
 
 
-def apply_node_topology(
-    hostname: str, topology: str, topology_plugin: str | None = None
-) -> None:
+def apply_node_topology(hostname: str, topology: str) -> None:
     """Apply topology and clear manual drain state for a resumed worker.
 
     Users may drain POWERED_DOWN workers to prevent Slurm from automatically
@@ -671,17 +726,11 @@ def apply_node_topology(
             "update",
             f"nodename={hostname}",
             f"{node_addr}",
+            f"{topology}",
+            "state=UNDRAIN",
+            "reason=",
+            "comment=",
         ]
-        topology_plugin = topology_plugin or get_topology_plugin()
-        if topology_plugin != TOPOLOGY_PLUGIN_BLOCK:
-            cmd.append(f"{topology}")
-        cmd.extend(
-            [
-                "state=UNDRAIN",
-                "reason=",
-                "comment=",
-            ]
-        )
         logger.info("Running: %s", " ".join(cmd))
         result: subprocess.CompletedProcess[str] = subprocess.run(
             cmd,
@@ -712,6 +761,44 @@ def apply_node_topology(
         sys.exit(1)
 
 
+def _topology_spec(formatted: str) -> str:
+    """Strip the "topology=" prefix, leaving the bare "<name>:<unit>" spec."""
+    return formatted.split("=", 1)[1] if formatted.startswith("topology=") else formatted
+
+
+def build_bound_topology(
+    raw_topology: str, bindings: list[tuple[str, str]], fabric: str
+) -> str:
+    """Build the Topology= value registering this node into every topology that covers it.
+
+    Slurm accepts a comma-separated list of "<name>:<unit>" specs, so a node described as a tree
+    in one topology and as blocks in another registers into both.
+    """
+    specs: list[str] = []
+    for name, kind in bindings:
+        plugin: str = (
+            TOPOLOGY_PLUGIN_BLOCK if kind == TOPOLOGY_TYPE_BLOCK else TOPOLOGY_PLUGIN_TREE
+        )
+        formatted: str = format_slurm_topology(raw_topology, plugin, fabric, name)
+        if formatted:
+            specs.append(_topology_spec(formatted))
+
+    return f"topology={','.join(specs)}" if specs else ""
+
+
+def build_bound_unknown_topology(bindings: list[tuple[str, str]], fabric: str) -> str:
+    """Build the Topology= value placing a node with no usable labels into its catch-all units."""
+    unknown: str = unknown_switch_name(fabric)
+    specs: list[str] = []
+    for name, kind in bindings:
+        if kind == TOPOLOGY_TYPE_BLOCK:
+            specs.append(f"{name}:{unknown}")
+        else:
+            specs.append(f"{name}:{fabric}:{unknown}")
+
+    return f"topology={','.join(specs)}" if specs else ""
+
+
 def is_gpu_enabled() -> bool:
     """Return True if NODESET_GPU_ENABLED is set to 'true'."""
     return os.environ.get("NODESET_GPU_ENABLED", "") == "true"
@@ -729,14 +816,27 @@ def wait_for_topology() -> None:
     wait_timeout: int = get_topology_wait_timeout()
     poll_interval: int = get_topology_poll_interval()
     topology_plugin: str = get_topology_plugin()
+    bindings: list[tuple[str, str]] = get_topology_bindings()
+    topology_config_path: Path = resolve_topology_config_path()
+
+    if bindings and topology_config_path == SLURM_TOPOLOGY_CONFIG_PATH:
+        logger.info(
+            "Topology bindings %s are configured but only %s is present; "
+            "waiting for topology.yaml to be delivered",
+            bindings,
+            topology_config_path,
+        )
 
     if not is_gpu_enabled():
         fabric: str = get_topology_fabric()
-        unknown: str = unknown_switch_name(fabric)
-        if topology_plugin == TOPOLOGY_PLUGIN_BLOCK:
-            topology: str = f"topology=default:{unknown}"
+        if bindings:
+            topology: str = build_bound_unknown_topology(bindings, fabric)
         else:
-            topology = f"topology=default:{fabric}:{unknown}"
+            unknown: str = unknown_switch_name(fabric)
+            if topology_plugin == TOPOLOGY_PLUGIN_BLOCK:
+                topology = f"topology={DEFAULT_TOPOLOGY_NAME}:{unknown}"
+            else:
+                topology = f"topology={DEFAULT_TOPOLOGY_NAME}:{fabric}:{unknown}"
 
         logger.info(
             "NODESET_GPU_ENABLED is not set to 'true', "
@@ -744,8 +844,10 @@ def wait_for_topology() -> None:
             hostname,
             topology,
         )
-        wait_for_hostname_in_topology_conf(hostname, wait_timeout, poll_interval)
-        apply_node_topology(hostname, topology, topology_plugin)
+        wait_for_hostname_in_topology_conf(
+            hostname, wait_timeout, poll_interval, topology_config_path
+        )
+        apply_node_topology(hostname, topology)
         return
 
     node_name: str = get_node_name()
@@ -802,15 +904,19 @@ def wait_for_topology() -> None:
         )
         time.sleep(poll_interval)
 
-    topology: str = format_slurm_topology(
-        raw_topology, topology_plugin, get_topology_fabric()
-    )
+    fabric = get_topology_fabric()
+    if bindings:
+        topology: str = build_bound_topology(raw_topology, bindings, fabric)
+    else:
+        topology = format_slurm_topology(raw_topology, topology_plugin, fabric)
     if not topology:
         logger.error("Failed to format topology from raw data: %s", raw_topology)
         sys.exit(1)
 
-    wait_for_hostname_in_topology_conf(hostname, wait_timeout, poll_interval)
-    apply_node_topology(hostname, topology, topology_plugin)
+    wait_for_hostname_in_topology_conf(
+        hostname, wait_timeout, poll_interval, topology_config_path
+    )
+    apply_node_topology(hostname, topology)
 
 
 # endregion Topology functions

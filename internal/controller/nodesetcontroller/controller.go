@@ -74,9 +74,16 @@ type NodeSetReconciler struct {
 	NodeSetPowerState   *reconciler.NodeSetPowerStateReconciler
 	Role                *reconciler.RoleReconciler
 	RoleBinding         *reconciler.RoleBindingReconciler
+
+	// multiTopologyEnabled mirrors the flag WorkerTopologyReconciler renders with. Workers may only
+	// be told to register into named topologies that are actually written to the topology config.
+	// See consts.EnvEnableMultiTopology.
+	multiTopologyEnabled bool
 }
 
-func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *NodeSetReconciler {
+func NewNodeSetReconciler(
+	client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder, multiTopologyEnabled bool,
+) *NodeSetReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	return &NodeSetReconciler{
 		Reconciler:          r,
@@ -88,6 +95,8 @@ func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder
 		NodeSetPowerState:   reconciler.NewNodeSetPowerStateReconciler(r),
 		Role:                reconciler.NewRoleReconciler(r),
 		RoleBinding:         reconciler.NewRoleBindingReconciler(r),
+
+		multiTopologyEnabled: multiTopologyEnabled,
 	}
 }
 

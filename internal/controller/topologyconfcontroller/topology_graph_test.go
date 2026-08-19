@@ -147,7 +147,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 			allNodeNames:  []string{"gpu-0", "gpu-1", "cpu-0"},
 			expected: []string{
 				"SwitchName=root Switches=unknown",
-				"SwitchName=unknown Nodes=cpu-0,gpu-0,gpu-1",
+				"SwitchName=unknown Nodes=cpu-0,gpu-[0-1]",
 			},
 		},
 		{
@@ -420,7 +420,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 			expected: []string{
 				"SwitchName=fab-a Switches=fab-a.unknown",
 				"SwitchName=fab-b Switches=fab-b.unknown",
-				"SwitchName=fab-a.unknown Nodes=a-0,a-1",
+				"SwitchName=fab-a.unknown Nodes=a-[0-1]",
 				"SwitchName=fab-b.unknown Nodes=b-0",
 			},
 		},
