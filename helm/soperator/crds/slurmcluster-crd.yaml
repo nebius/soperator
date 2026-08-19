@@ -10209,6 +10209,13 @@ spec:
           status:
             description: status defines the observed state of JailedConfig
             properties:
+              appliedHash:
+                description: |-
+                  AppliedHash fingerprints the payload last written to the jail and, when the config asks for
+                  them, whose update actions completed. It is what lets a reconciliation tell a real config
+                  change from a re-run over identical content, so an unchanged config does not reconfigure the
+                  cluster again.
+                type: string
               conditions:
                 description: Current state of jailed config
                 items:
@@ -17784,7 +17791,7 @@ spec:
                 default: false
                 description: |-
                   EphemeralNodes enables ephemeral node behavior for this NodeSet.
-                  When true, nodes will use dynamic topology injection instead of legacy topology.conf.
+                  When true, nodes will use dynamic topology injection instead of the rendered topology.yaml.
                   Topology data is read from the topology-node-labels ConfigMap at runtime
                   and passed to slurmd via --conf "Topology=..." parameter.
                   This mode is designed for cloud/ephemeral worker nodes that may be dynamically
@@ -28764,6 +28771,12 @@ spec:
                           items:
                             type: string
                           type: array
+                        topologyRef:
+                          description: |-
+                            TopologyRef binds the Partition to one of Topology.Topologies by name, rendering
+                            Topology=<name> on the partition line. When empty, the partition uses the topology marked
+                            ClusterDefault. A reference that resolves to no defined topology is dropped.
+                          type: string
                       required:
                       - name
                       type: object
@@ -31503,11 +31516,6 @@ spec:
                     default: SwitchAsNodeRank
                     description: TopologyParam is list of comma-separated options
                       identifying network topology options.
-                    type: string
-                  topologyPlugin:
-                    default: topology/tree
-                    description: TopologyPlugin identifies the plugin to determine
-                      network topology for optimizations.
                     type: string
                 type: object
               slurmNodes:
@@ -50523,12 +50531,84 @@ spec:
               topology:
                 description: Topology contains topology-related parameters for Slurm.
                 properties:
-                  blockSize:
-                    default: 18
+                  topologies:
                     description: |-
-                      BlockSize represents a schedulable size of a block for topology/block plugin.
-                      Maps to BlockSizes parameter in topology.conf.
-                    type: integer
+                      Topologies defines the named network topologies rendered into topology.yaml, letting a
+                      cluster describe heterogeneous fabrics (e.g. InfiniBand GPU NodeSets next to Ethernet-only
+                      CPU ones) separately instead of squeezing them into one flat topology.
+                      See https://slurm.schedmd.com/topology.html#multi_topo.
+
+                      A cluster that declares none gets no topology config at all.
+
+                      Names must be unique: duplicates would emit the same topology twice and slurmctld rejects the
+                      whole file. The map list type has the API server enforce that.
+                    items:
+                      description: |-
+                        NamedTopology defines one entry of topology.yaml: a named topology, the plugin that backs it,
+                        and the NodeSets whose Slurm nodes it covers.
+                      properties:
+                        clusterDefault:
+                          description: |-
+                            ClusterDefault marks the topology used by partitions that don't set TopologyRef, and by
+                            cluster-wide operations not tied to a partition.
+
+                            Exactly one topology always ends up as the default: Slurm uses the first entry of
+                            topology.yaml for those operations no matter what, so when no topology requests it the
+                            operator promotes the first one rather than leave the choice to file order. Setting this to
+                            false everywhere therefore does not produce a cluster without a default.
+                          type: boolean
+                        name:
+                          description: |-
+                            Name identifies the topology and must be unique across Topologies. It is rendered as the
+                            "topology" attribute of the entry in topology.yaml, and is how anything referring to this
+                            topology names it.
+                          minLength: 1
+                          type: string
+                        nodeSetRefs:
+                          description: |-
+                            NodeSetRefs lists the NodeSets whose Slurm nodes belong to this topology. Each value must
+                            correspond to a NodeSet.Metadata.Name, or be the special value "ALL" covering every NodeSet
+                            of the cluster. Topologies may overlap: Slurm lets a node belong to several topologies at
+                            once, so the same NodeSet can be described as a tree in one and as blocks in another.
+                          items:
+                            type: string
+                          type: array
+                        topo:
+                          description: Topo selects the topology plugin and carries
+                            its plugin-specific parameters.
+                          properties:
+                            blockSizes:
+                              description: |-
+                                BlockSizes is the planning base block size followed by any higher-level block sizes to
+                                enforce. Each successive value must be a power of two larger than the previous one.
+                                Applies only to Type "block"; it maps to the block_sizes attribute of topology.yaml.
+                              items:
+                                type: integer
+                              type: array
+                            type:
+                              description: |-
+                                Type identifies the topology plugin backing this topology.
+
+                                "flat" applies no placement optimization and lists no nodes. It is what a cluster with no
+                                fabric to optimize on should use, and the only way to describe such nodes without inventing a
+                                switch hierarchy for them. A partition still has to reach it, through TopologyRef or by the
+                                topology being the ClusterDefault.
+                              enum:
+                              - tree
+                              - block
+                              - flat
+                              type: string
+                          required:
+                          - type
+                          type: object
+                      required:
+                      - name
+                      - topo
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                 type: object
               useDefaultAppArmorProfile:
                 default: false

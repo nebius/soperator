@@ -37,7 +37,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 			expectedError:   false,
 		},
 		{
-			name: "ConfigMap exists, JailedConfig does not exist - should create JailedConfig",
+			name: "ConfigMap exists - should update it",
 			existingObjects: []client.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
@@ -46,7 +46,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 						ResourceVersion: "1000",
 					},
 					Data: map[string]string{
-						consts.ConfigMapKeyTopologyConfig: "old config",
+						consts.ConfigMapKeyTopologyYAML: "old config",
 					},
 				},
 			},
@@ -67,8 +67,8 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 						},
 						Items: []corev1.KeyToPath{
 							{
-								Key:  consts.ConfigMapKeyTopologyConfig,
-								Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyConfig),
+								Key:  consts.ConfigMapKeyTopologyYAML,
+								Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyYAML),
 							},
 						},
 					},
@@ -86,7 +86,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 						ResourceVersion: "1000",
 					},
 					Data: map[string]string{
-						consts.ConfigMapKeyTopologyConfig: "old config",
+						consts.ConfigMapKeyTopologyYAML: "old config",
 					},
 				},
 				&v1alpha1.JailedConfig{
@@ -101,8 +101,8 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 						},
 						Items: []corev1.KeyToPath{
 							{
-								Key:  consts.ConfigMapKeyTopologyConfig,
-								Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyConfig),
+								Key:  consts.ConfigMapKeyTopologyYAML,
+								Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyYAML),
 							},
 						},
 					},
@@ -120,7 +120,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 						ResourceVersion: "1000",
 					},
 					Data: map[string]string{
-						consts.ConfigMapKeyTopologyConfig: "existing data",
+						consts.ConfigMapKeyTopologyYAML: "existing data",
 					},
 				},
 				&v1alpha1.JailedConfig{
@@ -135,8 +135,8 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 						},
 						Items: []corev1.KeyToPath{
 							{
-								Key:  consts.ConfigMapKeyTopologyConfig,
-								Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyConfig),
+								Key:  consts.ConfigMapKeyTopologyYAML,
+								Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyYAML),
 							},
 						},
 					},
@@ -162,7 +162,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			err := reconciler.updateTopologyConfigMap(ctx, namespace, consts.ConfigMapNameTopologyConfig, "new-topology-config", "test-cluster")
+			err := reconciler.updateTopologyConfigMap(ctx, namespace, consts.ConfigMapNameTopologyConfig, "new-topology-config", consts.ConfigMapKeyTopologyYAML)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -177,19 +177,7 @@ func TestWorkerTopologyReconciler_updateTopologyConfigMap_Fixed(t *testing.T) {
 					Namespace: namespace,
 				}, &updatedConfigMap)
 				assert.NoError(t, err)
-				assert.Equal(t, renderManagedTopologyConfig("new-topology-config"), updatedConfigMap.Data[consts.ConfigMapKeyTopologyConfig])
-
-				// Verify JailedConfig exists and has correct spec
-				var updatedJailedConfig v1alpha1.JailedConfig
-				err = fakeClient.Get(ctx, types.NamespacedName{
-					Name:      consts.ConfigMapNameTopologyConfig,
-					Namespace: namespace,
-				}, &updatedJailedConfig)
-				assert.NoError(t, err)
-				assert.Equal(t, consts.ConfigMapNameTopologyConfig, updatedJailedConfig.Spec.ConfigMap.Name)
-				assert.Len(t, updatedJailedConfig.Spec.Items, 1)
-				assert.Equal(t, consts.ConfigMapKeyTopologyConfig, updatedJailedConfig.Spec.Items[0].Key)
-				assert.Equal(t, filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyConfig), updatedJailedConfig.Spec.Items[0].Path)
+				assert.Equal(t, renderManagedTopologyConfig("new-topology-config"), updatedConfigMap.Data[consts.ConfigMapKeyTopologyYAML])
 			}
 		})
 	}
@@ -209,11 +197,47 @@ func TestWorkerTopologyReconciler_renderTopologyConfigMap(t *testing.T) {
 	namespace := "test-namespace"
 	config := "SwitchName=root"
 
-	cm := r.renderTopologyConfigMap(namespace, consts.ConfigMapNameTopologyConfig, config)
+	cm := r.renderTopologyConfigMap(namespace, consts.ConfigMapNameTopologyConfig, config, consts.ConfigMapKeyTopologyYAML)
 
 	assert.Equal(t, consts.ConfigMapNameTopologyConfig, cm.Name)
 	assert.Equal(t, namespace, cm.Namespace)
 	assert.Equal(t, corev1.SchemeGroupVersion.String(), cm.APIVersion)
 	assert.Equal(t, "ConfigMap", cm.Kind)
-	assert.Equal(t, renderManagedTopologyConfig(config), cm.Data[consts.ConfigMapKeyTopologyConfig])
+	assert.Equal(t, renderManagedTopologyConfig(config), cm.Data[consts.ConfigMapKeyTopologyYAML])
+}
+
+// TestUpdateTopologyConfigMapDropsStaleKeys pins that the controller owns the ConfigMap wholesale:
+// a key it does not write is a leftover and must not survive an update, or it would keep a dead
+// config around that reads like the live one.
+func TestUpdateTopologyConfigMapDropsStaleKeys(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+
+	const namespace = "soperator"
+
+	existing := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      consts.ConfigMapNameTopologyConfig,
+			Namespace: namespace,
+		},
+		Data: map[string]string{"leftover.conf": "SwitchName=root\n"},
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existing).Build()
+	r := &WorkerTopologyReconciler{BaseReconciler: BaseReconciler{Client: fakeClient, Scheme: scheme}}
+
+	err := r.updateTopologyConfigMap(
+		context.Background(), namespace, consts.ConfigMapNameTopologyConfig,
+		"- topology: flat\n", consts.ConfigMapKeyTopologyYAML,
+	)
+	assert.NoError(t, err)
+
+	var updated corev1.ConfigMap
+	assert.NoError(t, fakeClient.Get(context.Background(), types.NamespacedName{
+		Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace,
+	}, &updated))
+
+	assert.NotContains(t, updated.Data, "leftover.conf")
+	assert.Contains(t, updated.Data, consts.ConfigMapKeyTopologyYAML)
 }

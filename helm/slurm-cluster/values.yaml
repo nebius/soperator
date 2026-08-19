@@ -162,12 +162,62 @@ slurmConfig:
   maxJobCount: 20000
   minJobAge: 1800
   messageTimeout: 60
-  topologyPlugin: "topology/tree"
   topologyParam: "SwitchAsNodeRank"
 # Topology contains topology-related parameters for Slurm.
-# Example for topology/block plugin:
+#
+# topologies describes several named topologies rendered into topology.yaml, so heterogeneous
+# fabrics can be described separately instead of being squeezed into one flat topology. The operator
+# generates none of them: every topology a cluster needs is declared here, normally at provisioning
+# time.
+#
+# What each type lists:
+#   flat  - no nodes at all. It applies no placement optimization, so it fits nodes with no fabric
+#           to optimize on, and any partition that reaches it can allocate any of its nodes.
+#   tree  - the nodes of the GPU NodeSets it covers, laid out as a switch hierarchy.
+#   block - the nodes of the GPU NodeSets it covers, grouped into blocks.
+# CPU-only NodeSets are never listed by tree or block: they sit on no fabric, and placing them under
+# a switch would tell the scheduler they are one hop from the GPU nodes.
+#
+# A topology only takes effect through a partition that reaches it, either by
+# partitionConfiguration.partitions[].topologyRef or by being the clusterDefault. Keep a flat
+# topology as the clusterDefault unless every node of every unbound partition is listed by the
+# default one: a block topology refuses to allocate nodes outside its blocks.
+#
+# Example of a cluster with an InfiniBand fabric and an NVL domain:
 # topology:
-#   blockSize: 18
+#   topologies:
+#     - name: flat
+#       clusterDefault: true
+#       topo:
+#         type: flat
+#       nodeSetRefs:
+#         - ALL
+#     - name: tree-ib
+#       topo:
+#         type: tree
+#       nodeSetRefs:
+#         - ALL
+#     - name: block-nvl72
+#       topo:
+#         type: block
+#         blockSizes:
+#           - 18
+#       nodeSetRefs:
+#         - worker-gb300
+#
+# and the partitions binding to them:
+# partitionConfiguration:
+#   configType: structured
+#   partitions:
+#     - name: main
+#       isAll: true
+#       topologyRef: flat
+#       config: "Default=YES State=UP"
+#     - name: gpu
+#       nodeSetRefs:
+#         - worker-gb300
+#       topologyRef: block-nvl72
+#       config: "State=UP"
 topology: null
 customSlurmConfig: ""
 customCgroupConfig: ""

@@ -99,8 +99,6 @@ slurmCluster:
         hostPath:
           path: /var/run/nebius/slurm
           type: DirectoryOrCreate
-    slurmConfig:
-      topologyPlugin: ""
     populateJail:
       k8sNodeFilterName: kind
     periodicChecks:

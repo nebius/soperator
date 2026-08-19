@@ -212,6 +212,7 @@ func main() {
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		clusterName,
+		mgr.GetEventRecorder("jailedconfig-controller"),
 		slurmAPIClient,
 		jailFs,
 		reconfigurePollInterval,

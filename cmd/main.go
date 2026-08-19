@@ -353,6 +353,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			soperatorNamespace,
+			mgr.GetEventRecorder(topologyconfcontroller.WorkerTopologyReconcilerName),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err,
 				"unable to create controller",

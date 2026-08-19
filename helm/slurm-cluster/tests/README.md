@@ -44,7 +44,6 @@ These tests verify the following kubebuilder default values:
 - `maxJobCount: 20000`
 - `minJobAge: 1800`
 - `messageTimeout: 60`
-- `topologyPlugin: "topology/tree"`
 - `topologyParam: "SwitchAsNodeRank"`
 
 ### MPIConfig

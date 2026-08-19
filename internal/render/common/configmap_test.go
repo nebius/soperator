@@ -286,64 +286,6 @@ func TestRenderConfigMapSecurityLimits(t *testing.T) {
 	}
 }
 
-func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
-	tests := []struct {
-		name                     string
-		cluster                  values.SlurmCluster
-		expectedTopologyPlugin   string
-		unexpectedTopologyPlugin string
-	}{
-		{
-			name: "No topology config",
-			cluster: values.SlurmCluster{
-				SlurmConfig: slurmv1.SlurmConfig{
-					TopologyPlugin: "",
-				},
-			},
-			expectedTopologyPlugin:   "",
-			unexpectedTopologyPlugin: "",
-		},
-		{
-			name: "Override topology plugin",
-			cluster: values.SlurmCluster{
-				SlurmConfig: slurmv1.SlurmConfig{
-					TopologyPlugin: "topology/block",
-				},
-			},
-			expectedTopologyPlugin:   "topology/block",
-			unexpectedTopologyPlugin: "topology/tree",
-		},
-		{
-			name: "ConfigMap exists but topology config inside",
-			cluster: values.SlurmCluster{
-				SlurmConfig: slurmv1.SlurmConfig{
-					TopologyPlugin: "",
-				},
-			},
-			expectedTopologyPlugin:   "",
-			unexpectedTopologyPlugin: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-
-			result := RenderConfigMapSlurmConfigs(&tt.cluster)
-			assert.NotNil(t, result)
-
-			if tt.expectedTopologyPlugin == "" {
-				assert.NotContains(t, result.Data[consts.ConfigMapKeySlurmBaseConfig], "TopologyPlugin")
-			} else {
-				assert.Contains(t, result.Data[consts.ConfigMapKeySlurmBaseConfig], "TopologyPlugin="+tt.expectedTopologyPlugin)
-			}
-
-			if tt.unexpectedTopologyPlugin != "" {
-				assert.NotContains(t, result.Data[consts.ConfigMapKeySlurmBaseConfig], "TopologyPlugin="+tt.unexpectedTopologyPlugin)
-			}
-		})
-	}
-}
-
 func TestRenderSlurmConfigMapWithLargeSuspendTime(t *testing.T) {
 	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{
 		SlurmConfig: slurmv1.SlurmConfig{
@@ -1018,6 +960,14 @@ func TestAddNodeSetsToSlurmConfig(t *testing.T) {
 	}
 }
 
+// gpuNodeSetWithReplicas builds a NodeSet a user-defined topology can cover: CPU-only NodeSets are
+// pulled out of those and described by the generated flat topology instead.
+func gpuNodeSetWithReplicas(name string, replicas int32) slurmv1alpha1.NodeSet {
+	nodeSet := nodeSetWithReplicas(name, replicas)
+	nodeSet.Spec.GPU.Enabled = true
+	return nodeSet
+}
+
 func nodeSetWithReplicas(name string, replicas int32) slurmv1alpha1.NodeSet {
 	return slurmv1alpha1.NodeSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1056,6 +1006,94 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 				},
 			},
 			expected: []string{"PartitionName=main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP"},
+		},
+		{
+			name: "Partition bound to a named topology",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{gpuNodeSetWithReplicas("h100", 4)},
+				Topology: &slurmv1.Topology{
+					Topologies: []slurmv1.NamedTopology{
+						{Name: "ib-gpu", Topo: slurmv1.TopologyPlugin{Type: consts.SlurmTopologyTypeBlock}},
+					},
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "gpu",
+							IsAll:       true,
+							TopologyRef: "ib-gpu",
+							Config:      "Default=YES State=UP",
+						},
+					},
+				},
+			},
+			expected: []string{"PartitionName=gpu Nodes=ALL Topology=ib-gpu Default=YES State=UP"},
+		},
+		{
+			name: "Partition bound to a declared but unpopulated topology keeps the binding",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{gpuNodeSetWithReplicas("h100", 4)},
+				Topology: &slurmv1.Topology{
+					Topologies: []slurmv1.NamedTopology{
+						{
+							Name:        "ghost",
+							Topo:        slurmv1.TopologyPlugin{Type: consts.SlurmTopologyTypeBlock},
+							NodeSetRefs: []string{"never-applied"},
+						},
+					},
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "spooky",
+							IsAll:       true,
+							TopologyRef: "ghost",
+							Config:      "Default=YES State=UP",
+						},
+					},
+				},
+			},
+			// The topology is written out empty until its NodeSets arrive, so the binding still
+			// resolves and must not be dropped.
+			expected: []string{"PartitionName=spooky Nodes=ALL Topology=ghost Default=YES State=UP"},
+		},
+		{
+			name: "Partition referencing an undefined topology drops the binding",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{gpuNodeSetWithReplicas("h100", 4)},
+				Topology: &slurmv1.Topology{
+					Topologies: []slurmv1.NamedTopology{
+						{Name: "ib-gpu", Topo: slurmv1.TopologyPlugin{Type: consts.SlurmTopologyTypeBlock}},
+					},
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "gpu",
+							IsAll:       true,
+							TopologyRef: "not-applied-yet",
+							Config:      "Default=YES State=UP",
+						},
+					},
+				},
+			},
+			expected:    []string{"PartitionName=gpu Nodes=ALL Default=YES State=UP"},
+			notExpected: []string{"Topology=not-applied-yet"},
 		},
 		{
 			name: "Single partition with nodeset refs",

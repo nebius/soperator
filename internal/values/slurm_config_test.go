@@ -40,12 +40,12 @@ func Test_buildSlurmConfigFrom(t *testing.T) {
 
 	t.Run("carries other fields through unchanged", func(t *testing.T) {
 		result := buildSlurmConfigFrom(&slurmv1.SlurmConfig{
-			SuspendTime:    ptr.To[int32](600),
-			TopologyPlugin: consts.SlurmTopologyTree,
+			SuspendTime:   ptr.To[int32](600),
+			TopologyParam: "SwitchAsNodeRank",
 		})
 
 		require.NotNil(t, result.SuspendTime)
 		assert.Equal(t, int32(600), *result.SuspendTime)
-		assert.Equal(t, consts.SlurmTopologyTree, result.TopologyPlugin)
+		assert.Equal(t, "SwitchAsNodeRank", result.TopologyParam)
 	})
 }

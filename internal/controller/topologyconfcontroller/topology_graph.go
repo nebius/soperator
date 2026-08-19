@@ -67,19 +67,11 @@ func unknownSwitchName(fabric string) string {
 	return fabric + ".unknown"
 }
 
-// RenderConfigLines renders only SWITCH vertices as Slurm topology configuration lines.
-// WORKER vertices (leaves) are not rendered as separate lines - they only appear in
-// "Nodes=" lists of their parent switches.
-//
-// The format is:
-//
-//	SwitchName=<switch_name> Switches=<child1,child2,...>  (if children are switches)
-//	SwitchName=<switch_name> Nodes=<child1,child2,...>     (if children are workers)
-//
-// This distinction is critical: switches with grandchildren use "Switches=",
-// while switches with only worker children use "Nodes=".
-func (g TopologyGraph) RenderConfigLines() []string {
-	var lines []string
+// RenderSwitches flattens the graph into the switch entries of a tree topology, in the shape
+// topology.yaml expects. Only SWITCH vertices are emitted; worker leaves appear in their parent's
+// node list.
+func (g TopologyGraph) RenderSwitches() []switchYAML {
+	var switches []switchYAML
 	for parent, childrenSet := range g.children {
 		if len(childrenSet) == 0 {
 			continue // Skip leaves (worker nodes).
@@ -93,6 +85,8 @@ func (g TopologyGraph) RenderConfigLines() []string {
 			children = append(children, child)
 		}
 		slices.Sort(children)
+
+		entry := switchYAML{Switch: slurmSafeSwitchName(parent)}
 		if hasGrandChildren {
 			// Children are switches: sanitize each so Slurm's hostlist parser cannot overflow a
 			// long trailing decimal run and break the parent/child reference.
@@ -100,14 +94,19 @@ func (g TopologyGraph) RenderConfigLines() []string {
 			for i, child := range children {
 				safeChildren[i] = slurmSafeSwitchName(child)
 			}
-			lines = append(lines, fmt.Sprintf("SwitchName=%s Switches=%s", slurmSafeSwitchName(parent), slurmpattern.Merge(safeChildren)))
+			entry.Children = slurmpattern.Merge(safeChildren)
 		} else {
-			// Children are worker nodes: their names must match real Slurm node names verbatim.
-			lines = append(lines, fmt.Sprintf("SwitchName=%s Nodes=%s", slurmSafeSwitchName(parent), strings.Join(children, ",")))
+			// Children are worker nodes, collapsed into a hostlist expression the same way blocks
+			// are. Their names are not sanitized: unlike switch names they must expand back to the
+			// real Slurm node names.
+			entry.Nodes = slurmpattern.Merge(children)
 		}
+		switches = append(switches, entry)
 	}
-	slices.Sort(lines)
-	return lines
+	slices.SortFunc(switches, func(a, b switchYAML) int {
+		return strings.Compare(a.Switch, b.Switch)
+	})
+	return switches
 }
 
 // BuildTopologyGraph constructs the tree topology in two stages.

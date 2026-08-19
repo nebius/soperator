@@ -77,7 +77,6 @@ func TestRenderNodeSetStatefulSet_SSSD(t *testing.T) {
 		consts.CGroupV2,
 		false,
 		false,
-		"",
 	)
 	assert.NoError(t, err)
 	assert.Equal(t,

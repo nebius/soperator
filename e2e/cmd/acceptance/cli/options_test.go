@@ -26,7 +26,7 @@ func TestParseOptionsExplicitValues(t *testing.T) {
 		"--soperator-version", "4.1.5-reb85d0e5",
 		"--run-unstable=true",
 		"--scenario", "features/internal_ssh.feature:3",
-		"--scenario=features/topology.feature:3",
+		"--scenario=features/observability.feature:3",
 		"--report-dir", "reports",
 	})
 	require.NoError(t, err)
@@ -35,7 +35,7 @@ func TestParseOptionsExplicitValues(t *testing.T) {
 	assert.Equal(t, "custom", opts.SlurmClusterName)
 	assert.Equal(t, "4.1.5-reb85d0e5", opts.SoperatorVersion)
 	assert.True(t, opts.RunUnstableTests)
-	assert.Equal(t, []string{"features/internal_ssh.feature:3", "features/topology.feature:3"}, opts.ScenarioPaths)
+	assert.Equal(t, []string{"features/internal_ssh.feature:3", "features/observability.feature:3"}, opts.ScenarioPaths)
 	assert.Equal(t, "reports", opts.ReportDir)
 }
 

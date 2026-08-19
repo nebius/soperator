@@ -32,7 +32,6 @@ func FeaturePaths() []string {
 		"features/node_replacement.feature",
 		"features/docker_containers.feature",
 		"features/enroot_containers.feature",
-		"features/topology.feature",
 		"features/passive_checks.feature",
 		"features/active_checks.feature",
 		"features/system_checks.feature",

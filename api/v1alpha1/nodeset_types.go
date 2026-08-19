@@ -144,7 +144,7 @@ type NodeSetSpec struct {
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
 	// EphemeralNodes enables ephemeral node behavior for this NodeSet.
-	// When true, nodes will use dynamic topology injection instead of legacy topology.conf.
+	// When true, nodes will use dynamic topology injection instead of the rendered topology.yaml.
 	// Topology data is read from the topology-node-labels ConfigMap at runtime
 	// and passed to slurmd via --conf "Topology=..." parameter.
 	// This mode is designed for cloud/ephemeral worker nodes that may be dynamically

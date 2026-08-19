@@ -13,7 +13,7 @@ const maxSafeTrailingDigits = 18
 // or be misparsed.
 const slurmNameTerminator = "_"
 
-// slurmSafeSwitchName makes a switch or block name safe to emit in topology.conf.
+// slurmSafeSwitchName makes a switch or block name safe to emit in topology.yaml.
 //
 // Slurm only numerically parses the *trailing* decimal run of a name; when that run is long enough
 // to exceed the uint64 range Slurm saturates it to UINT64_MAX and rewrites the name, so a parent's
