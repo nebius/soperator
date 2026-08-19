@@ -5,6 +5,7 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strconv"
 
 	appspub "github.com/openkruise/kruise-api/apps/pub"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -36,6 +37,9 @@ func RenderNodeSetStatefulSet(
 	labels := common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	labels[consts.LabelNodeSetKey] = nodeSet.Name
 	labels[consts.LabelWorkerKey] = consts.LabelWorkerValue
+	labels[consts.LabelSoperatorRollingUpdateEnabled] = strconv.FormatBool(
+		nodeSet.UpdateStrategy == consts.UpdateStrategySlurmAwareRollingUpdate,
+	)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	matchLabels[consts.LabelNodeSetKey] = nodeSet.Name
 
@@ -145,8 +149,9 @@ func RenderNodeSetStatefulSet(
 	}
 
 	annotations := map[string]string{
-		"kruise.io/auto-generate-persistent-pod-state": "true",
-		"kruise.io/preferred-persistent-topology":      "kubernetes.io/hostname",
+		"kruise.io/auto-generate-persistent-pod-state":        "true",
+		"kruise.io/preferred-persistent-topology":             "kubernetes.io/hostname",
+		consts.AnnotationSoperatorRollingUpdateMaxUnavailable: nodeSet.StatefulSet.MaxUnavailable.String(),
 	}
 
 	pvcRetentionPolicy := nodeSet.PersistentVolumeClaimRetentionPolicy
@@ -217,12 +222,12 @@ func renderUpdateStrategies(nodeSet *values.SlurmNodeSet) (kruisev1b1.StatefulSe
 				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
 			},
 			nil
-	case consts.UpdateStrategyOnDelete:
+	case consts.UpdateStrategySlurmAwareRollingUpdate:
 		return kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.OnDeleteStatefulSetStrategyType,
 			},
 			kruisev1b1.VolumeClaimUpdateStrategy{
-				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+				Type: kruisev1b1.OnPVCDeleteVolumeClaimUpdateStrategyType,
 			},
 			nil
 	default:

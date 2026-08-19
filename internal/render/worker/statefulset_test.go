@@ -1135,12 +1135,20 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 				assert.Equal(t, tt.expectedMaxUnavailable, *result.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
 					"UpdateStrategy.RollingUpdate.MaxUnavailable governs the update path and must not be affected")
 			}
+
+			assert.Equal(
+				t,
+				tt.expectedMaxUnavailable.String(),
+				result.Annotations[consts.AnnotationSoperatorRollingUpdateMaxUnavailable],
+				"rolling update controller annotation should preserve NodeSet.MaxUnavailable",
+			)
+			assert.Equal(t, "false", result.Labels[consts.LabelSoperatorRollingUpdateEnabled])
 		})
 	}
 
-	t.Run("onDelete strategy is propagated", func(t *testing.T) {
+	t.Run("slurm-aware rolling update uses onDelete internally", func(t *testing.T) {
 		nodeSet := makeNodeSet(intstr.FromInt32(500), intstr.FromString("20%"))
-		nodeSet.UpdateStrategy = consts.UpdateStrategyOnDelete
+		nodeSet.UpdateStrategy = consts.UpdateStrategySlurmAwareRollingUpdate
 
 		result, err := worker.RenderNodeSetStatefulSet(
 			"test-cluster",
@@ -1154,7 +1162,9 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, appsv1.OnDeleteStatefulSetStrategyType, result.Spec.UpdateStrategy.Type)
 		assert.Nil(t, result.Spec.UpdateStrategy.RollingUpdate)
-		assert.Equal(t, kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, result.Spec.VolumeClaimUpdateStrategy.Type)
+		assert.Equal(t, kruisev1b1.OnPVCDeleteVolumeClaimUpdateStrategyType, result.Spec.VolumeClaimUpdateStrategy.Type)
+		assert.Equal(t, consts.LabelSoperatorRollingUpdateValue, result.Labels[consts.LabelSoperatorRollingUpdateEnabled])
+		assert.Equal(t, "20%", result.Annotations[consts.AnnotationSoperatorRollingUpdateMaxUnavailable])
 	})
 
 	t.Run("unsupported strategy returns an error", func(t *testing.T) {

@@ -313,9 +313,11 @@ type NodeSetSpec struct {
 
 	// endregion Scheduling
 
-	// UpdateStrategy controls how the advanced StatefulSet updates worker pods.
+	// UpdateStrategy controls how worker pods are updated. The rollingUpdate strategy delegates
+	// updates to the advanced StatefulSet, while slurmAwareRollingUpdate coordinates each update
+	// with Slurm before replacing the worker pod.
 	//
-	// +kubebuilder:validation:Enum=rollingUpdate;onDelete
+	// +kubebuilder:validation:Enum=rollingUpdate;slurmAwareRollingUpdate
 	// +kubebuilder:default="rollingUpdate"
 	UpdateStrategy consts.UpdateStrategy `json:"updateStrategy"`
 }

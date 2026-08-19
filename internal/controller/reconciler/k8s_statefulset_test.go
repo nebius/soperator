@@ -185,6 +185,36 @@ func TestAdvancedStatefulSetPatchCopiesPVCDeletionPolicy(t *testing.T) {
 	}
 }
 
+func TestAdvancedStatefulSetPatchCopiesVolumeClaimUpdateStrategy(t *testing.T) {
+	existing := &kruisev1b1.StatefulSet{
+		Spec: kruisev1b1.StatefulSetSpec{
+			VolumeClaimUpdateStrategy: kruisev1b1.VolumeClaimUpdateStrategy{
+				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+			},
+		},
+	}
+	desired := &kruisev1b1.StatefulSet{
+		Spec: kruisev1b1.StatefulSetSpec{
+			VolumeClaimUpdateStrategy: kruisev1b1.VolumeClaimUpdateStrategy{
+				Type: kruisev1b1.OnPVCDeleteVolumeClaimUpdateStrategyType,
+			},
+		},
+	}
+
+	r := &AdvancedStatefulSetReconciler{}
+	if _, err := r.patch(existing, desired); err != nil {
+		t.Fatalf("patch returned error: %v", err)
+	}
+
+	if existing.Spec.VolumeClaimUpdateStrategy != desired.Spec.VolumeClaimUpdateStrategy {
+		t.Fatalf(
+			"expected VolumeClaimUpdateStrategy=%+v, got %+v",
+			desired.Spec.VolumeClaimUpdateStrategy,
+			existing.Spec.VolumeClaimUpdateStrategy,
+		)
+	}
+}
+
 func TestAdvancedStatefulSetPatchCopiesScaleStrategy(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -222,6 +252,75 @@ func TestAdvancedStatefulSetPatchCopiesScaleStrategy(t *testing.T) {
 				t.Fatalf("expected ScaleStrategy=%+v, got %+v", tt.desired, existing.Spec.ScaleStrategy)
 			}
 		})
+	}
+}
+
+func TestAdvancedStatefulSetPatchCopiesUpdateStrategy(t *testing.T) {
+	existingMaxUnavailable := intstr.FromString("10%")
+	desiredMaxUnavailable := intstr.FromString("40%")
+	existing := &kruisev1b1.StatefulSet{Spec: kruisev1b1.StatefulSetSpec{
+		UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
+			Type: appsv1.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
+				MaxUnavailable: &existingMaxUnavailable,
+			},
+		},
+	}}
+	desired := &kruisev1b1.StatefulSet{Spec: kruisev1b1.StatefulSetSpec{
+		UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
+			Type: appsv1.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
+				MaxUnavailable: &desiredMaxUnavailable,
+			},
+		},
+	}}
+
+	r := &AdvancedStatefulSetReconciler{}
+	if _, err := r.patch(existing, desired); err != nil {
+		t.Fatalf("patch returned error: %v", err)
+	}
+
+	if !equality.Semantic.DeepEqual(existing.Spec.UpdateStrategy, desired.Spec.UpdateStrategy) {
+		t.Fatalf("expected UpdateStrategy=%+v, got %+v", desired.Spec.UpdateStrategy, existing.Spec.UpdateStrategy)
+	}
+}
+
+func TestAdvancedStatefulSetPatchUpdatesTopLevelMetadata(t *testing.T) {
+	existing := &kruisev1b1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
+		Labels: map[string]string{
+			"rolling-update-enabled": "false",
+			"external-label":         "preserved",
+		},
+		Annotations: map[string]string{
+			"rolling-update-max-unavailable": "1",
+			"versions":                       "preserved",
+		},
+	}}
+	desired := &kruisev1b1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
+		Labels: map[string]string{
+			"rolling-update-enabled": "true",
+		},
+		Annotations: map[string]string{
+			"rolling-update-max-unavailable": "40%",
+		},
+	}}
+
+	r := &AdvancedStatefulSetReconciler{}
+	if _, err := r.patch(existing, desired); err != nil {
+		t.Fatalf("patch returned error: %v", err)
+	}
+
+	if got := existing.Labels["rolling-update-enabled"]; got != "true" {
+		t.Fatalf("expected rolling-update-enabled=true, got %q", got)
+	}
+	if got := existing.Annotations["rolling-update-max-unavailable"]; got != "40%" {
+		t.Fatalf("expected rolling-update-max-unavailable=40%%, got %q", got)
+	}
+	if got := existing.Labels["external-label"]; got != "preserved" {
+		t.Fatalf("expected external label to be preserved, got %q", got)
+	}
+	if got := existing.Annotations["versions"]; got != "preserved" {
+		t.Fatalf("expected versions annotation to be preserved, got %q", got)
 	}
 }
 

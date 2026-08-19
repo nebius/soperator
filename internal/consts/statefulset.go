@@ -7,6 +7,6 @@ const (
 type UpdateStrategy string
 
 const (
-	UpdateStrategyRollingUpdate UpdateStrategy = "rollingUpdate"
-	UpdateStrategyOnDelete      UpdateStrategy = "onDelete"
+	UpdateStrategyRollingUpdate           UpdateStrategy = "rollingUpdate"
+	UpdateStrategySlurmAwareRollingUpdate UpdateStrategy = "slurmAwareRollingUpdate"
 )

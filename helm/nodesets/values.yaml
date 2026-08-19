@@ -67,7 +67,7 @@ nodesets:
     # Optional, defaults to 20%
     maxUnavailable: 1
     # Update strategy for the worker StatefulSet.
-    # Valid values: rollingUpdate, onDelete.
+    # Valid values: rollingUpdate, slurmAwareRollingUpdate.
     # Optional, defaults to rollingUpdate
     updateStrategy: rollingUpdate
     # Maximum number of worker pods that can be created in parallel during

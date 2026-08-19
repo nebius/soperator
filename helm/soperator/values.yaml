@@ -9,6 +9,7 @@ controllerManager:
       cluster: true
       nodeconfigurator: true
       nodeset: true
+      rollingupdate: true
       topology: true
     containerSecurityContext:
       allowPrivilegeEscalation: false

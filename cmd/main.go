@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -52,9 +53,12 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
 	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
+	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
+	"nebius.ai/slurm-operator/internal/controller/updatecontroller"
 	"nebius.ai/slurm-operator/internal/controllersenabled"
 	metricsopts "nebius.ai/slurm-operator/internal/metrics"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 	webhookv1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	webhookv1alpha1 "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -180,7 +184,7 @@ func main() {
 		controllersSpec = controllersFlag
 		controllersSource = "flag"
 	}
-	availableControllers := []string{"cluster", "nodeconfigurator", "nodeset", "topology"}
+	availableControllers := []string{"cluster", "nodeconfigurator", "nodeset", "rollingupdate", "topology"}
 	controllersSet, err := controllersenabled.New(
 		controllersSpec,
 		availableControllers,
@@ -306,6 +310,29 @@ func main() {
 		}
 	}
 	// endregion Reconciler/NodeSet
+
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
+
+	if controllersSet.Enabled("rollingupdate") {
+		if err = soperatorchecks.NewSlurmAPIClientsController(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
+			slurmAPIClients,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
+		}
+
+		if err = updatecontroller.NewRollingUpdateReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(updatecontroller.RollingUpdateControllerName),
+			slurmAPIClients,
+		).
+			SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create controller", "controller", updatecontroller.RollingUpdateControllerName)
+		}
+	}
 
 	// region Reconciler/Topology
 	if controllersSet.Enabled("topology") {
