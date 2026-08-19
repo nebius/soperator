@@ -1,10 +1,15 @@
 package values
 
 import (
+	"fmt"
+	"strings"
+
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
+	topologyrefs "nebius.ai/slurm-operator/internal/utils/slurm/topology"
 )
 
 // buildSlurmConfigFrom copies the SlurmConfig spec and fills in defaults that Slurm must not be
@@ -52,4 +57,30 @@ func buildHealthCheckConfig(healthCheckConfig *slurmv1.HealthCheckConfig) *Healt
 		HealthCheckProgram:   healthCheckConfig.HealthCheckProgram,
 		HealthCheckNodeState: healthCheckConfig.HealthCheckNodeState,
 	}
+}
+
+// BuildNodeSetTopologyBindings encodes the named topologies covering a NodeSet as a comma-separated
+// "name=kind" list for the worker init container. Slurm lets a node belong to several topologies at
+// once, so every topology referencing the NodeSet is listed.
+//
+// A CPU-only NodeSet belongs to the generated flat topology and to nothing else, mirroring what the
+// topology controller writes into topology.yaml.
+func BuildNodeSetTopologyBindings(topology *slurmv1.Topology, nodeSet *slurmv1alpha1.NodeSet) string {
+	if topology == nil || len(topology.Topologies) == 0 {
+		return ""
+	}
+
+	if !nodeSet.Spec.GPU.Enabled {
+		return fmt.Sprintf("%s=%s", consts.SlurmTopologyCPUOnlyName, consts.SlurmTopologyTypeFlat)
+	}
+
+	var bindings []string
+	for _, named := range topology.Topologies {
+		if !topologyrefs.CoversNodeSet(named.NodeSetRefs, nodeSet.Name) {
+			continue
+		}
+		bindings = append(bindings, fmt.Sprintf("%s=%s", named.Name, named.Topo.Type))
+	}
+
+	return strings.Join(bindings, ",")
 }

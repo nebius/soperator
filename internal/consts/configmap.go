@@ -24,6 +24,9 @@ const (
 	ConfigMapKeyMPIConfig           = "mpi.conf"
 	ConfigMapKeySlurmdbdConfig      = "slurmdbd.conf"
 	ConfigMapKeyTopologyConfig      = "topology.conf"
+	// ConfigMapKeyTopologyYAML holds several named topologies. Slurm checks for topology.yaml
+	// first and ignores topology.conf when it exists, so the two keys are mutually exclusive.
+	ConfigMapKeyTopologyYAML = "topology.yaml"
 
 	ConfigMapKeySshdConfig              = SshdName + "_config"
 	ConfigMapKeySshRootPublicKeysConfig = authorizedKeys

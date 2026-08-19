@@ -155,7 +155,7 @@ func TestCollectWorkerPods(t *testing.T) {
 		WithObjects(objects...).
 		Build()
 
-	reconciler := tc.NewWorkerTopologyReconciler(fakeClient, scheme, namespace)
+	reconciler := tc.NewWorkerTopologyReconciler(fakeClient, scheme, namespace, true)
 
 	pods, err := reconciler.CollectWorkerPods(context.Background(), nodeSetList, clusterName, namespace)
 	require.NoError(t, err)

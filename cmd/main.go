@@ -147,6 +147,9 @@ func main() {
 	if topologyLabelPrefix == "" {
 		topologyLabelPrefix = consts.DefaultTopologyLabelPrefix
 	}
+	// Enabled unless explicitly disabled: clusters that don't set spec.topology.topologies keep
+	// rendering the legacy topology.conf either way.
+	multiTopologyEnabled := os.Getenv(consts.EnvEnableMultiTopology) != "false"
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -292,6 +295,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(nodeSetNameLower+"-controller"),
+			multiTopologyEnabled,
 		).
 			SetupWithManager(mgr, nodeSetNameLower, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create controller", "controller", nodeSetName)
@@ -326,6 +330,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			soperatorNamespace,
+			multiTopologyEnabled,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err,
 				"unable to create controller",

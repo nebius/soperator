@@ -50,6 +50,7 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			300,
 			consts.SlurmTopologyBlock,
 			"fab-test",
+			"ib-gpu=block,eth-cpu=tree",
 			0,
 		)
 
@@ -57,10 +58,11 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 		assert.Equal(t, container.Image, result.Image)
 		assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller", "wait-topology"}, result.Command)
-		assert.Equal(t, 12, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 5 topology
+		assert.Equal(t, 13, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 6 topology
 		assert.Equal(t, 3, len(result.VolumeMounts))
 		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
 		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_FABRIC", "fab-test")
+		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_BINDINGS", "ib-gpu=block,eth-cpu=tree")
 
 		expectedMounts := map[string]string{
 			consts.VolumeNameJail:               consts.VolumeMountPathJail,
@@ -82,6 +84,7 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			false,
 			false,
 			0,
+			"",
 			"",
 			"",
 			0,
@@ -128,6 +131,7 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			0,
 			"",
 			"",
+			"",
 			120,
 		)
 
@@ -141,6 +145,7 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			false,
 			false,
 			0,
+			"",
 			"",
 			"",
 			0,
@@ -210,6 +215,7 @@ func Test_RenderContainerWorkerInit_K8SServiceName(t *testing.T) {
 				false,
 				tt.gpuEnabled,
 				0,
+				"",
 				"",
 				"",
 				0,
