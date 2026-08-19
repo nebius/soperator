@@ -96,6 +96,7 @@ func newMetricsCollector(
 	var nodeInfoLabels = []string{
 		"node_name",
 		"instance_id",
+		"nodeset_name",
 		"state_base",
 		"state_is_drain",
 		"state_is_maintenance",
@@ -634,6 +635,7 @@ func (c *MetricsCollector) slurmNodeMetrics(
 			labels := []string{
 				node.Name,
 				node.InstanceID,
+				topology.SlurmNodeSetName,
 				string(node.BaseState()),
 				strconv.FormatBool(node.IsDrainState()),       // Keep "true"/"false" for backward compatibility
 				strconv.FormatBool(node.IsMaintenanceState()), // Keep "true"/"false" for backward compatibility
