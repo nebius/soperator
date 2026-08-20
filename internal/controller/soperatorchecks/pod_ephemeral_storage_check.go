@@ -2,7 +2,6 @@ package soperatorchecks
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -12,20 +11,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0044"
-	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -38,7 +33,7 @@ import (
 
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
-// +kubebuilder:rbac:groups=core,resources=nodes/proxy,verbs=get;watch;list
+// +kubebuilder:rbac:groups=core,resources=nodes/stats,verbs=get
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch;list;watch;get;update
 // +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch;list;watch;get;update
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
@@ -81,8 +76,7 @@ type EphemeralStorageInfo struct {
 type PodEphemeralStorageCheck struct {
 	*reconciler.Reconciler
 	requeueAfter    time.Duration
-	clientset       kubernetes.Interface
-	restConfig      *rest.Config
+	kubelet         *kubeletStatsClient
 	usageThreshold  float64
 	resumeThreshold float64
 	slurmAPIClients *slurmapi.ClientSet
@@ -97,19 +91,19 @@ func NewPodEphemeralStorageCheck(
 	usageThreshold float64,
 	resumeThreshold float64,
 	slurmAPIClients *slurmapi.ClientSet,
+	kubeletConfig KubeletClientConfig,
 ) (*PodEphemeralStorageCheck, error) {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
-	clientset, err := kubernetes.NewForConfig(restConfig)
+	kubelet, err := newKubeletStatsClient(restConfig, kubeletConfig)
 	if err != nil {
-		return nil, fmt.Errorf("creating kubernetes clientset: %w", err)
+		return nil, fmt.Errorf("creating kubelet stats client: %w", err)
 	}
 
 	return &PodEphemeralStorageCheck{
 		Reconciler:      r,
 		requeueAfter:    requeueAfter,
-		clientset:       clientset,
-		restConfig:      restConfig,
+		kubelet:         kubelet,
 		usageThreshold:  usageThreshold,
 		resumeThreshold: resumeThreshold,
 		slurmAPIClients: slurmAPIClients,
@@ -141,9 +135,6 @@ func (r *PodEphemeralStorageCheck) SetupWithManager(mgr ctrl.Manager, maxConcurr
 
 	return ctrl.NewControllerManagedBy(mgr).Named(PodEphemeralStorageCheckName).
 		For(&corev1.Pod{}).
-		Watches(&kruisev1b1.StatefulSet{},
-			handler.EnqueueRequestsFromMapFunc(r.mapKruiseStatefulSetToPods),
-		).
 		WithEventFilter(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
 				pod, ok := e.Object.(*corev1.Pod)
@@ -176,6 +167,10 @@ func (r *PodEphemeralStorageCheck) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, fmt.Errorf("getting pod: %w", err)
 	}
 
+	if !r.isPodRelevant(pod) {
+		return ctrl.Result{}, nil
+	}
+
 	if err := r.ReconcilePodEphemeralStorageCheckForPod(ctx, pod); err != nil {
 		return ctrl.Result{}, fmt.Errorf("reconciling Pod Ephemeral Storage Check: %w", err)
 	}
@@ -206,59 +201,6 @@ func (r *PodEphemeralStorageCheck) isPodRelevant(pod *corev1.Pod) bool {
 	}
 
 	return false
-}
-
-// hasOwnerWithSoperator checks if the object has an owner that belongs to soperator
-func (r *PodEphemeralStorageCheck) hasOwnerWithSoperator(obj client.Object) bool {
-	ownerRefs := obj.GetOwnerReferences()
-	for _, ownerRef := range ownerRefs {
-		if ownerRef.Kind == "SlurmCluster" &&
-			ownerRef.APIVersion == "slurm.nebius.ai/v1" {
-			return true
-		}
-	}
-	return false
-}
-
-// mapKruiseStatefulSetToPods maps kruise StatefulSet changes to pod reconcile requests
-func (r *PodEphemeralStorageCheck) mapKruiseStatefulSetToPods(ctx context.Context, obj client.Object) []reconcile.Request {
-	sts, ok := obj.(*kruisev1b1.StatefulSet)
-	if !ok {
-		return nil
-	}
-	if !r.hasOwnerWithSoperator(sts) {
-		return nil
-	}
-
-	return r.getPodsForStatefulSet(ctx, sts.Namespace, sts.Name)
-}
-
-// getPodsForStatefulSet returns reconcile requests for pods owned by the StatefulSet
-func (r *PodEphemeralStorageCheck) getPodsForStatefulSet(ctx context.Context, namespace, statefulSetName string) []reconcile.Request {
-	var podList corev1.PodList
-	err := r.List(ctx, &podList, client.InNamespace(namespace), client.MatchingLabels{
-		consts.LabelWorkerKey: consts.LabelWorkerValue,
-	})
-	if err != nil {
-		return nil
-	}
-
-	var requests []reconcile.Request
-	for _, pod := range podList.Items {
-		for _, ownerRef := range pod.GetOwnerReferences() {
-			if ownerRef.Kind == "StatefulSet" && ownerRef.Name == statefulSetName {
-				requests = append(requests, reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      pod.Name,
-						Namespace: pod.Namespace,
-					},
-				})
-				break
-			}
-		}
-	}
-
-	return requests
 }
 
 func (r *PodEphemeralStorageCheck) ReconcilePodEphemeralStorageCheckForPod(ctx context.Context, pod *corev1.Pod) error {
@@ -441,56 +383,20 @@ func (r *PodEphemeralStorageCheck) checkSlurmNodeDrainStatus(ctx context.Context
 	return fmt.Errorf("node needs draining")
 }
 
-func (r *PodEphemeralStorageCheck) findWorkerPods(ctx context.Context, namespace string) ([]corev1.Pod, error) {
-	var podList corev1.PodList
-	err := r.List(ctx, &podList, client.InNamespace(namespace), client.MatchingLabels{
-		consts.LabelWorkerKey: consts.LabelWorkerValue,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("listing worker pods: %w", err)
-	}
-
-	var runningPods []corev1.Pod
-	for _, pod := range podList.Items {
-		if pod.Status.Phase == corev1.PodRunning && pod.Spec.NodeName != "" {
-			runningPods = append(runningPods, pod)
-		}
-	}
-
-	return runningPods, nil
-}
-
-func (r *PodEphemeralStorageCheck) getUniqueNodeNames(pods []corev1.Pod) []string {
-	nodeSet := make(map[string]bool)
-	for _, pod := range pods {
-		if pod.Spec.NodeName != "" {
-			nodeSet[pod.Spec.NodeName] = true
-		}
-	}
-
-	var nodeNames []string
-	for nodeName := range nodeSet {
-		nodeNames = append(nodeNames, nodeName)
-	}
-	return nodeNames
-}
-
 func (r *PodEphemeralStorageCheck) getEphemeralStorageStatsFromNode(ctx context.Context, nodeName string, workerPods []corev1.Pod) ([]EphemeralStorageInfo, error) {
-	result := r.clientset.CoreV1().RESTClient().Get().
-		Resource("nodes").
-		Name(nodeName).
-		SubResource("proxy").
-		Suffix("stats/summary").
-		Do(ctx)
+	node := &corev1.Node{}
+	if err := r.Get(ctx, types.NamespacedName{Name: nodeName}, node); err != nil {
+		return nil, fmt.Errorf("getting node %s: %w", nodeName, err)
+	}
 
-	rawData, err := result.Raw()
+	address, port, err := kubeletAddressForNode(node)
+	if err != nil {
+		return nil, err
+	}
+
+	stats, err := r.kubelet.GetSummary(ctx, address, port)
 	if err != nil {
 		return nil, fmt.Errorf("getting kubelet stats from node %s: %w", nodeName, err)
-	}
-
-	var stats KubeletStats
-	if err := json.Unmarshal(rawData, &stats); err != nil {
-		return nil, fmt.Errorf("decoding kubelet stats: %w", err)
 	}
 
 	workerPodMap := make(map[string]corev1.Pod)
