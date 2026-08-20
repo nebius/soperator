@@ -154,6 +154,7 @@ open-source, cloud-agnostic version of Soperator. It covers:
 
 - Architecture details.
 - Feature coverage compared with typical Slurm installations.
+- Network topology, including describing several fabrics as named topologies.
 - Current limitations.
 - Guidance for deploying Soperator on any cloud or on-premises.
 - Local development with Kind.

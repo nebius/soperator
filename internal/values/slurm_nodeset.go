@@ -72,6 +72,11 @@ type SlurmNodeSet struct {
 	// per-fabric root switch in topology.conf.
 	TopologyFabric string
 
+	// TopologyBindings names the topology.yaml entries covering this NodeSet as "name=kind" pairs,
+	// which the worker init container turns into the node's Topology= registration. Empty for
+	// clusters still on the single topology.conf.
+	TopologyBindings string
+
 	ActiveNodes []int32
 }
 

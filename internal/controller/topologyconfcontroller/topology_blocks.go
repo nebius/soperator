@@ -36,26 +36,37 @@ func (b TopologyBlocks) RenderConfigLines() []string {
 		return nil
 	}
 
-	lines := make([]string, 0, len(b.blocks))
+	blocks := b.RenderBlocks()
+	lines := make([]string, 0, len(blocks))
+	for _, blk := range blocks {
+		lines = append(lines, fmt.Sprintf("BlockName=%s Nodes=%s", blk.Block, blk.Nodes))
+	}
 
+	return lines
+}
+
+// RenderBlocks flattens the topology into the block entries of a block topology, shared by the
+// topology.conf and topology.yaml renderers so the two formats cannot drift apart.
+func (b TopologyBlocks) RenderBlocks() []blockYAML {
+	if len(b.blocks) == 0 {
+		return nil
+	}
+
+	blocks := make([]blockYAML, 0, len(b.blocks))
 	for blockName, workers := range b.blocks {
 		if len(workers) == 0 {
 			continue
 		}
-		lines = append(
-			lines,
-			fmt.Sprintf(
-				"BlockName=%s Nodes=%s",
-				// Block names are external tier-0 labels; sanitize them like switch names. The
-				// worker list must stay verbatim to match real Slurm node names.
-				slurmSafeSwitchName(blockName),
-				slurmpattern.Merge(workers),
-			),
-		)
+		blocks = append(blocks, blockYAML{
+			// Block names are external tier-0 labels; sanitize them like switch names. The
+			// worker list must stay verbatim to match real Slurm node names.
+			Block: slurmSafeSwitchName(blockName),
+			Nodes: slurmpattern.Merge(workers),
+		})
 	}
-	sort.Strings(lines)
+	sort.Slice(blocks, func(i, j int) bool { return blocks[i].Block < blocks[j].Block })
 
-	return lines
+	return blocks
 }
 
 // BuildTopologyBlocks builds the block topology in two stages, mirroring BuildTopologyGraph.

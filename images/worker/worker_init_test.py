@@ -113,13 +113,16 @@ class TestFormatSlurmTopology(unittest.TestCase):
         )
         self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
-    def test_json_format_with_tier_zero(self):
-        """JSON format with tier-0 builds full hierarchy including tier-0 as leaf."""
+    def test_json_format_ignores_tier_zero_in_tree_mode(self):
+        """tier-0 names a block, so the tree path stops at tier-1.
+
+        The operator leaves tier-0 out of the tree it writes into the topology config, so
+        including it here would put the node one switch below where the config places it.
+        """
         result = worker_init.format_slurm_topology(
             '{"tier-0":"nvl0","tier-1":"leaf01"}'
         )
-        # tier-1 (rack/leaf-switch) first, tier-0 (NVL domain) last
-        self.assertEqual(result, "topology=default:root:leaf01:nvl0")
+        self.assertEqual(result, "topology=default:root:leaf01")
 
     def test_json_format_block_topology_uses_tier_zero(self):
         """JSON format in block mode uses tier-0 as the block name."""
@@ -225,12 +228,12 @@ class TestFormatTierTopology(unittest.TestCase):
         )
         self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
-    def test_tier_zero_included_as_leaf(self):
-        """tier-0 is included as the innermost switch (leaf/block domain)."""
+    def test_tier_zero_excluded_from_tree(self):
+        """tier-0 is the NVL/block domain and is not part of the switch tree."""
         result = worker_init._format_tier_topology(
             {"tier-0": "nvl0", "tier-1": "leaf01", "tier-2": "spine01"}
         )
-        self.assertEqual(result, "topology=default:root:spine01:leaf01:nvl0")
+        self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
     def test_three_tiers_builds_hierarchy(self):
         """Three tiers builds full path from fabric to leaf."""
@@ -744,71 +747,6 @@ class TestWaitForController(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 2)
 
 
-class TestApplyNodeTopology(unittest.TestCase):
-    """Tests for apply_node_topology function."""
-
-    @mock.patch("worker_init.get_node_addr", return_value="nodeaddr=worker-0.svc")
-    @mock.patch("subprocess.run")
-    def test_scontrol_update_uses_topology_argument_for_tree_plugin(
-        self, mock_run, mock_get_node_addr
-    ):
-        """Computed topology is passed to scontrol update for tree topology."""
-        mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
-
-        worker_init.apply_node_topology(
-            "worker-0",
-            "topology=default:root:leaf01",
-            worker_init.TOPOLOGY_PLUGIN_TREE,
-        )
-
-        mock_run.assert_called_once_with(
-            [
-                "scontrol",
-                "update",
-                "nodename=worker-0",
-                "nodeaddr=worker-0.svc",
-                "topology=default:root:leaf01",
-                "state=UNDRAIN",
-                "reason=",
-                "comment=",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        mock_get_node_addr.assert_called_once_with()
-
-    @mock.patch("worker_init.get_node_addr", return_value="nodeaddr=worker-0.svc")
-    @mock.patch("subprocess.run")
-    def test_scontrol_update_omits_topology_argument_for_block_plugin(
-        self, mock_run, mock_get_node_addr
-    ):
-        """Computed topology is omitted from scontrol update for block topology."""
-        mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
-
-        worker_init.apply_node_topology(
-            "worker-0",
-            "topology=default:block1",
-            worker_init.TOPOLOGY_PLUGIN_BLOCK,
-        )
-
-        mock_run.assert_called_once_with(
-            [
-                "scontrol",
-                "update",
-                "nodename=worker-0",
-                "nodeaddr=worker-0.svc",
-                "state=UNDRAIN",
-                "reason=",
-                "comment=",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        mock_get_node_addr.assert_called_once_with()
-
-
 class TestIsGpuEnabled(unittest.TestCase):
     """Tests for is_gpu_enabled function."""
 
@@ -852,12 +790,10 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
         ):
             worker_init.wait_for_topology()
 
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
-        mock_apply.assert_called_once_with(
-            "worker-0",
-            "topology=default:root:unknown",
-            worker_init.TOPOLOGY_PLUGIN_TREE,
+        mock_wait_hostname.assert_called_once_with(
+            "worker-0", 180, 5, worker_init.SLURM_TOPOLOGY_CONFIG_PATH
         )
+        mock_apply.assert_called_once_with("worker-0", "topology=default:root:unknown")
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
@@ -873,12 +809,10 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
         ):
             worker_init.wait_for_topology()
 
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
-        mock_apply.assert_called_once_with(
-            "worker-0",
-            "topology=default:unknown",
-            worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        mock_wait_hostname.assert_called_once_with(
+            "worker-0", 180, 5, worker_init.SLURM_TOPOLOGY_CONFIG_PATH
         )
+        mock_apply.assert_called_once_with("worker-0", "topology=default:unknown")
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
@@ -934,7 +868,9 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
         ), mock.patch("worker_init.read_topology_for_node") as mock_read:
             worker_init.wait_for_topology()
             mock_read.assert_not_called()
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
+        mock_wait_hostname.assert_called_once_with(
+            "worker-0", 180, 5, worker_init.SLURM_TOPOLOGY_CONFIG_PATH
+        )
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")
@@ -1164,12 +1100,10 @@ class TestTopologyIntegration(unittest.TestCase):
         ):
             worker_init.wait_for_topology()
 
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
-        mock_apply.assert_called_once_with(
-            "worker-0",
-            "topology=default:block1",
-            worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        mock_wait_hostname.assert_called_once_with(
+            "worker-0", 180, 5, worker_init.SLURM_TOPOLOGY_CONFIG_PATH
         )
+        mock_apply.assert_called_once_with("worker-0", "topology=default:block1")
 
 
 class TestEdgeCases(unittest.TestCase):
@@ -1252,3 +1186,122 @@ class TestMainArgparse(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestTopologyBindings(unittest.TestCase):
+    """Tests for multi-topology binding of a node."""
+
+    def test_bindings_unset_yields_empty_list(self):
+        env = dict(os.environ)
+        env.pop("SLURM_TOPOLOGY_BINDINGS", None)
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(worker_init.get_topology_bindings(), [])
+
+    def test_bindings_are_parsed_into_name_kind_pairs(self):
+        with mock.patch.dict(
+            os.environ, {"SLURM_TOPOLOGY_BINDINGS": "ib-gpu=block,eth=tree"}
+        ):
+            self.assertEqual(
+                worker_init.get_topology_bindings(),
+                [("ib-gpu", "block"), ("eth", "tree")],
+            )
+
+    def test_malformed_bindings_are_skipped(self):
+        with mock.patch.dict(
+            os.environ, {"SLURM_TOPOLOGY_BINDINGS": "ib-gpu=block,broken,=tree"}
+        ):
+            self.assertEqual(worker_init.get_topology_bindings(), [("ib-gpu", "block")])
+
+    def test_bound_topology_joins_every_covering_topology(self):
+        """One label set registers the node into a block and a tree topology at once.
+
+        The block topology takes tier-0 as its block, while the tree topology walks tier-1 upwards
+        and leaves tier-0 out, landing the node on the same switch the operator wrote into the
+        topology config.
+        """
+        topology = worker_init.build_bound_topology(
+            '{"tier-0":"block1","tier-1":"leaf1"}',
+            [("ib-gpu", "block"), ("eth", "tree")],
+            "root",
+        )
+        self.assertEqual(topology, "topology=ib-gpu:block1,eth:root:leaf1")
+
+    def test_bound_unknown_topology_uses_catch_all_units(self):
+        topology = worker_init.build_bound_unknown_topology(
+            [("ib-gpu", "block"), ("eth", "tree")], "fab-a"
+        )
+        self.assertEqual(
+            topology, "topology=ib-gpu:fab-a.unknown,eth:fab-a:fab-a.unknown"
+        )
+
+    def test_bound_topology_without_bindings_is_empty(self):
+        self.assertEqual(worker_init.build_bound_topology("block1", [], "root"), "")
+
+
+class TestResolveTopologyConfigPath(unittest.TestCase):
+    """Tests for picking the topology file slurmctld actually reads."""
+
+    def test_yaml_wins_over_conf(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            conf = Path(tmp) / "topology.conf"
+            yaml = Path(tmp) / "topology.yaml"
+            conf.write_text("SwitchName=root Nodes=worker-0\n")
+            yaml.write_text("- topology: t1\n")
+
+            self.assertEqual(worker_init.resolve_topology_config_path(conf, yaml), yaml)
+
+    def test_falls_back_to_conf_when_yaml_absent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            conf = Path(tmp) / "topology.conf"
+            yaml = Path(tmp) / "topology.yaml"
+            conf.write_text("SwitchName=root Nodes=worker-0\n")
+
+            self.assertEqual(worker_init.resolve_topology_config_path(conf, yaml), conf)
+
+    def test_hostname_is_found_in_topology_yaml(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            yaml = Path(tmp) / "topology.yaml"
+            yaml.write_text(
+                "- topology: topo1\n"
+                "  cluster_default: true\n"
+                "  block:\n"
+                "    blocks:\n"
+                "        - block: b1\n"
+                "          nodes: worker-[0-3]\n"
+            )
+
+            self.assertTrue(
+                worker_init.topology_conf_contains_hostname(yaml, "worker-2")
+            )
+            self.assertFalse(
+                worker_init.topology_conf_contains_hostname(yaml, "worker-9")
+            )
+
+
+class TestTopologyMatchesOperatorConfig(unittest.TestCase):
+    """The unit a worker registers into must be the one the operator wrote into the config.
+
+    The operator's tree builder drops tier-0 (it names a block, not a switch) and places the node
+    directly under its tier-1 switch. A worker that included tier-0 would register one switch
+    deeper, on a switch the topology config never defines.
+    """
+
+    LABELS = '{"tier-0":"nvl0","tier-1":"leaf01","tier-2":"spine01"}'
+
+    def test_tree_registration_matches_the_switch_holding_the_node(self):
+        # Operator renders: SwitchName=leaf01 Nodes=<node>, under spine01, under root.
+        self.assertEqual(
+            worker_init.format_slurm_topology(
+                self.LABELS, worker_init.TOPOLOGY_PLUGIN_TREE, "root"
+            ),
+            "topology=default:root:spine01:leaf01",
+        )
+
+    def test_block_registration_matches_the_block_holding_the_node(self):
+        # Operator renders: BlockName=nvl0 Nodes=<node>.
+        self.assertEqual(
+            worker_init.format_slurm_topology(
+                self.LABELS, worker_init.TOPOLOGY_PLUGIN_BLOCK, "root"
+            ),
+            "topology=default:nvl0",
+        )

@@ -468,6 +468,11 @@ func (r NodeSetReconciler) executeReconciliation(
 
 				topologyPlugin := cluster.Spec.SlurmConfig.TopologyPlugin
 				topologyPluginEnabled := topologyPlugin != ""
+				if r.multiTopologyEnabled {
+					nodeSetValues.TopologyBindings = values.BuildNodeSetTopologyBindings(
+						cluster.Spec.Topology, nodeSet.Name,
+					)
+				}
 
 				desired, err := worker.RenderNodeSetStatefulSet(
 					cluster.Name,

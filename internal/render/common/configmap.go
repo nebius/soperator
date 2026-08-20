@@ -19,6 +19,7 @@ import (
 	"nebius.ai/slurm-operator/internal/naming"
 	renderutils "nebius.ai/slurm-operator/internal/render/utils"
 	"nebius.ai/slurm-operator/internal/utils"
+	topologyrefs "nebius.ai/slurm-operator/internal/utils/slurm/topology"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -212,10 +213,14 @@ func AddPartitionsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *valu
 	}
 
 	replicas := nodeSetReplicas(cluster)
+	declaredTopologies := declaredTopologyNames(cluster)
+	renderedTopologies := topologyrefs.RenderedNames(cluster.Topology, cluster.NodeSets)
 
 	for _, partition := range cluster.PartitionConfiguration.Partitions {
+		topology := partitionTopology(res, partition, declaredTopologies, renderedTopologies)
+
 		if partition.IsAll {
-			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=ALL %s", partition.Name, partition.Config))
+			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=ALL %s%s", partition.Name, topology, partition.Config))
 			continue
 		}
 
@@ -230,17 +235,67 @@ func AddPartitionsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *valu
 		switch {
 		case len(resolved) > 0:
 			nodes := strings.Join(resolved, ",")
-			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=%s %s", partition.Name, nodes, partition.Config))
+			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=%s %s%s", partition.Name, nodes, topology, partition.Config))
 		case len(ignored) > 0:
 			// Keeping the partition without resources is better than dropping it: dropping would
 			// delete it from a running cluster on reconfigure, together with its pending jobs, and
 			// would take the cluster's default partition down with it.
 			res.AddComment(fmt.Sprintf("WARNING: Partition %s has no usable nodeset refs, rendering it without nodes", partition.Name))
-			res.AddProperty("PartitionName", fmt.Sprintf(`%s Nodes="" %s`, partition.Name, partition.Config))
+			res.AddProperty("PartitionName", fmt.Sprintf(`%s Nodes="" %s%s`, partition.Name, topology, partition.Config))
 		default:
 			res.AddComment(fmt.Sprintf("WARNING: Partition %s has no nodeset refs and is not 'all', skipping", partition.Name))
 		}
 	}
+}
+
+// declaredTopologyNames collects every topology name the cluster spec declares, whether or not it
+// reaches a NodeSet. It separates "you named something that does not exist" from "you named a
+// topology that will not be in the rendered config".
+func declaredTopologyNames(cluster *values.SlurmCluster) map[string]struct{} {
+	if cluster.Topology == nil {
+		return nil
+	}
+	names := make(map[string]struct{}, len(cluster.Topology.Topologies))
+	for _, topology := range cluster.Topology.Topologies {
+		names[topology.Name] = struct{}{}
+	}
+	return names
+}
+
+// partitionTopology renders the "Topology=<name> " option binding a partition to one of the named
+// topologies, or an empty string when the partition follows the cluster default.
+//
+// The binding is dropped unless the topology actually reaches the rendered topology config, for the
+// same reason a dangling NodeSetRef is dropped: slurmctld rejects the whole config over a partition
+// pointing at a topology it cannot see, and both situations turn up routinely while a SlurmCluster
+// and its NodeSets are applied one after another.
+func partitionTopology(
+	res *renderutils.PropertiesConfig,
+	partition slurmv1.Partition,
+	declared, rendered map[string]struct{},
+) string {
+	if partition.TopologyRef == "" {
+		return ""
+	}
+
+	if _, ok := declared[partition.TopologyRef]; !ok {
+		res.AddComment(fmt.Sprintf(
+			"WARNING: Partition %s references undefined topology %s, ignoring it",
+			partition.Name, partition.TopologyRef,
+		))
+		return ""
+	}
+
+	if _, ok := rendered[partition.TopologyRef]; !ok {
+		res.AddComment(fmt.Sprintf(
+			"WARNING: Partition %s references topology %s, which covers no NodeSet and is absent "+
+				"from the topology config, ignoring it",
+			partition.Name, partition.TopologyRef,
+		))
+		return ""
+	}
+
+	return fmt.Sprintf("Topology=%s ", partition.TopologyRef)
 }
 
 // AddNodesToGresConfig adds node-scoped settings to the slurm config

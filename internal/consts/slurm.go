@@ -47,4 +47,18 @@ const (
 	// SlurmTopologyDefaultFabric is the default IB fabric / top-of-tree switch name used for
 	// NodeSets without an explicit spec.topology.fabric. It preserves the legacy single-root tree.
 	SlurmTopologyDefaultFabric = "root"
+
+	// Topology plugin kinds of a named topology in topology.yaml. Unlike SlurmTopologyTree and
+	// SlurmTopologyBlock, which are slurm.conf TopologyPlugin values, these name the per-topology
+	// attribute keys of topology.yaml.
+	SlurmTopologyTypeTree  = "tree"
+	SlurmTopologyTypeBlock = "block"
+
+	// SlurmTopologyNodeSetRefAll covers every NodeSet of the cluster in NamedTopology.NodeSetRefs.
+	SlurmTopologyNodeSetRefAll = "ALL"
+
+	// EnvEnableMultiTopology gates rendering topology.yaml from spec.topology.topologies. It is
+	// enabled unless explicitly set to "false"; with it off, clusters fall back to the legacy
+	// single topology.conf regardless of spec.topology.topologies.
+	EnvEnableMultiTopology = "SLURM_OPERATOR_ENABLE_MULTI_TOPOLOGY"
 )
