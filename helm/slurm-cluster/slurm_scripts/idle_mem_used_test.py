@@ -1,12 +1,13 @@
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 
-DRAIN_SCRIPT_PATH = Path(__file__).with_name("idle_mem_used.drain.sh")
-UNDRAIN_SCRIPT_PATH = Path(__file__).with_name("idle_mem_used.undrain.sh")
+PYTHON_DRAIN_SCRIPT_PATH = Path(__file__).with_name("idle_mem_used.drain.py")
+PYTHON_UNDRAIN_SCRIPT_PATH = Path(__file__).with_name("idle_mem_used.undrain.py")
 GIB = 1024 * 1024 * 1024
 
 
@@ -20,7 +21,7 @@ class IdleMemUsedTest(unittest.TestCase):
         available_bytes: int | None,
         node_real_memory_bytes: int | None = 56 * GIB,
         free_bytes_rc: int = 0,
-        script_path: Path = DRAIN_SCRIPT_PATH,
+        script_path: Path = PYTHON_DRAIN_SCRIPT_PATH,
     ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as tmpdir:
             scontrol_path = Path(tmpdir) / "scontrol"
@@ -87,8 +88,9 @@ class IdleMemUsedTest(unittest.TestCase):
                 [
                     "bash",
                     "-c",
-                    'exec 3>&1; exec bash "$1"',
+                    'exec 3>&1; exec "$1" "$2"',
                     "idle-mem-used-test",
+                    sys.executable,
                     str(script_path),
                 ],
                 check=False,
@@ -247,7 +249,7 @@ class IdleMemUsedTest(unittest.TestCase):
             listjobs_output="undrain must not query local jobs",
             total_bytes=64 * GIB,
             available_bytes=60 * GIB,
-            script_path=UNDRAIN_SCRIPT_PATH,
+            script_path=PYTHON_UNDRAIN_SCRIPT_PATH,
         )
 
         self.assertEqual(0, result.returncode)
@@ -262,7 +264,7 @@ class IdleMemUsedTest(unittest.TestCase):
             listjobs_output="undrain must not query local jobs",
             total_bytes=64 * GIB,
             available_bytes=22 * GIB,
-            script_path=UNDRAIN_SCRIPT_PATH,
+            script_path=PYTHON_UNDRAIN_SCRIPT_PATH,
         )
 
         self.assertEqual(1, result.returncode)
@@ -276,13 +278,29 @@ class IdleMemUsedTest(unittest.TestCase):
             total_bytes=None,
             available_bytes=None,
             free_bytes_rc=2,
-            script_path=UNDRAIN_SCRIPT_PATH,
+            script_path=PYTHON_UNDRAIN_SCRIPT_PATH,
         )
 
         self.assertEqual(1, result.returncode)
         self.assertIn("Could not read local memory information", result.stderr)
         self.assertIn("keeping node drained", result.stderr)
         self.assertNotIn("Memory comparison:", result.stdout)
+
+    def test_undrain_keeps_node_drained_when_real_memory_is_unavailable(self):
+        result = self.run_check(
+            listjobs_rc=64,
+            listjobs_output="undrain must not query local jobs",
+            total_bytes=None,
+            available_bytes=None,
+            node_real_memory_bytes=None,
+            script_path=PYTHON_UNDRAIN_SCRIPT_PATH,
+        )
+
+        self.assertEqual(1, result.returncode)
+        self.assertNotIn("listjobs", result.stdout)
+        self.assertNotIn("listjobs", result.stderr)
+        self.assertIn("Invalid or unavailable Slurm RealMemory", result.stderr)
+        self.assertIn("keeping node drained", result.stderr)
 
 
 if __name__ == "__main__":

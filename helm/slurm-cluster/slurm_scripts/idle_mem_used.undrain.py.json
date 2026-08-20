@@ -1,6 +1,6 @@
 {
   "name": "idle_mem_used",
-  "command": "./idle_mem_used.undrain.sh",
+  "command": "/usr/bin/python3 ./idle_mem_used.undrain.py",
   "platforms": ["any"],
   "skip_for_cpu_jobs": false,
   "skip_for_partial_gpu_jobs": false,

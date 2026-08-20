@@ -5,18 +5,18 @@ tests:
   - it: should enable the idle memory drain and undrain checks with node RealMemory
     asserts:
       - isNotNull:
-          path: data["idle_mem_used.drain.sh"]
+          path: data["idle_mem_used.drain.py"]
       - isNotNull:
-          path: data["idle_mem_used.undrain.sh"]
+          path: data["idle_mem_used.undrain.py"]
       - matchRegex:
           path: data["checks.json"]
           pattern: '"name": "idle_mem_used"'
       - matchRegex:
           path: data["checks.json"]
-          pattern: '"command": "./idle_mem_used.drain.sh"'
+          pattern: '"command": "/usr/bin/python3 ./idle_mem_used.drain.py"'
       - matchRegex:
           path: data["checks.json"]
-          pattern: '"command": "./idle_mem_used.undrain.sh"'
+          pattern: '"command": "/usr/bin/python3 ./idle_mem_used.undrain.py"'
       - matchRegex:
           path: data["checks.json"]
           pattern: '"contexts": \[\s*"hc_program"\s*\]'
@@ -37,15 +37,15 @@ tests:
     set:
       slurmScripts:
         builtIn:
-          idle_mem_used.drain.sh:
+          idle_mem_used.drain.py:
             enabled: false
-          idle_mem_used.undrain.sh:
+          idle_mem_used.undrain.py:
             enabled: false
     asserts:
       - isNull:
-          path: data["idle_mem_used.drain.sh"]
+          path: data["idle_mem_used.drain.py"]
       - isNull:
-          path: data["idle_mem_used.undrain.sh"]
+          path: data["idle_mem_used.undrain.py"]
       - notMatchRegex:
           path: data["checks.json"]
-          pattern: '"command": "./idle_mem_used.(drain|undrain).sh"'
+          pattern: '"command": "/usr/bin/python3 ./idle_mem_used.(drain|undrain).py"'
