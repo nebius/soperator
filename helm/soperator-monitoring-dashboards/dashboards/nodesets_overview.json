@@ -1,0 +1,1286 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "For GB platforms",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": 26,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [
+        "soperator",
+        "gpu"
+      ],
+      "targetBlank": true,
+      "title": "GPU Stats",
+      "tooltip": "",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 108,
+      "panels": [],
+      "title": "Quick Stats",
+      "type": "row"
+    },
+    {
+      "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "id": 111,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "On GB platforms we create one Slurm Nodeset and one NVLink Instance Group per physical rack.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "title": "",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "For GB platform only",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "super-light-purple"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "id": 102,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "targets": [
+        {
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "count(\n  count by (label_topology_nebius_com_nvl_instance_group_id) (\n    kube_node_labels{\n      label_topology_nebius_com_nvl_instance_group_id!=\"\"\n    }\n  )\n)",
+          "instant": true,
+          "range": false,
+          "refId": "A",
+          "useCustomValues": true,
+          "useDashValues": false
+        }
+      ],
+      "title": "NVLink Instance Groups",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "GPU Nodes",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "super-light-purple"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "targets": [
+        {
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "count(\n  slurm_node_info\n) by()",
+          "instant": true,
+          "range": false,
+          "refId": "A",
+          "useCustomValues": true,
+          "useDashValues": false
+        }
+      ],
+      "title": "Nodes",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "super-light-purple"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "id": 9,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "targets": [
+        {
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "count(\n  DCGM_FI_DEV_GPU_UTIL\n) by()",
+          "instant": true,
+          "range": false,
+          "refId": "A",
+          "useCustomValues": true,
+          "useDashValues": false
+        }
+      ],
+      "title": "GPUs",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "noValue": "No GPU",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "super-light-blue"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "id": 3,
+      "maxPerRow": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "name",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "group(\n    kube_node_labels{label_nebius_com_gpu_name!=\"\", label_topology_nebius_com_nvl_instance_group_id!=\"\"}\n) by (label_nebius_com_gpu_name)",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A",
+          "useCustomValues": false,
+          "useDashValues": false
+        }
+      ],
+      "title": "GPU Platform",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "id": 109,
+      "panels": [],
+      "title": "Overview",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Mapping Nodeset to NVLIG to Instance ID",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": false
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Nodeset"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 516
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "NVLink Instance Group ID"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 672
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Instance Count"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 164
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 16,
+        "x": 0,
+        "y": 5
+      },
+      "id": 107,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "group (slurm_node_info) by (node_name, nodeset_name, state_base, state_is_maintenance, state_is_not_responding, reason)",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "group (slurm_node_nvlink_instance_group) by (node_name, nodeset_name, nvlink_instance_group, instance_id)",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Nodes",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "node_name",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Value": true,
+              "Value #A": true,
+              "Value #B": true,
+              "__name__": true,
+              "__name__ 1": true,
+              "__name__ 2": true,
+              "address": true,
+              "cluster": true,
+              "cluster 1": true,
+              "cluster 2": true,
+              "container_id": true,
+              "container_id 1": true,
+              "container_id 2": true,
+              "endpoint": true,
+              "endpoint 1": true,
+              "endpoint 2": true,
+              "iam_project_id": true,
+              "iam_project_id 1": true,
+              "iam_project_id 2": true,
+              "iam_tenant_id": true,
+              "iam_tenant_id 1": true,
+              "iam_tenant_id 2": true,
+              "instance_id 1": true,
+              "instance_id 2": true,
+              "job": true,
+              "job 1": true,
+              "job 2": true,
+              "mk8s_cluster_id": true,
+              "mk8s_cluster_id 1": true,
+              "mk8s_cluster_id 2": true,
+              "namespace": true,
+              "namespace 1": true,
+              "namespace 2": true,
+              "node_name 1": true,
+              "nodeset_name 1": false,
+              "nodeset_name 2": true,
+              "prometheus": true,
+              "prometheus 1": true,
+              "prometheus 2": true,
+              "state_base": false,
+              "state_is_cloud": true,
+              "state_is_drain": true,
+              "state_is_maintenance": true,
+              "state_is_reserved": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Time 1": 4,
+              "Time 2": 8,
+              "Value #A": 10,
+              "Value #B": 7,
+              "instance_id": 1,
+              "node_name": 0,
+              "nodeset_name 1": 2,
+              "nodeset_name 2": 9,
+              "nvlink_instance_group": 3,
+              "state_base": 5,
+              "state_is_maintenance": 6
+            },
+            "renameByName": {
+              "Time 1": "",
+              "instance_id": "Compute Instance ID",
+              "node_name": "Slurm Node",
+              "nodeset_name": "Nodeset",
+              "nodeset_name 1": "Nodeset",
+              "nvlink_instance_group": "NVLink Instance Group ID",
+              "state_base": "Base State"
+            }
+          }
+        },
+        {
+          "id": "groupToNestedTable",
+          "options": {
+            "fields": {
+              "NVLink Instance Group ID": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "Node": {
+                "aggregations": []
+              },
+              "Nodeset": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "nodeset_name": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "nvlink_instance_group": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "state_base": {
+                "aggregations": []
+              }
+            },
+            "showSubframeHeaders": true
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "\n",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "1": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "healthy"
+                },
+                "2": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "unhealthy"
+                },
+                "3": {
+                  "color": "orange",
+                  "index": 2,
+                  "text": "mixed"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 8,
+        "x": 16,
+        "y": 5
+      },
+      "id": 112,
+      "maxPerRow": 2,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "name",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "WITH (\n    nodes = count by (nodeset_name, node_name) (\n        slurm_node_info{\n            nodeset_name=~\"$nodeset\"\n        }\n    ),\n\n    healthy = count by (nodeset_name, node_name) (\n        slurm_node_info{\n            state_base=~\"IDLE|ALLOCATED\",\n            state_is_maintenance!=\"true\",\n            state_is_not_responding!=\"true\",\n            nodeset_name=~\"$nodeset\"\n        }\n    ),\n\n    total_nodes = count(nodes) by (nodeset_name),\n\n    healthy_nodes = count(healthy) by (nodeset_name)\n)\n\n2\n+ (healthy_nodes > bool 0)\n- 2 * (healthy_nodes == bool total_nodes)",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Nodesets Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Timeline of NodeSet health. Healthy means all nodes are IDLE or ALLOCATED and neither in maintenance nor not responding; unhealthy means none are healthy; mixed means only some are healthy.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "fillOpacity": 70,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 1,
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "1": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "healthy"
+                },
+                "2": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "unhealthy"
+                },
+                "3": {
+                  "color": "orange",
+                  "index": 2,
+                  "text": "mixed"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "id": 113,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "showValue": "never",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "WITH (\n    nodes = count by (nodeset_name, node_name) (\n        slurm_node_info{\n            nodeset_name=~\"$nodeset\"\n        }\n    ),\n\n    healthy = count by (nodeset_name, node_name) (\n        slurm_node_info{\n            state_base=~\"IDLE|ALLOCATED\",\n            state_is_maintenance!=\"true\",\n            state_is_not_responding!=\"true\",\n            nodeset_name=~\"$nodeset\"\n        }\n    ),\n\n    total_nodes = count(nodes) by (nodeset_name),\n\n    healthy_nodes = (\n        count(healthy) by (nodeset_name)\n        or 0 * total_nodes\n    )\n)\n\n2\n+ (healthy_nodes > bool 0)\n- 2 * (healthy_nodes == bool total_nodes)",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "{{nodeset_name}}",
+          "range": true,
+          "refId": "A",
+          "useCustomValues": true,
+          "useDashValues": false
+        }
+      ],
+      "title": "Nodesets Status Over Time",
+      "type": "state-timeline"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "id": 103,
+      "panels": [],
+      "title": "Stats",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Proportion of GPUs with at least 10% utilization to total for selected nodesets",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "light-orange",
+            "mode": "shades"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "light-orange"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "id": 104,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "(\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$nodeset\"\n    }\n      >=\n    10\n  ) by(cluster)\n    /\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$nodeset\"\n    }\n  ) by(cluster)\n)\n  *\n100",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "useCustomValues": true,
+          "useDashValues": false
+        }
+      ],
+      "title": "Nodeset Utilization",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Only for GPUs with at least 10% utilization for selected nodesets",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 50,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "watt"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "min"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "min"
+            },
+            "properties": [
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
+      "id": 105,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "max(\n  DCGM_FI_DEV_POWER_USAGE{\n      slurm_nodeset_name=~\"$nodeset\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$nodeset\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "hide": false,
+          "legendFormat": "max",
+          "range": true,
+          "refId": "C",
+          "useCustomValues": true,
+          "useDashValues": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{\n    slurm_nodeset_name=~\"$nodeset\"\n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$nodeset\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "hide": false,
+          "legendFormat": "avg",
+          "range": true,
+          "refId": "B",
+          "useCustomValues": true,
+          "useDashValues": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "min(\n  DCGM_FI_DEV_POWER_USAGE{\n    slurm_nodeset_name=~\"$nodeset\"\n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$nodeset\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "hide": false,
+          "legendFormat": "min",
+          "range": true,
+          "refId": "A",
+          "useCustomValues": true,
+          "useDashValues": false
+        }
+      ],
+      "title": "Nodeset Power usage",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 110,
+      "panels": [],
+      "title": "Node Status",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "\n",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "1": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "healthy"
+                },
+                "2": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "unhealthy"
+                },
+                "3": {
+                  "color": "yellow",
+                  "index": 2,
+                  "text": "maintenance"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 106,
+      "maxPerRow": 2,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "name",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "repeat": "nodeset",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "# Healthy\ncount by (nodeset_name, node_name) (\n    slurm_node_info{\n        state_base=~\"IDLE|ALLOCATED\",\n        state_is_maintenance!=\"true\",\n        state_is_not_responding!=\"true\",\n        node_name=~\"$node_name\",\n        nodeset_name=~\"$nodeset\"\n    }\n) * 1\nOR\n# Down\ncount by (nodeset_name, node_name) (\n    slurm_node_info{\n        state_is_not_responding=\"true\",\n        state_is_maintenance!=\"true\",\n        node_name=~\"$node_name\",\n        nodeset_name=~\"$nodeset\"\n    }\n) * 2\nOR\n# Maintenance\ncount by (nodeset_name, node_name) (\n    slurm_node_info{\n        state_is_maintenance=\"true\",\n        node_name=~\"$node_name\",\n        nodeset_name=~\"$nodeset\"\n    }\n) * 3",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "{{node_name}}",
+          "range": false,
+          "refId": "B"
+        }
+      ],
+      "title": "Node Status for $nodeset",
+      "type": "stat"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "VictoriaMetrics",
+          "value": "VictoriaMetrics"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "label": "Datasource",
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "type": "datasource"
+      },
+      {
+        "allValue": ".*",
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(slurm_node_nvlink_instance_group,nodeset_name)",
+        "description": "",
+        "includeAll": true,
+        "label": "Nodeset",
+        "multi": true,
+        "name": "nodeset",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(slurm_node_nvlink_instance_group,nodeset_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(slurm_node_info{node_name=~\"$nodeset-.*\"}, node_name)",
+        "description": "",
+        "includeAll": true,
+        "label": "Worker Node",
+        "multi": true,
+        "name": "node_name",
+        "options": [],
+        "query": {
+          "qryType": 5,
+          "query": "label_values(slurm_node_info{node_name=~\"$nodeset-.*\"}, node_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "2026-08-19T08:37:58.486Z",
+    "to": "2026-08-19T16:09:37.496Z"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "browser",
+  "title": "Nodesets Overview",
+  "uid": "cfvmw1c8vgruoa",
+  "version": 17
+}
