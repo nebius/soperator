@@ -129,8 +129,9 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  count by (label_topology_nebius_com_nvl_instance_group_id) (\n    kube_node_labels{\n      label_topology_nebius_com_nvl_instance_group_id!=\"\"\n    }\n  )\n)",
+          "expr": "count(\n  count(slurm_node_nvlink_instance_group) by (cluster, nvlink_instance_group)\n) by (cluster)",
           "instant": true,
+          "legendFormat": "__auto",
           "range": false,
           "refId": "A",
           "useCustomValues": true,
@@ -1126,7 +1127,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "#6b6b6b"
               }
             ]
           }
@@ -1214,7 +1215,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(slurm_node_nvlink_instance_group,nodeset_name)",
+        "definition": "label_values(slurm_node_info,nodeset_name)",
         "description": "",
         "includeAll": true,
         "label": "Nodeset",
@@ -1223,7 +1224,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(slurm_node_nvlink_instance_group,nodeset_name)",
+          "query": "label_values(slurm_node_info,nodeset_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1244,7 +1245,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(slurm_node_info{node_name=~\"$nodeset-.*\"}, node_name)",
+        "definition": "label_values(slurm_node_info{nodeset_name=~\"$nodeset\"}, node_name)",
         "description": "",
         "includeAll": true,
         "label": "Worker Node",
@@ -1253,7 +1254,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(slurm_node_info{node_name=~\"$nodeset-.*\"}, node_name)",
+          "query": "label_values(slurm_node_info{nodeset_name=~\"$nodeset\"}, node_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1264,8 +1265,8 @@
     ]
   },
   "time": {
-    "from": "2026-08-19T08:37:58.486Z",
-    "to": "2026-08-19T16:09:37.496Z"
+    "from": "now-6h",
+    "to": "now"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -1274,13 +1275,10 @@
       "5m",
       "15m",
       "30m",
-      "1h",
-      "2h",
-      "1d"
     ]
   },
   "timezone": "browser",
   "title": "Nodesets Overview",
-  "uid": "cfvmw1c8vgruoa",
-  "version": 17
+  "uid": "nodesets_overview",
+  "version": 21
 }
