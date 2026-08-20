@@ -149,9 +149,8 @@ func RenderNodeSetStatefulSet(
 	}
 
 	annotations := map[string]string{
-		"kruise.io/auto-generate-persistent-pod-state":        "true",
-		"kruise.io/preferred-persistent-topology":             "kubernetes.io/hostname",
-		consts.AnnotationSoperatorRollingUpdateMaxUnavailable: nodeSet.StatefulSet.MaxUnavailable.String(),
+		"kruise.io/auto-generate-persistent-pod-state": "true",
+		"kruise.io/preferred-persistent-topology":      "kubernetes.io/hostname",
 	}
 
 	pvcRetentionPolicy := nodeSet.PersistentVolumeClaimRetentionPolicy
@@ -179,7 +178,7 @@ func RenderNodeSetStatefulSet(
 			Replicas:            replicas,
 			ReserveOrdinals:     reserveOrdinals,
 			ScaleStrategy: &kruisev1b1.StatefulSetScaleStrategy{
-				MaxUnavailable: &nodeSet.StatefulSet.MaxConcurrentStartup,
+				MaxUnavailable: &nodeSet.StatefulSet.MaxUnavailable,
 			},
 			UpdateStrategy: updateStrategy,
 			Selector: &metav1.LabelSelector{

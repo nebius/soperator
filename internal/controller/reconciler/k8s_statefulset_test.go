@@ -292,8 +292,8 @@ func TestAdvancedStatefulSetPatchUpdatesTopLevelMetadata(t *testing.T) {
 			"external-label":         "preserved",
 		},
 		Annotations: map[string]string{
-			"rolling-update-max-unavailable": "1",
-			"versions":                       "preserved",
+			"managed-annotation": "old",
+			"versions":           "preserved",
 		},
 	}}
 	desired := &kruisev1b1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
@@ -301,7 +301,7 @@ func TestAdvancedStatefulSetPatchUpdatesTopLevelMetadata(t *testing.T) {
 			"rolling-update-enabled": "true",
 		},
 		Annotations: map[string]string{
-			"rolling-update-max-unavailable": "40%",
+			"managed-annotation": "new",
 		},
 	}}
 
@@ -313,8 +313,8 @@ func TestAdvancedStatefulSetPatchUpdatesTopLevelMetadata(t *testing.T) {
 	if got := existing.Labels["rolling-update-enabled"]; got != "true" {
 		t.Fatalf("expected rolling-update-enabled=true, got %q", got)
 	}
-	if got := existing.Annotations["rolling-update-max-unavailable"]; got != "40%" {
-		t.Fatalf("expected rolling-update-max-unavailable=40%%, got %q", got)
+	if got := existing.Annotations["managed-annotation"]; got != "new" {
+		t.Fatalf("expected managed-annotation=new, got %q", got)
 	}
 	if got := existing.Labels["external-label"]; got != "preserved" {
 		t.Fatalf("expected external label to be preserved, got %q", got)

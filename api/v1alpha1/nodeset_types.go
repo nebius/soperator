@@ -115,6 +115,7 @@ const (
 )
 
 // NodeSetSpec defines the desired state of NodeSet
+// +kubebuilder:validation:XValidation:rule="!has(self.maxUnavailable) || (type(self.maxUnavailable) == int ? (self.maxUnavailable >= 1 && self.maxUnavailable <= 500) : (self.maxUnavailable.matches('^[1-9][0-9]*%$') && int(self.maxUnavailable.find('^[0-9]+')) * self.replicas / 100 <= 500))",message="maxUnavailable must resolve to no more than 500 workers"
 type NodeSetSpec struct {
 	// ClusterName is the name of the SlurmCluster this NodeSet belongs to.
 	// Must be in the same namespace as the NodeSet.
@@ -130,27 +131,17 @@ type NodeSetSpec struct {
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas,omitempty"`
 
-	// MaxUnavailable represents the maximum number of worker pods that can be unavailable during the update.
+	// MaxUnavailable represents the maximum number of worker pods that can be unavailable during scaling and updates.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding down.
-	// Also, MaxUnavailable can just be allowed to work with [k8s.io/api/apps/v1.ParallelPodManagement].
-	// Defaults to 20%.
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="20%"
-	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
-
-	// MaxConcurrentStartup caps the number of worker pods created in parallel
-	// during initial NodeSet scale-out (i.e. cluster creation or NodeSet growth).
-	// Value can be an absolute number (ex: 500) or a percentage of desired pods (ex: 10%).
-	// Maps to the underlying kruise AdvancedStatefulSet's scaleStrategy.maxUnavailable.
-	// Prevents overloading the Slurm controller with simultaneous slurmd registrations
-	// on large clusters.
+	// It limits concurrent worker startup during scale-out and concurrent worker replacement during rolling updates,
+	// preventing simultaneous slurmd registrations from overloading the Slurm controller.
+	// MaxUnavailable can only be used with [k8s.io/api/apps/v1.ParallelPodManagement].
 	// Defaults to 500.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=500
-	MaxConcurrentStartup *intstr.IntOrString `json:"maxConcurrentStartup,omitempty"`
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
 	// EphemeralNodes enables ephemeral node behavior for this NodeSet.
 	// When true, nodes will use dynamic topology injection instead of legacy topology.conf.

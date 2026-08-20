@@ -134,7 +134,6 @@ func BuildSlurmNodeSetFrom(
 			naming.BuildNodeSetStatefulSetName(nodeSet.Name),
 			nsSpec.Replicas,
 			nsSpec.MaxUnavailable,
-			nsSpec.MaxConcurrentStartup,
 		),
 		UpdateStrategy:  nsSpec.UpdateStrategy,
 		Service:         buildServiceFrom(naming.BuildNodeSetServiceName(clusterName, nodeSet.Name)),

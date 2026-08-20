@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -68,7 +69,7 @@ func TestRollingUpdateEnabledRequiresOnDeleteStrategy(t *testing.T) {
 	assert.False(t, rollingUpdateEnabled(sts))
 }
 
-func TestRebootBudgetUsesStatefulSetAnnotation(t *testing.T) {
+func TestRebootBudgetUsesStatefulSetScaleStrategy(t *testing.T) {
 	tests := []struct {
 		name           string
 		replicas       int32
@@ -86,9 +87,7 @@ func TestRebootBudgetUsesStatefulSetAnnotation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sts := testStatefulSet()
 			sts.Spec.Replicas = ptr.To(tt.replicas)
-			sts.Annotations = map[string]string{
-				consts.AnnotationSoperatorRollingUpdateMaxUnavailable: tt.maxUnavailable,
-			}
+			setMaxUnavailable(sts, intstr.Parse(tt.maxUnavailable))
 
 			assert.Equal(t, tt.want, rebootBudget(sts))
 		})
@@ -353,9 +352,7 @@ func TestProcessRollingUpdateContinuesWithinBudgetAfterSafeDelete(t *testing.T) 
 	sts := testStatefulSet()
 	sts.Spec.Replicas = ptr.To(int32(3))
 	sts.Status.ReadyReplicas = 3
-	sts.Annotations = map[string]string{
-		consts.AnnotationSoperatorRollingUpdateMaxUnavailable: "2",
-	}
+	setMaxUnavailable(sts, intstr.FromInt32(2))
 
 	slurmClient := &slurmapifake.MockClient{}
 	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{
@@ -604,9 +601,7 @@ func TestProcessRollingUpdateContinuesWithinBudgetAfterUndrain(t *testing.T) {
 	sts := testStatefulSet()
 	sts.Spec.Replicas = ptr.To(int32(2))
 	sts.Status.ReadyReplicas = 2
-	sts.Annotations = map[string]string{
-		consts.AnnotationSoperatorRollingUpdateMaxUnavailable: "2",
-	}
+	setMaxUnavailable(sts, intstr.FromInt32(2))
 
 	slurmClient := &slurmapifake.MockClient{}
 	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{
@@ -719,7 +714,7 @@ func crashLoopingContainerStatus(name string) corev1.ContainerStatus {
 }
 
 func testStatefulSet() *kruisev1b1.StatefulSet {
-	return &kruisev1b1.StatefulSet{
+	sts := &kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "workers", Namespace: "default"},
 		Spec: kruisev1b1.StatefulSetSpec{
 			Replicas: ptr.To(int32(1)),
@@ -727,6 +722,14 @@ func testStatefulSet() *kruisev1b1.StatefulSet {
 				Type: appsv1.OnDeleteStatefulSetStrategyType,
 			},
 		},
+	}
+	setMaxUnavailable(sts, intstr.FromInt32(1))
+	return sts
+}
+
+func setMaxUnavailable(sts *kruisev1b1.StatefulSet, maxUnavailable intstr.IntOrString) {
+	sts.Spec.ScaleStrategy = &kruisev1b1.StatefulSetScaleStrategy{
+		MaxUnavailable: ptr.To(maxUnavailable),
 	}
 }
 

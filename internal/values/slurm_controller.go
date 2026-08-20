@@ -42,7 +42,6 @@ func buildSlurmControllerFrom(clusterName, namePrefix string, maintenance *const
 		naming.BuildStatefulSetName(consts.ComponentTypeController, namePrefix),
 		consts.SingleReplicas,
 		nil,
-		nil,
 	)
 
 	daemonSet := buildDaemonSetFrom(

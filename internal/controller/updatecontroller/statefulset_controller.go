@@ -458,8 +458,8 @@ func rebootBudget(sts *kruisev1b1.StatefulSet) int {
 	}
 
 	maxUnavailable := intstr.FromInt32(1)
-	if raw := sts.GetAnnotations()[consts.AnnotationSoperatorRollingUpdateMaxUnavailable]; raw != "" {
-		maxUnavailable = intstr.Parse(raw)
+	if sts.Spec.ScaleStrategy != nil && sts.Spec.ScaleStrategy.MaxUnavailable != nil {
+		maxUnavailable = *sts.Spec.ScaleStrategy.MaxUnavailable
 	}
 
 	budget, err := intstr.GetScaledValueFromIntOrPercent(&maxUnavailable, int(replicas), false)
