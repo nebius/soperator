@@ -675,13 +675,6 @@ def apply_node_topology(
         topology_plugin = topology_plugin or get_topology_plugin()
         if topology_plugin != TOPOLOGY_PLUGIN_BLOCK:
             cmd.append(f"{topology}")
-        cmd.extend(
-            [
-                "state=UNDRAIN",
-                "reason=",
-                "comment=",
-            ]
-        )
         logger.info("Running: %s", " ".join(cmd))
         result: subprocess.CompletedProcess[str] = subprocess.run(
             cmd,

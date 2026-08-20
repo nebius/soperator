@@ -62,20 +62,15 @@ nodesets:
     # A number of workers in the NodeSet
     # Optional, defaults to 1
     replicas: 3
-    # Maximum number of unavailable replicas during updates
+    # Maximum number of unavailable replicas during scaling and updates.
+    # This limits both concurrent worker startup and rolling replacement.
     # Could be a count (number) or percent (string)
-    # Optional, defaults to 20%
-    maxUnavailable: 1
+    # Optional, defaults to 500
+    maxUnavailable: 500
     # Update strategy for the worker StatefulSet.
-    # Valid values: rollingUpdate, onDelete.
+    # Valid values: rollingUpdate, slurmAwareRollingUpdate.
     # Optional, defaults to rollingUpdate
     updateStrategy: rollingUpdate
-    # Maximum number of worker pods that can be created in parallel during
-    # initial scale-out, to avoid overloading the Slurm controller with
-    # simultaneous slurmd registrations.
-    # Could be a count (number) or percent (string).
-    # Optional, defaults to 500
-    maxConcurrentStartup: 500
     # Enable ephemeral node behavior for this NodeSet.
     # When true, nodes will use dynamic topology injection instead of legacy topology.conf.
     # Topology data is read from the topology-node-labels ConfigMap at runtime.

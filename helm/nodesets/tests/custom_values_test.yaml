@@ -8,7 +8,7 @@ tests:
         - name: custom-workers
           replicas: 10
           priorityClass: "custom-priority"
-          updateStrategy: onDelete
+          updateStrategy: slurmAwareRollingUpdate
           slurmd:
             image:
               repository: "custom/slurm"
@@ -52,7 +52,7 @@ tests:
           value: "custom-priority"
       - equal:
           path: spec.updateStrategy
-          value: "onDelete"
+          value: "slurmAwareRollingUpdate"
       - equal:
           path: spec.nodeConfig.autoResume
           value: false

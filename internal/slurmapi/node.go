@@ -145,6 +145,11 @@ func (n *Node) IsFailState() bool {
 	return exists
 }
 
+func (n *Node) IsIdleState() bool {
+	_, exists := n.States[api.V0044NodeStateIDLE]
+	return exists
+}
+
 func (n *Node) IsPlannedState() bool {
 	_, exists := n.States[api.V0044NodeStatePLANNED]
 	return exists
@@ -162,6 +167,16 @@ func (n *Node) IsNotRespondingState() bool {
 
 func (n *Node) IsInvalidState() bool {
 	_, exists := n.States[api.V0044NodeStateINVALID]
+	return exists
+}
+
+func (n *Node) IsRebootIssuedState() bool {
+	_, exists := n.States[api.V0044NodeStateREBOOTISSUED]
+	return exists
+}
+
+func (n *Node) IsRebootRequestedState() bool {
+	_, exists := n.States[api.V0044NodeStateREBOOTREQUESTED]
 	return exists
 }
 

@@ -1054,7 +1054,7 @@ func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testin
 }
 
 func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
-	makeNodeSet := func(maxConcurrentStartup, maxUnavailable intstr.IntOrString) *values.SlurmNodeSet {
+	makeNodeSet := func(maxUnavailable intstr.IntOrString) *values.SlurmNodeSet {
 		return &values.SlurmNodeSet{
 			Name: "test-nodeset",
 			ParentalCluster: client.ObjectKey{
@@ -1078,9 +1078,8 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 			VolumeSpool: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"}},
 			VolumeJail:  corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"}},
 			StatefulSet: values.StatefulSet{
-				Replicas:             1,
-				MaxUnavailable:       maxUnavailable,
-				MaxConcurrentStartup: maxConcurrentStartup,
+				Replicas:       1,
+				MaxUnavailable: maxUnavailable,
 			},
 			SupervisorDConfigMapName: "supervisord-config",
 			SSHDConfigMapName:        "sshd-config",
@@ -1089,25 +1088,16 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                       string
-		maxConcurrentStartup       intstr.IntOrString
-		maxUnavailable             intstr.IntOrString
-		expectedMaxConcurrentStart intstr.IntOrString
-		expectedMaxUnavailable     intstr.IntOrString
+		name           string
+		maxUnavailable intstr.IntOrString
 	}{
 		{
-			name:                       "absolute MaxConcurrentStartup is propagated to ScaleStrategy",
-			maxConcurrentStartup:       intstr.FromInt32(500),
-			maxUnavailable:             intstr.FromString("20%"),
-			expectedMaxConcurrentStart: intstr.FromInt32(500),
-			expectedMaxUnavailable:     intstr.FromString("20%"),
+			name:           "absolute MaxUnavailable is propagated to scale and update strategies",
+			maxUnavailable: intstr.FromInt32(500),
 		},
 		{
-			name:                       "percentage MaxConcurrentStartup is propagated to ScaleStrategy",
-			maxConcurrentStartup:       intstr.FromString("10%"),
-			maxUnavailable:             intstr.FromInt32(1),
-			expectedMaxConcurrentStart: intstr.FromString("10%"),
-			expectedMaxUnavailable:     intstr.FromInt32(1),
+			name:           "percentage MaxUnavailable is propagated to scale and update strategies",
+			maxUnavailable: intstr.FromString("10%"),
 		},
 	}
 
@@ -1115,7 +1105,7 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := worker.RenderNodeSetStatefulSet(
 				"test-cluster",
-				makeNodeSet(tt.maxConcurrentStartup, tt.maxUnavailable),
+				makeNodeSet(tt.maxUnavailable),
 				&slurmv1.Secrets{},
 				consts.CGroupV2,
 				true,
@@ -1126,21 +1116,23 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 
 			if assert.NotNil(t, result.Spec.ScaleStrategy) &&
 				assert.NotNil(t, result.Spec.ScaleStrategy.MaxUnavailable) {
-				assert.Equal(t, tt.expectedMaxConcurrentStart, *result.Spec.ScaleStrategy.MaxUnavailable,
-					"ScaleStrategy.MaxUnavailable should mirror StatefulSet.MaxConcurrentStartup")
+				assert.Equal(t, tt.maxUnavailable, *result.Spec.ScaleStrategy.MaxUnavailable,
+					"ScaleStrategy.MaxUnavailable should mirror StatefulSet.MaxUnavailable")
 			}
 
 			if assert.NotNil(t, result.Spec.UpdateStrategy.RollingUpdate) &&
 				assert.NotNil(t, result.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable) {
-				assert.Equal(t, tt.expectedMaxUnavailable, *result.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
-					"UpdateStrategy.RollingUpdate.MaxUnavailable governs the update path and must not be affected")
+				assert.Equal(t, tt.maxUnavailable, *result.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
+					"UpdateStrategy.RollingUpdate.MaxUnavailable should mirror StatefulSet.MaxUnavailable")
 			}
+
+			assert.Equal(t, "false", result.Labels[consts.LabelSoperatorRollingUpdateEnabled])
 		})
 	}
 
-	t.Run("onDelete strategy is propagated", func(t *testing.T) {
-		nodeSet := makeNodeSet(intstr.FromInt32(500), intstr.FromString("20%"))
-		nodeSet.UpdateStrategy = consts.UpdateStrategyOnDelete
+	t.Run("slurm-aware rolling update uses onDelete internally", func(t *testing.T) {
+		nodeSet := makeNodeSet(intstr.FromString("20%"))
+		nodeSet.UpdateStrategy = consts.UpdateStrategySlurmAwareRollingUpdate
 
 		result, err := worker.RenderNodeSetStatefulSet(
 			"test-cluster",
@@ -1154,11 +1146,13 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, appsv1.OnDeleteStatefulSetStrategyType, result.Spec.UpdateStrategy.Type)
 		assert.Nil(t, result.Spec.UpdateStrategy.RollingUpdate)
-		assert.Equal(t, kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType, result.Spec.VolumeClaimUpdateStrategy.Type)
+		assert.Equal(t, kruisev1b1.OnPVCDeleteVolumeClaimUpdateStrategyType, result.Spec.VolumeClaimUpdateStrategy.Type)
+		assert.Equal(t, consts.LabelSoperatorRollingUpdateValue, result.Labels[consts.LabelSoperatorRollingUpdateEnabled])
+		assert.Equal(t, intstr.FromString("20%"), *result.Spec.ScaleStrategy.MaxUnavailable)
 	})
 
 	t.Run("unsupported strategy returns an error", func(t *testing.T) {
-		nodeSet := makeNodeSet(intstr.FromInt32(500), intstr.FromString("20%"))
+		nodeSet := makeNodeSet(intstr.FromString("20%"))
 		nodeSet.UpdateStrategy = consts.UpdateStrategy("unsupported")
 
 		_, err := worker.RenderNodeSetStatefulSet(
