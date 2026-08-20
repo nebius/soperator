@@ -70,8 +70,8 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "On GB platforms we create one Slurm Nodeset and one NVLink Instance Group per physical rack.",
-        "mode": "markdown"
+        "content": "On GB platforms we create one Slurm Nodeset and one NVLink Instance Group per physical rack (18 nodes). <br>On other platforms Nodesets can have anywhere between 1 and 100 nodes.",
+        "mode": "html"
       },
       "pluginVersion": "11.6.14+security-04",
       "title": "",
@@ -1184,7 +1184,11 @@
   ],
   "preload": false,
   "schemaVersion": 41,
-  "tags": [],
+  "tags": [
+    "soperator",
+    "nodesets",
+    "overview"
+  ],
   "templating": {
     "list": [
       {
@@ -1274,11 +1278,11 @@
       "1m",
       "5m",
       "15m",
-      "30m",
+      "30m"
     ]
   },
   "timezone": "browser",
   "title": "Nodesets Overview",
   "uid": "nodesets_overview",
-  "version": 21
+  "version": 23
 }
