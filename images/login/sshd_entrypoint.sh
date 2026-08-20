@@ -28,6 +28,21 @@ mkdir -p /var/run/sshd
 echo "Complement jail rootfs"
 /opt/bin/slurm/complement_jail.sh -j /mnt/jail -u /mnt/jail.upper
 
+# Keep ChrootDirectory in the operator-rendered config for compatibility with
+# older login images. This image uses the PAM mount-namespace jail instead.
+echo "Prepare sshd config for PAM jail"
+effective_sshd_config="/run/soperator-sshd_config"
+awk '
+    {
+        keyword = $1
+        sub(/=.*/, "", keyword)
+        if (tolower(keyword) != "chrootdirectory") {
+            print
+        }
+    }
+' /mnt/ssh-configs/sshd_config > "${effective_sshd_config}"
+chmod 0600 "${effective_sshd_config}"
+
 echo "Set up per-user cgroup isolation for SSH sessions (if enabled)"
 setup_user_isolation() {
     local conf="/etc/soperator/user-isolation.conf"
@@ -113,4 +128,4 @@ echo "Waiting until munge started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 
 echo "Start sshd daemon"
-exec /usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config
+exec /usr/sbin/sshd -D -e -f "${effective_sshd_config}"
