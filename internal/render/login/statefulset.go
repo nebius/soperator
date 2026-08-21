@@ -36,6 +36,10 @@ func RenderStatefulSet(
 		login.K8sNodeFilterName,
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
 	)
+	dockerImageStorageMount, err := findDockerImageStorageMount(login)
+	if err != nil {
+		return kruisev1b1.StatefulSet{}, fmt.Errorf("resolving login Docker image storage: %w", err)
+	}
 
 	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(
 		clusterName, secrets, volumeSources, login)
@@ -62,6 +66,23 @@ func RenderStatefulSet(
 			login.ContainerSSSD,
 			common.SSSDLdapCAConfigMap(login.SSSDLdapCAConfigMapName),
 		))
+	}
+
+	containers := []corev1.Container{
+		renderContainerSshd(
+			clusterWithGPU,
+			&login.ContainerSshd,
+			login.JailSubMounts,
+			login.CustomVolumeMounts,
+			login.ContainerSSSD,
+			login.UserIsolation,
+			login.DockerEnabled,
+			dockerImageStorageMount,
+			sshAppArmorProfile,
+		),
+	}
+	if login.DockerEnabled {
+		containers = append(containers, renderContainerDockerProxy(&login.ContainerSshd))
 	}
 
 	res := kruisev1b1.StatefulSet{
@@ -107,19 +128,9 @@ func RenderStatefulSet(
 					NodeSelector:     nodeFilter.NodeSelector,
 					Tolerations:      nodeFilter.Tolerations,
 					InitContainers:   initContainers,
-					Containers: []corev1.Container{
-						renderContainerSshd(
-							clusterWithGPU,
-							&login.ContainerSshd,
-							login.JailSubMounts,
-							login.CustomVolumeMounts,
-							login.ContainerSSSD,
-							login.UserIsolation,
-							sshAppArmorProfile,
-						),
-					},
-					Volumes:   volumes,
-					DNSPolicy: corev1.DNSClusterFirst,
+					Containers:       containers,
+					Volumes:          volumes,
+					DNSPolicy:        corev1.DNSClusterFirst,
 					DNSConfig: &corev1.PodDNSConfig{
 						Searches: []string{
 							naming.BuildNodeSetUmbrellaServiceFQDN(namespace, clusterName),

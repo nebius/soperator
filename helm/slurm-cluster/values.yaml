@@ -599,6 +599,11 @@ slurmNodes:
       # CPU weight per user (cgroup v2 cpu.weight, 1-10000). CPU is shared
       # proportionally between users under contention; idle CPU stays usable.
       cpuWeight: 100
+    # Rootful Docker support for SSH sessions. A dedicated writable jail
+    # sub-mount at /mnt/image-storage is required when enabled. Disabled by
+    # default so existing login nodes are unchanged on upgrade.
+    docker:
+      enabled: false
     volumes:
       jail:
         volumeSourceName: "jail"

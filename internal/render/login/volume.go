@@ -1,6 +1,8 @@
 package login
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -26,6 +28,9 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeInMemory(login.ContainerSshd.Resources.Memory()),
 		common.RenderVolumeTmpDisk(),
 		renderVolumeSshdConfigs(login.SSHDConfigMapName),
+	}
+	if login.DockerEnabled {
+		volumes = append(volumes, renderVolumeRuntime())
 	}
 	if login.UserIsolation != nil && ptr.Deref(login.UserIsolation.Enabled, false) {
 		volumes = append(volumes, renderVolumeUserIsolation(clusterName))
@@ -90,6 +95,37 @@ func renderVolumesAndClaimTemplateSpecs(
 	}
 
 	return volumes, pvcTemplateSpecs, nil
+}
+
+func findDockerImageStorageMount(login *values.SlurmLogin) (*slurmv1.NodeVolumeMount, error) {
+	if !login.DockerEnabled {
+		return nil, nil
+	}
+
+	for i := range login.JailSubMounts {
+		mount := &login.JailSubMounts[i]
+		if mount.MountPath != consts.DockerImageStorageMountPath {
+			continue
+		}
+		if mount.ReadOnly {
+			return nil, fmt.Errorf("login Docker image storage at %s must be writable", consts.DockerImageStorageMountPath)
+		}
+		return mount, nil
+	}
+
+	return nil, fmt.Errorf(
+		"login Docker requires a dedicated jail sub-mount at %s",
+		consts.DockerImageStorageMountPath,
+	)
+}
+
+func renderVolumeRuntime() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameRuntime,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
 }
 
 // region configs
