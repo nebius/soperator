@@ -6,6 +6,6 @@
     - localhost
   become: true
   roles:
-    - spank-nccl-inspector-preconf
+    - spank_nccl_inspector_preconf
   tags:
-    - spank-nccl-inspector-preconf
+    - spank_nccl_inspector_preconf

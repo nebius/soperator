@@ -2,25 +2,14 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/99
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260816173636 AS worker_slurmd
-
-ARG MELLANOX_REPO_URL=https://linux.mellanox.com/public/repo/doca/3.1.0
+# https://github.com/nebius/ml-containers/pull/98
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260819104842 AS worker_slurmd
 
 # Install useful packages
-RUN DPKG_ARCH="$(dpkg --print-architecture)" && \
-    case "$DPKG_ARCH" in \
-      amd64) MLNX_ARCH=x86_64 ;; \
-      arm64) MLNX_ARCH=arm64 ;; \
-      *) echo "Unsupported architecture: $DPKG_ARCH" && exit 1 ;; \
-    esac && \
-    echo "deb ${MELLANOX_REPO_URL}/ubuntu24.04/${MLNX_ARCH} ./" > /etc/apt/sources.list.d/mellanox_doca.list && \
-    wget -qO - https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub | apt-key add - && \
-    apt-get update && \
+RUN apt-get update && \
     apt -y install \
         pciutils \
         iproute2 \
-        infiniband-diags=2507mlnx58-1.2507097 \
         kmod \
         libncurses5-dev \
         supervisor \
@@ -29,20 +18,6 @@ RUN DPKG_ARCH="$(dpkg --print-architecture)" && \
         libnginx-mod-http-js && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-
-# Install OpenMPI
-ARG OPENMPI_VERSION=4.1.9a1
-COPY images/common/scripts/install_openmpi.sh /opt/bin/
-RUN chmod +x /opt/bin/install_openmpi.sh && \
-    /opt/bin/install_openmpi.sh && \
-    rm /opt/bin/install_openmpi.sh
-
-RUN arch=$(uname -m) && \
-    if [ "$arch" = "x86_64" ]; then alt_arch="x86_64"; \
-    elif [ "$arch" = "aarch64" ]; then alt_arch="aarch64"; \
-    else echo "Unsupported arch: $arch" && exit 1; fi && \
-    echo "LD_LIBRARY_PATH=/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib:/lib/${alt_arch}-linux-gnu:/usr/lib/${alt_arch}-linux-gnu:/usr/local/cuda/targets/${alt_arch}-linux/lib" >> /etc/environment
-ENV PATH=${PATH}:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # Create dummy library for replacing GPU-specific libraries on CPU workers in GPU clusters
 RUN ALT_ARCH="$(uname -m)" && \
@@ -73,12 +48,12 @@ RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
 
 # Install NCCL Inspector PreConf SPANK plugin
-COPY ansible/spank-nccl-inspector-preconf.yml /opt/ansible/spank-nccl-inspector-preconf.yml
-COPY ansible/roles/spank-nccl-inspector-preconf /opt/ansible/roles/spank-nccl-inspector-preconf
+COPY ansible/spank_nccl_inspector_preconf.yml /opt/ansible/spank_nccl_inspector_preconf.yml
+COPY ansible/roles/spank_nccl_inspector_preconf /opt/ansible/roles/spank_nccl_inspector_preconf
 RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local \
       -e spank_nccl_inspector_preconf_dump_dir_create=false \
-      spank-nccl-inspector-preconf.yml
+      spank_nccl_inspector_preconf.yml
 
 # Install enroot
 COPY images/common/scripts/install_enroot.sh /opt/bin/
@@ -103,10 +78,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ## Install nvidia-container-toolkit (for enroot usage)
-COPY ansible/nvidia-container-toolkit.yml /opt/ansible/nvidia-container-toolkit.yml
-COPY ansible/roles/nvidia-container-toolkit /opt/ansible/roles/nvidia-container-toolkit
+COPY ansible/nvidia_container_toolkit.yml /opt/ansible/nvidia_container_toolkit.yml
+COPY ansible/roles/nvidia_container_toolkit /opt/ansible/roles/nvidia_container_toolkit
 RUN cd /opt/ansible && \
-    ansible-playbook -i inventory/ -c local nvidia-container-toolkit.yml -t nvidia-container-toolkit
+    ansible-playbook -i inventory/ -c local nvidia_container_toolkit.yml -t nvidia_container_toolkit
 
 # Install Docker
 RUN apt-get update && \
