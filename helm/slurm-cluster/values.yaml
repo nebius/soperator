@@ -812,6 +812,14 @@ slurmScripts:
       enabled: true
       customContent: null
       customConfig: null
+    idle_mem_used.drain.py:
+      enabled: true
+      customContent: null
+      customConfig: null
+    idle_mem_used.undrain.py:
+      enabled: true
+      customContent: null
+      customConfig: null
     job_tmpfs_delete.sh:
       enabled: true
       customContent: null
