@@ -20,7 +20,6 @@ const (
 	passiveAllocGPUJobTimeout     = 4 * time.Minute
 	passiveAllocGPURecoverTimeout = 3 * time.Minute
 	passiveAllocMemDrainTimeout   = 3 * time.Minute
-	passiveAllocMemJobTimeout     = 4 * time.Minute
 	passiveAllocMemRecoverTimeout = 3 * time.Minute
 	passiveTmpfsCleanupTimeout    = 1 * time.Minute
 
@@ -62,7 +61,6 @@ type PassiveChecks struct {
 	gpuCount               int
 
 	allocMemScenarioActive bool
-	allocMemJob            framework.SbatchJob
 }
 
 func NewPassiveChecks(info *framework.ClusterInfo, runtime framework.Runtime, slurm *framework.SlurmClient, selector *framework.WorkerSelector) *PassiveChecks {
@@ -82,7 +80,6 @@ func (s *PassiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^GPU-only passive checks are not executed for the CPU job$`, s.gpuOnlyPassiveChecksAreNotExecutedForTheCPUJob)
 	sc.Step(`^the drop_page_cache passive check completed in Epilog$`, s.theDropPageCachePassiveCheckCompletedInEpilog)
 	sc.Step(`^memory pressure is created on the selected worker$`, s.memoryPressureIsCreatedOnTheSelectedWorker)
-	sc.Step(`^an all-memory Slurm job is submitted to the selected worker$`, s.anAllMemorySlurmJobIsSubmittedToTheSelectedWorker)
 	sc.Step(`^the selected worker is drained by alloc_mem_used$`, s.theSelectedWorkerIsDrainedByAllocMemUsed)
 	sc.Step(`^the memory pressure is removed$`, s.theMemoryPressureIsRemoved)
 	sc.Step(`^HealthCheckProgram runs on the selected worker$`, s.healthCheckProgramRunsOnTheSelectedWorker)
@@ -242,50 +239,6 @@ func (s *PassiveChecks) memoryPressureIsCreatedOnTheSelectedWorker(ctx context.C
 		return fmt.Errorf("create memory pressure on %s: %w", s.worker.Name, err)
 	}
 	s.runtime.Logf("alloc_mem_used: created %d bytes of memory pressure on %s", pressureBytes, s.worker.Name)
-	return nil
-}
-
-func (s *PassiveChecks) anAllMemorySlurmJobIsSubmittedToTheSelectedWorker(ctx context.Context) error {
-	if s.worker.Name == "" {
-		return fmt.Errorf("worker is not selected")
-	}
-	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
-		JobName:      "e2e-passive-alloc-mem-used",
-		Nodes:        1,
-		Nodelist:     []string{s.worker.Name},
-		TasksPerNode: 1,
-		ExtraFlags:   []string{"--mem=0", "--no-requeue"},
-		Wrap:         "true",
-	})
-	if err != nil {
-		return err
-	}
-	s.allocMemJob = job
-
-	// alloc_mem_used should reject the allocation in Prolog while the node has
-	// less available memory than the job requested, then drain the node.
-	if err := framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, s.slurm.WaitForJobGone(ctx, job.ID, passiveAllocMemJobTimeout)); err != nil {
-		return err
-	}
-
-	info, err := s.slurm.JobInfo(ctx, job.ID)
-	if err != nil {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, err)
-	}
-	if !info.SacctFound {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
-			fmt.Errorf("expected Slurm job %s to be recorded in sacct after Prolog failure, got:\n%s", job.ID, info.SacctDump))
-	}
-	if info.CompletedSuccessfully() {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
-			fmt.Errorf("expected Slurm job %s to fail in Prolog due to alloc_mem_used, got state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit))
-	}
-	if info.IsAlive() {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
-			fmt.Errorf("expected Slurm job %s to be finished after leaving squeue, got state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit))
-	}
-	s.runtime.Logf("alloc_mem_used trigger job %s finished as expected: state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit)
-	s.allocMemJob = framework.SbatchJob{}
 	return nil
 }
 
@@ -576,11 +529,6 @@ func (s *PassiveChecks) theSelectedGPUWorkerIsUsableAfterAllocGPUsBusy(ctx conte
 
 func (s *PassiveChecks) cleanupAndResetAllocMem(ctx context.Context) {
 	if s.allocMemScenarioActive {
-		if !s.allocMemJob.IsZero() {
-			if err := s.slurm.CancelJob(ctx, s.allocMemJob.ID, passiveAllocMemJobTimeout); err != nil {
-				s.runtime.Logf("cleanup: cancel alloc_mem_used trigger job %s: %v", s.allocMemJob.ID, err)
-			}
-		}
 		if err := s.removeMemoryPressure(ctx); err != nil {
 			s.runtime.Logf("cleanup: remove alloc_mem_used memory pressure: %v", err)
 		}
@@ -594,7 +542,6 @@ func (s *PassiveChecks) cleanupAndResetAllocMem(ctx context.Context) {
 		}
 	}
 	s.allocMemScenarioActive = false
-	s.allocMemJob = framework.SbatchJob{}
 }
 
 func (s *PassiveChecks) cleanupAndResetAllocGPU(ctx context.Context) {

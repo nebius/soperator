@@ -13,11 +13,11 @@ Feature: Passive checks
     When a CPU-only Slurm job runs on the selected worker
     Then the drop_page_cache passive check completed in Epilog
 
-  @soperator_version_>=4.0.0
-  Scenario: Passive Prolog drains a worker when allocated memory exceeds available memory
+  @soperator_version_>=5.0.0
+  Scenario: HealthCheckProgram drains an idle worker when available memory is below RealMemory
     Given a worker is selected
     When memory pressure is created on the selected worker
-    And an all-memory Slurm job is submitted to the selected worker
+    And HealthCheckProgram runs on the selected worker
     Then the selected worker is drained by alloc_mem_used
     When the memory pressure is removed
     And HealthCheckProgram runs on the selected worker
