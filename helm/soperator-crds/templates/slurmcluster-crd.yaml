@@ -45882,6 +45882,18 @@ spec:
                           - name
                           type: object
                         type: array
+                      docker:
+                        description: |-
+                          Docker defines Docker support for SSH sessions on login nodes.
+                          A writable jail sub-mount at /mnt/image-storage is required when enabled.
+                        properties:
+                          enabled:
+                            default: false
+                            description: |-
+                              Enabled starts a rootful Docker daemon and exposes its proxied socket to SSH sessions.
+                              Docker requires a dedicated writable image-storage disk mounted at /mnt/image-storage.
+                            type: boolean
+                        type: object
                       hostUsers:
                         description: HostUsers controls if the pod containers can
                           use the host user namespace

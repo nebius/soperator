@@ -149,6 +149,19 @@ static int validate_old_root(
     return PAM_SUCCESS;
 }
 
+static void configure_docker_environment(const struct jail_context *context)
+{
+    static const char docker_host[] = "DOCKER_HOST=unix:///var/run/soperator-docker.sock";
+
+    if (access("/run/soperator-docker.enabled", F_OK) != 0) {
+        return;
+    }
+    if (pam_putenv(context->pamh, docker_host) != PAM_SUCCESS) {
+        jail_log(context, "set Docker socket environment: PAM error");
+        return;
+    }
+}
+
 static int enter_jail(const struct jail_context *context, const char *jail_path)
 {
     char old_root[PATH_MAX];
@@ -219,6 +232,7 @@ PAM_EXTERN int pam_sm_open_session(
         jail_log(&context, "expected exactly one argument: <jail-path>");
         result = PAM_SESSION_ERR;
     } else {
+        configure_docker_environment(&context);
         result = enter_jail(&context, argv[0]);
     }
 
