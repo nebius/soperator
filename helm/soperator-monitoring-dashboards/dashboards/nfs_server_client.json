@@ -85,7 +85,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "node_nfsd_server_threads{   namespace=\"nfs-system\"}",
+          "expr": "node_nfsd_server_threads{cluster=~\"$cluster\",    namespace=\"nfs-system\"}",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A",
@@ -162,7 +162,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "kubelet_volume_stats_used_bytes{\n    persistentvolumeclaim=\"nfs-server-storage\"\n}\n/\nkubelet_volume_stats_capacity_bytes{\n    persistentvolumeclaim=\"nfs-server-storage\"\n}",
+          "expr": "kubelet_volume_stats_used_bytes{cluster=~\"$cluster\", \n    persistentvolumeclaim=\"nfs-server-storage\"\n}\n/\nkubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", \n    persistentvolumeclaim=\"nfs-server-storage\"\n}",
           "range": true,
           "refId": "A",
           "useCustomValues": false,
@@ -239,7 +239,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "kubelet_volume_stats_capacity_bytes{\n    persistentvolumeclaim=\"nfs-server-storage\"\n}",
+          "expr": "kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", \n    persistentvolumeclaim=\"nfs-server-storage\"\n}",
           "range": true,
           "refId": "A",
           "useCustomValues": false,
@@ -316,7 +316,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (cluster) (rate(node_nfs_rpc_retransmissions_total{  }[$__rate_interval]))",
+          "expr": "sum by (cluster) (rate(node_nfs_rpc_retransmissions_total{cluster=~\"$cluster\"  }[$__rate_interval]))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -446,7 +446,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(node_nfs_rpcs_total{  }[$__rate_interval])\n* on(cluster, pod) group_left(node)\nkube_pod_info{  node=~\"$compute_instance\"}",
+          "expr": "rate(node_nfs_rpcs_total{cluster=~\"$cluster\"  }[$__rate_interval])\n* on(cluster, pod) group_left(node)\nkube_pod_info{cluster=~\"$cluster\",   node=~\"$compute_instance\"}",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -563,7 +563,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(node_nfs_rpc_retransmissions_total{  }[$__rate_interval])\n* on(cluster, pod) group_left(node)\nkube_pod_info{  node=~\"$compute_instance\"}",
+          "expr": "rate(node_nfs_rpc_retransmissions_total{cluster=~\"$cluster\"  }[$__rate_interval])\n* on(cluster, pod) group_left(node)\nkube_pod_info{cluster=~\"$cluster\",   node=~\"$compute_instance\"}",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -682,7 +682,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(\n  rate(node_nfs_requests_total{  proto=\"4\"}[$__rate_interval])\n  * on(cluster, pod) group_left(node)\n  kube_pod_info{  node=~\"$compute_instance\"}\n) by (method)",
+          "expr": "sum(\n  rate(node_nfs_requests_total{cluster=~\"$cluster\",   proto=\"4\"}[$__rate_interval])\n  * on(cluster, pod) group_left(node)\n  kube_pod_info{cluster=~\"$cluster\",   node=~\"$compute_instance\"}\n) by (method)",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -871,7 +871,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(node_nfsd_disk_bytes_read_total{   namespace=\"nfs-system\"}[$__rate_interval])",
+          "expr": "rate(node_nfsd_disk_bytes_read_total{cluster=~\"$cluster\",    namespace=\"nfs-system\"}[$__rate_interval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "NFSd bytes read",
@@ -887,7 +887,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(node_nfsd_disk_bytes_written_total{   namespace=\"nfs-system\"}[$__rate_interval])",
+          "expr": "rate(node_nfsd_disk_bytes_written_total{cluster=~\"$cluster\",    namespace=\"nfs-system\"}[$__rate_interval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "NFSd bytes written",
@@ -1051,7 +1051,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(node_nfsd_packets_total{proto=\"tcp\",   namespace=\"nfs-system\"}[$__rate_interval])",
+          "expr": "rate(node_nfsd_packets_total{cluster=~\"$cluster\", proto=\"tcp\",   namespace=\"nfs-system\"}[$__rate_interval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "TCP - NFSd network packets (sent+received)",
@@ -1067,7 +1067,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(node_nfsd_packets_total{proto=\"udp\",   namespace=\"nfs-system\"}[$__rate_interval])",
+          "expr": "rate(node_nfsd_packets_total{cluster=~\"$cluster\", proto=\"udp\",   namespace=\"nfs-system\"}[$__rate_interval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "UDP - NFSd network packets (sent+received)",
@@ -1169,7 +1169,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(node_nfsd_read_ahead_cache_not_found_total{ namespace=\"nfs-system\" }[$__rate_interval])",
+          "expr": "rate(node_nfsd_read_ahead_cache_not_found_total{cluster=~\"$cluster\",  namespace=\"nfs-system\" }[$__rate_interval])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -1183,7 +1183,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(node_nfsd_reply_cache_hits_total{ namespace=\"nfs-system\" }[$__rate_interval])",
+          "expr": "rate(node_nfsd_reply_cache_hits_total{cluster=~\"$cluster\",  namespace=\"nfs-system\" }[$__rate_interval])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -1197,7 +1197,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(node_nfsd_reply_cache_misses_total{ namespace=\"nfs-system\" }[$__rate_interval])",
+          "expr": "rate(node_nfsd_reply_cache_misses_total{cluster=~\"$cluster\",  namespace=\"nfs-system\" }[$__rate_interval])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -1211,7 +1211,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(node_nfsd_reply_cache_nocache_total{ namespace=\"nfs-system\" }[$__rate_interval])",
+          "expr": "rate(node_nfsd_reply_cache_nocache_total{cluster=~\"$cluster\",  namespace=\"nfs-system\" }[$__rate_interval])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -1324,7 +1324,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(node_nfsd_rpc_errors_total{ namespace=\"nfs-system\" }[$__rate_interval])",
+          "expr": "rate(node_nfsd_rpc_errors_total{cluster=~\"$cluster\",  namespace=\"nfs-system\" }[$__rate_interval])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -1338,7 +1338,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(node_nfsd_server_rpcs_total{ namespace=\"nfs-system\" }[$__rate_interval])",
+          "expr": "rate(node_nfsd_server_rpcs_total{cluster=~\"$cluster\",  namespace=\"nfs-system\" }[$__rate_interval])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -1439,7 +1439,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(node_nfsd_requests_total{proto=\"4\",  namespace=\"nfs-system\" }[$__rate_interval])",
+          "expr": "rate(node_nfsd_requests_total{cluster=~\"$cluster\", proto=\"4\",  namespace=\"nfs-system\" }[$__rate_interval])",
           "intervalFactor": 1,
           "legendFormat": "{{ method }}",
           "range": true,
@@ -1478,6 +1478,46 @@
         "type": "datasource"
       },
       {
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "filters": [],
+        "hide": 2,
+        "label": "O11y",
+        "name": "o11y",
+        "type": "adhoc"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(node_os_info, cluster)",
+        "hide": 2,
+        "includeAll": true,
+        "label": "Cluster",
+        "multi": false,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(node_os_info, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
         "allValue": ".*",
         "allowCustomValue": true,
         "current": {
@@ -1488,7 +1528,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_pod_info{}, node)",
+        "definition": "label_values(kube_pod_info{cluster=~\"$cluster\"}, node)",
         "description": "NFS client compute instance",
         "includeAll": true,
         "label": "Compute instance",
@@ -1497,7 +1537,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(kube_pod_info{}, node)",
+          "query": "label_values(kube_pod_info{cluster=~\"$cluster\"}, node)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,

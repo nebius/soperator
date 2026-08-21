@@ -111,7 +111,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "time() - max(container_start_time_seconds{namespace=~\"soperator\", pod=\"$pod\", container=\"slurmctld\"})",
+              "expr": "time() - max(container_start_time_seconds{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container=\"slurmctld\"})",
               "legendFormat": "slurmctld uptime",
               "range": true,
               "refId": "A"
@@ -198,7 +198,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(kube_pod_status_phase{namespace=~\"soperator\", pod=\"$pod\", phase=\"Running\"})",
+              "expr": "max(kube_pod_status_phase{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", phase=\"Running\"})",
               "instant": true,
               "legendFormat": "phase",
               "range": false,
@@ -292,7 +292,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (container) (\n  kube_pod_container_status_restarts_total{namespace=~\"soperator\", pod=\"$pod\"}\n)",
+              "expr": "sum by (container) (\n  kube_pod_container_status_restarts_total{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\"}\n)",
               "legendFormat": "{{container}}",
               "range": true,
               "refId": "A"
@@ -363,7 +363,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  changes(\n    sum without (uid, pod_ip) (\n      kube_pod_info{namespace=~\"soperator\", pod=\"$pod\", node!=\"\"}\n    )[1d:1m]\n  )\n)",
+              "expr": "sum(\n  changes(\n    sum without (uid, pod_ip) (\n      kube_pod_info{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", node!=\"\"}\n    )[1d:1m]\n  )\n)",
               "instant": true,
               "legendFormat": "reschedules",
               "range": false,
@@ -474,7 +474,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(slurm_controller_server_thread_count)",
+          "expr": "max(slurm_controller_server_thread_count{cluster=~\"$cluster\"})",
           "legendFormat": "threads",
           "range": true,
           "refId": "A"
@@ -548,7 +548,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg_over_time((100 * sum(container_memory_working_set_bytes{namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\"}) / sum(kube_pod_container_resource_limits{namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\", resource=\"memory\"}))[1h:])",
+          "expr": "avg_over_time((100 * sum(container_memory_working_set_bytes{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\"}) / sum(kube_pod_container_resource_limits{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\", resource=\"memory\"}))[1h:])",
           "legendFormat": "used %",
           "range": true,
           "refId": "A"
@@ -622,7 +622,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg_over_time((100 * (1 - max(kubelet_volume_stats_inodes_free{persistentvolumeclaim=\"controller-spool-$pod\"} / kubelet_volume_stats_inodes{persistentvolumeclaim=\"controller-spool-$pod\"})))[1h:])",
+          "expr": "avg_over_time((100 * (1 - max(kubelet_volume_stats_inodes_free{cluster=~\"$cluster\", persistentvolumeclaim=\"controller-spool-$pod\"} / kubelet_volume_stats_inodes{cluster=~\"$cluster\", persistentvolumeclaim=\"controller-spool-$pod\"})))[1h:])",
           "legendFormat": "inodes used %",
           "range": true,
           "refId": "A"
@@ -696,7 +696,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\"}[1h]))",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\"}[1h]))",
           "legendFormat": "cores",
           "range": true,
           "refId": "A"
@@ -770,7 +770,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg_over_time((100 * (count(DCGM_FI_DEV_GPU_TEMP{hpc_job!=\"\"} and on(exported_pod) label_replace(slurm_node_info{is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\")) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP and on(exported_pod) label_replace(slurm_node_info{is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\")))[1h:])",
+          "expr": "avg_over_time((100 * (count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job!=\"\"} and on(exported_pod) label_replace(slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\")) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"} and on(exported_pod) label_replace(slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\")))[1h:])",
           "legendFormat": "allocated %",
           "range": true,
           "refId": "A"
@@ -844,7 +844,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg_over_time((100 * (count(DCGM_FI_DEV_GPU_UTIL >= 10) or vector(0)) / count(DCGM_FI_DEV_GPU_UTIL))[1h:])",
+          "expr": "avg_over_time((100 * (count(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"} >= 10) or vector(0)) / count(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"}))[1h:])",
           "legendFormat": "utilized %",
           "range": true,
           "refId": "A"
@@ -951,7 +951,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (device) (\n  rate(container_fs_reads_bytes_total{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
+              "expr": "sum by (device) (\n  rate(container_fs_reads_bytes_total{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
               "legendFormat": "{{device}} read",
               "range": true,
               "refId": "A"
@@ -962,7 +962,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * sum by (device) (\n  rate(container_fs_writes_bytes_total{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
+              "expr": "-1 * sum by (device) (\n  rate(container_fs_writes_bytes_total{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
               "legendFormat": "{{device}} write",
               "range": true,
               "refId": "B"
@@ -1087,7 +1087,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(kubelet_volume_stats_used_bytes{persistentvolumeclaim=\"controller-spool-$pod\"})",
+              "expr": "max(kubelet_volume_stats_used_bytes{cluster=~\"$cluster\", persistentvolumeclaim=\"controller-spool-$pod\"})",
               "legendFormat": "used",
               "range": true,
               "refId": "A"
@@ -1098,7 +1098,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=\"controller-spool-$pod\"})",
+              "expr": "max(kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", persistentvolumeclaim=\"controller-spool-$pod\"})",
               "legendFormat": "capacity",
               "range": true,
               "refId": "B"
@@ -1223,7 +1223,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(kubelet_volume_stats_inodes_used{persistentvolumeclaim=\"controller-spool-$pod\"})",
+              "expr": "max(kubelet_volume_stats_inodes_used{cluster=~\"$cluster\", persistentvolumeclaim=\"controller-spool-$pod\"})",
               "legendFormat": "used",
               "range": true,
               "refId": "A"
@@ -1234,7 +1234,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(kubelet_volume_stats_inodes{persistentvolumeclaim=\"controller-spool-$pod\"})",
+              "expr": "max(kubelet_volume_stats_inodes{cluster=~\"$cluster\", persistentvolumeclaim=\"controller-spool-$pod\"})",
               "legendFormat": "total",
               "range": true,
               "refId": "B"
@@ -1331,7 +1331,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_disk_read_time_seconds_total{instance=\"$instance\"}[$__rate_interval])\n/\nirate(node_disk_reads_completed_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_disk_read_time_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])\n/\nirate(node_disk_reads_completed_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Read wait time avg",
               "range": true,
               "refId": "A"
@@ -1342,7 +1342,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_disk_write_time_seconds_total{instance=\"$instance\"}[$__rate_interval])\n/\nirate(node_disk_writes_completed_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_disk_write_time_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])\n/\nirate(node_disk_writes_completed_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Write wait time avg",
               "range": true,
               "refId": "B"
@@ -1439,7 +1439,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_filefd_allocated{instance=\"$instance\"}",
+              "expr": "node_filefd_allocated{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Open files (system-wide)",
               "range": true,
               "refId": "A"
@@ -1540,7 +1540,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_filesystem_readonly{instance=\"$instance\", device!~\"rootfs\", mountpoint!~\"/mnt/cloud-metadata\"}",
+              "expr": "node_filesystem_readonly{cluster=~\"$cluster\", instance=\"$instance\", device!~\"rootfs\", mountpoint!~\"/mnt/cloud-metadata\"}",
               "legendFormat": "{{mountpoint}} - ReadOnly",
               "range": true,
               "refId": "A"
@@ -1551,7 +1551,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_filesystem_device_error{instance=\"$instance\", device!~\"rootfs\", fstype!~\"tmpfs\"}",
+              "expr": "node_filesystem_device_error{cluster=~\"$cluster\", instance=\"$instance\", device!~\"rootfs\", fstype!~\"tmpfs\"}",
               "legendFormat": "{{mountpoint}} - Device error",
               "range": true,
               "refId": "B"
@@ -1648,7 +1648,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_disk_reads_completed_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_disk_reads_completed_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}} - reads",
               "range": true,
               "refId": "A"
@@ -1659,7 +1659,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_disk_writes_completed_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_disk_writes_completed_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}} - writes",
               "range": true,
               "refId": "B"
@@ -1756,7 +1756,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_disk_read_bytes_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_disk_read_bytes_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}} - read",
               "range": true,
               "refId": "A"
@@ -1767,7 +1767,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * irate(node_disk_written_bytes_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "-1 * irate(node_disk_written_bytes_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}} - write",
               "range": true,
               "refId": "B"
@@ -1866,7 +1866,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_disk_io_time_seconds_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_disk_io_time_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}}",
               "range": true,
               "refId": "A"
@@ -1981,7 +1981,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count by (job_state) (slurm_job_info{job_state=~\"PENDING|RUNNING|SUSPENDED|COMPLETING|CONFIGURING|RESIZING|REQUEUED|SIGNALING|STAGE_OUT\"}) or label_replace(vector(0), \"job_state\", \"PENDING\", \"\", \"\")",
+              "expr": "count by (job_state) (slurm_job_info{cluster=~\"$cluster\", job_state=~\"PENDING|RUNNING|SUSPENDED|COMPLETING|CONFIGURING|RESIZING|REQUEUED|SIGNALING|STAGE_OUT\"}) or label_replace(vector(0), \"job_state\", \"PENDING\", \"\", \"\")",
               "legendFormat": "{{job_state}}",
               "range": true,
               "refId": "A"
@@ -2081,7 +2081,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * (count(DCGM_FI_DEV_GPU_TEMP{hpc_job!=\"\"} and on(exported_pod) label_replace(slurm_node_info{is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\")) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP and on(exported_pod) label_replace(slurm_node_info{is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\"))",
+              "expr": "100 * (count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job!=\"\"} and on(exported_pod) label_replace(slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\")) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"} and on(exported_pod) label_replace(slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\"))",
               "legendFormat": "allocated",
               "range": true,
               "refId": "A"
@@ -2181,7 +2181,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * (count(DCGM_FI_DEV_GPU_UTIL >= 10) or vector(0)) / count(DCGM_FI_DEV_GPU_UTIL)",
+              "expr": "100 * (count(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"} >= 10) or vector(0)) / count(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"})",
               "legendFormat": "utilized",
               "range": true,
               "refId": "A"
@@ -2391,7 +2391,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Down",
@@ -2405,7 +2405,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Drained",
@@ -2419,7 +2419,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Draining",
@@ -2433,7 +2433,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain!=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain!=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Busy",
@@ -2447,7 +2447,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain!=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain!=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Idle",
@@ -2461,7 +2461,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_is_maintenance=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_is_maintenance=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Maintenance",
@@ -2475,7 +2475,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=\"UNKNOWN\", state_is_maintenance!=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"UNKNOWN\", state_is_maintenance!=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Unknown",
@@ -2579,7 +2579,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * (count(slurm_node_info{state_base=~\"ALLOCATED|MIXED\"}) or vector(0)) / count(slurm_node_info{is_unavailable=\"\"})",
+              "expr": "100 * (count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\"}) or vector(0)) / count(slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"})",
               "legendFormat": "allocated",
               "range": true,
               "refId": "A"
@@ -2689,7 +2689,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (message_type) (\n  rate(slurm_controller_rpc_calls_total[5m])\n)",
+              "expr": "sum by (message_type) (\n  rate(slurm_controller_rpc_calls_total{cluster=~\"$cluster\"}[5m])\n)",
               "legendFormat": "{{message_type}}",
               "range": true,
               "refId": "A"
@@ -2786,7 +2786,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (message_type) (rate(slurm_controller_rpc_duration_seconds_total[5m]))\n/\nsum by (message_type) (rate(slurm_controller_rpc_calls_total[5m]))",
+              "expr": "sum by (message_type) (rate(slurm_controller_rpc_duration_seconds_total{cluster=~\"$cluster\"}[5m]))\n/\nsum by (message_type) (rate(slurm_controller_rpc_calls_total{cluster=~\"$cluster\"}[5m]))",
               "legendFormat": "{{message_type}}",
               "range": true,
               "refId": "A"
@@ -2883,7 +2883,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (message_type) (rate(slurm_controller_rpc_duration_seconds_total[5m]))",
+              "expr": "sum by (message_type) (rate(slurm_controller_rpc_duration_seconds_total{cluster=~\"$cluster\"}[5m]))",
               "legendFormat": "{{message_type}}",
               "range": true,
               "refId": "A"
@@ -2980,7 +2980,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10,\n  sum by (user) (\n    rate(slurm_controller_rpc_user_calls_total[5m])\n  )\n)",
+              "expr": "topk(10,\n  sum by (user) (\n    rate(slurm_controller_rpc_user_calls_total{cluster=~\"$cluster\"}[5m])\n  )\n)",
               "legendFormat": "{{user}}",
               "range": true,
               "refId": "A"
@@ -3077,7 +3077,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10,\n  sum by (user) (\n    rate(slurm_controller_rpc_user_duration_seconds_total[5m])\n  )\n)",
+              "expr": "topk(10,\n  sum by (user) (\n    rate(slurm_controller_rpc_user_duration_seconds_total{cluster=~\"$cluster\"}[5m])\n  )\n)",
               "legendFormat": "{{user}}",
               "range": true,
               "refId": "A"
@@ -3174,7 +3174,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10,\n  sum by (user) (rate(slurm_controller_rpc_user_duration_seconds_total[5m]))\n  /\n  sum by (user) (rate(slurm_controller_rpc_user_calls_total[5m]))\n)",
+              "expr": "topk(10,\n  sum by (user) (rate(slurm_controller_rpc_user_duration_seconds_total{cluster=~\"$cluster\"}[5m]))\n  /\n  sum by (user) (rate(slurm_controller_rpc_user_calls_total{cluster=~\"$cluster\"}[5m]))\n)",
               "legendFormat": "{{user}}",
               "range": true,
               "refId": "A"
@@ -3271,7 +3271,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_agent_queue_size",
+              "expr": "slurm_agent_queue_size{cluster=~\"$cluster\"}",
               "legendFormat": "queued",
               "range": true,
               "refId": "A"
@@ -3282,7 +3282,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_agent_thread_cnt",
+              "expr": "slurm_agent_thread_cnt{cluster=~\"$cluster\"}",
               "legendFormat": "dispatching",
               "range": true,
               "refId": "B"
@@ -3293,7 +3293,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_agent_cnt",
+              "expr": "slurm_agent_cnt{cluster=~\"$cluster\"}",
               "legendFormat": "agent pool",
               "range": true,
               "refId": "C"
@@ -3390,7 +3390,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_slurmdbd_queue_size",
+              "expr": "slurm_slurmdbd_queue_size{cluster=~\"$cluster\"}",
               "legendFormat": "buffered messages",
               "range": true,
               "refId": "A"
@@ -3513,7 +3513,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_schedule_cycle_last / 1e6",
+              "expr": "slurm_schedule_cycle_last{cluster=~\"$cluster\"} / 1e6",
               "legendFormat": "last cycle (1 sample / scrape, default 30s)",
               "range": true,
               "refId": "A"
@@ -3610,7 +3610,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_schedule_cycle_cnt[5m]) * 60",
+              "expr": "rate(slurm_schedule_cycle_cnt{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "cycles/min",
               "range": true,
               "refId": "A"
@@ -3621,7 +3621,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_schedule_queue_len",
+              "expr": "slurm_schedule_queue_len{cluster=~\"$cluster\"}",
               "legendFormat": "queue length",
               "range": true,
               "refId": "B"
@@ -3718,7 +3718,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_sched_exit_end[5m]) * 60",
+              "expr": "rate(slurm_sched_exit_end{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "End of job queue",
               "range": true,
               "refId": "A"
@@ -3729,7 +3729,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_sched_exit_max_depth[5m]) * 60",
+              "expr": "rate(slurm_sched_exit_max_depth{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Hit default_queue_depth",
               "range": true,
               "refId": "B"
@@ -3740,7 +3740,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_sched_exit_max_job_start[5m]) * 60",
+              "expr": "rate(slurm_sched_exit_max_job_start{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Hit sched_max_job_start",
               "range": true,
               "refId": "C"
@@ -3751,7 +3751,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_sched_exit_lic[5m]) * 60",
+              "expr": "rate(slurm_sched_exit_lic{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Blocked on licenses",
               "range": true,
               "refId": "D"
@@ -3762,7 +3762,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_sched_exit_rpc_cnt[5m]) * 60",
+              "expr": "rate(slurm_sched_exit_rpc_cnt{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Hit max_rpc_cnt",
               "range": true,
               "refId": "E"
@@ -3773,7 +3773,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_sched_exit_timeout[5m]) * 60",
+              "expr": "rate(slurm_sched_exit_timeout{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Timeout (max_sched_time)",
               "range": true,
               "refId": "F"
@@ -3875,7 +3875,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_bf_active",
+              "expr": "slurm_bf_active{cluster=~\"$cluster\"}",
               "legendFormat": "state",
               "range": true,
               "refId": "A"
@@ -3980,7 +3980,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "time() - slurm_bf_when_last_cycle",
+              "expr": "time() - slurm_bf_when_last_cycle{cluster=~\"$cluster\"}",
               "legendFormat": "age",
               "range": true,
               "refId": "A"
@@ -4085,7 +4085,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_bf_cycle_last / 1e6",
+              "expr": "slurm_bf_cycle_last{cluster=~\"$cluster\"} / 1e6",
               "legendFormat": "last cycle (1 sample / scrape, default 30s)",
               "range": true,
               "refId": "A"
@@ -4182,7 +4182,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_cycle_cnt[5m]) * 60",
+              "expr": "rate(slurm_bf_cycle_cnt{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "cycles/min",
               "range": true,
               "refId": "A"
@@ -4279,7 +4279,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_bf_queue_len",
+              "expr": "slurm_bf_queue_len{cluster=~\"$cluster\"}",
               "legendFormat": "backfill queue length",
               "range": true,
               "refId": "A"
@@ -4376,7 +4376,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_bf_last_depth",
+              "expr": "slurm_bf_last_depth{cluster=~\"$cluster\"}",
               "legendFormat": "examined (slurm_bf_last_depth)",
               "range": true,
               "refId": "A"
@@ -4387,7 +4387,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_bf_last_depth_try",
+              "expr": "slurm_bf_last_depth_try{cluster=~\"$cluster\"}",
               "legendFormat": "attempted to start (slurm_bf_last_depth_try)",
               "range": true,
               "refId": "B"
@@ -4484,7 +4484,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_bf_table_size",
+              "expr": "slurm_bf_table_size{cluster=~\"$cluster\"}",
               "legendFormat": "time-slot table size",
               "range": true,
               "refId": "A"
@@ -4581,7 +4581,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_exit_end[5m]) * 60",
+              "expr": "rate(slurm_bf_exit_end{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "End of job queue",
               "range": true,
               "refId": "A"
@@ -4592,7 +4592,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_exit_max_job_start[5m]) * 60",
+              "expr": "rate(slurm_bf_exit_max_job_start{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Hit bf_max_job_start",
               "range": true,
               "refId": "B"
@@ -4603,7 +4603,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_exit_max_job_test[5m]) * 60",
+              "expr": "rate(slurm_bf_exit_max_job_test{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Hit bf_max_job_test",
               "range": true,
               "refId": "C"
@@ -4614,7 +4614,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_exit_state_changed[5m]) * 60",
+              "expr": "rate(slurm_bf_exit_state_changed{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "System state changed",
               "range": true,
               "refId": "D"
@@ -4625,7 +4625,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_exit_table_limit[5m]) * 60",
+              "expr": "rate(slurm_bf_exit_table_limit{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Hit table size limit (bf_node_space_size)",
               "range": true,
               "refId": "E"
@@ -4636,7 +4636,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_exit_timeout[5m]) * 60",
+              "expr": "rate(slurm_bf_exit_timeout{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Timeout (bf_max_time)",
               "range": true,
               "refId": "F"
@@ -4782,7 +4782,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (container) (\n  container_memory_working_set_bytes{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}\n)",
+              "expr": "sum by (container) (\n  container_memory_working_set_bytes{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}\n)",
               "legendFormat": "{{container}}",
               "range": true,
               "refId": "A"
@@ -4793,7 +4793,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_MemAvailable_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_MemAvailable_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "MemAvailable",
               "range": true,
               "refId": "B"
@@ -4891,7 +4891,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100\n* sum by (container) (\n    container_memory_working_set_bytes{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}\n  )\n/ on (container)\n  (\n    sum by (container) (\n      kube_pod_container_resource_limits{namespace=~\"soperator\", pod=\"$pod\", resource=\"memory\"}\n    )\n    or\n    on (container)\n    sum by (container) (\n      container_memory_working_set_bytes{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"} * 0\n    )\n    + on () group_left scalar(node_memory_MemAvailable_bytes{instance=\"$instance\"})\n  )",
+              "expr": "100\n* sum by (container) (\n    container_memory_working_set_bytes{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}\n  )\n/ on (container)\n  (\n    sum by (container) (\n      kube_pod_container_resource_limits{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", resource=\"memory\"}\n    )\n    or\n    on (container)\n    sum by (container) (\n      container_memory_working_set_bytes{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"} * 0\n    )\n    + on () group_left scalar(node_memory_MemAvailable_bytes{cluster=~\"$cluster\", instance=\"$instance\"})\n  )",
               "legendFormat": "{{container}}",
               "range": true,
               "refId": "A"
@@ -4988,7 +4988,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Active_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Active_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Active - Memory that has been used more recently and usually not reclaimed unless absolutely necessary",
               "range": true,
               "refId": "A"
@@ -4999,7 +4999,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Inactive_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Inactive_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Inactive - Memory which has been less recently used. It is more eligible to be reclaimed for other purposes",
               "range": true,
               "refId": "B"
@@ -5126,7 +5126,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Committed_AS_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Committed_AS_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Committed_AS - Amount of memory presently allocated on the system",
               "range": true,
               "refId": "A"
@@ -5137,7 +5137,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_CommitLimit_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_CommitLimit_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "CommitLimit - Amount of memory currently available to be allocated on the system",
               "range": true,
               "refId": "B"
@@ -5234,7 +5234,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Writeback_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Writeback_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Writeback - Memory which is actively being written back to disk",
               "range": true,
               "refId": "A"
@@ -5245,7 +5245,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_WritebackTmp_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_WritebackTmp_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "WritebackTmp - Memory used by FUSE for temporary writeback buffers",
               "range": true,
               "refId": "B"
@@ -5256,7 +5256,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Dirty_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Dirty_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Dirty - Memory which is waiting to get written back to the disk",
               "range": true,
               "refId": "C"
@@ -5353,7 +5353,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pgfault{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pgfault{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Pgfault - Page major and minor fault operations",
               "range": true,
               "refId": "A"
@@ -5364,7 +5364,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pgmajfault{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pgmajfault{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Pgmajfault - Major page fault operations",
               "range": true,
               "refId": "B"
@@ -5464,7 +5464,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_vmstat_oom_kill{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_oom_kill{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "oom killer invocations",
               "range": true,
               "refId": "A"
@@ -5561,7 +5561,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pgpgin{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pgpgin{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Pagesin - Page in operations",
               "range": true,
               "refId": "A"
@@ -5572,7 +5572,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * irate(node_vmstat_pgpgout{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "-1 * irate(node_vmstat_pgpgout{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Pagesout - Page out operations",
               "range": true,
               "refId": "B"
@@ -5669,7 +5669,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Mapped_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Mapped_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Mapped - Used memory in mapped pages files which have been mapped, such as libraries",
               "range": true,
               "refId": "A"
@@ -5680,7 +5680,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Shmem_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Shmem_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Shmem - Used shared memory (shared between several processes, thus including RAM disks)",
               "range": true,
               "refId": "B"
@@ -5691,7 +5691,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_ShmemHugePages_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_ShmemHugePages_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "ShmemHugePages - Memory used by shared memory (shmem) and tmpfs allocated with huge pages",
               "range": true,
               "refId": "C"
@@ -5702,7 +5702,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_ShmemPmdMapped_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_ShmemPmdMapped_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "ShmemPmdMapped - Amount of shared (shmem/tmpfs) memory backed by huge pages",
               "range": true,
               "refId": "D"
@@ -5799,7 +5799,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_AnonHugePages_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_AnonHugePages_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "AnonHugePages - Memory in anonymous huge pages",
               "range": true,
               "refId": "A"
@@ -5810,7 +5810,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_AnonPages_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_AnonPages_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "AnonPages - Memory in user pages not backed by files",
               "range": true,
               "refId": "B"
@@ -5907,7 +5907,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "container_memory_rss{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}",
+              "expr": "container_memory_rss{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}",
               "legendFormat": "{{container}} rss",
               "range": true,
               "refId": "A"
@@ -5918,7 +5918,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "container_memory_cache{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}",
+              "expr": "container_memory_cache{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}",
               "legendFormat": "{{container}} cache",
               "range": true,
               "refId": "B"
@@ -5929,7 +5929,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "container_memory_mapped_file{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}",
+              "expr": "container_memory_mapped_file{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}",
               "legendFormat": "{{container}} mapped_file",
               "range": true,
               "refId": "C"
@@ -6041,7 +6041,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  rate(container_network_receive_bytes_total{namespace=~\"soperator\", pod=\"$pod\"}[5m])\n)",
+              "expr": "sum(\n  rate(container_network_receive_bytes_total{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\"}[5m])\n)",
               "legendFormat": "rx",
               "range": true,
               "refId": "A"
@@ -6052,7 +6052,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * sum(\n  rate(container_network_transmit_bytes_total{namespace=~\"soperator\", pod=\"$pod\"}[5m])\n)",
+              "expr": "-1 * sum(\n  rate(container_network_transmit_bytes_total{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\"}[5m])\n)",
               "legendFormat": "tx",
               "range": true,
               "refId": "B"
@@ -6149,7 +6149,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_packets_total{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_packets_total{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Receive",
               "range": true,
               "refId": "A"
@@ -6160,7 +6160,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * irate(node_network_transmit_packets_total{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
+              "expr": "-1 * irate(node_network_transmit_packets_total{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Transmit",
               "range": true,
               "refId": "B"
@@ -6257,7 +6257,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_errs_total{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_errs_total{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Receive errors",
               "range": true,
               "refId": "A"
@@ -6268,7 +6268,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_transmit_errs_total{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
+              "expr": "irate(node_network_transmit_errs_total{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Transmit errors",
               "range": true,
               "refId": "B"
@@ -6279,7 +6279,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_drop_total{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_drop_total{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Receive drops",
               "range": true,
               "refId": "C"
@@ -6290,7 +6290,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_transmit_drop_total{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
+              "expr": "irate(node_network_transmit_drop_total{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Transmit drops",
               "range": true,
               "refId": "D"
@@ -6387,7 +6387,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_netstat_Tcp_CurrEstab{instance=\"$instance\"}",
+              "expr": "node_netstat_Tcp_CurrEstab{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "CurrEstab - TCP connections in ESTABLISHED or CLOSE-WAIT",
               "range": true,
               "refId": "A"
@@ -6398,7 +6398,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_ActiveOpens{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_ActiveOpens{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "ActiveOpens/s - new outbound connections",
               "range": true,
               "refId": "B"
@@ -6409,7 +6409,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_PassiveOpens{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_PassiveOpens{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "PassiveOpens/s - new inbound connections",
               "range": true,
               "refId": "C"
@@ -6506,7 +6506,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_RetransSegs{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_RetransSegs{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "RetransSegs - TCP segments retransmitted",
               "range": true,
               "refId": "A"
@@ -6517,7 +6517,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "SynRetrans - SYN/ACK retransmits",
               "range": true,
               "refId": "B"
@@ -6528,7 +6528,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_ListenDrops{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_ListenDrops{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "ListenDrops - SYNs to LISTEN sockets ignored (overflow)",
               "range": true,
               "refId": "C"
@@ -6539,7 +6539,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_ListenOverflows{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_ListenOverflows{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "ListenOverflows - listen queue overflowed",
               "range": true,
               "refId": "D"
@@ -6550,7 +6550,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_OutRsts{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_OutRsts{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "OutRsts - segments sent with RST flag",
               "range": true,
               "refId": "E"
@@ -6676,7 +6676,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_nf_conntrack_entries{instance=\"$instance\"}",
+              "expr": "node_nf_conntrack_entries{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "entries",
               "range": true,
               "refId": "A"
@@ -6687,7 +6687,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_nf_conntrack_entries_limit{instance=\"$instance\"}",
+              "expr": "node_nf_conntrack_entries_limit{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "limit",
               "range": true,
               "refId": "B"
@@ -6785,7 +6785,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_network_up{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}",
+              "expr": "node_network_up{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}",
               "legendFormat": "{{device}} - operstate=up",
               "range": true,
               "refId": "A"
@@ -6796,7 +6796,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_network_carrier{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}",
+              "expr": "node_network_carrier{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}",
               "legendFormat": "{{device}} - physical link carrier",
               "range": true,
               "refId": "B"
@@ -6911,7 +6911,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_bytes_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_bytes_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{pod}} {{device}} RX",
               "range": true,
               "refId": "A"
@@ -6922,7 +6922,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * irate(node_network_transmit_bytes_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "-1 * irate(node_network_transmit_bytes_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{pod}} {{device}} TX",
               "range": true,
               "refId": "B"
@@ -7019,7 +7019,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_netstat_Tcp_CurrEstab{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}",
+              "expr": "node_netstat_Tcp_CurrEstab{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}",
               "legendFormat": "{{pod}} established",
               "range": true,
               "refId": "A"
@@ -7116,7 +7116,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_packets_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_packets_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{pod}} {{device}} RX",
               "range": true,
               "refId": "A"
@@ -7127,7 +7127,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * irate(node_network_transmit_packets_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "-1 * irate(node_network_transmit_packets_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{pod}} {{device}} TX",
               "range": true,
               "refId": "B"
@@ -7224,7 +7224,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_RetransSegs{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_RetransSegs{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
               "legendFormat": "{{pod}} retrans",
               "range": true,
               "refId": "A"
@@ -7235,7 +7235,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
               "legendFormat": "{{pod}} SYN retrans",
               "range": true,
               "refId": "B"
@@ -7332,7 +7332,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_errs_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_errs_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{device}} RX errs",
               "range": true,
               "refId": "A"
@@ -7343,7 +7343,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_drop_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_drop_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{device}} RX drops",
               "range": true,
               "refId": "B"
@@ -7354,7 +7354,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_transmit_errs_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "irate(node_network_transmit_errs_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{device}} TX errs",
               "range": true,
               "refId": "C"
@@ -7365,7 +7365,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_transmit_drop_total{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "irate(node_network_transmit_drop_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{device}} TX drops",
               "range": true,
               "refId": "D"
@@ -7462,7 +7462,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_ListenDrops{pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_ListenDrops{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
               "legendFormat": "{{pod}} listen drops",
               "range": true,
               "refId": "A"
@@ -7574,7 +7574,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (container) (\n  rate(container_cpu_usage_seconds_total{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
+              "expr": "sum by (container) (\n  rate(container_cpu_usage_seconds_total{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
               "legendFormat": "{{container}}",
               "range": true,
               "refId": "A"
@@ -7670,7 +7670,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"system\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"system\"}[$__rate_interval]))",
               "legendFormat": "System - Processes executing in kernel mode",
               "range": true,
               "refId": "A"
@@ -7681,7 +7681,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"user\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"user\"}[$__rate_interval]))",
               "legendFormat": "User - Normal processes executing in user mode",
               "range": true,
               "refId": "B"
@@ -7692,7 +7692,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"nice\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"nice\"}[$__rate_interval]))",
               "legendFormat": "Nice - Niced processes in user mode",
               "range": true,
               "refId": "C"
@@ -7703,7 +7703,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"iowait\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"iowait\"}[$__rate_interval]))",
               "legendFormat": "Iowait - Waiting for I/O to complete",
               "range": true,
               "refId": "D"
@@ -7714,7 +7714,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"irq\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"irq\"}[$__rate_interval]))",
               "legendFormat": "Irq - Servicing interrupts",
               "range": true,
               "refId": "E"
@@ -7725,7 +7725,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"softirq\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"softirq\"}[$__rate_interval]))",
               "legendFormat": "Softirq - Servicing softirqs",
               "range": true,
               "refId": "F"
@@ -7736,7 +7736,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"steal\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"steal\"}[$__rate_interval]))",
               "legendFormat": "Steal - Time stolen by the hypervisor",
               "range": true,
               "refId": "G"
@@ -7747,7 +7747,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"idle\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"idle\"}[$__rate_interval]))",
               "legendFormat": "Idle - Waiting for something to happen",
               "range": true,
               "refId": "H"
@@ -7844,7 +7844,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_load1{instance=\"$instance\"}",
+              "expr": "node_load1{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Load 1m",
               "range": true,
               "refId": "A"
@@ -7855,7 +7855,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_load5{instance=\"$instance\"}",
+              "expr": "node_load5{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Load 5m",
               "range": true,
               "refId": "B"
@@ -7866,7 +7866,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_load15{instance=\"$instance\"}",
+              "expr": "node_load15{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Load 15m",
               "range": true,
               "refId": "C"
@@ -7963,7 +7963,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_context_switches_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_context_switches_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Context switches/s",
               "range": true,
               "refId": "A"
@@ -7974,7 +7974,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_intr_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_intr_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Interrupts/s",
               "range": true,
               "refId": "B"
@@ -8100,7 +8100,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * max(kube_node_status_condition{node=\"$node\", condition=\"MemoryPressure\", status=\"true\"})",
+              "expr": "100 * max(kube_node_status_condition{cluster=~\"$cluster\", node=\"$node\", condition=\"MemoryPressure\", status=\"true\"})",
               "legendFormat": "Kubelet MemoryPressure (0/100)",
               "range": true,
               "refId": "A"
@@ -8111,7 +8111,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * irate(node_pressure_memory_waiting_seconds_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "100 * irate(node_pressure_memory_waiting_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Memory PSI some - % time at least one task stalled on memory",
               "range": true,
               "refId": "B"
@@ -8122,7 +8122,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * irate(node_pressure_memory_stalled_seconds_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "100 * irate(node_pressure_memory_stalled_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Memory PSI full - % time ALL tasks stalled on memory",
               "range": true,
               "refId": "C"
@@ -8133,7 +8133,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * irate(node_pressure_cpu_waiting_seconds_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "100 * irate(node_pressure_cpu_waiting_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "CPU PSI some - % time at least one task stalled on CPU",
               "range": true,
               "refId": "D"
@@ -8144,7 +8144,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * irate(node_pressure_io_waiting_seconds_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "100 * irate(node_pressure_io_waiting_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "I/O PSI some - % time at least one task stalled on I/O",
               "range": true,
               "refId": "E"
@@ -8155,7 +8155,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * irate(node_pressure_io_stalled_seconds_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "100 * irate(node_pressure_io_stalled_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "I/O PSI full - % time ALL tasks stalled on I/O",
               "range": true,
               "refId": "F"
@@ -8198,6 +8198,46 @@
         "type": "datasource"
       },
       {
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "filters": [],
+        "hide": 2,
+        "label": "O11y",
+        "name": "o11y",
+        "type": "adhoc"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(node_os_info, cluster)",
+        "hide": 2,
+        "includeAll": true,
+        "label": "Cluster",
+        "multi": false,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(node_os_info, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
         "allowCustomValue": false,
         "current": {
           "text": "controller-0",
@@ -8207,7 +8247,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_pod_info{namespace=~\"soperator\", pod=~\"controller-[0-9]+\"}, pod)",
+        "definition": "label_values(kube_pod_info{cluster=~\"$cluster\", namespace=~\"soperator\", pod=~\"controller-[0-9]+\"}, pod)",
         "description": "Controller pod to inspect. Discovered from kube_pod_info; defaults to controller-0.",
         "includeAll": false,
         "label": "Controller Pod",
@@ -8216,7 +8256,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(kube_pod_info{namespace=~\"soperator\", pod=~\"controller-[0-9]+\"}, pod)",
+          "query": "label_values(kube_pod_info{cluster=~\"$cluster\", namespace=~\"soperator\", pod=~\"controller-[0-9]+\"}, pod)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -8234,7 +8274,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_pod_info{namespace=~\"soperator\", pod=\"$pod\"}, node)",
+        "definition": "label_values(kube_pod_info{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\"}, node)",
         "description": "K8s node hosting the selected controller pod. Hidden; used for joining node-exporter metrics.",
         "hide": 2,
         "includeAll": false,
@@ -8244,7 +8284,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(kube_pod_info{namespace=~\"soperator\", pod=\"$pod\"}, node)",
+          "query": "label_values(kube_pod_info{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\"}, node)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -8262,7 +8302,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(node_uname_info{nodename=\"$node\"}, instance)",
+        "definition": "label_values(node_uname_info{cluster=~\"$cluster\", nodename=\"$node\"}, instance)",
         "description": "node-exporter `instance` label for the controller node. Hidden; used to filter node_* metrics.",
         "hide": 2,
         "includeAll": false,
@@ -8272,7 +8312,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(node_uname_info{nodename=\"$node\"}, instance)",
+          "query": "label_values(node_uname_info{cluster=~\"$cluster\", nodename=\"$node\"}, instance)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
