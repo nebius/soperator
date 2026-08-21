@@ -21,4 +21,4 @@ metadata:
 data:
   {{ printf "%s.json" $dashboardName }}: |
     {{- toString $file | nindent 4 }}
-{{- end }}
+{{ end }}
