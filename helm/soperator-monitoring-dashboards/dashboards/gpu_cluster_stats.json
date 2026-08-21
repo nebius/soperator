@@ -73,7 +73,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "count(count by (Hostname) (DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"}))",
+          "expr": "count(count by (Hostname) (DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}))",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -135,7 +135,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "count(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"})",
+          "expr": "count(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -193,7 +193,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "avg_over_time((count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\"} > 100))[$__range:])",
+          "expr": "avg_over_time((count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"} > 100))[$__range:])",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -254,7 +254,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg_over_time((count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\"} <= 100))[$__range:])",
+          "expr": "avg_over_time((count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"} <= 100))[$__range:])",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -321,7 +321,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg(avg_over_time(DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}[$__range])) * 100",
+          "expr": "avg(avg_over_time(DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}[$__range])) * 100",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -378,7 +378,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "sum(avg_over_time(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"}[$__range])) / 1000",
+          "expr": "sum(avg_over_time(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}[$__range])) / 1000",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -538,21 +538,21 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg(DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}) * 100",
+          "expr": "avg(DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "Average",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "quantile(0.95, DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}) * 100",
+          "expr": "quantile(0.95, DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "P95",
           "range": true,
           "refId": "B"
         },
         {
-          "expr": "max(DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}) * 100",
+          "expr": "max(DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "Max (straggler signal)",
           "range": true,
@@ -670,14 +670,14 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\"} > 100)",
+          "expr": "count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"} > 100)",
           "instant": false,
           "legendFormat": "In Use",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\"} <= 100)",
+          "expr": "count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"} <= 100)",
           "instant": false,
           "legendFormat": "Idle",
           "range": true,
@@ -765,14 +765,14 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"})",
+          "expr": "avg(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "Average",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "min(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"})",
+          "expr": "min(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "Min (node stalled?)",
           "range": true,
@@ -860,14 +860,14 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{cluster=~\"$cluster\"}) * 100",
+          "expr": "avg(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "Average",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "max(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{cluster=~\"$cluster\"}) * 100",
+          "expr": "max(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "Max",
           "range": true,
@@ -955,7 +955,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg(DCGM_FI_PROF_SM_OCCUPANCY{cluster=~\"$cluster\"}) * 100",
+          "expr": "avg(DCGM_FI_PROF_SM_OCCUPANCY{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "Average",
           "range": true,
@@ -1042,7 +1042,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "sum(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"}) / 1000",
+          "expr": "sum(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) / 1000",
           "instant": false,
           "legendFormat": "Total Power",
           "range": true,
@@ -1160,14 +1160,14 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "sum(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\"})",
+          "expr": "sum(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "VRAM Used",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "sum(DCGM_FI_DEV_FB_FREE{cluster=~\"$cluster\"})",
+          "expr": "sum(DCGM_FI_DEV_FB_FREE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "VRAM Free",
           "range": true,
@@ -1271,7 +1271,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg by (Hostname) (DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}) * 100",
+          "expr": "avg by (Hostname) (DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "{{Hostname}}",
           "range": true,
@@ -1344,7 +1344,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg by (Hostname) (avg_over_time(DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}[$__range])) * 100",
+          "expr": "avg by (Hostname) (avg_over_time(DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}[$__range])) * 100",
           "instant": true,
           "legendFormat": "{{Hostname}}",
           "range": false,
@@ -1425,7 +1425,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg by (Hostname) (DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}) * 100",
+          "expr": "avg by (Hostname) (DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "{{Hostname}}",
           "range": true,
@@ -1569,14 +1569,14 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "max(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"})",
+          "expr": "max(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "Max",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "avg(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"})",
+          "expr": "avg(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "Average",
           "range": true,
@@ -1708,7 +1708,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "max(DCGM_FI_DEV_MEMORY_TEMP{cluster=~\"$cluster\"})",
+          "expr": "max(DCGM_FI_DEV_MEMORY_TEMP{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "Max",
           "range": true,
@@ -1718,7 +1718,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_MEMORY_TEMP{cluster=~\"$cluster\"})",
+          "expr": "avg(DCGM_FI_DEV_MEMORY_TEMP{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "Average",
           "range": true,
@@ -1787,7 +1787,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "max by (Hostname) (max_over_time(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"}[$__range]))",
+          "expr": "max by (Hostname) (max_over_time(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}[$__range]))",
           "instant": true,
           "legendFormat": "{{Hostname}}",
           "range": false,
@@ -1863,6 +1863,34 @@
         "type": "query"
       },
       {
+        "allValue": ".*",
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
+        "description": "",
+        "includeAll": true,
+        "label": "Nodeset",
+        "multi": true,
+        "name": "nodeset",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
         "allowCustomValue": false,
         "current": {
           "text": "4",
@@ -1872,7 +1900,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "query_result(count(count by (Hostname) (DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"})))",
+        "definition": "query_result(count(count by (Hostname) (DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})))",
         "hide": 2,
         "includeAll": false,
         "label": "Instance count (hidden)",
@@ -1886,7 +1914,7 @@
         ],
         "query": {
           "qryType": 5,
-          "query": "query_result(count(count by (Hostname) (DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"})))",
+          "query": "query_result(count(count by (Hostname) (DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})))",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "regex": "/\\s(\\d+)\\s*\\d*$/",
@@ -1905,6 +1933,6 @@
   "timezone": "browser",
   "title": "GPU Cluster Stats",
   "uid": "soperator-gpu-cluster-stats",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

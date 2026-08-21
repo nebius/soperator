@@ -6269,7 +6269,7 @@
           "uid": "${datasource}"
         },
         "definition": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
-        "description": "For GB platforms",
+        "description": "",
         "includeAll": true,
         "label": "Nodeset",
         "multi": true,
