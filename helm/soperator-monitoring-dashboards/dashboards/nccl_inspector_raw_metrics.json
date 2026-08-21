@@ -115,7 +115,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "nccl_algorithm_bandwidth_gbs{hostname=~\"$hostname\", slurm_job_id=~\"$jobid\"}",
+          "expr": "nccl_algorithm_bandwidth_gbs{cluster=~\"$cluster\", hostname=~\"$hostname\", slurm_job_id=~\"$jobid\"}",
           "interval": "100ms",
           "legendFormat": "{{slurm_job_id}}.{{slurm_step_id}} | {{hostname}} [{{hostname_pid}}] / {{n_nodes}} | {{collective}} | R {{rank}}/{{nranks}} | {{message_size_bytes}} B | {{comm_id}}",
           "range": true,
@@ -221,7 +221,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "nccl_bus_bandwidth_gbs{hostname=~\"$hostname\", slurm_job_id=~\"$jobid\"}",
+          "expr": "nccl_bus_bandwidth_gbs{cluster=~\"$cluster\", hostname=~\"$hostname\", slurm_job_id=~\"$jobid\"}",
           "interval": "100ms",
           "legendFormat": "{{slurm_job_id}}.{{slurm_step_id}} | {{hostname}} [{{hostname_pid}}] / {{n_nodes}} | {{collective}} | R {{rank}}/{{nranks}} | {{message_size_bytes}} B | {{comm_id}}",
           "range": true,
@@ -327,7 +327,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "nccl_collective_exec_time_microseconds{hostname=~\"$hostname\", slurm_job_id=~\"$jobid\"}",
+          "expr": "nccl_collective_exec_time_microseconds{cluster=~\"$cluster\", hostname=~\"$hostname\", slurm_job_id=~\"$jobid\"}",
           "interval": "100ms",
           "legendFormat": "{{slurm_job_id}}.{{slurm_step_id}} | {{hostname}} [{{hostname_pid}}] / {{n_nodes}} | {{collective}} | R {{rank}}/{{nranks}} | {{message_size_bytes}} B | {{comm_id}}",
           "range": true,
@@ -433,7 +433,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "nccl_message_size_bytes{hostname=~\"$hostname\", slurm_job_id=~\"$jobid\"}",
+          "expr": "nccl_message_size_bytes{cluster=~\"$cluster\", hostname=~\"$hostname\", slurm_job_id=~\"$jobid\"}",
           "interval": "100ms",
           "legendFormat": "{{slurm_job_id}}.{{slurm_step_id}} | {{hostname}} [{{hostname_pid}}] / {{n_nodes}} | {{collective}} | R {{rank}}/{{nranks}} | {{message_size_bytes}} B | {{comm_id}}",
           "range": true,
@@ -473,6 +473,46 @@
         "type": "datasource"
       },
       {
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "filters": [],
+        "hide": 2,
+        "label": "O11y",
+        "name": "o11y",
+        "type": "adhoc"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(node_os_info, cluster)",
+        "hide": 2,
+        "includeAll": true,
+        "label": "Cluster",
+        "multi": false,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(node_os_info, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
         "allowCustomValue": false,
         "current": {
           "text": [
@@ -486,7 +526,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values({__name__=~\"nccl.*\", slurm_job_id!=\"\"}, slurm_job_id)",
+        "definition": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", slurm_job_id!=\"\"}, slurm_job_id)",
         "includeAll": true,
         "allValue": ".*",
         "label": "Slurm Job ID",
@@ -495,7 +535,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values({__name__=~\"nccl.*\", slurm_job_id!=\"\"}, slurm_job_id)",
+          "query": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", slurm_job_id!=\"\"}, slurm_job_id)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -516,7 +556,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values({__name__=~\"nccl.*\", hostname!=\"\"}, hostname)",
+        "definition": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", hostname!=\"\"}, hostname)",
         "includeAll": true,
         "allValue": ".*",
         "label": "Worker",
@@ -525,7 +565,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values({__name__=~\"nccl.*\", hostname!=\"\"}, hostname)",
+          "query": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", hostname!=\"\"}, hostname)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,

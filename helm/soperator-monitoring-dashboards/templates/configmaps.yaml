@@ -1,7 +1,10 @@
 {{- $namePrefix := include "soperator-monitoring-dashboards.namePrefix" . -}}
 {{- range $path, $file := .Files.Glob "dashboards/*.json" }}
+{{- $dashboard := mustFromJson (toString $file) -}}
+{{- include "soperator-monitoring-dashboards.validateDashboardPortability" (dict "path" $path "dashboard" $dashboard) -}}
 {{- $dashboardName := include "soperator-monitoring-dashboards.dashboardName" $path -}}
 {{- $cmName := include "soperator-monitoring-dashboards.cmName" (dict "namePrefix" $namePrefix "dashboardName" $dashboardName) -}}
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -18,5 +21,4 @@ metadata:
 data:
   {{ printf "%s.json" $dashboardName }}: |
     {{- toString $file | nindent 4 }}
----
 {{- end }}

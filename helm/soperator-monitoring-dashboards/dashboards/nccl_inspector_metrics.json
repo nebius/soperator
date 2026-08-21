@@ -132,7 +132,7 @@
           "disableTextWrap": false,
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "nccl_algorithm_bandwidth_gbs{rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"}",
+          "expr": "nccl_algorithm_bandwidth_gbs{cluster=~\"$cluster\", rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"}",
           "format": "time_series",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
@@ -259,7 +259,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "nccl_bus_bandwidth_gbs{rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"${collective}\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"}",
+          "expr": "nccl_bus_bandwidth_gbs{cluster=~\"$cluster\", rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"${collective}\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": true,
@@ -346,7 +346,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "nccl_bus_bandwidth_gbs{rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"}",
+          "expr": "nccl_bus_bandwidth_gbs{cluster=~\"$cluster\", rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": true,
@@ -443,7 +443,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "nccl_bus_bandwidth_gbs{rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"}",
+          "expr": "nccl_bus_bandwidth_gbs{cluster=~\"$cluster\", rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"}",
           "format": "time_series",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
@@ -568,7 +568,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "nccl_collective_exec_time_microseconds{rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"} < 50000",
+          "expr": "nccl_collective_exec_time_microseconds{cluster=~\"$cluster\", rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"} < 50000",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": true,
@@ -653,7 +653,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "nccl_collective_exec_time_microseconds{rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"} < 50000",
+          "expr": "nccl_collective_exec_time_microseconds{cluster=~\"$cluster\", rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"} < 50000",
           "format": "time_series",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
@@ -739,7 +739,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "nccl_collective_exec_time_microseconds{rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"} < 50000",
+          "expr": "nccl_collective_exec_time_microseconds{cluster=~\"$cluster\", rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"} < 50000",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": true,
@@ -845,7 +845,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "nccl_collective_exec_time_microseconds{rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"} > 50000",
+          "expr": "nccl_collective_exec_time_microseconds{cluster=~\"$cluster\", rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"} > 50000",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": true,
@@ -968,7 +968,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "nccl_message_size_bytes{rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"}",
+          "expr": "nccl_message_size_bytes{cluster=~\"$cluster\", rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": true,
@@ -1090,7 +1090,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "nccl_collective_sequence_number{rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"}",
+          "expr": "nccl_collective_sequence_number{cluster=~\"$cluster\", rank=~\"${rank}\", nranks=~\"${n_ranks}\", collective=~\"$collective\", slurm_job_id=~\"$jobid\", hostname=~\"$hostname\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": true,
@@ -1133,6 +1133,46 @@
         "type": "datasource"
       },
       {
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "filters": [],
+        "hide": 2,
+        "label": "O11y",
+        "name": "o11y",
+        "type": "adhoc"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(node_os_info, cluster)",
+        "hide": 2,
+        "includeAll": true,
+        "label": "Cluster",
+        "multi": false,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(node_os_info, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
         "allValue": ".*",
         "current": {
           "text": "All",
@@ -1142,14 +1182,14 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values({__name__=~\"nccl.*\", rank!=\"\"}, rank)",
+        "definition": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", rank!=\"\"}, rank)",
         "includeAll": true,
         "label": "Rank",
         "name": "rank",
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values({__name__=~\"nccl.*\", rank!=\"\"}, rank)",
+          "query": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", rank!=\"\"}, rank)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1167,14 +1207,14 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values({__name__=~\"nccl.*\", nranks!=\"\"}, nranks)",
+        "definition": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", nranks!=\"\"}, nranks)",
         "includeAll": true,
         "label": "N Ranks",
         "name": "n_ranks",
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values({__name__=~\"nccl.*\", nranks!=\"\"}, nranks)",
+          "query": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", nranks!=\"\"}, nranks)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1192,14 +1232,14 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values({__name__=~\"nccl.*\", collective!=\"\"}, collective)",
+        "definition": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", collective!=\"\"}, collective)",
         "includeAll": true,
         "label": "Collective",
         "name": "collective",
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values({__name__=~\"nccl.*\", collective!=\"\"}, collective)",
+          "query": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", collective!=\"\"}, collective)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1220,7 +1260,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values({__name__=~\"nccl.*\", slurm_job_id!=\"\"}, slurm_job_id)",
+        "definition": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", slurm_job_id!=\"\"}, slurm_job_id)",
         "includeAll": true,
         "allValue": ".*",
         "label": "Slurm Job ID",
@@ -1229,7 +1269,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values({__name__=~\"nccl.*\", slurm_job_id!=\"\"}, slurm_job_id)",
+          "query": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", slurm_job_id!=\"\"}, slurm_job_id)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1249,7 +1289,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values({__name__=~\"nccl.*\", hostname!=\"\"}, hostname)",
+        "definition": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", hostname!=\"\"}, hostname)",
         "includeAll": true,
         "allValue": ".*",
         "label": "Worker",
@@ -1258,7 +1298,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values({__name__=~\"nccl.*\", hostname!=\"\"}, hostname)",
+          "query": "label_values({cluster=~\"$cluster\", __name__=~\"nccl.*\", hostname!=\"\"}, hostname)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,

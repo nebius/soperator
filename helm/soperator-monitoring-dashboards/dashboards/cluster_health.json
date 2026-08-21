@@ -124,7 +124,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "group(\n    kube_customresource_slurmcluster_info{\n        cr_version!=\"\"\n    }\n) by(cr_version)\n",
+          "expr": "group(\n    kube_customresource_slurmcluster_info{cluster=~\"$cluster\", \n        cr_version!=\"\"\n    }\n) by(cr_version)\n",
           "instant": true,
           "legendFormat": "{{version}}",
           "range": false,
@@ -193,7 +193,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  cadvisor_version_info{}\n) by(iam_project_id)",
+          "expr": "count(\n  cadvisor_version_info{cluster=~\"$cluster\"}\n) by(iam_project_id)",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -262,7 +262,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "group(\n    kube_node_labels{label_nebius_com_gpu_name!=\"\"}\n) by (label_nebius_com_gpu_name)",
+          "expr": "group(\n    kube_node_labels{cluster=~\"$cluster\", label_nebius_com_gpu_name!=\"\"}\n) by (label_nebius_com_gpu_name)",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -326,7 +326,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  slurm_node_info{\n}\n) by()",
+          "expr": "count(\n  slurm_node_info{cluster=~\"$cluster\"\n}\n) by()",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -396,7 +396,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "(\n  tlast_change_over_time(\n    (\n      group(\n        kube_customresource_slurmcluster_info{\n          cr_version!=\"\"\n        }\n      ) by(cr_version)\n    )[180d]\n  )\n    *\n  1000\n)\nand on(cr_version)\ngroup(\n  kube_customresource_slurmcluster_info{\n    cr_version!=\"\"\n  }\n) by(cr_version)",
+          "expr": "(\n  tlast_change_over_time(\n    (\n      group(\n        kube_customresource_slurmcluster_info{cluster=~\"$cluster\", \n          cr_version!=\"\"\n        }\n      ) by(cr_version)\n    )[180d]\n  )\n    *\n  1000\n)\nand on(cr_version)\ngroup(\n  kube_customresource_slurmcluster_info{cluster=~\"$cluster\", \n    cr_version!=\"\"\n  }\n) by(cr_version)",
           "instant": true,
           "legendFormat": "{{version}}",
           "range": false,
@@ -465,7 +465,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  cadvisor_version_info{}\n) by(mk8s_cluster_id)",
+          "expr": "count(\n  cadvisor_version_info{cluster=~\"$cluster\"}\n) by(mk8s_cluster_id)",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -529,7 +529,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  DCGM_FI_DEV_GPU_UTIL{\n    \n  }\n) by()",
+          "expr": "count(\n  DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n    \n  }\n) by()",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -592,7 +592,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  count(slurm_node_nvlink_instance_group) by (cluster, nvlink_instance_group)\n) by (cluster)",
+          "expr": "count(\n  count(slurm_node_nvlink_instance_group{cluster=~\"$cluster\"}) by (cluster, nvlink_instance_group)\n) by (cluster)",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -670,7 +670,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{\n        \n    }\n        >=\n    10\n)[1d:10m])\n/\nsum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{\n        \n    }\n)[1d:10m])\n* 100",
+          "expr": "sum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        \n    }\n        >=\n    10\n)[1d:10m])\n/\nsum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        \n    }\n)[1d:10m])\n* 100",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -745,7 +745,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(\n  (\n    count(\n      slurm_node_job{\n        \n      }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  1\n) by ()",
+          "expr": "avg(\n  (\n    count(\n      slurm_node_job{cluster=~\"$cluster\"\n        \n      }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{cluster=~\"$cluster\", \n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  1\n) by ()",
           "hide": false,
           "instant": false,
           "legendFormat": "__auto",
@@ -817,7 +817,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{\n    \n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      \n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"\n    \n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n      \n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "instant": false,
           "range": true,
@@ -881,7 +881,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n    slurm_node_info{\n        \n        state_base=~\"IDLE|MIXED|ALLOCATED\",\n        state_is_drain=\"false\"\n    }\n) by ()\n",
+          "expr": "count(\n    slurm_node_info{cluster=~\"$cluster\", \n        \n        state_base=~\"IDLE|MIXED|ALLOCATED\",\n        state_is_drain=\"false\"\n    }\n) by ()\n",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -946,7 +946,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "time() - kube_pod_created{\n  \n  namespace=~\"soperator\",\n  pod=~\"controller-[0-9]+\"\n}",
+          "expr": "time() - kube_pod_created{cluster=~\"$cluster\", \n  \n  namespace=~\"soperator\",\n  pod=~\"controller-[0-9]+\"\n}",
           "instant": true,
           "legendFormat": "{{pod}}",
           "range": false,
@@ -1019,7 +1019,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_avg(sum(increase(slurm_node_unavailability_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+          "expr": "histogram_avg(sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
           "hide": false,
           "range": true,
           "refId": "B",
@@ -1084,7 +1084,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{\n        \n    }\n        >=\n    10\n)[7d:1h])\n/\nsum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{\n           }\n)[7d:1h])\n* 100",
+          "expr": "sum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        \n    }\n        >=\n    10\n)[7d:1h])\n/\nsum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n           }\n)[7d:1h])\n* 100",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -1159,7 +1159,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(\n  sum_over_time(\n    (\n      slurm_job_info{\n        \n        slurm_partition${partition_match_exp},\n        job_state=\"RUNNING\"\n      }\n    )[1d:1m]\n  )\n    *\n  60\n) by ()",
+          "expr": "avg(\n  sum_over_time(\n    (\n      slurm_job_info{cluster=~\"$cluster\", \n        \n        slurm_partition${partition_match_exp},\n        job_state=\"RUNNING\"\n      }\n    )[1d:1m]\n  )\n    *\n  60\n) by ()",
           "hide": false,
           "instant": false,
           "legendFormat": "__auto",
@@ -1226,7 +1226,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "with (\n  filters = {}\n)\navg(\n  DCGM_FI_DEV_GPU_UTIL{filters}\n)",
+          "expr": "with (\n  filters = {}\n)\navg(\n  DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", filters}\n)",
           "instant": false,
           "range": true,
           "refId": "A",
@@ -1298,7 +1298,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n    slurm_node_info{\n        \n        state_base=~\"DOWN|ERROR\",\n        state_is_drain=\"true\"\n    }\n) by ()\n",
+          "expr": "count(\n    slurm_node_info{cluster=~\"$cluster\", \n        \n        state_base=~\"DOWN|ERROR\",\n        state_is_drain=\"true\"\n    }\n) by ()\n",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -1378,7 +1378,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(increase(max by(node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (slurm_node_fails_total{state_is_maintenance=\"false\", })[$__range]))",
+          "expr": "sum(increase(max by(node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (slurm_node_fails_total{cluster=~\"$cluster\", state_is_maintenance=\"false\", })[$__range]))",
           "format": "time_series",
           "instant": true,
           "intervalFactor": 2,
@@ -1452,7 +1452,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_avg(sum(increase(slurm_node_draining_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+          "expr": "histogram_avg(sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
           "hide": false,
           "range": true,
           "refId": "B",
@@ -1517,7 +1517,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "with (\n  filters = {}\n)\ncount(\n  slurm_job_info{\n    filters,\n    job_state=\"RUNNING\",\n    slurm_partition${partition_match_exp},\n  }\n)",
+          "expr": "with (\n  filters = {}\n)\ncount(\n  slurm_job_info{cluster=~\"$cluster\", \n    filters,\n    job_state=\"RUNNING\",\n    slurm_partition${partition_match_exp},\n  }\n)",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -1581,7 +1581,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  slurm_node_info{state_base=\"ALLOCATED\"}\n) by(cluster)",
+          "expr": "count(\n  slurm_node_info{cluster=~\"$cluster\", state_base=\"ALLOCATED\"}\n) by(cluster)",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -1651,7 +1651,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\n  sum (\n    increase(\n      sum by (node_name, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n        slurm_node_gpu_seconds_total{\n          \n          state_is_maintenance=\"false\",\n          state_base=~\".*\"\n        }\n      )[7d]\n    )\n  )\n  /\n  (\n    sum (\n      increase(\n        max by (node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n          slurm_node_fails_total{\n            \n            state_is_maintenance=\"false\"\n          }\n        )[7d]\n      )\n    )\n    or\n    (\n      sum (\n        increase(\n          slurm_node_gpu_seconds_total{\n            \n            state_is_maintenance=\"false\",\n            state_base=~\".*\"\n          }[7d]\n        )\n      ) * 0\n    )\n  )\n) / 3600",
+          "expr": "(\n  sum (\n    increase(\n      sum by (node_name, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n        slurm_node_gpu_seconds_total{cluster=~\"$cluster\", \n          \n          state_is_maintenance=\"false\",\n          state_base=~\".*\"\n        }\n      )[7d]\n    )\n  )\n  /\n  (\n    sum (\n      increase(\n        max by (node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n          slurm_node_fails_total{cluster=~\"$cluster\", \n            \n            state_is_maintenance=\"false\"\n          }\n        )[7d]\n      )\n    )\n    or\n    (\n      sum (\n        increase(\n          slurm_node_gpu_seconds_total{cluster=~\"$cluster\", \n            \n            state_is_maintenance=\"false\",\n            state_base=~\".*\"\n          }[7d]\n        )\n      ) * 0\n    )\n  )\n) / 3600",
           "format": "time_series",
           "instant": true,
           "intervalFactor": 2,
@@ -1764,7 +1764,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n        }\n      >=\n    10\n  ) by(cluster)\n    /\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n        }\n  ) by(cluster)\n)\n  *\n100",
+          "expr": "(\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n      >=\n    10\n  ) by(cluster)\n    /\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n  ) by(cluster)\n)\n  *\n100",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A",
@@ -1861,7 +1861,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\n  sum (\n    increase(\n      sum by (node_name, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n        slurm_node_gpu_seconds_total{\n          state_is_maintenance=\"false\",\n        }\n      )[7d]\n    )\n  )\n  /\n  (\n    sum (\n      increase(\n        max by (node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n          slurm_node_fails_total{\n            state_is_maintenance=\"false\"\n          }\n        )[7d]\n      )\n    )\n    or\n    (\n      sum (\n        increase(\n          slurm_node_gpu_seconds_total{\n            state_is_maintenance=\"false\",\n          }[7d]\n        )\n      ) * 0\n    )\n  )\n) / 36",
+          "expr": "(\n  sum (\n    increase(\n      sum by (node_name, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n        slurm_node_gpu_seconds_total{cluster=~\"$cluster\", \n          state_is_maintenance=\"false\",\n        }\n      )[7d]\n    )\n  )\n  /\n  (\n    sum (\n      increase(\n        max by (node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n          slurm_node_fails_total{cluster=~\"$cluster\", \n            state_is_maintenance=\"false\"\n          }\n        )[7d]\n      )\n    )\n    or\n    (\n      sum (\n        increase(\n          slurm_node_gpu_seconds_total{cluster=~\"$cluster\", \n            state_is_maintenance=\"false\",\n          }[7d]\n        )\n      ) * 0\n    )\n  )\n) / 36",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "MTBF",
@@ -2019,7 +2019,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(\n  DCGM_FI_DEV_POWER_USAGE{\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "max(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "legendFormat": "max",
           "range": true,
@@ -2033,7 +2033,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{\n      }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"\n      }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "legendFormat": "avg",
           "range": true,
@@ -2047,7 +2047,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "min(\n  DCGM_FI_DEV_POWER_USAGE{\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "min(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "legendFormat": "min",
           "range": true,
@@ -2144,7 +2144,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(\n  slurm_job_info{\n    slurm_partition${partition_match_exp},\n    job_state=\"PENDING\"\n  }\n) by(job_state_reason)",
+          "expr": "sum(\n  slurm_job_info{cluster=~\"$cluster\", \n    slurm_partition${partition_match_exp},\n    job_state=\"PENDING\"\n  }\n) by(job_state_reason)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A",
@@ -2302,7 +2302,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(\n  DCGM_FI_PROF_SM_ACTIVE\n)",
+          "expr": "max(\n  DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}\n)",
           "hide": false,
           "legendFormat": "max",
           "range": true,
@@ -2316,7 +2316,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(\n  DCGM_FI_PROF_SM_ACTIVE\n)",
+          "expr": "avg(\n  DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}\n)",
           "hide": false,
           "legendFormat": "avg",
           "range": true,
@@ -2330,7 +2330,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "min(\n  DCGM_FI_PROF_SM_ACTIVE\n)",
+          "expr": "min(\n  DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}\n)",
           "hide": false,
           "legendFormat": "min",
           "range": true,
@@ -2553,7 +2553,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Down",
@@ -2567,7 +2567,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Drained",
@@ -2581,7 +2581,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Draining",
@@ -2595,7 +2595,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain!=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain!=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Busy",
@@ -2609,7 +2609,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain!=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain!=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Idle",
@@ -2623,7 +2623,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_is_maintenance=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_is_maintenance=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Maintenance",
@@ -2637,7 +2637,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=\"UNKNOWN\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"UNKNOWN\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Unknown",
@@ -2741,7 +2741,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "with (\n  node_fails = sum by (node_name) (\n      # Down: Nodes in DOWN or ERROR state (not in maintenance)\n      count by (node_name) (slurm_node_info{state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 1 or\n      # Drained: IDLE nodes with drain flag (not in maintenance)\n      count by (node_name) (slurm_node_info{state_base=\"IDLE\", state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 2 or\n      # Draining: ALLOCATED/MIXED nodes with drain flag (not in maintenance)\n      count by (node_name) (slurm_node_info{state_base=~\"ALLOCATED|MIXED\", state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 3\n    )\n)\nnode_fails\nor\n(\n  # To show recovery as IDLE without drain state after failure\n  count by (node_name) (slurm_node_info{state_base=~\"IDLE\", state_is_drain=\"false\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 4\n  and\n  min_over_time(node_fails[15m:1m]) > 0\n)",
+              "expr": "with (\n  node_fails = sum by (node_name) (\n      # Down: Nodes in DOWN or ERROR state (not in maintenance)\n      count by (node_name) (slurm_node_info{cluster=~\"$cluster\", state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 1 or\n      # Drained: IDLE nodes with drain flag (not in maintenance)\n      count by (node_name) (slurm_node_info{cluster=~\"$cluster\", state_base=\"IDLE\", state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 2 or\n      # Draining: ALLOCATED/MIXED nodes with drain flag (not in maintenance)\n      count by (node_name) (slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 3\n    )\n)\nnode_fails\nor\n(\n  # To show recovery as IDLE without drain state after failure\n  count by (node_name) (slurm_node_info{cluster=~\"$cluster\", state_base=~\"IDLE\", state_is_drain=\"false\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 4\n  and\n  min_over_time(node_fails[15m:1m]) > 0\n)",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "__auto",
@@ -2905,7 +2905,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(1, sum(increase(slurm_node_unavailability_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(1, sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "max",
               "range": true,
@@ -2919,7 +2919,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_avg(sum(increase(slurm_node_unavailability_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+              "expr": "histogram_avg(sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "avg",
               "range": true,
@@ -2933,7 +2933,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(0, sum(increase(slurm_node_unavailability_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0, sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "min",
               "range": true,
@@ -3083,7 +3083,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(1, sum(increase(slurm_node_draining_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(1, sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "max",
               "range": true,
@@ -3097,7 +3097,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_avg(sum(increase(slurm_node_draining_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+              "expr": "histogram_avg(sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "avg",
               "range": true,
@@ -3111,7 +3111,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(0, sum(increase(slurm_node_draining_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0, sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "min",
               "range": true,
@@ -3333,7 +3333,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "with (\n  filters = {},\n  running_jobs = group(slurm_job_info{filters, job_state=~\"RUNNING\"}) by (job_id, job_name),\n  node_fails = (\n    # Get nodes with problems: DOWN/ERROR states or drain flag\n    slurm_node_info{filters, state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"} or\n    slurm_node_info{filters, state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"}\n  ),\n  node_fails_with_job_id = node_fails * on (node_name) group_left(job_id) slurm_node_job{filters}\n)\n(\n  node_fails_with_job_id\n  and on (job_id)\n  (\n      running_jobs offset -60m or running_jobs offset 60m\n  )\n)\nor\nnode_fails",
+              "expr": "with (\n  filters = {},\n  running_jobs = group(slurm_job_info{cluster=~\"$cluster\", filters, job_state=~\"RUNNING\"}) by (job_id, job_name),\n  node_fails = (\n    # Get nodes with problems: DOWN/ERROR states or drain flag\n    slurm_node_info{cluster=~\"$cluster\", filters, state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"} or\n    slurm_node_info{cluster=~\"$cluster\", filters, state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"}\n  ),\n  node_fails_with_job_id = node_fails * on (node_name) group_left(job_id) slurm_node_job{cluster=~\"$cluster\", filters}\n)\n(\n  node_fails_with_job_id\n  and on (job_id)\n  (\n      running_jobs offset -60m or running_jobs offset 60m\n  )\n)\nor\nnode_fails",
               "format": "table",
               "instant": false,
               "legendFormat": "__auto",
@@ -3879,7 +3879,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "with (\n  filters = {}\n)\n# Main job info\nslurm_job_info{\n  filters,\n  job_state=~\"RUNNING\", \n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}\n* on (job_id) group_left()\ncount by (job_id) (slurm_node_job{filters})",
+              "expr": "with (\n  filters = {}\n)\n# Main job info\nslurm_job_info{cluster=~\"$cluster\", \n  filters,\n  job_state=~\"RUNNING\", \n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}\n* on (job_id) group_left()\ncount by (job_id) (slurm_node_job{cluster=~\"$cluster\", filters})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -3894,7 +3894,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "with (\n  filters = {}\n)\n# Job duration\nmax by (job_id) (slurm_job_duration_seconds{filters})\n* on (job_id) group_left()\nslurm_job_info{\n  filters,\n  job_state=~\"RUNNING\", \n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}",
+              "expr": "with (\n  filters = {}\n)\n# Job duration\nmax by (job_id) (slurm_job_duration_seconds{cluster=~\"$cluster\", filters})\n* on (job_id) group_left()\nslurm_job_info{cluster=~\"$cluster\", \n  filters,\n  job_state=~\"RUNNING\", \n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}",
               "format": "table",
               "hide": false,
               "instant": true,
@@ -3909,7 +3909,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "with (\n  filters = {}\n)\n# GPU Util\navg(\n  label_move(\n    DCGM_FI_DEV_GPU_UTIL{filters}\n  , 'hpc_job','job_id')\n) by (job_id)\nand on (job_id)\nslurm_job_info{\n  filters,\n  job_state=\"RUNNING\",\n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}",
+              "expr": "with (\n  filters = {}\n)\n# GPU Util\navg(\n  label_move(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", filters}\n  , 'hpc_job','job_id')\n) by (job_id)\nand on (job_id)\nslurm_job_info{cluster=~\"$cluster\", \n  filters,\n  job_state=\"RUNNING\",\n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}",
               "format": "table",
               "hide": false,
               "instant": true,
@@ -3924,7 +3924,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "with (\n  filters = {}\n)\n# SM Util\navg(\n  label_move(\n    DCGM_FI_PROF_SM_ACTIVE{filters}\n  , 'hpc_job','job_id')\n) by (job_id)\nand on (job_id)\nslurm_job_info{\n  filters,\n  job_state=\"RUNNING\",\n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}",
+              "expr": "with (\n  filters = {}\n)\n# SM Util\navg(\n  label_move(\n    DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\", filters}\n  , 'hpc_job','job_id')\n) by (job_id)\nand on (job_id)\nslurm_job_info{cluster=~\"$cluster\", \n  filters,\n  job_state=\"RUNNING\",\n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}",
               "format": "table",
               "hide": false,
               "instant": true,
@@ -4196,7 +4196,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "(\n  sum(\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp},\n      job_state=~\"COMPLETED\"\n    }\n      and on(job_id)\n    (\n      count(\n        slurm_node_job{ }\n      ) by(job_id)\n        >=\n      0\n    )\n  ) by (cluster)\n    /\n  sum(\n    slurm_job_info{\n      slurm_partition${partition_match_exp},\n      job_state=~\"COMPLETED|FAILED|CANCELLED|TIMEOUT|DEADLINE\",\n    }\n      and on(job_id)\n    (\n      count(\n        slurm_node_job{ }\n      ) by(job_id)\n        >=\n      0\n    )\n  ) by (cluster)\n) \n  *\n100",
+              "expr": "(\n  sum(\n    slurm_job_info{cluster=~\"$cluster\", \n      \n      slurm_partition${partition_match_exp},\n      job_state=~\"COMPLETED\"\n    }\n      and on(job_id)\n    (\n      count(\n        slurm_node_job{cluster=~\"$cluster\" }\n      ) by(job_id)\n        >=\n      0\n    )\n  ) by (cluster)\n    /\n  sum(\n    slurm_job_info{cluster=~\"$cluster\", \n      slurm_partition${partition_match_exp},\n      job_state=~\"COMPLETED|FAILED|CANCELLED|TIMEOUT|DEADLINE\",\n    }\n      and on(job_id)\n    (\n      count(\n        slurm_node_job{cluster=~\"$cluster\" }\n      ) by(job_id)\n        >=\n      0\n    )\n  ) by (cluster)\n) \n  *\n100",
               "hide": false,
               "legendFormat": "__auto",
               "range": true,
@@ -4349,7 +4349,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(\n  (\n    count(\n      slurm_node_job{\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  0\n) by()",
+              "expr": "max(\n  (\n    count(\n      slurm_node_job{cluster=~\"$cluster\"\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{cluster=~\"$cluster\", \n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  0\n) by()",
               "hide": false,
               "legendFormat": "max",
               "range": true,
@@ -4363,7 +4363,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "avg(\n  (\n    count(\n      slurm_node_job{\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  0\n) by()",
+              "expr": "avg(\n  (\n    count(\n      slurm_node_job{cluster=~\"$cluster\"\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{cluster=~\"$cluster\", \n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  0\n) by()",
               "hide": false,
               "legendFormat": "avg",
               "range": true,
@@ -4377,7 +4377,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "min(\n  (\n    count(\n      slurm_node_job{\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  0\n) by()",
+              "expr": "min(\n  (\n    count(\n      slurm_node_job{cluster=~\"$cluster\"\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{cluster=~\"$cluster\", \n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  0\n) by()",
               "hide": false,
               "legendFormat": "min",
               "range": true,
@@ -4530,7 +4530,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(\n  slurm_job_duration_seconds\n  and on(job_id)\n  slurm_job_info{slurm_partition${partition_match_exp} }\n)",
+              "expr": "max(\n  slurm_job_duration_seconds{cluster=~\"$cluster\"}\n  and on(job_id)\n  slurm_job_info{cluster=~\"$cluster\", slurm_partition${partition_match_exp} }\n)",
               "hide": false,
               "legendFormat": "max",
               "range": true,
@@ -4544,7 +4544,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "avg(\n  slurm_job_duration_seconds{ }\n    and on(job_id)\n  slurm_job_info{slurm_partition${partition_match_exp} }\n)",
+              "expr": "avg(\n  slurm_job_duration_seconds{cluster=~\"$cluster\" }\n    and on(job_id)\n  slurm_job_info{cluster=~\"$cluster\", slurm_partition${partition_match_exp} }\n)",
               "hide": false,
               "legendFormat": "avg",
               "range": true,
@@ -4558,7 +4558,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "min(\n  slurm_job_duration_seconds{ }\n    and on(job_id)\n  slurm_job_info{slurm_partition${partition_match_exp} }\n)",
+              "expr": "min(\n  slurm_job_duration_seconds{cluster=~\"$cluster\" }\n    and on(job_id)\n  slurm_job_info{cluster=~\"$cluster\", slurm_partition${partition_match_exp} }\n)",
               "hide": false,
               "legendFormat": "min",
               "range": true,
@@ -4638,7 +4638,7 @@
             {
               "editorMode": "code",
               "exemplar": false,
-              "expr": "histogram(\n    count(slurm_node_job) by (job_id)\n    and on(job_id)\n    slurm_job_info{\n      slurm_partition${partition_match_exp}\n    }\n)",
+              "expr": "histogram(\n    count(slurm_node_job{cluster=~\"$cluster\"}) by (job_id)\n    and on(job_id)\n    slurm_job_info{cluster=~\"$cluster\", \n      slurm_partition${partition_match_exp}\n    }\n)",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -4734,7 +4734,7 @@
               "disableTextWrap": false,
               "editorMode": "code",
               "exemplar": false,
-              "expr": "floor(\n    avg_over_time(\n  (\n    (\n      (\n        round((count(DCGM_FI_DEV_FB_USED{hpc_job!=\"\"} > 2) by(hpc_job) / 8) > 2)\n          -\n        round(\n          (count(DCGM_FI_DEV_POWER_USAGE{hpc_job!=\"\"} > 120) by(hpc_job) / 8)\n            >\n          2\n        )\n      )\n        /\n      round((count(DCGM_FI_DEV_FB_USED{hpc_job!=\"\", } > 2) by(hpc_job) / 8) > 2)\n    )\n      *\n    100\n  )[1h:1m]\n) >=  70\n)\n  and on(hpc_job)\nlabel_move(slurm_job_info{job_state=\"RUNNING\"}, 'job_id', 'hpc_job')\nand on (hpc_job)\ncount_over_time( #filter out short durations\navg_over_time((\n  (\n    (\n      (\n        round((count(DCGM_FI_DEV_FB_USED{hpc_job!=\"\"} > 2) by(hpc_job) / 8) > 2)\n          -\n        round(\n          (count(DCGM_FI_DEV_POWER_USAGE{hpc_job!=\"\"} > 120) by(hpc_job) / 8)\n            >\n          2\n        )\n      )\n        /\n      round((count(DCGM_FI_DEV_FB_USED{hpc_job!=\"\"} > 2) by(hpc_job) / 8) > 2)\n    )\n      *\n    100\n  )[1h:1m]\n) > 70\n  and on(hpc_job)\nlabel_move(slurm_job_info{job_state=\"RUNNING\"}, 'job_id', 'hpc_job')\n)[1h:1m]\n) > 20",
+              "expr": "floor(\n    avg_over_time(\n  (\n    (\n      (\n        round((count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", hpc_job!=\"\"} > 2) by(hpc_job) / 8) > 2)\n          -\n        round(\n          (count(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\", hpc_job!=\"\"} > 120) by(hpc_job) / 8)\n            >\n          2\n        )\n      )\n        /\n      round((count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", hpc_job!=\"\", } > 2) by(hpc_job) / 8) > 2)\n    )\n      *\n    100\n  )[1h:1m]\n) >=  70\n)\n  and on(hpc_job)\nlabel_move(slurm_job_info{cluster=~\"$cluster\", job_state=\"RUNNING\"}, 'job_id', 'hpc_job')\nand on (hpc_job)\ncount_over_time( #filter out short durations\navg_over_time((\n  (\n    (\n      (\n        round((count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", hpc_job!=\"\"} > 2) by(hpc_job) / 8) > 2)\n          -\n        round(\n          (count(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\", hpc_job!=\"\"} > 120) by(hpc_job) / 8)\n            >\n          2\n        )\n      )\n        /\n      round((count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", hpc_job!=\"\"} > 2) by(hpc_job) / 8) > 2)\n    )\n      *\n    100\n  )[1h:1m]\n) > 70\n  and on(hpc_job)\nlabel_move(slurm_job_info{cluster=~\"$cluster\", job_state=\"RUNNING\"}, 'job_id', 'hpc_job')\n)[1h:1m]\n) > 20",
               "format": "time_series",
               "fullMetaSearch": false,
               "hide": false,
@@ -4932,7 +4932,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "with (\n    filters = {slurm_partition${partition_match_exp}},\n)\nsum by (job_id,)(\n  count by (job_id, job_name) (slurm_job_info{job_state=\"PENDING\", filters}) * 1 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"CONFIGURING\",filters}) * 2 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"RUNNING\", filters}) * 3 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"COMPLETING\", filters}) * 4 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"COMPLETED\", filters}) * 5 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"CANCELLED\", filters}) * 6 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"FAILED\", filters}) * 7 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"TIMEOUT\", filters}) * 8 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"PREEMPTED\", filters}) * 9 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"NODE_FAIL\", filters}) * 10 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"BOOT_FAIL\", filters}) * 11 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"DEADLINE\", filters}) * 12 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"OUT_OF_MEMORY\", filters}) * 13 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"REQUEUED\", filters}) * 14 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"RESIZING\", filters}) * 15 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"SUSPENDED\", filters}) * 16 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"STOPPED\", filters}) * 17 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"POWER_UP_NODE\", filters}) * 18 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"SIGNALING\", filters}) * 19 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"STAGE_OUT\", filters}) * 20 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"UPDATE_DB\", filters}) * 21\n)",
+              "expr": "with (\n    filters = {slurm_partition${partition_match_exp}},\n)\nsum by (job_id,)(\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"PENDING\", filters}) * 1 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"CONFIGURING\",filters}) * 2 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"RUNNING\", filters}) * 3 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"COMPLETING\", filters}) * 4 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"COMPLETED\", filters}) * 5 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"CANCELLED\", filters}) * 6 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"FAILED\", filters}) * 7 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"TIMEOUT\", filters}) * 8 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"PREEMPTED\", filters}) * 9 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"NODE_FAIL\", filters}) * 10 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"BOOT_FAIL\", filters}) * 11 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"DEADLINE\", filters}) * 12 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"OUT_OF_MEMORY\", filters}) * 13 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"REQUEUED\", filters}) * 14 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"RESIZING\", filters}) * 15 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"SUSPENDED\", filters}) * 16 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"STOPPED\", filters}) * 17 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"POWER_UP_NODE\", filters}) * 18 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"SIGNALING\", filters}) * 19 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"STAGE_OUT\", filters}) * 20 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"UPDATE_DB\", filters}) * 21\n)",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{job_id}}",
@@ -5039,7 +5039,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count by(job_state) (slurm_job_info{user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
+              "expr": "count by(job_state) (slurm_job_info{cluster=~\"$cluster\", user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{job_state}}",
@@ -5146,7 +5146,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count by(slurm_partition) (slurm_job_info{job_state=\"RUNNING\", user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
+              "expr": "count by(slurm_partition) (slurm_job_info{cluster=~\"$cluster\", job_state=\"RUNNING\", user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{slurm_partition}}",
@@ -5407,7 +5407,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "with (\n  filters = {}\n)\nslurm_job_info{\n  filters,\n  job_state=~\"COMPLETED|CANCELLED|FAILED|TIMEOUT\", \n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}\n* on (job_id) group_left()\ncount by (job_id) (slurm_node_job{filters}) ",
+              "expr": "with (\n  filters = {}\n)\nslurm_job_info{cluster=~\"$cluster\", \n  filters,\n  job_state=~\"COMPLETED|CANCELLED|FAILED|TIMEOUT\", \n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}\n* on (job_id) group_left()\ncount by (job_id) (slurm_node_job{cluster=~\"$cluster\", filters}) ",
               "format": "table",
               "instant": false,
               "range": true,
@@ -5740,7 +5740,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count by(user_name) (slurm_job_info{job_state=\"RUNNING\", user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
+              "expr": "count by(user_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"RUNNING\", user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{user_name}}",
@@ -5846,7 +5846,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count by(user_name) (slurm_job_info{user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
+              "expr": "count by(user_name) (slurm_job_info{cluster=~\"$cluster\", user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{user_name}}",
@@ -5948,7 +5948,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "with (\n  filters = {}\n)\navg(\n  label_move(DCGM_FI_DEV_GPU_UTIL{filters, hpc_job!=\"\"}, 'hpc_job','job_id')\n  * on (job_id) group_left(user_name)\n  slurm_job_info{\n    filters,\n    job_state=\"RUNNING\",\n    user_name=~\"$user_name\", \n    slurm_partition${partition_match_exp}\n  }\n) by (user_name)",
+              "expr": "with (\n  filters = {}\n)\navg(\n  label_move(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", filters, hpc_job!=\"\"}, 'hpc_job','job_id')\n  * on (job_id) group_left(user_name)\n  slurm_job_info{cluster=~\"$cluster\", \n    filters,\n    job_state=\"RUNNING\",\n    user_name=~\"$user_name\", \n    slurm_partition${partition_match_exp}\n  }\n) by (user_name)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "__auto",
@@ -6074,7 +6074,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "count(\n    count(\n        slurm_job_info{\n            \n            slurm_partition${partition_match_exp}\n        }\n    ) by (user_name)\n) by ()",
+              "expr": "count(\n    count(\n        slurm_job_info{cluster=~\"$cluster\", \n            \n            slurm_partition${partition_match_exp}\n        }\n    ) by (user_name)\n) by ()",
               "legendFormat": "count",
               "range": true,
               "refId": "A",
@@ -6174,7 +6174,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "with (\n  filters = {}\n)\ncount(\n  slurm_node_job{filters}\n  * on (job_id) group_left(user_name)\n  slurm_job_info{\n    filters,\n    job_state=\"RUNNING\",\n    user_name=~\"$user_name\", \n    slurm_partition${partition_match_exp}\n  }\n) by (user_name)",
+              "expr": "with (\n  filters = {}\n)\ncount(\n  slurm_node_job{cluster=~\"$cluster\", filters}\n  * on (job_id) group_left(user_name)\n  slurm_job_info{cluster=~\"$cluster\", \n    filters,\n    job_state=\"RUNNING\",\n    user_name=~\"$user_name\", \n    slurm_partition${partition_match_exp}\n  }\n) by (user_name)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "__auto",
@@ -6218,6 +6218,46 @@
         "type": "datasource"
       },
       {
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "filters": [],
+        "hide": 2,
+        "label": "O11y",
+        "name": "o11y",
+        "type": "adhoc"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(node_os_info, cluster)",
+        "hide": 2,
+        "includeAll": true,
+        "label": "Cluster",
+        "multi": false,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(node_os_info, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
         "allValue": ".*",
         "allowCustomValue": false,
         "current": {
@@ -6228,7 +6268,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(slurm_node_info,nodeset_name)",
+        "definition": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
         "description": "For GB platforms",
         "includeAll": true,
         "label": "Nodeset",
@@ -6237,7 +6277,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(slurm_node_info,nodeset_name)",
+          "query": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -6255,7 +6295,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(slurm_node_info{nodeset_name=~\"$nodeset\"}, node_name)",
+        "definition": "label_values(slurm_node_info{cluster=~\"$cluster\", nodeset_name=~\"$nodeset\"}, node_name)",
         "description": "",
         "includeAll": true,
         "label": "Worker Node",
@@ -6264,7 +6304,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(slurm_node_info{nodeset_name=~\"$nodeset\"}, node_name)",
+          "query": "label_values(slurm_node_info{cluster=~\"$cluster\", nodeset_name=~\"$nodeset\"}, node_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -6285,7 +6325,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(slurm_job_info,user_name)",
+        "definition": "label_values(slurm_job_info{cluster=~\"$cluster\"},user_name)",
         "description": "",
         "includeAll": true,
         "label": "Job Username",
@@ -6294,7 +6334,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(slurm_job_info,user_name)",
+          "query": "label_values(slurm_job_info{cluster=~\"$cluster\"},user_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,

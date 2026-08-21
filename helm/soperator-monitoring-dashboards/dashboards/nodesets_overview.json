@@ -129,7 +129,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  count(slurm_node_nvlink_instance_group) by (cluster, nvlink_instance_group)\n) by (cluster)",
+          "expr": "count(\n  count(slurm_node_nvlink_instance_group{cluster=~\"$cluster\"}) by (cluster, nvlink_instance_group)\n) by (cluster)",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -193,7 +193,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  slurm_node_info\n) by()",
+          "expr": "count(\n  slurm_node_info{cluster=~\"$cluster\"}\n) by()",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -256,7 +256,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  DCGM_FI_DEV_GPU_UTIL\n) by()",
+          "expr": "count(\n  DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"}\n) by()",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -325,7 +325,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "group(\n    kube_node_labels{label_nebius_com_gpu_name!=\"\", label_topology_nebius_com_nvl_instance_group_id!=\"\"}\n) by (label_nebius_com_gpu_name)",
+          "expr": "group(\n    kube_node_labels{cluster=~\"$cluster\", label_nebius_com_gpu_name!=\"\", label_topology_nebius_com_nvl_instance_group_id!=\"\"}\n) by (label_nebius_com_gpu_name)",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -449,7 +449,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "group (slurm_node_info) by (node_name, nodeset_name, state_base, state_is_maintenance, state_is_not_responding, reason)",
+          "expr": "group (slurm_node_info{cluster=~\"$cluster\"}) by (node_name, nodeset_name, state_base, state_is_maintenance, state_is_not_responding, reason)",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -464,7 +464,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "group (slurm_node_nvlink_instance_group) by (node_name, nodeset_name, nvlink_instance_group, instance_id)",
+          "expr": "group (slurm_node_nvlink_instance_group{cluster=~\"$cluster\"}) by (node_name, nodeset_name, nvlink_instance_group, instance_id)",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -670,7 +670,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "WITH (\n    nodes = count by (nodeset_name, node_name) (\n        slurm_node_info{\n            nodeset_name=~\"$nodeset\"\n        }\n    ),\n\n    healthy = count by (nodeset_name, node_name) (\n        slurm_node_info{\n            state_base=~\"IDLE|ALLOCATED\",\n            state_is_maintenance!=\"true\",\n            state_is_not_responding!=\"true\",\n            nodeset_name=~\"$nodeset\"\n        }\n    ),\n\n    total_nodes = count(nodes) by (nodeset_name),\n\n    healthy_nodes = count(healthy) by (nodeset_name)\n)\n\n2\n+ (healthy_nodes > bool 0)\n- 2 * (healthy_nodes == bool total_nodes)",
+          "expr": "WITH (\n    nodes = count by (nodeset_name, node_name) (\n        slurm_node_info{cluster=~\"$cluster\", \n            nodeset_name=~\"$nodeset\"\n        }\n    ),\n\n    healthy = count by (nodeset_name, node_name) (\n        slurm_node_info{cluster=~\"$cluster\", \n            state_base=~\"IDLE|ALLOCATED\",\n            state_is_maintenance!=\"true\",\n            state_is_not_responding!=\"true\",\n            nodeset_name=~\"$nodeset\"\n        }\n    ),\n\n    total_nodes = count(nodes) by (nodeset_name),\n\n    healthy_nodes = count(healthy) by (nodeset_name)\n)\n\n2\n+ (healthy_nodes > bool 0)\n- 2 * (healthy_nodes == bool total_nodes)",
           "hide": false,
           "instant": true,
           "legendFormat": "__auto",
@@ -768,7 +768,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "WITH (\n    nodes = count by (nodeset_name, node_name) (\n        slurm_node_info{\n            nodeset_name=~\"$nodeset\"\n        }\n    ),\n\n    healthy = count by (nodeset_name, node_name) (\n        slurm_node_info{\n            state_base=~\"IDLE|ALLOCATED\",\n            state_is_maintenance!=\"true\",\n            state_is_not_responding!=\"true\",\n            nodeset_name=~\"$nodeset\"\n        }\n    ),\n\n    total_nodes = count(nodes) by (nodeset_name),\n\n    healthy_nodes = (\n        count(healthy) by (nodeset_name)\n        or 0 * total_nodes\n    )\n)\n\n2\n+ (healthy_nodes > bool 0)\n- 2 * (healthy_nodes == bool total_nodes)",
+          "expr": "WITH (\n    nodes = count by (nodeset_name, node_name) (\n        slurm_node_info{cluster=~\"$cluster\", \n            nodeset_name=~\"$nodeset\"\n        }\n    ),\n\n    healthy = count by (nodeset_name, node_name) (\n        slurm_node_info{cluster=~\"$cluster\", \n            state_base=~\"IDLE|ALLOCATED\",\n            state_is_maintenance!=\"true\",\n            state_is_not_responding!=\"true\",\n            nodeset_name=~\"$nodeset\"\n        }\n    ),\n\n    total_nodes = count(nodes) by (nodeset_name),\n\n    healthy_nodes = (\n        count(healthy) by (nodeset_name)\n        or 0 * total_nodes\n    )\n)\n\n2\n+ (healthy_nodes > bool 0)\n- 2 * (healthy_nodes == bool total_nodes)",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "{{nodeset_name}}",
@@ -881,7 +881,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$nodeset\"\n    }\n      >=\n    10\n  ) by(cluster)\n    /\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$nodeset\"\n    }\n  ) by(cluster)\n)\n  *\n100",
+          "expr": "(\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", \n      slurm_nodeset_name=~\"$nodeset\"\n    }\n      >=\n    10\n  ) by(cluster)\n    /\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", \n      slurm_nodeset_name=~\"$nodeset\"\n    }\n  ) by(cluster)\n)\n  *\n100",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A",
@@ -1037,7 +1037,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(\n  DCGM_FI_DEV_POWER_USAGE{\n      slurm_nodeset_name=~\"$nodeset\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$nodeset\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "max(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\", \n      slurm_nodeset_name=~\"$nodeset\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", \n      slurm_nodeset_name=~\"$nodeset\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "legendFormat": "max",
           "range": true,
@@ -1051,7 +1051,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{\n    slurm_nodeset_name=~\"$nodeset\"\n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$nodeset\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\", \n    slurm_nodeset_name=~\"$nodeset\"\n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", \n      slurm_nodeset_name=~\"$nodeset\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "legendFormat": "avg",
           "range": true,
@@ -1065,7 +1065,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "min(\n  DCGM_FI_DEV_POWER_USAGE{\n    slurm_nodeset_name=~\"$nodeset\"\n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$nodeset\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "min(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\", \n    slurm_nodeset_name=~\"$nodeset\"\n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", \n      slurm_nodeset_name=~\"$nodeset\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "legendFormat": "min",
           "range": true,
@@ -1170,7 +1170,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "# Healthy\ncount by (nodeset_name, node_name) (\n    slurm_node_info{\n        state_base=~\"IDLE|ALLOCATED\",\n        state_is_maintenance!=\"true\",\n        state_is_not_responding!=\"true\",\n        node_name=~\"$node_name\",\n        nodeset_name=~\"$nodeset\"\n    }\n) * 1\nOR\n# Down\ncount by (nodeset_name, node_name) (\n    slurm_node_info{\n        state_is_not_responding=\"true\",\n        state_is_maintenance!=\"true\",\n        node_name=~\"$node_name\",\n        nodeset_name=~\"$nodeset\"\n    }\n) * 2\nOR\n# Maintenance\ncount by (nodeset_name, node_name) (\n    slurm_node_info{\n        state_is_maintenance=\"true\",\n        node_name=~\"$node_name\",\n        nodeset_name=~\"$nodeset\"\n    }\n) * 3",
+          "expr": "# Healthy\ncount by (nodeset_name, node_name) (\n    slurm_node_info{cluster=~\"$cluster\", \n        state_base=~\"IDLE|ALLOCATED\",\n        state_is_maintenance!=\"true\",\n        state_is_not_responding!=\"true\",\n        node_name=~\"$node_name\",\n        nodeset_name=~\"$nodeset\"\n    }\n) * 1\nOR\n# Down\ncount by (nodeset_name, node_name) (\n    slurm_node_info{cluster=~\"$cluster\", \n        state_is_not_responding=\"true\",\n        state_is_maintenance!=\"true\",\n        node_name=~\"$node_name\",\n        nodeset_name=~\"$nodeset\"\n    }\n) * 2\nOR\n# Maintenance\ncount by (nodeset_name, node_name) (\n    slurm_node_info{cluster=~\"$cluster\", \n        state_is_maintenance=\"true\",\n        node_name=~\"$node_name\",\n        nodeset_name=~\"$nodeset\"\n    }\n) * 3",
           "hide": false,
           "instant": true,
           "legendFormat": "{{node_name}}",
@@ -1207,28 +1207,38 @@
         "type": "datasource"
       },
       {
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "filters": [],
+        "hide": 2,
+        "label": "O11y",
+        "name": "o11y",
+        "type": "adhoc"
+      },
+      {
         "allValue": ".*",
-        "allowCustomValue": false,
         "current": {
+          "selected": true,
           "text": "All",
-          "value": [
-            "$__all"
-          ]
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(slurm_node_info,nodeset_name)",
-        "description": "",
+        "definition": "label_values(node_os_info, cluster)",
+        "hide": 2,
         "includeAll": true,
-        "label": "Nodeset",
-        "multi": true,
-        "name": "nodeset",
+        "label": "Cluster",
+        "multi": false,
+        "name": "cluster",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(slurm_node_info,nodeset_name)",
+          "query": "label_values(node_os_info, cluster)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1249,7 +1259,37 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(slurm_node_info{nodeset_name=~\"$nodeset\"}, node_name)",
+        "definition": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
+        "description": "",
+        "includeAll": true,
+        "label": "Nodeset",
+        "multi": true,
+        "name": "nodeset",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(slurm_node_info{cluster=~\"$cluster\", nodeset_name=~\"$nodeset\"}, node_name)",
         "description": "",
         "includeAll": true,
         "label": "Worker Node",
@@ -1258,7 +1298,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(slurm_node_info{nodeset_name=~\"$nodeset\"}, node_name)",
+          "query": "label_values(slurm_node_info{cluster=~\"$cluster\", nodeset_name=~\"$nodeset\"}, node_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
