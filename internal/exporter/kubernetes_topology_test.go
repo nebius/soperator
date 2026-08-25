@@ -50,6 +50,7 @@ func TestKubernetesNodeTopologySource(t *testing.T) {
 				Namespace: "slurm",
 				Labels: map[string]string{
 					consts.LabelInstanceKey: "cluster-a",
+					consts.LabelNodeSetKey:  "gpu-workers",
 					consts.LabelWorkerKey:   consts.LabelWorkerValue,
 				},
 			},
@@ -57,10 +58,22 @@ func TestKubernetesNodeTopologySource(t *testing.T) {
 		},
 		&corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
+				Name:      "worker-1",
+				Namespace: "slurm",
+				Labels: map[string]string{
+					consts.LabelInstanceKey: "cluster-a",
+					consts.LabelNodeSetKey:  "gpu-workers",
+					consts.LabelWorkerKey:   consts.LabelWorkerValue,
+				},
+			},
+		},
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:      "other-worker-0",
 				Namespace: "slurm",
 				Labels: map[string]string{
 					consts.LabelInstanceKey: "cluster-b",
+					consts.LabelNodeSetKey:  "other-workers",
 					consts.LabelWorkerKey:   consts.LabelWorkerValue,
 				},
 			},
@@ -70,8 +83,8 @@ func TestKubernetesNodeTopologySource(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "k8s-node-1",
 				Labels: map[string]string{
-					nvlinkInstanceGroupLabel: "nvlig-1",
-					slurmNodeSetNameLabel:    "gpu-workers",
+					nvlinkInstanceGroupLabel:       "nvlig-1",
+					"slurm.nebius.ai/nodeset-name": "infrastructure-node-pool",
 				},
 			},
 		},
@@ -87,6 +100,9 @@ func TestKubernetesNodeTopologySource(t *testing.T) {
 			NVLinkInstanceGroup: "nvlig-1",
 			SlurmNodeSetName:    "gpu-workers",
 		},
+		"worker-1": {
+			SlurmNodeSetName: "gpu-workers",
+		},
 	}, topologies)
 }
 
@@ -94,8 +110,8 @@ func TestTopologyNodeSelector(t *testing.T) {
 	selector, err := topologyNodeSelector()
 	require.NoError(t, err)
 
-	assert.True(t, selector.Matches(labels.Set{slurmNodeSetNameLabel: "gpu-workers"}))
-	assert.True(t, selector.Matches(labels.Set{slurmNodeSetNameLabel: ""}))
+	assert.True(t, selector.Matches(labels.Set{nvlinkInstanceGroupLabel: "nvlig-1"}))
+	assert.True(t, selector.Matches(labels.Set{nvlinkInstanceGroupLabel: ""}))
 	assert.False(t, selector.Matches(labels.Set{}))
 }
 
@@ -118,6 +134,7 @@ func TestKubernetesNodeTopologySourceGetsEachUsedNodeOnce(t *testing.T) {
 				Namespace: "slurm",
 				Labels: map[string]string{
 					consts.LabelInstanceKey: "cluster-a",
+					consts.LabelNodeSetKey:  "gpu-workers",
 					consts.LabelWorkerKey:   consts.LabelWorkerValue,
 				},
 			},
@@ -129,6 +146,7 @@ func TestKubernetesNodeTopologySourceGetsEachUsedNodeOnce(t *testing.T) {
 				Namespace: "slurm",
 				Labels: map[string]string{
 					consts.LabelInstanceKey: "cluster-a",
+					consts.LabelNodeSetKey:  "gpu-workers",
 					consts.LabelWorkerKey:   consts.LabelWorkerValue,
 				},
 			},
@@ -139,7 +157,6 @@ func TestKubernetesNodeTopologySourceGetsEachUsedNodeOnce(t *testing.T) {
 				Name: "k8s-node-1",
 				Labels: map[string]string{
 					nvlinkInstanceGroupLabel: "nvlig-1",
-					slurmNodeSetNameLabel:    "gpu-workers",
 				},
 			},
 		},
@@ -190,6 +207,7 @@ func TestTransformWorkerPodForTopology(t *testing.T) {
 			ResourceVersion: "123",
 			Labels: map[string]string{
 				consts.LabelInstanceKey: "cluster-a",
+				consts.LabelNodeSetKey:  "gpu-workers",
 				consts.LabelWorkerKey:   consts.LabelWorkerValue,
 				"irrelevant":            "value",
 			},
@@ -211,6 +229,7 @@ func TestTransformWorkerPodForTopology(t *testing.T) {
 	assert.Equal(t, "123", actual.ResourceVersion)
 	assert.Equal(t, map[string]string{
 		consts.LabelInstanceKey: "cluster-a",
+		consts.LabelNodeSetKey:  "gpu-workers",
 		consts.LabelWorkerKey:   consts.LabelWorkerValue,
 	}, actual.Labels)
 	assert.Equal(t, corev1.PodSpec{NodeName: "k8s-node-1"}, actual.Spec)
@@ -225,7 +244,6 @@ func TestTransformNodeForTopology(t *testing.T) {
 			ResourceVersion: "456",
 			Labels: map[string]string{
 				nvlinkInstanceGroupLabel: "nvlig-1",
-				slurmNodeSetNameLabel:    "gpu-workers",
 				"irrelevant":             "value",
 			},
 			Annotations: map[string]string{"irrelevant": "value"},
@@ -242,7 +260,6 @@ func TestTransformNodeForTopology(t *testing.T) {
 	assert.Equal(t, "456", actual.ResourceVersion)
 	assert.Equal(t, map[string]string{
 		nvlinkInstanceGroupLabel: "nvlig-1",
-		slurmNodeSetNameLabel:    "gpu-workers",
 	}, actual.Labels)
 	assert.Empty(t, actual.Spec)
 	assert.Empty(t, actual.Status)
