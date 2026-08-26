@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -292,6 +293,45 @@ func TestUpdateEphemeralModeAppliedCondition(t *testing.T) {
 			assert.Equal(t, nodeSet.Generation, condition.ObservedGeneration)
 		})
 	}
+}
+
+func TestDeleteNodeSetPowerState(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, slurmv1alpha1.AddToScheme(scheme))
+
+	nodeSet := &slurmv1alpha1.NodeSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-nodeset",
+			Namespace: "test-namespace",
+		},
+	}
+	powerState := &slurmv1alpha1.NodeSetPowerState{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nodeSet.Name,
+			Namespace: nodeSet.Namespace,
+		},
+		Spec: slurmv1alpha1.NodeSetPowerStateSpec{
+			NodeSetRef:  nodeSet.Name,
+			ActiveNodes: []int32{0, 2},
+		},
+	}
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(nodeSet, powerState).
+		Build()
+	r := &NodeSetReconciler{
+		Reconciler: reconciler.NewReconciler(fakeClient, scheme, record.NewFakeRecorder(10)),
+	}
+
+	require.NoError(t, r.deleteNodeSetPowerState(context.Background(), nodeSet))
+	require.NoError(t, r.deleteNodeSetPowerState(context.Background(), nodeSet))
+
+	err := fakeClient.Get(
+		context.Background(),
+		client.ObjectKeyFromObject(powerState),
+		&slurmv1alpha1.NodeSetPowerState{},
+	)
+	assert.True(t, apierrors.IsNotFound(err))
 }
 
 func TestExpectedReplicas(t *testing.T) {

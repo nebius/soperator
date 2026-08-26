@@ -115,7 +115,8 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	clusterWithGPU := values.BuildClusterWithGPUFromNodeSets(nodeSets)
 
 	// region Ephemeral nodes power state
-	if nodeSetValues.EphemeralNodes != nil && *nodeSetValues.EphemeralNodes {
+	ephemeralNodesEnabled := nodeSetValues.EphemeralNodes != nil && *nodeSetValues.EphemeralNodes
+	if ephemeralNodesEnabled {
 		activeNodes, err := r.reconcileNodeSetPowerState(ctx, nodeSet)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("reconciling NodeSetPowerState: %w", err)
@@ -129,8 +130,16 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		return ctrl.Result{}, err
 	}
 
+	// Remove any stale NodeSetPowerState after the NodeSet becomes static.
+	// Apply static replicas and clear reserved ordinals before removing the power state.
+	if !ephemeralNodesEnabled {
+		if err = r.deleteNodeSetPowerState(ctx, nodeSet); err != nil {
+			return ctrl.Result{}, fmt.Errorf("deleting NodeSetPowerState: %w", err)
+		}
+	}
+
 	if err = r.updateEphemeralModeAppliedCondition(ctx, nodeSet); err != nil {
-		return ctrl.Result{}, fmt.Errorf("updating ephemeral nodes condition: %w", err)
+		return ctrl.Result{}, fmt.Errorf("updating ephemeral mode applied condition: %w", err)
 	}
 
 	// region Maintenance condition
@@ -782,6 +791,19 @@ func (r *NodeSetReconciler) reconcileNodeSetPowerState(
 	)
 
 	return existing.Spec.ActiveNodes, nil
+}
+
+func (r *NodeSetReconciler) deleteNodeSetPowerState(
+	ctx context.Context,
+	nodeSet *slurmv1alpha1.NodeSet,
+) error {
+	powerState := &slurmv1alpha1.NodeSetPowerState{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nodeSet.Name,
+			Namespace: nodeSet.Namespace,
+		},
+	}
+	return client.IgnoreNotFound(r.Delete(ctx, powerState))
 }
 
 func buildActiveNodesForNewPowerState(nodeSet *slurmv1alpha1.NodeSet) []int32 {
