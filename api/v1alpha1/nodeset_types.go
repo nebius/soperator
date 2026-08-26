@@ -112,6 +112,8 @@ const (
 	ConditionNodeSetPodsReady = "PodsReady"
 	// ConditionNodeSetStatefulSetTerminated is set when StatefulSet for NodeSet is terminated.
 	ConditionNodeSetStatefulSetTerminated = "StatefulSetTerminated"
+	// ConditionNodeSetEphemeralModeApplied indicates whether the last successfully reconciled mode was ephemeral.
+	ConditionNodeSetEphemeralModeApplied = "EphemeralModeApplied"
 )
 
 // NodeSetSpec defines the desired state of NodeSet
