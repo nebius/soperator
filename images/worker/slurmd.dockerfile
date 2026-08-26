@@ -3,6 +3,20 @@
 ARG SLURM_VERSION
 
 # https://github.com/nebius/ml-containers/pull/99
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260816173636 AS worker_pam_builder
+
+RUN apt-get update && \
+    apt-get install -y libpam0g-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY images/common/pam_soperator_jail.c /usr/src/pam-soperator-jail/
+COPY images/common/scripts/build_pam_soperator_jail.sh /usr/src/pam-soperator-jail/
+RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
+    /usr/src/pam-soperator-jail/pam_soperator_jail.c \
+    /out
+
+# https://github.com/nebius/ml-containers/pull/99
 FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260816173636 AS worker_slurmd
 
 ARG MELLANOX_REPO_URL=https://linux.mellanox.com/public/repo/doca/3.1.0
@@ -149,6 +163,12 @@ RUN rm -rf /home
 # Delete SSH "message of the day" scripts because they aren't needed on worker nodes
 RUN rm -rf /etc/update-motd.d
 
+# Install the native PAM module that places each SSH session in its own mount
+# namespace and pivots it into /mnt/jail. Worker SSH sessions intentionally do
+# not use the login node's per-user cgroup hook.
+COPY --from=worker_pam_builder /out/ /
+RUN echo "session required pam_soperator_jail.so /mnt/jail" >> /etc/pam.d/sshd
+
 # Expose the port used for accessing slurmd
 EXPOSE 6818
 
@@ -165,12 +185,14 @@ COPY images/worker/write_soperator_metadata.sh /opt/bin/slurm/
 COPY images/worker/worker_init.py /opt/bin/slurm/
 
 # Copy supervisord entrypoint script
+COPY images/common/scripts/sshd_pam_jail_entrypoint.sh /opt/bin/slurm/
 COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
 COPY images/worker/docker_proxy_nginx_entrypoint.sh /opt/bin/slurm/
 COPY images/worker/dockerd_entrypoint.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
     chmod +x /opt/bin/slurm/write_soperator_metadata.sh && \
+    chmod +x /opt/bin/slurm/sshd_pam_jail_entrypoint.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
     chmod +x /opt/bin/slurm/worker_init.py && \
     chmod +x /opt/bin/slurm/docker_proxy_nginx_entrypoint.sh && \

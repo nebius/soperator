@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 #define PAM_SM_SESSION
 
+/* Enter the shared Soperator jail in a private mount namespace for an SSH session. */
+
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>

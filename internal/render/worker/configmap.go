@@ -85,7 +85,7 @@ func generateDefaultSupervisordConfig() renderutils.ConfigFile {
 	res.AddLine("stderr_logfile=/dev/fd/2")
 	res.AddLine("stderr_logfile_maxbytes=0")
 	res.AddLine("redirect_stderr=true")
-	res.AddLine("command=/usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config")
+	res.AddLine("command=/bin/sh -c 'if [ -x /opt/bin/slurm/sshd_pam_jail_entrypoint.sh ]; then exec /opt/bin/slurm/sshd_pam_jail_entrypoint.sh; else exec /usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config; fi'")
 	res.AddLine("autostart=true")
 	res.AddLine("autorestart=true")
 	res.AddLine("startsecs=0")
