@@ -1,6 +1,10 @@
 package kubeobjects
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"encoding/json"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 const (
 	SlurmClusterPhaseAvailable = "Available"
@@ -26,8 +30,9 @@ const (
 )
 
 type ObjectMeta struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
+	Name       string `json:"name"`
+	Namespace  string `json:"namespace"`
+	Generation int64  `json:"generation"`
 }
 
 type SlurmClusterList struct {
@@ -55,9 +60,11 @@ type NodeSet struct {
 }
 
 type NodeSetSpec struct {
-	ClusterName string         `json:"clusterName"`
-	Replicas    int32          `json:"replicas"`
-	GPU         NodeSetGPUSpec `json:"gpu"`
+	ClusterName                 string         `json:"clusterName"`
+	Replicas                    int32          `json:"replicas"`
+	EphemeralNodes              *bool          `json:"ephemeralNodes"`
+	InitialNumberEphemeralNodes int32          `json:"initialNumberEphemeralNodes"`
+	GPU                         NodeSetGPUSpec `json:"gpu"`
 }
 
 type NodeSetGPUSpec struct {
@@ -65,8 +72,26 @@ type NodeSetGPUSpec struct {
 }
 
 type NodeSetStatus struct {
-	Phase    string `json:"phase"`
-	Replicas int32  `json:"replicas"`
+	Phase      string             `json:"phase"`
+	Replicas   int32              `json:"replicas"`
+	Conditions []metav1.Condition `json:"conditions"`
+}
+
+type NodeSetPowerState struct {
+	Spec NodeSetPowerStateSpec `json:"spec"`
+}
+
+type NodeSetPowerStateSpec struct {
+	ActiveNodes []int32 `json:"activeNodes"`
+}
+
+type KruiseStatefulSet struct {
+	Spec KruiseStatefulSetSpec `json:"spec"`
+}
+
+type KruiseStatefulSetSpec struct {
+	Replicas        *int32            `json:"replicas"`
+	ReserveOrdinals []json.RawMessage `json:"reserveOrdinals"`
 }
 
 type ActiveCheckList struct {
