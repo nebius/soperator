@@ -23,11 +23,11 @@ type kubernetesNodeTopologySource struct {
 }
 
 func topologyNodeSelector() (labels.Selector, error) {
-	nodeSetRequirement, err := labels.NewRequirement(slurmNodeSetNameLabel, selection.Exists, nil)
+	nvlinkRequirement, err := labels.NewRequirement(nvlinkInstanceGroupLabel, selection.Exists, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create Slurm NodeSet label selector: %w", err)
+		return nil, fmt.Errorf("create NVLink instance group label selector: %w", err)
 	}
-	return labels.NewSelector().Add(*nodeSetRequirement), nil
+	return labels.NewSelector().Add(*nvlinkRequirement), nil
 }
 
 // NewKubernetesNodeTopologyCache creates a list/watch cache scoped to the Kubernetes objects
@@ -110,6 +110,10 @@ func (s *kubernetesNodeTopologySource) ListNodeTopologies(ctx context.Context) (
 	podsByKubernetesNode := make(map[string][]string, len(pods.Items))
 	for i := range pods.Items {
 		pod := &pods.Items[i]
+		topologies[pod.Name] = NodeTopology{
+			KubernetesNode:   pod.Spec.NodeName,
+			SlurmNodeSetName: pod.Labels[consts.LabelNodeSetKey],
+		}
 		if pod.Spec.NodeName == "" {
 			continue
 		}
@@ -125,12 +129,9 @@ func (s *kubernetesNodeTopologySource) ListNodeTopologies(ctx context.Context) (
 			return nil, fmt.Errorf("get Kubernetes node %q: %w", kubernetesNode, err)
 		}
 
-		topology := NodeTopology{
-			KubernetesNode:      kubernetesNode,
-			NVLinkInstanceGroup: node.Labels[nvlinkInstanceGroupLabel],
-			SlurmNodeSetName:    node.Labels[slurmNodeSetNameLabel],
-		}
 		for _, podName := range podNames {
+			topology := topologies[podName]
+			topology.NVLinkInstanceGroup = node.Labels[nvlinkInstanceGroupLabel]
 			topologies[podName] = topology
 		}
 	}
@@ -151,6 +152,7 @@ func transformWorkerPodForTopology(obj any) (any, error) {
 		ResourceVersion: pod.ResourceVersion,
 		Labels: map[string]string{
 			consts.LabelInstanceKey: pod.Labels[consts.LabelInstanceKey],
+			consts.LabelNodeSetKey:  pod.Labels[consts.LabelNodeSetKey],
 			consts.LabelWorkerKey:   pod.Labels[consts.LabelWorkerKey],
 		},
 	}
@@ -172,7 +174,6 @@ func transformNodeForTopology(obj any) (any, error) {
 		ResourceVersion: node.ResourceVersion,
 		Labels: map[string]string{
 			nvlinkInstanceGroupLabel: node.Labels[nvlinkInstanceGroupLabel],
-			slurmNodeSetNameLabel:    node.Labels[slurmNodeSetNameLabel],
 		},
 	}
 	node.Spec = corev1.NodeSpec{}

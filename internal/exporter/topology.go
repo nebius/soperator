@@ -2,19 +2,16 @@ package exporter
 
 import "context"
 
-const (
-	nvlinkInstanceGroupLabel = "topology.nebius.com/nvl-instance-group-id"
-	slurmNodeSetNameLabel    = "slurm.nebius.ai/nodeset-name"
-)
+const nvlinkInstanceGroupLabel = "topology.nebius.com/nvl-instance-group-id"
 
-// NodeTopology describes the Kubernetes placement metadata for a Slurm node.
+// NodeTopology describes Soperator NodeSet membership and Kubernetes placement metadata for a Slurm node.
 type NodeTopology struct {
 	KubernetesNode      string
 	NVLinkInstanceGroup string
 	SlurmNodeSetName    string
 }
 
-// NodeTopologySource resolves Slurm worker names to Kubernetes node topology.
+// NodeTopologySource resolves Slurm worker names to Soperator NodeSet and Kubernetes node topology.
 type NodeTopologySource interface {
 	ListNodeTopologies(ctx context.Context) (map[string]NodeTopology, error)
 }

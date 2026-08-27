@@ -25,7 +25,7 @@
           "uid": "${datasource}"
         },
         "enable": false,
-        "expr": "group by (node, pod) (\n  changes(\n      sum without (uid, pod_ip)(\n          kube_pod_info{pod=~\"worker-.*\", node!=\"\"}\n      )\n  ) > 0\n  and on (pod) \n  sum by (pod)(\n      kube_pod_info{pod=~\"worker-.*\", node!=\"\"}\n  ) @ start()\n)",
+        "expr": "group by (node, pod) (\n  changes(\n      sum without (uid, pod_ip)(\n          kube_pod_info{cluster=~\"$cluster\", pod=~\"worker-.*\", node!=\"\"}\n      )\n  ) > 0\n  and on (pod) \n  sum by (pod)(\n      kube_pod_info{cluster=~\"$cluster\", pod=~\"worker-.*\", node!=\"\"}\n  ) @ start()\n)",
         "hide": true,
         "iconColor": "red",
         "name": "Worker Reschedule",
@@ -38,14 +38,16 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 20,
+  "id": 7,
   "links": [
     {
       "asDropdown": false,
       "icon": "external link",
       "includeVars": true,
       "keepTime": true,
-      "tags": ["workers-overview"],
+      "tags": [
+        "workers-overview"
+      ],
       "targetBlank": true,
       "title": "Detailed Stats",
       "tooltip": "",
@@ -88,7 +90,7 @@
         "content": "* You can select multiple Jobs, list of Workers will be filtered based on that, only one of the jobs is selected by default\n* You can select multiple Workers, All are selected by default\n* Stats in all panels will be based on selected Jobs and Workers\n* check per worker stats below when there are large variance in cluster level stats, or when you want to spot outlier workers\n",
         "mode": "markdown"
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "title": "Usage Guide",
       "type": "text"
     },
@@ -110,8 +112,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "orange",
@@ -141,7 +142,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["mean"],
+          "calcs": [
+            "mean"
+          ],
           "fields": "",
           "values": false
         },
@@ -149,7 +152,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -157,7 +160,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg (\n  (1 - rate(node_cpu_seconds_total{mode=\"idle\"}[1m]))\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n) * 100",
+          "expr": "avg (\n  (1 - rate(node_cpu_seconds_total{cluster=~\"$cluster\", mode=\"idle\"}[1m]))\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n) * 100",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -189,8 +192,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -217,7 +219,9 @@
         "orientation": "horizontal",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -225,7 +229,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -233,7 +237,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_SM_CLOCK{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}*1000000)",
+          "expr": "avg(DCGM_FI_DEV_SM_CLOCK{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}*1000000)",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -272,8 +276,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#299c46",
-                "value": null
+                "color": "#299c46"
               },
               {
                 "color": "rgba(237, 129, 40, 0.89)",
@@ -304,7 +307,9 @@
         "orientation": "horizontal",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -312,7 +317,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -320,7 +325,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(DCGM_FI_DEV_POWER_USAGE{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "sum(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -357,8 +362,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#299c46",
-                "value": null
+                "color": "#299c46"
               },
               {
                 "color": "rgba(237, 129, 40, 0.89)",
@@ -389,7 +393,9 @@
         "orientation": "horizontal",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -397,7 +403,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -405,7 +411,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_MEM_COPY_UTIL{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "avg(DCGM_FI_DEV_MEM_COPY_UTIL{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -442,8 +448,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#299c46",
-                "value": null
+                "color": "#299c46"
               },
               {
                 "color": "rgba(237, 129, 40, 0.89)",
@@ -474,7 +479,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["mean"],
+          "calcs": [
+            "mean"
+          ],
           "fields": "",
           "values": false
         },
@@ -482,7 +489,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -490,7 +497,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(\n    (\n        node_memory_MemTotal_bytes - \n        node_memory_MemFree_bytes  - \n        node_memory_Buffers_bytes - \n        node_memory_Cached_bytes\n    ) / \n    node_memory_MemTotal_bytes{instance=~\"$ip\"}\n    * on(instance) group_left(nodename) node_uname_info\n    * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n) * 100",
+          "expr": "avg(\n    (\n        node_memory_MemTotal_bytes{cluster=~\"$cluster\"} - \n        node_memory_MemFree_bytes{cluster=~\"$cluster\"}  - \n        node_memory_Buffers_bytes{cluster=~\"$cluster\"} - \n        node_memory_Cached_bytes{cluster=~\"$cluster\"}\n    ) / \n    node_memory_MemTotal_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n    * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n    * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n) * 100",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
@@ -524,8 +531,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -552,7 +558,9 @@
         "orientation": "horizontal",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -560,7 +568,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -568,7 +576,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_MEM_CLOCK{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}*1000000)",
+          "expr": "avg(DCGM_FI_DEV_MEM_CLOCK{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}*1000000)",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -609,8 +617,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#299c46",
-                "value": null
+                "color": "#299c46"
               },
               {
                 "color": "orange",
@@ -641,7 +648,9 @@
         "orientation": "horizontal",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["mean"],
+          "calcs": [
+            "mean"
+          ],
           "fields": "",
           "values": false
         },
@@ -649,7 +658,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -657,7 +666,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_GPU_UTIL{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "avg(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -694,8 +703,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#299c46",
-                "value": null
+                "color": "#299c46"
               },
               {
                 "color": "rgba(237, 129, 40, 0.89)",
@@ -726,7 +734,9 @@
         "orientation": "horizontal",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -734,7 +744,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -742,7 +752,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "avg(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -792,8 +802,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -826,7 +835,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 72
+                "value": 94
               },
               {
                 "id": "custom.align",
@@ -842,7 +851,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 67
+                "value": 81
               }
             ]
           },
@@ -854,7 +863,67 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 87
+                "value": 108
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Job State"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 116
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Job State Reason"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 169
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Partition"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 141
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "State"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 153
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "State Reason"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 174
               }
             ]
           }
@@ -873,14 +942,16 @@
           "countRows": false,
           "enablePagination": true,
           "fields": "",
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "show": false
         },
         "frameIndex": 0,
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -889,7 +960,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "with (\n  filters = {job_id=~\"$slurm_job\"}\n)\nslurm_job_info{filters}\n* on (job_id) group_left()\ncount by (job_id) (slurm_node_job{filters}) ",
+          "expr": "with (\n  filters = {job_id=~\"$slurm_job\"}\n)\nslurm_job_info{cluster=~\"$cluster\", filters}\n* on (job_id) group_left()\ncount by (job_id) (slurm_node_job{cluster=~\"$cluster\", filters}) ",
           "format": "table",
           "instant": true,
           "range": false,
@@ -926,16 +997,21 @@
               "container_id": true,
               "end_time": true,
               "endpoint": true,
+              "finished_time": true,
               "finished_time (first)": true,
+              "iam_project_id": true,
+              "iam_tenant_id": true,
               "instance": true,
               "job": true,
-              "job_state": true,
-              "job_state_reason": true,
+              "job_state": false,
+              "job_state_reason": false,
+              "mk8s_cluster_id": true,
               "namespace": true,
+              "nodeset_name (uniqueValues)": false,
               "pod": true,
               "prometheus": true,
               "slurm_job_info (last)": true,
-              "slurm_partition": true,
+              "slurm_partition": false,
               "standard_error": true,
               "standard_output": true,
               "start_time": true,
@@ -949,37 +1025,42 @@
               "Value": 3,
               "array_job_id": 5,
               "cluster": 6,
-              "container": 7,
-              "container_id": 8,
-              "end_time": 9,
-              "endpoint": 10,
-              "instance": 11,
-              "job": 12,
+              "container_id": 7,
+              "end_time": 8,
+              "endpoint": 9,
+              "finished_time": 18,
+              "iam_project_id": 19,
+              "iam_tenant_id": 20,
+              "job": 10,
               "job_id": 0,
-              "job_name": 13,
-              "job_state": 14,
-              "job_state_reason": 15,
-              "namespace": 16,
-              "pod": 17,
-              "prometheus": 18,
-              "slurm_partition": 19,
-              "standard_error": 20,
-              "standard_output": 21,
-              "start_time": 22,
-              "submit_time": 23,
+              "job_name": 22,
+              "job_state": 11,
+              "job_state_reason": 12,
+              "mk8s_cluster_id": 21,
+              "namespace": 13,
+              "prometheus": 14,
+              "slurm_partition": 15,
+              "start_time": 16,
+              "submit_time": 17,
               "user_id": 1,
               "user_name": 2
             },
             "renameByName": {
               "Value": "Workers",
+              "Value #A": "Workers",
               "container": "",
+              "finished_time": "Finish Time",
               "finished_time_ms": "Finished Time",
               "job": "",
               "job_id": "Job ID",
               "job_name": "Job Name",
               "job_name (first)": "Job Name",
+              "job_state": "State",
               "job_state (first)": "State",
+              "job_state_reason": "State Reason",
               "job_state_reason (first)": "State Reason",
+              "nodeset_name (uniqueValues)": "Nodesets",
+              "slurm_partition": "Partition",
               "slurm_partition (first)": "Partition",
               "start_time_ms": "Start Time",
               "submit_time": "",
@@ -1005,6 +1086,7 @@
             "mode": "palette-classic-by-name"
           },
           "custom": {
+            "axisPlacement": "auto",
             "fillOpacity": 75,
             "hideFrom": {
               "legend": false,
@@ -1131,8 +1213,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1167,7 +1248,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -1175,7 +1256,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "with (\n    filters = { job_id=~\"$slurm_job\"},\n)\nsum by (job_id,)(\n  count by (job_id, job_name) (slurm_job_info{job_state=\"PENDING\", filters}) * 1 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"CONFIGURING\",filters}) * 2 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"RUNNING\", filters}) * 3 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"COMPLETING\", filters}) * 4 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"COMPLETED\", filters}) * 5 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"CANCELLED\", filters}) * 6 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"FAILED\", filters}) * 7 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"TIMEOUT\", filters}) * 8 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"PREEMPTED\", filters}) * 9 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"NODE_FAIL\", filters}) * 10 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"BOOT_FAIL\", filters}) * 11 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"DEADLINE\", filters}) * 12 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"OUT_OF_MEMORY\", filters}) * 13 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"REQUEUED\", filters}) * 14 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"RESIZING\", filters}) * 15 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"SUSPENDED\", filters}) * 16 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"STOPPED\", filters}) * 17 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"POWER_UP_NODE\", filters}) * 18 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"SIGNALING\", filters}) * 19 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"STAGE_OUT\", filters}) * 20 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"UPDATE_DB\", filters}) * 21\n)",
+          "expr": "with (\n    filters = { job_id=~\"$slurm_job\"},\n)\nsum by (job_id,)(\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"PENDING\", filters}) * 1 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"CONFIGURING\",filters}) * 2 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"RUNNING\", filters}) * 3 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"COMPLETING\", filters}) * 4 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"COMPLETED\", filters}) * 5 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"CANCELLED\", filters}) * 6 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"FAILED\", filters}) * 7 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"TIMEOUT\", filters}) * 8 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"PREEMPTED\", filters}) * 9 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"NODE_FAIL\", filters}) * 10 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"BOOT_FAIL\", filters}) * 11 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"DEADLINE\", filters}) * 12 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"OUT_OF_MEMORY\", filters}) * 13 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"REQUEUED\", filters}) * 14 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"RESIZING\", filters}) * 15 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"SUSPENDED\", filters}) * 16 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"STOPPED\", filters}) * 17 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"POWER_UP_NODE\", filters}) * 18 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"SIGNALING\", filters}) * 19 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"STAGE_OUT\", filters}) * 20 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"UPDATE_DB\", filters}) * 21\n)",
           "format": "time_series",
           "hide": false,
           "legendFormat": "{{job_id}}",
@@ -1253,8 +1334,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1286,7 +1366,10 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [10, 10],
+                  "dash": [
+                    10,
+                    10
+                  ],
                   "fill": "dash"
                 }
               },
@@ -1320,7 +1403,9 @@
       "interval": "2m",
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
@@ -1331,7 +1416,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -1339,7 +1424,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(DCGM_FI_DEV_GPU_UTIL{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "max(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1354,7 +1439,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_GPU_UTIL{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "avg(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1369,7 +1454,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "min(DCGM_FI_DEV_GPU_UTIL{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "min(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1431,8 +1516,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1449,7 +1533,9 @@
       "id": 405,
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
@@ -1460,7 +1546,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -1468,7 +1554,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"} * 1979)",
+          "expr": "sum(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"} * 1979)",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1483,7 +1569,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"} * 989.7)",
+          "expr": "sum(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"} * 989.7)",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1550,8 +1636,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1583,7 +1668,10 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [10, 10],
+                  "dash": [
+                    10,
+                    10
+                  ],
                   "fill": "dash"
                 }
               },
@@ -1632,7 +1720,9 @@
       "interval": "2m",
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
@@ -1643,7 +1733,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -1651,7 +1741,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max (DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "max (DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1666,7 +1756,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg (DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "avg (DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1681,7 +1771,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "min (DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "min (DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1745,8 +1835,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1778,7 +1867,10 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [10, 10],
+                  "dash": [
+                    10,
+                    10
+                  ],
                   "fill": "dash"
                 }
               },
@@ -1823,7 +1915,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -1831,7 +1923,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(\n  (1 - rate(node_cpu_seconds_total{mode=\"idle\", instance=~\"$ip\"}[$__rate_interval]))\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
+          "expr": "max(\n  (1 - rate(node_cpu_seconds_total{cluster=~\"$cluster\", mode=\"idle\", instance=~\"$ip\"}[$__rate_interval]))\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
           "instant": false,
           "legendFormat": "max",
           "range": true,
@@ -1843,7 +1935,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(\n  (1 - rate(node_cpu_seconds_total{mode=\"idle\", instance=~\"$ip\"}[$__rate_interval]))\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
+          "expr": "avg(\n  (1 - rate(node_cpu_seconds_total{cluster=~\"$cluster\", mode=\"idle\", instance=~\"$ip\"}[$__rate_interval]))\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
           "hide": false,
           "instant": false,
           "legendFormat": "avg",
@@ -1856,7 +1948,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "min(\n  (1 - rate(node_cpu_seconds_total{mode=\"idle\", instance=~\"$ip\"}[$__rate_interval]))\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
+          "expr": "min(\n  (1 - rate(node_cpu_seconds_total{cluster=~\"$cluster\", mode=\"idle\", instance=~\"$ip\"}[$__rate_interval]))\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
           "hide": false,
           "instant": false,
           "legendFormat": "min",
@@ -1919,8 +2011,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1952,7 +2043,10 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [10, 10],
+                  "dash": [
+                    10,
+                    10
+                  ],
                   "fill": "dash"
                 }
               },
@@ -1994,7 +2088,9 @@
       "interval": "2m",
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
@@ -2005,7 +2101,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -2013,7 +2109,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(DCGM_FI_DEV_FB_USED{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}/(DCGM_FI_DEV_FB_USED{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}+DCGM_FI_DEV_FB_FREE{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}))",
+          "expr": "max(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}/(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}+DCGM_FI_DEV_FB_FREE{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -2028,7 +2124,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_FB_USED{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}/(DCGM_FI_DEV_FB_USED{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}+DCGM_FI_DEV_FB_FREE{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}))",
+          "expr": "avg(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}/(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}+DCGM_FI_DEV_FB_FREE{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -2043,7 +2139,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "min(DCGM_FI_DEV_FB_USED{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}/(DCGM_FI_DEV_FB_USED{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}+DCGM_FI_DEV_FB_FREE{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}))",
+          "expr": "min(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}/(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}+DCGM_FI_DEV_FB_FREE{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -2105,8 +2201,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2163,7 +2258,9 @@
       "interval": "1m",
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
@@ -2174,7 +2271,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -2182,7 +2279,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(\n  rate(node_infiniband_port_data_transmitted_bytes_total{instance=~\"$ip\"}[$__interval])\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
+          "expr": "sum(\n  rate(node_infiniband_port_data_transmitted_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -2197,7 +2294,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(\n  rate(node_infiniband_port_data_received_bytes_total{instance=~\"$ip\"}[$__interval])\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
+          "expr": "sum(\n  rate(node_infiniband_port_data_received_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2261,8 +2358,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2294,7 +2390,10 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [10, 10],
+                  "dash": [
+                    10,
+                    10
+                  ],
                   "fill": "dash"
                 }
               },
@@ -2347,7 +2446,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -2355,7 +2454,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(\n  (\n    (\n      node_memory_MemTotal_bytes - \n      node_memory_MemFree_bytes - \n      node_memory_Buffers_bytes - \n      node_memory_Cached_bytes\n    )\n    /\n    node_memory_MemTotal_bytes{instance=~\"$ip\"}\n  )\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
+          "expr": "max(\n  (\n    (\n      node_memory_MemTotal_bytes{cluster=~\"$cluster\"} - \n      node_memory_MemFree_bytes{cluster=~\"$cluster\"} - \n      node_memory_Buffers_bytes{cluster=~\"$cluster\"} - \n      node_memory_Cached_bytes{cluster=~\"$cluster\"}\n    )\n    /\n    node_memory_MemTotal_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n  )\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2370,7 +2469,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(\n  (\n    (\n      node_memory_MemTotal_bytes - \n      node_memory_MemFree_bytes - \n      node_memory_Buffers_bytes - \n      node_memory_Cached_bytes\n    )\n    /\n    node_memory_MemTotal_bytes{instance=~\"$ip\"}\n  )\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
+          "expr": "avg(\n  (\n    (\n      node_memory_MemTotal_bytes{cluster=~\"$cluster\"} - \n      node_memory_MemFree_bytes{cluster=~\"$cluster\"} - \n      node_memory_Buffers_bytes{cluster=~\"$cluster\"} - \n      node_memory_Cached_bytes{cluster=~\"$cluster\"}\n    )\n    /\n    node_memory_MemTotal_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n  )\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2385,7 +2484,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "min(\n  (\n    (\n      node_memory_MemTotal_bytes - \n      node_memory_MemFree_bytes - \n      node_memory_Buffers_bytes - \n      node_memory_Cached_bytes\n    )\n    /\n    node_memory_MemTotal_bytes{instance=~\"$ip\"}\n  )\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
+          "expr": "min(\n  (\n    (\n      node_memory_MemTotal_bytes{cluster=~\"$cluster\"} - \n      node_memory_MemFree_bytes{cluster=~\"$cluster\"} - \n      node_memory_Buffers_bytes{cluster=~\"$cluster\"} - \n      node_memory_Cached_bytes{cluster=~\"$cluster\"}\n    )\n    /\n    node_memory_MemTotal_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n  )\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(hpc_job) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job=~\"$slurm_job\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2466,8 +2565,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2485,7 +2583,9 @@
       "interval": "2m",
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
@@ -2496,7 +2596,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -2504,7 +2604,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg by (exported_pod) (DCGM_FI_DEV_GPU_UTIL{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "avg by (exported_pod) (DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -2569,8 +2669,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2588,7 +2687,9 @@
       "interval": "2m",
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
@@ -2599,7 +2700,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -2607,7 +2708,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg by (exported_pod) (DCGM_FI_DEV_FB_USED{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}/(DCGM_FI_DEV_FB_USED{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}+DCGM_FI_DEV_FB_FREE{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}))",
+          "expr": "avg by (exported_pod) (DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}/(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}+DCGM_FI_DEV_FB_FREE{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -2674,8 +2775,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2693,7 +2793,9 @@
       "interval": "2m",
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
@@ -2704,7 +2806,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
@@ -2712,7 +2814,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg by (exported_pod) (DCGM_FI_DEV_MEM_COPY_UTIL{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "avg by (exported_pod) (DCGM_FI_DEV_MEM_COPY_UTIL{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -2774,8 +2876,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2793,7 +2894,9 @@
       "interval": "2m",
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
@@ -2812,7 +2915,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (exported_pod) (DCGM_FI_DEV_POWER_USAGE{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "sum by (exported_pod) (DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -2877,8 +2980,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2896,7 +2998,9 @@
       "interval": "2m",
       "options": {
         "legend": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
@@ -2915,7 +3019,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg by (exported_pod) (DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
+          "expr": "avg by (exported_pod) (DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -2978,8 +3082,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -3031,7 +3134,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (err_msg, exported_pod) (rate(DCGM_FI_DEV_XID_ERRORS{exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}))",
+          "expr": "sum by (err_msg, exported_pod) (rate(DCGM_FI_DEV_XID_ERRORS{cluster=~\"$cluster\", exported_pod=~\"$worker\",hpc_job=~\"$slurm_job\"}))",
           "instant": false,
           "legendFormat": "{{exported_pod}}: {{err_msg}}",
           "range": true,
@@ -3044,27 +3147,67 @@
   ],
   "preload": false,
   "refresh": "",
-  "schemaVersion": 40,
-  "tags": ["nebius", "soperator", "overview", "jobs"],
+  "schemaVersion": 41,
+  "tags": [
+    "nebius",
+    "soperator",
+    "overview",
+    "jobs"
+  ],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": true,
           "text": "VictoriaMetrics",
           "value": "VictoriaMetrics"
         },
         "hide": 2,
         "includeAll": false,
         "label": "Datasource",
-        "multi": false,
         "name": "datasource",
         "options": [],
         "query": "prometheus",
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
         "type": "datasource"
+      },
+      {
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "filters": [],
+        "hide": 2,
+        "label": "O11y",
+        "name": "o11y",
+        "type": "adhoc"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(node_os_info, cluster)",
+        "hide": 2,
+        "includeAll": true,
+        "label": "Cluster",
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(node_os_info, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
       },
       {
         "current": {
@@ -3087,14 +3230,24 @@
       },
       {
         "current": {
-          "text": ["102"],
-          "value": ["102"]
+          "text": [
+            "86",
+            "85",
+            "84",
+            "83"
+          ],
+          "value": [
+            "86",
+            "85",
+            "84",
+            "83"
+          ]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "query_result(count by (job_id) (slurm_job_info{user_name!=\"soperatorchecks\"}))",
+        "definition": "query_result(count by (job_id) (slurm_job_info{cluster=~\"$cluster\", user_name!=\"soperatorchecks\"}))",
         "description": "",
         "includeAll": false,
         "label": "Jobs",
@@ -3103,7 +3256,7 @@
         "options": [],
         "query": {
           "qryType": 3,
-          "query": "query_result(count by (job_id) (slurm_job_info{user_name!=\"soperatorchecks\"}))",
+          "query": "query_result(count by (job_id) (slurm_job_info{cluster=~\"$cluster\", user_name!=\"soperatorchecks\"}))",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -3112,6 +3265,7 @@
         "type": "query"
       },
       {
+        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
@@ -3120,7 +3274,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(DCGM_FI_DEV_GPU_TEMP{hpc_job=~\"$slurm_job\"},exported_pod)",
+        "definition": "label_values(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job=~\"$slurm_job\"},exported_pod)",
         "description": "Filtered by selected Jobs",
         "includeAll": true,
         "label": "Workers",
@@ -3129,7 +3283,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(DCGM_FI_DEV_GPU_TEMP{hpc_job=~\"$slurm_job\"},exported_pod)",
+          "query": "label_values(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job=~\"$slurm_job\"},exported_pod)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -3138,6 +3292,7 @@
         "type": "query"
       },
       {
+        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
@@ -3146,7 +3301,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_pod_info{pod=~\"$worker\"},node)",
+        "definition": "label_values(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"},node)",
         "hide": 2,
         "includeAll": true,
         "label": "instance",
@@ -3155,7 +3310,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(kube_pod_info{pod=~\"$worker\"},node)",
+          "query": "label_values(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"},node)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -3164,6 +3319,7 @@
         "type": "query"
       },
       {
+        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
@@ -3172,7 +3328,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(node_uname_info{container=\"node-exporter\", nodename=~\"$hostname\"},instance)",
+        "definition": "label_values(node_uname_info{cluster=~\"$cluster\", container=\"node-exporter\", nodename=~\"$hostname\"},instance)",
         "hide": 2,
         "includeAll": true,
         "label": "ip",
@@ -3181,7 +3337,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(node_uname_info{container=\"node-exporter\", nodename=~\"$hostname\"},instance)",
+          "query": "label_values(node_uname_info{cluster=~\"$cluster\", container=\"node-exporter\", nodename=~\"$hostname\"},instance)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -3210,6 +3366,5 @@
   "timezone": "browser",
   "title": "Jobs Overview",
   "uid": "soperator_jobs_overview",
-  "version": 1,
-  "weekStart": ""
+  "version": 2
 }

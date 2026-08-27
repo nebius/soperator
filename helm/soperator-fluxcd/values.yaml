@@ -477,6 +477,8 @@ observability:
           requests:
             cpu: 100m
       grafana:
+        image:
+          tag: "11.6.14-security-04"
         nodeSelector:
           slurm.nebius.ai/nodeset: system
         affinity:

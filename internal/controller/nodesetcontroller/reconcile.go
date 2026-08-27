@@ -115,7 +115,8 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	clusterWithGPU := values.BuildClusterWithGPUFromNodeSets(nodeSets)
 
 	// region Ephemeral nodes power state
-	if nodeSetValues.EphemeralNodes != nil && *nodeSetValues.EphemeralNodes {
+	ephemeralNodesEnabled := nodeSetValues.EphemeralNodes != nil && *nodeSetValues.EphemeralNodes
+	if ephemeralNodesEnabled {
 		activeNodes, err := r.reconcileNodeSetPowerState(ctx, nodeSet)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("reconciling NodeSetPowerState: %w", err)
@@ -127,6 +128,18 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 
 	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster, clusterWithGPU); err != nil {
 		return ctrl.Result{}, err
+	}
+
+	// Remove any stale NodeSetPowerState after the NodeSet becomes static.
+	// Apply static replicas and clear reserved ordinals before removing the power state.
+	if !ephemeralNodesEnabled {
+		if err = r.deleteNodeSetPowerState(ctx, nodeSet); err != nil {
+			return ctrl.Result{}, fmt.Errorf("deleting NodeSetPowerState: %w", err)
+		}
+	}
+
+	if err = r.updateEphemeralModeAppliedCondition(ctx, nodeSet); err != nil {
+		return ctrl.Result{}, fmt.Errorf("updating ephemeral mode applied condition: %w", err)
 	}
 
 	// region Maintenance condition
@@ -227,6 +240,7 @@ func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv
 		slurmv1alpha1.ConditionNodeSetStatefulSetUpdated,
 		slurmv1alpha1.ConditionNodeSetPodsReady,
 		slurmv1alpha1.ConditionNodeSetStatefulSetTerminated,
+		slurmv1alpha1.ConditionNodeSetEphemeralModeApplied,
 	} {
 		if meta.FindStatusCondition(nodeSet.Status.Conditions, conditionType) != nil {
 			continue
@@ -254,6 +268,28 @@ func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv
 	}
 
 	return nil
+}
+
+func (r *NodeSetReconciler) updateEphemeralModeAppliedCondition(
+	ctx context.Context,
+	nodeSet *slurmv1alpha1.NodeSet,
+) error {
+	condition := metav1.Condition{
+		Type:               slurmv1alpha1.ConditionNodeSetEphemeralModeApplied,
+		Status:             metav1.ConditionFalse,
+		ObservedGeneration: nodeSet.Generation,
+		Reason:             "StaticModeApplied",
+		Message:            "Static nodes mode is applied",
+	}
+	if nodeSet.Spec.EphemeralNodes != nil && *nodeSet.Spec.EphemeralNodes {
+		condition.Status = metav1.ConditionTrue
+		condition.Reason = "EphemeralModeApplied"
+		condition.Message = "Ephemeral nodes mode is applied"
+	}
+
+	return r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) bool {
+		return meta.SetStatusCondition(&status.Conditions, condition)
+	})
 }
 
 // executeReconciliation reconciles all resources necessary for deploying Slurm NodeSet workers
@@ -706,11 +742,7 @@ func (r *NodeSetReconciler) reconcileNodeSetPowerState(
 
 	if apierrors.IsNotFound(err) {
 		logger.V(1).Info("NodeSetPowerState not found, it will be created")
-		activeNodes := make([]int32, nodeSet.Spec.InitialNumberEphemeralNodes)
-		for i := int32(0); i < nodeSet.Spec.InitialNumberEphemeralNodes; i++ {
-			activeNodes[i] = i
-		}
-		desired.Spec.ActiveNodes = activeNodes
+		desired.Spec.ActiveNodes = buildActiveNodesForNewPowerState(nodeSet)
 	}
 
 	if err := r.NodeSetPowerState.Reconcile(ctx, nodeSet, desired); err != nil {
@@ -760,4 +792,36 @@ func (r *NodeSetReconciler) reconcileNodeSetPowerState(
 	)
 
 	return existing.Spec.ActiveNodes, nil
+}
+
+func (r *NodeSetReconciler) deleteNodeSetPowerState(
+	ctx context.Context,
+	nodeSet *slurmv1alpha1.NodeSet,
+) error {
+	powerState := &slurmv1alpha1.NodeSetPowerState{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nodeSet.Name,
+			Namespace: nodeSet.Namespace,
+		},
+	}
+	return client.IgnoreNotFound(r.Delete(ctx, powerState))
+}
+
+func buildActiveNodesForNewPowerState(nodeSet *slurmv1alpha1.NodeSet) []int32 {
+	activeCount := nodeSet.Spec.InitialNumberEphemeralNodes
+	appliedMode := meta.FindStatusCondition(
+		nodeSet.Status.Conditions,
+		slurmv1alpha1.ConditionNodeSetEphemeralModeApplied,
+	)
+
+	// On a static-to-ephemeral transition, activate all spec replicas instead of applying the initial ephemeral count
+	if appliedMode != nil && appliedMode.Status == metav1.ConditionFalse {
+		activeCount = nodeSet.Spec.Replicas
+	}
+
+	activeNodes := make([]int32, activeCount)
+	for i := int32(0); i < activeCount; i++ {
+		activeNodes[i] = i
+	}
+	return activeNodes
 }
