@@ -2,11 +2,13 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/99
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260816173636 AS login_pam_builder
+# https://github.com/nebius/ml-containers/pull/90
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260624084749 AS login_pam_builder
 
 RUN apt-get update && \
-    apt-get install -y libpam0g-dev && \
+    apt-get install -y --no-install-recommends \
+        gcc \
+        libpam0g-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -112,6 +114,8 @@ COPY --from=login_pam_builder /out/ /
 
 # Install the per-user cgroup isolation PAM hook.
 # It is a no-op unless enabled via the SlurmCluster `login.userIsolation` field.
+# Keep pam_soperator_jail last: it pivots the per-session sshd process into the
+# jail, so any PAM session modules after it would also run inside the jail.
 COPY images/login/user_isolation_pam_hook.sh /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/user_isolation_pam_hook.sh && \
     echo "session optional pam_exec.so quiet log=/proc/1/fd/1 /opt/bin/slurm/user_isolation_pam_hook.sh" >> /etc/pam.d/sshd && \
@@ -120,10 +124,7 @@ RUN chmod +x /opt/bin/slurm/user_isolation_pam_hook.sh && \
 # Expose the port used for accessing sshd
 EXPOSE 22
 
-# Copy & run the entrypoint scripts
-COPY images/common/scripts/sshd_pam_jail_entrypoint.sh /opt/bin/slurm/
+# Copy & run the entrypoint script
 COPY images/login/sshd_entrypoint.sh /opt/bin/slurm/
-RUN chmod +x \
-    /opt/bin/slurm/sshd_entrypoint.sh \
-    /opt/bin/slurm/sshd_pam_jail_entrypoint.sh
+RUN chmod +x /opt/bin/slurm/sshd_entrypoint.sh
 ENTRYPOINT ["/opt/bin/slurm/sshd_entrypoint.sh"]

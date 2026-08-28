@@ -18,7 +18,7 @@ populate_jail_rootfs() {
       --exclude-xattr system.nfs4_acl
 
     echo "Set permissions for jail directory"
-    chmod 755 /mnt/jail # Permissions 755 are only allowed permissions for OpenSSH ChrootDirectory feature
+    chmod 755 /mnt/jail # Keep the jail root traversable by SSH users
 
     # TODO: Move this to an active check/action when it's implemented
     echo "Generate an internal SSH keypair for user root"

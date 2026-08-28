@@ -2,11 +2,13 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/99
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260816173636 AS worker_pam_builder
+# https://github.com/nebius/ml-containers/pull/90
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260624084749 AS worker_pam_builder
 
 RUN apt-get update && \
-    apt-get install -y libpam0g-dev && \
+    apt-get install -y --no-install-recommends \
+        gcc \
+        libpam0g-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -166,6 +168,8 @@ RUN rm -rf /etc/update-motd.d
 # Install the native PAM module that places each SSH session in its own mount
 # namespace and pivots it into /mnt/jail. Worker SSH sessions intentionally do
 # not use the login node's per-user cgroup hook.
+# Keep pam_soperator_jail last: it pivots the per-session sshd process into the
+# jail, so any PAM session modules after it would also run inside the jail.
 COPY --from=worker_pam_builder /out/ /
 RUN echo "session required pam_soperator_jail.so /mnt/jail" >> /etc/pam.d/sshd
 
@@ -185,14 +189,12 @@ COPY images/worker/write_soperator_metadata.sh /opt/bin/slurm/
 COPY images/worker/worker_init.py /opt/bin/slurm/
 
 # Copy supervisord entrypoint script
-COPY images/common/scripts/sshd_pam_jail_entrypoint.sh /opt/bin/slurm/
 COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
 COPY images/worker/docker_proxy_nginx_entrypoint.sh /opt/bin/slurm/
 COPY images/worker/dockerd_entrypoint.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
     chmod +x /opt/bin/slurm/write_soperator_metadata.sh && \
-    chmod +x /opt/bin/slurm/sshd_pam_jail_entrypoint.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
     chmod +x /opt/bin/slurm/worker_init.py && \
     chmod +x /opt/bin/slurm/docker_proxy_nginx_entrypoint.sh && \

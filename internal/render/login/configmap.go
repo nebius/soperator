@@ -73,7 +73,6 @@ func generateSshdConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdRSAKeyName)
 	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdECDSAKeyName)
 	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdECDSA25519KeyName)
-	res.AddLine("ChrootDirectory " + consts.VolumeMountPathJail)
 	res.AddLine("ClientAliveInterval " + consts.SSHDClientAliveInterval)
 	res.AddLine("ClientAliveCountMax " + consts.SSHDClientAliveCountMax)
 	res.AddLine("MaxStartups " + consts.SSHDMaxStartups)

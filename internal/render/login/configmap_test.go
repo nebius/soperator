@@ -9,7 +9,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -34,7 +33,7 @@ func TestGenerateSshdConfig_AuthorizedKeysCommandDependsOnSSSD(t *testing.T) {
 	assert.Contains(t, withSSSD, "AuthorizedKeysCommandUser root")
 }
 
-func TestGenerateSshdConfig_KeepsChrootForOldLoginImages(t *testing.T) {
+func TestGenerateSshdConfig_UsesPAMJail(t *testing.T) {
 	cluster := &values.SlurmCluster{
 		NodeLogin: values.SlurmLogin{
 			ContainerSshd: values.Container{
@@ -45,7 +44,7 @@ func TestGenerateSshdConfig_KeepsChrootForOldLoginImages(t *testing.T) {
 
 	rendered := generateSshdConfig(cluster).Render()
 	assert.Contains(t, rendered, "UsePAM yes")
-	assert.Contains(t, rendered, "ChrootDirectory "+consts.VolumeMountPathJail)
+	assert.NotContains(t, rendered, "ChrootDirectory")
 }
 
 func TestGenerateUserIsolationConfig_Disabled(t *testing.T) {

@@ -113,4 +113,4 @@ echo "Waiting until munge started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 
 echo "Start sshd daemon"
-exec /opt/bin/slurm/sshd_pam_jail_entrypoint.sh
+exec /usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config

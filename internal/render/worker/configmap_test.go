@@ -6,16 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-func TestGenerateDefaultSupervisordConfig_UsesPAMJailEntrypoint(t *testing.T) {
+func TestGenerateDefaultSupervisordConfig_StartsSSHDDirectly(t *testing.T) {
 	rendered := generateDefaultSupervisordConfig().Render()
 
-	assert.Contains(t, rendered, "[ -x /opt/bin/slurm/sshd_pam_jail_entrypoint.sh ]")
-	assert.Contains(t, rendered, "exec /opt/bin/slurm/sshd_pam_jail_entrypoint.sh")
-	assert.Contains(t, rendered, "else exec /usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config")
+	assert.Contains(t, rendered, "command=/usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config")
+	assert.NotContains(t, rendered, "sshd_pam_jail_entrypoint.sh")
 }
 
 func TestGenerateSshdConfig_AuthorizedKeysCommandDependsOnSSSD(t *testing.T) {
@@ -37,7 +35,7 @@ func TestGenerateSshdConfig_AuthorizedKeysCommandDependsOnSSSD(t *testing.T) {
 	assert.Contains(t, withSSSD, "AuthorizedKeysCommandUser root")
 }
 
-func TestGenerateSshdConfig_KeepsChrootForOldWorkerImages(t *testing.T) {
+func TestGenerateSshdConfig_UsesPAMJail(t *testing.T) {
 	login := &values.SlurmLogin{
 		ContainerSshd: values.Container{
 			NodeContainer: slurmv1.NodeContainer{Port: 22},
@@ -46,5 +44,5 @@ func TestGenerateSshdConfig_KeepsChrootForOldWorkerImages(t *testing.T) {
 
 	rendered := generateSshdConfig(login).Render()
 	assert.Contains(t, rendered, "UsePAM yes")
-	assert.Contains(t, rendered, "ChrootDirectory "+consts.VolumeMountPathJail)
+	assert.NotContains(t, rendered, "ChrootDirectory")
 }
