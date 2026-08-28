@@ -48,9 +48,16 @@ jobs:
 
           # Only scheduled runs count here. A manual run occupies a project, which
           # the selector already accounts for, but it must not affect the schedule.
-          # The actor= query parameter is avoided on purpose: it serves stale results.
+          # PR comment dispatches also run as github-actions[bot], so restrict the
+          # results to branches the scheduler owns. The actor= query parameter is
+          # avoided on purpose: it serves stale results.
+          BRANCHES_JSON=$(printf '%s\n' "${BRANCHES[@]}" | jq -R . | jq -s .)
           RUNS=$(gh api "repos/${{ github.repository }}/actions/workflows/e2e_test.yml/runs?per_page=100" \
-            --jq '[.workflow_runs[] | select(.actor.login == "github-actions[bot]")]')
+            | jq --argjson branches "$BRANCHES_JSON" \
+              '[.workflow_runs[] | select(
+                .actor.login == "github-actions[bot]"
+                and (.head_branch as $branch | $branches | index($branch))
+              )]')
 
           # A run that finds no free profile waits, then fails. Dispatching on every
           # tick regardless would turn a stretch of tight capacity into a stream of
