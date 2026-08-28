@@ -95,8 +95,12 @@ COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
 # Copy script for bind-mounting slurm into the jail
 COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
+# Copy script for preparing an SSHD configuration compatible with the PAM jail
+COPY images/common/scripts/prepare_sshd_pam_jail_config.sh /opt/bin/slurm/
+
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
-    chmod +x /opt/bin/slurm/bind_slurm_common.sh
+    chmod +x /opt/bin/slurm/bind_slurm_common.sh && \
+    chmod +x /opt/bin/slurm/prepare_sshd_pam_jail_config.sh
 
 # Update linker cache
 RUN ldconfig

@@ -112,5 +112,13 @@ setup_user_isolation
 echo "Waiting until munge started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
 
+source_sshd_config_dir="/mnt/ssh-configs"
+effective_sshd_config_dir=$(mktemp -d /run/soperator-ssh-configs.XXXXXX)
+/opt/bin/slurm/prepare_sshd_pam_jail_config.sh \
+    "${source_sshd_config_dir}" \
+    "${effective_sshd_config_dir}"
+mount --bind "${effective_sshd_config_dir}" "${source_sshd_config_dir}"
+/usr/sbin/sshd -t -f "${source_sshd_config_dir}/sshd_config"
+
 echo "Start sshd daemon"
-exec /usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config
+exec /usr/sbin/sshd -D -e -f "${source_sshd_config_dir}/sshd_config"

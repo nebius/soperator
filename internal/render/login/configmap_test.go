@@ -33,7 +33,7 @@ func TestGenerateSshdConfig_AuthorizedKeysCommandDependsOnSSSD(t *testing.T) {
 	assert.Contains(t, withSSSD, "AuthorizedKeysCommandUser root")
 }
 
-func TestGenerateSshdConfig_UsesPAMJail(t *testing.T) {
+func TestGenerateSshdConfig_KeepsChrootFallbackForOldImages(t *testing.T) {
 	cluster := &values.SlurmCluster{
 		NodeLogin: values.SlurmLogin{
 			ContainerSshd: values.Container{
@@ -44,7 +44,8 @@ func TestGenerateSshdConfig_UsesPAMJail(t *testing.T) {
 
 	rendered := generateSshdConfig(cluster).Render()
 	assert.Contains(t, rendered, "UsePAM yes")
-	assert.NotContains(t, rendered, "ChrootDirectory")
+	assert.Contains(t, rendered, "# Upgrade fallback for pre-PAM images")
+	assert.Contains(t, rendered, "ChrootDirectory /mnt/jail")
 }
 
 func TestGenerateUserIsolationConfig_Disabled(t *testing.T) {
