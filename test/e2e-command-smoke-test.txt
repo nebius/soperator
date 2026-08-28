@@ -1,0 +1,1 @@
+This temporary marker makes the PR exercise the full Build All and E2E command path.
