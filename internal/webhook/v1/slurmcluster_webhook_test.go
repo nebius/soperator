@@ -163,3 +163,60 @@ func TestValidateSlurmClusterUserIsolation(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestValidateSlurmClusterLoginDocker(t *testing.T) {
+	validator := &SlurmClusterCustomValidator{}
+
+	clusterWith := func(docker *slurmv1.LoginDocker, mounts ...slurmv1.NodeVolumeMount) *slurmv1.SlurmCluster {
+		return &slurmv1.SlurmCluster{
+			Spec: slurmv1.SlurmClusterSpec{
+				SlurmNodes: slurmv1.SlurmNodes{
+					Login: slurmv1.SlurmNodeLogin{
+						Docker:  docker,
+						Volumes: slurmv1.SlurmNodeLoginVolumes{JailSubMounts: mounts},
+					},
+				},
+			},
+		}
+	}
+
+	t.Run("admits omitted Docker without image storage", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(nil))
+		assert.NoError(t, err)
+	})
+
+	t.Run("admits Docker with enabled omitted without image storage", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginDocker{}))
+		assert.NoError(t, err)
+	})
+
+	t.Run("admits disabled Docker without image storage", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginDocker{
+			Enabled: ptr.To(false),
+		}))
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects enabled Docker without image storage", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginDocker{
+			Enabled: ptr.To(true),
+		}))
+		assert.ErrorContains(t, err, "/mnt/image-storage")
+	})
+
+	t.Run("rejects read-only image storage", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(
+			&slurmv1.LoginDocker{Enabled: ptr.To(true)},
+			slurmv1.NodeVolumeMount{MountPath: "/mnt/image-storage", ReadOnly: true},
+		))
+		assert.ErrorContains(t, err, "must be writable")
+	})
+
+	t.Run("admits enabled Docker with writable image storage", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(
+			&slurmv1.LoginDocker{Enabled: ptr.To(true)},
+			slurmv1.NodeVolumeMount{MountPath: "/mnt/image-storage"},
+		))
+		assert.NoError(t, err)
+	})
+}

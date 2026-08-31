@@ -491,6 +491,10 @@ spec:
         cpuWeight: {{ .cpuWeight }}
         {{- end }}
       {{- end }}
+      {{- with .Values.slurmNodes.login.docker }}
+      docker:
+        enabled: {{ default false .enabled }}
+      {{- end }}
     exporter:
       enabled: {{ .Values.slurmNodes.exporter.enabled }}
       size: {{ required ".Values.slurmNodes.exporter.size must be provided." .Values.slurmNodes.exporter.size }}

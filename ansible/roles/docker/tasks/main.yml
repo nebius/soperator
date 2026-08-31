@@ -1,0 +1,13 @@
+---
+
+- name: Ensure Docker packages are installed
+  ansible.builtin.apt:
+    name:
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-ce
+      - docker-ce-cli
+    state: present
+    update_cache: true
+  tags:
+    - docker

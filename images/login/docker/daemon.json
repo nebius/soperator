@@ -1,0 +1,8 @@
+{
+  "data-root": "/mnt/image-storage/docker",
+  "group": "root",
+  "hosts": [
+    "unix:///var/run/docker.sock"
+  ],
+  "bip": "169.254.0.1/16"
+}

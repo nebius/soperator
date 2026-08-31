@@ -1062,6 +1062,22 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Optional
 	UserIsolation *LoginUserIsolation `json:"userIsolation,omitempty"`
+
+	// Docker defines Docker support for SSH sessions on login nodes.
+	// A writable jail sub-mount at /mnt/image-storage is required when enabled.
+	//
+	// +kubebuilder:validation:Optional
+	Docker *LoginDocker `json:"docker,omitempty"`
+}
+
+// LoginDocker defines Docker support for SSH sessions on login nodes.
+type LoginDocker struct {
+	// Enabled starts a rootful Docker daemon and exposes its proxied socket to SSH sessions.
+	// Docker requires a dedicated writable image-storage disk mounted at /mnt/image-storage.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // LoginUserIsolation defines per-user cgroup v2 limits applied to each SSH session on login nodes.
