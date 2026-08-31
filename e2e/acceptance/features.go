@@ -36,5 +36,8 @@ func FeaturePaths() []string {
 		"features/passive_checks.feature",
 		"features/active_checks.feature",
 		"features/system_checks.feature",
+		"features/topology.feature",
+		"features/topology_tree.feature",
+		"features/topology_legacy.feature",
 	}
 }

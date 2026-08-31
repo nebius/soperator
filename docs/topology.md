@@ -353,6 +353,49 @@ topology marked `cluster_default`, not all of them, and it takes a topology name
 The units in `scontrol show node` must exist in the rendered file. If a node reports a switch or
 block that the file does not define, the worker and the operator disagree — see below.
 
+### Checking that a tree really constrains scheduling
+
+The file, the loaded config and the registrations can all agree while the scheduler ignores the
+tree, and `$SLURM_TOPOLOGY_ADDR` no longer answers that question: on a multi-topology cluster it
+reports the bare node name with `SLURM_TOPOLOGY_ADDR_PATTERN=node`, whatever topology the job's
+partition uses.
+
+What does answer it is `--switches`, which caps the leaf switches an allocation may span. Take two
+workers that `scontrol show node` places on different leaf switches and ask for both within one
+switch:
+
+```
+srun -p gpu -N2 -w h100-0,h100-4 hostname                 # allocates
+srun -p gpu -N2 -w h100-0,h100-4 --switches=1 hostname    # waits, never placed
+```
+
+The first run is what tells a topology constraint apart from workers that are merely busy. Two
+workers on the same leaf switch stay placeable under `--switches=1`.
+
+### Acceptance scenarios
+
+Every scenario opens with a step that reads the cluster's configuration. A cluster that does not
+ask for the capability under test skips immediately, before any work; past that step a missing,
+unhealthy or unusable resource fails.
+
+`e2e/acceptance/features/topology.feature` runs in every e2e run and covers the published config,
+what `topoconf` loaded, the partition bindings, the workers' registrations and a job per topology.
+
+`e2e/acceptance/features/topology_tree.feature` covers the `--switches` behaviour and also runs in
+every e2e run. It skips itself unless the cluster configures a tree spanning more than one leaf
+switch.
+
+`e2e/acceptance/features/topology_block.feature` is kept out of the default suite because it
+reconfigures the block topology while it runs. Start it by hand:
+
+```
+go run ./e2e/cmd/acceptance --kubectl-context <ctx> --scenario features/topology_block.feature
+```
+
+`e2e/acceptance/features/topology_legacy.feature` checks the single `topology/tree` configuration
+that clusters used before named topologies. It is tagged `>=4.0.0,<5.0.0`, so the runner picks it
+only on those clusters and skips it on 5.0.0 and later.
+
 ### When Slurm re-reads the topology
 
 Two different mechanisms keep the running cluster in step with the file, and it is worth knowing
