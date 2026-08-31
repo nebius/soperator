@@ -2,8 +2,9 @@ Feature: Enroot containers
   @soperator_version_>=5.0.0
   Scenario Outline: Enroot containers can run over SSH
     Given an Enroot SSH test user exists
-    When the user imports and starts an Enroot container over SSH on a <node> node
-    Then the SSH Enroot smoke test succeeds
+    When the user imports an Enroot image over SSH on a <node> node
+    And the user starts the imported Enroot image over SSH
+    Then the container reports Ubuntu
 
     Examples:
       | node   |
