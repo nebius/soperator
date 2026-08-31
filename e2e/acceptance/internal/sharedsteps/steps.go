@@ -32,6 +32,8 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewPassiveChecks(info, runtime, slurm, selector),
 		NewActiveChecks(info, runtime, slurm, kubectl, selector),
 		NewSystemChecks(runtime, slurm, kubectl, selector),
+		NewTopology(info, runtime, kubectl, selector),
+		NewTopologyLegacy(runtime, selector),
 	} {
 		registerScenarioScoped(sc, family)
 	}

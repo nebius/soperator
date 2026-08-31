@@ -30,9 +30,10 @@ const (
 )
 
 type ObjectMeta struct {
-	Name       string `json:"name"`
-	Namespace  string `json:"namespace"`
-	Generation int64  `json:"generation"`
+	Name        string            `json:"name"`
+	Namespace   string            `json:"namespace"`
+	Generation  int64             `json:"generation"`
+	Annotations map[string]string `json:"annotations"`
 }
 
 type SlurmClusterList struct {
@@ -41,7 +42,39 @@ type SlurmClusterList struct {
 
 type SlurmCluster struct {
 	Metadata ObjectMeta         `json:"metadata"`
+	Spec     SlurmClusterSpec   `json:"spec"`
 	Status   SlurmClusterStatus `json:"status"`
+}
+
+type SlurmClusterSpec struct {
+	Topology               *SlurmClusterTopology  `json:"topology"`
+	PartitionConfiguration PartitionConfiguration `json:"partitionConfiguration"`
+}
+
+type SlurmClusterTopology struct {
+	Topologies []NamedTopology `json:"topologies"`
+}
+
+type NamedTopology struct {
+	Name           string         `json:"name"`
+	ClusterDefault *bool          `json:"clusterDefault"`
+	Topo           TopologyPlugin `json:"topo"`
+	NodeSetRefs    []string       `json:"nodeSetRefs"`
+}
+
+type TopologyPlugin struct {
+	Type       string `json:"type"`
+	BlockSizes []int  `json:"blockSizes"`
+}
+
+type PartitionConfiguration struct {
+	ConfigType string      `json:"configType"`
+	Partitions []Partition `json:"partitions"`
+}
+
+type Partition struct {
+	Name        string `json:"name"`
+	TopologyRef string `json:"topologyRef"`
 }
 
 type SlurmClusterStatus struct {
@@ -124,4 +157,19 @@ type ActiveCheckSlurmJobsStatus struct {
 	LastRunFailJobsAndReasons  []any    `json:"lastRunFailJobsAndReasons"`
 	LastRunErrorJobsAndReasons []any    `json:"lastRunErrorJobsAndReasons"`
 	LastRunCancelledJobs       []string `json:"lastRunCancelledJobs"`
+}
+
+type JailedConfig struct {
+	Metadata ObjectMeta         `json:"metadata"`
+	Spec     JailedConfigSpec   `json:"spec"`
+	Status   JailedConfigStatus `json:"status"`
+}
+
+type JailedConfigSpec struct {
+	UpdateActions []string `json:"updateActions"`
+}
+
+type JailedConfigStatus struct {
+	AppliedHash string             `json:"appliedHash"`
+	Conditions  []metav1.Condition `json:"conditions"`
 }
