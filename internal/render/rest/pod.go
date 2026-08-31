@@ -35,7 +35,7 @@ func BasePodTemplateSpec(
 	}
 
 	labels := maps.Clone(matchLabels)
-	maps.Copy(labels, valuesREST.Labels)
+	common.MergeExtraLabels(labels, valuesREST.Labels)
 
 	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNameREST)
 	maps.Copy(annotations, valuesREST.Annotations)

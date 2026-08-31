@@ -40,7 +40,7 @@ func RenderNodeSetStatefulSet(
 	labels[consts.LabelSoperatorRollingUpdateEnabled] = strconv.FormatBool(
 		nodeSet.UpdateStrategy == consts.UpdateStrategySlurmAwareRollingUpdate,
 	)
-	maps.Copy(labels, nodeSet.Labels)
+	common.MergeExtraLabels(labels, nodeSet.Labels)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	matchLabels[consts.LabelNodeSetKey] = nodeSet.Name
 
@@ -190,6 +190,8 @@ func RenderNodeSetStatefulSet(
 				nodeSet.ParentalCluster.Namespace,
 				nodeSet.ParentalCluster.Name,
 				pvcTemplateSpecs,
+				nodeSet.Labels,
+				nodeSet.Annotations,
 			),
 			VolumeClaimUpdateStrategy: volumeClaimUpdateStrategy,
 			Template: corev1.PodTemplateSpec{

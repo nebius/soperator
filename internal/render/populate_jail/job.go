@@ -23,7 +23,7 @@ func RenderPopulateJailJob(
 	populateJail *values.PopulateJail,
 ) batchv1.Job {
 	labels := common.RenderLabels(consts.ComponentTypePopulateJail, clusterName)
-	maps.Copy(labels, populateJail.Labels)
+	common.MergeExtraLabels(labels, populateJail.Labels)
 
 	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNamePopulateJail)
 	maps.Copy(annotations, populateJail.Annotations)

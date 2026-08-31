@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -26,7 +27,7 @@ func renderPodTemplateSpec(
 		nodeFilter = slurmv1.K8sNodeFilter{}
 	}
 	labels := maps.Clone(matchLabels)
-	maps.Copy(labels, clusterValues.SlurmExporter.Labels)
+	common.MergeExtraLabels(labels, clusterValues.SlurmExporter.Labels)
 
 	result := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{

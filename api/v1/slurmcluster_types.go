@@ -59,12 +59,12 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Required
 	SlurmNodes SlurmNodes `json:"slurmNodes"`
 
-	// ExtraLabels are custom K8s labels added to every Pod and the spool PVC of this cluster.
+	// ExtraLabels are custom K8s labels added to every Pod and PVC created for this cluster.
 	//
 	// +kubebuilder:validation:Optional
 	ExtraLabels map[string]string `json:"extraLabels,omitempty"`
 
-	// ExtraAnnotations are custom K8s annotations added to every Pod and the spool PVC of this cluster.
+	// ExtraAnnotations are custom K8s annotations added to every Pod and PVC created for this cluster.
 	//
 	// +kubebuilder:validation:Optional
 	ExtraAnnotations map[string]string `json:"extraAnnotations,omitempty"`
