@@ -25,6 +25,7 @@ require (
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.55.0
 	google.golang.org/grpc v1.83.1
+	gopkg.in/yaml.v3 v3.0.1
 	istio.io/pkg v0.0.0-20241216214326-d70796207df3
 	k8s.io/api v0.36.4
 	k8s.io/apiextensions-apiserver v0.36.4

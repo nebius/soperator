@@ -502,8 +502,10 @@ func (r NodeSetReconciler) executeReconciliation(
 					secrets.SshdKeysName = naming.BuildSecretSSHDKeysName(cluster.Name)
 				}
 
-				topologyPlugin := cluster.Spec.SlurmConfig.TopologyPlugin
-				topologyPluginEnabled := topologyPlugin != ""
+				// The same condition the topology controller renders on: waiting for a topology
+				// config the operator never writes would time out every worker init container.
+				topologyEnabled := cluster.Spec.Topology != nil &&
+					len(cluster.Spec.Topology.Topologies) > 0
 
 				desired, err := worker.RenderNodeSetStatefulSet(
 					cluster.Name,
@@ -511,8 +513,7 @@ func (r NodeSetReconciler) executeReconciliation(
 					&secrets,
 					cluster.Spec.CgroupVersion,
 					clusterWithGPU,
-					topologyPluginEnabled,
-					topologyPlugin,
+					topologyEnabled,
 				)
 				if err != nil {
 					stepLogger.Error(err, "Failed to render")

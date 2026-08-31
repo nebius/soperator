@@ -47,9 +47,6 @@ tests:
           path: spec.slurmConfig.messageTimeout
           value: 60
       - equal:
-          path: spec.slurmConfig.topologyPlugin
-          value: "topology/tree"
-      - equal:
           path: spec.slurmConfig.topologyParam
           value: "SwitchAsNodeRank"
 

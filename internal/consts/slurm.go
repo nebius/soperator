@@ -41,10 +41,16 @@ var SlurmNodeReasonsList = []string{
 const (
 	SlurmConfigRawStrategyPatch    = "patch"
 	SlurmConfigRawStrategyOverride = "override"
-	SlurmTopologyTree              = "topology/tree"
-	SlurmTopologyBlock             = "topology/block"
-
 	// SlurmTopologyDefaultFabric is the default IB fabric / top-of-tree switch name used for
 	// NodeSets without an explicit spec.topology.fabric. It preserves the legacy single-root tree.
 	SlurmTopologyDefaultFabric = "root"
+
+	// Topology plugin kinds of a named topology in topology.yaml. These name the per-topology
+	// attribute keys rather than slurm.conf values.
+	SlurmTopologyTypeTree  = "tree"
+	SlurmTopologyTypeBlock = "block"
+	SlurmTopologyTypeFlat  = "flat"
+
+	// SlurmTopologyNodeSetRefAll covers every NodeSet of the cluster in NamedTopology.NodeSetRefs.
+	SlurmTopologyNodeSetRefAll = "ALL"
 )

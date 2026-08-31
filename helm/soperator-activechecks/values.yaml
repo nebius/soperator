@@ -57,7 +57,6 @@ checks:
     dependsOn:
       - "manage-jail-state"
       - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
     schedule: "0 0,12 * * *"
     suspend: false
     runAfterCreation: true
@@ -78,7 +77,6 @@ checks:
     dependsOn:
       - "manage-jail-state"
       - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
     suspend: true
     runAfterCreation: false
     slurmJobSpec:
@@ -98,7 +96,6 @@ checks:
       - "gpu-checks"
       - "manage-jail-state"
       - "wait-for-soperatorchecks-srun-ready"
-      - "wait-for-topology"
     suspend: true
     runAfterCreation: true
     slurmJobSpec:
@@ -227,15 +224,6 @@ checks:
             value: "ansible.posix.jsonl"
           - name: "ANSIBLE_FORCE_COLOR"
             value: "0"
-  wait-for-topology:
-    enabled: true
-    checkType: "k8sJob"
-    suspend: true
-    runAfterCreation: true
-    k8sJobSpec:
-      scriptFile: "scripts/wait-for-topology.sh"
-      jobContainer:
-        appArmorProfile: unconfined
   wait-for-soperatorchecks-srun-ready:
     enabled: true
     checkType: "k8sJob"

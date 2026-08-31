@@ -26,7 +26,6 @@ func RenderContainerWorkerInit(
 	container *values.Container,
 	topologyEnabled, gpuEnabled bool,
 	waitTimeoutSeconds int32,
-	topologyPlugin string,
 	topologyFabric string,
 	randomDelaySeconds int32,
 ) corev1.Container {
@@ -124,14 +123,6 @@ func RenderContainerWorkerInit(
 				Value: "5",
 			},
 		)
-		if topologyPlugin != "" {
-			env = append(env,
-				corev1.EnvVar{
-					Name:  "SLURM_TOPOLOGY_PLUGIN",
-					Value: topologyPlugin,
-				},
-			)
-		}
 		fabric := topologyFabric
 		if fabric == "" {
 			fabric = consts.SlurmTopologyDefaultFabric

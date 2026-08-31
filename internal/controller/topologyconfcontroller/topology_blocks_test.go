@@ -2,6 +2,7 @@ package topologyconfcontroller_test
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -27,7 +28,7 @@ func TestBuildTopologyBlocks_GroupsWorkersByTierZero(t *testing.T) {
 		allNodeNames := []string{"pod1", "pod2", "pod3", "pod4"}
 
 		blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames, nil)
-		lines := blocks.RenderConfigLines()
+		lines := renderedBlockLines(blocks)
 
 		require.True(t, len(lines) != 0, "expected non-empty block lines")
 		result := parseBlockLines(t, lines)
@@ -52,7 +53,7 @@ func TestBuildTopologyBlocks_GroupsWorkersByTierZero(t *testing.T) {
 		allNodeNames := []string{"pod-1", "pod-2", "pod-3", "pod-4"}
 
 		blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames, nil)
-		lines := blocks.RenderConfigLines()
+		lines := renderedBlockLines(blocks)
 
 		require.True(t, len(lines) != 0, "expected non-empty block lines")
 		result := parseBlockLines(t, lines)
@@ -82,7 +83,7 @@ func TestBuildTopologyBlocks_AssignsUnknownBlock(t *testing.T) {
 	allNodeNames := []string{"pod1", "pod2", "pod3"}
 
 	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames, nil)
-	result := parseBlockLines(t, blocks.RenderConfigLines())
+	result := parseBlockLines(t, renderedBlockLines(blocks))
 
 	require.Equal(t, map[string][]string{
 		"block-a": {"pod1"},
@@ -103,7 +104,7 @@ func TestBuildTopologyBlocks_RenderMergesWorkerNodes(t *testing.T) {
 	allNodeNames := []string{"worker-0", "worker-1", "worker-cpu-0", "worker-2", "worker-cpu-1", "workerkek1"}
 
 	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, podsByNode, allNodeNames, nil)
-	lines := blocks.RenderConfigLines()
+	lines := renderedBlockLines(blocks)
 
 	require.Equal(t, []string{
 		"BlockName=block-a Nodes=worker-[0-2],worker-cpu-[0-1],workerkek1",
@@ -123,7 +124,7 @@ func TestBuildTopologyBlocks_SanitizesBlockName(t *testing.T) {
 	allNodeNames := []string{"worker-0"}
 
 	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames, nil)
-	lines := blocks.RenderConfigLines()
+	lines := renderedBlockLines(blocks)
 
 	require.Equal(t, []string{
 		"BlockName=6f84b74219aa22869602735141708147_ Nodes=worker-0",
@@ -132,7 +133,7 @@ func TestBuildTopologyBlocks_SanitizesBlockName(t *testing.T) {
 
 func TestBuildTopologyBlocks_RenderEmpty(t *testing.T) {
 	blocks := tc.BuildTopologyBlocks(context.Background(), map[string]tc.NodeTopologyLabels{}, map[string][]string{}, nil, nil)
-	require.Nil(t, blocks.RenderConfigLines())
+	require.Nil(t, renderedBlockLines(blocks))
 }
 
 // Powered-down nodes from different fabrics must not share one "unknown" block.
@@ -154,7 +155,7 @@ func TestBuildTopologyBlocks_PerFabricUnknown(t *testing.T) {
 		"fab-a.unknown": {"a-[0-1]"},
 		"fab-b.unknown": {"b-0"},
 		"unknown":       {"def-0"},
-	}, parseBlockLines(t, blocks.RenderConfigLines()))
+	}, parseBlockLines(t, renderedBlockLines(blocks)))
 }
 
 func parseBlockLines(t *testing.T, lines []string) map[string][]string {
@@ -174,4 +175,14 @@ func parseBlockLines(t *testing.T, lines []string) map[string][]string {
 		result[blockName] = nodes
 	}
 	return result
+}
+
+// renderedBlockLines formats the block entries as single lines, keeping these
+// assertions readable now that the only rendered format is topology.yaml.
+func renderedBlockLines(blocks tc.TopologyBlocks) []string {
+	var lines []string
+	for _, block := range blocks.RenderBlocks() {
+		lines = append(lines, fmt.Sprintf("BlockName=%s Nodes=%s", block.Block, block.Nodes))
+	}
+	return lines
 }

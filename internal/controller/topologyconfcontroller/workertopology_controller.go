@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"strings"
 	"time"
@@ -13,8 +14,10 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,10 +45,6 @@ var (
 	}
 )
 
-const (
-	defBlockSize = 16
-)
-
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create;patch
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
@@ -55,7 +54,19 @@ const (
 type WorkerTopologyReconciler struct {
 	BaseReconciler
 	namespace string
+	recorder  events.EventRecorder
 }
+
+// Event reasons reported against the SlurmCluster whose topology is misconfigured. They exist
+// because these situations are otherwise invisible: the config renders, the operator stays healthy,
+// and the first symptom is a job that cannot be scheduled.
+const (
+	reasonTopologyReachesNoNode  = "TopologyReachesNoNode"
+	reasonUnresolvedTopologyRef  = "UnresolvedTopologyRef"
+	reasonClusterDefaultConflict = "ClusterDefaultConflict"
+
+	actionRenderTopology = "RenderTopology"
+)
 
 // Link represents a connection in the topology
 type Link struct {
@@ -65,14 +76,26 @@ type Link struct {
 }
 
 func NewWorkerTopologyReconciler(
-	client client.Client, scheme *runtime.Scheme, namespace string) *WorkerTopologyReconciler {
+	client client.Client, scheme *runtime.Scheme, namespace string, recorder events.EventRecorder,
+) *WorkerTopologyReconciler {
 	return &WorkerTopologyReconciler{
 		BaseReconciler: BaseReconciler{
 			Client: client,
 			Scheme: scheme,
 		},
 		namespace: namespace,
+		recorder:  recorder,
 	}
+}
+
+// recordTopologyIssue reports a topology misconfiguration on the SlurmCluster.
+func (r *WorkerTopologyReconciler) recordTopologyIssue(
+	slurmCluster *slurmv1.SlurmCluster, reason, note string, args ...any,
+) {
+	if r.recorder == nil {
+		return
+	}
+	r.recorder.Eventf(slurmCluster, nil, corev1.EventTypeWarning, reason, actionRenderTopology, note, args...)
 }
 
 func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -86,7 +109,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, fmt.Errorf("get SlurmCluster %q in namespace %q: %w", req.Name, req.Namespace, err)
 	}
 
-	shouldReconcileCluster := isClusterReconciliationNeeded(slurmCluster)
+	shouldReconcileCluster := r.isClusterReconciliationNeeded(slurmCluster)
 
 	if !shouldReconcileCluster {
 		return DefaultRequeueResult, nil
@@ -108,7 +131,11 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	logger.V(1).Info("Fetched NodeSets for SlurmCluster", "count", len(nodeSetList))
 
-	existingTopologyConfig, err := r.EnsureWorkerTopologyConfigMap(ctx, req.Namespace, topoConfigName, slurmCluster.Name, logger)
+	configKey := consts.ConfigMapKeyTopologyYAML
+
+	existingTopologyConfig, err := r.EnsureWorkerTopologyConfigMap(
+		ctx, req.Namespace, topoConfigName, slurmCluster.Name, configKey, slurmCluster, logger,
+	)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("ensure worker topology ConfigMap: %w", err)
 	}
@@ -121,39 +148,50 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		logger.Info("No worker topology to apply yet (empty desired topology), preserving existing topology config")
 		return DefaultRequeueResult, nil
 	}
+	desiredStructure, err := topologyStructure(desiredTopology)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("calculate topology structure: %w", err)
+	}
 
-	existingTopology := existingTopologyConfig.Data[consts.ConfigMapKeyTopologyConfig]
+	existingTopology := existingTopologyConfig.Data[configKey]
 	renderedDesiredTopology := renderManagedTopologyConfig(desiredTopology)
 
-	desiredHash := r.calculateConfigHash(renderedDesiredTopology)
-	existingHash := r.calculateConfigHash(existingTopology)
-
-	if desiredHash == existingHash {
+	if r.calculateConfigHash(renderedDesiredTopology) == r.calculateConfigHash(existingTopology) {
 		logger.Info("Topology config unchanged, skipping update")
-		if err := r.ensureJailedConfig(ctx, req.Namespace, topoConfigName, slurmCluster.Name); err != nil {
+		if err := r.ensureJailedConfig(ctx, req.Namespace, topoConfigName, slurmCluster.Name, configKey, desiredStructure); err != nil {
 			return ctrl.Result{}, fmt.Errorf("ensure JailedConfig: %w", err)
 		}
 		return DefaultRequeueResult, nil
 	}
 
-	if err := r.updateTopologyConfigMap(ctx, req.Namespace, topoConfigName, desiredTopology, slurmCluster.Name); err != nil {
+	// The content is published before the request, on purpose: requesting first would let
+	// sconfigcontroller reconfigure the old content and satisfy the request against it. Publishing
+	// first means the request only ever stands over content already in the ConfigMap.
+	if err := r.updateTopologyConfigMap(ctx, req.Namespace, topoConfigName, desiredTopology, configKey); err != nil {
 		logger.Error(err, "Update ConfigMap with topology config")
 		return ctrl.Result{}, fmt.Errorf("update ConfigMap with topology config: %w", err)
+	}
+
+	if err := r.ensureJailedConfig(
+		ctx, req.Namespace, topoConfigName, slurmCluster.Name, configKey, desiredStructure,
+	); err != nil {
+		return ctrl.Result{}, fmt.Errorf("ensure JailedConfig: %w", err)
 	}
 
 	logger.Info("Reconciliation completed successfully")
 	return DefaultRequeueResult, nil
 }
 
-// isClusterReconciliationNeeded checks if the SlurmCluster requires topology reconciliation based on its SlurmConfig.TopologyPlugin setting.
-func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
-	return slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree ||
-		slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyBlock
+// isClusterReconciliationNeeded reports whether the cluster describes a network topology at all.
+// A cluster that declares none is left alone: there is nothing to render, and nothing to fail over.
+func (r *WorkerTopologyReconciler) isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
+	return len(namedTopologies(slurmCluster)) > 0
 }
 
 // EnsureWorkerTopologyConfigMap checks if the topology ConfigMap and JailedConfig exist, and creates them if they don't.
 func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
-	ctx context.Context, namespace, resourceName, clusterName string, logger logr.Logger,
+	ctx context.Context, namespace, resourceName, clusterName, configKey string,
+	slurmCluster *slurmv1.SlurmCluster, logger logr.Logger,
 ) (*corev1.ConfigMap, error) {
 	configMapKey := client.ObjectKey{Name: resourceName, Namespace: namespace}
 	jailedConfigKey := client.ObjectKey{Name: resourceName, Namespace: namespace}
@@ -187,7 +225,7 @@ func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 			"configMapExists", configMapExists,
 			"jailedConfigExists", jailedConfigExists)
 
-		if err = r.createDefaultTopologyResources(ctx, namespace, resourceName, clusterName); err != nil {
+		if err = r.createDefaultTopologyResources(ctx, namespace, resourceName, clusterName, configKey, slurmCluster); err != nil {
 			return nil, fmt.Errorf("create default topology resources in namespace %q: %w", namespace, err)
 		}
 
@@ -205,27 +243,48 @@ func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
 
 // createDefaultTopologyResources creates the default topology ConfigMap and JailedConfig with a basic topology configuration.
 func (r *WorkerTopologyReconciler) createDefaultTopologyResources(
-	ctx context.Context, namespace, resourceName, clusterName string,
+	ctx context.Context, namespace, resourceName, clusterName, configKey string, slurmCluster *slurmv1.SlurmCluster,
 ) error {
 
-	defaultTopology := "SwitchName=root"
+	defaultTopology, err := r.defaultTopologyConfig(ctx, slurmCluster)
+	if err != nil {
+		return fmt.Errorf("render default topology config: %w", err)
+	}
 
-	configMap := r.renderTopologyConfigMap(namespace, resourceName, defaultTopology)
-	err := r.Client.Create(ctx, configMap)
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	configMap := r.renderTopologyConfigMap(namespace, resourceName, defaultTopology, configKey)
+	if err := r.Client.Create(ctx, configMap); err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create ConfigMap %s: %w", configMap.Name, err)
 	}
 
-	jailedConfig := r.renderTopologyJailedConfig(namespace, resourceName, clusterName)
-	err = r.Client.Create(ctx, jailedConfig)
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	jailedConfig := r.renderTopologyJailedConfig(namespace, resourceName, clusterName, configKey)
+	if err := r.Client.Create(ctx, jailedConfig); err != nil && !apierrors.IsAlreadyExists(err) {
 		return fmt.Errorf("create JailedConfig %s: %w", jailedConfig.Name, err)
 	}
 
 	return nil
 }
 
-func (r *WorkerTopologyReconciler) renderTopologyConfigMap(namespace, resourceName, config string) *corev1.ConfigMap {
+// defaultTopologyConfig is the placeholder stored when the topology resources are first created,
+// before any node topology has been discovered.
+//
+// Every configured topology is emitted with its own plugin but no members, so partitions
+// referencing them by name still resolve. This mirrors the single-topology placeholder, which is a
+// lone "SwitchName=root" carrying no nodes. Real switches and blocks replace it on the first
+// successful build.
+func (r *WorkerTopologyReconciler) defaultTopologyConfig(
+	ctx context.Context, slurmCluster *slurmv1.SlurmCluster,
+) (string, error) {
+	specs := namedTopologies(slurmCluster)
+	entries := make([]topologyYAMLEntry, 0, len(specs))
+	for _, spec := range specs {
+		entries = append(entries, emptyTopologyEntry(spec))
+	}
+	r.markClusterDefault(ctx, slurmCluster, entries)
+
+	return renderTopologyYAML(entries)
+}
+
+func (r *WorkerTopologyReconciler) renderTopologyConfigMap(namespace, resourceName, config, configKey string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		TypeMeta: ctrl.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.String(),
@@ -236,7 +295,7 @@ func (r *WorkerTopologyReconciler) renderTopologyConfigMap(namespace, resourceNa
 			Namespace: namespace,
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeyTopologyConfig: renderManagedTopologyConfig(config),
+			configKey: renderManagedTopologyConfig(config),
 		},
 	}
 }
@@ -245,7 +304,7 @@ func renderManagedTopologyConfig(config string) string {
 	return common.WithManagedSlurmConfigWarning(renderutils.NewAsIsConfig(config)).Render()
 }
 
-func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace, resourceName, clusterName string) *v1alpha1.JailedConfig {
+func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace, resourceName, clusterName, configKey string) *v1alpha1.JailedConfig {
 	return &v1alpha1.JailedConfig{
 		TypeMeta: ctrl.TypeMeta{
 			APIVersion: v1alpha1.GroupVersion.String(),
@@ -265,8 +324,8 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace, resourc
 			},
 			Items: []corev1.KeyToPath{
 				{
-					Key:  consts.ConfigMapKeyTopologyConfig,
-					Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyConfig),
+					Key:  configKey,
+					Path: filepath.Join("/etc/slurm/", configKey),
 				},
 			},
 			UpdateActions: []v1alpha1.UpdateAction{},
@@ -274,7 +333,7 @@ func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace, resourc
 	}
 }
 
-// buildNodeSetTopologyConfig builds the topology config from NodeSets or worker.Size.
+// buildNodeSetTopologyConfig renders the cluster's named topologies into the body of topology.yaml.
 func (r *WorkerTopologyReconciler) buildNodeSetTopologyConfig(
 	ctx context.Context, namespace string, slurmCluster *slurmv1.SlurmCluster, nodeSetList []v1alpha1.NodeSet,
 ) (string, error) {
@@ -283,28 +342,17 @@ func (r *WorkerTopologyReconciler) buildNodeSetTopologyConfig(
 		return "", fmt.Errorf("get node topology labels config map: %w", err)
 	}
 
-	allNodeNames := collectAllNodeNames(nodeSetList)
-	fabricByNode := collectFabricByNode(nodeSetList)
-
 	gpuPodsByNode, err := r.collectScheduledGPUPodsByNode(ctx, nodeSetList, slurmCluster.Name, namespace)
 	if err != nil {
 		return "", fmt.Errorf("collect scheduled GPU pods: %w", err)
 	}
 
-	if slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyBlock {
-		var blockSize *int
-		if slurmCluster.Spec.Topology != nil {
-			blockSize = slurmCluster.Spec.Topology.BlockSize
-		}
-		return r.BuildTopologyBlocks(ctx, blockSize, nodeTopologyCM, gpuPodsByNode, allNodeNames, fabricByNode)
-	}
-
-	return r.BuildTopologyConfig(ctx, nodeTopologyCM, gpuPodsByNode, allNodeNames, fabricByNode)
+	return r.buildMultiTopologyYAML(ctx, slurmCluster, nodeSetList, nodeTopologyCM, gpuPodsByNode)
 }
 
 // collectAllNodeNames returns every Slurm node name derived from the NodeSets' replica ranges,
 // including powered-down ephemeral nodes that currently have no pod. Stage 1 of topology building
-// relies on this complete list to keep topology.conf stable across pod lifecycle changes.
+// relies on this complete list to keep topology.yaml stable across pod lifecycle changes.
 func collectAllNodeNames(nodeSetList []v1alpha1.NodeSet) []string {
 	var names []string
 	for _, nodeSet := range nodeSetList {
@@ -424,50 +472,6 @@ func (r *WorkerTopologyReconciler) listPods(
 	return podList, nil
 }
 
-// BuildTopologyBlocks builds topology/block config.
-func (r *WorkerTopologyReconciler) BuildTopologyBlocks(
-	ctx context.Context,
-	blockSize *int,
-	topologyNodeLabelsCM *corev1.ConfigMap,
-	gpuPodsByNode map[string][]string,
-	allNodeNames []string,
-	fabricByNode map[string]string,
-) (string, error) {
-	bs := defBlockSize
-	if blockSize != nil {
-		bs = *blockSize
-	}
-
-	labelsByNode, err := r.ParseNodeTopologyLabels(topologyNodeLabelsCM.Data)
-	if err != nil {
-		return "", fmt.Errorf("deserialize node block topology: %w", err)
-	}
-
-	blocks := BuildTopologyBlocks(ctx, labelsByNode, gpuPodsByNode, allNodeNames, fabricByNode)
-
-	config := strings.Join(blocks.RenderConfigLines(), "\n") + "\n"
-	config = fmt.Sprintf("%sBlockSizes=%d\n", config, bs)
-
-	return config, nil
-}
-
-// BuildTopologyConfig builds topology/tree config.
-func (r *WorkerTopologyReconciler) BuildTopologyConfig(
-	ctx context.Context,
-	topologyNodeLabelsCM *corev1.ConfigMap,
-	gpuPodsByNode map[string][]string,
-	allNodeNames []string,
-	fabricByNode map[string]string,
-) (string, error) {
-	labelsByNode, err := r.ParseNodeTopologyLabels(topologyNodeLabelsCM.Data)
-	if err != nil {
-		return "", fmt.Errorf("deserialize node tree topology: %w", err)
-	}
-	graph := BuildTopologyGraph(ctx, labelsByNode, gpuPodsByNode, allNodeNames, fabricByNode)
-	config := strings.Join(graph.RenderConfigLines(), "\n") + "\n"
-	return config, nil
-}
-
 // NodeTopologyLabels represents the labels for a node's topology, e.g.:
 //
 //	{
@@ -496,7 +500,7 @@ func (r *WorkerTopologyReconciler) calculateConfigHash(config string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace, resourceName, config, clusterName string) error {
+func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace, resourceName, config, configKey string) error {
 	configMapKey := client.ObjectKey{Name: resourceName, Namespace: namespace}
 	renderedConfig := renderManagedTopologyConfig(config)
 	existingConfigMap := &corev1.ConfigMap{}
@@ -509,7 +513,7 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 					Namespace: namespace,
 				},
 				Data: map[string]string{
-					consts.ConfigMapKeyTopologyConfig: renderedConfig,
+					configKey: renderedConfig,
 				},
 			}
 			if err := r.Client.Create(ctx, cm); err != nil {
@@ -519,14 +523,13 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 			return fmt.Errorf("get ConfigMap %s: %w", resourceName, err)
 		}
 	} else {
-		existingConfigMap.Data[consts.ConfigMapKeyTopologyConfig] = renderedConfig
+		// The ConfigMap is owned wholesale, not merged into: any key other than the one being
+		// written is a leftover, and leaving one behind would keep a dead config around that reads
+		// like the live one.
+		existingConfigMap.Data = map[string]string{configKey: renderedConfig}
 		if err := r.Client.Update(ctx, existingConfigMap); err != nil {
 			return fmt.Errorf("update ConfigMap %s: %w", existingConfigMap.Name, err)
 		}
-	}
-
-	if err := r.ensureJailedConfig(ctx, namespace, resourceName, clusterName); err != nil {
-		return fmt.Errorf("ensure JailedConfig: %w", err)
 	}
 
 	return nil
@@ -534,8 +537,11 @@ func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, 
 
 // ensureJailedConfig ensures the JailedConfig for topology exists and matches the desired state.
 // If it doesn't exist, it creates one. If it exists, it updates the spec to match desired.
-func (r *WorkerTopologyReconciler) ensureJailedConfig(ctx context.Context, namespace, resourceName, clusterName string) error {
-	desired := r.renderTopologyJailedConfig(namespace, resourceName, clusterName)
+func (r *WorkerTopologyReconciler) ensureJailedConfig(
+	ctx context.Context, namespace, resourceName, clusterName, configKey, structure string,
+) error {
+	logger := log.FromContext(ctx).WithName(WorkerTopologyReconcilerName)
+	desired := r.renderTopologyJailedConfig(namespace, resourceName, clusterName, configKey)
 
 	existing := &v1alpha1.JailedConfig{}
 	err := r.Client.Get(ctx, client.ObjectKeyFromObject(desired), existing)
@@ -549,7 +555,19 @@ func (r *WorkerTopologyReconciler) ensureJailedConfig(ctx context.Context, names
 		return fmt.Errorf("get JailedConfig %s: %w", desired.Name, err)
 	}
 
+	desired.Spec.UpdateActions = reconcileReconfigureRequest(logger, existing, structure)
+	desired.Annotations = map[string]string{
+		consts.AnnotationTopologyStructure:   committedStructure(existing, structure),
+		consts.AnnotationTopologyAppliedHash: requestedAtAppliedHash(existing, structure),
+	}
+
 	existing.Labels = desired.Labels
+	// Merged, not replaced: the JailedConfig may carry annotations this controller knows nothing
+	// about, and overwriting would drop them on every reconcile.
+	if existing.Annotations == nil {
+		existing.Annotations = map[string]string{}
+	}
+	maps.Copy(existing.Annotations, desired.Annotations)
 	existing.Spec = desired.Spec
 
 	if err := r.Client.Update(ctx, existing); err != nil {
@@ -557,6 +575,84 @@ func (r *WorkerTopologyReconciler) ensureJailedConfig(ctx context.Context, names
 	}
 
 	return nil
+}
+
+// reconcileReconfigureRequest decides whether the topology config should ask sconfigcontroller for
+// a `scontrol reconfigure`.
+//
+// It asks when the set of topologies, their plugins or their block sizes changed, because only a
+// re-read teaches slurmctld about those. It keeps asking until a reconfigure is confirmed for the
+// current generation, and withdraws the request only then: clearing it a reconcile later would race
+// with sconfigcontroller reading the spec, and the reconfigure would be lost.
+func reconcileReconfigureRequest(
+	logger logr.Logger, existing *v1alpha1.JailedConfig, structure string,
+) []v1alpha1.UpdateAction {
+	structureChanged := existing.Annotations[consts.AnnotationTopologyStructure] != structure
+	if structureChanged {
+		logger.Info("Topology structure changed, requesting a Slurm reconfigure",
+			"structure", structure)
+		return []v1alpha1.UpdateAction{v1alpha1.UpdateActionReconfigure}
+	}
+
+	if !hasReconfigureRequest(existing) {
+		return []v1alpha1.UpdateAction{}
+	}
+
+	if !reconfigureConfirmed(existing) {
+		return existing.Spec.UpdateActions
+	}
+
+	logger.Info("Slurm reconfigure confirmed, withdrawing the request")
+	return []v1alpha1.UpdateAction{}
+}
+
+// reconfigureConfirmed reports whether a reconfigure ran for the content the JailedConfig now
+// carries.
+//
+// The applied hash decides it, not Generation. The request lives in the spec while the structure
+// lives in an annotation, so a structural change raised against an already-outstanding request
+// leaves Generation untouched; a confirmation earned over the previous content would then read as
+// confirming the new one, and the request would be withdrawn before slurmctld ever re-read it.
+// The applied hash instead moves only when sconfigcontroller writes new content.
+func reconfigureConfirmed(jailedConfig *v1alpha1.JailedConfig) bool {
+	condition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(v1alpha1.ReconfigurePerformed))
+	if condition == nil || condition.Status != metav1.ConditionTrue {
+		return false
+	}
+	return jailedConfig.Status.AppliedHash !=
+		jailedConfig.Annotations[consts.AnnotationTopologyAppliedHash]
+}
+
+// requestedAtAppliedHash pins the applied hash the outstanding request was raised against, so
+// reconfigureConfirmed can tell "applied since" from "applied before". It is refreshed whenever the
+// structure changes and held steady while the request waits.
+func requestedAtAppliedHash(existing *v1alpha1.JailedConfig, structure string) string {
+	if existing.Annotations[consts.AnnotationTopologyStructure] != structure {
+		return existing.Status.AppliedHash
+	}
+	if !hasReconfigureRequest(existing) || reconfigureConfirmed(existing) {
+		return existing.Status.AppliedHash
+	}
+	return existing.Annotations[consts.AnnotationTopologyAppliedHash]
+}
+
+// committedStructure keeps the previously recorded structure while a reconfigure request is
+// outstanding. The first reconciliation records the desired structure alongside the new request;
+// later reconciliations must preserve it until that request is confirmed.
+func committedStructure(existing *v1alpha1.JailedConfig, structure string) string {
+	if !hasReconfigureRequest(existing) || reconfigureConfirmed(existing) {
+		return structure
+	}
+	return existing.Annotations[consts.AnnotationTopologyStructure]
+}
+
+func hasReconfigureRequest(jailedConfig *v1alpha1.JailedConfig) bool {
+	for _, action := range jailedConfig.Spec.UpdateActions {
+		if action == v1alpha1.UpdateActionReconfigure {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,

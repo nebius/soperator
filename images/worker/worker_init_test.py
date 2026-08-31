@@ -50,10 +50,10 @@ class TestFormatSlurmTopology(unittest.TestCase):
         result = worker_init.format_slurm_topology("my-topo:leaf-switch")
         self.assertEqual(result, "topology=my-topo:root:leaf-switch")
 
-    def test_tier_format_single_tier(self):
-        """Single tier format is converted correctly."""
+    def test_tier_zero_alone_yields_no_tree_unit(self):
+        """tier-0 names a block, not a switch, so a tree topology has nowhere to put the node."""
         result = worker_init.format_slurm_topology("tier-0=switch1")
-        self.assertEqual(result, "topology=default:root:switch1")
+        self.assertEqual(result, "")
 
     def test_tier_format_two_tiers(self):
         """Two tier format builds full hierarchy: spine first, leaf last."""
@@ -113,13 +113,16 @@ class TestFormatSlurmTopology(unittest.TestCase):
         )
         self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
-    def test_json_format_with_tier_zero(self):
-        """JSON format with tier-0 builds full hierarchy including tier-0 as leaf."""
+    def test_json_format_ignores_tier_zero_in_tree_mode(self):
+        """tier-0 names a block, so the tree path stops at tier-1.
+
+        The operator leaves tier-0 out of the tree it writes into the topology config, so
+        including it here would put the node one switch below where the config places it.
+        """
         result = worker_init.format_slurm_topology(
             '{"tier-0":"nvl0","tier-1":"leaf01"}'
         )
-        # tier-1 (rack/leaf-switch) first, tier-0 (NVL domain) last
-        self.assertEqual(result, "topology=default:root:leaf01:nvl0")
+        self.assertEqual(result, "topology=default:root:leaf01")
 
     def test_json_format_block_topology_uses_tier_zero(self):
         """JSON format in block mode uses tier-0 as the block name."""
@@ -225,12 +228,12 @@ class TestFormatTierTopology(unittest.TestCase):
         )
         self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
-    def test_tier_zero_included_as_leaf(self):
-        """tier-0 is included as the innermost switch (leaf/block domain)."""
+    def test_tier_zero_excluded_from_tree(self):
+        """tier-0 is the NVL/block domain and is not part of the switch tree."""
         result = worker_init._format_tier_topology(
             {"tier-0": "nvl0", "tier-1": "leaf01", "tier-2": "spine01"}
         )
-        self.assertEqual(result, "topology=default:root:spine01:leaf01:nvl0")
+        self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
     def test_three_tiers_builds_hierarchy(self):
         """Three tiers builds full path from fabric to leaf."""
@@ -426,36 +429,6 @@ class TestGetEnvironmentVariables(unittest.TestCase):
         with mock.patch.dict(os.environ, {"TOPOLOGY_POLL_INTERVAL": "10"}):
             result = worker_init.get_topology_poll_interval()
         self.assertEqual(result, 10)
-
-    def test_get_topology_plugin_env_override(self):
-        """Topology plugin can be supplied by environment variable."""
-        with mock.patch.dict(
-            os.environ,
-            {"SLURM_TOPOLOGY_PLUGIN": worker_init.TOPOLOGY_PLUGIN_BLOCK},
-        ):
-            result = worker_init.get_topology_plugin("/missing/slurm_base.conf.noedit")
-        self.assertEqual(result, worker_init.TOPOLOGY_PLUGIN_BLOCK)
-
-    def test_get_topology_plugin_from_slurm_base_config(self):
-        """Topology plugin is read from slurm_base.conf.noedit when env is not set."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            slurm_base_config = os.path.join(temp_dir, "slurm_base.conf.noedit")
-            with open(slurm_base_config, "w") as f:
-                f.write("# comment\nTopologyPlugin = topology/block # inline\n")
-
-            env = os.environ.copy()
-            env.pop("SLURM_TOPOLOGY_PLUGIN", None)
-            with mock.patch.dict(os.environ, env, clear=True):
-                result = worker_init.get_topology_plugin(slurm_base_config)
-        self.assertEqual(result, worker_init.TOPOLOGY_PLUGIN_BLOCK)
-
-    def test_get_topology_plugin_defaults_to_tree(self):
-        """Missing slurm_base.conf.noedit defaults to topology/tree."""
-        env = os.environ.copy()
-        env.pop("SLURM_TOPOLOGY_PLUGIN", None)
-        with mock.patch.dict(os.environ, env, clear=True):
-            result = worker_init.get_topology_plugin("/missing/slurm_base.conf.noedit")
-        self.assertEqual(result, worker_init.TOPOLOGY_PLUGIN_TREE)
 
     def test_get_controller_max_attempts_default(self):
         """Get controller max attempts returns default when not set."""
@@ -744,64 +717,6 @@ class TestWaitForController(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 2)
 
 
-class TestApplyNodeTopology(unittest.TestCase):
-    """Tests for apply_node_topology function."""
-
-    @mock.patch("worker_init.get_node_addr", return_value="nodeaddr=worker-0.svc")
-    @mock.patch("subprocess.run")
-    def test_scontrol_update_uses_topology_argument_for_tree_plugin(
-        self, mock_run, mock_get_node_addr
-    ):
-        """Computed topology is passed to scontrol update for tree topology."""
-        mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
-
-        worker_init.apply_node_topology(
-            "worker-0",
-            "topology=default:root:leaf01",
-            worker_init.TOPOLOGY_PLUGIN_TREE,
-        )
-
-        mock_run.assert_called_once_with(
-            [
-                "scontrol",
-                "update",
-                "nodename=worker-0",
-                "nodeaddr=worker-0.svc",
-                "topology=default:root:leaf01",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        mock_get_node_addr.assert_called_once_with()
-
-    @mock.patch("worker_init.get_node_addr", return_value="nodeaddr=worker-0.svc")
-    @mock.patch("subprocess.run")
-    def test_scontrol_update_omits_topology_argument_for_block_plugin(
-        self, mock_run, mock_get_node_addr
-    ):
-        """Computed topology is omitted from scontrol update for block topology."""
-        mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
-
-        worker_init.apply_node_topology(
-            "worker-0",
-            "topology=default:block1",
-            worker_init.TOPOLOGY_PLUGIN_BLOCK,
-        )
-
-        mock_run.assert_called_once_with(
-            [
-                "scontrol",
-                "update",
-                "nodename=worker-0",
-                "nodeaddr=worker-0.svc",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        mock_get_node_addr.assert_called_once_with()
-
 
 class TestIsGpuEnabled(unittest.TestCase):
     """Tests for is_gpu_enabled function."""
@@ -829,165 +744,51 @@ class TestIsGpuEnabled(unittest.TestCase):
             self.assertFalse(worker_init.is_gpu_enabled())
 
 
-class TestWaitForTopologyNonGpu(unittest.TestCase):
-    """Tests for wait_for_topology non-GPU fast path."""
 
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
-    @mock.patch("worker_init.apply_node_topology")
-    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
-    @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
-    def test_non_gpu_applies_unknown_topology(
-        self, mock_gpu, mock_apply, mock_wait_hostname
-    ):
-        """Non-GPU node immediately applies topology=default:root:unknown."""
-        with mock.patch(
-            "worker_init.get_topology_plugin",
-            return_value=worker_init.TOPOLOGY_PLUGIN_TREE,
-        ):
-            worker_init.wait_for_topology()
-
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
-        mock_apply.assert_called_once_with(
-            "worker-0",
-            "topology=default:root:unknown",
-            worker_init.TOPOLOGY_PLUGIN_TREE,
-        )
-
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
-    @mock.patch("worker_init.apply_node_topology")
-    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
-    @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
-    def test_non_gpu_applies_unknown_block_topology(
-        self, mock_gpu, mock_apply, mock_wait_hostname
-    ):
-        """Non-GPU node in block mode applies topology=default:unknown."""
-        with mock.patch(
-            "worker_init.get_topology_plugin",
-            return_value=worker_init.TOPOLOGY_PLUGIN_BLOCK,
-        ):
-            worker_init.wait_for_topology()
-
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
-        mock_apply.assert_called_once_with(
-            "worker-0",
-            "topology=default:unknown",
-            worker_init.TOPOLOGY_PLUGIN_BLOCK,
-        )
-
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
-    @mock.patch("worker_init.apply_node_topology")
-    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
-    @mock.patch.dict(
-        os.environ, {"HOSTNAME": "worker-0", "SLURM_TOPOLOGY_FABRIC": "fab-a"}
-    )
-    def test_non_gpu_applies_per_fabric_unknown_topology(
-        self, mock_gpu, mock_apply, mock_wait_hostname
-    ):
-        """Non-GPU node with a fabric joins <fabric>:<fabric>.unknown."""
-        with mock.patch(
-            "worker_init.get_topology_plugin",
-            return_value=worker_init.TOPOLOGY_PLUGIN_TREE,
-        ):
-            worker_init.wait_for_topology()
-
-        mock_apply.assert_called_once_with(
-            "worker-0", "topology=default:fab-a:fab-a.unknown"
-        )
-
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
-    @mock.patch("worker_init.apply_node_topology")
-    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
-    @mock.patch.dict(
-        os.environ, {"HOSTNAME": "worker-0", "SLURM_TOPOLOGY_FABRIC": "fab-a"}
-    )
-    def test_non_gpu_applies_per_fabric_unknown_block(
-        self, mock_gpu, mock_apply, mock_wait_hostname
-    ):
-        """Non-GPU node with a fabric in block mode joins the <fabric>.unknown block."""
-        with mock.patch(
-            "worker_init.get_topology_plugin",
-            return_value=worker_init.TOPOLOGY_PLUGIN_BLOCK,
-        ):
-            worker_init.wait_for_topology()
-
-        mock_apply.assert_called_once_with(
-            "worker-0", "topology=default:fab-a.unknown"
-        )
-
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
-    @mock.patch("worker_init.apply_node_topology")
-    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
-    @mock.patch.dict(os.environ, {"HOSTNAME": "worker-0"})
-    def test_non_gpu_does_not_read_configmap(
-        self, mock_gpu, mock_apply, mock_wait_hostname
-    ):
-        """Non-GPU node does not wait for ConfigMap at all."""
-        with mock.patch(
-            "worker_init.get_topology_plugin",
-            return_value=worker_init.TOPOLOGY_PLUGIN_TREE,
-        ), mock.patch("worker_init.read_topology_for_node") as mock_read:
-            worker_init.wait_for_topology()
-            mock_read.assert_not_called()
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
-
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
-    @mock.patch("worker_init.apply_node_topology")
-    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
-    def test_non_gpu_exits_if_hostname_not_set(
-        self, mock_gpu, mock_apply, mock_wait_hostname
-    ):
-        """Non-GPU node exits if HOSTNAME is not set."""
-        env = os.environ.copy()
-        env.pop("HOSTNAME", None)
-        with mock.patch.dict(os.environ, env, clear=True):
-            with self.assertRaises(SystemExit) as ctx:
-                worker_init.wait_for_topology()
-            self.assertEqual(ctx.exception.code, 1)
-        mock_wait_hostname.assert_not_called()
-        mock_apply.assert_not_called()
-
-
-class TestTopologyConfContainsHostname(unittest.TestCase):
-    """Tests for topology.conf hostname membership checks."""
+class TestTopologyConfigContainsHostname(unittest.TestCase):
+    """Tests for topology.yaml hostname membership checks."""
 
     def test_exact_token(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            topology_conf = Path(temp_dir) / "topology.conf"
-            with open(topology_conf, "w") as f:
+            topology_config = Path(temp_dir) / "topology.yaml"
+            with open(topology_config, "w") as f:
                 f.write(
-                    "SwitchName=root Switches=unknown\n"
-                    "SwitchName=unknown Nodes=worker-0,worker-1\n"
+                    "- topology: tree-ib\n"
+                    "  tree:\n"
+                    "    switches:\n"
+                    "        - switch: unknown\n"
+                    "          nodes: worker-0,worker-1\n"
                 )
 
             self.assertTrue(
-                worker_init.topology_conf_contains_hostname(
-                    topology_conf,
+                worker_init.topology_config_contains_hostname(
+                    topology_config,
                     "worker-0",
                 )
             )
 
     def test_does_not_match_partial_hostname(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            topology_conf = Path(temp_dir) / "topology.conf"
-            with open(topology_conf, "w") as f:
-                f.write("SwitchName=unknown Nodes=worker-10\n")
+            topology_config = Path(temp_dir) / "topology.yaml"
+            with open(topology_config, "w") as f:
+                f.write("- topology: tree-ib\n  tree:\n    switches:\n        - switch: unknown\n          nodes: worker-10\n")
 
             self.assertFalse(
-                worker_init.topology_conf_contains_hostname(
-                    topology_conf,
+                worker_init.topology_config_contains_hostname(
+                    topology_config,
                     "worker-1",
                 )
             )
 
     def test_contains_hostname_in_slurm_range(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            topology_conf = Path(temp_dir) / "topology.conf"
-            with open(topology_conf, "w") as f:
-                f.write("SwitchName=unknown Nodes=worker-[0-5]\n")
+            topology_config = Path(temp_dir) / "topology.yaml"
+            with open(topology_config, "w") as f:
+                f.write("- topology: tree-ib\n  tree:\n    switches:\n        - switch: unknown\n          nodes: worker-[0-5]\n")
 
             self.assertTrue(
-                worker_init.topology_conf_contains_hostname(
-                    topology_conf,
+                worker_init.topology_config_contains_hostname(
+                    topology_config,
                     "worker-1",
                 )
             )
@@ -996,90 +797,109 @@ class TestTopologyConfContainsHostname(unittest.TestCase):
         self,
     ):
         with tempfile.TemporaryDirectory() as temp_dir:
-            topology_conf = Path(temp_dir) / "topology.conf"
-            with open(topology_conf, "w") as f:
+            topology_config = Path(temp_dir) / "topology.yaml"
+            with open(topology_config, "w") as f:
                 f.write(
-                    "BlockName=computenvlinstancegroup-e00nd50be1dk3g89f3 "
-                    "Nodes=worker-rack1-[0-12]\n"
-                    "BlockSizes=13\n"
+                    "- topology: block-nvl72\n"
+                    "  block:\n"
+                    "    block_sizes:\n"
+                    "        - 13\n"
+                    "    blocks:\n"
+                    "        - block: computenvlinstancegroup-e00nd50be1dk3g89f3\n"
+                    "          nodes: worker-rack1-[0-12]\n"
                 )
 
             self.assertTrue(
-                worker_init.topology_conf_contains_hostname(
-                    topology_conf,
+                worker_init.topology_config_contains_hostname(
+                    topology_config,
                     "worker-rack1-8",
                 )
             )
 
     def test_does_not_match_hostname_outside_slurm_range(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            topology_conf = Path(temp_dir) / "topology.conf"
-            with open(topology_conf, "w") as f:
+            topology_config = Path(temp_dir) / "topology.yaml"
+            with open(topology_config, "w") as f:
                 f.write("SwitchName=unknown Nodes=worker-[10-15]\n")
 
             self.assertFalse(
-                worker_init.topology_conf_contains_hostname(
-                    topology_conf,
+                worker_init.topology_config_contains_hostname(
+                    topology_config,
                     "worker-1",
                 )
             )
 
     def test_contains_hostname_in_merged_slurm_hostlist(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            topology_conf = Path(temp_dir) / "topology.conf"
-            with open(topology_conf, "w") as f:
+            topology_config = Path(temp_dir) / "topology.yaml"
+            with open(topology_config, "w") as f:
                 f.write(
-                    "BlockName=block-a "
-                    "Nodes=worker-[0-2,4],worker-cpu-[0-1],workerkek1\n"
+                    "- topology: block-nvl72\n"
+                    "  block:\n"
+                    "    blocks:\n"
+                    "        - block: block-a\n"
+                    "          nodes: worker-[0-2,4],worker-cpu-[0-1],workerkek1\n"
                 )
 
             self.assertTrue(
-                worker_init.topology_conf_contains_hostname(
-                    topology_conf,
+                worker_init.topology_config_contains_hostname(
+                    topology_config,
                     "worker-cpu-1",
                 )
             )
             self.assertTrue(
-                worker_init.topology_conf_contains_hostname(
-                    topology_conf,
+                worker_init.topology_config_contains_hostname(
+                    topology_config,
                     "worker-4",
                 )
             )
             self.assertFalse(
-                worker_init.topology_conf_contains_hostname(
-                    topology_conf,
+                worker_init.topology_config_contains_hostname(
+                    topology_config,
                     "worker-3",
                 )
             )
             self.assertTrue(
-                worker_init.topology_conf_contains_hostname(
-                    topology_conf,
+                worker_init.topology_config_contains_hostname(
+                    topology_config,
                     "workerkek1",
                 )
             )
 
     def test_contains_hostname_in_zero_padded_slurm_range(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            topology_conf = Path(temp_dir) / "topology.conf"
-            with open(topology_conf, "w") as f:
-                f.write("SwitchName=leaf Nodes=gpu[099-101]\n")
+            topology_config = Path(temp_dir) / "topology.yaml"
+            with open(topology_config, "w") as f:
+                f.write(
+                    "- topology: tree-ib\n"
+                    "  tree:\n"
+                    "    switches:\n"
+                    "        - switch: leaf\n"
+                    "          nodes: gpu[099-101]\n"
+                )
 
             self.assertTrue(
-                worker_init.topology_conf_contains_hostname(topology_conf, "gpu099")
+                worker_init.topology_config_contains_hostname(topology_config, "gpu099")
             )
             self.assertFalse(
-                worker_init.topology_conf_contains_hostname(topology_conf, "gpu99")
+                worker_init.topology_config_contains_hostname(topology_config, "gpu99")
             )
 
     def test_nodes_all_contains_hostname(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            topology_conf = Path(temp_dir) / "topology.conf"
-            with open(topology_conf, "w") as f:
-                f.write("SwitchName=root Nodes=ALL\n")
+            topology_config = Path(temp_dir) / "topology.yaml"
+            with open(topology_config, "w") as f:
+                f.write(
+                    "- topology: tree-ib\n"
+                    "  tree:\n"
+                    "    switches:\n"
+                    "        - switch: root\n"
+                    "          nodes: ALL\n"
+                )
 
             self.assertTrue(
-                worker_init.topology_conf_contains_hostname(
-                    topology_conf,
+                worker_init.topology_config_contains_hostname(
+                    topology_config,
                     "worker-1",
                 )
             )
@@ -1133,12 +953,11 @@ class TestTopologyIntegration(unittest.TestCase):
         formatted = worker_init.format_slurm_topology(result)
         self.assertEqual(formatted, "topology=default:root:spine01:leaf01")
 
-    @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
+    @mock.patch("worker_init.wait_for_hostname_in_topology_config")
     @mock.patch("worker_init.apply_node_topology")
     def test_wait_for_topology_block_json_applies_tier_zero(
-        self, mock_apply, mock_wait_hostname
-    ):
-        """Block mode applies tier-0 as the dynamic topology unit."""
+        self, mock_apply, mock_wait_hostname):
+        """A block topology registers the node under its tier-0 block."""
         node_name = "gpu-node-003"
         topology = '{"tier-0":"block1","tier-1":"leaf01","tier-2":"spine01"}'
 
@@ -1146,24 +965,30 @@ class TestTopologyIntegration(unittest.TestCase):
         with open(node_file, "w") as f:
             f.write(topology)
 
+        config_path = Path(self.configmap_dir) / "topology.yaml"
+        config_path.write_text(
+            "- topology: block-nvl72\n"
+            "  block:\n"
+            "    blocks:\n"
+            "        - block: block1\n"
+            "          nodes: worker-0\n"
+        )
+
         env = {
             "HOSTNAME": "worker-0",
             "K8S_NODE_NAME": node_name,
             "TOPOLOGY_CONFIGMAP_PATH": self.configmap_dir,
             "NODESET_GPU_ENABLED": "true",
         }
+        # The plugin comes from the topology the config places this worker in, not from a
+        # cluster-wide setting.
         with mock.patch.dict(os.environ, env), mock.patch(
-            "worker_init.get_topology_plugin",
-            return_value=worker_init.TOPOLOGY_PLUGIN_BLOCK,
+            "worker_init.wait_for_topology_file", return_value=config_path
         ):
             worker_init.wait_for_topology()
 
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
-        mock_apply.assert_called_once_with(
-            "worker-0",
-            "topology=default:block1",
-            worker_init.TOPOLOGY_PLUGIN_BLOCK,
-        )
+        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5, config_path)
+        mock_apply.assert_called_once_with("worker-0", "topology=block-nvl72:block1")
 
 
 class TestEdgeCases(unittest.TestCase):
@@ -1242,6 +1067,232 @@ class TestMainArgparse(unittest.TestCase):
             with self.assertRaises(SystemExit) as ctx:
                 worker_init.main()
             self.assertNotEqual(ctx.exception.code, 0)
+
+
+
+
+
+class TestTopologyMatchesOperatorConfig(unittest.TestCase):
+    """The unit a worker registers into must be the one the operator wrote into the config.
+
+    The operator's tree builder drops tier-0 (it names a block, not a switch) and places the node
+    directly under its tier-1 switch. A worker that included tier-0 would register one switch
+    deeper, on a switch the topology config never defines.
+    """
+
+    LABELS = '{"tier-0":"nvl0","tier-1":"leaf01","tier-2":"spine01"}'
+
+    def test_tree_registration_matches_the_switch_holding_the_node(self):
+        # Operator renders: SwitchName=leaf01 Nodes=<node>, under spine01, under root.
+        self.assertEqual(
+            worker_init.format_slurm_topology(
+                self.LABELS, worker_init.TOPOLOGY_PLUGIN_TREE, "root"
+            ),
+            "topology=default:root:spine01:leaf01",
+        )
+
+    def test_block_registration_matches_the_block_holding_the_node(self):
+        # Operator renders: BlockName=nvl0 Nodes=<node>.
+        self.assertEqual(
+            worker_init.format_slurm_topology(
+                self.LABELS, worker_init.TOPOLOGY_PLUGIN_BLOCK, "root"
+            ),
+            "topology=default:nvl0",
+        )
+
+
+
+class TestParseTopologyBindings(unittest.TestCase):
+    """The worker derives which topologies to join from the config it already waits for.
+
+    That keeps it in step with the rendered file by construction: it joins exactly what the file
+    places it in, with no second source of truth to drift.
+    """
+
+    CONFIG = """# Managed by Soperator.
+
+- topology: flat
+  cluster_default: true
+  flat: true
+- topology: tree-ib
+  cluster_default: false
+  tree:
+    switches:
+        - switch: leaf3
+          nodes: h100-[0-3]
+        - switch: root
+          children: leaf3
+- topology: block-nvl72
+  cluster_default: false
+  block:
+    block_sizes:
+        - 4
+    blocks:
+        - block: block7
+          nodes: h100-[0-3]
+"""
+
+    def _write(self, tmp):
+        path = Path(tmp) / "topology.yaml"
+        path.write_text(self.CONFIG)
+        return path
+
+    def test_a_listed_worker_joins_every_topology_listing_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(
+                worker_init.parse_topology_bindings(self._write(tmp), "h100-2"),
+                [("tree-ib", "tree"), ("block-nvl72", "block")],
+            )
+
+    def test_a_flat_topology_is_never_joined(self):
+        """Flat lists no nodes and defines no unit, so there is nothing to register into."""
+        with tempfile.TemporaryDirectory() as tmp:
+            bindings = worker_init.parse_topology_bindings(self._write(tmp), "h100-0")
+            self.assertNotIn("flat", [name for name, _ in bindings])
+
+    def test_an_unlisted_worker_joins_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(
+                worker_init.parse_topology_bindings(self._write(tmp), "cpu-0"), []
+            )
+
+    def test_a_missing_file_is_not_fatal(self):
+        self.assertEqual(
+            worker_init.parse_topology_bindings(Path("/nonexistent/topology.yaml"), "h100-0"),
+            [],
+        )
+
+
+class TestCpuOnlyWorkerInMultiTopology(unittest.TestCase):
+    """A CPU-only worker appears in no node list, so it must not wait for its hostname."""
+
+    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.wait_for_hostname_in_topology_config")
+    @mock.patch("worker_init.is_gpu_enabled", return_value=False)
+    @mock.patch(
+        "worker_init.wait_for_topology_file",
+        return_value=worker_init.SLURM_TOPOLOGY_YAML_PATH,
+    )
+    @mock.patch.dict(os.environ, {"HOSTNAME": "cpu-0"})
+    def test_skips_the_hostname_wait_and_the_registration(
+        self, mock_wait_file, mock_gpu, mock_wait_hostname, mock_apply
+    ):
+        worker_init.wait_for_topology()
+
+        mock_wait_file.assert_called_once()
+        mock_wait_hostname.assert_not_called()
+        mock_apply.assert_called_once_with("cpu-0", "")
+
+
+
+
+
+class TestTopologyHostnameWait(unittest.TestCase):
+    """A cluster described entirely as flat names no node, so there is nothing to wait for.
+
+    Waiting anyway would time out and crash-loop the init container of every GPU worker.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.configmap_dir = self.tmp.name
+
+    def test_config_has_non_flat_topology(self):
+        flat = Path(self.configmap_dir) / "flat.yaml"
+        flat.write_text("- topology: flat\n  cluster_default: true\n  flat: true\n")
+        self.assertFalse(worker_init.config_has_non_flat_topology(flat))
+
+        tree = Path(self.configmap_dir) / "tree.yaml"
+        tree.write_text(
+            "- topology: tree-ib\n  tree:\n    switches:\n"
+            "        - switch: leaf01\n          nodes: worker-0\n"
+        )
+        self.assertTrue(worker_init.config_has_non_flat_topology(tree))
+
+        placeholder = Path(self.configmap_dir) / "placeholder.yaml"
+        placeholder.write_text(
+            "- topology: block-nvl72\n  block:\n    block_sizes:\n"
+            "        - 1\n    blocks:\n        - block: unknown\n"
+        )
+        self.assertTrue(worker_init.config_has_non_flat_topology(placeholder))
+
+    def test_a_missing_file_has_no_non_flat_topology(self):
+        self.assertFalse(
+            worker_init.config_has_non_flat_topology(
+                Path("/nonexistent/topology.yaml")
+            )
+        )
+
+    @mock.patch("worker_init.time.sleep")
+    @mock.patch("worker_init.time.monotonic", side_effect=[0, 0, 1])
+    def test_hostname_timeout_warns_and_continues(self, mock_monotonic, mock_sleep):
+        config_path = Path(self.configmap_dir) / "topology.yaml"
+        config_path.write_text("- topology: tree-ib\n  tree:\n")
+
+        with self.assertLogs(worker_init.logger, level="WARNING") as logs:
+            worker_init.wait_for_hostname_in_topology_config(
+                "worker-0", 1, 1, config_path
+            )
+
+        self.assertTrue(
+            any(
+                "continuing without topology placement" in line
+                for line in logs.output
+            )
+        )
+        mock_sleep.assert_called_once_with(1)
+
+    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.wait_for_hostname_in_topology_config")
+    def test_gpu_worker_skips_the_wait_and_registers_nothing(
+        self, mock_wait_hostname, mock_apply
+    ):
+        node_name = "gpu-node-001"
+
+        config_path = Path(self.configmap_dir) / "topology.yaml"
+        config_path.write_text("- topology: flat\n  cluster_default: true\n  flat: true\n")
+
+        env = {
+            "HOSTNAME": "worker-0",
+            "K8S_NODE_NAME": node_name,
+            "TOPOLOGY_CONFIGMAP_PATH": self.configmap_dir,
+            "NODESET_GPU_ENABLED": "true",
+        }
+        with mock.patch.dict(os.environ, env), mock.patch(
+            "worker_init.wait_for_topology_file", return_value=config_path
+        ):
+            worker_init.wait_for_topology()
+
+        mock_wait_hostname.assert_not_called()
+        mock_apply.assert_called_once_with("worker-0", "")
+
+    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.wait_for_hostname_in_topology_config")
+    def test_placeholder_waits_even_without_nodes(
+        self, mock_wait_hostname, mock_apply
+    ):
+        node_name = "gpu-node-001"
+
+        config_path = Path(self.configmap_dir) / "topology.yaml"
+        config_path.write_text(
+            "- topology: block-nvl72\n  block:\n    block_sizes:\n"
+            "        - 1\n    blocks:\n        - block: unknown\n"
+        )
+
+        env = {
+            "HOSTNAME": "worker-0",
+            "K8S_NODE_NAME": node_name,
+            "TOPOLOGY_CONFIGMAP_PATH": self.configmap_dir,
+            "NODESET_GPU_ENABLED": "true",
+        }
+        with mock.patch.dict(os.environ, env), mock.patch(
+            "worker_init.wait_for_topology_file", return_value=config_path
+        ):
+            worker_init.wait_for_topology()
+
+        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5, config_path)
+        mock_apply.assert_called_once_with("worker-0", "")
 
 
 if __name__ == "__main__":

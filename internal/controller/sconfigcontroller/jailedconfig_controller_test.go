@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	k8srest "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/ptr"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -89,6 +90,7 @@ func newTestJailedConfigController(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		"test-cluster",
+		events.NewFakeRecorder(100),
 		apiClient,
 		fakeFs,
 		1*time.Second, // Poll interval for tests
@@ -351,6 +353,16 @@ func TestJailedConfigReconciler_Empty(t *testing.T) {
 
 	_, err := sctrl.Reconcile(context.Background(), request)
 	require.NoError(t, err)
+
+	jailedConfig := &slurmv1alpha1.JailedConfig{}
+	require.NoError(t, sctrl.Client.Get(context.Background(), request.NamespacedName, jailedConfig))
+	condition := meta.FindStatusCondition(
+		jailedConfig.Status.Conditions,
+		string(slurmv1alpha1.UpdateActionsCompleted),
+	)
+	require.NotNil(t, condition)
+	require.Equal(t, string(slurmv1alpha1.ReasonMissingAction), condition.Reason)
+	require.Equal(t, payloadHash(map[string]JailedFile{}), jailedConfig.Status.AppliedHash)
 }
 
 func TestJailedConfigReconciler_SingleData(t *testing.T) {

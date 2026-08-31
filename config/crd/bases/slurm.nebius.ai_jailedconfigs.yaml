@@ -134,6 +134,13 @@ spec:
           status:
             description: status defines the observed state of JailedConfig
             properties:
+              appliedHash:
+                description: |-
+                  AppliedHash fingerprints the payload last written to the jail and, when the config asks for
+                  them, whose update actions completed. It is what lets a reconciliation tell a real config
+                  change from a re-run over identical content, so an unchanged config does not reconfigure the
+                  cluster again.
+                type: string
               conditions:
                 description: Current state of jailed config
                 items:

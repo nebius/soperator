@@ -69,7 +69,7 @@ type SlurmNodeSet struct {
 
 	// TopologyFabric is the IB fabric / top-of-tree switch name (spec.topology.fabric). It is
 	// passed to worker-init so the dynamic topology path it declares matches the operator's
-	// per-fabric root switch in topology.conf.
+	// per-fabric root switch in topology.yaml.
 	TopologyFabric string
 
 	ActiveNodes []int32

@@ -87,6 +87,11 @@ const (
 	FilesWritten JailedConfigConditionType = "FilesWritten"
 	// UpdateActionsCompleted indicates whether all update actions were completed
 	UpdateActionsCompleted JailedConfigConditionType = "UpdateActionsCompleted"
+	// ReconfigurePerformed indicates that a reconfigure actually ran for the generation named by
+	// the condition's ObservedGeneration. UpdateActionsCompleted cannot answer this: it reports
+	// success both when a reconfigure ran and when none was needed. Whoever asked for the action
+	// uses this to know when it is safe to withdraw the request.
+	ReconfigurePerformed JailedConfigConditionType = "ReconfigurePerformed"
 
 	// ReasonInit means that condition was just initialized
 	ReasonInit = "Init"
@@ -104,6 +109,13 @@ const (
 
 // JailedConfigStatus defines the observed state of JailedConfig.
 type JailedConfigStatus struct {
+	// AppliedHash fingerprints the payload last written to the jail and, when the config asks for
+	// them, whose update actions completed. It is what lets a reconciliation tell a real config
+	// change from a re-run over identical content, so an unchanged config does not reconfigure the
+	// cluster again.
+	// +optional
+	AppliedHash string `json:"appliedHash,omitempty"`
+
 	// Current state of jailed config
 	// +optional
 	// +patchMergeKey=type

@@ -2,6 +2,7 @@ package topologyconfcontroller_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -147,7 +148,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 			allNodeNames:  []string{"gpu-0", "gpu-1", "cpu-0"},
 			expected: []string{
 				"SwitchName=root Switches=unknown",
-				"SwitchName=unknown Nodes=cpu-0,gpu-0,gpu-1",
+				"SwitchName=unknown Nodes=cpu-0,gpu-[0-1]",
 			},
 		},
 		{
@@ -420,7 +421,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 			expected: []string{
 				"SwitchName=fab-a Switches=fab-a.unknown",
 				"SwitchName=fab-b Switches=fab-b.unknown",
-				"SwitchName=fab-a.unknown Nodes=a-0,a-1",
+				"SwitchName=fab-a.unknown Nodes=a-[0-1]",
 				"SwitchName=fab-b.unknown Nodes=b-0",
 			},
 		},
@@ -487,7 +488,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			graph := tc.BuildTopologyGraph(context.Background(), tt.labelsByNode, tt.gpuPodsByNode, tt.allNodeNames, tt.fabricByNode)
-			result := graph.RenderConfigLines()
+			result := renderedSwitchLines(graph)
 			require.ElementsMatch(t, tt.expected, result)
 		})
 	}
@@ -512,7 +513,21 @@ func TestRenderTopologyConfig_MergesSwitches(t *testing.T) {
 	allNodeNames := []string{"worker-a", "worker-b", "worker-c", "worker-d", "worker-e"}
 
 	graph := tc.BuildTopologyGraph(context.Background(), labelsByNode, podsByNode, allNodeNames, nil)
-	lines := graph.RenderConfigLines()
+	lines := renderedSwitchLines(graph)
 
 	require.Contains(t, lines, "SwitchName=spine-0 Switches=leaf-[0-1],leaf-cpu-[0,2],leafkek1")
+}
+
+// renderedSwitchLines formats the switch entries as single lines, keeping these
+// assertions readable now that the only rendered format is topology.yaml.
+func renderedSwitchLines(graph tc.TopologyGraph) []string {
+	var lines []string
+	for _, sw := range graph.RenderSwitches() {
+		if sw.Children != "" {
+			lines = append(lines, fmt.Sprintf("SwitchName=%s Switches=%s", sw.Switch, sw.Children))
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("SwitchName=%s Nodes=%s", sw.Switch, sw.Nodes))
+	}
+	return lines
 }

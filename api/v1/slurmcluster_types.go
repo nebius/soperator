@@ -179,11 +179,6 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=60
 	MessageTimeout *int32 `json:"messageTimeout,omitempty"`
-	// TopologyPlugin identifies the plugin to determine network topology for optimizations.
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="topology/tree"
-	TopologyPlugin string `json:"topologyPlugin,omitempty"`
 	// TopologyParam is list of comma-separated options identifying network topology options.
 	//
 	// +kubebuilder:validation:Optional
@@ -213,12 +208,78 @@ type SlurmConfig struct {
 
 // Topology contains topology-related parameters for Slurm.
 type Topology struct {
-	// BlockSize represents a schedulable size of a block for topology/block plugin.
-	// Maps to BlockSizes parameter in topology.conf.
+	// Topologies defines the named network topologies rendered into topology.yaml, letting a
+	// cluster describe heterogeneous fabrics (e.g. InfiniBand GPU NodeSets next to Ethernet-only
+	// CPU ones) separately instead of squeezing them into one flat topology.
+	// See https://slurm.schedmd.com/topology.html#multi_topo.
+	//
+	// A cluster that declares none gets no topology config at all.
+	//
+	// Names must be unique: duplicates would emit the same topology twice and slurmctld rejects the
+	// whole file. The map list type has the API server enforce that.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=18
-	BlockSize *int `json:"blockSize,omitempty"`
+	// +listType=map
+	// +listMapKey=name
+	Topologies []NamedTopology `json:"topologies,omitempty"`
+}
+
+// NamedTopology defines one entry of topology.yaml: a named topology, the plugin that backs it,
+// and the NodeSets whose Slurm nodes it covers.
+type NamedTopology struct {
+	// Name identifies the topology and must be unique across Topologies. It is rendered as the
+	// "topology" attribute of the entry in topology.yaml, and is how anything referring to this
+	// topology names it.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// ClusterDefault marks the topology used by partitions that don't set TopologyRef, and by
+	// cluster-wide operations not tied to a partition.
+	//
+	// Exactly one topology always ends up as the default: Slurm uses the first entry of
+	// topology.yaml for those operations no matter what, so when no topology requests it the
+	// operator promotes the first one rather than leave the choice to file order. Setting this to
+	// false everywhere therefore does not produce a cluster without a default.
+	//
+	// +kubebuilder:validation:Optional
+	ClusterDefault *bool `json:"clusterDefault,omitempty"`
+
+	// Topo selects the topology plugin and carries its plugin-specific parameters.
+	//
+	// +kubebuilder:validation:Required
+	Topo TopologyPlugin `json:"topo"`
+
+	// NodeSetRefs lists the NodeSets whose Slurm nodes belong to this topology. Each value must
+	// correspond to a NodeSet.Metadata.Name, or be the special value "ALL" covering every NodeSet
+	// of the cluster. Topologies may overlap: Slurm lets a node belong to several topologies at
+	// once, so the same NodeSet can be described as a tree in one and as blocks in another.
+	//
+	// +kubebuilder:validation:Optional
+	NodeSetRefs []string `json:"nodeSetRefs,omitempty"`
+}
+
+// TopologyPlugin is a discriminated union: Type picks the plugin, and the remaining fields
+// apply only to the matching plugin.
+type TopologyPlugin struct {
+	// Type identifies the topology plugin backing this topology.
+	//
+	// "flat" applies no placement optimization and lists no nodes. It is what a cluster with no
+	// fabric to optimize on should use, and the only way to describe such nodes without inventing a
+	// switch hierarchy for them. A partition still has to reach it, through TopologyRef or by the
+	// topology being the ClusterDefault.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=tree;block;flat
+	Type string `json:"type"`
+
+	// BlockSizes is the planning base block size followed by any higher-level block sizes to
+	// enforce. Each successive value must be a power of two larger than the previous one.
+	// Applies only to Type "block"; it maps to the block_sizes attribute of topology.yaml.
+	//
+	// +kubebuilder:validation:Optional
+	BlockSizes []int `json:"blockSizes,omitempty"`
 }
 
 type MPIConfig struct {
@@ -513,6 +574,13 @@ type Partition struct {
 	//
 	// +kubebuilder:validation:Optional
 	NodeSetRefs []string `json:"nodeSetRefs,omitempty"`
+
+	// TopologyRef binds the Partition to one of Topology.Topologies by name, rendering
+	// Topology=<name> on the partition line. When empty, the partition uses the topology marked
+	// ClusterDefault. A reference that resolves to no defined topology is dropped.
+	//
+	// +kubebuilder:validation:Optional
+	TopologyRef string `json:"topologyRef,omitempty"`
 
 	// Config allows to provide additional configuration for a Partition regarding https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION.
 	//

@@ -48,7 +48,6 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			true,
 			true,
 			300,
-			consts.SlurmTopologyBlock,
 			"fab-test",
 			0,
 		)
@@ -57,10 +56,21 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 		assert.Equal(t, container.Image, result.Image)
 		assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller", "wait-topology"}, result.Command)
-		assert.Equal(t, 12, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 5 topology
+		assert.Equal(t, 11, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 4 topology
 		assert.Equal(t, 3, len(result.VolumeMounts))
-		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
 		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_FABRIC", "fab-test")
+
+		// The plugin is a property of each topology in the config, not of the cluster, so the
+		// worker no longer needs to be told one.
+		for _, envVar := range result.Env {
+			assert.NotEqual(t, "SLURM_TOPOLOGY_PLUGIN", envVar.Name)
+		}
+
+		// The topologies a worker joins are derived at runtime from the topology config it already
+		// waits for; carrying them in the pod spec would roll the NodeSet on every topology edit.
+		for _, envVar := range result.Env {
+			assert.NotEqual(t, "SLURM_TOPOLOGY_BINDINGS", envVar.Name)
+		}
 
 		expectedMounts := map[string]string{
 			consts.VolumeNameJail:               consts.VolumeMountPathJail,
@@ -82,7 +92,6 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			false,
 			false,
 			0,
-			"",
 			"",
 			0,
 		)
@@ -127,7 +136,6 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			false,
 			0,
 			"",
-			"",
 			120,
 		)
 
@@ -141,7 +149,6 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			false,
 			false,
 			0,
-			"",
 			"",
 			0,
 		)
@@ -210,7 +217,6 @@ func Test_RenderContainerWorkerInit_K8SServiceName(t *testing.T) {
 				false,
 				tt.gpuEnabled,
 				0,
-				"",
 				"",
 				0,
 			)
@@ -301,7 +307,6 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 				consts.CGroupV2,
 				tt.clusterWithGPU,
 				false,
-				"",
 			)
 			assert.NoError(t, err)
 
@@ -354,7 +359,6 @@ func TestRenderNodeSetStatefulSet_NvidiaIMEXCLIMount(t *testing.T) {
 		consts.CGroupV2,
 		true,
 		false,
-		"",
 	)
 	assert.NoError(t, err)
 
@@ -413,7 +417,6 @@ func TestRenderNodeSetStatefulSet_NvidiaIMEXNotMountedForCPUWorker(t *testing.T)
 		consts.CGroupV2,
 		false,
 		false,
-		"",
 	)
 	assert.NoError(t, err)
 
@@ -532,7 +535,6 @@ func TestRenderNodeSetStatefulSet_HostJournalMount(t *testing.T) {
 		consts.CGroupV2,
 		false,
 		false,
-		"",
 	)
 	assert.NoError(t, err)
 
@@ -708,7 +710,6 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 				consts.CGroupV2,
 				true,
 				tt.topologyPluginEnabled,
-				consts.SlurmTopologyBlock,
 			)
 			assert.NoError(t, err)
 
@@ -735,7 +736,8 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			assert.Equal(t, tt.expectWaitForTopology, hasWaitForTopology,
 				"wait-topology command presence mismatch")
 			if tt.expectWaitForTopology && assert.NotNil(t, workerInitContainer) {
-				assertEnvValue(t, workerInitContainer.Env, "SLURM_TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
+				assertEnvValue(t, workerInitContainer.Env, "TOPOLOGY_CONFIGMAP_PATH",
+					consts.VolumeMountPathTopologyNodeLabels)
 			}
 
 			// Verify topology-related volumes
@@ -851,7 +853,6 @@ func TestRenderNodeSetStatefulSet_DockerEnabled(t *testing.T) {
 				consts.CGroupV2,
 				false,
 				false,
-				"",
 			)
 			assert.NoError(t, err)
 
@@ -911,7 +912,6 @@ func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 			consts.CGroupV2,
 			false,
 			false,
-			"",
 		)
 		assert.NoError(t, err)
 
@@ -939,7 +939,6 @@ func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 			consts.CGroupV2,
 			false,
 			false,
-			"",
 		)
 		assert.ErrorContains(t, err, "is managed by Soperator")
 	})
@@ -1042,7 +1041,6 @@ func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testin
 				consts.CGroupV2,
 				true,
 				false,
-				"",
 			)
 			assert.NoError(t, err)
 			if assert.NotNil(t, result.Spec.PersistentVolumeClaimRetentionPolicy) {
@@ -1110,7 +1108,6 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 				consts.CGroupV2,
 				true,
 				false,
-				"",
 			)
 			assert.NoError(t, err)
 
@@ -1141,7 +1138,6 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 			consts.CGroupV2,
 			true,
 			false,
-			"",
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, appsv1.OnDeleteStatefulSetStrategyType, result.Spec.UpdateStrategy.Type)
@@ -1162,7 +1158,6 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 			consts.CGroupV2,
 			true,
 			false,
-			"",
 		)
 		assert.ErrorContains(t, err, `unsupported update strategy "unsupported"`)
 	})
@@ -1266,7 +1261,6 @@ func TestRenderNodeSetStatefulSet_EphemeralNodesReserveOrdinals(t *testing.T) {
 				consts.CGroupV2,
 				true,
 				false,
-				"",
 			)
 			assert.NoError(t, err)
 

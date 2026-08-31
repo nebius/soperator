@@ -2,7 +2,6 @@ package topologyconfcontroller
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -26,36 +25,28 @@ func (b TopologyBlocks) AddNode(block, worker string) {
 	b.blocks[block] = append(b.blocks[block], worker)
 }
 
-// RenderConfigLines formats each populated block as a Slurm topology.conf line:
-//
-//	BlockName=<tier-0 label> Nodes=<comma-separated worker list>
-//
-// https://slurm.schedmd.com/topology.conf.html#SECTION_EXAMPLE
-func (b TopologyBlocks) RenderConfigLines() []string {
+// RenderBlocks flattens the topology into the block entries of a block topology, in the shape
+// topology.yaml expects.
+func (b TopologyBlocks) RenderBlocks() []blockYAML {
 	if len(b.blocks) == 0 {
 		return nil
 	}
 
-	lines := make([]string, 0, len(b.blocks))
-
+	blocks := make([]blockYAML, 0, len(b.blocks))
 	for blockName, workers := range b.blocks {
 		if len(workers) == 0 {
 			continue
 		}
-		lines = append(
-			lines,
-			fmt.Sprintf(
-				"BlockName=%s Nodes=%s",
-				// Block names are external tier-0 labels; sanitize them like switch names. The
-				// worker list must stay verbatim to match real Slurm node names.
-				slurmSafeSwitchName(blockName),
-				slurmpattern.Merge(workers),
-			),
-		)
+		blocks = append(blocks, blockYAML{
+			// Block names are external tier-0 labels; sanitize them like switch names. The
+			// worker list must stay verbatim to match real Slurm node names.
+			Block: slurmSafeSwitchName(blockName),
+			Nodes: slurmpattern.Merge(workers),
+		})
 	}
-	sort.Strings(lines)
+	sort.Slice(blocks, func(i, j int) bool { return blocks[i].Block < blocks[j].Block })
 
-	return lines
+	return blocks
 }
 
 // BuildTopologyBlocks builds the block topology in two stages, mirroring BuildTopologyGraph.
