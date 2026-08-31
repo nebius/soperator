@@ -10,10 +10,12 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// NodePodsFetcher fetches the pods running on a specific node without going
-// through the controller-runtime informer cache.
+// NodePodsFetcher fetches the pods running on a node from the kubelet, the only authority on
+// what is still running there. It never lists pods from the API server: a field-selected pod
+// LIST makes the API server range-read every pod in the cluster out of etcd, and it answers
+// what the control plane believes runs on the node rather than what actually does.
 type NodePodsFetcher interface {
-	GetPodsOnNode(ctx context.Context, nodeName string) (*corev1.PodList, error)
+	GetPodsOnNode(ctx context.Context, node *corev1.Node) (*corev1.PodList, error)
 }
 
 // apiserverNodeProxy implements NodePodsFetcher via the API server's
@@ -24,19 +26,19 @@ type apiserverNodeProxy struct {
 	clientset kubernetes.Interface
 }
 
-func (p *apiserverNodeProxy) GetPodsOnNode(ctx context.Context, nodeName string) (*corev1.PodList, error) {
+func (p *apiserverNodeProxy) GetPodsOnNode(ctx context.Context, node *corev1.Node) (*corev1.PodList, error) {
 	raw, err := p.clientset.CoreV1().RESTClient().Get().
 		Resource("nodes").
-		Name(nodeName).
+		Name(node.Name).
 		SubResource("proxy").
 		Suffix("pods").
 		DoRaw(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("node proxy request failed for %s: %w", nodeName, err)
+		return nil, fmt.Errorf("node proxy request failed for %s: %w", node.Name, err)
 	}
 	var podList corev1.PodList
 	if err := json.Unmarshal(raw, &podList); err != nil {
-		return nil, fmt.Errorf("decode proxy response for %s: %w", nodeName, err)
+		return nil, fmt.Errorf("decode proxy response for %s: %w", node.Name, err)
 	}
 	return &podList, nil
 }

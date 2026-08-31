@@ -23,7 +23,7 @@ type mockNodePodsFetcher struct {
 	err     error
 }
 
-func (m *mockNodePodsFetcher) GetPodsOnNode(_ context.Context, _ string) (*corev1.PodList, error) {
+func (m *mockNodePodsFetcher) GetPodsOnNode(_ context.Context, _ *corev1.Node) (*corev1.PodList, error) {
 	return m.podList, m.err
 }
 

@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"testing"
 	"time"
 
@@ -25,9 +28,26 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/kubeletclient"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
 )
+
+// splitHostPort breaks an httptest server URL into the pieces a node status carries.
+func splitHostPort(t *testing.T, rawURL string) (string, int32) {
+	t.Helper()
+
+	parsed, err := url.Parse(rawURL)
+	require.NoError(t, err)
+
+	host, portStr, err := net.SplitHostPort(parsed.Host)
+	require.NoError(t, err)
+
+	port, err := strconv.Atoi(portStr)
+	require.NoError(t, err)
+
+	return host, int32(port)
+}
 
 func createTestPodEphemeralStorageCheck(t *testing.T, objects ...client.Object) *PodEphemeralStorageCheck {
 	scheme := runtime.NewScheme()
@@ -53,7 +73,7 @@ func createTestPodEphemeralStorageCheck(t *testing.T, objects ...client.Object) 
 		80.0,
 		75.0,
 		slurmAPIClients,
-		KubeletClientConfig{InsecureSkipTLSVerify: true},
+		kubeletclient.Config{InsecureSkipTLSVerify: true},
 	)
 	require.NoError(t, err)
 	return controller

@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,6 +45,7 @@ import (
 
 	"nebius.ai/slurm-operator/internal/cli"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/kubeletclient"
 	metricsopts "nebius.ai/slurm-operator/internal/metrics"
 	"nebius.ai/slurm-operator/internal/rebooter"
 	//+kubebuilder:scaffold:imports
@@ -93,6 +95,24 @@ func getZapOpts(logFormat, logLevel string) []zap.Opts {
 	return zapOpts
 }
 
+// newNodePodsFetcher builds the fetcher used to check pod eviction during a drain.
+// It reads from the node's own kubelet, keeping the API server off the critical path of a
+// reboot, and falls back to the API server node proxy when the kubelet cannot be reached.
+// Both paths ask the same kubelet, so the fallback cannot report a different answer.
+func newNodePodsFetcher(config *rest.Config, kubeletConfig kubeletclient.Config) (rebooter.NodePodsFetcher, error) {
+	kubeletFetcher, err := rebooter.NewKubeletNodePodsFetcher(config, kubeletConfig)
+	if err != nil {
+		return nil, fmt.Errorf("create kubelet node pods fetcher: %w", err)
+	}
+
+	proxyFetcher, err := rebooter.NewAPIServerNodePodsFetcher(config)
+	if err != nil {
+		return nil, fmt.Errorf("create API server node proxy fetcher: %w", err)
+	}
+
+	return rebooter.NewFallbackNodePodsFetcher(kubeletFetcher, proxyFetcher), nil
+}
+
 // maxConcurrency is the maximum number of concurrent reconciles for a controller.
 // For reconsiling the node it has to be 1. Otherwise, it wold  be possible to get race conditions.
 const maxConcurrency = 1
@@ -108,6 +128,12 @@ func main() {
 
 		reconcileTimeout time.Duration
 		cacheSyncTimeout time.Duration
+
+		kubeletPort                  int
+		kubeletTimeout               time.Duration
+		kubeletInsecureSkipTLSVerify bool
+		kubeletCAFile                string
+		kubeletTLSServerName         string
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -120,6 +146,11 @@ func main() {
 	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 1*time.Minute, "The maximum duration allowed for a single reconcile if some error occurs")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
+	flag.IntVar(&kubeletPort, "kubelet-port", kubeletclient.DefaultPort, "The kubelet port used on nodes that do not advertise a kubelet endpoint.")
+	flag.DurationVar(&kubeletTimeout, "kubelet-request-timeout", 10*time.Second, "The timeout for a single request to the local kubelet.")
+	flag.BoolVar(&kubeletInsecureSkipTLSVerify, "kubelet-insecure-skip-tls-verify", true, "If set, the kubelet serving certificate is not verified. Kubelet serving certificates are self-signed unless the cluster enables serverTLSBootstrap.")
+	flag.StringVar(&kubeletCAFile, "kubelet-ca-file", "", "The CA bundle used to verify the kubelet serving certificate. Only used when kubelet-insecure-skip-tls-verify is false.")
+	flag.StringVar(&kubeletTLSServerName, "kubelet-tls-server-name", "", "The server name used to verify the kubelet serving certificate. Only used when kubelet-insecure-skip-tls-verify is false.")
 	flag.Parse()
 
 	opts := getZapOpts(logFormat, logLevel)
@@ -165,7 +196,7 @@ func main() {
 		Cache: cache.Options{
 			ByObject: map[client.Object]cache.ByObject{
 				&corev1.Node{}: {Field: fields.OneTermEqualSelector("metadata.name", nodeName)},
-				// Guardrail: nothing caches pods today (pod reads go through the kubelet via nodes/proxy),
+				// Guardrail: nothing caches pods today (pod reads go straight to the local kubelet),
 				// but a single cached pod read added in the future would silently start an informer over
 				// every pod in the cluster. This selector caps such an informer to this node's own pods.
 				&corev1.Pod{}: {Field: fields.OneTermEqualSelector("spec.nodeName", nodeName)},
@@ -207,7 +238,13 @@ func main() {
 	default:
 		rebooterParams.EvictionMethod = consts.RebooterEvict
 	}
-	nodePodsFetcher, err := rebooter.NewAPIServerNodePodsFetcher(mgr.GetConfig())
+	nodePodsFetcher, err := newNodePodsFetcher(mgr.GetConfig(), kubeletclient.Config{
+		Port:                  int32(kubeletPort),
+		Timeout:               kubeletTimeout,
+		InsecureSkipTLSVerify: kubeletInsecureSkipTLSVerify,
+		CAFile:                kubeletCAFile,
+		TLSServerName:         kubeletTLSServerName,
+	})
 	if err != nil {
 		cli.Fail(setupLog, err, "unable to create node pods fetcher")
 	}

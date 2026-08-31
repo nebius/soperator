@@ -27,6 +27,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/jwt"
+	"nebius.ai/slurm-operator/internal/kubeletclient"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
@@ -76,7 +77,7 @@ type EphemeralStorageInfo struct {
 type PodEphemeralStorageCheck struct {
 	*reconciler.Reconciler
 	requeueAfter    time.Duration
-	kubelet         *kubeletStatsClient
+	kubelet         *kubeletclient.Client
 	usageThreshold  float64
 	resumeThreshold float64
 	slurmAPIClients *slurmapi.ClientSet
@@ -91,13 +92,13 @@ func NewPodEphemeralStorageCheck(
 	usageThreshold float64,
 	resumeThreshold float64,
 	slurmAPIClients *slurmapi.ClientSet,
-	kubeletConfig KubeletClientConfig,
+	kubeletConfig kubeletclient.Config,
 ) (*PodEphemeralStorageCheck, error) {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
-	kubelet, err := newKubeletStatsClient(restConfig, kubeletConfig)
+	kubelet, err := kubeletclient.New(restConfig, kubeletConfig)
 	if err != nil {
-		return nil, fmt.Errorf("creating kubelet stats client: %w", err)
+		return nil, fmt.Errorf("creating kubelet client: %w", err)
 	}
 
 	return &PodEphemeralStorageCheck{
@@ -389,13 +390,13 @@ func (r *PodEphemeralStorageCheck) getEphemeralStorageStatsFromNode(ctx context.
 		return nil, fmt.Errorf("getting node %s: %w", nodeName, err)
 	}
 
-	address, port, err := kubeletAddressForNode(node)
+	address, port, err := kubeletclient.AddressForNode(node)
 	if err != nil {
 		return nil, err
 	}
 
-	stats, err := r.kubelet.GetSummary(ctx, address, port)
-	if err != nil {
+	var stats KubeletStats
+	if err := r.kubelet.Get(ctx, address, port, kubeletclient.SummaryPath, &stats); err != nil {
 		return nil, fmt.Errorf("getting kubelet stats from node %s: %w", nodeName, err)
 	}
 
