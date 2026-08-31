@@ -44,7 +44,7 @@ func BasePodTemplateSpec(
 	}
 
 	labels := maps.Clone(matchLabels)
-	maps.Copy(labels, sConfigController.Labels)
+	common.MergeExtraLabels(labels, sConfigController.Labels)
 
 	annotations := map[string]string{
 		consts.AnnotationDefaultContainerName: consts.ContainerNameSConfigController,

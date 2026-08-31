@@ -35,7 +35,7 @@ func RenderStatefulSet(
 
 	labels[consts.LabelControllerType] = consts.LabelControllerTypeMain
 	matchLabels[consts.LabelControllerType] = consts.LabelControllerTypeMain
-	maps.Copy(labels, controller.Labels)
+	common.MergeExtraLabels(labels, controller.Labels)
 
 	annotations := map[string]string{
 		consts.AnnotationDefaultContainerName: consts.ContainerNameSlurmctld,
@@ -101,6 +101,8 @@ func RenderStatefulSet(
 				namespace,
 				clusterName,
 				pvcTemplateSpecs,
+				controller.Labels,
+				controller.Annotations,
 			),
 			VolumeClaimUpdateStrategy: kruisev1b1.VolumeClaimUpdateStrategy{
 				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
