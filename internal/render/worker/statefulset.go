@@ -34,7 +34,7 @@ func RenderNodeSetStatefulSet(
 	labels := common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	labels[consts.LabelNodeSetKey] = nodeSet.Name
 	labels[consts.LabelWorkerKey] = consts.LabelWorkerValue
-	maps.Copy(labels, nodeSet.Labels)
+	common.MergeExtraLabels(labels, nodeSet.Labels)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	matchLabels[consts.LabelNodeSetKey] = nodeSet.Name
 
@@ -177,6 +177,8 @@ func RenderNodeSetStatefulSet(
 				nodeSet.ParentalCluster.Namespace,
 				nodeSet.ParentalCluster.Name,
 				pvcTemplateSpecs,
+				nodeSet.Labels,
+				nodeSet.Annotations,
 			),
 			VolumeClaimUpdateStrategy: volumeClaimUpdateStrategy,
 			Template: corev1.PodTemplateSpec{

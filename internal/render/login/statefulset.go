@@ -33,7 +33,7 @@ func RenderStatefulSet(
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeLogin, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName)
-	maps.Copy(labels, login.Labels)
+	common.MergeExtraLabels(labels, login.Labels)
 
 	annotations := renderPodAnnotations()
 	maps.Copy(annotations, login.Annotations)
@@ -92,6 +92,8 @@ func RenderStatefulSet(
 				namespace,
 				clusterName,
 				pvcTemplateSpecs,
+				login.Labels,
+				login.Annotations,
 			),
 			VolumeClaimUpdateStrategy: kruisev1b1.VolumeClaimUpdateStrategy{
 				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
