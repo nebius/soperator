@@ -73,6 +73,18 @@ echo "Complement jail rootfs"
 echo "Create privilege separation directory /var/run/sshd"
 mkdir -p /var/run/sshd
 
+source_sshd_config_dir="/mnt/ssh-configs"
+effective_sshd_config_dir=$(mktemp -d /run/soperator-ssh-configs.XXXXXX)
+/opt/bin/slurm/prepare_sshd_pam_jail_config.sh \
+    "${source_sshd_config_dir}" \
+    "${effective_sshd_config_dir}"
+
+# Supervisor configuration is independently reconciled and can temporarily
+# retain the legacy SSHD command during upgrades. Keep its configured path
+# pointed at the startup snapshot prepared for the PAM jail.
+mount --bind "${effective_sshd_config_dir}" "${source_sshd_config_dir}"
+/usr/sbin/sshd -t -f "${source_sshd_config_dir}/sshd_config"
+
 # TODO: Since 1.29 kubernetes supports native sidecar containers. We can remove it in feature releases
 echo "Waiting until munge is started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done

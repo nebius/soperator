@@ -41,13 +41,7 @@ func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Contex
 	}
 	s.targetWorker = workers[0]
 
-	cmd := fmt.Sprintf("id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s",
-		framework.ShellQuote(sshUserName), framework.ShellQuote(sshUserName))
-	if _, err := s.runtime.Jail().Run(ctx, cmd); err != nil {
-		return fmt.Errorf("create user %s: %w", sshUserName, err)
-	}
-
-	return nil
+	return ensureSSHTestUser(ctx, s.runtime, sshUserName)
 }
 
 func (s *InternalSSH) theUserSSHsFromTheLoginNodeToAWorker(ctx context.Context) error {

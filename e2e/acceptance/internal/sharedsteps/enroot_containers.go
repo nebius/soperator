@@ -25,6 +25,10 @@ const (
 	enrootProbeTimeout    = 5 * time.Minute
 	enrootStopTimeout     = 3 * time.Minute
 	enrootGPUSmokeTimeout = 10 * time.Minute
+	enrootSSHSmokeTimeout = 8 * time.Minute
+
+	enrootSSHKeyName    = "soperator_e2e_enroot_ssh"
+	enrootSSHKeyComment = "soperator-e2e-enroot-ssh"
 )
 
 type EnrootContainers struct {
@@ -42,6 +46,12 @@ type EnrootContainers struct {
 	runtimeNamePrefix  string
 
 	directSquashFS *bool
+
+	sshEnrootOutput    string
+	sshEnrootTarget    string
+	sshEnrootHost      string
+	sshEnrootImagePath string
+	sshIdentitySet     bool
 }
 
 func NewEnrootContainers(runtime framework.Runtime, slurm *framework.SlurmClient, selector *framework.WorkerSelector) *EnrootContainers {
@@ -53,6 +63,7 @@ func NewEnrootContainers(runtime framework.Runtime, slurm *framework.SlurmClient
 }
 
 func (s *EnrootContainers) RegisterSteps(sc *godog.ScenarioContext) {
+	sc.Step(`^an Enroot SSH test user exists$`, s.anEnrootSSHTestUserExists)
 	sc.Step(`^a long-running Enroot container job is submitted on two workers$`, s.aLongRunningEnrootContainerJobIsSubmittedOnTwoWorkers)
 	sc.Step(`^the Enroot container job is running$`, s.theEnrootContainerJobIsRunning)
 	sc.Step(`^an Enroot image artifact is present on a worker$`, s.anEnrootImageArtifactIsPresentOnAWorker)
@@ -65,6 +76,9 @@ func (s *EnrootContainers) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^Enroot runtime state is cleaned up$`, s.enrootRuntimeStateIsCleanedUp)
 	sc.Step(`^an Enroot GPU smoke job is submitted on one GPU worker$`, s.anEnrootGPUSmokeJobIsSubmittedOnOneGPUWorker)
 	sc.Step(`^the Enroot GPU smoke job succeeds and reports visible GPUs$`, s.theEnrootGPUSmokeJobSucceedsAndReportsVisibleGPUs)
+	sc.Step(`^the user imports an Enroot image over SSH on a (login|worker) node$`, s.theUserImportsAnEnrootImageOverSSH)
+	sc.Step(`^the user starts the imported Enroot image over SSH$`, s.theUserStartsTheImportedEnrootImageOverSSH)
+	sc.Step(`^the container reports Ubuntu$`, s.theContainerReportsUbuntu)
 }
 
 func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
@@ -79,6 +93,172 @@ func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
 	s.squashStatBefore = ""
 	s.runtimeNamePrefix = ""
 	s.directSquashFS = nil
+	if s.sshEnrootImagePath != "" {
+		if cleanupErr := s.removeEnrootSSHImage(ctx); cleanupErr != nil {
+			s.runtime.Logf("cleanup: remove imported Enroot SSH image: %v", cleanupErr)
+		}
+	}
+	if s.sshIdentitySet {
+		if cleanupErr := s.removeEnrootSSHTestIdentity(ctx); cleanupErr != nil {
+			s.runtime.Logf("cleanup: remove Enroot SSH test identity: %v", cleanupErr)
+		}
+	}
+	s.sshEnrootOutput = ""
+	s.sshEnrootTarget = ""
+	s.sshEnrootHost = ""
+	s.sshEnrootImagePath = ""
+	s.sshIdentitySet = false
+}
+
+func (s *EnrootContainers) anEnrootSSHTestUserExists(ctx context.Context) error {
+	if err := ensureSSHTestUser(ctx, s.runtime, sshUserName); err != nil {
+		return err
+	}
+
+	setupIdentity := fmt.Sprintf(`
+set -euo pipefail
+install -d -m 0700 "${HOME}/.ssh"
+key="${HOME}/.ssh/%s"
+authorized_keys="${HOME}/.ssh/authorized_keys"
+rm -f "${key}" "${key}.pub"
+touch "${authorized_keys}"
+sed -i '\# %s$#d' "${authorized_keys}"
+ssh-keygen -q -t ecdsa -N '' -C %s -f "${key}"
+cat "${key}.pub" >> "${authorized_keys}"
+chmod 0600 "${authorized_keys}"
+`, enrootSSHKeyName, enrootSSHKeyComment, framework.ShellQuote(enrootSSHKeyComment))
+	command := fmt.Sprintf(
+		"su - %s -c %s",
+		framework.ShellQuote(sshUserName),
+		framework.ShellQuote(framework.BashLC(setupIdentity)),
+	)
+	s.sshIdentitySet = true
+	if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
+		return fmt.Errorf("prepare SSH identity for %s: %w", sshUserName, err)
+	}
+
+	return nil
+}
+
+func (s *EnrootContainers) removeEnrootSSHTestIdentity(ctx context.Context) error {
+	cleanupIdentity := fmt.Sprintf(`
+key="${HOME}/.ssh/%s"
+authorized_keys="${HOME}/.ssh/authorized_keys"
+rm -f "${key}" "${key}.pub"
+if [ -f "${authorized_keys}" ]; then
+    sed -i '\# %s$#d' "${authorized_keys}"
+fi
+`, enrootSSHKeyName, enrootSSHKeyComment)
+	command := fmt.Sprintf(
+		"if id %s >/dev/null 2>&1; then su - %s -c %s; fi",
+		framework.ShellQuote(sshUserName),
+		framework.ShellQuote(sshUserName),
+		framework.ShellQuote(framework.BashLC(cleanupIdentity)),
+	)
+	_, err := s.runtime.Jail().Run(ctx, command)
+	return err
+}
+
+func (s *EnrootContainers) theUserImportsAnEnrootImageOverSSH(ctx context.Context, target string) error {
+	host := "localhost"
+	if target == "worker" {
+		workers, err := s.selector.PickWorkers(ctx, 1)
+		if err != nil {
+			return framework.SkipIfInsufficientWorkers(s.runtime, err)
+		}
+		host = workers[0].Name
+	}
+
+	s.sshEnrootTarget = target
+	s.sshEnrootHost = host
+	s.sshEnrootImagePath = path.Join(
+		"/home",
+		sshUserName,
+		".cache",
+		fmt.Sprintf("soperator-e2e-enroot-ssh-%s-%d.sqsh", target, time.Now().UnixNano()),
+	)
+
+	remoteCommand := fmt.Sprintf(
+		"install -d -m 0700 %s && enroot import --output %s %s",
+		framework.ShellQuote(path.Dir(s.sshEnrootImagePath)),
+		framework.ShellQuote(s.sshEnrootImagePath),
+		framework.ShellQuote(enrootLifecycleImage),
+	)
+	if _, err := s.runEnrootSSHCommand(ctx, remoteCommand); err != nil {
+		return fmt.Errorf("import Enroot image over SSH on %s node: %w", target, err)
+	}
+
+	return nil
+}
+
+func (s *EnrootContainers) theUserStartsTheImportedEnrootImageOverSSH(ctx context.Context) error {
+	if s.sshEnrootImagePath == "" {
+		return fmt.Errorf("start imported Enroot image: image path is empty")
+	}
+
+	remoteCommand := fmt.Sprintf(
+		"enroot start %s cat /etc/os-release",
+		framework.ShellQuote(s.sshEnrootImagePath),
+	)
+	output, err := s.runEnrootSSHCommand(ctx, remoteCommand)
+	if err != nil {
+		return fmt.Errorf("start imported Enroot image over SSH on %s node: %w", s.sshEnrootTarget, err)
+	}
+
+	s.sshEnrootOutput = output
+	return nil
+}
+
+func (s *EnrootContainers) runEnrootSSHCommand(ctx context.Context, remoteCommand string) (string, error) {
+	if s.sshEnrootHost == "" {
+		return "", fmt.Errorf("run Enroot SSH command: target host is empty")
+	}
+
+	sshCommand := fmt.Sprintf(
+		"timeout %.0f ssh -i ~/.ssh/%s -o IdentitiesOnly=yes -o BatchMode=yes -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null %s %s",
+		enrootSSHSmokeTimeout.Seconds(),
+		enrootSSHKeyName,
+		framework.ShellQuote(s.sshEnrootHost),
+		framework.ShellQuote(framework.BashLC(remoteCommand)),
+	)
+	command := fmt.Sprintf(
+		"su - %s -c %s",
+		framework.ShellQuote(sshUserName),
+		framework.ShellQuote(sshCommand),
+	)
+
+	return s.runtime.Jail().Run(ctx, command)
+}
+
+func (s *EnrootContainers) removeEnrootSSHImage(ctx context.Context) error {
+	if s.sshEnrootHost == "" || s.sshEnrootImagePath == "" {
+		return nil
+	}
+
+	_, err := s.runEnrootSSHCommand(
+		ctx,
+		fmt.Sprintf("rm -f -- %s", framework.ShellQuote(s.sshEnrootImagePath)),
+	)
+	return err
+}
+
+func (s *EnrootContainers) theContainerReportsUbuntu() error {
+	if id := osReleaseID(s.sshEnrootOutput); id != "ubuntu" {
+		return fmt.Errorf("container OS ID = %q, want %q; output: %s", id, "ubuntu", strings.TrimSpace(s.sshEnrootOutput))
+	}
+
+	return nil
+}
+
+func osReleaseID(output string) string {
+	for line := range strings.SplitSeq(output, "\n") {
+		key, value, found := strings.Cut(strings.TrimSpace(line), "=")
+		if found && key == "ID" {
+			return strings.Trim(value, `"'`)
+		}
+	}
+
+	return ""
 }
 
 func (s *EnrootContainers) aLongRunningEnrootContainerJobIsSubmittedOnTwoWorkers(ctx context.Context) error {

@@ -131,8 +131,9 @@ As you can see, it's pretty short and doesn't do anything supernatural.
 
 This plugin isn’t bound to Soperator setup and could theoretically work in typical (non-Kubernetes) Slurm installations.
 
-We use a different approach to change the root directory for user-established SSH sessions to Login nodes. We simply use
-OpenSSH’s ChrootDirectory feature.
+SSH sessions on login and worker nodes enter the same jail through a PAM session module. The module creates a private
+mount namespace for each session and uses `pivot_root`, allowing tools such as Enroot to create their own namespaces
+inside the jail.
 
 The jail storage is initially populated at the moment of creating the cluster. It's done by the K8s job "populate-jail"
 that runs only once. It uses [images/populate_jail/](../images/populate_jail) container image. The content this job

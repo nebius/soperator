@@ -2,6 +2,22 @@
 
 ARG SLURM_VERSION
 
+# https://github.com/nebius/ml-containers/pull/90
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260624084749 AS worker_pam_builder
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc \
+        libpam0g-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY images/common/pam_soperator_jail.c /usr/src/pam-soperator-jail/
+COPY images/common/scripts/build_pam_soperator_jail.sh /usr/src/pam-soperator-jail/
+RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
+    /usr/src/pam-soperator-jail/pam_soperator_jail.c \
+    /out
+
 # https://github.com/nebius/ml-containers/pull/99
 FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260816173636 AS worker_slurmd
 
@@ -124,12 +140,16 @@ COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
 # Copy script for bind-mounting slurm into the jail
 COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
+# Copy script for preparing an SSHD configuration compatible with the PAM jail
+COPY images/common/scripts/prepare_sshd_pam_jail_config.sh /opt/bin/slurm/
+
 # Copy scripts for rebooting K8s nodes and handing off worker operations
 COPY images/common/scripts/reboot.sh /opt/bin/slurm/
 COPY images/common/scripts/worker_handoff.py /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh && \
+    chmod +x /opt/bin/slurm/prepare_sshd_pam_jail_config.sh && \
     chmod +x /opt/bin/slurm/reboot.sh && \
     chmod +x /opt/bin/slurm/worker_handoff.py
 
@@ -148,6 +168,14 @@ RUN rm -rf /home
 
 # Delete SSH "message of the day" scripts because they aren't needed on worker nodes
 RUN rm -rf /etc/update-motd.d
+
+# Install the native PAM module that places each SSH session in its own mount
+# namespace and pivots it into /mnt/jail. Worker SSH sessions intentionally do
+# not use the login node's per-user cgroup hook.
+# Keep pam_soperator_jail last: it pivots the per-session sshd process into the
+# jail, so any PAM session modules after it would also run inside the jail.
+COPY --from=worker_pam_builder /out/ /
+RUN echo "session required pam_soperator_jail.so /mnt/jail" >> /etc/pam.d/sshd
 
 # Expose the port used for accessing slurmd
 EXPOSE 6818
