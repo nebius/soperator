@@ -454,18 +454,18 @@ func (r *RebooterReconciler) IsNodeTaintedWithNoExecute(node *corev1.Node) bool 
 	return false
 }
 
-// AreAllPodsEvicted checks if all pods on the node are evicted by querying
-// the API server's node proxy endpoint. This avoids loading full PodList
-// objects into the informer cache while staying on the API server's auth path.
+// AreAllPodsEvicted checks if all pods on the node are evicted. The pods come from the
+// node's own kubelet, so no PodList is loaded into the informer cache and the API server
+// stays off the critical path of a drain.
 func (r *RebooterReconciler) AreAllPodsEvicted(ctx context.Context, node *corev1.Node) error {
 	logger := log.FromContext(ctx).WithName("AreAllPodsEvicted").WithValues("nodeName", node.Name).V(1)
 
-	podList, err := r.NodePodsFetcher.GetPodsOnNode(ctx, node.Name)
+	podList, err := r.NodePodsFetcher.GetPodsOnNode(ctx, node)
 	if err != nil {
 		return fmt.Errorf("fetch pods on node %s: %w", node.Name, err)
 	}
 
-	logger.Info("Checking pods via API server proxy", "count", len(podList.Items))
+	logger.Info("Checking pods on node", "count", len(podList.Items))
 	for i := range podList.Items {
 		pod := &podList.Items[i]
 		if IsControlledByDaemonSet(*pod) {

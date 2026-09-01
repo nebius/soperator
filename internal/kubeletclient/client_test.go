@@ -1,4 +1,4 @@
-package soperatorchecks
+package kubeletclient
 
 import (
 	"context"
@@ -16,6 +16,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type summaryResponse struct {
+	Node struct {
+		NodeName string `json:"nodeName"`
+	} `json:"node"`
+	Pods []struct {
+		PodRef struct {
+			UID string `json:"uid"`
+		} `json:"podRef"`
+	} `json:"pods"`
+}
+
 // splitHostPort breaks an httptest server URL into the pieces a node status carries.
 func splitHostPort(t *testing.T, rawURL string) (string, int32) {
 	t.Helper()
@@ -32,10 +43,10 @@ func splitHostPort(t *testing.T, rawURL string) (string, int32) {
 	return host, int32(port)
 }
 
-func newTestKubeletClient(t *testing.T, timeout time.Duration) *kubeletStatsClient {
+func newTestClient(t *testing.T, timeout time.Duration) *Client {
 	t.Helper()
 
-	client, err := newKubeletStatsClient(nil, KubeletClientConfig{
+	client, err := New(nil, Config{
 		Timeout:               timeout,
 		InsecureSkipTLSVerify: true,
 	})
@@ -44,30 +55,49 @@ func newTestKubeletClient(t *testing.T, timeout time.Duration) *kubeletStatsClie
 	return client
 }
 
-func TestKubeletStatsClientGetSummary(t *testing.T) {
+func TestClientGetSummary(t *testing.T) {
 	var gotPath string
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"node":{"nodeName":"test-node"},"pods":[{"podRef":{"name":"p","namespace":"ns","uid":"uid-1"},"ephemeral-storage":{"usedBytes":1024}}]}`))
+		_, _ = w.Write([]byte(`{"node":{"nodeName":"test-node"},"pods":[{"podRef":{"uid":"uid-1"}}]}`))
 	}))
 	defer server.Close()
 
 	host, port := splitHostPort(t, server.URL)
 
-	stats, err := newTestKubeletClient(t, time.Minute).GetSummary(context.Background(), host, port)
-	require.NoError(t, err)
+	var stats summaryResponse
+	require.NoError(t, newTestClient(t, time.Minute).Get(context.Background(), host, port, SummaryPath, &stats))
 
-	assert.Equal(t, kubeletSummaryPath, gotPath)
+	assert.Equal(t, SummaryPath, gotPath)
 	assert.Equal(t, "test-node", stats.Node.NodeName)
 	require.Len(t, stats.Pods, 1)
-	require.NotNil(t, stats.Pods[0].EphemeralStorage.UsedBytes)
-	assert.Equal(t, uint64(1024), *stats.Pods[0].EphemeralStorage.UsedBytes)
+	assert.Equal(t, "uid-1", stats.Pods[0].PodRef.UID)
 }
 
-// A kubelet that authorizes against nodes/stats rejects an unauthorized caller, which is
+// The kubelet maps /pods onto the nodes/proxy sub-resource, so it decodes into a plain PodList.
+func TestClientGetPods(t *testing.T) {
+	var gotPath string
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"kind":"PodList","apiVersion":"v1","items":[{"metadata":{"name":"pod-a","namespace":"default"}}]}`))
+	}))
+	defer server.Close()
+
+	host, port := splitHostPort(t, server.URL)
+
+	var podList corev1.PodList
+	require.NoError(t, newTestClient(t, time.Minute).Get(context.Background(), host, port, PodsPath, &podList))
+
+	assert.Equal(t, PodsPath, gotPath)
+	require.Len(t, podList.Items, 1)
+	assert.Equal(t, "pod-a", podList.Items[0].Name)
+}
+
+// A kubelet that authorizes against a sub-resource rejects an unauthorized caller, which is
 // the expected failure when the service account lacks the sub-resource grant.
-func TestKubeletStatsClientGetSummaryForbidden(t *testing.T) {
+func TestClientGetForbidden(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "forbidden (user=system:serviceaccount:soperator:checks)", http.StatusForbidden)
 	}))
@@ -75,13 +105,13 @@ func TestKubeletStatsClientGetSummaryForbidden(t *testing.T) {
 
 	host, port := splitHostPort(t, server.URL)
 
-	_, err := newTestKubeletClient(t, time.Minute).GetSummary(context.Background(), host, port)
+	err := newTestClient(t, time.Minute).Get(context.Background(), host, port, SummaryPath, &summaryResponse{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "403")
 	assert.Contains(t, err.Error(), "forbidden")
 }
 
-func TestKubeletStatsClientGetSummaryTimeout(t *testing.T) {
+func TestClientGetTimeout(t *testing.T) {
 	release := make(chan struct{})
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		<-release
@@ -93,22 +123,22 @@ func TestKubeletStatsClientGetSummaryTimeout(t *testing.T) {
 
 	host, port := splitHostPort(t, server.URL)
 
-	_, err := newTestKubeletClient(t, 50*time.Millisecond).GetSummary(context.Background(), host, port)
+	err := newTestClient(t, 50*time.Millisecond).Get(context.Background(), host, port, SummaryPath, &summaryResponse{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "request kubelet stats")
+	assert.Contains(t, err.Error(), "request kubelet")
 }
 
-func TestKubeletStatsClientDefaultPort(t *testing.T) {
-	client, err := newKubeletStatsClient(nil, KubeletClientConfig{InsecureSkipTLSVerify: true})
+func TestClientDefaultPort(t *testing.T) {
+	client, err := New(nil, Config{InsecureSkipTLSVerify: true})
 	require.NoError(t, err)
-	assert.Equal(t, int32(DefaultKubeletPort), client.defaultPort)
+	assert.Equal(t, int32(DefaultPort), client.DefaultPort())
 
-	client, err = newKubeletStatsClient(nil, KubeletClientConfig{Port: 10255})
+	client, err = New(nil, Config{Port: 10255})
 	require.NoError(t, err)
-	assert.Equal(t, int32(10255), client.defaultPort)
+	assert.Equal(t, int32(10255), client.DefaultPort())
 }
 
-func TestKubeletAddressForNode(t *testing.T) {
+func TestAddressForNode(t *testing.T) {
 	tests := []struct {
 		name        string
 		node        *corev1.Node
@@ -163,7 +193,7 @@ func TestKubeletAddressForNode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			address, port, err := kubeletAddressForNode(tt.node)
+			address, port, err := AddressForNode(tt.node)
 			if tt.wantErr {
 				require.Error(t, err)
 				return

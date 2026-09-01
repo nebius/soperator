@@ -25,6 +25,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/kubeletclient"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
 )
@@ -68,7 +69,7 @@ func newDrainTestEnv(t *testing.T, usagePercent float64, slurmNode slurmapi.Node
 	var hits atomic.Int32
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
-		if r.URL.Path != kubeletSummaryPath {
+		if r.URL.Path != kubeletclient.SummaryPath {
 			http.NotFound(w, r)
 			return
 		}
@@ -153,7 +154,7 @@ func newDrainTestEnv(t *testing.T, usagePercent float64, slurmNode slurmapi.Node
 		drainTestUsageThreshold,
 		drainTestResumeThreshold,
 		clientSet,
-		KubeletClientConfig{InsecureSkipTLSVerify: true},
+		kubeletclient.Config{InsecureSkipTLSVerify: true},
 	)
 	require.NoError(t, err)
 

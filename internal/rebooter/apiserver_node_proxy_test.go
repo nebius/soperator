@@ -45,7 +45,7 @@ func TestAPIServerNodeProxyGetPodsOnNode(t *testing.T) {
 		t.Fatalf("create fetcher: %v", err)
 	}
 
-	podList, err := fetcher.GetPodsOnNode(context.Background(), "test-node")
+	podList, err := fetcher.GetPodsOnNode(context.Background(), &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}})
 	if err != nil {
 		t.Fatalf("get pods on node: %v", err)
 	}

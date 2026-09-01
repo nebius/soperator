@@ -48,6 +48,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/controllersenabled"
+	"nebius.ai/slurm-operator/internal/kubeletclient"
 	metricsopts "nebius.ai/slurm-operator/internal/metrics"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 
@@ -169,7 +170,7 @@ func main() {
 	flag.Float64Var(&ephemeralStorageResumeThreshold, "ephemeral-storage-resume-threshold", 80.0, "The threshold percentage below which a drained node is resumed (default 80%). Must be less than ephemeral-storage-threshold to avoid flapping.")
 	flag.StringVar(&maintenanceConditionType, "maintenance-condition-type", string(consts.DefaultMaintenanceConditionType), "The condition type for scheduled maintenance")
 	flag.StringVar(&maintenanceIgnoreNodeLabels, "maintenance-ignore-node-labels", os.Getenv("MAINTENANCE_IGNORE_NODE_LABELS"), "Comma-separated list of node label key=value pairs to ignore during maintenance (e.g., 'env=prod,tier=critical')")
-	flag.IntVar(&kubeletPort, "kubelet-port", soperatorchecks.DefaultKubeletPort, "The kubelet port used for pod ephemeral storage stats on nodes that do not advertise a kubelet endpoint.")
+	flag.IntVar(&kubeletPort, "kubelet-port", kubeletclient.DefaultPort, "The kubelet port used for pod ephemeral storage stats on nodes that do not advertise a kubelet endpoint.")
 	flag.DurationVar(&kubeletTimeout, "kubelet-request-timeout", 10*time.Second, "The timeout for a single kubelet stats request. Kubelet builds the summary from cAdvisor, which is slow on busy nodes.")
 	flag.IntVar(&kubeletMaxIdleConns, "kubelet-max-idle-conns", 1024, "The maximum number of pooled kubelet connections. One connection is kept per node, so values below the node count make most requests pay a fresh TLS handshake.")
 	flag.BoolVar(&kubeletInsecureSkipTLSVerify, "kubelet-insecure-skip-tls-verify", true, "If set, the kubelet serving certificate is not verified. Kubelet serving certificates are self-signed unless the cluster enables serverTLSBootstrap.")
@@ -363,7 +364,7 @@ func main() {
 			ephemeralStorageThreshold,
 			ephemeralStorageResumeThreshold,
 			slurmAPIClients,
-			soperatorchecks.KubeletClientConfig{
+			kubeletclient.Config{
 				Port:                  int32(kubeletPort),
 				Timeout:               kubeletTimeout,
 				MaxIdleConns:          kubeletMaxIdleConns,
