@@ -121,18 +121,9 @@ func TestEveryEmbeddedStepHasADefinition(t *testing.T) {
 		doc, err := gherkin.ParseGherkinDocument(strings.NewReader(string(content)), (&messages.Incrementing{}).NewId)
 		require.NoError(t, err)
 
-		for _, child := range doc.Feature.Children {
-			// Background steps run for every scenario of the feature, so they need a definition
-			// just as much as the scenario's own steps.
-			if child.Background != nil {
-				for _, step := range child.Background.Steps {
-					assertStepIsDefined(t, definitions, path, step.Text)
-				}
-			}
-			if child.Scenario == nil {
-				continue
-			}
-			for _, step := range child.Scenario.Steps {
+		pickles := gherkin.Pickles(*doc, path, (&messages.Incrementing{}).NewId)
+		for _, pickle := range pickles {
+			for _, step := range pickle.Steps {
 				assertStepIsDefined(t, definitions, path, step.Text)
 			}
 		}
