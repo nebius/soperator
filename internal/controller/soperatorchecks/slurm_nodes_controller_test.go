@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -578,4 +579,93 @@ func hasHardwareIssuesSuspected(t *testing.T, ctx context.Context, k8sClient ctr
 		}
 	}
 	return false
+}
+
+func TestSlurmNodesController_processK8SNodesMaintenance_readsNodesFromCache(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	slurmClusterName := types.NamespacedName{Namespace: "test-ns", Name: "test-cluster"}
+
+	newNode := func(name string, conditions ...corev1.NodeCondition) *corev1.Node {
+		return &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status:     corev1.NodeStatus{Conditions: conditions},
+		}
+	}
+	newWorkerPod := func(name, nodeName string) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: slurmClusterName.Namespace,
+				Name:      name,
+				Labels: map[string]string{
+					consts.LabelWorkerKey:   consts.LabelWorkerValue,
+					consts.LabelInstanceKey: slurmClusterName.Name,
+				},
+			},
+			Spec: corev1.PodSpec{NodeName: nodeName},
+		}
+	}
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(
+			newNode("instance-maintenance", corev1.NodeCondition{
+				Type:   consts.DefaultMaintenanceConditionType,
+				Status: corev1.ConditionTrue,
+			}),
+			newNode("instance-healthy"),
+			newWorkerPod("worker-0", "instance-maintenance"),
+			newWorkerPod("worker-1", "instance-healthy"),
+		).
+		WithIndex(&corev1.Pod{}, "spec.nodeName", func(obj ctrlclient.Object) []string {
+			return []string{obj.(*corev1.Pod).Spec.NodeName}
+		}).
+		Build()
+
+	apiClient := slurmapifake.NewMockClient(t)
+	apiClient.On(
+		"SlurmV0044PostNodeWithResponse",
+		ctx,
+		"worker-0",
+		mock.MatchedBy(func(body api.SlurmV0044PostNodeJSONRequestBody) bool {
+			return body.State != nil &&
+				len(*body.State) == 1 &&
+				(*body.State)[0] == api.V0044UpdateNodeMsgStateDRAIN
+		}),
+	).Return(&api.SlurmV0044PostNodeResponse{
+		JSON200: &api.V0044OpenapiResp{Errors: &[]api.V0044OpenapiError{}},
+	}, nil).Once()
+	apiClient.On("GetNode", ctx, "worker-0").Return(slurmapi.Node{
+		Name:   "worker-0",
+		States: map[api.V0044NodeState]struct{}{api.V0044NodeStateIDLE: {}, api.V0044NodeStateDRAIN: {}},
+	}, nil).Once()
+
+	slurmAPIClients := slurmapi.NewClientSet(ctx)
+	slurmAPIClients.AddClient(slurmClusterName, apiClient)
+
+	controller := NewSlurmNodesController(
+		k8sClient,
+		scheme,
+		record.NewFakeRecorder(10),
+		slurmAPIClients,
+		time.Minute,
+		true,
+		// Nodes must come from the cached client, so an empty uncached reader is enough here.
+		fake.NewClientBuilder().WithScheme(scheme).Build(),
+		"",
+	)
+
+	require.NoError(t, controller.processK8SNodesMaintenance(ctx))
+
+	var maintained corev1.Node
+	require.NoError(t, k8sClient.Get(ctx, types.NamespacedName{Name: "instance-maintenance"}, &maintained))
+	require.True(t, slices.ContainsFunc(maintained.Status.Conditions, func(c corev1.NodeCondition) bool {
+		return c.Type == consts.SoperatorChecksK8SNodeMaintenance && c.Status == corev1.ConditionTrue
+	}))
+
+	var healthy corev1.Node
+	require.NoError(t, k8sClient.Get(ctx, types.NamespacedName{Name: "instance-healthy"}, &healthy))
+	require.Empty(t, healthy.Status.Conditions)
 }

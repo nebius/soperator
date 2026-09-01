@@ -47,6 +47,7 @@ import (
 	"nebius.ai/slurm-operator/internal/cli"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/controllersenabled"
 	"nebius.ai/slurm-operator/internal/kubeletclient"
 	metricsopts "nebius.ai/slurm-operator/internal/metrics"
@@ -269,6 +270,7 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 		Cache: cache.Options{
 			DefaultNamespaces: watchNsCacheByName,
+			ByObject:          controllerconfig.NodeCacheByObject(),
 		},
 	})
 	if err != nil {

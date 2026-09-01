@@ -43,12 +43,10 @@ type NodeTopologyReconciler struct {
 	BaseReconciler
 	Namespace           string
 	topologyLabelPrefix string
-	// https://github.com/kubernetes-sigs/controller-runtime/issues/3044
-	APIReader client.Reader // Direct API reader for pagination
 }
 
 func NewNodeTopologyReconciler(
-	client client.Client, scheme *runtime.Scheme, namespace, topologyLabelPrefix string, apiReader client.Reader) *NodeTopologyReconciler {
+	client client.Client, scheme *runtime.Scheme, namespace, topologyLabelPrefix string) *NodeTopologyReconciler {
 	return &NodeTopologyReconciler{
 		BaseReconciler: BaseReconciler{
 			Client: client,
@@ -56,7 +54,6 @@ func NewNodeTopologyReconciler(
 		},
 		Namespace:           namespace,
 		topologyLabelPrefix: topologyLabelPrefix,
-		APIReader:           apiReader,
 	}
 }
 
@@ -375,40 +372,25 @@ func (r *NodeTopologyReconciler) initializeResourceDistributionWithAllNodes(ctx 
 
 	configMapData := make(map[string]string)
 
+	// Read from the manager cache: this controller already watches every Node, so the informer
+	// holds them all regardless. Paginating the same data back out of the API server bought no
+	// memory and only added round-trips and client-side throttling.
 	nodeList := &corev1.NodeList{}
-	continueToken := ""
+	if err := r.Client.List(ctx, nodeList); err != nil {
+		return fmt.Errorf("list nodes: %w", err)
+	}
 
-	for {
-		listOptions := []client.ListOption{
-			client.Limit(consts.DefaultLimit),
-		}
-		if continueToken != "" {
-			listOptions = append(listOptions, client.Continue(continueToken))
-		}
-
-		// Use APIReader instead of cached client for pagination support
-		// https://github.com/kubernetes-sigs/controller-runtime/issues/3044
-		if err := r.APIReader.List(ctx, nodeList, listOptions...); err != nil {
-			return fmt.Errorf("list nodes: %w", err)
-		}
-
-		for _, node := range nodeList.Items {
-			if _, hasTierLabel := node.Labels[r.tierOneLabel()]; hasTierLabel {
-				tierData := ExtractTierLabels(node.Labels, r.topologyLabelPrefix)
-				if len(tierData) > 0 {
-					tierDataJSON, err := json.Marshal(tierData)
-					if err != nil {
-						logger.Error(err, "Failed to serialize tier data for node", "node", node.Name)
-						continue
-					}
-					configMapData[node.Name] = string(tierDataJSON)
+	for _, node := range nodeList.Items {
+		if _, hasTierLabel := node.Labels[r.tierOneLabel()]; hasTierLabel {
+			tierData := ExtractTierLabels(node.Labels, r.topologyLabelPrefix)
+			if len(tierData) > 0 {
+				tierDataJSON, err := json.Marshal(tierData)
+				if err != nil {
+					logger.Error(err, "Failed to serialize tier data for node", "node", node.Name)
+					continue
 				}
+				configMapData[node.Name] = string(tierDataJSON)
 			}
-		}
-
-		continueToken = nodeList.Continue
-		if continueToken == "" {
-			break
 		}
 	}
 

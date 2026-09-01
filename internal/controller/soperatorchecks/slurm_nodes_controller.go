@@ -35,10 +35,15 @@ const (
 
 type SlurmNodesController struct {
 	*reconciler.Reconciler
-	slurmAPIClients          *slurmapi.ClientSet
-	requeueAfter             time.Duration
-	enabledNodeReplacement   bool
-	apiReader                client.Reader // Direct API reader for pagination
+	slurmAPIClients        *slurmapi.ClientSet
+	requeueAfter           time.Duration
+	enabledNodeReplacement bool
+	// Uncached reader for the worker pod behind getSlurmNodeAssignmentTime. That read decides whether
+	// a drained slurm node has since been reassigned to a fresh compute instance, and this reconcile
+	// is driven by slurm API polling rather than pod events, so nothing guarantees the reassignment
+	// has reached the cache yet. A stale pod there makes the controller suspect hardware issues on a
+	// healthy new instance and replace it for nothing.
+	apiReader                client.Reader
 	MaintenanceConditionType corev1.NodeConditionType
 }
 
@@ -513,38 +518,32 @@ func (c *SlurmNodesController) processKillTaskFailed(
 }
 
 func (c *SlurmNodesController) processK8SNodesMaintenance(ctx context.Context) error {
-	nextToken := ""
+	// Read from the manager cache. This controller already reads Nodes through the cached client
+	// elsewhere, so the Node informer holds the whole set anyway; paginating the same data back out
+	// of the API server every reconcile only added round-trips and client-side throttling.
+	nodes := &corev1.NodeList{}
+	if err := c.Client.List(ctx, nodes); err != nil {
+		return fmt.Errorf("list k8s nodes: %w", err)
+	}
 
-	for {
-		listK8SNodesResp, err := listK8SNodesWithReader(ctx, c.apiReader, consts.DefaultLimit, nextToken)
-		if err != nil {
-			return fmt.Errorf("list k8s nodes: %w", err)
+	for _, k8sNode := range nodes.Items {
+		drainFn := func() error {
+			return c.drainSlurmNodesWithConditionUpdate(
+				ctx,
+				k8sNode.Name,
+				consts.SlurmNodeReasonNodeReplacement,
+				newNodeCondition(
+					consts.SoperatorChecksK8SNodeMaintenance,
+					corev1.ConditionTrue,
+					consts.ReasonNodeDraining,
+					consts.MessageMaintenanceScheduled,
+				),
+			)
 		}
 
-		for _, k8sNode := range listK8SNodesResp.Items {
-			drainFn := func() error {
-				return c.drainSlurmNodesWithConditionUpdate(
-					ctx,
-					k8sNode.Name,
-					consts.SlurmNodeReasonNodeReplacement,
-					newNodeCondition(
-						consts.SoperatorChecksK8SNodeMaintenance,
-						corev1.ConditionTrue,
-						consts.ReasonNodeDraining,
-						consts.MessageMaintenanceScheduled,
-					),
-				)
-			}
-
-			if err := c.processMaintenance(ctx, &k8sNode, drainFn, nil); err != nil {
-				return fmt.Errorf("process maintenance: %w", err)
-			}
+		if err := c.processMaintenance(ctx, &k8sNode, drainFn, nil); err != nil {
+			return fmt.Errorf("process maintenance: %w", err)
 		}
-
-		if listK8SNodesResp.Continue == "" {
-			break
-		}
-		nextToken = listK8SNodesResp.Continue
 	}
 
 	return nil
