@@ -116,7 +116,6 @@ class Check(typing.NamedTuple):
     # - CHECKS_NODE_REASON - (drain/down) reason field of the Slurm node
     # - CHECKS_NODE_COMMENT - comment field of the Slurm node
     # - CHECKS_NODE_REAL_MEM_BYTES - total allocatable memory in bytes for the Slurm node
-    # - CHECKS_JOB_ALLOC_MEM_BYTES - memory in bytes, allocated for this Slurm job on this node
     # Some values are extracted from long-running commands, so they aren't exported by default.
     need_env: list[str] = []
 
@@ -125,9 +124,6 @@ class NodeInfo(typing.NamedTuple):
     reason: str = ""
     comment: str = ""
     real_memory_bytes: int = 0
-
-class JobInfo(typing.NamedTuple):
-    allocated_memory_bytes: int = 0
 
 # Get environment variables
 try:
@@ -360,8 +356,6 @@ def export_needed_env(check: Check):
             os.environ["CHECKS_NODE_COMMENT"] = get_node_info().comment
         if env == "CHECKS_NODE_REAL_MEM_BYTES":
             os.environ["CHECKS_NODE_REAL_MEM_BYTES"] = str(get_node_real_memory_bytes())
-        if env == "CHECKS_JOB_ALLOC_MEM_BYTES":
-            os.environ["CHECKS_JOB_ALLOC_MEM_BYTES"] = str(get_job_info().allocated_memory_bytes)
 
 # Get node RealMemory from node-local metadata, avoiding a controller RPC in the normal path.
 # Fall back to Slurm node info for compatibility with workers that have not yet been restarted
@@ -467,45 +461,6 @@ def get_node_info() -> NodeInfo:
     except Exception as e:
         logging.warning(f"Failed to get info about Slurm node {SLURMD_NODENAME}: {e}")
         return NodeInfo()
-
-# Get info about the Slurm job from "scontrol show job"
-# Please note, this command can be executed from both jail or host rootfs
-# This function returns the cached value for subsequent calls
-@functools.lru_cache(maxsize=1)
-def get_job_info() -> JobInfo:
-    try:
-        if CHECKS_CONTEXT not in ("prolog", "epilog"):
-            logging.warning(f"Requested Slurm job info from an unsupported context: {CHECKS_CONTEXT}")
-            return JobInfo()
-
-        # Warning: this command can be executed from both jail or host rootfs
-        result = subprocess.run(
-            ["scontrol", "show", "job", SLURM_JOB_ID, "--json"],
-            check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True
-        )
-        json_out = result.stdout.strip()
-        data = json.loads(json_out)
-
-        jobs = data.get("jobs", [])
-        if not jobs:
-            raise ValueError("No jobs data found")
-
-        job = jobs[0]
-        allocated_memory_mib = 0
-        job_resources = job.get("job_resources", {}).get("nodes", {}).get("allocation", [])
-        for allocation in job_resources:
-            if allocation.get("name") == SLURMD_NODENAME:
-                allocated_memory_mib = allocation.get("memory", {}).get("allocated", 0)
-                break
-
-        info = JobInfo(
-            allocated_memory_bytes=(allocated_memory_mib * 1024 * 1024),
-        )
-        logging.info(f"Slurm job info: {json.dumps(info._asdict(), indent=2)}")
-        return info
-    except Exception as e:
-        logging.warning(f"Failed to get info about Slurm job {SLURM_JOB_ID}: {e}")
-        return JobInfo()
 
 def job_related_run() -> bool:
     return CHECKS_CONTEXT in ("prolog", "epilog")
