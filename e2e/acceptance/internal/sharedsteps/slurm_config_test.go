@@ -12,14 +12,14 @@ import (
 func TestParseSlurmConfiguration(t *testing.T) {
 	configuration, err := parseSlurmConfiguration(`Configuration data as of 2026-09-01T15:00:00
 MpiDefault              = pmix
-SlurmctldTimeout        = 180 sec
+SlurmdTimeout           = 180 sec
 PluginOption            = name=value
 `)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{
-		"MpiDefault":       "pmix",
-		"PluginOption":     "name=value",
-		"SlurmctldTimeout": "180 sec",
+		"MpiDefault":    "pmix",
+		"PluginOption":  "name=value",
+		"SlurmdTimeout": "180 sec",
 	}, configuration)
 }
 
@@ -40,14 +40,14 @@ func TestParseSlurmSettingsTable(t *testing.T) {
 	table := newSlurmSettingsTable(
 		[]string{"setting", "value"},
 		[]string{" MpiDefault ", " pmix "},
-		[]string{"SlurmctldTimeout", "180 sec"},
+		[]string{"SlurmdTimeout", "180 sec"},
 	)
 
 	expected, err := parseSlurmSettingsTable(table)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{
-		"MpiDefault":       "pmix",
-		"SlurmctldTimeout": "180 sec",
+		"MpiDefault":    "pmix",
+		"SlurmdTimeout": "180 sec",
 	}, expected)
 }
 
@@ -88,8 +88,8 @@ func TestValidateSlurmSettingsReportsAllProblemsInOrder(t *testing.T) {
 
 func TestValidateSlurmSettingsAcceptsExactValues(t *testing.T) {
 	configuration := map[string]string{
-		"MpiDefault":       "pmix",
-		"SlurmctldTimeout": "180 sec",
+		"MpiDefault":    "pmix",
+		"SlurmdTimeout": "180 sec",
 	}
 
 	assert.NoError(t, validateSlurmSettings(configuration, configuration))

@@ -12,7 +12,6 @@ Feature: Default Slurm configuration
       | ReturnToService  | 2                         |
       | SchedulerType    | sched/backfill            |
       | JobRequeue       | 1                         |
-      | SlurmctldTimeout | 180 sec                   |
       | SlurmdTimeout    | 180 sec                   |
     And its cluster name matches the target cluster
     And main partition smoke job succeeds
