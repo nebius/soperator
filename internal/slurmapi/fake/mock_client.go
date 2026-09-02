@@ -420,6 +420,54 @@ func (_c *MockClient_RebootNodes_Call) RunAndReturn(run func(context.Context, sl
 	return _c
 }
 
+// SetNodeTopology provides a mock function with given fields: ctx, nodes, topologyStr
+func (_m *MockClient) SetNodeTopology(ctx context.Context, nodes string, topologyStr string) error {
+	ret := _m.Called(ctx, nodes, topologyStr)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetNodeTopology")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, nodes, topologyStr)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClient_SetNodeTopology_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetNodeTopology'
+type MockClient_SetNodeTopology_Call struct {
+	*mock.Call
+}
+
+// SetNodeTopology is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nodes string
+//   - topologyStr string
+func (_e *MockClient_Expecter) SetNodeTopology(ctx interface{}, nodes interface{}, topologyStr interface{}) *MockClient_SetNodeTopology_Call {
+	return &MockClient_SetNodeTopology_Call{Call: _e.mock.On("SetNodeTopology", ctx, nodes, topologyStr)}
+}
+
+func (_c *MockClient_SetNodeTopology_Call) Run(run func(ctx context.Context, nodes string, topologyStr string)) *MockClient_SetNodeTopology_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockClient_SetNodeTopology_Call) Return(_a0 error) *MockClient_SetNodeTopology_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClient_SetNodeTopology_Call) RunAndReturn(run func(context.Context, string, string) error) *MockClient_SetNodeTopology_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SlurmV0044DeleteJobWithResponse provides a mock function with given fields: ctx, jobId, params, reqEditors
 func (_m *MockClient) SlurmV0044DeleteJobWithResponse(ctx context.Context, jobId string, params *v0044.SlurmV0044DeleteJobParams, reqEditors ...v0044.RequestEditorFn) (*v0044.SlurmV0044DeleteJobResponse, error) {
 	_va := make([]interface{}, len(reqEditors))

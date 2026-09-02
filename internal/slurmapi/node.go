@@ -20,6 +20,11 @@ type Node struct {
 	Comment     string
 	Reservation string
 
+	// Topology is the node's dynamic topology registration, as set by `scontrol update
+	// nodename=... topology=...`. It is empty for a node placed only by topology.yaml: Slurm
+	// prints the field solely from the node's own registration, never from the file.
+	Topology string
+
 	// Resource-related fields (nullable to detect missing data)
 	CPUs                *int32
 	AllocCPUs           *int32
@@ -108,6 +113,10 @@ func NodeFromAPI(node api.V0044Node) (Node, error) {
 
 	if node.Reservation != nil {
 		res.Reservation = *node.Reservation
+	}
+
+	if node.Topology != nil {
+		res.Topology = *node.Topology
 	}
 
 	return res, nil

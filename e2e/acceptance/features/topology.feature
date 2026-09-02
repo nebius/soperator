@@ -13,8 +13,7 @@ Feature: Slurm named topologies
     When Slurm is asked which topologies it loaded
     Then Slurm loaded exactly the topologies the operator rendered
 
-  # Remove @unstable after worker topology registration is fixed.
-  @multi_topology @unstable @soperator_version_>=5.0.0
+  @multi_topology @soperator_version_>=5.0.0
   Scenario: Partitions and workers use their configured topologies
     Given the operator published the topology config
     When Slurm is asked which topologies it loaded

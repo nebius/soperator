@@ -718,6 +718,30 @@ class TestWaitForController(unittest.TestCase):
 
 
 
+class TestApplyNodeTopology(unittest.TestCase):
+    """Tests for applying the prepared topology after controller readiness."""
+
+    @mock.patch("worker_init.get_node_addr", return_value="nodeaddr=worker.service.svc")
+    @mock.patch("subprocess.run")
+    def test_updates_node_without_another_ping(self, mock_run, mock_node_addr):
+        mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+
+        worker_init.apply_node_topology("worker-0", "topology=default:root:leaf-0")
+
+        mock_run.assert_called_once_with(
+            [
+                "scontrol",
+                "update",
+                "nodename=worker-0",
+                "nodeaddr=worker.service.svc",
+                "topology=default:root:leaf-0",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+
 class TestIsGpuEnabled(unittest.TestCase):
     """Tests for is_gpu_enabled function."""
 
@@ -1043,16 +1067,26 @@ class TestMainArgparse(unittest.TestCase):
             worker_init.main()
         mock_wait.assert_called_once()
 
-    @mock.patch("worker_init.wait_for_topology")
-    @mock.patch("worker_init.wait_for_controller")
-    def test_main_both_commands(self, mock_controller, mock_topology):
-        """Main runs both commands sequentially."""
-        with mock.patch(
-            "sys.argv", ["worker_init.py", "wait-controller", "wait-topology"]
+    def test_main_both_commands(self):
+        """Delay precedes the controller wait, even when topology is requested first."""
+        for commands in (
+            ["wait-controller", "wait-topology"],
+            ["wait-topology", "wait-controller"],
         ):
-            worker_init.main()
-        mock_controller.assert_called_once()
-        mock_topology.assert_called_once()
+            with self.subTest(commands=commands):
+                parent = mock.Mock()
+                with mock.patch("worker_init.wait_for_topology") as topology, \
+                    mock.patch("worker_init.wait_for_controller") as controller, \
+                    mock.patch("worker_init.apply_random_startup_delay") as delay, \
+                    mock.patch("sys.argv", ["worker_init.py", *commands]):
+                    parent.attach_mock(delay, "delay")
+                    parent.attach_mock(controller, "controller")
+                    parent.attach_mock(topology, "topology")
+                    worker_init.main()
+                self.assertEqual(
+                    parent.mock_calls,
+                    [mock.call.delay(), mock.call.controller(), mock.call.topology()],
+                )
 
     def test_main_no_command(self):
         """Main exits with error when no command is given."""
@@ -1293,6 +1327,46 @@ class TestTopologyHostnameWait(unittest.TestCase):
 
         mock_wait_hostname.assert_called_once_with("worker-0", 180, 5, config_path)
         mock_apply.assert_called_once_with("worker-0", "")
+
+
+class TestRegistrationMatchesTheOperator(unittest.TestCase):
+    """Pin the exact registration strings the worker produces.
+
+    The operator computes the same values from the rendered topology.yaml and pushes them through
+    slurmrestd to correct a registration that was lost. If the two ever disagree they overwrite each
+    other on every reconcile, so the expected strings here are duplicated verbatim in
+    TestDesiredRegistrations* in internal/controller/topologyconfcontroller/node_registration_test.go
+    and the two sets must be changed together.
+    """
+
+    FABRIC = "fab"
+    LABELS = '{"tier-1": "leaf-a", "tier-2": "spine", "tier-0": "block-0"}'
+
+    def test_tree_registration(self):
+        result = worker_init.build_bound_topology(
+            self.LABELS, [("tree-ib", "tree")], self.FABRIC
+        )
+        self.assertEqual(result, "topology=tree-ib:fab:spine:leaf-a")
+
+    def test_block_registration(self):
+        result = worker_init.build_bound_topology(
+            self.LABELS, [("block-nvl72", "block")], self.FABRIC
+        )
+        self.assertEqual(result, "topology=block-nvl72:block-0")
+
+    def test_several_topologies_are_joined_in_config_order(self):
+        result = worker_init.build_bound_topology(
+            self.LABELS, [("tree-ib", "tree"), ("block-nvl72", "block")], self.FABRIC
+        )
+        self.assertEqual(
+            result, "topology=tree-ib:fab:spine:leaf-a,block-nvl72:block-0"
+        )
+
+    def test_flat_contributes_nothing(self):
+        result = worker_init.build_bound_topology(
+            self.LABELS, [("flat", "flat")], self.FABRIC
+        )
+        self.assertEqual(result, "")
 
 
 if __name__ == "__main__":
