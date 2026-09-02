@@ -56,6 +56,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 	"nebius.ai/slurm-operator/internal/controller/updatecontroller"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/controllersenabled"
 	metricsopts "nebius.ai/slurm-operator/internal/metrics"
 	"nebius.ai/slurm-operator/internal/slurmapi"
@@ -247,6 +248,7 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 		Cache: cache.Options{
 			DefaultNamespaces: watchNsCacheByName,
+			ByObject:          controllerconfig.NodeCacheByObject(),
 		},
 	})
 	if err != nil {
@@ -341,7 +343,6 @@ func main() {
 			mgr.GetScheme(),
 			soperatorNamespace,
 			topologyLabelPrefix,
-			mgr.GetAPIReader(),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err,
 				"unable to create controller",
