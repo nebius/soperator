@@ -99,7 +99,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"gpu_cluster":      gpuClusterValue(ns.InfinibandFabric),
 			"preemptible":      preemptibleValue(ns.Preemptible),
 			"features":         nil,
-			"create_partition": nil,
+			"create_partition": true,
 			"node_local_jail_submounts": []map[string]interface{}{
 				{
 					"name":            "local-data",
