@@ -1131,7 +1131,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(\n  rate(node_infiniband_port_data_transmitted_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n)\n",
+          "expr": "sum(\n  rate(node_infiniband_port_data_transmitted_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n)\n",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1146,7 +1146,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(\n  rate(node_infiniband_port_data_received_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
+          "expr": "sum(\n  rate(node_infiniband_port_data_received_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -1685,7 +1685,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"system\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"system\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -1700,7 +1700,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"user\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"user\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "User - Normal processes executing in user mode",
@@ -1714,7 +1714,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"nice\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"nice\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Nice - Niced processes executing in user mode",
@@ -1728,7 +1728,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"iowait\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"iowait\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Iowait - Waiting for I/O to complete",
@@ -1742,7 +1742,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"irq\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"irq\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Irq - Servicing interrupts",
@@ -1756,7 +1756,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"softirq\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"softirq\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Softirq - Servicing softirqs",
@@ -1770,7 +1770,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"steal\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"steal\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Steal - Time spent in other operating systems when running in a virtualized environment",
@@ -1784,7 +1784,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"idle\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"idle\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,

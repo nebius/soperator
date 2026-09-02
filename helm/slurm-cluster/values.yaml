@@ -874,14 +874,6 @@ slurmScripts:
       enabled: true
       customContent: null
       customConfig: null
-    map_job_dcgm.sh:
-      enabled: true
-      customContent: null
-      customConfig: null
-    unmap_job_dcgm.sh:
-      enabled: true
-      customContent: null
-      customConfig: null
   extra: null
   # extra:
   #   example.sh:
