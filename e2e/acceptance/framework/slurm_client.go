@@ -21,8 +21,8 @@ func NewSlurmClient(runtime Runtime) *SlurmClient {
 }
 
 // SbatchOptions describes a Slurm batch submission from an acceptance test.
-// SubmitBatch always adds -o/-e pointing inside AcceptanceJobOutputDir so the
-// job log ends up in the CI artifact; callers don't set output flags.
+// SubmitBatch adds -o/-e pointing inside OutputDir, which defaults to
+// AcceptanceJobOutputDir.
 type SbatchOptions struct {
 	JobName      string   // required; used in output filename
 	Nodes        int      // -N (omitted if 0)
@@ -31,6 +31,8 @@ type SbatchOptions struct {
 	TasksPerNode int      // --ntasks-per-node (omitted if 0)
 	ExtraFlags   []string // verbatim flags appended before --wrap
 	Wrap         string   // --wrap body
+	RunAsUser    string   // submit through sudo -iu (omitted if empty)
+	OutputDir    string   // defaults to AcceptanceJobOutputDir
 }
 
 // SbatchJob is the handle returned by SubmitBatch. StdoutPath and StderrPath
@@ -60,12 +62,17 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	if strings.TrimSpace(opts.Wrap) == "" {
 		return SbatchJob{}, fmt.Errorf("sbatch: wrap body is required")
 	}
+	outputDir := strings.TrimSpace(opts.OutputDir)
+	if outputDir == "" {
+		outputDir = AcceptanceJobOutputDir
+	}
+	runAsUser := strings.TrimSpace(opts.RunAsUser)
 
 	var args []string
 	args = append(args, "--parsable")
 	args = append(args, fmt.Sprintf("--job-name=%s", ShellQuote(jobName)))
-	args = append(args, fmt.Sprintf("-o %s/%%x-%%j.out", AcceptanceJobOutputDir))
-	args = append(args, fmt.Sprintf("-e %s/%%x-%%j.err", AcceptanceJobOutputDir))
+	args = append(args, fmt.Sprintf("-o %s", ShellQuote(outputDir+"/%x-%j.out")))
+	args = append(args, fmt.Sprintf("-e %s", ShellQuote(outputDir+"/%x-%j.err")))
 	if opts.Nodes > 0 {
 		args = append(args, fmt.Sprintf("-N %d", opts.Nodes))
 	}
@@ -83,10 +90,14 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	}
 	args = append(args, fmt.Sprintf("--wrap=%s", ShellQuote(opts.Wrap)))
 
-	command := fmt.Sprintf("mkdir -p %s && sbatch %s",
-		ShellQuote(AcceptanceJobOutputDir),
-		strings.Join(args, " "),
-	)
+	mkdirCommand := fmt.Sprintf("mkdir -p %s", ShellQuote(outputDir))
+	sbatchCommand := fmt.Sprintf("sbatch %s", strings.Join(args, " "))
+	if runAsUser != "" {
+		quotedUser := ShellQuote(runAsUser)
+		mkdirCommand = fmt.Sprintf("sudo -iu %s -- mkdir -p %s", quotedUser, ShellQuote(outputDir))
+		sbatchCommand = fmt.Sprintf("sudo -iu %s -- sbatch %s", quotedUser, strings.Join(args, " "))
+	}
+	command := mkdirCommand + " && " + sbatchCommand
 
 	// TODO: Add safe retries for sbatch without creating duplicate jobs.
 	out, err := s.runtime.Jail().Run(ctx, command)
@@ -100,8 +111,8 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	return SbatchJob{
 		ID:         jobID,
 		JobName:    jobName,
-		StdoutPath: fmt.Sprintf("%s/%s-%s.out", AcceptanceJobOutputDir, jobName, jobID),
-		StderrPath: fmt.Sprintf("%s/%s-%s.err", AcceptanceJobOutputDir, jobName, jobID),
+		StdoutPath: fmt.Sprintf("%s/%s-%s.out", outputDir, jobName, jobID),
+		StderrPath: fmt.Sprintf("%s/%s-%s.err", outputDir, jobName, jobID),
 	}, nil
 }
 

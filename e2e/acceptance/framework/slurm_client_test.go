@@ -22,6 +22,28 @@ func TestSubmitBatchQuotesJobName(t *testing.T) {
 	assert.Contains(t, runtime.jailCommand, "--job-name="+ShellQuote(jobName))
 }
 
+func TestSubmitBatchRunsAsUserWithCustomOutputDir(t *testing.T) {
+	runtime := &submitBatchRuntime{}
+	outputDir := "/opt/soperator-home/soperatorchecks/.acceptance/gpu profiling"
+
+	job, err := NewSlurmClient(runtime).SubmitBatch(t.Context(), SbatchOptions{
+		JobName:   "gpu-profile",
+		Wrap:      "true",
+		RunAsUser: "soperatorchecks",
+		OutputDir: outputDir,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, outputDir+"/gpu-profile-123.out", job.StdoutPath)
+	assert.Equal(t, outputDir+"/gpu-profile-123.err", job.StderrPath)
+	assert.Contains(t, runtime.jailCommand,
+		"sudo -iu 'soperatorchecks' -- mkdir -p "+ShellQuote(outputDir))
+	assert.Contains(t, runtime.jailCommand,
+		"sudo -iu 'soperatorchecks' -- sbatch")
+	assert.Contains(t, runtime.jailCommand, "-o "+ShellQuote(outputDir+"/%x-%j.out"))
+	assert.Contains(t, runtime.jailCommand, "-e "+ShellQuote(outputDir+"/%x-%j.err"))
+}
+
 func TestParseSacctJob(t *testing.T) {
 	dump := `
 123.batch|COMPLETED|0:0||

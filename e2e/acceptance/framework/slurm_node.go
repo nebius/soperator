@@ -14,6 +14,7 @@ var (
 	slurmNodeReasonPattern     = regexp.MustCompile(`\bReason=([^\n]+)`)
 	slurmNodeInstanceIDPattern = regexp.MustCompile(`\bInstanceId=([^\s]+)`)
 	slurmNodeRealMemoryPattern = regexp.MustCompile(`\bRealMemory=(\d+)`)
+	slurmNodeGPUCountPattern   = regexp.MustCompile(`\bCfgTRES=[^\s]*\bgres/gpu=(\d+)`)
 )
 
 type SlurmNodeInfo struct {
@@ -22,6 +23,7 @@ type SlurmNodeInfo struct {
 	Reason        string
 	InstanceID    string
 	RealMemoryMiB uint64
+	GPUCount      int
 }
 
 func ParseSlurmNodeInfo(name, output string) SlurmNodeInfo {
@@ -40,6 +42,11 @@ func ParseSlurmNodeInfo(name, output string) SlurmNodeInfo {
 	if match := slurmNodeRealMemoryPattern.FindStringSubmatch(output); len(match) == 2 {
 		if value, err := strconv.ParseUint(match[1], 10, 64); err == nil {
 			info.RealMemoryMiB = value
+		}
+	}
+	if match := slurmNodeGPUCountPattern.FindStringSubmatch(output); len(match) == 2 {
+		if value, err := strconv.Atoi(match[1]); err == nil {
+			info.GPUCount = value
 		}
 	}
 	return info

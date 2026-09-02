@@ -27,6 +27,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewObservability(kubectl),
 		NewInternalSSH(runtime, selector),
 		NewPackageInstallation(runtime, selector),
+		NewGPUProfiling(runtime, slurm, selector),
 		NewSoperatorUtils(runtime, selector),
 		NewNodeSetEphemeralModeTransition(info, runtime, kubectl),
 		NewNodeReplacement(runtime, slurm, selector),
