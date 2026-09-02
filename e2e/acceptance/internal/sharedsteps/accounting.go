@@ -1,0 +1,500 @@
+package sharedsteps
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/cucumber/godog"
+
+	"github.com/nebius/soperator/e2e/acceptance/framework"
+)
+
+const (
+	accountingTestUser       = "bob"
+	accountingTestUserHome   = "/home/bob"
+	accountingTestAccount    = "e2e-research"
+	accountingTestJobName    = "e2e-accounting"
+	accountingSmokeTimeout   = 2 * time.Minute
+	accountingReportTimeout  = 2 * time.Minute
+	accountingCleanupTimeout = 2 * time.Minute
+)
+
+var accountingJobFields = []string{
+	"JobIDRaw",
+	"JobName",
+	"User",
+	"Account",
+	"State",
+	"ExitCode",
+	"Elapsed",
+	"Start",
+	"End",
+}
+
+type Accounting struct {
+	info    *framework.ClusterInfo
+	runtime framework.Runtime
+	slurm   *framework.SlurmClient
+	kubectl *framework.KubectlClient
+
+	clusterName string
+	job         framework.SbatchJob
+}
+
+type accountingSlurmCluster struct {
+	Spec struct {
+		SlurmNodes struct {
+			Accounting struct {
+				Enabled bool `json:"enabled"`
+			} `json:"accounting"`
+		} `json:"slurmNodes"`
+	} `json:"spec"`
+}
+
+type accountingClusterRecord struct {
+	Cluster     string
+	ControlHost string
+	ControlPort string
+}
+
+type accountingJobRecord struct {
+	JobID    string
+	JobName  string
+	User     string
+	Account  string
+	State    string
+	ExitCode string
+	Elapsed  string
+	Start    string
+	End      string
+}
+
+type accountingReportExpectation struct {
+	name           string
+	command        string
+	expectedPrefix []string
+}
+
+func NewAccounting(
+	info *framework.ClusterInfo,
+	runtime framework.Runtime,
+	slurm *framework.SlurmClient,
+	kubectl *framework.KubectlClient,
+) *Accounting {
+	return &Accounting{
+		info:    info,
+		runtime: runtime,
+		slurm:   slurm,
+		kubectl: kubectl,
+	}
+}
+
+func (s *Accounting) RegisterSteps(sc *godog.ScenarioContext) {
+	sc.Step(`^Slurm accounting is reachable and the cluster is registered$`, s.slurmAccountingIsReachable)
+	sc.Step(`^an acceptance test user exists$`, s.acceptanceTestUserExists)
+	sc.Step(`^a test Slurm account is created and associated with the user$`, s.createTestAccountAndAssociation)
+	sc.Step(`^the user association is visible in Slurm accounting$`, s.userAssociationIsVisible)
+	sc.Step(`^the user submits a one-node smoke job to the test account$`, s.submitAccountingSmokeJob)
+	sc.Step(`^the job completes and is recorded with the expected user and account$`, s.jobIsRecorded)
+	sc.Step(`^CPU, billing, cluster utilization, and job-size reports contain accounting data$`, s.accountingReportsContainData)
+}
+
+func (s *Accounting) CleanupAndReset(ctx context.Context) {
+	if !s.job.IsZero() {
+		cleanupCtx, cancel := context.WithTimeout(ctx, accountingCleanupTimeout)
+		defer cancel()
+		if err := s.slurm.CancelJob(cleanupCtx, s.job.ID, accountingCleanupTimeout); err != nil {
+			s.runtime.Logf("cleanup: cancel accounting job %s: %v", s.job.ID, err)
+		}
+	}
+	s.clusterName = ""
+	s.job = framework.SbatchJob{}
+}
+
+func (s *Accounting) slurmAccountingIsReachable(ctx context.Context) error {
+	var cluster accountingSlurmCluster
+	if err := s.kubectl.GetJSON(ctx, &cluster,
+		"get", "slurmcluster", s.info.SlurmClusterName,
+		"-n", framework.SoperatorNamespace, "-o", "json"); err != nil {
+		return fmt.Errorf("get SlurmCluster %s/%s: %w",
+			framework.SoperatorNamespace, s.info.SlurmClusterName, err)
+	}
+	if !cluster.Spec.SlurmNodes.Accounting.Enabled {
+		s.runtime.Logf("acceptance: Slurm accounting is disabled, skipping scenario")
+		return godog.ErrSkip
+	}
+
+	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx,
+		"sacctmgr show cluster format=Cluster,ControlHost,ControlPort -nP")
+	if err != nil {
+		return fmt.Errorf("query registered Slurm clusters: %w", err)
+	}
+	record, err := findAccountingCluster(output, s.info.SlurmClusterName)
+	if err != nil {
+		return err
+	}
+	s.clusterName = record.Cluster
+	s.runtime.Logf("accounting: cluster=%s control=%s:%s",
+		record.Cluster, record.ControlHost, record.ControlPort)
+	return nil
+}
+
+func (s *Accounting) acceptanceTestUserExists(ctx context.Context) error {
+	return ensureSSHTestUser(ctx, s.runtime, accountingTestUser)
+}
+
+func (s *Accounting) createTestAccountAndAssociation(ctx context.Context) error {
+	if s.clusterName == "" {
+		return fmt.Errorf("registered accounting cluster is not selected")
+	}
+
+	cluster := framework.ShellQuote(s.clusterName)
+	account := framework.ShellQuote(accountingTestAccount)
+	accountExists, err := s.slurmAccountingAccountExists(ctx)
+	if err != nil {
+		return err
+	}
+	if !accountExists {
+		if _, err := s.runtime.Jail().Run(ctx, fmt.Sprintf(
+			"sacctmgr -i add account name=%s cluster=%s description=%s organization=%s",
+			account,
+			cluster,
+			framework.ShellQuote("Soperator acceptance tests"),
+			framework.ShellQuote("e2e"),
+		)); err != nil {
+			return fmt.Errorf("create Slurm account %s: %w", accountingTestAccount, err)
+		}
+	}
+
+	associationExists, _, err := s.queryTestAssociation(ctx)
+	if err != nil {
+		return err
+	}
+	if associationExists {
+		return nil
+	}
+
+	userExists, err := s.slurmAccountingUserExists(ctx)
+	if err != nil {
+		return err
+	}
+	command := fmt.Sprintf(
+		"sacctmgr -i add user name=%s account=%s cluster=%s",
+		framework.ShellQuote(accountingTestUser), account, cluster,
+	)
+	if !userExists {
+		command += " defaultaccount=" + account
+	}
+	if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
+		return fmt.Errorf("associate Slurm user %s with account %s: %w",
+			accountingTestUser, accountingTestAccount, err)
+	}
+	return nil
+}
+
+func (s *Accounting) slurmAccountingAccountExists(ctx context.Context) (bool, error) {
+	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf(
+		"sacctmgr show account where name=%s format=Account -nP",
+		framework.ShellQuote(accountingTestAccount),
+	))
+	if err != nil {
+		return false, fmt.Errorf("query Slurm account %s: %w", accountingTestAccount, err)
+	}
+	for _, row := range parseAccountingRows(output) {
+		if len(row) > 0 && row[0] == accountingTestAccount {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (s *Accounting) slurmAccountingUserExists(ctx context.Context) (bool, error) {
+	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf(
+		"sacctmgr show user where name=%s format=User -nP",
+		framework.ShellQuote(accountingTestUser),
+	))
+	if err != nil {
+		return false, fmt.Errorf("query Slurm user %s: %w", accountingTestUser, err)
+	}
+	for _, row := range parseAccountingRows(output) {
+		if len(row) > 0 && row[0] == accountingTestUser {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (s *Accounting) userAssociationIsVisible(ctx context.Context) error {
+	exists, output, err := s.queryTestAssociation(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("Slurm association cluster=%s account=%s user=%s is missing from output:\n%s",
+			s.clusterName, accountingTestAccount, accountingTestUser, strings.TrimSpace(output))
+	}
+	return nil
+}
+
+func (s *Accounting) queryTestAssociation(ctx context.Context) (bool, string, error) {
+	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf(
+		"sacctmgr show assoc where cluster=%s account=%s user=%s format=Cluster,Account,User -nP",
+		framework.ShellQuote(s.clusterName),
+		framework.ShellQuote(accountingTestAccount),
+		framework.ShellQuote(accountingTestUser),
+	))
+	if err != nil {
+		return false, output, fmt.Errorf("query Slurm association for %s/%s: %w",
+			accountingTestAccount, accountingTestUser, err)
+	}
+	return accountingAssociationExists(
+		output, s.clusterName, accountingTestAccount, accountingTestUser,
+	), output, nil
+}
+
+func (s *Accounting) submitAccountingSmokeJob(ctx context.Context) error {
+	stdoutPath := accountingTestUserHome + "/e2e-accounting.out"
+	stderrPath := accountingTestUserHome + "/e2e-accounting.err"
+	command := strings.Join([]string{
+		"sudo", "-iu", framework.ShellQuote(accountingTestUser), "--", "sbatch",
+		"--parsable",
+		"--job-name=" + framework.ShellQuote(accountingTestJobName),
+		"--account=" + framework.ShellQuote(accountingTestAccount),
+		"-N", "1",
+		"--output=" + framework.ShellQuote(stdoutPath),
+		"--error=" + framework.ShellQuote(stderrPath),
+		"--open-mode=truncate",
+		"--wrap=" + framework.ShellQuote("hostname"),
+	}, " ")
+	output, err := s.runtime.Jail().Run(ctx, command)
+	if err != nil {
+		return fmt.Errorf("submit accounting smoke job as %s: %w", accountingTestUser, err)
+	}
+	jobID, err := framework.ParseSbatchJobID(output)
+	if err != nil {
+		return fmt.Errorf("parse accounting smoke job ID: %w", err)
+	}
+	s.job = framework.SbatchJob{
+		ID:         jobID,
+		JobName:    accountingTestJobName,
+		StdoutPath: stdoutPath,
+		StderrPath: stderrPath,
+	}
+	s.runtime.Logf("accounting: submitted job=%s user=%s account=%s",
+		jobID, accountingTestUser, accountingTestAccount)
+	return nil
+}
+
+func (s *Accounting) jobIsRecorded(ctx context.Context) error {
+	if s.job.IsZero() {
+		return fmt.Errorf("accounting smoke job was not submitted")
+	}
+	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, s.job, accountingSmokeTimeout); err != nil {
+		return err
+	}
+
+	return s.runtime.WaitFor(ctx, fmt.Sprintf("job %s accounting record", s.job.ID),
+		accountingSmokeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+			output, err := s.runtime.Jail().RunWithDefaultRetry(waitCtx, fmt.Sprintf(
+				"sacct -X -j %s -nP --format=%s",
+				framework.ShellQuote(s.job.ID), strings.Join(accountingJobFields, ","),
+			))
+			if err != nil {
+				return false, fmt.Errorf("query accounting record for job %s: %w", s.job.ID, err)
+			}
+			record, found := findAccountingJobRecord(output, s.job.ID)
+			if !found {
+				return false, fmt.Errorf("job %s is missing from sacct output:\n%s",
+					s.job.ID, strings.TrimSpace(output))
+			}
+			if err := validateAccountingJobRecord(record); err != nil {
+				return false, err
+			}
+			return true, nil
+		})
+}
+
+func (s *Accounting) accountingReportsContainData(ctx context.Context) error {
+	cluster := framework.ShellQuote(s.clusterName)
+	window := "start=now-24hours end=now+24hours"
+	expectations := []accountingReportExpectation{
+		{
+			name: "CPU user top",
+			command: fmt.Sprintf(
+				"sreport -nP -T cpu user top %s clusters=%s format=Cluster,Login,Account,Used",
+				window, cluster),
+			expectedPrefix: []string{s.clusterName},
+		},
+		{
+			name: "billing user top",
+			command: fmt.Sprintf(
+				"sreport -nP -T billing user top %s clusters=%s format=Cluster,Login,Account,Used",
+				window, cluster),
+			expectedPrefix: []string{s.clusterName},
+		},
+		{
+			name: "cluster utilization",
+			command: fmt.Sprintf(
+				"sreport -nP cluster utilization %s clusters=%s format=Cluster,Allocated,Reported",
+				window, cluster),
+			expectedPrefix: []string{s.clusterName},
+		},
+		{
+			name: "job sizes",
+			command: fmt.Sprintf(
+				"sreport -nP job sizes %s clusters=%s format=Cluster,Account",
+				window, cluster),
+			expectedPrefix: []string{s.clusterName},
+		},
+	}
+
+	for _, expectation := range expectations {
+		if err := s.waitForAccountingReport(ctx, expectation); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Accounting) waitForAccountingReport(ctx context.Context, expectation accountingReportExpectation) error {
+	return s.runtime.WaitFor(ctx, expectation.name+" accounting data",
+		accountingReportTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+			output, err := s.runtime.Jail().RunWithDefaultRetry(waitCtx, expectation.command)
+			if err != nil {
+				return false, fmt.Errorf("run %s report: %w", expectation.name, err)
+			}
+			if !accountingReportContainsRow(output, expectation.expectedPrefix) {
+				return false, fmt.Errorf("%s report has no row beginning with %q; output:\n%s",
+					expectation.name, strings.Join(expectation.expectedPrefix, "|"), strings.TrimSpace(output))
+			}
+			return true, nil
+		})
+}
+
+func findAccountingCluster(output, expectedCluster string) (accountingClusterRecord, error) {
+	for _, row := range parseAccountingRows(output) {
+		if len(row) < 3 || row[0] != expectedCluster {
+			continue
+		}
+		record := accountingClusterRecord{
+			Cluster:     row[0],
+			ControlHost: row[1],
+			ControlPort: row[2],
+		}
+		if record.ControlHost == "" || record.ControlPort == "" {
+			return accountingClusterRecord{}, fmt.Errorf(
+				"registered Slurm cluster %s has incomplete control endpoint host=%q port=%q",
+				record.Cluster, record.ControlHost, record.ControlPort)
+		}
+		return record, nil
+	}
+	return accountingClusterRecord{}, fmt.Errorf(
+		"Slurm cluster %s is not registered in accounting output:\n%s",
+		expectedCluster, strings.TrimSpace(output))
+}
+
+func accountingAssociationExists(output, cluster, account, user string) bool {
+	for _, row := range parseAccountingRows(output) {
+		if len(row) >= 3 && row[0] == cluster && row[1] == account && row[2] == user {
+			return true
+		}
+	}
+	return false
+}
+
+func findAccountingJobRecord(output, jobID string) (accountingJobRecord, bool) {
+	for _, row := range parseAccountingRows(output) {
+		if len(row) < len(accountingJobFields) || row[0] != jobID {
+			continue
+		}
+		return accountingJobRecord{
+			JobID:    row[0],
+			JobName:  row[1],
+			User:     row[2],
+			Account:  row[3],
+			State:    row[4],
+			ExitCode: row[5],
+			Elapsed:  row[6],
+			Start:    row[7],
+			End:      row[8],
+		}, true
+	}
+	return accountingJobRecord{}, false
+}
+
+func validateAccountingJobRecord(record accountingJobRecord) error {
+	var problems []string
+	for _, field := range []struct {
+		name     string
+		actual   string
+		expected string
+	}{
+		{"job name", record.JobName, accountingTestJobName},
+		{"user", record.User, accountingTestUser},
+		{"account", record.Account, accountingTestAccount},
+		{"state", record.State, "COMPLETED"},
+		{"exit code", record.ExitCode, "0:0"},
+	} {
+		if field.actual != field.expected {
+			problems = append(problems, fmt.Sprintf("%s=%q, expected %q",
+				field.name, field.actual, field.expected))
+		}
+	}
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"elapsed", record.Elapsed},
+		{"start", record.Start},
+		{"end", record.End},
+	} {
+		if field.value == "" || field.value == "Unknown" {
+			problems = append(problems, fmt.Sprintf("%s=%q", field.name, field.value))
+		}
+	}
+	if len(problems) > 0 {
+		return fmt.Errorf("job %s has invalid accounting record: %s",
+			record.JobID, strings.Join(problems, "; "))
+	}
+	return nil
+}
+
+func accountingReportContainsRow(output string, expectedPrefix []string) bool {
+	for _, row := range parseAccountingRows(output) {
+		if len(row) < len(expectedPrefix) {
+			continue
+		}
+		matches := true
+		for i, expected := range expectedPrefix {
+			if row[i] != expected {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return true
+		}
+	}
+	return false
+}
+
+func parseAccountingRows(output string) [][]string {
+	var rows [][]string
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Split(line, "|")
+		if len(fields) > 0 && fields[len(fields)-1] == "" {
+			fields = fields[:len(fields)-1]
+		}
+		for i := range fields {
+			fields[i] = strings.TrimSpace(fields[i])
+		}
+		rows = append(rows, fields)
+	}
+	return rows
+}

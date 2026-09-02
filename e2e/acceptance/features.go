@@ -26,6 +26,7 @@ func SharedFeatureSource() FeatureSource {
 func FeaturePaths() []string {
 	return []string{
 		"features/cluster_creation.feature",
+		"features/accounting.feature",
 		"features/observability.feature",
 		"features/internal_ssh.feature",
 		"features/package_installation.feature",
