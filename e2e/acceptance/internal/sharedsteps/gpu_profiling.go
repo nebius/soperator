@@ -13,7 +13,9 @@ import (
 )
 
 const (
-	gpuProfilingUser       = "soperatorchecks"
+	gpuProfilingUser = "soperatorchecks"
+	// Profiling jobs run as soperatorchecks, so their logs and reports need a
+	// user-writable directory. The E2E cluster teardown removes these artifacts.
 	gpuProfilingOutputDir  = "/opt/soperator-home/soperatorchecks/.acceptance/gpu-profiling"
 	gpuProfilingJobTimeout = 15 * time.Minute
 	gpuProfilingCleanup    = 3 * time.Minute
@@ -51,31 +53,6 @@ func (s *GPUProfiling) CleanupAndReset(ctx context.Context) {
 	if !s.job.IsZero() {
 		if err := s.slurm.CancelJob(ctx, s.job.ID, gpuProfilingCleanup); err != nil {
 			s.runtime.Logf("cleanup: cancel GPU profiling job %s: %v", s.job.ID, err)
-		}
-	}
-
-	var files []string
-	if s.job.StdoutPath != "" {
-		files = append(files, s.job.StdoutPath)
-	}
-	if s.job.StderrPath != "" {
-		files = append(files, s.job.StderrPath)
-	}
-	if s.reportPath != "" {
-		files = append(files, s.reportPath)
-	}
-	if len(files) > 0 {
-		quotedFiles := make([]string, 0, len(files))
-		for _, file := range files {
-			quotedFiles = append(quotedFiles, framework.ShellQuote(file))
-		}
-		command := "rm -f -- " + strings.Join(quotedFiles, " ")
-		if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
-			s.runtime.Logf("cleanup: remove GPU profiling files: %v", err)
-		}
-		if _, err := s.runtime.Jail().Run(ctx,
-			fmt.Sprintf("rmdir %s 2>/dev/null || true", framework.ShellQuote(gpuProfilingOutputDir))); err != nil {
-			s.runtime.Logf("cleanup: remove empty GPU profiling output directory: %v", err)
 		}
 	}
 
