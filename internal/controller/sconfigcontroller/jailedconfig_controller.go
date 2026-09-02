@@ -52,6 +52,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/slurmapi"
+	slurmpattern "nebius.ai/slurm-operator/internal/utils/slurm/pattern"
 )
 
 const (
@@ -340,7 +341,8 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
 		}
-	} else if reconfigureIsDue(jailedConfig, hash) {
+	} else if due, reason := reconfigureIsDue(jailedConfig, hash); due {
+		logger.Info("Reconfiguring Slurm", "config", jailedConfig.Name, "reason", reason)
 		err = r.reconfigureCluster(ctx)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("reconfiguring Slurm cluster: %w", err)
@@ -531,26 +533,35 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 	// check the group reconfigures on every pass, because the slurm configs member carries the
 	// action permanently -- so a topology-only edit would restart slurmd across the cluster.
 	needsReconfigure := false
+	var reconfigureTrigger, reconfigureReason string
 	for i := range jailedConfigs.Items {
 		jailedConfig := &jailedConfigs.Items[i]
 		if _, written := writtenHashes[jailedConfig.Name]; !written {
 			continue
 		}
-		if reconfigureIsDue(jailedConfig, writtenHashes[jailedConfig.Name]) {
+		if due, reason := reconfigureIsDue(jailedConfig, writtenHashes[jailedConfig.Name]); due {
 			needsReconfigure = true
+			reconfigureTrigger, reconfigureReason = jailedConfig.Name, reason
 			break
 		}
 	}
 
 	if needsReconfigure {
-		logger.V(1).Info("Performing reconfigure for aggregated group", "aggregationKey", aggregationKey)
+		// Reported at info level on purpose: a reconfigure restarts slurmctld, so an unexpected one
+		// has to be explainable from the default logs, without turning on debug after the fact.
+		logger.Info("Reconfiguring Slurm",
+			"aggregationKey", aggregationKey,
+			"triggeredBy", reconfigureTrigger,
+			"reason", reconfigureReason)
 		if err = r.reconfigureCluster(ctx); err != nil {
-			r.recordReconfigure(jailedConfigs.Items, writtenHashes, corev1.EventTypeWarning,
-				reasonReconfigureFailed, fmt.Sprintf("Slurm reconfigure failed: %v", err))
+			r.recordReconfigure(jailedConfigs.Items, writtenHashes, corev1.EventTypeWarning, reasonReconfigureFailed,
+				fmt.Sprintf("Slurm reconfigure failed, triggered by %s because %s: %v",
+					reconfigureTrigger, reconfigureReason, err))
 			return ctrl.Result{}, fmt.Errorf("reconfiguring Slurm cluster for aggregated group: %w", err)
 		}
-		r.recordReconfigure(jailedConfigs.Items, writtenHashes, corev1.EventTypeNormal,
-			reasonReconfigured, "slurmctld re-read the configs written for this JailedConfig")
+		r.recordReconfigure(jailedConfigs.Items, writtenHashes, corev1.EventTypeNormal, reasonReconfigured,
+			fmt.Sprintf("slurmctld re-read the configs written for this JailedConfig; triggered by %s because %s",
+				reconfigureTrigger, reconfigureReason))
 
 		// Report it against each config's own generation, so whoever asked for the action can tell
 		// this reconfigure from one that ran for an earlier version of the spec.
@@ -600,12 +611,21 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 	return ctrl.Result{}, nil
 }
 
-// reconfigureIsDue reports whether this config needs slurmctld to re-read what was just written.
+// Why a reconfigure was due, reported in logs and in the event so the trigger is nameable after the
+// fact. A reconfigure restarts slurmctld, so "which config asked, and why" is the first question
+// asked of any unexpected one.
+const (
+	reconfigureReasonContentChanged = "the written content differs from the last applied one"
+	reconfigureReasonUnsatisfied    = "the request has not been satisfied for the current generation"
+)
+
+// reconfigureIsDue reports whether this config needs slurmctld to re-read what was just written, and
+// why.
 //
 // It is due when the content changed, and also when the request itself is new: a config can ask for
 // a reconfigure over content that renders identically -- a topology gaining an entry that reaches no
 // node yet, say -- and gating on the hash alone would leave that request permanently unsatisfied.
-func reconfigureIsDue(jailedConfig *slurmv1alpha1.JailedConfig, writtenHash string) bool {
+func reconfigureIsDue(jailedConfig *slurmv1alpha1.JailedConfig, writtenHash string) (bool, string) {
 	requested := false
 	for _, action := range jailedConfig.Spec.UpdateActions {
 		if action == slurmv1alpha1.UpdateActionReconfigure {
@@ -614,16 +634,21 @@ func reconfigureIsDue(jailedConfig *slurmv1alpha1.JailedConfig, writtenHash stri
 		}
 	}
 	if !requested {
-		return false
+		return false, ""
 	}
 
 	if writtenHash != jailedConfig.Status.AppliedHash {
-		return true
+		return true, reconfigureReasonContentChanged
 	}
 
 	condition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.ReconfigurePerformed))
-	return condition == nil || condition.Status != metav1.ConditionTrue ||
+	unsatisfied := condition == nil || condition.Status != metav1.ConditionTrue ||
 		condition.ObservedGeneration != jailedConfig.Generation
+	if unsatisfied {
+		return true, reconfigureReasonUnsatisfied
+	}
+
+	return false, ""
 }
 
 // hasFailedFilesWrittenCondition checks if the JailedConfig has a failed FilesWritten condition.
@@ -952,13 +977,16 @@ func (r *JailedConfigReconciler) pollSlurmNodesRestart(ctx context.Context, node
 func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 	logger := logf.FromContext(ctx)
 
-	logger.V(1).Info("Reconfiguring cluster")
+	started := time.Now()
 
 	logger.V(1).Info("Storing nodes start times before reconfigure")
 	nodeToStartBefore, err := r.getNodesStartTime(ctx)
 	if err != nil {
-		return err
+		// The phase is named because each one fails for its own reason: this one only ever means
+		// the Slurm API was unreachable or unhealthy, before anything was asked of slurmctld.
+		return fmt.Errorf("read node start times before reconfigure: %w", err)
 	}
+	watchedNodes := len(nodeToStartBefore)
 
 	logger.V(1).Info("Requesting Slurm API to reconfigure nodes")
 	reconfigureResponse, err := r.slurmAPIClient.SlurmV0044GetReconfigureWithResponse(ctx)
@@ -976,10 +1004,34 @@ func (r *JailedConfigReconciler) reconfigureCluster(ctx context.Context) error {
 	defer cancel()
 	err = r.pollSlurmNodesRestart(pollCtx, nodeToStartBefore)
 	if errors.Is(err, context.DeadlineExceeded) {
-		return fmt.Errorf("nodes did not restart: %w", err)
+		// pollSlurmNodesRestart drops each node as it comes back, so what is left names exactly the
+		// nodes that never restarted. Reported because the deadline alone cannot tell one stuck
+		// slurmd from a cluster that never got the message.
+		return fmt.Errorf("nodes did not restart within %s: %s: %w",
+			r.reconfigureWaitTimeout, slurmpattern.Merge(pendingNodeNames(nodeToStartBefore)), err)
+	}
+	if err != nil {
+		// Not treated as a failure, because slurmctld re-execs on reconfigure and the API is
+		// expected to blink out from under the poll. Logged rather than dropped: the same error
+		// also covers a poll that gave up for a reason worth knowing about.
+		logger.Info("Stopped waiting for nodes to restart before all of them came back",
+			"cause", err.Error(),
+			"nodesLeft", slurmpattern.Merge(pendingNodeNames(nodeToStartBefore)))
 	}
 
+	logger.Info("Slurm reconfigure finished",
+		"elapsed", time.Since(started).String(), "nodesWatched", watchedNodes)
+
 	return nil
+}
+
+func pendingNodeNames(nodeToStart map[string]int64) []string {
+	names := make([]string, 0, len(nodeToStart))
+	for name := range nodeToStart {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 type statusPatcher func(status *slurmv1alpha1.JailedConfigStatus)

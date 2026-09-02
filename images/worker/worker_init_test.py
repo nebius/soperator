@@ -717,6 +717,29 @@ class TestWaitForController(unittest.TestCase):
         self.assertEqual(mock_run.call_count, 2)
 
 
+class TestApplyNodeTopology(unittest.TestCase):
+    """Tests for applying the prepared topology after controller readiness."""
+
+    @mock.patch("worker_init.get_node_addr", return_value="nodeaddr=worker.service.svc")
+    @mock.patch("subprocess.run")
+    def test_updates_node_without_another_ping(self, mock_run, mock_node_addr):
+        mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+
+        worker_init.apply_node_topology("worker-0", "topology=default:root:leaf-0")
+
+        mock_run.assert_called_once_with(
+            [
+                "scontrol",
+                "update",
+                "nodename=worker-0",
+                "nodeaddr=worker.service.svc",
+                "topology=default:root:leaf-0",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
 
 class TestIsGpuEnabled(unittest.TestCase):
     """Tests for is_gpu_enabled function."""
@@ -954,10 +977,10 @@ class TestTopologyIntegration(unittest.TestCase):
         self.assertEqual(formatted, "topology=default:root:spine01:leaf01")
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_config")
-    @mock.patch("worker_init.apply_node_topology")
-    def test_wait_for_topology_block_json_applies_tier_zero(
-        self, mock_apply, mock_wait_hostname):
-        """A block topology registers the node under its tier-0 block."""
+    def test_wait_for_topology_block_json_builds_tier_zero(
+        self, mock_wait_hostname
+    ):
+        """A block topology update uses the node's tier-0 block."""
         node_name = "gpu-node-003"
         topology = '{"tier-0":"block1","tier-1":"leaf01","tier-2":"spine01"}'
 
@@ -985,10 +1008,10 @@ class TestTopologyIntegration(unittest.TestCase):
         with mock.patch.dict(os.environ, env), mock.patch(
             "worker_init.wait_for_topology_file", return_value=config_path
         ):
-            worker_init.wait_for_topology()
+            result = worker_init.wait_for_topology()
 
         mock_wait_hostname.assert_called_once_with("worker-0", 180, 5, config_path)
-        mock_apply.assert_called_once_with("worker-0", "topology=block-nvl72:block1")
+        self.assertEqual(result, ("worker-0", "topology=block-nvl72:block1"))
 
 
 class TestEdgeCases(unittest.TestCase):
@@ -1029,30 +1052,66 @@ class TestEdgeCases(unittest.TestCase):
 class TestMainArgparse(unittest.TestCase):
     """Tests for main() argument parsing."""
 
+    @mock.patch("worker_init.create_slurm_config_symlink")
     @mock.patch("worker_init.wait_for_controller")
-    def test_main_wait_controller(self, mock_wait):
+    def test_main_wait_controller(self, mock_wait, mock_symlink):
         """Main calls wait_for_controller for 'wait-controller' command."""
         with mock.patch("sys.argv", ["worker_init.py", "wait-controller"]):
             worker_init.main()
-        mock_wait.assert_called_once()
+        mock_symlink.assert_called_once()
+        mock_wait.assert_called_once_with(create_config_symlink=False)
 
-    @mock.patch("worker_init.wait_for_topology")
-    def test_main_wait_topology(self, mock_wait):
-        """Main calls wait_for_topology for 'wait-topology' command."""
+    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.wait_for_controller")
+    @mock.patch(
+        "worker_init.wait_for_topology",
+        return_value=("worker-0", "topology=default:root:leaf-0"),
+    )
+    @mock.patch("worker_init.create_slurm_config_symlink")
+    def test_main_wait_topology(
+        self, mock_symlink, mock_topology, mock_controller, mock_apply
+    ):
+        """Topology initialization also waits for the controller before applying."""
         with mock.patch("sys.argv", ["worker_init.py", "wait-topology"]):
             worker_init.main()
-        mock_wait.assert_called_once()
-
-    @mock.patch("worker_init.wait_for_topology")
-    @mock.patch("worker_init.wait_for_controller")
-    def test_main_both_commands(self, mock_controller, mock_topology):
-        """Main runs both commands sequentially."""
-        with mock.patch(
-            "sys.argv", ["worker_init.py", "wait-controller", "wait-topology"]
-        ):
-            worker_init.main()
-        mock_controller.assert_called_once()
+        mock_symlink.assert_called_once()
         mock_topology.assert_called_once()
+        mock_controller.assert_called_once_with(create_config_symlink=False)
+        mock_apply.assert_called_once_with(
+            "worker-0", "topology=default:root:leaf-0"
+        )
+
+    def test_main_both_commands(self):
+        """Main follows topology, delay, controller, update ordering."""
+        parent = mock.Mock()
+        with mock.patch("worker_init.create_slurm_config_symlink") as mock_symlink, \
+            mock.patch(
+                "worker_init.wait_for_topology",
+                return_value=("worker-0", "topology=default:root:leaf-0"),
+            ) as mock_topology, \
+            mock.patch("worker_init.apply_random_startup_delay") as mock_delay, \
+            mock.patch("worker_init.wait_for_controller") as mock_controller, \
+            mock.patch("worker_init.apply_node_topology") as mock_apply, \
+            mock.patch(
+                "sys.argv", ["worker_init.py", "wait-controller", "wait-topology"]
+            ):
+            parent.attach_mock(mock_symlink, "symlink")
+            parent.attach_mock(mock_topology, "topology")
+            parent.attach_mock(mock_delay, "delay")
+            parent.attach_mock(mock_controller, "controller")
+            parent.attach_mock(mock_apply, "apply")
+            worker_init.main()
+
+        self.assertEqual(
+            parent.mock_calls,
+            [
+                mock.call.symlink(),
+                mock.call.topology(),
+                mock.call.delay(),
+                mock.call.controller(create_config_symlink=False),
+                mock.call.apply("worker-0", "topology=default:root:leaf-0"),
+            ],
+        )
 
     def test_main_no_command(self):
         """Main exits with error when no command is given."""
@@ -1166,7 +1225,6 @@ class TestParseTopologyBindings(unittest.TestCase):
 class TestCpuOnlyWorkerInMultiTopology(unittest.TestCase):
     """A CPU-only worker appears in no node list, so it must not wait for its hostname."""
 
-    @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.wait_for_hostname_in_topology_config")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
     @mock.patch(
@@ -1175,13 +1233,13 @@ class TestCpuOnlyWorkerInMultiTopology(unittest.TestCase):
     )
     @mock.patch.dict(os.environ, {"HOSTNAME": "cpu-0"})
     def test_skips_the_hostname_wait_and_the_registration(
-        self, mock_wait_file, mock_gpu, mock_wait_hostname, mock_apply
+        self, mock_wait_file, mock_gpu, mock_wait_hostname
     ):
-        worker_init.wait_for_topology()
+        result = worker_init.wait_for_topology()
 
         mock_wait_file.assert_called_once()
         mock_wait_hostname.assert_not_called()
-        mock_apply.assert_called_once_with("cpu-0", "")
+        self.assertEqual(result, ("cpu-0", ""))
 
 
 
@@ -1243,10 +1301,9 @@ class TestTopologyHostnameWait(unittest.TestCase):
         )
         mock_sleep.assert_called_once_with(1)
 
-    @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.wait_for_hostname_in_topology_config")
     def test_gpu_worker_skips_the_wait_and_registers_nothing(
-        self, mock_wait_hostname, mock_apply
+        self, mock_wait_hostname
     ):
         node_name = "gpu-node-001"
 
@@ -1262,15 +1319,14 @@ class TestTopologyHostnameWait(unittest.TestCase):
         with mock.patch.dict(os.environ, env), mock.patch(
             "worker_init.wait_for_topology_file", return_value=config_path
         ):
-            worker_init.wait_for_topology()
+            result = worker_init.wait_for_topology()
 
         mock_wait_hostname.assert_not_called()
-        mock_apply.assert_called_once_with("worker-0", "")
+        self.assertEqual(result, ("worker-0", ""))
 
-    @mock.patch("worker_init.apply_node_topology")
     @mock.patch("worker_init.wait_for_hostname_in_topology_config")
     def test_placeholder_waits_even_without_nodes(
-        self, mock_wait_hostname, mock_apply
+        self, mock_wait_hostname
     ):
         node_name = "gpu-node-001"
 
@@ -1289,10 +1345,10 @@ class TestTopologyHostnameWait(unittest.TestCase):
         with mock.patch.dict(os.environ, env), mock.patch(
             "worker_init.wait_for_topology_file", return_value=config_path
         ):
-            worker_init.wait_for_topology()
+            result = worker_init.wait_for_topology()
 
         mock_wait_hostname.assert_called_once_with("worker-0", 180, 5, config_path)
-        mock_apply.assert_called_once_with("worker-0", "")
+        self.assertEqual(result, ("worker-0", ""))
 
 
 if __name__ == "__main__":

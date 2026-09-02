@@ -447,6 +447,21 @@ content would otherwise read as confirming the new one.
 
 #### Watching it happen
 
+Every published change to `topology.yaml` is recorded on the SlurmCluster, in its own namespace and
+under its own name, with a summary of how node membership moved:
+
+```
+kubectl -n <ns> describe slurmcluster <name>
+...
+Events:
+  Type    Reason             Age   From                     Message
+  Normal  TopologyRendered   2m    workertopology-reconciler Published topology.yaml: +block-nvl72 (2 nodes); tree-ib 6 nodes (+0 -2)
+```
+
+This is the only signal for a node moved between topologies: membership is not part of the structure
+fingerprint, so such an edit asks for no reconfigure. The operator log carries the same change with
+the node names spelled out, under `Topology config changed, publishing it`.
+
 Every performed reconfigure is recorded as a Kubernetes event on each `JailedConfig` it covered, so
 it is visible without reading operator logs:
 
@@ -458,7 +473,16 @@ Events:
   Normal  Reconfigured   1m    jailedconfig-controller slurmctld re-read the configs written for this JailedConfig
 ```
 
-A failed one is recorded as a `Warning` with reason `ReconfigureFailed` and the error.
+A failed one is recorded as a `Warning` with reason `ReconfigureFailed`, naming the config that
+triggered the reconfigure, why it was due, and the error. When the failure is nodes not coming back,
+the error names them:
+
+```
+nodes did not restart within 5m0s: worker-[3-5]: context deadline exceeded
+```
+
+Repeated failures aggregate into one event with a count, so `kubectl get events` shows how long a
+request has been failing without comparing timestamps by hand.
 
 #### Misconfigurations reported as events
 
@@ -471,6 +495,9 @@ them without digging through operator logs:
 | `TopologyReachesNoNode` | A `tree` or `block` topology matches no node and is rendered empty. Usually its `nodeSetRefs` names a NodeSet that does not exist, or only CPU-only ones. Not reported for `flat`, which lists no nodes by design. |
 | `UnresolvedTopologyRef` | A partition's `topologyRef` names a topology that is not in the rendered config. The binding is dropped and the partition falls back to the cluster default. |
 | `ClusterDefaultConflict` | Several topologies set `clusterDefault`. The first one stays the default, the rest are cleared. |
+
+`TopologyRendered` is emitted on the same object but is not a problem report: it records a normal
+publish.
 
 #### What a reconfigure does not do
 

@@ -8,7 +8,7 @@ Supports two modes:
 
 Environment Variables (all modes):
     WORKER_INIT_RANDOM_DELAY_SECONDS: Upper bound of a random startup delay applied before
-        running any command. The actual delay is picked uniformly from
+        contacting the controller. The actual delay is picked uniformly from
         [0, WORKER_INIT_RANDOM_DELAY_SECONDS]. Spreads slurmd registrations across workers to
         avoid overloading the controller. Unset or 0 disables the delay (default: 0).
 
@@ -150,7 +150,7 @@ def get_node_addr() -> str:
     return f"nodeaddr={pod_name}.{service_name}.{pod_namespace}.svc"
 
 
-def wait_for_controller() -> None:
+def wait_for_controller(create_config_symlink: bool = True) -> None:
     """Wait for slurmctld to be ready by polling scontrol ping."""
     max_attempts: int = get_controller_max_attempts()
     poll_interval: int = get_controller_poll_interval()
@@ -158,7 +158,8 @@ def wait_for_controller() -> None:
     logger.info("Waiting for Slurm controller to be ready...")
     logger.info("Max attempts: %d, Poll interval: %ds", max_attempts, poll_interval)
 
-    create_slurm_config_symlink()
+    if create_config_symlink:
+        create_slurm_config_symlink()
 
     logger.info("Checking slurmctld readiness...")
     for attempt in range(max_attempts):
@@ -447,6 +448,10 @@ def wait_for_hostname_in_topology_config(
 
         if topology_config_contains_hostname(current_path, hostname):
             logger.info("Hostname %s found in %s", hostname, current_path)
+            try:
+                logger.info("Topology config %s content:\n%s", current_path, current_path.read_text())
+            except (IOError, OSError) as e:
+                logger.warning("Failed to read topology config %s for logging: %s", current_path, e)
             return
 
         logger.info(
@@ -828,8 +833,8 @@ def is_gpu_enabled() -> bool:
     return os.environ.get("NODESET_GPU_ENABLED", "") == "true"
 
 
-def wait_for_topology() -> None:
-    """Wait until this node is placed in the topology config, then register it via scontrol.
+def wait_for_topology() -> tuple[str, str]:
+    """Wait until this node is placed in the topology config and build its update values.
 
     A worker joins whichever topologies the rendered config lists it in, which keeps it in step with
     the file by construction. A CPU-only worker is listed by none -- tree and block topologies
@@ -847,8 +852,7 @@ def wait_for_topology() -> None:
             "Node %s is CPU-only, no topology lists it; skipping topology registration",
             hostname,
         )
-        apply_node_topology(hostname, "")
-        return
+        return hostname, ""
 
     # A placeholder tree or block has no node list yet, but waiting is still necessary to avoid
     # registering before the operator publishes the populated topology. Flat-only clusters never
@@ -867,8 +871,7 @@ def wait_for_topology() -> None:
             config_path,
             hostname,
         )
-        apply_node_topology(hostname, "")
-        return
+        return hostname, ""
 
     node_name: str = get_node_name()
     topology_path: Path = get_topology_path()
@@ -934,7 +937,7 @@ def wait_for_topology() -> None:
             hostname,
         )
 
-    apply_node_topology(hostname, topology)
+    return hostname, topology
 
 
 # endregion Topology functions
@@ -948,24 +951,24 @@ def main():
         "commands",
         nargs="+",
         choices=["wait-controller", "wait-topology"],
-        help="One or more initialization commands to run sequentially. "
-        "If both are specified, wait-controller is always executed first.",
+        help="One or more worker initialization steps to run.",
     )
 
     args: argparse.Namespace = parser.parse_args()
 
+    create_slurm_config_symlink()
+
+    topology_update: tuple[str, str] | None = None
+    if "wait-topology" in args.commands:
+        topology_update = wait_for_topology()
+
     apply_random_startup_delay()
 
-    # Ensure wait-controller always runs first
-    commands: list[str] = sorted(
-        args.commands, key=lambda c: 0 if c == "wait-controller" else 1
-    )
+    if "wait-controller" in args.commands or topology_update is not None:
+        wait_for_controller(create_config_symlink=False)
 
-    for cmd in commands:
-        if cmd == "wait-controller":
-            wait_for_controller()
-        elif cmd == "wait-topology":
-            wait_for_topology()
+    if topology_update is not None:
+        apply_node_topology(*topology_update)
 
 
 if __name__ == "__main__":

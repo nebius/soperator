@@ -65,6 +65,12 @@ const (
 	reasonUnresolvedTopologyRef  = "UnresolvedTopologyRef"
 	reasonClusterDefaultConflict = "ClusterDefaultConflict"
 
+	// reasonTopologyRendered reports a published change to topology.yaml. Unlike the reasons above
+	// it is not a problem report: it exists so that a node moved between topologies leaves a trace
+	// outside the ConfigMap, since such a move changes neither the structure fingerprint nor
+	// anything else the operator logs.
+	reasonTopologyRendered = "TopologyRendered"
+
 	actionRenderTopology = "RenderTopology"
 )
 
@@ -96,6 +102,16 @@ func (r *WorkerTopologyReconciler) recordTopologyIssue(
 		return
 	}
 	r.recorder.Eventf(slurmCluster, nil, corev1.EventTypeWarning, reason, actionRenderTopology, note, args...)
+}
+
+// recordTopologyRendered reports a published topology.yaml change against the SlurmCluster it was
+// rendered for, which puts the event in that cluster's namespace under that cluster's name.
+func (r *WorkerTopologyReconciler) recordTopologyRendered(slurmCluster *slurmv1.SlurmCluster, change topologyChange) {
+	if r.recorder == nil {
+		return
+	}
+	r.recorder.Eventf(slurmCluster, nil, corev1.EventTypeNormal, reasonTopologyRendered, actionRenderTopology,
+		"Published topology.yaml: %s", change.Summary)
 }
 
 func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -163,6 +179,14 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 		return DefaultRequeueResult, nil
 	}
+
+	change := summarizeTopologyChange(existingTopology, renderedDesiredTopology)
+	// Reported at info level and as an event on purpose. Node membership is left out of the
+	// structure fingerprint, so moving nodes between topologies asks for no reconfigure and would
+	// otherwise be published without a single line saying so.
+	logger.Info("Topology config changed, publishing it",
+		"change", change.Summary, "nodes", change.Detail, "structure", desiredStructure)
+	r.recordTopologyRendered(slurmCluster, change)
 
 	// The content is published before the request, on purpose: requesting first would let
 	// sconfigcontroller reconfigure the old content and satisfy the request against it. Publishing
