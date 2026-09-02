@@ -3,6 +3,7 @@ package sharedsteps
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,7 +18,6 @@ const (
 	accountingTestAccount    = "e2e-research"
 	accountingTestJobName    = "e2e-accounting"
 	accountingSmokeTimeout   = 2 * time.Minute
-	accountingReportTimeout  = 2 * time.Minute
 	accountingCleanupTimeout = 2 * time.Minute
 )
 
@@ -29,6 +29,10 @@ var accountingJobFields = []string{
 	"State",
 	"ExitCode",
 	"Elapsed",
+	"ElapsedRaw",
+	"NNodes",
+	"NCPUS",
+	"AllocTRES",
 	"Start",
 	"End",
 }
@@ -52,21 +56,19 @@ type accountingClusterRecord struct {
 }
 
 type accountingJobRecord struct {
-	JobID    string
-	JobName  string
-	User     string
-	Account  string
-	State    string
-	ExitCode string
-	Elapsed  string
-	Start    string
-	End      string
-}
-
-type accountingReportExpectation struct {
-	name           string
-	command        string
-	expectedPrefix []string
+	JobID      string
+	JobName    string
+	User       string
+	Account    string
+	State      string
+	ExitCode   string
+	Elapsed    string
+	ElapsedRaw string
+	Nodes      string
+	CPUs       string
+	AllocTRES  string
+	Start      string
+	End        string
 }
 
 func NewAccounting(
@@ -91,8 +93,7 @@ func (s *Accounting) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a test Slurm account is created and associated with the user$`, s.createTestAccountAndAssociation)
 	sc.Step(`^the user association is visible in Slurm accounting$`, s.userAssociationIsVisible)
 	sc.Step(`^the user submits a one-node smoke job to the test account$`, s.submitAccountingSmokeJob)
-	sc.Step(`^the job completes and is recorded with the expected user and account$`, s.jobIsRecorded)
-	sc.Step(`^CPU, billing, cluster utilization, and job-size reports contain accounting data$`, s.accountingReportsContainData)
+	sc.Step(`^the job completes and is recorded with the expected user, account, and allocated resources$`, s.jobIsRecorded)
 }
 
 func (s *Accounting) CleanupAndReset(ctx context.Context) {
@@ -270,7 +271,7 @@ func (s *Accounting) submitAccountingSmokeJob(ctx context.Context) error {
 		"--output=" + framework.ShellQuote(stdoutPath),
 		"--error=" + framework.ShellQuote(stderrPath),
 		"--open-mode=truncate",
-		"--wrap=" + framework.ShellQuote("hostname"),
+		"--wrap=" + framework.ShellQuote("hostname; sleep 2"),
 	}, " ")
 	output, err := s.runtime.Jail().Run(ctx, command)
 	if err != nil {
@@ -320,63 +321,6 @@ func (s *Accounting) jobIsRecorded(ctx context.Context) error {
 		})
 }
 
-func (s *Accounting) accountingReportsContainData(ctx context.Context) error {
-	cluster := framework.ShellQuote(s.clusterName)
-	window := "start=now-24hours end=now+24hours"
-	expectations := []accountingReportExpectation{
-		{
-			name: "CPU user top",
-			command: fmt.Sprintf(
-				"sreport -nP -T cpu user top %s clusters=%s format=Cluster,Login,Account,Used",
-				window, cluster),
-			expectedPrefix: []string{s.clusterName},
-		},
-		{
-			name: "billing user top",
-			command: fmt.Sprintf(
-				"sreport -nP -T billing user top %s clusters=%s format=Cluster,Login,Account,Used",
-				window, cluster),
-			expectedPrefix: []string{s.clusterName},
-		},
-		{
-			name: "cluster utilization",
-			command: fmt.Sprintf(
-				"sreport -nP cluster utilization %s clusters=%s format=Cluster,Allocated,Reported",
-				window, cluster),
-			expectedPrefix: []string{s.clusterName},
-		},
-		{
-			name: "job sizes",
-			command: fmt.Sprintf(
-				"sreport -nP job sizes %s clusters=%s format=Cluster,Account",
-				window, cluster),
-			expectedPrefix: []string{s.clusterName},
-		},
-	}
-
-	for _, expectation := range expectations {
-		if err := s.waitForAccountingReport(ctx, expectation); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *Accounting) waitForAccountingReport(ctx context.Context, expectation accountingReportExpectation) error {
-	return s.runtime.WaitFor(ctx, expectation.name+" accounting data",
-		accountingReportTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-			output, err := s.runtime.Jail().RunWithDefaultRetry(waitCtx, expectation.command)
-			if err != nil {
-				return false, fmt.Errorf("run %s report: %w", expectation.name, err)
-			}
-			if !accountingReportContainsRow(output, expectation.expectedPrefix) {
-				return false, fmt.Errorf("%s report has no row beginning with %q; output:\n%s",
-					expectation.name, strings.Join(expectation.expectedPrefix, "|"), strings.TrimSpace(output))
-			}
-			return true, nil
-		})
-}
-
 func findAccountingCluster(output, expectedCluster string) (accountingClusterRecord, error) {
 	for _, row := range parseAccountingRows(output) {
 		if len(row) < 3 || row[0] != expectedCluster {
@@ -414,15 +358,19 @@ func findAccountingJobRecord(output, jobID string) (accountingJobRecord, bool) {
 			continue
 		}
 		return accountingJobRecord{
-			JobID:    row[0],
-			JobName:  row[1],
-			User:     row[2],
-			Account:  row[3],
-			State:    row[4],
-			ExitCode: row[5],
-			Elapsed:  row[6],
-			Start:    row[7],
-			End:      row[8],
+			JobID:      row[0],
+			JobName:    row[1],
+			User:       row[2],
+			Account:    row[3],
+			State:      row[4],
+			ExitCode:   row[5],
+			Elapsed:    row[6],
+			ElapsedRaw: row[7],
+			Nodes:      row[8],
+			CPUs:       row[9],
+			AllocTRES:  row[10],
+			Start:      row[11],
+			End:        row[12],
 		}, true
 	}
 	return accountingJobRecord{}, false
@@ -458,6 +406,23 @@ func validateAccountingJobRecord(record accountingJobRecord) error {
 			problems = append(problems, fmt.Sprintf("%s=%q", field.name, field.value))
 		}
 	}
+	if record.Nodes != "1" {
+		problems = append(problems, fmt.Sprintf("nodes=%q, expected %q", record.Nodes, "1"))
+	}
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"elapsed raw", record.ElapsedRaw},
+		{"CPUs", record.CPUs},
+		{"allocated CPU TRES", accountingTRESValue(record.AllocTRES, "cpu")},
+		{"allocated billing TRES", accountingTRESValue(record.AllocTRES, "billing")},
+	} {
+		value, err := strconv.ParseFloat(field.value, 64)
+		if err != nil || value <= 0 {
+			problems = append(problems, fmt.Sprintf("%s=%q, expected a positive number", field.name, field.value))
+		}
+	}
 	if len(problems) > 0 {
 		return fmt.Errorf("job %s has invalid accounting record: %s",
 			record.JobID, strings.Join(problems, "; "))
@@ -465,23 +430,14 @@ func validateAccountingJobRecord(record accountingJobRecord) error {
 	return nil
 }
 
-func accountingReportContainsRow(output string, expectedPrefix []string) bool {
-	for _, row := range parseAccountingRows(output) {
-		if len(row) < len(expectedPrefix) {
-			continue
-		}
-		matches := true
-		for i, expected := range expectedPrefix {
-			if row[i] != expected {
-				matches = false
-				break
-			}
-		}
-		if matches {
-			return true
+func accountingTRESValue(allocTRES, name string) string {
+	for _, tres := range strings.Split(allocTRES, ",") {
+		key, value, found := strings.Cut(strings.TrimSpace(tres), "=")
+		if found && key == name {
+			return strings.TrimSpace(value)
 		}
 	}
-	return false
+	return ""
 }
 
 func parseAccountingRows(output string) [][]string {

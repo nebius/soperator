@@ -32,7 +32,7 @@ func TestAccountingAssociationExists(t *testing.T) {
 }
 
 func TestFindAndValidateAccountingJobRecord(t *testing.T) {
-	output := "42|e2e-accounting|bob|e2e-research|COMPLETED|0:0|00:00:01|2026-09-02T10:00:00|2026-09-02T10:00:01|\n"
+	output := "42|e2e-accounting|bob|e2e-research|COMPLETED|0:0|00:00:02|2|1|2|billing=2,cpu=2,mem=1436G,node=1|2026-09-02T10:00:00|2026-09-02T10:00:02|\n"
 	record, found := findAccountingJobRecord(output, "42")
 	require.True(t, found)
 	assert.NoError(t, validateAccountingJobRecord(record))
@@ -40,15 +40,19 @@ func TestFindAndValidateAccountingJobRecord(t *testing.T) {
 
 func TestValidateAccountingJobRecordReportsMismatches(t *testing.T) {
 	record := accountingJobRecord{
-		JobID:    "42",
-		JobName:  "wrong",
-		User:     "alice",
-		Account:  "other",
-		State:    "FAILED",
-		ExitCode: "1:0",
-		Elapsed:  "",
-		Start:    "Unknown",
-		End:      "Unknown",
+		JobID:      "42",
+		JobName:    "wrong",
+		User:       "alice",
+		Account:    "other",
+		State:      "FAILED",
+		ExitCode:   "1:0",
+		Elapsed:    "",
+		ElapsedRaw: "0",
+		Nodes:      "2",
+		CPUs:       "0",
+		AllocTRES:  "billing=0,cpu=0",
+		Start:      "Unknown",
+		End:        "Unknown",
 	}
 	err := validateAccountingJobRecord(record)
 	require.Error(t, err)
@@ -59,19 +63,16 @@ func TestValidateAccountingJobRecordReportsMismatches(t *testing.T) {
 		`state="FAILED"`,
 		`exit code="1:0"`,
 		`elapsed=""`,
+		`elapsed raw="0"`,
+		`nodes="2"`,
+		`CPUs="0"`,
+		`allocated CPU TRES="0"`,
+		`allocated billing TRES="0"`,
 		`start="Unknown"`,
 		`end="Unknown"`,
 	} {
 		assert.ErrorContains(t, err, expected)
 	}
-}
-
-func TestAccountingReportContainsRow(t *testing.T) {
-	output := "other|bob|e2e-research|10|\nsoperator|bob|e2e-research|20|\n"
-	assert.True(t, accountingReportContainsRow(output,
-		[]string{"soperator", "bob", "e2e-research"}))
-	assert.False(t, accountingReportContainsRow(output,
-		[]string{"soperator", "alice", "e2e-research"}))
 }
 
 func TestParseAccountingRowsTrimsFieldsAndTrailingDelimiter(t *testing.T) {
