@@ -27,6 +27,12 @@ type NodeSetInfo struct {
 	Phase         string
 }
 
+type SlurmClusterInfo struct {
+	Name              string
+	Namespace         string
+	AccountingEnabled bool
+}
+
 type WorkerPodInfo struct {
 	SlurmNodeName      string
 	PodName            string
@@ -36,6 +42,24 @@ type WorkerPodInfo struct {
 
 func NewKubectlClient(exec Exec) *KubectlClient {
 	return &KubectlClient{exec: exec}
+}
+
+func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClusterInfo, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return SlurmClusterInfo{}, fmt.Errorf("SlurmCluster name is empty")
+	}
+
+	var cluster kubeobjects.SlurmCluster
+	if err := c.GetJSON(ctx, &cluster,
+		"get", "slurmcluster", name, "-n", SoperatorNamespace, "-o", "json"); err != nil {
+		return SlurmClusterInfo{}, fmt.Errorf("get SlurmCluster %s/%s: %w", SoperatorNamespace, name, err)
+	}
+	return SlurmClusterInfo{
+		Name:              cluster.Metadata.Name,
+		Namespace:         cluster.Metadata.Namespace,
+		AccountingEnabled: cluster.Spec.SlurmNodes.Accounting.Enabled,
+	}, nil
 }
 
 func (c *KubectlClient) GetJSON(ctx context.Context, out any, args ...string) error {

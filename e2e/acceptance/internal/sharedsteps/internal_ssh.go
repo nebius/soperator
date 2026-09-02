@@ -41,7 +41,10 @@ func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Contex
 	}
 	s.targetWorker = workers[0]
 
-	return ensureSSHTestUser(ctx, s.runtime, sshUserName)
+	if err := ensureSSHTestUser(ctx, s.runtime, sshUserName); err != nil {
+		return err
+	}
+	return waitForSSHTestUserOnWorker(ctx, s.runtime, sshUserName, s.targetWorker)
 }
 
 func (s *InternalSSH) theUserSSHsFromTheLoginNodeToAWorker(ctx context.Context) error {

@@ -34,23 +34,15 @@ var accountingJobFields = []string{
 }
 
 type Accounting struct {
-	info    *framework.ClusterInfo
-	runtime framework.Runtime
-	slurm   *framework.SlurmClient
-	kubectl *framework.KubectlClient
+	info     *framework.ClusterInfo
+	runtime  framework.Runtime
+	slurm    *framework.SlurmClient
+	kubectl  *framework.KubectlClient
+	selector *framework.WorkerSelector
 
 	clusterName string
+	worker      framework.WorkerInfo
 	job         framework.SbatchJob
-}
-
-type accountingSlurmCluster struct {
-	Spec struct {
-		SlurmNodes struct {
-			Accounting struct {
-				Enabled bool `json:"enabled"`
-			} `json:"accounting"`
-		} `json:"slurmNodes"`
-	} `json:"spec"`
 }
 
 type accountingClusterRecord struct {
@@ -82,12 +74,14 @@ func NewAccounting(
 	runtime framework.Runtime,
 	slurm *framework.SlurmClient,
 	kubectl *framework.KubectlClient,
+	selector *framework.WorkerSelector,
 ) *Accounting {
 	return &Accounting{
-		info:    info,
-		runtime: runtime,
-		slurm:   slurm,
-		kubectl: kubectl,
+		info:     info,
+		runtime:  runtime,
+		slurm:    slurm,
+		kubectl:  kubectl,
+		selector: selector,
 	}
 }
 
@@ -110,18 +104,16 @@ func (s *Accounting) CleanupAndReset(ctx context.Context) {
 		}
 	}
 	s.clusterName = ""
+	s.worker = framework.WorkerInfo{}
 	s.job = framework.SbatchJob{}
 }
 
 func (s *Accounting) slurmAccountingIsReachable(ctx context.Context) error {
-	var cluster accountingSlurmCluster
-	if err := s.kubectl.GetJSON(ctx, &cluster,
-		"get", "slurmcluster", s.info.SlurmClusterName,
-		"-n", framework.SoperatorNamespace, "-o", "json"); err != nil {
-		return fmt.Errorf("get SlurmCluster %s/%s: %w",
-			framework.SoperatorNamespace, s.info.SlurmClusterName, err)
+	cluster, err := s.kubectl.SlurmCluster(ctx, s.info.SlurmClusterName)
+	if err != nil {
+		return err
 	}
-	if !cluster.Spec.SlurmNodes.Accounting.Enabled {
+	if !cluster.AccountingEnabled {
 		s.runtime.Logf("acceptance: Slurm accounting is disabled, skipping scenario")
 		return godog.ErrSkip
 	}
@@ -142,7 +134,15 @@ func (s *Accounting) slurmAccountingIsReachable(ctx context.Context) error {
 }
 
 func (s *Accounting) acceptanceTestUserExists(ctx context.Context) error {
-	return ensureSSHTestUser(ctx, s.runtime, accountingTestUser)
+	workers, err := s.selector.PickWorkers(ctx, 1)
+	if err != nil {
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
+	}
+	s.worker = workers[0]
+	if err := ensureSSHTestUser(ctx, s.runtime, accountingTestUser); err != nil {
+		return err
+	}
+	return waitForSSHTestUserOnWorker(ctx, s.runtime, accountingTestUser, s.worker)
 }
 
 func (s *Accounting) createTestAccountAndAssociation(ctx context.Context) error {
@@ -255,6 +255,9 @@ func (s *Accounting) queryTestAssociation(ctx context.Context) (bool, string, er
 }
 
 func (s *Accounting) submitAccountingSmokeJob(ctx context.Context) error {
+	if s.worker.Name == "" {
+		return fmt.Errorf("worker for accounting smoke job is not selected")
+	}
 	stdoutPath := accountingTestUserHome + "/e2e-accounting.out"
 	stderrPath := accountingTestUserHome + "/e2e-accounting.err"
 	command := strings.Join([]string{
@@ -263,6 +266,7 @@ func (s *Accounting) submitAccountingSmokeJob(ctx context.Context) error {
 		"--job-name=" + framework.ShellQuote(accountingTestJobName),
 		"--account=" + framework.ShellQuote(accountingTestAccount),
 		"-N", "1",
+		"--nodelist=" + framework.ShellQuote(s.worker.Name),
 		"--output=" + framework.ShellQuote(stdoutPath),
 		"--error=" + framework.ShellQuote(stderrPath),
 		"--open-mode=truncate",

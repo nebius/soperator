@@ -11,6 +11,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestKubectlClientSlurmCluster(t *testing.T) {
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00slurmcluster\x00soperator\x00-n\x00soperator\x00-o\x00json": `{
+			"metadata": {"name": "soperator", "namespace": "soperator"},
+			"spec": {"slurmNodes": {"accounting": {"enabled": true}}}
+		}`,
+	}}
+
+	cluster, err := NewKubectlClient(exec).SlurmCluster(t.Context(), "soperator")
+	require.NoError(t, err)
+	assert.Equal(t, SlurmClusterInfo{
+		Name:              "soperator",
+		Namespace:         "soperator",
+		AccountingEnabled: true,
+	}, cluster)
+}
+
+func TestKubectlClientSlurmClusterRejectsEmptyName(t *testing.T) {
+	_, err := NewKubectlClient(&kubectlClientTestExec{}).SlurmCluster(t.Context(), " ")
+	assert.ErrorContains(t, err, "name is empty")
+}
+
 func TestKubectlClientNodeSetsFiltersByClusterName(t *testing.T) {
 	exec := &kubectlClientTestExec{kubectl: map[string]string{
 		"get\x00nodesets\x00-n\x00soperator\x00-o\x00json": `{
