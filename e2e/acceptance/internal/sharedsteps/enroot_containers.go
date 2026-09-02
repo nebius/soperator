@@ -166,6 +166,9 @@ func (s *EnrootContainers) theUserImportsAnEnrootImageOverSSH(ctx context.Contex
 		if err != nil {
 			return framework.SkipIfInsufficientWorkers(s.runtime, err)
 		}
+		if err := waitForSSHTestUserOnWorker(ctx, s.runtime, sshUserName, workers[0]); err != nil {
+			return err
+		}
 		host = workers[0].Name
 	}
 

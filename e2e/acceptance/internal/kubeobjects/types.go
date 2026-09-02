@@ -49,6 +49,15 @@ type SlurmCluster struct {
 type SlurmClusterSpec struct {
 	Topology               *SlurmClusterTopology  `json:"topology"`
 	PartitionConfiguration PartitionConfiguration `json:"partitionConfiguration"`
+	SlurmNodes             SlurmClusterNodes      `json:"slurmNodes"`
+}
+
+type SlurmClusterNodes struct {
+	Accounting SlurmClusterAccounting `json:"accounting"`
+}
+
+type SlurmClusterAccounting struct {
+	Enabled bool `json:"enabled"`
 }
 
 type SlurmClusterTopology struct {
