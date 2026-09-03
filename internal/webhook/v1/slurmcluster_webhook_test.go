@@ -163,3 +163,79 @@ func TestValidateSlurmClusterUserIsolation(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestValidateSlurmClusterLoginAutoscaling(t *testing.T) {
+	validator := &SlurmClusterCustomValidator{}
+	clusterWith := func(autoscaling *slurmv1.LoginAutoscaling, size int32, cpu string) *slurmv1.SlurmCluster {
+		resources := corev1.ResourceList{}
+		if cpu != "" {
+			resources[corev1.ResourceCPU] = resource.MustParse(cpu)
+		}
+		return &slurmv1.SlurmCluster{Spec: slurmv1.SlurmClusterSpec{
+			SlurmNodes: slurmv1.SlurmNodes{Login: slurmv1.SlurmNodeLogin{
+				SlurmNode:   slurmv1.SlurmNode{Size: size},
+				Sshd:        slurmv1.NodeContainer{Resources: resources},
+				Autoscaling: autoscaling,
+			}},
+		}}
+	}
+
+	t.Run("admits valid autoscaling", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginAutoscaling{
+			Enabled:                        true,
+			MinReplicas:                    2,
+			MaxReplicas:                    4,
+			TargetCPUUtilizationPercentage: 70,
+		}, 2, "1"))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ignores autoscaling requirements when disabled", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginAutoscaling{
+			Enabled:     false,
+			MinReplicas: 1,
+			MaxReplicas: 4,
+		}, 0, ""))
+		assert.NoError(t, err)
+	})
+
+	t.Run("ignores login size and admits independent autoscaling bounds", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginAutoscaling{
+			Enabled:                        true,
+			MinReplicas:                    1,
+			MaxReplicas:                    2,
+			TargetCPUUtilizationPercentage: 70,
+		}, 10, "1"))
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects max replicas below minimum", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginAutoscaling{
+			Enabled:                        true,
+			MinReplicas:                    3,
+			MaxReplicas:                    2,
+			TargetCPUUtilizationPercentage: 70,
+		}, 1, "1"))
+		assert.ErrorContains(t, err, "must be at least minReplicas")
+	})
+
+	t.Run("rejects missing CPU request", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginAutoscaling{
+			Enabled:                        true,
+			MinReplicas:                    1,
+			MaxReplicas:                    2,
+			TargetCPUUtilizationPercentage: 70,
+		}, 1, ""))
+		assert.ErrorContains(t, err, "resources.cpu")
+	})
+
+	t.Run("rejects invalid target utilization", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginAutoscaling{
+			Enabled:                        true,
+			MinReplicas:                    1,
+			MaxReplicas:                    2,
+			TargetCPUUtilizationPercentage: 101,
+		}, 1, "1"))
+		assert.ErrorContains(t, err, "must be between 1 and 100")
+	})
+}

@@ -92,6 +92,32 @@ type SlurmClusterStatus struct {
 	Conditions []metav1.Condition `json:"conditions"`
 }
 
+type LoginAutoscalingCluster struct {
+	Spec struct {
+		SlurmNodes struct {
+			Login struct {
+				Size        int32           `json:"size"`
+				Autoscaling json.RawMessage `json:"autoscaling,omitempty"`
+			} `json:"login"`
+		} `json:"slurmNodes"`
+	} `json:"spec"`
+}
+
+type LoginStatefulSet struct {
+	Metadata metav1.ObjectMeta `json:"metadata"`
+	Spec     struct {
+		Replicas *int32 `json:"replicas"`
+	} `json:"spec"`
+	Status struct {
+		Replicas      int32 `json:"replicas"`
+		ReadyReplicas int32 `json:"readyReplicas"`
+	} `json:"status"`
+}
+
+type LoginStatefulSetList struct {
+	Items []LoginStatefulSet `json:"items"`
+}
+
 type NodeSetList struct {
 	Items []NodeSet `json:"items"`
 }

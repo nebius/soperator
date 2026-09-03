@@ -185,6 +185,46 @@ func TestAdvancedStatefulSetPatchCopiesPVCDeletionPolicy(t *testing.T) {
 	}
 }
 
+func TestAdvancedStatefulSetPatchPreservesExternallyManagedReplicas(t *testing.T) {
+	liveReplicas := int32(4)
+	existing := &kruisev1b1.StatefulSet{
+		Spec: kruisev1b1.StatefulSetSpec{Replicas: &liveReplicas},
+	}
+	desired := &kruisev1b1.StatefulSet{}
+
+	r := &AdvancedStatefulSetReconciler{}
+	if _, err := r.patch(existing, desired); err != nil {
+		t.Fatalf("patch returned error: %v", err)
+	}
+
+	if desired.Spec.Replicas == nil || *desired.Spec.Replicas != liveReplicas {
+		t.Fatalf("desired replicas = %v, want preserved live value %d", desired.Spec.Replicas, liveReplicas)
+	}
+	if existing.Spec.Replicas == nil || *existing.Spec.Replicas != liveReplicas {
+		t.Fatalf("existing replicas = %v, want %d", existing.Spec.Replicas, liveReplicas)
+	}
+}
+
+func TestAdvancedStatefulSetPatchOverridesOperatorManagedReplicas(t *testing.T) {
+	liveReplicas := int32(4)
+	desiredReplicas := int32(2)
+	existing := &kruisev1b1.StatefulSet{
+		Spec: kruisev1b1.StatefulSetSpec{Replicas: &liveReplicas},
+	}
+	desired := &kruisev1b1.StatefulSet{
+		Spec: kruisev1b1.StatefulSetSpec{Replicas: &desiredReplicas},
+	}
+
+	r := &AdvancedStatefulSetReconciler{}
+	if _, err := r.patch(existing, desired); err != nil {
+		t.Fatalf("patch returned error: %v", err)
+	}
+
+	if existing.Spec.Replicas == nil || *existing.Spec.Replicas != desiredReplicas {
+		t.Fatalf("existing replicas = %v, want desired value %d", existing.Spec.Replicas, desiredReplicas)
+	}
+}
+
 func TestAdvancedStatefulSetPatchCopiesVolumeClaimUpdateStrategy(t *testing.T) {
 	existing := &kruisev1b1.StatefulSet{
 		Spec: kruisev1b1.StatefulSetSpec{

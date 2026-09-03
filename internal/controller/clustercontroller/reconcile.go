@@ -10,6 +10,7 @@ import (
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -52,6 +53,7 @@ import (
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets/status,verbs=get
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
@@ -81,46 +83,48 @@ import (
 type SlurmClusterReconciler struct {
 	*reconciler.Reconciler
 
-	ConfigMap           *reconciler.ConfigMapReconciler
-	JailedConfig        *reconciler.JailedConfigReconciler
-	Secret              *reconciler.SecretReconciler
-	CronJob             *reconciler.CronJobReconciler
-	Job                 *reconciler.JobReconciler
-	Service             *reconciler.ServiceReconciler
-	StatefulSet         *reconciler.StatefulSetReconciler
-	AdvancedStatefulSet *reconciler.AdvancedStatefulSetReconciler
-	ServiceAccount      *reconciler.ServiceAccountReconciler
-	Role                *reconciler.RoleReconciler
-	RoleBinding         *reconciler.RoleBindingReconciler
-	PodMonitor          *reconciler.PodMonitorReconciler
-	ServiceMonitor      *reconciler.ServiceMonitorReconciler
-	Deployment          *reconciler.DeploymentReconciler
-	MariaDb             *reconciler.MariaDbReconciler
-	MariaDbGrant        *reconciler.MariaDbGrantReconciler
-	AppArmorProfile     *reconciler.AppArmorProfileReconciler
+	ConfigMap               *reconciler.ConfigMapReconciler
+	JailedConfig            *reconciler.JailedConfigReconciler
+	Secret                  *reconciler.SecretReconciler
+	CronJob                 *reconciler.CronJobReconciler
+	Job                     *reconciler.JobReconciler
+	Service                 *reconciler.ServiceReconciler
+	StatefulSet             *reconciler.StatefulSetReconciler
+	AdvancedStatefulSet     *reconciler.AdvancedStatefulSetReconciler
+	HorizontalPodAutoscaler *reconciler.HorizontalPodAutoscalerReconciler
+	ServiceAccount          *reconciler.ServiceAccountReconciler
+	Role                    *reconciler.RoleReconciler
+	RoleBinding             *reconciler.RoleBindingReconciler
+	PodMonitor              *reconciler.PodMonitorReconciler
+	ServiceMonitor          *reconciler.ServiceMonitorReconciler
+	Deployment              *reconciler.DeploymentReconciler
+	MariaDb                 *reconciler.MariaDbReconciler
+	MariaDbGrant            *reconciler.MariaDbGrantReconciler
+	AppArmorProfile         *reconciler.AppArmorProfileReconciler
 }
 
 func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *SlurmClusterReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	return &SlurmClusterReconciler{
-		Reconciler:          r,
-		ConfigMap:           reconciler.NewConfigMapReconciler(r),
-		JailedConfig:        reconciler.NewJailedConfigReconciler(r),
-		Secret:              reconciler.NewSecretReconciler(r),
-		CronJob:             reconciler.NewCronJobReconciler(r),
-		Job:                 reconciler.NewJobReconciler(r),
-		Service:             reconciler.NewServiceReconciler(r),
-		StatefulSet:         reconciler.NewStatefulSetReconciler(r),
-		AdvancedStatefulSet: reconciler.NewAdvancedStatefulSetReconciler(r),
-		ServiceAccount:      reconciler.NewServiceAccountReconciler(r),
-		Role:                reconciler.NewRoleReconciler(r),
-		RoleBinding:         reconciler.NewRoleBindingReconciler(r),
-		PodMonitor:          reconciler.NewPodMonitorReconciler(r),
-		ServiceMonitor:      reconciler.NewServiceMonitorReconciler(r),
-		Deployment:          reconciler.NewDeploymentReconciler(r),
-		MariaDb:             reconciler.NewMariaDbReconciler(r),
-		MariaDbGrant:        reconciler.NewMariaDbGrantReconciler(r),
-		AppArmorProfile:     reconciler.NewAppArmorProfileReconciler(r),
+		Reconciler:              r,
+		ConfigMap:               reconciler.NewConfigMapReconciler(r),
+		JailedConfig:            reconciler.NewJailedConfigReconciler(r),
+		Secret:                  reconciler.NewSecretReconciler(r),
+		CronJob:                 reconciler.NewCronJobReconciler(r),
+		Job:                     reconciler.NewJobReconciler(r),
+		Service:                 reconciler.NewServiceReconciler(r),
+		StatefulSet:             reconciler.NewStatefulSetReconciler(r),
+		AdvancedStatefulSet:     reconciler.NewAdvancedStatefulSetReconciler(r),
+		HorizontalPodAutoscaler: reconciler.NewHorizontalPodAutoscalerReconciler(r),
+		ServiceAccount:          reconciler.NewServiceAccountReconciler(r),
+		Role:                    reconciler.NewRoleReconciler(r),
+		RoleBinding:             reconciler.NewRoleBindingReconciler(r),
+		PodMonitor:              reconciler.NewPodMonitorReconciler(r),
+		ServiceMonitor:          reconciler.NewServiceMonitorReconciler(r),
+		Deployment:              reconciler.NewDeploymentReconciler(r),
+		MariaDb:                 reconciler.NewMariaDbReconciler(r),
+		MariaDbGrant:            reconciler.NewMariaDbGrantReconciler(r),
+		AppArmorProfile:         reconciler.NewAppArmorProfileReconciler(r),
 	}
 }
 
@@ -839,6 +843,7 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 				&corev1.ConfigMap{},
 				&corev1.Secret{},
 				&kruisev1b1.StatefulSet{},
+				&autoscalingv2.HorizontalPodAutoscaler{},
 				&slurmv1alpha1.JailedConfig{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
