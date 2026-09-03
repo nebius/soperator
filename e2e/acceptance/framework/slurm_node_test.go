@@ -1,10 +1,14 @@
 package framework
 
 import (
+	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseSlurmNodeInfo(t *testing.T) {
@@ -54,4 +58,46 @@ func TestParseSlurmNodeInfoGPUCount(t *testing.T) {
 
 func TestParseSlurmNodeNames(t *testing.T) {
 	assert.Equal(t, []string{"worker-0", "worker-1"}, ParseSlurmNodeNames("\nworker-0\nworker-1\nworker-0\n"))
+}
+
+func TestSlurmClientActiveWorkerStartTimes(t *testing.T) {
+	runtime := &slurmNodeRuntime{outputs: map[string]string{
+		`sinfo -hN -p main -o '%N'`:     "worker-0\nworker-1\nworker-2\nworker-3\n",
+		`scontrol show node 'worker-0'`: "NodeName=worker-0 State=IDLE SlurmdStartTime=2026-08-28T10:23:44",
+		`scontrol show node 'worker-1'`: "NodeName=worker-1 State=IDLE+NOT_RESPONDING SlurmdStartTime=2026-08-28T10:23:44",
+		`scontrol show node 'worker-2'`: "NodeName=worker-2 State=IDLE+POWERING_DOWN SlurmdStartTime=2026-08-28T10:23:44",
+		`scontrol show node 'worker-3'`: "NodeName=worker-3 State=IDLE+POWERED_DOWN SlurmdStartTime=None",
+	}}
+
+	startTimes, err := NewSlurmClient(runtime).ActiveWorkerStartTimes(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, map[string]time.Time{
+		"worker-0": time.Date(2026, time.August, 28, 10, 23, 44, 0, time.UTC),
+	}, startTimes)
+}
+
+func TestSlurmClientActiveWorkerStartTimesRequiresActiveWorker(t *testing.T) {
+	runtime := &slurmNodeRuntime{outputs: map[string]string{
+		`sinfo -hN -p main -o '%N'`:     "worker-0\n",
+		`scontrol show node 'worker-0'`: "NodeName=worker-0 State=IDLE+POWERED_DOWN SlurmdStartTime=None",
+	}}
+
+	_, err := NewSlurmClient(runtime).ActiveWorkerStartTimes(t.Context())
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "find active workers")
+}
+
+type slurmNodeRuntime struct {
+	Runtime
+	outputs map[string]string
+}
+
+func (r *slurmNodeRuntime) Controller() CommandScope {
+	return NewCommandScope(func(ctx context.Context, command string) (string, error) {
+		output, found := r.outputs[command]
+		if !found {
+			return "", fmt.Errorf("unexpected controller command: %s", strings.TrimSpace(command))
+		}
+		return output, nil
+	})
 }

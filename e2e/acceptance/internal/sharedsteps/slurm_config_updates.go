@@ -44,7 +44,8 @@ func NewSlurmConfigUpdates(
 }
 
 func (s *SlurmConfigUpdates) RegisterSteps(sc *godog.ScenarioContext) {
-	sc.Step(`^the current custom Slurm configuration and worker start times are recorded$`, s.recordCurrentState)
+	sc.Step(`^at least one active worker is available for Slurm reconfiguration$`, s.recordActiveWorkerStartTimes)
+	sc.Step(`^the current custom Slurm configuration is recorded$`, s.recordCurrentConfig)
 	sc.Step(`^worker start times remain unchanged while the Slurm configuration is unchanged$`, s.checkWorkerStartTimesStable)
 	sc.Step(`^JobRequeue is overridden to 0 in the SlurmCluster$`, s.overrideJobRequeue)
 	sc.Step(`^the effective JobRequeue value becomes 0$`, s.checkOverriddenJobRequeue)
@@ -73,7 +74,20 @@ func (s *SlurmConfigUpdates) CleanupAndReset(ctx context.Context) {
 	s.restoreNeeded = false
 }
 
-func (s *SlurmConfigUpdates) recordCurrentState(ctx context.Context) error {
+func (s *SlurmConfigUpdates) recordActiveWorkerStartTimes(ctx context.Context) error {
+	startTimes, err := s.slurm.ActiveWorkerStartTimes(ctx)
+	if err != nil {
+		return err
+	}
+	s.workerStartTimes = startTimes
+	return nil
+}
+
+func (s *SlurmConfigUpdates) recordCurrentConfig(ctx context.Context) error {
+	if len(s.workerStartTimes) == 0 {
+		return fmt.Errorf("record active worker start times before the Slurm configuration")
+	}
+
 	cluster, err := s.kubectl.SlurmCluster(ctx, s.info.SlurmClusterName)
 	if err != nil {
 		return err
@@ -83,7 +97,11 @@ func (s *SlurmConfigUpdates) recordCurrentState(ctx context.Context) error {
 		s.originalCustomConfig = &original
 	}
 
-	s.originalJobRequeue, err = s.effectiveSlurmSetting(ctx, "JobRequeue")
+	configuration, err := s.slurm.Configuration(ctx)
+	if err != nil {
+		return err
+	}
+	s.originalJobRequeue, err = slurmSetting(configuration, "JobRequeue")
 	if err != nil {
 		return err
 	}
@@ -91,10 +109,6 @@ func (s *SlurmConfigUpdates) recordCurrentState(ctx context.Context) error {
 		return fmt.Errorf("change JobRequeue from 0: scenario requires a different original value")
 	}
 
-	s.workerStartTimes, err = s.activeWorkerStartTimes(ctx)
-	if err != nil {
-		return err
-	}
 	s.stateRecorded = true
 	return nil
 }
@@ -116,7 +130,7 @@ func (s *SlurmConfigUpdates) checkWorkerStartTimesStable(ctx context.Context) er
 		case <-timer.C:
 			return nil
 		case <-ticker.C:
-			current, err := s.activeWorkerStartTimes(ctx)
+			current, err := s.slurm.ActiveWorkerStartTimes(ctx)
 			if err != nil {
 				return err
 			}
@@ -171,15 +185,7 @@ func (s *SlurmConfigUpdates) patchCustomConfig(ctx context.Context, value *strin
 	return nil
 }
 
-func (s *SlurmConfigUpdates) effectiveSlurmSetting(ctx context.Context, setting string) (string, error) {
-	output, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "scontrol show config")
-	if err != nil {
-		return "", fmt.Errorf("read effective Slurm configuration: %w", err)
-	}
-	configuration, err := parseSlurmConfiguration(output)
-	if err != nil {
-		return "", fmt.Errorf("parse effective Slurm configuration: %w", err)
-	}
+func slurmSetting(configuration map[string]string, setting string) (string, error) {
 	value, found := configuration[setting]
 	if !found {
 		return "", fmt.Errorf("find %s in effective Slurm configuration", setting)
@@ -193,7 +199,11 @@ func (s *SlurmConfigUpdates) waitForJobRequeue(ctx context.Context, expected str
 		slurmConfigUpdateTimeout,
 		framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			actual, err := s.effectiveSlurmSetting(waitCtx, "JobRequeue")
+			configuration, err := s.slurm.Configuration(waitCtx)
+			if err != nil {
+				return false, err
+			}
+			actual, err := slurmSetting(configuration, "JobRequeue")
 			if err != nil {
 				return false, err
 			}
@@ -203,32 +213,6 @@ func (s *SlurmConfigUpdates) waitForJobRequeue(ctx context.Context, expected str
 			return true, nil
 		},
 	)
-}
-
-func (s *SlurmConfigUpdates) activeWorkerStartTimes(ctx context.Context) (map[string]time.Time, error) {
-	names, err := s.slurm.MainPartitionNodeNames(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	startTimes := make(map[string]time.Time, len(names))
-	for _, name := range names {
-		node, err := s.slurm.NodeInfo(ctx, name)
-		if err != nil {
-			return nil, err
-		}
-		if node.HasStateFlag("NOT_RESPONDING") || node.HasStateFlag("POWERING_DOWN") || node.HasStateFlag("POWERED_DOWN") {
-			continue
-		}
-		if node.SlurmdStartTime.IsZero() {
-			return nil, fmt.Errorf("read valid SlurmdStartTime for active worker %s", name)
-		}
-		startTimes[name] = node.SlurmdStartTime
-	}
-	if len(startTimes) == 0 {
-		return nil, fmt.Errorf("find active workers with SlurmdStartTime")
-	}
-	return startTimes, nil
 }
 
 func (s *SlurmConfigUpdates) waitForWorkersReconfigured(ctx context.Context) error {
@@ -242,7 +226,7 @@ func (s *SlurmConfigUpdates) waitForWorkersReconfigured(ctx context.Context) err
 		slurmConfigUpdateTimeout,
 		framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			current, err := s.activeWorkerStartTimes(waitCtx)
+			current, err := s.slurm.ActiveWorkerStartTimes(waitCtx)
 			if err != nil {
 				return false, err
 			}

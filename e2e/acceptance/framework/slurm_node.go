@@ -87,6 +87,32 @@ func (s *SlurmClient) MainPartitionNodeNames(ctx context.Context) ([]string, err
 	return ParseSlurmNodeNames(out), nil
 }
 
+func (s *SlurmClient) ActiveWorkerStartTimes(ctx context.Context) (map[string]time.Time, error) {
+	names, err := s.MainPartitionNodeNames(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	startTimes := make(map[string]time.Time, len(names))
+	for _, name := range names {
+		node, err := s.NodeInfo(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		if node.HasStateFlag("NOT_RESPONDING") || node.HasStateFlag("POWERING_DOWN") || node.HasStateFlag("POWERED_DOWN") {
+			continue
+		}
+		if node.SlurmdStartTime.IsZero() {
+			return nil, fmt.Errorf("read valid SlurmdStartTime for active worker %s", name)
+		}
+		startTimes[name] = node.SlurmdStartTime
+	}
+	if len(startTimes) == 0 {
+		return nil, fmt.Errorf("find active workers with SlurmdStartTime")
+	}
+	return startTimes, nil
+}
+
 func ParseSlurmNodeNames(output string) []string {
 	seen := make(map[string]struct{})
 	var names []string

@@ -35,6 +35,16 @@ func TestCustomSlurmConfigWithJobRequeue(t *testing.T) {
 	}
 }
 
+func TestSlurmSetting(t *testing.T) {
+	value, err := slurmSetting(map[string]string{"JobRequeue": "1"}, "JobRequeue")
+	require.NoError(t, err)
+	assert.Equal(t, "1", value)
+
+	_, err = slurmSetting(map[string]string{}, "JobRequeue")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "find JobRequeue")
+}
+
 func TestCompareWorkerStartTimes(t *testing.T) {
 	before := time.Date(2026, time.August, 28, 10, 23, 44, 0, time.UTC)
 	after := before.Add(time.Minute)

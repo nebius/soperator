@@ -23,7 +23,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 	for _, family := range []scenarioScopedStepFamily{
 		NewClusterCreation(info, runtime, kubectl, selector),
 		NewAccounting(info, runtime, slurm, kubectl, selector),
-		NewSlurmConfig(info, runtime),
+		NewSlurmConfig(info, slurm),
 		NewSlurmConfigUpdates(info, runtime, slurm, kubectl),
 		NewObservability(kubectl),
 		NewInternalSSH(runtime, selector),
