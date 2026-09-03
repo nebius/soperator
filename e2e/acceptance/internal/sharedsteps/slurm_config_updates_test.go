@@ -35,12 +35,12 @@ func TestCustomSlurmConfigWithJobRequeue(t *testing.T) {
 	}
 }
 
-func TestSlurmSetting(t *testing.T) {
-	value, err := slurmSetting(map[string]string{"JobRequeue": "1"}, "JobRequeue")
+func TestJobRequeue(t *testing.T) {
+	value, err := jobRequeue(map[string]string{"JobRequeue": "1"})
 	require.NoError(t, err)
 	assert.Equal(t, "1", value)
 
-	_, err = slurmSetting(map[string]string{}, "JobRequeue")
+	_, err = jobRequeue(map[string]string{})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "find JobRequeue")
 }

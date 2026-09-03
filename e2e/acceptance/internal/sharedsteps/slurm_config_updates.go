@@ -101,7 +101,7 @@ func (s *SlurmConfigUpdates) recordCurrentConfig(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	s.originalJobRequeue, err = slurmSetting(configuration, "JobRequeue")
+	s.originalJobRequeue, err = jobRequeue(configuration)
 	if err != nil {
 		return err
 	}
@@ -185,10 +185,10 @@ func (s *SlurmConfigUpdates) patchCustomConfig(ctx context.Context, value *strin
 	return nil
 }
 
-func slurmSetting(configuration map[string]string, setting string) (string, error) {
-	value, found := configuration[setting]
+func jobRequeue(configuration map[string]string) (string, error) {
+	value, found := configuration["JobRequeue"]
 	if !found {
-		return "", fmt.Errorf("find %s in effective Slurm configuration", setting)
+		return "", fmt.Errorf("find JobRequeue in effective Slurm configuration")
 	}
 	return value, nil
 }
@@ -203,7 +203,7 @@ func (s *SlurmConfigUpdates) waitForJobRequeue(ctx context.Context, expected str
 			if err != nil {
 				return false, err
 			}
-			actual, err := slurmSetting(configuration, "JobRequeue")
+			actual, err := jobRequeue(configuration)
 			if err != nil {
 				return false, err
 			}
