@@ -13,12 +13,12 @@ import (
 
 type SlurmConfig struct {
 	info          *framework.ClusterInfo
-	runtime       framework.Runtime
+	slurm         *framework.SlurmClient
 	configuration map[string]string
 }
 
-func NewSlurmConfig(info *framework.ClusterInfo, runtime framework.Runtime) *SlurmConfig {
-	return &SlurmConfig{info: info, runtime: runtime}
+func NewSlurmConfig(info *framework.ClusterInfo, slurm *framework.SlurmClient) *SlurmConfig {
+	return &SlurmConfig{info: info, slurm: slurm}
 }
 
 func (s *SlurmConfig) RegisterSteps(sc *godog.ScenarioContext) {
@@ -32,14 +32,9 @@ func (s *SlurmConfig) CleanupAndReset(ctx context.Context) {
 }
 
 func (s *SlurmConfig) readEffectiveSlurmConfiguration(ctx context.Context) error {
-	output, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "scontrol show config")
+	configuration, err := s.slurm.Configuration(ctx)
 	if err != nil {
-		return fmt.Errorf("read effective Slurm configuration: %w", err)
-	}
-
-	configuration, err := parseSlurmConfiguration(output)
-	if err != nil {
-		return fmt.Errorf("parse effective Slurm configuration: %w", err)
+		return err
 	}
 	s.configuration = configuration
 	return nil
@@ -66,30 +61,6 @@ func (s *SlurmConfig) checkClusterName() error {
 	return validateSlurmSettings(s.configuration, map[string]string{
 		"ClusterName": s.info.SlurmClusterName,
 	})
-}
-
-func parseSlurmConfiguration(output string) (map[string]string, error) {
-	configuration := make(map[string]string)
-	for lineNumber, line := range strings.Split(output, "\n") {
-		key, value, found := strings.Cut(line, "=")
-		if !found {
-			continue
-		}
-
-		key = strings.TrimSpace(key)
-		value = strings.TrimSpace(value)
-		if key == "" {
-			return nil, fmt.Errorf("parse line %d: setting name is empty", lineNumber+1)
-		}
-		if _, found := configuration[key]; found {
-			return nil, fmt.Errorf("parse line %d: setting %q is duplicated", lineNumber+1, key)
-		}
-		configuration[key] = value
-	}
-	if len(configuration) == 0 {
-		return nil, fmt.Errorf("find settings in scontrol output")
-	}
-	return configuration, nil
 }
 
 func parseSlurmSettingsTable(table *godog.Table) (map[string]string, error) {

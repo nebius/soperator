@@ -15,15 +15,19 @@ var (
 	slurmNodeInstanceIDPattern = regexp.MustCompile(`\bInstanceId=([^\s]+)`)
 	slurmNodeRealMemoryPattern = regexp.MustCompile(`\bRealMemory=(\d+)`)
 	slurmNodeGPUCountPattern   = regexp.MustCompile(`\bCfgTRES=[^\s]*\bgres/gpu=(\d+)`)
+	slurmdStartTimePattern     = regexp.MustCompile(`\bSlurmdStartTime=([^\s]+)`)
 )
 
+const slurmTimestampLayout = "2006-01-02T15:04:05"
+
 type SlurmNodeInfo struct {
-	Name          string
-	State         string
-	Reason        string
-	InstanceID    string
-	RealMemoryMiB uint64
-	GPUCount      int
+	Name            string
+	State           string
+	Reason          string
+	InstanceID      string
+	RealMemoryMiB   uint64
+	GPUCount        int
+	SlurmdStartTime time.Time
 }
 
 func ParseSlurmNodeInfo(name, output string) SlurmNodeInfo {
@@ -47,6 +51,11 @@ func ParseSlurmNodeInfo(name, output string) SlurmNodeInfo {
 	if match := slurmNodeGPUCountPattern.FindStringSubmatch(output); len(match) == 2 {
 		if value, err := strconv.Atoi(match[1]); err == nil {
 			info.GPUCount = value
+		}
+	}
+	if match := slurmdStartTimePattern.FindStringSubmatch(output); len(match) == 2 {
+		if value, err := time.Parse(slurmTimestampLayout, match[1]); err == nil {
+			info.SlurmdStartTime = value
 		}
 	}
 	return info
@@ -76,6 +85,32 @@ func (s *SlurmClient) MainPartitionNodeNames(ctx context.Context) ([]string, err
 		return nil, fmt.Errorf("list Slurm main partition nodes: %w", err)
 	}
 	return ParseSlurmNodeNames(out), nil
+}
+
+func (s *SlurmClient) ActiveWorkerStartTimes(ctx context.Context) (map[string]time.Time, error) {
+	names, err := s.MainPartitionNodeNames(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	startTimes := make(map[string]time.Time, len(names))
+	for _, name := range names {
+		node, err := s.NodeInfo(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		if node.HasStateFlag("NOT_RESPONDING") || node.HasStateFlag("POWERING_DOWN") || node.HasStateFlag("POWERED_DOWN") {
+			continue
+		}
+		if node.SlurmdStartTime.IsZero() {
+			return nil, fmt.Errorf("read valid SlurmdStartTime for active worker %s", name)
+		}
+		startTimes[name] = node.SlurmdStartTime
+	}
+	if len(startTimes) == 0 {
+		return nil, fmt.Errorf("find active workers with SlurmdStartTime")
+	}
+	return startTimes, nil
 }
 
 func ParseSlurmNodeNames(output string) []string {

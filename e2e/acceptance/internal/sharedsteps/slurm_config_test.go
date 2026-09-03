@@ -9,33 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseSlurmConfiguration(t *testing.T) {
-	configuration, err := parseSlurmConfiguration(`Configuration data as of 2026-09-01T15:00:00
-MpiDefault              = pmix
-SlurmdTimeout           = 180 sec
-PluginOption            = name=value
-`)
-	require.NoError(t, err)
-	assert.Equal(t, map[string]string{
-		"MpiDefault":    "pmix",
-		"PluginOption":  "name=value",
-		"SlurmdTimeout": "180 sec",
-	}, configuration)
-}
-
-func TestParseSlurmConfigurationRejectsInvalidOutput(t *testing.T) {
-	for name, output := range map[string]string{
-		"no settings":    "Configuration data as of today\n",
-		"empty setting":  " = value\n",
-		"duplicate name": "MpiDefault = pmix\nMpiDefault = none\n",
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := parseSlurmConfiguration(output)
-			assert.Error(t, err)
-		})
-	}
-}
-
 func TestParseSlurmSettingsTable(t *testing.T) {
 	table := newSlurmSettingsTable(
 		[]string{"setting", "value"},

@@ -31,6 +31,7 @@ type SlurmClusterInfo struct {
 	Name              string
 	Namespace         string
 	AccountingEnabled bool
+	CustomSlurmConfig *string
 }
 
 type WorkerPodInfo struct {
@@ -59,7 +60,33 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 		Name:              cluster.Metadata.Name,
 		Namespace:         cluster.Metadata.Namespace,
 		AccountingEnabled: cluster.Spec.SlurmNodes.Accounting.Enabled,
+		CustomSlurmConfig: cluster.Spec.CustomSlurmConfig,
 	}, nil
+}
+
+func (c *KubectlClient) PatchSlurmClusterCustomConfig(ctx context.Context, name string, value *string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("SlurmCluster name is empty")
+	}
+
+	patch, err := json.Marshal(map[string]any{
+		"spec": map[string]any{
+			"customSlurmConfig": value,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("marshal SlurmCluster custom config patch: %w", err)
+	}
+
+	if _, err := c.exec.Kubectl().RunWithDefaultRetry(ctx,
+		"patch", "slurmcluster", name,
+		"-n", SoperatorNamespace,
+		"--type=merge", "-p", string(patch),
+	); err != nil {
+		return fmt.Errorf("patch SlurmCluster %s/%s custom config: %w", SoperatorNamespace, name, err)
+	}
+	return nil
 }
 
 func (c *KubectlClient) GetJSON(ctx context.Context, out any, args ...string) error {
