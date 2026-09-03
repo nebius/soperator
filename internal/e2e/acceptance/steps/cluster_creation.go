@@ -16,6 +16,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/e2e/acceptance/framework"
 )
 
@@ -45,6 +46,7 @@ func (s *ClusterCreation) Register(sc *godog.ScenarioContext) {
 	sc.Step(`^configured nodesets match the live cluster$`, s.checkExpectedNodeSets)
 	sc.Step(`^main and hidden partitions are present and sane$`, s.checkPartitions)
 	sc.Step(`^all Slurm nodes are healthy$`, s.checkSlurmNodeHealth)
+	sc.Step(`^no ActiveChecks are Failed or Error$`, s.checkActiveChecks)
 	sc.Step(`^login welcome output shows cluster information$`, s.checkWelcomeOutput)
 	sc.Step(`^main partition smoke job succeeds$`, s.checkMainSmokeJob)
 	sc.Step(`^hidden partition smoke job succeeds$`, s.checkHiddenSmokeJob)
@@ -304,6 +306,59 @@ func (s *ClusterCreation) checkSlurmNodeHealth(ctx context.Context) error {
 	if len(unhealthy) > 0 {
 		sort.Strings(unhealthy)
 		return fmt.Errorf("%s", strings.Join(unhealthy, "; "))
+	}
+	return nil
+}
+
+func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
+	var checks slurmv1alpha1.ActiveCheckList
+	if err := kubectlJSON(ctx, s.exec, &checks, "get", "activechecks", "-A", "-o", "json"); err != nil {
+		return fmt.Errorf("list ActiveChecks: %w", err)
+	}
+	if len(checks.Items) == 0 {
+		return fmt.Errorf("no ActiveChecks found")
+	}
+
+	var problems []string
+	checkedCount := 0
+	for _, check := range checks.Items {
+		runAfterCreation := true
+		if check.Spec.RunAfterCreation != nil {
+			runAfterCreation = *check.Spec.RunAfterCreation
+		}
+		if !runAfterCreation {
+			continue
+		}
+		checkedCount++
+
+		checkType := check.Spec.CheckType
+		if checkType == "" {
+			checkType = "k8sJob"
+		}
+
+		switch checkType {
+		case "k8sJob":
+			if check.Status.K8sJobsStatus.LastJobStatus == consts.ActiveCheckK8sJobStatusFailed {
+				problems = append(problems, fmt.Sprintf("%s/%s k8s status=%s", check.Namespace, check.Name, check.Status.K8sJobsStatus.LastJobStatus))
+			}
+		case "slurmJob":
+			status := check.Status.SlurmJobsStatus.LastRunStatus
+			// InProgress is valid here: the HelmRelease hook already gated the initial run,
+			// and this status can belong to a later scheduled execution.
+			if status == consts.ActiveCheckSlurmRunStatusFailed || status == consts.ActiveCheckSlurmRunStatusError {
+				problems = append(problems, fmt.Sprintf("%s/%s slurm status=%s", check.Namespace, check.Name, status))
+			}
+		default:
+			problems = append(problems, fmt.Sprintf("%s/%s unknown checkType=%s", check.Namespace, check.Name, checkType))
+		}
+	}
+
+	if checkedCount == 0 {
+		return fmt.Errorf("no runAfterCreation ActiveChecks found")
+	}
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		return fmt.Errorf("%s", strings.Join(problems, "; "))
 	}
 	return nil
 }
