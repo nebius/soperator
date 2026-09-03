@@ -18,6 +18,8 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-security-profiles-operator
       version: {{ .Values.securityProfilesOperator.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   install:
     {{- toYaml .Values.securityProfilesOperator.install | nindent 4 }}
   upgrade:
