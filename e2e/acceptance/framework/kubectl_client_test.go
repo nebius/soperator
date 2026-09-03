@@ -12,10 +12,14 @@ import (
 )
 
 func TestKubectlClientSlurmCluster(t *testing.T) {
+	customConfig := "JobRequeue=0"
 	exec := &kubectlClientTestExec{kubectl: map[string]string{
 		"get\x00slurmcluster\x00soperator\x00-n\x00soperator\x00-o\x00json": `{
 			"metadata": {"name": "soperator", "namespace": "soperator"},
-			"spec": {"slurmNodes": {"accounting": {"enabled": true}}}
+			"spec": {
+				"customSlurmConfig": "JobRequeue=0",
+				"slurmNodes": {"accounting": {"enabled": true}}
+			}
 		}`,
 	}}
 
@@ -25,12 +29,49 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 		Name:              "soperator",
 		Namespace:         "soperator",
 		AccountingEnabled: true,
+		CustomSlurmConfig: &customConfig,
 	}, cluster)
 }
 
 func TestKubectlClientSlurmClusterRejectsEmptyName(t *testing.T) {
 	_, err := NewKubectlClient(&kubectlClientTestExec{}).SlurmCluster(t.Context(), " ")
 	assert.ErrorContains(t, err, "name is empty")
+}
+
+func TestKubectlClientPatchSlurmClusterCustomConfig(t *testing.T) {
+	for name, test := range map[string]struct {
+		value *string
+		patch string
+	}{
+		"set": {
+			value: ptrTo("JobRequeue=0\n"),
+			patch: `{"spec":{"customSlurmConfig":"JobRequeue=0\n"}}`,
+		},
+		"remove": {
+			patch: `{"spec":{"customSlurmConfig":null}}`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			exec := &kubectlClientTestExec{kubectl: map[string]string{
+				strings.Join([]string{
+					"patch", "slurmcluster", "soperator", "-n", "soperator",
+					"--type=merge", "-p", test.patch,
+				}, "\x00"): "",
+			}}
+
+			err := NewKubectlClient(exec).PatchSlurmClusterCustomConfig(t.Context(), "soperator", test.value)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestKubectlClientPatchSlurmClusterCustomConfigRejectsEmptyName(t *testing.T) {
+	err := NewKubectlClient(&kubectlClientTestExec{}).PatchSlurmClusterCustomConfig(t.Context(), " ", nil)
+	assert.ErrorContains(t, err, "name is empty")
+}
+
+func ptrTo[T any](value T) *T {
+	return &value
 }
 
 func TestKubectlClientNodeSetsFiltersByClusterName(t *testing.T) {

@@ -24,6 +24,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewClusterCreation(info, runtime, kubectl, selector),
 		NewAccounting(info, runtime, slurm, kubectl, selector),
 		NewSlurmConfig(info, runtime),
+		NewSlurmConfigUpdates(info, runtime, slurm, kubectl),
 		NewObservability(kubectl),
 		NewInternalSSH(runtime, selector),
 		NewPackageInstallation(runtime, selector),

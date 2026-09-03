@@ -50,6 +50,7 @@ type SlurmClusterSpec struct {
 	Topology               *SlurmClusterTopology  `json:"topology"`
 	PartitionConfiguration PartitionConfiguration `json:"partitionConfiguration"`
 	SlurmNodes             SlurmClusterNodes      `json:"slurmNodes"`
+	CustomSlurmConfig      *string                `json:"customSlurmConfig"`
 }
 
 type SlurmClusterNodes struct {
