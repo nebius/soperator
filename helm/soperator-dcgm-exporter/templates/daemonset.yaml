@@ -24,8 +24,6 @@ spec:
           value: "true"
         - name: DCGM_EXPORTER_COLLECTORS
           value: /etc/dcgm-exporter/dcgm-metrics.csv
-        - name: DCGM_HPC_JOB_MAPPING_DIR
-          value: {{ .Values.dcgmHpcJobMappingDir }}
         - name: NODE_NAME
           valueFrom:
             fieldRef:
@@ -55,30 +53,9 @@ spec:
           name: metrics-config
           readOnly: true
           subPath: dcgm-metrics.csv
-        - mountPath: {{ .Values.dcgmHpcJobMappingDir }}
-          mountPropagation: HostToContainer
-          name: hpc-jobs-dir
       dnsPolicy: ClusterFirst
-      initContainers:
-      - name: create-hpc-jobs-dir
-        command:
-        - sh
-        - -c
-        - |
-          mkdir -p {{ .Values.dcgmHpcJobMappingDir }}
-        env:
-        - name: KUBERNETES_CLUSTER_DOMAIN
-          value: {{ quote .Values.kubernetesClusterDomain }}
-        image: {{ .Values.daemonSet.createHpcJobsDir.image.repository }}:{{ .Values.daemonSet.createHpcJobsDir.image.tag }}
-        imagePullPolicy: {{ .Values.daemonSet.createHpcJobsDir.image.pullPolicy | default "IfNotPresent" }}
-        resources: {}
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - mountPath: /var
-          mountPropagation: HostToContainer
-          name: host-var
       {{- if .Values.validateToolkit }}
+      initContainers:
       - name: toolkit-validation
         args:
         - until [ -f /run/nvidia/validations/toolkit-ready ]; do echo waiting for nvidia container stack to be setup; sleep 5; done
@@ -126,14 +103,6 @@ spec:
           type: ""
         name: run-nvidia
       {{- end }}
-      - hostPath:
-          path: {{ .Values.dcgmHpcJobMappingDir }}
-          type: ""
-        name: hpc-jobs-dir
-      - hostPath:
-          path: /var
-          type: ""
-        name: host-var
       - configMap:
           defaultMode: 420
           items:

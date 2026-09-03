@@ -648,7 +648,6 @@ observability:
         retries: 6
         remediateLastFailure: true
     values:
-      hpcJobMapDir: /var/run/nebius/slurm
       validateToolkit: true
       resources:
         limits:

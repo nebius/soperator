@@ -1,7 +1,5 @@
 kubernetesClusterDomain: cluster.local
 
-dcgmHpcJobMappingDir: /var/run/nebius/slurm
-
 validateToolkit: true
 
 metricsPort: 9400
@@ -14,12 +12,6 @@ daemonSet:
     image:
       repository: cr.eu-north1.nebius.cloud/marketplace/nebius/nvidia-gpu-operator/image/gpu-operator-validator
       tag: v24.6.2
-      pullPolicy: IfNotPresent
-
-  createHpcJobsDir:
-    image:
-      repository: cr.eu-north1.nebius.cloud/soperator/busybox
-      tag: latest
       pullPolicy: IfNotPresent
 
   nvidiaDcgmExporter:
@@ -43,6 +35,14 @@ serviceMonitor:
       regex: feature_node_kubernetes_io_.*|kubernetes_io_.*|nvidia_com_gpu.*
     - action: labeldrop
       regex: UUID|DCGM_FI_PROCESS_NAME|DCGM_FI_DEV_SERIAL|DCGM_FI_DEV_NAME|job|pci_bus_id|prometheus
+    # The worker Pod name (exported_pod after the scrape resolves the pod-label
+    # conflict) equals the Slurm node name; expose it as node_name so DCGM series
+    # join with the Slurm exporter metrics without label rewriting.
+    - action: replace
+      regex: (.+)
+      sourceLabels:
+        - exported_pod
+      targetLabel: node_name
   relabelings:
     - action: replace
       regex: nvidia-dcgm-exporter

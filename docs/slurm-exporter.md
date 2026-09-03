@@ -140,6 +140,20 @@ max by (user_name, nvlink_instance_group, nodeset_name) (
 )
 ```
 
+### Joining DCGM GPU metrics with jobs
+
+DCGM metrics carry no job labels, but they carry `node_name` — the Slurm node name, copied at scrape time from the worker Pod name. Attribute GPU metrics to jobs by joining it with `slurm_node_job`. The join is node-granular — when several jobs share one node, each job inherits the whole node's GPU signal.
+
+```promql
+# Average GPU utilization per running job
+avg by (job_id) (
+  slurm_node_job
+    * on (node_name) group_left()
+  avg by (node_name) (DCGM_FI_DEV_GPU_UTIL)
+)
+and on (job_id) slurm_job_info{job_state="RUNNING"}
+```
+
 ### Controller RPC Metrics
 
 These metrics provide insights into SLURM controller performance, similar to the output of the `sdiag` command, and were implemented to address [issue #1027](https://github.com/nebius/soperator/issues/1027).

@@ -710,7 +710,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Share of GPUs Slurm is currently using, as reported by the DCGM exporter via the `hpc_job` label (set by soperator's `map_job_dcgm.sh` prolog/epilog).\n\nBoth numerator and denominator are joined with `slurm_node_info{is_unavailable=\"\"}` on `exported_pod` \u2194 `node_name`, so only GPUs on *available* nodes (not DOWN or DRAINED) are counted. This means drained/down hosts don't dilute the score on either side \u2014 no manual ratio correction needed.\n\nRequires the DCGM exporter and soperator's GPU-mapping scripts (default in the chart). CPU-only clusters or non-soperator deployments will show \"No data\".\n\nValue shown is the **1h moving average**, not the instantaneous reading \u2014 smooths out scrape jitter and short bursts.\n\n**Note on join keys**: DCGM's `pod` label is the DaemonSet-pod name and conflicts with the Prometheus scrape target's `pod`, so the scrape rules relabel the original (worker pod) to `exported_pod`. That's the label we join on.",
+      "description": "Share of GPUs Slurm is currently using: a GPU counts as allocated when its node's Slurm base state is ALLOCATED or MIXED (from `slurm_node_info`).\n\nBoth numerator and denominator are joined with `slurm_node_info{is_unavailable=\"\"}` on `exported_pod` \u2194 `node_name`, so only GPUs on *available* nodes (not DOWN or DRAINED) are counted. This means drained/down hosts don't dilute the score on either side \u2014 no manual ratio correction needed.\n\nRequires the DCGM exporter and the soperator Slurm exporter (both default in the chart). CPU-only clusters or non-soperator deployments will show \"No data\".\n\nValue shown is the **1h moving average**, not the instantaneous reading \u2014 smooths out scrape jitter and short bursts.\n\n**Note on join keys**: DCGM's `pod` label is the DaemonSet-pod name and conflicts with the Prometheus scrape target's `pod`, so the scrape rules relabel the original (worker pod) to `exported_pod` and copy it to `node_name` — the worker pod name equals the Slurm node name. That's the label we join on.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -770,7 +770,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg_over_time((100 * (count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job!=\"\"} and on(exported_pod) label_replace(slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\")) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"} and on(exported_pod) label_replace(slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\")))[1h:])",
+          "expr": "avg_over_time((100 * (count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"} and on(node_name) slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\", state_base=~\"ALLOCATED|MIXED\"}) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"} and on(node_name) slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"}))[1h:])",
           "legendFormat": "allocated %",
           "range": true,
           "refId": "A"
@@ -1995,7 +1995,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Share of GPUs Slurm is currently using, per-scrape. Both numerator and denominator are joined with `slurm_node_info{is_unavailable=\"\"}` on `exported_pod` \u2194 `node_name`, so only GPUs on *available* nodes (not DOWN or DRAINED) are counted \u2014 drained/down hosts don't dilute the score on either side.\n\nComplement to the GPU Utilization % panel \u2014 together they show scheduler packing vs actual GPU work.\n\n**Note on join keys**: DCGM's `pod` label is the DaemonSet-pod name and conflicts with the Prometheus scrape target's `pod`, so the scrape rules relabel the original (worker pod) to `exported_pod`. That's the label we join on.",
+          "description": "Share of GPUs Slurm is currently using, per-scrape. Both numerator and denominator are joined with `slurm_node_info{is_unavailable=\"\"}` on `exported_pod` \u2194 `node_name`, so only GPUs on *available* nodes (not DOWN or DRAINED) are counted \u2014 drained/down hosts don't dilute the score on either side.\n\nComplement to the GPU Utilization % panel \u2014 together they show scheduler packing vs actual GPU work.\n\n**Note on join keys**: DCGM's `pod` label is the DaemonSet-pod name and conflicts with the Prometheus scrape target's `pod`, so the scrape rules relabel the original (worker pod) to `exported_pod` and copy it to `node_name` — the worker pod name equals the Slurm node name. That's the label we join on.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2081,7 +2081,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * (count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", hpc_job!=\"\"} and on(exported_pod) label_replace(slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\")) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"} and on(exported_pod) label_replace(slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"}, \"exported_pod\", \"$1\", \"node_name\", \"(.*)\"))",
+              "expr": "100 * (count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"} and on(node_name) slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\", state_base=~\"ALLOCATED|MIXED\"}) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"} and on(node_name) slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"})",
               "legendFormat": "allocated",
               "range": true,
               "refId": "A"

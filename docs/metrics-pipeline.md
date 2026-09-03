@@ -67,6 +67,7 @@ The exporter applies metric relabeling to drop volatile Kubernetes labels (`pod`
 - Metrics: GPU temperature, power, utilization, memory, errors
 - Scrape Interval: 15s
 - DaemonSet: Runs on nodes with `nvidia.com/gpu.deploy.dcgm-exporter=true`
+- Job attribution: DCGM metrics carry no job labels; per-job GPU views join them with the Slurm exporter's `slurm_node_job` metric on `node_name`, which is added to DCGM series at scrape time from the worker Pod name (see [slurm-exporter.md](slurm-exporter.md))
 
 Connection Example:
 ```bash

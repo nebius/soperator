@@ -75,7 +75,7 @@ Soperator consists of the following components:
 - **soperator-activechecks**. This chart is optional. It is used to deploy Kubernetes resources of `kind: ActiveCheck`, which perform active jobs to monitor and validate the state of a Slurm cluster.
 - **soperator-crds**. It deploys the schema of the `SlurmCluster` custom resource, it should always be applied when
   you upgrade the version of Soperator in your cluster.
-- **soperator-dcgm-exporter**. This chart is optional. It is a custom Helm chart with `hpc-jobs-dir` where Slurm stores information about jobs.
+- **soperator-dcgm-exporter**. This chart is optional. It deploys the NVIDIA DCGM exporter with soperator's curated metric set and Slurm-aware relabelings (NVLink instance group and NodeSet labels).
 - **soperator-fluxcd**. This chart is optional. It is an umbrella chart with various components designed for convenient use in a cluster with soperator. It includes `kind: HelmRelease` and `kind: HelmRepository`. This approach was chosen because customizing components through Kustomize is difficult, and Helm dependencies lack flexibility in configuration. Therefore, this umbrella chart was created to deploy HelmReleases with properly configured dependencies.
 - **soperatorchecks**. This chart is optional. It is used to deploy additional controller that runs Slurm and Kubernetes jobs to actively check the state of the Slurm cluster.
 
