@@ -2,8 +2,8 @@
 
 ARG CUDA_VERSION
 ARG SLURM_VERSION
-# https://github.com/nebius/ml-containers/pull/93
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260714103620 AS jail
+# https://github.com/nebius/ml-containers/pull/98
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260819104849 AS jail
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
@@ -34,6 +34,11 @@ RUN apt update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+COPY ansible/squashfuse.yml /opt/ansible/squashfuse.yml
+COPY ansible/roles/squashfuse /opt/ansible/roles/squashfuse
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local squashfuse.yml -t squashfuse
+
 COPY ansible/sssd.yml /opt/ansible/sssd.yml
 COPY ansible/roles/sssd /opt/ansible/roles/sssd
 RUN cd /opt/ansible && \
@@ -58,10 +63,10 @@ RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local nvtop.yml
 
 ## Install Docker CLI
-COPY ansible/docker-cli.yml /opt/ansible/docker-cli.yml
-COPY ansible/roles/docker-cli /opt/ansible/roles/docker-cli
+COPY ansible/docker_cli.yml /opt/ansible/docker_cli.yml
+COPY ansible/roles/docker_cli /opt/ansible/roles/docker_cli
 RUN cd /opt/ansible && \
-    ansible-playbook -i inventory/ -c local docker-cli.yml
+    ansible-playbook -i inventory/ -c local docker_cli.yml
 
 ## Install GDRCopy libraries & executables
 COPY ansible/gdrcopy.yml /opt/ansible/gdrcopy.yml
@@ -70,10 +75,10 @@ RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local gdrcopy.yml
 
 ## Install nvidia-container-toolkit (for enroot usage)
-COPY ansible/nvidia-container-toolkit.yml /opt/ansible/nvidia-container-toolkit.yml
-COPY ansible/roles/nvidia-container-toolkit /opt/ansible/roles/nvidia-container-toolkit
+COPY ansible/nvidia_container_toolkit.yml /opt/ansible/nvidia_container_toolkit.yml
+COPY ansible/roles/nvidia_container_toolkit /opt/ansible/roles/nvidia_container_toolkit
 RUN cd /opt/ansible && \
-    ansible-playbook -i inventory/ -c local nvidia-container-toolkit.yml -t nvidia-container-toolkit
+    ansible-playbook -i inventory/ -c local nvidia_container_toolkit.yml -t nvidia_container_toolkit
 
 # Setup the default $HOME directory content
 COPY ansible/skel.yml /opt/ansible/skel.yml
@@ -88,16 +93,16 @@ RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local motd.yml
 
 # Copy wrapper scripts and utilities
-COPY ansible/soperator-scripts.yml /opt/ansible/soperator-scripts.yml
-COPY ansible/roles/soperator-scripts /opt/ansible/roles/soperator-scripts
+COPY ansible/soperator_scripts.yml /opt/ansible/soperator_scripts.yml
+COPY ansible/roles/soperator_scripts /opt/ansible/roles/soperator_scripts
 RUN cd /opt/ansible && \
-    ansible-playbook -i inventory/ -c local soperator-scripts.yml
+    ansible-playbook -i inventory/ -c local soperator_scripts.yml
 
 # Install Nebius health-check library
-COPY ansible/nc-health-checker.yml /opt/ansible/nc-health-checker.yml
-COPY ansible/roles/nc-health-checker /opt/ansible/roles/nc-health-checker
+COPY ansible/nc_health_checker.yml /opt/ansible/nc_health_checker.yml
+COPY ansible/roles/nc_health_checker /opt/ansible/roles/nc_health_checker
 RUN cd /opt/ansible && \
-    ansible-playbook -i inventory/ -c local nc-health-checker.yml
+    ansible-playbook -i inventory/ -c local nc_health_checker.yml
 
 # Remove ansible
 RUN rm -rf /opt/ansible

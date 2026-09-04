@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"errors"
 	"flag"
@@ -41,7 +40,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -49,7 +47,10 @@ import (
 	"nebius.ai/slurm-operator/internal/cli"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/controllersenabled"
+	"nebius.ai/slurm-operator/internal/kubeletclient"
+	metricsopts "nebius.ai/slurm-operator/internal/metrics"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -113,20 +114,28 @@ func main() {
 		logFormat                   string
 		logLevel                    string
 		enabledNodeReplacement      bool
-		enableExtensiveCheck        bool
 		deleteNotReadyNodes         bool
 		notReadyTimeout             time.Duration
 		maintenanceConditionType    string
 		maintenanceIgnoreNodeLabels string
 		controllersFlag             string
 
-		reconcileTimeout                         time.Duration
-		reconcileTimeoutPodEphemeralStorageCheck time.Duration
-		maxConcurrency                           int
-		maxConcurrencyPodEphemeralStorageCheck   int
-		cacheSyncTimeout                         time.Duration
-		ephemeralStorageThreshold                float64
-		ephemeralStorageResumeThreshold          float64
+		requeueAfterSlurmNodes                 time.Duration
+		requeueAfterActiveCheck                time.Duration
+		requeueAfterActiveCheckJob             time.Duration
+		requeueAfterPodEphemeralStorageCheck   time.Duration
+		maxConcurrency                         int
+		maxConcurrencyPodEphemeralStorageCheck int
+		cacheSyncTimeout                       time.Duration
+		ephemeralStorageThreshold              float64
+		ephemeralStorageResumeThreshold        float64
+
+		kubeletPort                  int
+		kubeletTimeout               time.Duration
+		kubeletMaxIdleConns          int
+		kubeletInsecureSkipTLSVerify bool
+		kubeletCAFile                string
+		kubeletTLSServerName         string
 	)
 
 	var watchNsCacheByName = make(map[string]cache.Config)
@@ -148,19 +157,26 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&logFormat, "log-format", "json", "Log format: plain or json")
 	flag.StringVar(&logLevel, "log-level", "debug", "Log level: debug, info, warn, error, dpanic, panic, fatal")
-	flag.DurationVar(&reconcileTimeout, "reconcile-timeout", 3*time.Minute, "The maximum duration allowed for a single reconcile")
-	flag.DurationVar(&reconcileTimeoutPodEphemeralStorageCheck, "pod-ephemeral-reconcile-timeout", 15*time.Second, "The maximum duration allowed for a single reconcile of Pod Ephemeral Storage Check")
+	flag.DurationVar(&requeueAfterSlurmNodes, "requeue-after-slurm-nodes", 3*time.Minute, "The duration after which SlurmNodesController will be requeued for reconciliation.")
+	flag.DurationVar(&requeueAfterActiveCheck, "requeue-after-activecheck", 10*time.Second, "The duration after which ActiveCheck will be requeued for reconciliation.")
+	flag.DurationVar(&requeueAfterActiveCheckJob, "requeue-after-activecheckjob", time.Minute, "The duration after which ActiveCheckJob will be requeued for reconciliation.")
+	flag.DurationVar(&requeueAfterPodEphemeralStorageCheck, "requeue-after-pod-ephemeral-storage-check", time.Minute, "The duration after which Pod Ephemeral Storage Check will be requeued for reconciliation.")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
-	flag.IntVar(&maxConcurrencyPodEphemeralStorageCheck, "pod-ephemeral-max-concurrent-reconciles", 10, "Configures number of concurrent reconciles for Pod Ephemeral Storage Check. It should improve performance for clusters with many pods.")
+	flag.IntVar(&maxConcurrencyPodEphemeralStorageCheck, "pod-ephemeral-max-concurrent-reconciles", 50, "Configures number of concurrent reconciles for Pod Ephemeral Storage Check. It should improve performance for clusters with many pods.")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.BoolVar(&enabledNodeReplacement, "enable-node-replacement", true, "Enable node replacement controller")
-	flag.BoolVar(&enableExtensiveCheck, "enable-extensive-check", true, "If set, runs extensive check before setting unhealthy flag for HC failures")
 	flag.DurationVar(&notReadyTimeout, "not-ready-timeout", 15*time.Minute, "The timeout after which a NotReady node will be deleted. Nodes can be NotReady for more than 10 minutes when GPU operator is starting.")
 	flag.BoolVar(&deleteNotReadyNodes, "delete-not-ready-nodes", true, "If set, NotReady nodes will be deleted after the not-ready timeout is reached. If false, they will be marked as NotReady but not deleted.")
 	flag.Float64Var(&ephemeralStorageThreshold, "ephemeral-storage-threshold", 85.0, "The threshold percentage for ephemeral storage usage warnings (default 85%)")
 	flag.Float64Var(&ephemeralStorageResumeThreshold, "ephemeral-storage-resume-threshold", 80.0, "The threshold percentage below which a drained node is resumed (default 80%). Must be less than ephemeral-storage-threshold to avoid flapping.")
 	flag.StringVar(&maintenanceConditionType, "maintenance-condition-type", string(consts.DefaultMaintenanceConditionType), "The condition type for scheduled maintenance")
 	flag.StringVar(&maintenanceIgnoreNodeLabels, "maintenance-ignore-node-labels", os.Getenv("MAINTENANCE_IGNORE_NODE_LABELS"), "Comma-separated list of node label key=value pairs to ignore during maintenance (e.g., 'env=prod,tier=critical')")
+	flag.IntVar(&kubeletPort, "kubelet-port", kubeletclient.DefaultPort, "The kubelet port used for pod ephemeral storage stats on nodes that do not advertise a kubelet endpoint.")
+	flag.DurationVar(&kubeletTimeout, "kubelet-request-timeout", 10*time.Second, "The timeout for a single kubelet stats request. Kubelet builds the summary from cAdvisor, which is slow on busy nodes.")
+	flag.IntVar(&kubeletMaxIdleConns, "kubelet-max-idle-conns", 1024, "The maximum number of pooled kubelet connections. One connection is kept per node, so values below the node count make most requests pay a fresh TLS handshake.")
+	flag.BoolVar(&kubeletInsecureSkipTLSVerify, "kubelet-insecure-skip-tls-verify", true, "If set, the kubelet serving certificate is not verified. Kubelet serving certificates are self-signed unless the cluster enables serverTLSBootstrap.")
+	flag.StringVar(&kubeletCAFile, "kubelet-ca-file", "", "The CA bundle used to verify kubelet serving certificates. Only used when kubelet-insecure-skip-tls-verify is false.")
+	flag.StringVar(&kubeletTLSServerName, "kubelet-tls-server-name", "", "The server name used to verify kubelet serving certificates. Only used when kubelet-insecure-skip-tls-verify is false.")
 	flag.StringVar(&controllersFlag, "controllers", "", "A comma-separated list of controllers to enable or disable. Use '*' for all, and '-name' to disable. Overrides SLURM_OPERATOR_CONTROLLERS if set.")
 	flag.Parse()
 
@@ -186,7 +202,6 @@ func main() {
 		"activecheck",
 		"activecheckjob",
 		"serviceaccount",
-		"activecheckprolog",
 		"podephemeralstoragecheck",
 	}
 	controllersSet, err := controllersenabled.New(
@@ -236,12 +251,8 @@ func main() {
 	})
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
-		Metrics: metricsserver.Options{
-			BindAddress:   metricsAddr,
-			SecureServing: secureMetrics,
-			TLSOpts:       tlsOpts,
-		},
+		Scheme:                 scheme,
+		Metrics:                metricsopts.ServerOptions(metricsAddr, secureMetrics, tlsOpts),
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
@@ -259,13 +270,14 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 		Cache: cache.Options{
 			DefaultNamespaces: watchNsCacheByName,
+			ByObject:          controllerconfig.NodeCacheByObject(),
 		},
 	})
 	if err != nil {
 		cli.Fail(setupLog, err, "unable to start manager")
 	}
 
-	ctx := context.Background()
+	ctx := ctrl.SetupSignalHandler()
 
 	// Index pods by node name. This is used to list and evict pods from a specific node.
 	if err = mgr.GetFieldIndexer().IndexField(ctx, &corev1.Pod{}, "spec.nodeName", func(rawObj client.Object) []string {
@@ -275,7 +287,7 @@ func main() {
 		cli.Fail(setupLog, err, "unable to setup index field")
 	}
 
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(ctx)
 
 	if controllersSet.Enabled("slurmapiclients") {
 		if err = soperatorchecks.NewSlurmAPIClientsController(
@@ -283,7 +295,6 @@ func main() {
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
 			slurmAPIClients,
-			corev1.NodeConditionType(maintenanceConditionType),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
 		}
@@ -294,9 +305,8 @@ func main() {
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmNodesControllerName),
 			slurmAPIClients,
-			reconcileTimeout,
+			requeueAfterSlurmNodes,
 			enabledNodeReplacement,
-			enableExtensiveCheck,
 			mgr.GetAPIReader(),
 			corev1.NodeConditionType(maintenanceConditionType),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
@@ -321,7 +331,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckControllerName),
-			reconcileTimeout,
+			requeueAfterActiveCheck,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create activecheck controller", "controller", "ActiveCheck")
 		}
@@ -332,7 +342,7 @@ func main() {
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckJobControllerName),
 			slurmAPIClients,
-			reconcileTimeout,
+			requeueAfterActiveCheckJob,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create activecheckjob controller", "controller", "ActiveCheckJob")
 		}
@@ -342,32 +352,28 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmChecksServiceAccountControllerName),
-			reconcileTimeout,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create soperatorchecks serviceaccount controller", "controller", "ServiceAccount")
 		}
 	}
-	if controllersSet.Enabled("activecheckprolog") {
-		if err = soperatorchecks.NewActiveCheckPrologController(
-			mgr.GetClient(),
-			mgr.GetScheme(),
-			mgr.GetEventRecorderFor(soperatorchecks.SlurmActiveCheckPrologControllerName),
-			reconcileTimeout,
-		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
-			cli.Fail(setupLog, err, "unable to create soperatorchecks prolog controller", "controller", "Prolog")
-		}
-	}
-
 	if controllersSet.Enabled("podephemeralstoragecheck") {
 		podEphemeralStorageCheck, err := soperatorchecks.NewPodEphemeralStorageCheck(
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.PodEphemeralStorageCheckName),
 			ctrl.GetConfigOrDie(),
-			reconcileTimeoutPodEphemeralStorageCheck,
+			requeueAfterPodEphemeralStorageCheck,
 			ephemeralStorageThreshold,
 			ephemeralStorageResumeThreshold,
 			slurmAPIClients,
+			kubeletclient.Config{
+				Port:                  int32(kubeletPort),
+				Timeout:               kubeletTimeout,
+				MaxIdleConns:          kubeletMaxIdleConns,
+				InsecureSkipTLSVerify: kubeletInsecureSkipTLSVerify,
+				CAFile:                kubeletCAFile,
+				TLSServerName:         kubeletTLSServerName,
+			},
 		)
 		if err != nil {
 			cli.Fail(setupLog, err, "unable to create pod ephemeral storage check", "controller", "PodEphemeralStorageCheck")
@@ -387,7 +393,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err = mgr.Start(ctx); err != nil {
 		cli.Fail(setupLog, err, "unable to start manager")
 	}
 }

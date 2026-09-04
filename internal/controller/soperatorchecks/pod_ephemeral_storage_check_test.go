@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"testing"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -18,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,9 +28,26 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/kubeletclient"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
 )
+
+// splitHostPort breaks an httptest server URL into the pieces a node status carries.
+func splitHostPort(t *testing.T, rawURL string) (string, int32) {
+	t.Helper()
+
+	parsed, err := url.Parse(rawURL)
+	require.NoError(t, err)
+
+	host, portStr, err := net.SplitHostPort(parsed.Host)
+	require.NoError(t, err)
+
+	port, err := strconv.Atoi(portStr)
+	require.NoError(t, err)
+
+	return host, int32(port)
+}
 
 func createTestPodEphemeralStorageCheck(t *testing.T, objects ...client.Object) *PodEphemeralStorageCheck {
 	scheme := runtime.NewScheme()
@@ -54,6 +73,7 @@ func createTestPodEphemeralStorageCheck(t *testing.T, objects ...client.Object) 
 		80.0,
 		75.0,
 		slurmAPIClients,
+		kubeletclient.Config{InsecureSkipTLSVerify: true},
 	)
 	require.NoError(t, err)
 	return controller
@@ -204,93 +224,6 @@ func TestIsPodRelevant(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := controller.isPodRelevant(tt.pod)
 			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestGetUniqueNodeNames(t *testing.T) {
-	controller := createTestPodEphemeralStorageCheck(t)
-
-	tests := []struct {
-		name     string
-		pods     []corev1.Pod
-		expected []string
-	}{
-		{
-			name: "single pod on single node",
-			pods: []corev1.Pod{
-				{
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-				},
-			},
-			expected: []string{"node1"},
-		},
-		{
-			name: "multiple pods on same node",
-			pods: []corev1.Pod{
-				{
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-				},
-				{
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-				},
-			},
-			expected: []string{"node1"},
-		},
-		{
-			name: "pods on different nodes",
-			pods: []corev1.Pod{
-				{
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-				},
-				{
-					Spec: corev1.PodSpec{
-						NodeName: "node2",
-					},
-				},
-				{
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-				},
-			},
-			expected: []string{"node1", "node2"},
-		},
-		{
-			name: "pods with empty node names should be ignored",
-			pods: []corev1.Pod{
-				{
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-				},
-				{
-					Spec: corev1.PodSpec{
-						NodeName: "",
-					},
-				},
-			},
-			expected: []string{"node1"},
-		},
-		{
-			name:     "empty pod list",
-			pods:     []corev1.Pod{},
-			expected: []string{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := controller.getUniqueNodeNames(tt.pods)
-			assert.ElementsMatch(t, tt.expected, result)
 		})
 	}
 }
@@ -470,9 +403,10 @@ func TestGetEphemeralStorageStatsFromNode(t *testing.T) {
 		},
 	}
 
-	// Create a test HTTP server that returns mock kubelet stats
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/nodes/test-node/proxy/stats/summary" {
+	// Stand in for the kubelet itself, serving TLS with a self-signed certificate the
+	// same way a real kubelet does.
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/stats/summary" {
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.NewEncoder(w).Encode(mockStats); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -538,26 +472,21 @@ func TestGetEphemeralStorageStatsFromNode(t *testing.T) {
 		},
 	}
 
-	// Create a fake kubernetes client
-	fakeClientset := kubefake.NewSimpleClientset()
+	host, port := splitHostPort(t, server.URL)
 
-	// Create rest config pointing to our test server
-	restConfig := &rest.Config{
-		Host: server.URL,
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeInternalIP, Address: host},
+			},
+			DaemonEndpoints: corev1.NodeDaemonEndpoints{
+				KubeletEndpoint: corev1.DaemonEndpoint{Port: port},
+			},
+		},
 	}
 
-	controller := &PodEphemeralStorageCheck{
-		clientset:        fakeClientset,
-		restConfig:       restConfig,
-		usageThreshold:   80.0,
-		resumeThreshold:  75.0,
-		reconcileTimeout: time.Minute,
-	}
-
-	// Note: This test will fail because we can't easily mock the kubernetes REST client
-	// in a unit test. The actual function uses the REST client's proxy functionality
-	// which requires a real kubernetes API server or a more complex mock setup.
-	t.Skip("This test requires a more complex mock setup for the kubernetes REST client")
+	controller := createTestPodEphemeralStorageCheck(t, node)
 
 	result, err := controller.getEphemeralStorageStatsFromNode(context.Background(), "test-node", workerPods)
 	require.NoError(t, err)
@@ -694,600 +623,6 @@ func TestGetEphemeralStorageStatsFromNodeLogic(t *testing.T) {
 	assert.Equal(t, uint64(800000000), storageInfos[0].UsedBytes)
 	assert.Equal(t, uint64(1073741824), storageInfos[0].LimitBytes)
 	assert.InDelta(t, 74.51, storageInfos[0].UsagePercent, 0.1) // 800MB / 1Gi ≈ 74.51%
-}
-
-func TestFindWorkerPods(t *testing.T) {
-	tests := []struct {
-		name          string
-		namespace     string
-		existingPods  []client.Object
-		expectedCount int
-		expectedNames []string
-	}{
-		{
-			name:      "no pods in namespace",
-			namespace: "empty-ns",
-			existingPods: []client.Object{
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-1",
-						Namespace: "other-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
-					},
-				},
-			},
-			expectedCount: 0,
-			expectedNames: []string{},
-		},
-		{
-			name:      "only running worker pods with node assignment",
-			namespace: "test-ns",
-			existingPods: []client.Object{
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-1",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
-					},
-				},
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-2",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "node2",
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
-					},
-				},
-			},
-			expectedCount: 2,
-			expectedNames: []string{"worker-1", "worker-2"},
-		},
-		{
-			name:      "filter out non-worker pods",
-			namespace: "test-ns",
-			existingPods: []client.Object{
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-1",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
-					},
-				},
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "login-1",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: "login",
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
-					},
-				},
-			},
-			expectedCount: 1,
-			expectedNames: []string{"worker-1"},
-		},
-		{
-			name:      "filter out non-running pods",
-			namespace: "test-ns",
-			existingPods: []client.Object{
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-running",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
-					},
-				},
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-pending",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodPending,
-					},
-				},
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-failed",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodFailed,
-					},
-				},
-			},
-			expectedCount: 1,
-			expectedNames: []string{"worker-running"},
-		},
-		{
-			name:      "filter out pods without node assignment",
-			namespace: "test-ns",
-			existingPods: []client.Object{
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-assigned",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
-					},
-				},
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-unassigned",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "", // No node assignment
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
-					},
-				},
-			},
-			expectedCount: 1,
-			expectedNames: []string{"worker-assigned"},
-		},
-		{
-			name:      "mixed scenario with various pod states",
-			namespace: "test-ns",
-			existingPods: []client.Object{
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-good-1",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
-					},
-				},
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-good-2",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "node2",
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
-					},
-				},
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-pending",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodPending,
-					},
-				},
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "login-pod",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: "login",
-						},
-					},
-					Spec: corev1.PodSpec{
-						NodeName: "node1",
-					},
-					Status: corev1.PodStatus{
-						Phase: corev1.PodRunning,
-					},
-				},
-			},
-			expectedCount: 2,
-			expectedNames: []string{"worker-good-1", "worker-good-2"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			controller := createTestPodEphemeralStorageCheck(t, tt.existingPods...)
-
-			result, err := controller.findWorkerPods(context.Background(), tt.namespace)
-			require.NoError(t, err)
-			assert.Len(t, result, tt.expectedCount)
-
-			if tt.expectedCount > 0 {
-				var actualNames []string
-				for _, pod := range result {
-					actualNames = append(actualNames, pod.Name)
-				}
-				assert.ElementsMatch(t, tt.expectedNames, actualNames)
-
-				// Verify all returned pods are running and have node assignments
-				for _, pod := range result {
-					assert.Equal(t, corev1.PodRunning, pod.Status.Phase)
-					assert.NotEmpty(t, pod.Spec.NodeName)
-					assert.Equal(t, consts.LabelWorkerValue, pod.Labels[consts.LabelWorkerKey])
-				}
-			}
-		})
-	}
-}
-
-func TestHasOwnerWithSoperator(t *testing.T) {
-	controller := createTestPodEphemeralStorageCheck(t)
-
-	tests := []struct {
-		name     string
-		obj      client.Object
-		expected bool
-	}{
-		{
-			name: "object with SlurmCluster owner should return true",
-			obj: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "test-ns",
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							Kind:       "SlurmCluster",
-							APIVersion: "slurm.nebius.ai/v1",
-							Name:       "test-cluster",
-							UID:        "cluster-uid-123",
-						},
-					},
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "object with non-SlurmCluster owner should return false",
-			obj: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "test-ns",
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							Kind:       "Deployment",
-							APIVersion: "apps/v1",
-							Name:       "test-deployment",
-							UID:        "deployment-uid-123",
-						},
-					},
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "object with wrong APIVersion should return false",
-			obj: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "test-ns",
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							Kind:       "SlurmCluster",
-							APIVersion: "slurm.nebius.ai/v2", // Wrong version
-							Name:       "test-cluster",
-							UID:        "cluster-uid-123",
-						},
-					},
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "object with multiple owners including SlurmCluster should return true",
-			obj: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "test-ns",
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							Kind:       "ReplicaSet",
-							APIVersion: "apps/v1",
-							Name:       "test-rs",
-							UID:        "rs-uid-123",
-						},
-						{
-							Kind:       "SlurmCluster",
-							APIVersion: "slurm.nebius.ai/v1",
-							Name:       "test-cluster",
-							UID:        "cluster-uid-123",
-						},
-					},
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "object without owners should return false",
-			obj: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "test-ns",
-				},
-			},
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := controller.hasOwnerWithSoperator(tt.obj)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestGetPodsForStatefulSet(t *testing.T) {
-	tests := []struct {
-		name             string
-		namespace        string
-		statefulSetName  string
-		existingPods     []client.Object
-		expectedCount    int
-		expectedPodNames []string
-	}{
-		{
-			name:             "no pods for StatefulSet",
-			namespace:        "test-ns",
-			statefulSetName:  "worker-sts",
-			existingPods:     []client.Object{},
-			expectedCount:    0,
-			expectedPodNames: []string{},
-		},
-		{
-			name:            "pods owned by StatefulSet",
-			namespace:       "test-ns",
-			statefulSetName: "worker-sts",
-			existingPods: []client.Object{
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-sts-0",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "StatefulSet",
-								APIVersion: "apps.kruise.io/v1beta1",
-								Name:       "worker-sts",
-								UID:        "sts-uid-123",
-							},
-						},
-					},
-				},
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-sts-1",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "StatefulSet",
-								APIVersion: "apps.kruise.io/v1beta1",
-								Name:       "worker-sts",
-								UID:        "sts-uid-123",
-							},
-						},
-					},
-				},
-			},
-			expectedCount:    2,
-			expectedPodNames: []string{"worker-sts-0", "worker-sts-1"},
-		},
-		{
-			name:            "filter out pods not owned by StatefulSet",
-			namespace:       "test-ns",
-			statefulSetName: "worker-sts",
-			existingPods: []client.Object{
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-sts-0",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "StatefulSet",
-								APIVersion: "apps.kruise.io/v1beta1",
-								Name:       "worker-sts",
-								UID:        "sts-uid-123",
-							},
-						},
-					},
-				},
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "other-pod",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "StatefulSet",
-								APIVersion: "apps.kruise.io/v1beta1",
-								Name:       "other-sts", // Different StatefulSet
-								UID:        "other-sts-uid-123",
-							},
-						},
-					},
-				},
-			},
-			expectedCount:    1,
-			expectedPodNames: []string{"worker-sts-0"},
-		},
-		{
-			name:            "filter out non-worker pods",
-			namespace:       "test-ns",
-			statefulSetName: "worker-sts",
-			existingPods: []client.Object{
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-sts-0",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "StatefulSet",
-								APIVersion: "apps.kruise.io/v1beta1",
-								Name:       "worker-sts",
-								UID:        "sts-uid-123",
-							},
-						},
-					},
-				},
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "login-pod",
-						Namespace: "test-ns",
-						Labels: map[string]string{
-							consts.LabelWorkerKey: "login", // Not worker
-						},
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "StatefulSet",
-								APIVersion: "apps.kruise.io/v1beta1",
-								Name:       "worker-sts",
-								UID:        "sts-uid-123",
-							},
-						},
-					},
-				},
-			},
-			expectedCount:    1,
-			expectedPodNames: []string{"worker-sts-0"},
-		},
-		{
-			name:            "pods in different namespace should be ignored",
-			namespace:       "test-ns",
-			statefulSetName: "worker-sts",
-			existingPods: []client.Object{
-				&corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "worker-sts-0",
-						Namespace: "other-ns", // Different namespace
-						Labels: map[string]string{
-							consts.LabelWorkerKey: consts.LabelWorkerValue,
-						},
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "StatefulSet",
-								APIVersion: "apps.kruise.io/v1beta1",
-								Name:       "worker-sts",
-								UID:        "sts-uid-123",
-							},
-						},
-					},
-				},
-			},
-			expectedCount:    0,
-			expectedPodNames: []string{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			controller := createTestPodEphemeralStorageCheck(t, tt.existingPods...)
-
-			result := controller.getPodsForStatefulSet(context.Background(), tt.namespace, tt.statefulSetName)
-			assert.Len(t, result, tt.expectedCount)
-
-			if tt.expectedCount > 0 {
-				var actualNames []string
-				for _, req := range result {
-					actualNames = append(actualNames, req.Name)
-				}
-				assert.ElementsMatch(t, tt.expectedPodNames, actualNames)
-
-				// Verify all requests are in the correct namespace
-				for _, req := range result {
-					assert.Equal(t, tt.namespace, req.Namespace)
-				}
-			}
-		})
-	}
 }
 
 func TestCreateEphemeralStorageEventStructure(t *testing.T) {
@@ -1558,8 +893,8 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "drained by ephemeral storage check",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateDRAIN: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateDRAIN: {},
 				},
 				Reason: &slurmapi.NodeReason{
 					Reason: consts.SlurmUserReasonHC + " pod_ephemeral_storage 90.00% of ephemeral storage is used.",
@@ -1570,8 +905,8 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "drained by different reason",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateDRAIN: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateDRAIN: {},
 				},
 				Reason: &slurmapi.NodeReason{
 					Reason: consts.SlurmUserReasonHC + " gpu_check some GPU failure",
@@ -1582,8 +917,8 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "drained with no reason",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateDRAIN: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateDRAIN: {},
 				},
 				Reason: nil,
 			},
@@ -1592,8 +927,8 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "not drained but reason matches prefix",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateIDLE: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateIDLE: {},
 				},
 				Reason: &slurmapi.NodeReason{
 					Reason: consts.SlurmUserReasonHC + " pod_ephemeral_storage 90.00%",
@@ -1604,9 +939,9 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "drain+idle with matching reason",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateDRAIN: {},
-					api.V0041NodeStateIDLE:  {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateDRAIN: {},
+					api.V0044NodeStateIDLE:  {},
 				},
 				Reason: &slurmapi.NodeReason{
 					Reason: consts.SlurmUserReasonHC + " pod_ephemeral_storage 85.50% of ephemeral storage is used.",
@@ -1617,8 +952,8 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "drained manually by user",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateDRAIN: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateDRAIN: {},
 				},
 				Reason: &slurmapi.NodeReason{
 					Reason: "manual maintenance",
@@ -1629,8 +964,8 @@ func TestIsDrainedByEphemeralStorageCheck(t *testing.T) {
 		{
 			name: "reason is exact prefix with no trailing content",
 			node: slurmapi.Node{
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateDRAIN: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateDRAIN: {},
 				},
 				Reason: &slurmapi.NodeReason{
 					Reason: consts.SlurmUserReasonHC + " pod_ephemeral_storage",
@@ -1662,13 +997,13 @@ func TestUndrainSlurmNode(t *testing.T) {
 			name: "successful undrain",
 			setupMock: func(m *slurmapifake.MockClient) {
 				m.EXPECT().
-					SlurmV0041PostNodeWithResponse(mock.Anything, nodeName, mock.MatchedBy(func(body api.V0041UpdateNodeMsg) bool {
+					SlurmV0044PostNodeWithResponse(mock.Anything, nodeName, mock.MatchedBy(func(body api.V0044UpdateNodeMsg) bool {
 						return body.State != nil &&
 							len(*body.State) == 1 &&
-							(*body.State)[0] == api.V0041UpdateNodeMsgStateRESUME
+							(*body.State)[0] == api.V0044UpdateNodeMsgStateRESUME
 					})).
-					Return(&api.SlurmV0041PostNodeResponse{
-						JSON200: &api.V0041OpenapiResp{},
+					Return(&api.SlurmV0044PostNodeResponse{
+						JSON200: &api.V0044OpenapiResp{},
 					}, nil)
 			},
 			expectError:  false,
@@ -1678,7 +1013,7 @@ func TestUndrainSlurmNode(t *testing.T) {
 			name: "API returns error",
 			setupMock: func(m *slurmapifake.MockClient) {
 				m.EXPECT().
-					SlurmV0041PostNodeWithResponse(mock.Anything, nodeName, mock.Anything).
+					SlurmV0044PostNodeWithResponse(mock.Anything, nodeName, mock.Anything).
 					Return(nil, fmt.Errorf("connection refused"))
 			},
 			expectError: true,
@@ -1686,13 +1021,13 @@ func TestUndrainSlurmNode(t *testing.T) {
 		{
 			name: "API returns response with errors",
 			setupMock: func(m *slurmapifake.MockClient) {
-				errs := api.V0041OpenapiErrors{
+				errs := api.V0044OpenapiErrors{
 					{Description: strPtr("node not found"), ErrorNumber: int32Ptr(404)},
 				}
 				m.EXPECT().
-					SlurmV0041PostNodeWithResponse(mock.Anything, nodeName, mock.Anything).
-					Return(&api.SlurmV0041PostNodeResponse{
-						JSON200: &api.V0041OpenapiResp{
+					SlurmV0044PostNodeWithResponse(mock.Anything, nodeName, mock.Anything).
+					Return(&api.SlurmV0044PostNodeResponse{
+						JSON200: &api.V0044OpenapiResp{
 							Errors: &errs,
 						},
 					}, nil)
@@ -1706,7 +1041,7 @@ func TestUndrainSlurmNode(t *testing.T) {
 			mockClient := slurmapifake.NewMockClient(t)
 			tt.setupMock(mockClient)
 
-			slurmAPIClients := slurmapi.NewClientSet()
+			slurmAPIClients := slurmapi.NewClientSet(context.Background())
 			slurmAPIClients.AddClient(clusterName, mockClient)
 
 			controller := createTestPodEphemeralStorageCheck(t)
@@ -1723,7 +1058,7 @@ func TestUndrainSlurmNode(t *testing.T) {
 }
 
 func TestUndrainSlurmNode_ClusterNotFound(t *testing.T) {
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
 	// Don't add any client — the cluster won't be found.
 
 	controller := createTestPodEphemeralStorageCheck(t)

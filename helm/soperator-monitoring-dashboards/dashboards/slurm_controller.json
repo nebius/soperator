@@ -48,9 +48,9 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
-          "description": "Time since the controller pod started, derived from the oldest running container (container_start_time_seconds).",
+          "description": "Time since the slurmctld container last (re)started (`container_start_time_seconds`). Container restarts due to crashes or rollouts reset this to zero \u2014 useful for spotting unexpected slurmctld restarts.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -108,22 +108,22 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "time() - min(container_start_time_seconds{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"})",
-              "legendFormat": "uptime",
+              "expr": "time() - max(container_start_time_seconds{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container=\"slurmctld\"})",
+              "legendFormat": "slurmctld uptime",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Pod Uptime",
+          "title": "Container Uptime",
           "type": "stat"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Current pod phase from kube_pod_status_phase.",
           "fieldConfig": {
@@ -195,10 +195,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(kube_pod_status_phase{namespace=~\"soperator\", pod=\"$pod\", phase=\"Running\"})",
+              "expr": "max(kube_pod_status_phase{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", phase=\"Running\"})",
               "instant": true,
               "legendFormat": "phase",
               "range": false,
@@ -211,7 +211,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Cumulative container restart count over time. Each step up marks a restart event; flat means none. Drag to zoom into a window when investigating a specific restart.",
           "fieldConfig": {
@@ -289,10 +289,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (container) (\n  kube_pod_container_status_restarts_total{namespace=~\"soperator\", pod=\"$pod\"}\n)",
+              "expr": "sum by (container) (\n  kube_pod_container_status_restarts_total{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\"}\n)",
               "legendFormat": "{{container}}",
               "range": true,
               "refId": "A"
@@ -304,7 +304,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Number of times the controller pod was rescheduled to a different node in the last 24h. Detected via changes in kube_pod_info node label.",
           "fieldConfig": {
@@ -360,10 +360,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  changes(\n    sum without (uid, pod_ip) (\n      kube_pod_info{namespace=~\"soperator\", pod=\"$pod\", node!=\"\"}\n    )[1d:1m]\n  )\n)",
+              "expr": "sum(\n  changes(\n    sum without (uid, pod_ip) (\n      kube_pod_info{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", node!=\"\"}\n    )[1d:1m]\n  )\n)",
               "instant": true,
               "legendFormat": "reschedules",
               "range": false,
@@ -381,7 +381,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "Number of server threads running inside slurmctld (slurm_controller_server_thread_count).",
       "fieldConfig": {
@@ -389,8 +389,39 @@
           "color": {
             "mode": "thresholds"
           },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "thresholds",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "area"
+            }
+          },
           "mappings": [],
-          "noValue": "-",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -408,7 +439,7 @@
               }
             ]
           },
-          "unit": "none"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -420,45 +451,44 @@
       },
       "id": 5,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
+        "legend": {
           "calcs": [
-            "lastNotNull"
+            "lastNotNull",
+            "max",
+            "mean"
           ],
-          "fields": "",
-          "values": false
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": false
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "pluginVersion": "11.6.14",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(slurm_controller_server_thread_count)",
+          "expr": "max(slurm_controller_server_thread_count{cluster=~\"$cluster\"})",
           "legendFormat": "threads",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "slurmctld Server Threads",
-      "type": "stat"
+      "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
-      "description": "Slurmctld container memory working set as % of the container memory limit (`container_memory_working_set_bytes` \u00f7 `kube_pod_container_resource_limits{resource=\"memory\"}`). Approaching 100% means slurmctld is close to being OOM-killed by the kubelet. Requires a memory limit to be set on the slurmctld container; if no limit is configured this panel will show \"No data\". For the absolute byte timeseries see the **Memory** row \u2192 'Memory Working Set'.",
+      "description": "Slurmctld container memory working set as % of the container memory limit (`container_memory_working_set_bytes` \u00f7 `kube_pod_container_resource_limits{resource=\"memory\"}`). Approaching 100% means slurmctld is close to being OOM-killed by the kubelet. Requires a memory limit to be set on the slurmctld container; if no limit is configured this panel will show \"No data\". For the absolute byte timeseries see the **Memory** row \u2192 'Memory Working Set'.\n\nValue shown is the **1h moving average**, not the instantaneous reading \u2014 smooths out scrape jitter and short bursts.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -515,24 +545,24 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "100 * sum(container_memory_working_set_bytes{namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\"}) / sum(kube_pod_container_resource_limits{namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\", resource=\"memory\"})",
+          "expr": "avg_over_time((100 * sum(container_memory_working_set_bytes{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\"}) / sum(kube_pod_container_resource_limits{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\", resource=\"memory\"}))[1h:])",
           "legendFormat": "used %",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Memory",
+      "title": "Memory (1h avg)",
       "type": "gauge"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
-      "description": "Inode usage % of the controller spool PVC (`controller-spool-$pod`) \u2014 slurmctld's state-save directory accumulates many small files, so inode pressure typically hits before byte capacity. For bytes usage and the underlying timeseries see the **Storage** row.",
+      "description": "Inode usage % of the controller spool PVC (`controller-spool-$pod`) \u2014 slurmctld's state-save directory accumulates many small files, so inode pressure typically hits before byte capacity. For bytes usage and the underlying timeseries see the **Storage** row.\n\nValue shown is the **1h moving average**, not the instantaneous reading \u2014 smooths out scrape jitter and short bursts.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -589,24 +619,24 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "100 * (1 - max(kubelet_volume_stats_inodes_free{persistentvolumeclaim=\"controller-spool-$pod\"} / kubelet_volume_stats_inodes{persistentvolumeclaim=\"controller-spool-$pod\"}))",
+          "expr": "avg_over_time((100 * (1 - max(kubelet_volume_stats_inodes_free{cluster=~\"$cluster\", persistentvolumeclaim=\"controller-spool-$pod\"} / kubelet_volume_stats_inodes{cluster=~\"$cluster\", persistentvolumeclaim=\"controller-spool-$pod\"})))[1h:])",
           "legendFormat": "inodes used %",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Spool PVC Usage",
+      "title": "Spool PVC Usage (1h avg)",
       "type": "gauge"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
-      "description": "Slurmctld container CPU usage in cores (5m rate of `container_cpu_usage_seconds_total`). Full CPU timeseries lives in the **System** row \u2192 \"CPU Usage (cores)\" panel.",
+      "description": "Slurmctld container CPU usage in cores (5m rate of `container_cpu_usage_seconds_total`). Full CPU timeseries lives in the **System** row \u2192 \"CPU Usage (cores)\" panel.\n\nValue shown is the **1h moving average**, not the instantaneous reading \u2014 smooths out scrape jitter and short bursts.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -663,24 +693,24 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\"}[5m]))",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", container=\"slurmctld\"}[1h]))",
           "legendFormat": "cores",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "CPU Cores",
+      "title": "CPU Cores (1h avg)",
       "type": "gauge"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
-      "description": "Share of GPUs Slurm has assigned to running jobs \u2014 DCGM exporter via the `hpc_job` label populated by soperator's `map_job_dcgm.sh` prolog/epilog scripts. Same definition as the **Cluster Usage \u2192 GPU Allocation %** timeseries, shown here as an at-a-glance gauge.\n\nReflects scheduler packing quality. Compare against GPU Utilization to see the gap between assigned and actually-working GPUs.\n\nRequires the DCGM exporter and the soperator GPU-mapping scripts (both default in the chart). CPU-only clusters or non-soperator deployments will show \"No data\".",
+      "description": "Share of GPUs Slurm is currently using: a GPU counts as allocated when its node's Slurm base state is ALLOCATED or MIXED (from `slurm_node_info`).\n\nBoth numerator and denominator are joined with `slurm_node_info{is_unavailable=\"\"}` on `exported_pod` \u2194 `node_name`, so only GPUs on *available* nodes (not DOWN or DRAINED) are counted. This means drained/down hosts don't dilute the score on either side \u2014 no manual ratio correction needed.\n\nRequires the DCGM exporter and the soperator Slurm exporter (both default in the chart). CPU-only clusters or non-soperator deployments will show \"No data\".\n\nValue shown is the **1h moving average**, not the instantaneous reading \u2014 smooths out scrape jitter and short bursts.\n\n**Note on join keys**: DCGM's `pod` label is the DaemonSet-pod name and conflicts with the Prometheus scrape target's `pod`, so the scrape rules relabel the original (worker pod) to `exported_pod` and copy it to `node_name` — the worker pod name equals the Slurm node name. That's the label we join on.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -737,24 +767,24 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "100 * (count(DCGM_FI_DEV_GPU_TEMP{hpc_job!=\"\"}) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP)",
+          "expr": "avg_over_time((100 * (count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"} and on(node_name) slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\", state_base=~\"ALLOCATED|MIXED\"}) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"} and on(node_name) slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"}))[1h:])",
           "legendFormat": "allocated %",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "GPU Allocation",
+      "title": "GPU Allocation (1h avg)",
       "type": "gauge"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
-      "description": "Share of GPUs currently doing real work \u2014 DCGM reports `DCGM_FI_DEV_GPU_UTIL \u2265 10%`. Same metric and definition as the **Cluster Usage \u2192 GPU Utilization %** timeseries, shown here as an at-a-glance gauge.\n\nRequires the DCGM exporter (default in the soperator chart). CPU-only clusters or non-soperator deployments will show \"No data\".",
+      "description": "Share of GPUs currently doing real work \u2014 DCGM reports `DCGM_FI_DEV_GPU_UTIL \u2265 10%`. Same metric and definition as the **Cluster Usage \u2192 GPU Utilization %** timeseries, shown here as an at-a-glance gauge.\n\nRequires the DCGM exporter (default in the soperator chart). CPU-only clusters or non-soperator deployments will show \"No data\".\n\nValue shown is the **1h moving average**, not the instantaneous reading \u2014 smooths out scrape jitter and short bursts.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -811,16 +841,16 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "100 * (count(DCGM_FI_DEV_GPU_UTIL >= 10) or vector(0)) / count(DCGM_FI_DEV_GPU_UTIL)",
+          "expr": "avg_over_time((100 * (count(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"} >= 10) or vector(0)) / count(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"}))[1h:])",
           "legendFormat": "utilized %",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "GPU Utilization",
+      "title": "GPU Utilization (1h avg)",
       "type": "gauge"
     },
     {
@@ -836,9 +866,9 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
-          "description": "Container filesystem read/write throughput (rate over 5m). Read positive, Write negative.",
+          "description": "Container filesystem read/write throughput (rate over 5m). Read positive, Write negative. Split by `device` so per-disk hot spots are visible (typically only one device on the controller pod's spool PVC).",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -918,22 +948,22 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  rate(container_fs_reads_bytes_total{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
-              "legendFormat": "read",
+              "expr": "sum by (device) (\n  rate(container_fs_reads_bytes_total{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
+              "legendFormat": "{{device}} read",
               "range": true,
               "refId": "A"
             },
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * sum(\n  rate(container_fs_writes_bytes_total{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
-              "legendFormat": "write",
+              "expr": "-1 * sum by (device) (\n  rate(container_fs_writes_bytes_total{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
+              "legendFormat": "{{device}} write",
               "range": true,
               "refId": "B"
             }
@@ -944,7 +974,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Bytes used vs total capacity of the controller-spool PVC over time.",
           "fieldConfig": {
@@ -1054,10 +1084,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(kubelet_volume_stats_used_bytes{persistentvolumeclaim=\"controller-spool-$pod\"})",
+              "expr": "max(kubelet_volume_stats_used_bytes{cluster=~\"$cluster\", persistentvolumeclaim=\"controller-spool-$pod\"})",
               "legendFormat": "used",
               "range": true,
               "refId": "A"
@@ -1065,10 +1095,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=\"controller-spool-$pod\"})",
+              "expr": "max(kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", persistentvolumeclaim=\"controller-spool-$pod\"})",
               "legendFormat": "capacity",
               "range": true,
               "refId": "B"
@@ -1080,7 +1110,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Used inodes on the controller-spool PVC over time, with total inode capacity as a dashed reference. A steady upward drift hints at an inode leak.",
           "fieldConfig": {
@@ -1190,10 +1220,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(kubelet_volume_stats_inodes_used{persistentvolumeclaim=\"controller-spool-$pod\"})",
+              "expr": "max(kubelet_volume_stats_inodes_used{cluster=~\"$cluster\", persistentvolumeclaim=\"controller-spool-$pod\"})",
               "legendFormat": "used",
               "range": true,
               "refId": "A"
@@ -1201,10 +1231,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(kubelet_volume_stats_inodes{persistentvolumeclaim=\"controller-spool-$pod\"})",
+              "expr": "max(kubelet_volume_stats_inodes{cluster=~\"$cluster\", persistentvolumeclaim=\"controller-spool-$pod\"})",
               "legendFormat": "total",
               "range": true,
               "refId": "B"
@@ -1216,7 +1246,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Average per-IO wait time on the controller-host's block devices. High values indicate the underlying storage is the bottleneck (relevant for slurmctld spool writes).",
           "fieldConfig": {
@@ -1298,10 +1328,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_disk_read_time_seconds_total{instance=\"$instance\"}[$__rate_interval])\n/\nirate(node_disk_reads_completed_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_disk_read_time_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])\n/\nirate(node_disk_reads_completed_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Read wait time avg",
               "range": true,
               "refId": "A"
@@ -1309,10 +1339,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_disk_write_time_seconds_total{instance=\"$instance\"}[$__rate_interval])\n/\nirate(node_disk_writes_completed_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_disk_write_time_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])\n/\nirate(node_disk_writes_completed_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Write wait time avg",
               "range": true,
               "refId": "B"
@@ -1324,7 +1354,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Open file descriptors on the controller node (system-wide). slurmctld can run out of FDs under heavy connection load. Max is omitted when the kernel reports it as effectively unlimited.",
           "fieldConfig": {
@@ -1406,10 +1436,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_filefd_allocated{instance=\"$instance\"}",
+              "expr": "node_filefd_allocated{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Open files (system-wide)",
               "range": true,
               "refId": "A"
@@ -1421,7 +1451,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Per-mountpoint read-only and device-error flags (1 = bad). All zero in healthy state \u2014 any non-zero series indicates a filesystem in trouble. Mountpoints that are read-only by design (e.g. /mnt/cloud-metadata) are excluded.",
           "fieldConfig": {
@@ -1507,10 +1537,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_filesystem_readonly{instance=\"$instance\", device!~\"rootfs\", mountpoint!~\"/mnt/cloud-metadata\"}",
+              "expr": "node_filesystem_readonly{cluster=~\"$cluster\", instance=\"$instance\", device!~\"rootfs\", mountpoint!~\"/mnt/cloud-metadata\"}",
               "legendFormat": "{{mountpoint}} - ReadOnly",
               "range": true,
               "refId": "A"
@@ -1518,10 +1548,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_filesystem_device_error{instance=\"$instance\", device!~\"rootfs\", fstype!~\"tmpfs\"}",
+              "expr": "node_filesystem_device_error{cluster=~\"$cluster\", instance=\"$instance\", device!~\"rootfs\", fstype!~\"tmpfs\"}",
               "legendFormat": "{{mountpoint}} - Device error",
               "range": true,
               "refId": "B"
@@ -1533,7 +1563,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Per-device read and write IOPS on the controller node.",
           "fieldConfig": {
@@ -1615,10 +1645,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_disk_reads_completed_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_disk_reads_completed_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}} - reads",
               "range": true,
               "refId": "A"
@@ -1626,10 +1656,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_disk_writes_completed_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_disk_writes_completed_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}} - writes",
               "range": true,
               "refId": "B"
@@ -1641,7 +1671,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Per-device read/write throughput at the block-device layer. Differs from Container Filesystem IO (which is cgroup-scoped) \u2014 surfaces noisy-neighbour contention if any.",
           "fieldConfig": {
@@ -1723,10 +1753,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_disk_read_bytes_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_disk_read_bytes_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}} - read",
               "range": true,
               "refId": "A"
@@ -1734,10 +1764,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * irate(node_disk_written_bytes_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "-1 * irate(node_disk_written_bytes_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}} - write",
               "range": true,
               "refId": "B"
@@ -1749,7 +1779,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Fraction of time each block device was busy serving I/O. Persistent values near 1 mean the device is the bottleneck.",
           "fieldConfig": {
@@ -1833,10 +1863,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_disk_io_time_seconds_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_disk_io_time_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "{{device}}",
               "range": true,
               "refId": "A"
@@ -1865,7 +1895,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Jobs in any non-terminal state (`PENDING`, `RUNNING`, `SUSPENDED`, `COMPLETING`, `CONFIGURING`, `RESIZING`, `REQUEUED`, `SIGNALING`, `STAGE_OUT`), sourced from the soperator exporter (`slurm_job_info`). Stacked \u2014 the total is the count of jobs slurmctld is currently tracking. PENDING is the most operationally significant: a sustained pending backlog degrades scheduler performance (more jobs per cycle, higher chance of hitting `default_queue_depth` / `bf_max_job_test`). Cross-check with the Main Scheduler exit-reasons panel when PENDING climbs.",
           "fieldConfig": {
@@ -1881,7 +1911,7 @@
                 "axisPlacement": "auto",
                 "barAlignment": 0,
                 "drawStyle": "line",
-                "fillOpacity": 30,
+                "fillOpacity": 0,
                 "gradientMode": "none",
                 "hideFrom": {
                   "legend": false,
@@ -1899,7 +1929,7 @@
                 "spanNulls": false,
                 "stacking": {
                   "group": "A",
-                  "mode": "normal"
+                  "mode": "none"
                 },
                 "thresholdsStyle": {
                   "mode": "off"
@@ -1948,10 +1978,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count by (job_state) (slurm_job_info{job_state=~\"PENDING|RUNNING|SUSPENDED|COMPLETING|CONFIGURING|RESIZING|REQUEUED|SIGNALING|STAGE_OUT\"}) or label_replace(vector(0), \"job_state\", \"PENDING\", \"\", \"\")",
+              "expr": "count by (job_state) (slurm_job_info{cluster=~\"$cluster\", job_state=~\"PENDING|RUNNING|SUSPENDED|COMPLETING|CONFIGURING|RESIZING|REQUEUED|SIGNALING|STAGE_OUT\"}) or label_replace(vector(0), \"job_state\", \"PENDING\", \"\", \"\")",
               "legendFormat": "{{job_state}}",
               "range": true,
               "refId": "A"
@@ -1963,9 +1993,9 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
-          "description": "How many GPUs Slurm has assigned to running jobs, vs left idle. The two series stack to 100% of the live GPU count. Same data source as the Health \u2192 GPU Packing gauge.\n\nThis is a signal about **scheduler packing quality**. Low values mean either the scheduler isn't optimising well (e.g. hitting `default_queue_depth` / `bf_max_job_test` caps, fragmenting nodes, or priority/QoS preventing fills), or there simply aren't enough pending jobs to keep all GPUs busy. Cross-check with the Pending jobs panel: high pending + low allocation = scheduler problem; low pending + low allocation = no demand.",
+          "description": "Share of GPUs Slurm is currently using, per-scrape. Both numerator and denominator are joined with `slurm_node_info{is_unavailable=\"\"}` on `exported_pod` \u2194 `node_name`, so only GPUs on *available* nodes (not DOWN or DRAINED) are counted \u2014 drained/down hosts don't dilute the score on either side.\n\nComplement to the GPU Utilization % panel \u2014 together they show scheduler packing vs actual GPU work.\n\n**Note on join keys**: DCGM's `pod` label is the DaemonSet-pod name and conflicts with the Prometheus scrape target's `pod`, so the scrape rules relabel the original (worker pod) to `exported_pod` and copy it to `node_name` — the worker pod name equals the Slurm node name. That's the label we join on.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2048,10 +2078,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * (count(DCGM_FI_DEV_GPU_TEMP{hpc_job!=\"\"}) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP)",
+              "expr": "100 * (count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"} and on(node_name) slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\", state_base=~\"ALLOCATED|MIXED\"}) or vector(0)) / count(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\"} and on(node_name) slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"})",
               "legendFormat": "allocated",
               "range": true,
               "refId": "A"
@@ -2063,7 +2093,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Share of GPUs currently doing real work (DCGM reports `DCGM_FI_DEV_GPU_UTIL \u2265 10%`). Distinct from allocation: a GPU can be allocated to a Slurm job but idle (the job isn't actively using it). Mirrors the 'Cluster Utilization' panel in the Slurm Cluster Health dashboard.\n\nThis value should generally stay **below** GPU allocation %. The gap between allocation and utilization is the cost of running real jobs \u2014 GPUs assigned but not computing yet (container startup, dataset load, IO stalls, gradient sync waits, idle launchers, multi-node sync barriers). A widening gap means jobs are spending more time waiting than computing.",
           "fieldConfig": {
@@ -2148,10 +2178,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * (count(DCGM_FI_DEV_GPU_UTIL >= 10) or vector(0)) / count(DCGM_FI_DEV_GPU_UTIL)",
+              "expr": "100 * (count(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"} >= 10) or vector(0)) / count(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"})",
               "legendFormat": "utilized",
               "range": true,
               "refId": "A"
@@ -2163,7 +2193,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Node states breakdown:\n- **Down**: Nodes not operational (DOWN or ERROR states)\n- **Drained**: IDLE nodes with DRAIN flag\n- **Draining**: Nodes with DRAIN flag running jobs\n- **Busy**: Nodes running jobs normally (ALLOCATED or MIXED)\n- **Idle**: Nodes ready and available to accept new jobs\n- **Maintenance**: Nodes temporarily unavailable for administrative tasks",
           "fieldConfig": {
@@ -2358,10 +2388,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Down",
@@ -2372,10 +2402,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Drained",
@@ -2386,10 +2416,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Draining",
@@ -2400,10 +2430,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain!=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain!=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Busy",
@@ -2414,10 +2444,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain!=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain!=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Idle",
@@ -2428,10 +2458,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_is_maintenance=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_is_maintenance=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Maintenance",
@@ -2442,10 +2472,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=\"UNKNOWN\", state_is_maintenance!=\"true\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"UNKNOWN\", state_is_maintenance!=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Unknown",
@@ -2455,6 +2485,107 @@
             }
           ],
           "title": "Nodes by State",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Share of *schedulable* nodes Slurm is currently using (at least partially). Numerator: nodes where `state_base \u2208 {ALLOCATED, MIXED}` regardless of drain flag \u2014 DRAINING nodes are still doing useful work and count. Denominator: `count(slurm_node_info{is_unavailable=\"\"})` \u2014 the exporter's computed schedulability flag (`true` when node is DOWN+* or IDLE+DRAIN+*, empty otherwise). So DOWN and DRAINED nodes are excluded from both sides automatically.\n\nComplement to the **GPU Allocation %** panel above: node-level packing is coarser but works on CPU-only clusters and doesn't depend on DCGM.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "purple"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 15,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "noValue": "0"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 27
+          },
+          "id": 217,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "100 * (count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\"}) or vector(0)) / count(slurm_node_info{cluster=~\"$cluster\", is_unavailable=\"\"})",
+              "legendFormat": "allocated",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Node Allocation %",
           "type": "timeseries"
         }
       ],
@@ -2473,7 +2604,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "RPC call rate broken down by message type (rate over 5m, stacked).",
           "fieldConfig": {
@@ -2555,10 +2686,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (message_type) (\n  rate(slurm_controller_rpc_calls_total[5m])\n)",
+              "expr": "sum by (message_type) (\n  rate(slurm_controller_rpc_calls_total{cluster=~\"$cluster\"}[5m])\n)",
               "legendFormat": "{{message_type}}",
               "range": true,
               "refId": "A"
@@ -2570,7 +2701,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Average RPC latency per message type (rate(duration)/rate(calls), 5m window).",
           "fieldConfig": {
@@ -2652,10 +2783,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (message_type) (rate(slurm_controller_rpc_duration_seconds_total[5m]))\n/\nsum by (message_type) (rate(slurm_controller_rpc_calls_total[5m]))",
+              "expr": "sum by (message_type) (rate(slurm_controller_rpc_duration_seconds_total{cluster=~\"$cluster\"}[5m]))\n/\nsum by (message_type) (rate(slurm_controller_rpc_calls_total{cluster=~\"$cluster\"}[5m]))",
               "legendFormat": "{{message_type}}",
               "range": true,
               "refId": "A"
@@ -2667,7 +2798,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Per-message-type RPC processing time, as `rate(duration_seconds[5m])` without dividing by call count. Stacked area; the total stack height is the cluster-wide RPC processing concurrency.\n\nReading: a value of 1.0 for a message type means one worker thread of slurmctld was on average kept fully busy by that message type over the last 5 minutes. Latency \u00d7 call rate = duration rate \u2014 this panel highlights the message types that *cost* the most slurmctld time, even if individual calls are cheap.",
           "fieldConfig": {
@@ -2749,10 +2880,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (message_type) (rate(slurm_controller_rpc_duration_seconds_total[5m]))",
+              "expr": "sum by (message_type) (rate(slurm_controller_rpc_duration_seconds_total{cluster=~\"$cluster\"}[5m]))",
               "legendFormat": "{{message_type}}",
               "range": true,
               "refId": "A"
@@ -2764,7 +2895,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Top 10 users by RPC call rate (rate of slurm_controller_rpc_user_calls_total over 5m).",
           "fieldConfig": {
@@ -2846,10 +2977,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10,\n  sum by (user) (\n    rate(slurm_controller_rpc_user_calls_total[5m])\n  )\n)",
+              "expr": "topk(10,\n  sum by (user) (\n    rate(slurm_controller_rpc_user_calls_total{cluster=~\"$cluster\"}[5m])\n  )\n)",
               "legendFormat": "{{user}}",
               "range": true,
               "refId": "A"
@@ -2861,7 +2992,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Top 10 users by aggregate RPC time consumed per second (rate of slurm_controller_rpc_user_duration_seconds_total over 5m). A value of 1 means a user kept slurmctld busy for one full thread-second every second on average.",
           "fieldConfig": {
@@ -2943,10 +3074,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10,\n  sum by (user) (\n    rate(slurm_controller_rpc_user_duration_seconds_total[5m])\n  )\n)",
+              "expr": "topk(10,\n  sum by (user) (\n    rate(slurm_controller_rpc_user_duration_seconds_total{cluster=~\"$cluster\"}[5m])\n  )\n)",
               "legendFormat": "{{user}}",
               "range": true,
               "refId": "A"
@@ -2958,7 +3089,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Top 10 users by average RPC latency (rate of `slurm_controller_rpc_user_duration_seconds_total` divided by rate of `slurm_controller_rpc_user_calls_total`, 5m window). High latency for a specific user often points at expensive RPC patterns (`squeue` with large filters, repeated `scontrol show job` polls, etc.).",
           "fieldConfig": {
@@ -3040,10 +3171,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(10,\n  sum by (user) (rate(slurm_controller_rpc_user_duration_seconds_total[5m]))\n  /\n  sum by (user) (rate(slurm_controller_rpc_user_calls_total[5m]))\n)",
+              "expr": "topk(10,\n  sum by (user) (rate(slurm_controller_rpc_user_duration_seconds_total{cluster=~\"$cluster\"}[5m]))\n  /\n  sum by (user) (rate(slurm_controller_rpc_user_calls_total{cluster=~\"$cluster\"}[5m]))\n)",
               "legendFormat": "{{user}}",
               "range": true,
               "refId": "A"
@@ -3055,7 +3186,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "slurmctld \u2192 slurmd outbound RPC pool. `queued` is messages waiting to dispatch; should sit near zero. Sustained non-zero queue means dispatch is slower than enqueue and downstream slurmd operations (job start/cancel/reconfig) are being delayed.",
           "fieldConfig": {
@@ -3137,10 +3268,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_agent_queue_size",
+              "expr": "slurm_agent_queue_size{cluster=~\"$cluster\"}",
               "legendFormat": "queued",
               "range": true,
               "refId": "A"
@@ -3148,10 +3279,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_agent_thread_cnt",
+              "expr": "slurm_agent_thread_cnt{cluster=~\"$cluster\"}",
               "legendFormat": "dispatching",
               "range": true,
               "refId": "B"
@@ -3159,10 +3290,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_agent_cnt",
+              "expr": "slurm_agent_cnt{cluster=~\"$cluster\"}",
               "legendFormat": "agent pool",
               "range": true,
               "refId": "C"
@@ -3174,7 +3305,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Number of accounting messages slurmctld has buffered for slurmdbd. Should be near zero; growth means slurmdbd is unreachable or slow. Sustained growth is followed by a flush storm when slurmdbd recovers.",
           "fieldConfig": {
@@ -3256,10 +3387,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_slurmdbd_queue_size",
+              "expr": "slurm_slurmdbd_queue_size{cluster=~\"$cluster\"}",
               "legendFormat": "buffered messages",
               "range": true,
               "refId": "A"
@@ -3289,7 +3420,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Duration of the most recent main scheduler cycle. The slurmctld native endpoint exposes only the *last* cycle, so each scrape captures one sample (default scrape interval 30s) \u2014 cycles that ran between scrapes are not represented. Yellow above 50 ms, red above 500 ms.",
           "fieldConfig": {
@@ -3379,10 +3510,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_schedule_cycle_last / 1e6",
+              "expr": "slurm_schedule_cycle_last{cluster=~\"$cluster\"} / 1e6",
               "legendFormat": "last cycle (1 sample / scrape, default 30s)",
               "range": true,
               "refId": "A"
@@ -3394,7 +3525,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Main scheduler throughput and the last-cycle queue length (both from the slurmctld native OpenMetrics endpoint, Slurm 25.x+). For the exporter-based pending-jobs view, see the Cluster Usage row.",
           "fieldConfig": {
@@ -3476,10 +3607,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_schedule_cycle_cnt[5m]) * 60",
+              "expr": "rate(slurm_schedule_cycle_cnt{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "cycles/min",
               "range": true,
               "refId": "A"
@@ -3487,10 +3618,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_schedule_queue_len",
+              "expr": "slurm_schedule_queue_len{cluster=~\"$cluster\"}",
               "legendFormat": "queue length",
               "range": true,
               "refId": "B"
@@ -3502,7 +3633,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Rate of main scheduling cycles that ended for each reason \u2014 same data as `sdiag` \u2192 'Main scheduling statistics' \u2192 'Last cycle exited as'. The healthy series is `End of job queue`; every other reason means the cycle was cut short by a cap.\n\n- `End of job queue` (`slurm_sched_exit_end`) \u2014 examined every pending job and finished. Desired.\n- `Hit default_queue_depth` (`slurm_sched_exit_max_depth`) \u2014 capped after examining `default_queue_depth` jobs (SchedulerParameters, default 100). Raise if consistently non-zero.\n- `Hit sched_max_job_start` (`slurm_sched_exit_max_job_start`) \u2014 started `sched_max_job_start` jobs in one cycle (default 0 = unlimited; non-zero only if explicitly set).\n- `Blocked on licenses` (`slurm_sched_exit_lic`) \u2014 pending jobs were waiting on Slurm licenses; check `sacctmgr show license`.\n- `Hit max_rpc_cnt` (`slurm_sched_exit_rpc_cnt`) \u2014 slurmctld's RPC queue grew past `max_rpc_cnt`; scheduler deferred to drain it.\n- `Timeout (max_sched_time)` (`slurm_sched_exit_timeout`) \u2014 cycle exceeded `max_sched_time` seconds and was cut short.\n\nA non-zero rate on any reason other than `End of job queue` means the main scheduler is being throttled \u2014 raise the matching cap in `SchedulerParameters`.",
           "fieldConfig": {
@@ -3584,10 +3715,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_sched_exit_end[5m]) * 60",
+              "expr": "rate(slurm_sched_exit_end{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "End of job queue",
               "range": true,
               "refId": "A"
@@ -3595,10 +3726,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_sched_exit_max_depth[5m]) * 60",
+              "expr": "rate(slurm_sched_exit_max_depth{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Hit default_queue_depth",
               "range": true,
               "refId": "B"
@@ -3606,10 +3737,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_sched_exit_max_job_start[5m]) * 60",
+              "expr": "rate(slurm_sched_exit_max_job_start{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Hit sched_max_job_start",
               "range": true,
               "refId": "C"
@@ -3617,10 +3748,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_sched_exit_lic[5m]) * 60",
+              "expr": "rate(slurm_sched_exit_lic{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Blocked on licenses",
               "range": true,
               "refId": "D"
@@ -3628,10 +3759,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_sched_exit_rpc_cnt[5m]) * 60",
+              "expr": "rate(slurm_sched_exit_rpc_cnt{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Hit max_rpc_cnt",
               "range": true,
               "refId": "E"
@@ -3639,10 +3770,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_sched_exit_timeout[5m]) * 60",
+              "expr": "rate(slurm_sched_exit_timeout{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Timeout (max_sched_time)",
               "range": true,
               "refId": "F"
@@ -3669,7 +3800,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Whether the backfill scheduler is currently mid-cycle (`slurm_bf_active`: 0 = idle, 1 = running).",
           "fieldConfig": {
@@ -3741,10 +3872,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_bf_active",
+              "expr": "slurm_bf_active{cluster=~\"$cluster\"}",
               "legendFormat": "state",
               "range": true,
               "refId": "A"
@@ -3756,7 +3887,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Wall-clock age of the most recent backfill cycle (`time() - slurm_bf_when_last_cycle`). Sawtooth pattern; spikes indicate stalls. Yellow over 1 min, red over 5 min \u2014 likely a hung backfill.",
           "fieldConfig": {
@@ -3846,10 +3977,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "time() - slurm_bf_when_last_cycle",
+              "expr": "time() - slurm_bf_when_last_cycle{cluster=~\"$cluster\"}",
               "legendFormat": "age",
               "range": true,
               "refId": "A"
@@ -3861,7 +3992,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Duration of the most recent backfill cycle. The slurmctld native endpoint exposes only the *last* cycle, so each scrape captures one sample (default scrape interval 30s) \u2014 cycles that ran between scrapes are not represented. Backfill is naturally slower than the main scheduler; yellow above 1 s, red above 5 s.",
           "fieldConfig": {
@@ -3951,10 +4082,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_bf_cycle_last / 1e6",
+              "expr": "slurm_bf_cycle_last{cluster=~\"$cluster\"} / 1e6",
               "legendFormat": "last cycle (1 sample / scrape, default 30s)",
               "range": true,
               "refId": "A"
@@ -3966,7 +4097,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Backfill cycles per minute (5m rate \u00d7 60). Rate is bounded above by `1 / bf_interval` (default 30s \u2192 2/min).",
           "fieldConfig": {
@@ -4048,10 +4179,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_cycle_cnt[5m]) * 60",
+              "expr": "rate(slurm_bf_cycle_cnt{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "cycles/min",
               "range": true,
               "refId": "A"
@@ -4063,7 +4194,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Pending jobs awaiting backfill processing.",
           "fieldConfig": {
@@ -4145,10 +4276,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_bf_queue_len",
+              "expr": "slurm_bf_queue_len{cluster=~\"$cluster\"}",
               "legendFormat": "backfill queue length",
               "range": true,
               "refId": "A"
@@ -4160,7 +4291,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "`all` = jobs examined; `try` = jobs the scheduler actually attempted to start (the CPU-intensive subset).",
           "fieldConfig": {
@@ -4242,10 +4373,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_bf_last_depth",
+              "expr": "slurm_bf_last_depth{cluster=~\"$cluster\"}",
               "legendFormat": "examined (slurm_bf_last_depth)",
               "range": true,
               "refId": "A"
@@ -4253,10 +4384,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_bf_last_depth_try",
+              "expr": "slurm_bf_last_depth_try{cluster=~\"$cluster\"}",
               "legendFormat": "attempted to start (slurm_bf_last_depth_try)",
               "range": true,
               "refId": "B"
@@ -4268,7 +4399,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Distinct reservation time slots tested per cycle. Grows with `bf_window` and `bf_resolution`.",
           "fieldConfig": {
@@ -4350,10 +4481,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "slurm_bf_table_size",
+              "expr": "slurm_bf_table_size{cluster=~\"$cluster\"}",
               "legendFormat": "time-slot table size",
               "range": true,
               "refId": "A"
@@ -4365,7 +4496,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Rate of backfill cycles that ended for each reason \u2014 same data as `sdiag` \u2192 'Backfilling stats' \u2192 'Last cycle exited as'. The healthy series is `End of job queue`; every other reason means the cycle was cut short.\n\n- `End of job queue` (`slurm_bf_exit_end`) \u2014 examined every pending job and finished. Desired.\n- `Hit bf_max_job_start` (`slurm_bf_exit_max_job_start`) \u2014 started `bf_max_job_start` jobs in one cycle (default 0 = unlimited).\n- `Hit bf_max_job_test` (`slurm_bf_exit_max_job_test`) \u2014 examined `bf_max_job_test` jobs and stopped (default 100). Raise to let backfill look deeper into the queue.\n- `System state changed` (`slurm_bf_exit_state_changed`) \u2014 a job completed or a node state changed mid-cycle; backfill restarts with fresh data. Benign, but a sustained rate means the cluster is so dynamic that backfill never finishes a clean pass.\n- `Hit table size limit (bf_node_space_size)` (`slurm_bf_exit_table_limit`) \u2014 backfill's per-node reservation table hit `bf_node_space_size` entries (default 50, capped at 4000); cycle stops to avoid runaway memory.\n- `Timeout (bf_max_time)` (`slurm_bf_exit_timeout`) \u2014 cycle exceeded `bf_max_time` seconds (default 30, capped by `bf_interval`).\n\nA non-zero rate on any reason other than `End of job queue` (or, sometimes, `System state changed`) means backfill is being throttled \u2014 raise the matching cap in `SchedulerParameters`.",
           "fieldConfig": {
@@ -4447,10 +4578,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_exit_end[5m]) * 60",
+              "expr": "rate(slurm_bf_exit_end{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "End of job queue",
               "range": true,
               "refId": "A"
@@ -4458,10 +4589,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_exit_max_job_start[5m]) * 60",
+              "expr": "rate(slurm_bf_exit_max_job_start{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Hit bf_max_job_start",
               "range": true,
               "refId": "B"
@@ -4469,10 +4600,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_exit_max_job_test[5m]) * 60",
+              "expr": "rate(slurm_bf_exit_max_job_test{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Hit bf_max_job_test",
               "range": true,
               "refId": "C"
@@ -4480,10 +4611,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_exit_state_changed[5m]) * 60",
+              "expr": "rate(slurm_bf_exit_state_changed{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "System state changed",
               "range": true,
               "refId": "D"
@@ -4491,10 +4622,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_exit_table_limit[5m]) * 60",
+              "expr": "rate(slurm_bf_exit_table_limit{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Hit table size limit (bf_node_space_size)",
               "range": true,
               "refId": "E"
@@ -4502,10 +4633,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(slurm_bf_exit_timeout[5m]) * 60",
+              "expr": "rate(slurm_bf_exit_timeout{cluster=~\"$cluster\"}[5m]) * 60",
               "legendFormat": "Timeout (bf_max_time)",
               "range": true,
               "refId": "F"
@@ -4529,7 +4660,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Working-set memory of each container in the controller pod, stacked. The dashed line shows node_memory_MemAvailable_bytes \u2014 when the stacked total approaches it, the node is running out of allocatable memory.",
           "fieldConfig": {
@@ -4648,10 +4779,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (container) (\n  container_memory_working_set_bytes{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}\n)",
+              "expr": "sum by (container) (\n  container_memory_working_set_bytes{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}\n)",
               "legendFormat": "{{container}}",
               "range": true,
               "refId": "A"
@@ -4659,10 +4790,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_MemAvailable_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_MemAvailable_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "MemAvailable",
               "range": true,
               "refId": "B"
@@ -4674,7 +4805,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Working-set memory as a percentage of the per-container memory limit. Containers with no limit set fall back to node_memory_MemAvailable_bytes (memory the kernel believes is allocatable without pressure) as the denominator.",
           "fieldConfig": {
@@ -4757,10 +4888,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100\n* sum by (container) (\n    container_memory_working_set_bytes{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}\n  )\n/ on (container)\n  (\n    sum by (container) (\n      kube_pod_container_resource_limits{namespace=~\"soperator\", pod=\"$pod\", resource=\"memory\"}\n    )\n    or\n    on (container)\n    sum by (container) (\n      container_memory_working_set_bytes{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"} * 0\n    )\n    + on () group_left scalar(node_memory_MemAvailable_bytes{instance=\"$instance\"})\n  )",
+              "expr": "100\n* sum by (container) (\n    container_memory_working_set_bytes{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}\n  )\n/ on (container)\n  (\n    sum by (container) (\n      kube_pod_container_resource_limits{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", resource=\"memory\"}\n    )\n    or\n    on (container)\n    sum by (container) (\n      container_memory_working_set_bytes{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"} * 0\n    )\n    + on () group_left scalar(node_memory_MemAvailable_bytes{cluster=~\"$cluster\", instance=\"$instance\"})\n  )",
               "legendFormat": "{{container}}",
               "range": true,
               "refId": "A"
@@ -4772,7 +4903,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Active vs inactive memory on the controller node. Active is recently used; inactive is reclaimable on demand.",
           "fieldConfig": {
@@ -4830,7 +4961,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 53
+            "y": 61
           },
           "id": 22,
           "options": {
@@ -4854,10 +4985,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Active_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Active_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Active - Memory that has been used more recently and usually not reclaimed unless absolutely necessary",
               "range": true,
               "refId": "A"
@@ -4865,10 +4996,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Inactive_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Inactive_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Inactive - Memory which has been less recently used. It is more eligible to be reclaimed for other purposes",
               "range": true,
               "refId": "B"
@@ -4880,7 +5011,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Committed_AS vs CommitLimit. The kernel will refuse new allocations once Committed_AS approaches the limit (when overcommit is disabled).",
           "fieldConfig": {
@@ -4968,7 +5099,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 53
+            "y": 61
           },
           "id": 23,
           "options": {
@@ -4992,10 +5123,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Committed_AS_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Committed_AS_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Committed_AS - Amount of memory presently allocated on the system",
               "range": true,
               "refId": "A"
@@ -5003,10 +5134,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_CommitLimit_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_CommitLimit_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "CommitLimit - Amount of memory currently available to be allocated on the system",
               "range": true,
               "refId": "B"
@@ -5018,7 +5149,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Pages awaiting writeback to disk and dirty pages. Sustained high values can indicate slow storage or heavy IO.",
           "fieldConfig": {
@@ -5076,7 +5207,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 37
+            "y": 45
           },
           "id": 24,
           "options": {
@@ -5100,10 +5231,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Writeback_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Writeback_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Writeback - Memory which is actively being written back to disk",
               "range": true,
               "refId": "A"
@@ -5111,10 +5242,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_WritebackTmp_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_WritebackTmp_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "WritebackTmp - Memory used by FUSE for temporary writeback buffers",
               "range": true,
               "refId": "B"
@@ -5122,10 +5253,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Dirty_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Dirty_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Dirty - Memory which is waiting to get written back to the disk",
               "range": true,
               "refId": "C"
@@ -5137,7 +5268,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Minor and major page faults per second on the controller node. Major faults imply disk IO under memory pressure.",
           "fieldConfig": {
@@ -5195,7 +5326,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 45
+            "y": 53
           },
           "id": 25,
           "options": {
@@ -5219,10 +5350,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pgfault{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pgfault{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Pgfault - Page major and minor fault operations",
               "range": true,
               "refId": "A"
@@ -5230,10 +5361,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pgmajfault{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pgmajfault{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Pgmajfault - Major page fault operations",
               "range": true,
               "refId": "B"
@@ -5245,7 +5376,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Rate of OOM kill events on the controller node (node_vmstat_oom_kill).",
           "fieldConfig": {
@@ -5307,7 +5438,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 37
+            "y": 45
           },
           "id": 26,
           "options": {
@@ -5330,10 +5461,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_vmstat_oom_kill{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_oom_kill{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "oom killer invocations",
               "range": true,
               "refId": "A"
@@ -5345,7 +5476,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Rate of pages read from / written to disk by the kernel (node_vmstat_pgpgin/pgpgout). High values can correlate with memory pressure or heavy IO.",
           "fieldConfig": {
@@ -5403,7 +5534,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 45
+            "y": 53
           },
           "id": 27,
           "options": {
@@ -5427,10 +5558,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_vmstat_pgpgin{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_vmstat_pgpgin{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Pagesin - Page in operations",
               "range": true,
               "refId": "A"
@@ -5438,10 +5569,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * irate(node_vmstat_pgpgout{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "-1 * irate(node_vmstat_pgpgout{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Pagesout - Page out operations",
               "range": true,
               "refId": "B"
@@ -5453,7 +5584,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Shared memory and file mappings on the controller node. slurmctld uses POSIX shared memory for IPC; large or growing values can hint at file-backed working set or IPC pressure.",
           "fieldConfig": {
@@ -5511,7 +5642,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 61
+            "y": 69
           },
           "id": 28,
           "options": {
@@ -5535,10 +5666,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Mapped_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Mapped_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Mapped - Used memory in mapped pages files which have been mapped, such as libraries",
               "range": true,
               "refId": "A"
@@ -5546,10 +5677,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_Shmem_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_Shmem_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Shmem - Used shared memory (shared between several processes, thus including RAM disks)",
               "range": true,
               "refId": "B"
@@ -5557,10 +5688,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_ShmemHugePages_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_ShmemHugePages_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "ShmemHugePages - Memory used by shared memory (shmem) and tmpfs allocated with huge pages",
               "range": true,
               "refId": "C"
@@ -5568,10 +5699,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_ShmemPmdMapped_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_ShmemPmdMapped_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "ShmemPmdMapped - Amount of shared (shmem/tmpfs) memory backed by huge pages",
               "range": true,
               "refId": "D"
@@ -5583,7 +5714,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Anonymous (heap/stack) memory on the controller node. AnonPages is the closest single signal for slurmctld's actual memory footprint outside of file-backed caches.",
           "fieldConfig": {
@@ -5641,7 +5772,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 61
+            "y": 69
           },
           "id": 29,
           "options": {
@@ -5665,10 +5796,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_AnonHugePages_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_AnonHugePages_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "AnonHugePages - Memory in anonymous huge pages",
               "range": true,
               "refId": "A"
@@ -5676,16 +5807,135 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_memory_AnonPages_bytes{instance=\"$instance\"}",
+              "expr": "node_memory_AnonPages_bytes{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "AnonPages - Memory in user pages not backed by files",
               "range": true,
               "refId": "B"
             }
           ],
           "title": "Memory Anonymous",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Container-level memory breakdown for the controller pod, split by container. Complements **Memory Working Set** with three orthogonal views of where the pod's memory is sitting:\n\n- **`rss`** \u2014 actual heap + private anonymous mappings. Typically the dominant component for slurmctld.\n- **`cache`** \u2014 kernel page cache touched by this container's file I/O. Reclaimable; not real pressure.\n- **`mapped_file`** \u2014 pages mmap'd into the container's address space (subset of cache). slurmctld memory-maps state files in `StateSaveLocation`, so this can be MBs\u2013GBs on busy clusters.\n\nSum of `rss + cache` \u2248 container memory usage; sum of `rss + (cache \u2212 mapped_file)` is roughly what's accounted as Working Set.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 37
+          },
+          "id": 30,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "container_memory_rss{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{container}} rss",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "container_memory_cache{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{container}} cache",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "container_memory_mapped_file{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}",
+              "legendFormat": "{{container}} mapped_file",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "Container Memory Breakdown",
           "type": "timeseries"
         }
       ],
@@ -5706,7 +5956,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Network throughput on the controller pod's network namespace (rate over 5m). RX positive, TX negative.",
           "fieldConfig": {
@@ -5788,10 +6038,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  rate(container_network_receive_bytes_total{namespace=~\"soperator\", pod=\"$pod\"}[5m])\n)",
+              "expr": "sum(\n  rate(container_network_receive_bytes_total{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\"}[5m])\n)",
               "legendFormat": "rx",
               "range": true,
               "refId": "A"
@@ -5799,10 +6049,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * sum(\n  rate(container_network_transmit_bytes_total{namespace=~\"soperator\", pod=\"$pod\"}[5m])\n)",
+              "expr": "-1 * sum(\n  rate(container_network_transmit_bytes_total{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\"}[5m])\n)",
               "legendFormat": "tx",
               "range": true,
               "refId": "B"
@@ -5814,7 +6064,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Per-NIC packet rate (rate over 5m) on the controller node. Rx as positive, Tx as negative for visual symmetry.",
           "fieldConfig": {
@@ -5896,10 +6146,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_packets_total{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_packets_total{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Receive",
               "range": true,
               "refId": "A"
@@ -5907,10 +6157,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * irate(node_network_transmit_packets_total{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
+              "expr": "-1 * irate(node_network_transmit_packets_total{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Transmit",
               "range": true,
               "refId": "B"
@@ -5922,7 +6172,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Per-NIC packet errors and drops on the controller node. Both should be zero in healthy state.",
           "fieldConfig": {
@@ -6004,10 +6254,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_errs_total{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_errs_total{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Receive errors",
               "range": true,
               "refId": "A"
@@ -6015,10 +6265,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_transmit_errs_total{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
+              "expr": "irate(node_network_transmit_errs_total{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Transmit errors",
               "range": true,
               "refId": "B"
@@ -6026,10 +6276,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_drop_total{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_drop_total{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Receive drops",
               "range": true,
               "refId": "C"
@@ -6037,10 +6287,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_transmit_drop_total{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
+              "expr": "irate(node_network_transmit_drop_total{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}[$__rate_interval])",
               "legendFormat": "{{device}} - Transmit drops",
               "range": true,
               "refId": "D"
@@ -6052,7 +6302,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Currently established TCP connections on the controller node. For slurmctld this directly reflects how many slurmd/srun/sacct clients are connected.",
           "fieldConfig": {
@@ -6134,10 +6384,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_netstat_Tcp_CurrEstab{instance=\"$instance\"}",
+              "expr": "node_netstat_Tcp_CurrEstab{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "CurrEstab - TCP connections in ESTABLISHED or CLOSE-WAIT",
               "range": true,
               "refId": "A"
@@ -6145,10 +6395,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_ActiveOpens{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_ActiveOpens{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "ActiveOpens/s - new outbound connections",
               "range": true,
               "refId": "B"
@@ -6156,10 +6406,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_PassiveOpens{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_PassiveOpens{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "PassiveOpens/s - new inbound connections",
               "range": true,
               "refId": "C"
@@ -6171,7 +6421,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "TCP-level errors and retransmits. Listen drops and retransmits are early signs of overload or network problems.",
           "fieldConfig": {
@@ -6253,10 +6503,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_RetransSegs{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_RetransSegs{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "RetransSegs - TCP segments retransmitted",
               "range": true,
               "refId": "A"
@@ -6264,10 +6514,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "SynRetrans - SYN/ACK retransmits",
               "range": true,
               "refId": "B"
@@ -6275,10 +6525,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_ListenDrops{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_ListenDrops{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "ListenDrops - SYNs to LISTEN sockets ignored (overflow)",
               "range": true,
               "refId": "C"
@@ -6286,10 +6536,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_ListenOverflows{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_ListenOverflows{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "ListenOverflows - listen queue overflowed",
               "range": true,
               "refId": "D"
@@ -6297,10 +6547,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_OutRsts{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_OutRsts{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "OutRsts - segments sent with RST flag",
               "range": true,
               "refId": "E"
@@ -6312,7 +6562,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Netfilter connection-tracking entries vs limit. slurmctld sees many concurrent connections; if entries approach the limit, new connections fail silently.",
           "fieldConfig": {
@@ -6423,10 +6673,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_nf_conntrack_entries{instance=\"$instance\"}",
+              "expr": "node_nf_conntrack_entries{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "entries",
               "range": true,
               "refId": "A"
@@ -6434,10 +6684,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_nf_conntrack_entries_limit{instance=\"$instance\"}",
+              "expr": "node_nf_conntrack_entries_limit{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "limit",
               "range": true,
               "refId": "B"
@@ -6449,7 +6699,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Per-NIC operational state. UP/carrier should be 1 in healthy state \u2014 drops to 0 indicate the interface is administratively down or the cable/link has gone away.",
           "fieldConfig": {
@@ -6532,10 +6782,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_network_up{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}",
+              "expr": "node_network_up{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}",
               "legendFormat": "{{device}} - operstate=up",
               "range": true,
               "refId": "A"
@@ -6543,10 +6793,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_network_carrier{instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}",
+              "expr": "node_network_carrier{cluster=~\"$cluster\", instance=\"$instance\", device=~\"eth.*|en.*|bond.*\"}",
               "legendFormat": "{{device}} - physical link carrier",
               "range": true,
               "refId": "B"
@@ -6557,6 +6807,673 @@
         }
       ],
       "title": "Network",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 121
+      },
+      "id": 112,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Pod-level network throughput on controller-0 (RX = receive, TX = transmit). Source is the `node-exporter` sidecar running in the controller pod, scraped via `VMPodScrape` `custom-node-exporter`. Excludes `lo`. Note: this is **pod-level** traffic (slurmctld + sidecars), distinct from the host-level Network row below which shows the whole K8s node.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "Bps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 122
+          },
+          "id": 230,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_network_receive_bytes_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} {{device}} RX",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "-1 * irate(node_network_transmit_bytes_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} {{device}} TX",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Network Bandwidth",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Currently established TCP connections inside the controller pod (`node_netstat_Tcp_CurrEstab`). This is essentially the count of live slurmctld RPC clients plus a few sidecar/operator connections. Spikes correlate with bursts of `sbatch`/`squeue`/`sinfo` traffic.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 122
+          },
+          "id": 231,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "node_netstat_Tcp_CurrEstab{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}",
+              "legendFormat": "{{pod}} established",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "TCP Established Connections",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Pod-level packet rate (RX/TX packets per second), excluding `lo`. Useful for spotting packet-flood patterns that don't show up clearly in bytes (lots of small RPCs).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "pps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 130
+          },
+          "id": 232,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_network_receive_packets_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} {{device}} RX",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "-1 * irate(node_network_transmit_packets_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} {{device}} TX",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Packet Rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Rate of TCP retransmissions (`node_netstat_Tcp_RetransSegs`) and SYN retransmissions (`node_netstat_TcpExt_TCPSynRetrans`). Both should sit near zero. Sustained non-zero values indicate packet loss between the pod and its peers \u2014 slurmd nodes, slurmdbd, or external clients.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "pps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 130
+          },
+          "id": 233,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_netstat_Tcp_RetransSegs{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} retrans",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} SYN retrans",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "TCP Retransmits",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Interface-level errors and drops (`node_network_receive_errs_total`, `node_network_receive_drop_total`, `node_network_transmit_errs_total`, `node_network_transmit_drop_total`), excluding `lo`. Healthy is flat-zero. Anything non-zero typically means a network-stack or NIC problem.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "pps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 138
+          },
+          "id": 234,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_network_receive_errs_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{device}} RX errs",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_network_receive_drop_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{device}} RX drops",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_network_transmit_errs_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{device}} TX errs",
+              "range": true,
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_network_transmit_drop_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "legendFormat": "{{device}} TX drops",
+              "range": true,
+              "refId": "D"
+            }
+          ],
+          "title": "Network Errors & Drops",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Rate of TCP listen-queue overflows (`node_netstat_TcpExt_ListenDrops`) and connections from the SYN-cookie / SYN-queue path that got dropped. A non-zero rate here is a strong signal that slurmctld is being overwhelmed and the kernel can't keep up enqueuing new connections \u2014 cross-reference with the RPC row's *Outbound RPC* and inbound rate panels.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "pps"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 138
+          },
+          "id": 235,
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.14",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "irate(node_netstat_TcpExt_ListenDrops{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
+              "legendFormat": "{{pod}} listen drops",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "TCP Listen Queue Drops",
+          "type": "timeseries"
+        }
+      ],
+      "targets": [],
+      "title": "Controller Pod Network",
       "type": "row"
     },
     {
@@ -6572,7 +7489,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "CPU cores consumed by each container in the controller pod (rate over 5m).",
           "fieldConfig": {
@@ -6654,10 +7571,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (container) (\n  rate(container_cpu_usage_seconds_total{namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
+              "expr": "sum by (container) (\n  rate(container_cpu_usage_seconds_total{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\", container!=\"\", container!=\"POD\"}[5m])\n)",
               "legendFormat": "{{container}}",
               "range": true,
               "refId": "A"
@@ -6669,7 +7586,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Per-mode CPU utilisation on the controller node, stacked to 100%. Iowait, Steal, and Softirq are particularly informative when the controller feels slow.",
           "fieldConfig": {
@@ -6750,10 +7667,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"system\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"system\"}[$__rate_interval]))",
               "legendFormat": "System - Processes executing in kernel mode",
               "range": true,
               "refId": "A"
@@ -6761,10 +7678,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"user\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"user\"}[$__rate_interval]))",
               "legendFormat": "User - Normal processes executing in user mode",
               "range": true,
               "refId": "B"
@@ -6772,10 +7689,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"nice\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"nice\"}[$__rate_interval]))",
               "legendFormat": "Nice - Niced processes in user mode",
               "range": true,
               "refId": "C"
@@ -6783,10 +7700,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"iowait\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"iowait\"}[$__rate_interval]))",
               "legendFormat": "Iowait - Waiting for I/O to complete",
               "range": true,
               "refId": "D"
@@ -6794,10 +7711,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"irq\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"irq\"}[$__rate_interval]))",
               "legendFormat": "Irq - Servicing interrupts",
               "range": true,
               "refId": "E"
@@ -6805,10 +7722,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"softirq\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"softirq\"}[$__rate_interval]))",
               "legendFormat": "Softirq - Servicing softirqs",
               "range": true,
               "refId": "F"
@@ -6816,10 +7733,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"steal\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"steal\"}[$__rate_interval]))",
               "legendFormat": "Steal - Time stolen by the hypervisor",
               "range": true,
               "refId": "G"
@@ -6827,10 +7744,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(irate(node_cpu_seconds_total{instance=\"$instance\", mode=\"idle\"}[$__rate_interval]))",
+              "expr": "sum(irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=\"$instance\", mode=\"idle\"}[$__rate_interval]))",
               "legendFormat": "Idle - Waiting for something to happen",
               "range": true,
               "refId": "H"
@@ -6842,7 +7759,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "System load averages over 1, 5 and 15 minutes. Includes runnable + uninterruptible-IO tasks; values trending above the CPU count indicate scheduling backlog.",
           "fieldConfig": {
@@ -6924,10 +7841,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_load1{instance=\"$instance\"}",
+              "expr": "node_load1{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Load 1m",
               "range": true,
               "refId": "A"
@@ -6935,10 +7852,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_load5{instance=\"$instance\"}",
+              "expr": "node_load5{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Load 5m",
               "range": true,
               "refId": "B"
@@ -6946,10 +7863,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_load15{instance=\"$instance\"}",
+              "expr": "node_load15{cluster=~\"$cluster\", instance=\"$instance\"}",
               "legendFormat": "Load 15m",
               "range": true,
               "refId": "C"
@@ -6961,7 +7878,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Context-switch and interrupt rate on the controller node. Spikes here often correlate with bursts of slurmctld RPC traffic.",
           "fieldConfig": {
@@ -7043,10 +7960,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_context_switches_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_context_switches_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Context switches/s",
               "range": true,
               "refId": "A"
@@ -7054,10 +7971,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_intr_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "irate(node_intr_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Interrupts/s",
               "range": true,
               "refId": "B"
@@ -7069,7 +7986,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Multi-dimensional pressure on the controller node:\n\u2022 Kubelet MemoryPressure (binary 0/100) \u2014 when kubelet flags the node memory-pressured, it may evict pods.\n\u2022 Memory PSI some/full \u2014 kernel fraction of time tasks were stalled waiting for memory.\n\u2022 CPU PSI some \u2014 fraction of time tasks were stalled waiting for CPU.\n\u2022 I/O PSI some/full \u2014 fraction of time tasks were stalled on I/O.\n\nPSI usually rises before the kubelet condition trips.",
           "fieldConfig": {
@@ -7180,10 +8097,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * max(kube_node_status_condition{node=\"$node\", condition=\"MemoryPressure\", status=\"true\"})",
+              "expr": "100 * max(kube_node_status_condition{cluster=~\"$cluster\", node=\"$node\", condition=\"MemoryPressure\", status=\"true\"})",
               "legendFormat": "Kubelet MemoryPressure (0/100)",
               "range": true,
               "refId": "A"
@@ -7191,10 +8108,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * irate(node_pressure_memory_waiting_seconds_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "100 * irate(node_pressure_memory_waiting_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Memory PSI some - % time at least one task stalled on memory",
               "range": true,
               "refId": "B"
@@ -7202,10 +8119,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * irate(node_pressure_memory_stalled_seconds_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "100 * irate(node_pressure_memory_stalled_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "Memory PSI full - % time ALL tasks stalled on memory",
               "range": true,
               "refId": "C"
@@ -7213,10 +8130,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * irate(node_pressure_cpu_waiting_seconds_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "100 * irate(node_pressure_cpu_waiting_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "CPU PSI some - % time at least one task stalled on CPU",
               "range": true,
               "refId": "D"
@@ -7224,10 +8141,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * irate(node_pressure_io_waiting_seconds_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "100 * irate(node_pressure_io_waiting_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "I/O PSI some - % time at least one task stalled on I/O",
               "range": true,
               "refId": "E"
@@ -7235,10 +8152,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "100 * irate(node_pressure_io_stalled_seconds_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "100 * irate(node_pressure_io_stalled_seconds_total{cluster=~\"$cluster\", instance=\"$instance\"}[$__rate_interval])",
               "legendFormat": "I/O PSI full - % time ALL tasks stalled on I/O",
               "range": true,
               "refId": "F"
@@ -7263,6 +8180,64 @@
   "templating": {
     "list": [
       {
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics",
+          "value": "VictoriaMetrics"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "filters": [],
+        "hide": 2,
+        "label": "O11y",
+        "name": "o11y",
+        "type": "adhoc"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(node_os_info, cluster)",
+        "hide": 2,
+        "includeAll": true,
+        "label": "Cluster",
+        "multi": false,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(node_os_info, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
         "allowCustomValue": false,
         "current": {
           "text": "controller-0",
@@ -7270,9 +8245,9 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "VictoriaMetrics"
+          "uid": "${datasource}"
         },
-        "definition": "label_values(kube_pod_info{namespace=~\"soperator\", pod=~\"controller-[0-9]+\"}, pod)",
+        "definition": "label_values(kube_pod_info{cluster=~\"$cluster\", namespace=~\"soperator\", pod=~\"controller-[0-9]+\"}, pod)",
         "description": "Controller pod to inspect. Discovered from kube_pod_info; defaults to controller-0.",
         "includeAll": false,
         "label": "Controller Pod",
@@ -7281,7 +8256,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(kube_pod_info{namespace=~\"soperator\", pod=~\"controller-[0-9]+\"}, pod)",
+          "query": "label_values(kube_pod_info{cluster=~\"$cluster\", namespace=~\"soperator\", pod=~\"controller-[0-9]+\"}, pod)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -7297,9 +8272,9 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "VictoriaMetrics"
+          "uid": "${datasource}"
         },
-        "definition": "label_values(kube_pod_info{namespace=~\"soperator\", pod=\"$pod\"}, node)",
+        "definition": "label_values(kube_pod_info{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\"}, node)",
         "description": "K8s node hosting the selected controller pod. Hidden; used for joining node-exporter metrics.",
         "hide": 2,
         "includeAll": false,
@@ -7309,7 +8284,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(kube_pod_info{namespace=~\"soperator\", pod=\"$pod\"}, node)",
+          "query": "label_values(kube_pod_info{cluster=~\"$cluster\", namespace=~\"soperator\", pod=\"$pod\"}, node)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -7325,9 +8300,9 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "VictoriaMetrics"
+          "uid": "${datasource}"
         },
-        "definition": "label_values(node_uname_info{nodename=\"$node\"}, instance)",
+        "definition": "label_values(node_uname_info{cluster=~\"$cluster\", nodename=\"$node\"}, instance)",
         "description": "node-exporter `instance` label for the controller node. Hidden; used to filter node_* metrics.",
         "hide": 2,
         "includeAll": false,
@@ -7337,7 +8312,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(node_uname_info{nodename=\"$node\"}, instance)",
+          "query": "label_values(node_uname_info{cluster=~\"$cluster\", nodename=\"$node\"}, instance)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,

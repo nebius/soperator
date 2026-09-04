@@ -3,6 +3,7 @@ package common
 import (
 	"cmp"
 	"fmt"
+	"math/bits"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -18,12 +19,14 @@ import (
 	"nebius.ai/slurm-operator/internal/naming"
 	renderutils "nebius.ai/slurm-operator/internal/render/utils"
 	"nebius.ai/slurm-operator/internal/utils"
+	topologyrefs "nebius.ai/slurm-operator/internal/utils/slurm/topology"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
 // RenderConfigMapSlurmConfigs renders new [corev1.ConfigMap] containing '.conf' files for the following components:
 //
-// [consts.ConfigMapKeySlurmConfig] - Slurm config
+// [consts.ConfigMapKeySlurmConfig] - Slurm config entrypoint
+// [consts.ConfigMapKeySlurmBaseConfig] - Generated Slurm config
 // [consts.ConfigMapKeyCGroupConfig] - Cgroup config
 // [consts.ConfigMapKeySpankConfig] - SPANK plugins config
 // [consts.ConfigMapKeyGresConfig] - GRES config
@@ -36,13 +39,14 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) corev1.ConfigMap 
 			Labels:    RenderLabels(consts.ComponentTypeController, cluster.Name),
 		},
 		Data: map[string]string{
-			consts.ConfigMapKeySlurmConfig:       generateSlurmConfig(cluster).Render(),
-			consts.ConfigMapKeyRESTConfig:        generateRESTConfig().Render(),
-			consts.ConfigMapKeyCustomSlurmConfig: generateCustomSlurmConfig(cluster).Render(),
-			consts.ConfigMapKeyCGroupConfig:      generateCGroupConfig(cluster).Render(),
-			consts.ConfigMapKeySpankConfig:       generateSpankConfig(cluster).Render(),
-			consts.ConfigMapKeyGresConfig:        generateGresConfig(cluster).Render(),
-			consts.ConfigMapKeyMPIConfig:         generateMPIConfig(cluster).Render(),
+			consts.ConfigMapKeySlurmConfig:         RenderSlurmConfigEntrypoint().Render(),
+			consts.ConfigMapKeySlurmBaseConfig:     WithManagedSlurmConfigWarning(generateSlurmConfig(cluster)).Render(),
+			consts.ConfigMapKeyRESTConfig:          WithManagedSlurmConfigWarning(generateRESTConfig()).Render(),
+			consts.ConfigMapKeySlurmK8sExtraConfig: WithOverrideSlurmConfigWarning(generateCustomSlurmConfig(cluster)).Render(),
+			consts.ConfigMapKeyCGroupConfig:        WithManagedSlurmConfigWarning(generateCGroupConfig(cluster)).Render(),
+			consts.ConfigMapKeySpankConfig:         WithManagedSlurmConfigWarning(generateSpankConfig(cluster)).Render(),
+			consts.ConfigMapKeyGresConfig:          WithManagedSlurmConfigWarning(generateGresConfig(cluster)).Render(),
+			consts.ConfigMapKeyMPIConfig:           WithManagedSlurmConfigWarning(generateMPIConfig(cluster)).Render(),
 		},
 	}
 }
@@ -67,8 +71,9 @@ func RenderJailedConfigSlurmConfigs(cluster *values.SlurmCluster) slurmv1alpha1.
 			},
 			Items: []corev1.KeyToPath{
 				{Key: consts.ConfigMapKeySlurmConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeySlurmConfig)},
+				{Key: consts.ConfigMapKeySlurmBaseConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeySlurmBaseConfig)},
 				{Key: consts.ConfigMapKeyRESTConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyRESTConfig)},
-				{Key: consts.ConfigMapKeyCustomSlurmConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyCustomSlurmConfig)},
+				{Key: consts.ConfigMapKeySlurmK8sExtraConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeySlurmK8sExtraConfig)},
 				{Key: consts.ConfigMapKeyCGroupConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyCGroupConfig)},
 				{Key: consts.ConfigMapKeySpankConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeySpankConfig)},
 				{Key: consts.ConfigMapKeyGresConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyGresConfig)},
@@ -102,11 +107,15 @@ func AddNodeSetsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values
 	}
 }
 
-// AddNodesToSlurmConfig adds all node names to the slurm config
+// AddNodesToSlurmConfig adds all node names to the slurm config.
+//
+// All replicas in a NodeSet share an identical body, so we emit one line per
+// NodeSet using Slurm hostlist range syntax. This keeps the ConfigMap well
+// under the Kubernetes 1 MiB object size limit on large clusters.
 //
 // Example output:
-// NodeName=gb200-0-0 State=CLOUD NodeHostname=gb200-0-0 NodeAddr=gb200-0-0.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
-// NodeName=gb200-0-1 State=CLOUD NodeHostname=gb200-0-1 NodeAddr=gb200-0-1.gb200-0.soperator.svc RealMemory=1612639 Features=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-0-0 State=CLOUD NodeAddr=gb200-0-0.gb200-0.soperator.svc RealMemory=1612639 Feature=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-1-[0-17] State=CLOUD NodeAddr=gb200-1-[0-17].gb200-1.soperator.svc RealMemory=1612639 Feature=platform-gb200,gb200-rack-1 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
 func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
 	res.AddComment("Nodes section")
 
@@ -124,63 +133,73 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 			continue
 		}
 
-		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
-			nodeName := fmt.Sprintf("%s-%d", nodeSet.Name, i)
-
-			nodeAddr := fmt.Sprintf(
-				"%s.%s",
-				nodeName,
-				naming.BuildNodeSetUmbrellaServiceFQDN(nodeSet.Namespace, cluster.Name),
-			)
-			realMemory := strconv.FormatInt(
-				RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}),
-				10,
-			)
-
-			var nodeConfigParts []string
-			nodeConfigParts = append(nodeConfigParts,
-				fmt.Sprintf("NodeHostname=%s", nodeName),
-				fmt.Sprintf("NodeAddr=%s", nodeAddr),
-				fmt.Sprintf("RealMemory=%s", realMemory),
-			)
-			if nodeSet.Spec.Slurmd.Port != 0 {
-				nodeConfigParts = append(nodeConfigParts, fmt.Sprintf("Port=%d", nodeSet.Spec.Slurmd.Port))
-			}
-			nodeConfig := strings.Join(nodeConfigParts, " ")
-
-			if len(nodeSet.Spec.NodeConfig.Features) > 0 {
-				features := strings.Join(nodeSet.Spec.NodeConfig.Features, ",")
-				nodeConfig = fmt.Sprintf("%s %s%s", nodeConfig, nodeFeatureKey, features)
-			}
-
-			// Remove feature and state overrides
-			staticConfig := strings.Join(
-				slices.Filter(
-					nil,
-					strings.Split(nodeSet.Spec.NodeConfig.Static, " "),
-					func(s string) bool {
-						return !strings.HasPrefix(s, nodeFeatureKey) &&
-							!strings.HasPrefix(s, stateKey)
-					},
-				),
-				" ",
-			)
-
-			if len(nodeConfig) > 0 {
-				nodeConfig = fmt.Sprintf("%s %s", nodeConfig, staticConfig)
-			}
-
-			// Create static nodes with state CLOUD.
-			// Otherwise, nodes will disappear from the Slurm state every time the corresponding K8s pods don't run.
-			res.AddProperty(
-				"NodeName",
-				fmt.Sprintf("%s State=CLOUD %s", nodeName, nodeConfig),
-			)
+		var nodeRange string
+		if nodeSet.Spec.Replicas == 1 {
+			nodeRange = fmt.Sprintf("%s-0", nodeSet.Name)
+		} else {
+			nodeRange = fmt.Sprintf("%s-[0-%d]", nodeSet.Name, nodeSet.Spec.Replicas-1)
 		}
+
+		nodeAddr := fmt.Sprintf(
+			"%s.%s",
+			nodeRange,
+			naming.BuildNodeSetUmbrellaServiceFQDN(nodeSet.Namespace, cluster.Name),
+		)
+		realMemory := strconv.FormatInt(
+			RenderRealMemorySlurmd(corev1.ResourceRequirements{Requests: nodeSet.Spec.Slurmd.Resources}),
+			10,
+		)
+
+		var nodeConfigParts []string
+		nodeConfigParts = append(nodeConfigParts,
+			fmt.Sprintf("NodeAddr=%s", nodeAddr),
+			fmt.Sprintf("RealMemory=%s", realMemory),
+		)
+		if nodeSet.Spec.NodeConfig.AutoResume != nil && !*nodeSet.Spec.NodeConfig.AutoResume {
+			nodeConfigParts = append(nodeConfigParts, "AutoResume=Off")
+		}
+		if nodeSet.Spec.Slurmd.Port != 0 {
+			nodeConfigParts = append(nodeConfigParts, fmt.Sprintf("Port=%d", nodeSet.Spec.Slurmd.Port))
+		}
+		nodeConfig := strings.Join(nodeConfigParts, " ")
+
+		if len(nodeSet.Spec.NodeConfig.Features) > 0 {
+			features := strings.Join(nodeSet.Spec.NodeConfig.Features, ",")
+			nodeConfig = fmt.Sprintf("%s %s%s", nodeConfig, nodeFeatureKey, features)
+		}
+
+		staticConfig := strings.Join(
+			slices.Filter(
+				nil,
+				strings.Split(nodeSet.Spec.NodeConfig.Static, " "),
+				func(s string) bool {
+					return !strings.HasPrefix(s, nodeFeatureKey) &&
+						!strings.HasPrefix(s, stateKey)
+				},
+			),
+			" ",
+		)
+
+		if len(nodeConfig) > 0 {
+			nodeConfig = fmt.Sprintf("%s %s", nodeConfig, staticConfig)
+		}
+
+		// State=CLOUD keeps nodes registered in Slurm even when the
+		// corresponding K8s pods are not running.
+		res.AddProperty(
+			"NodeName",
+			fmt.Sprintf("%s State=CLOUD %s", nodeRange, nodeConfig),
+		)
 	}
 }
 
-// AddPartitionsToSlurmConfig adds structured partition configuration to the slurm config
+// AddPartitionsToSlurmConfig adds structured partition configuration to the slurm config.
+//
+// NodeSetRefs pointing to NodeSets that are absent from the NodeSet section are dropped: such a
+// reference makes slurmctld reject the whole config, and it shows up routinely during upgrades,
+// when NodeSets and SlurmCluster are applied one after another. A partition losing all of its refs
+// this way is rendered with a blank node list, which keeps it alive without resources until the
+// NodeSets show up.
 //
 // Example output:
 // PartitionName=main Nodes=ALL AllowGroups=mleng CpuBind=verbose Default=YES DefaultTime=1:00:00 MaxTime=4:00:00 DefCpuPerGPU=8 Hidden=NO OverSubscribe=YES PreemptMode=OFF PriorityTier=10 State=UP
@@ -193,18 +212,65 @@ func AddPartitionsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *valu
 		return
 	}
 
+	replicas := nodeSetReplicas(cluster)
+	declaredTopologies := topologyrefs.DeclaredNames(cluster.Topology)
+
 	for _, partition := range cluster.PartitionConfiguration.Partitions {
+		topology := partitionTopology(res, partition, declaredTopologies)
+
+		if partition.IsAll {
+			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=ALL %s%s", partition.Name, topology, partition.Config))
+			continue
+		}
+
+		resolved, ignored := resolvePartitionNodeSetRefs(partition, replicas)
+		for _, ref := range ignored {
+			res.AddComment(fmt.Sprintf(
+				"WARNING: Partition %s references NodeSet %s ignored: %s",
+				ref.Partition, ref.NodeSet, ref.Reason,
+			))
+		}
+
 		switch {
-		case partition.IsAll:
-			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=ALL %s", partition.Name, partition.Config))
-		case len(partition.NodeSetRefs) > 0:
-			nodes := strings.Join(partition.NodeSetRefs, ",")
-			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=%s %s", partition.Name, nodes, partition.Config))
+		case len(resolved) > 0:
+			nodes := strings.Join(resolved, ",")
+			res.AddProperty("PartitionName", fmt.Sprintf("%s Nodes=%s %s%s", partition.Name, nodes, topology, partition.Config))
+		case len(ignored) > 0:
+			// Keeping the partition without resources is better than dropping it: dropping would
+			// delete it from a running cluster on reconfigure, together with its pending jobs, and
+			// would take the cluster's default partition down with it.
+			res.AddComment(fmt.Sprintf("WARNING: Partition %s has no usable nodeset refs, rendering it without nodes", partition.Name))
+			res.AddProperty("PartitionName", fmt.Sprintf(`%s Nodes="" %s%s`, partition.Name, topology, partition.Config))
 		default:
 			res.AddComment(fmt.Sprintf("WARNING: Partition %s has no nodeset refs and is not 'all', skipping", partition.Name))
 		}
 	}
+}
 
+// partitionTopology renders the "Topology=<name> " option binding a partition to one of the named
+// topologies, or an empty string when the partition follows the cluster default.
+//
+// A ref naming no declared topology is dropped for the same reason a dangling NodeSetRef is:
+// slurmctld rejects the whole config over a partition pointing at a topology it cannot see, and
+// stale names turn up routinely while a SlurmCluster and its NodeSets are applied one after another.
+// Every declared topology reaches the file, empty if its NodeSets have not arrived, so being
+// declared is enough.
+func partitionTopology(
+	res *renderutils.PropertiesConfig, partition slurmv1.Partition, declared map[string]struct{},
+) string {
+	if partition.TopologyRef == "" {
+		return ""
+	}
+
+	if _, ok := declared[partition.TopologyRef]; !ok {
+		res.AddComment(fmt.Sprintf(
+			"WARNING: Partition %s references undefined topology %s, ignoring it",
+			partition.Name, partition.TopologyRef,
+		))
+		return ""
+	}
+
+	return fmt.Sprintf("Topology=%s ", partition.TopologyRef)
 }
 
 // AddNodesToGresConfig adds node-scoped settings to the slurm config
@@ -250,13 +316,15 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	{
 		svcName := cluster.NodeController.Service.Name
-		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", "controller-0", svcName))
+		controllerHostname := cluster.NodeController.StatefulSet.Name + "-0"
+		res.AddProperty("SlurmctldHost", fmt.Sprintf("%s(%s)", controllerHostname, svcName))
 	}
-
 	res.AddComment("")
+
 	res.AddProperty("AuthType", "auth/"+consts.Munge)
 	res.AddProperty("CredType", "cred/"+consts.Munge)
 	res.AddComment("")
+
 	res.AddComment("SlurmConfig Spec")
 	addSlurmConfigProperties(res, cluster.SlurmConfig)
 	res.AddComment("")
@@ -271,14 +339,18 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("ProctrackType", "proctrack/cgroup")
 	res.AddProperty("ReturnToService", 2)
 	res.AddComment("")
+
 	res.AddProperty("SlurmctldPidFile", "/var/run/"+consts.SlurmctldName+".pid")
 	res.AddProperty("SlurmctldPort", cluster.NodeController.ContainerSlurmctld.Port)
+	res.AddComment("")
+
 	// Slurm silently disables the metrics plugin if PrivateData is set in
-	// slurm.conf. Don't add a PrivateData property anywhere in this file.
+	// the generated Slurm config. Don't add a PrivateData property anywhere in this file.
 	if om := cluster.NodeController.OpenMetrics; om.Enabled == nil || *om.Enabled {
 		res.AddProperty("MetricsType", "metrics/openmetrics")
+		res.AddComment("")
 	}
-	res.AddComment("")
+
 	res.AddProperty("SlurmdPidFile", "/var/run/"+consts.SlurmdName+".pid")
 	res.AddComment("")
 	res.AddProperty("SlurmdSpoolDir", naming.BuildVolumeMountSpoolPath(consts.SlurmdName))
@@ -297,23 +369,23 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("PropagateResourceLimits", "NONE") // Don't propagate ulimits from the login node by default
 	res.AddComment("")
-	res.AddProperty("SchedulerParameters", "nohold_on_prolog_fail,extra_constraints,pack_serial_at_end,salloc_wait_nodes,sbatch_wait_nodes")
-	res.AddComment("")
-	res.AddComment("HEALTH CHECKS")
-	res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
 
 	if cluster.HealthCheckConfig != nil {
+		res.AddComment("HEALTH CHECKS")
+		res.AddComment("https://slurm.schedmd.com/slurm.conf.html#OPT_HealthCheckInterval")
+
 		res.AddProperty("HealthCheckInterval", cluster.HealthCheckConfig.HealthCheckInterval)
 		res.AddProperty("HealthCheckProgram", cluster.HealthCheckConfig.HealthCheckProgram)
 
-		var states []string
-		for _, state := range cluster.HealthCheckConfig.HealthCheckNodeState {
-			states = append(states, state.State)
+		states := make([]string, len(cluster.HealthCheckConfig.HealthCheckNodeState))
+		for i, state := range cluster.HealthCheckConfig.HealthCheckNodeState {
+			states[i] = state.State
 		}
 		res.AddProperty("HealthCheckNodeState", strings.Join(states, ","))
+
+		res.AddComment("")
 	}
 
-	res.AddComment("")
 	res.AddProperty("InactiveLimit", 0)
 	res.AddProperty("KillOnBadExit", 1)
 	res.AddProperty("KillWait", 180)
@@ -322,19 +394,44 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SlurmdTimeout", 180)
 	res.AddProperty("TCPTimeout", 15)
 	res.AddProperty("WaitTime", 0)
-	if cluster.HasEphemeralNodes() {
-		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=1024,conmgr_threads=32,cloud_dns,idle_on_node_suspend")
-	} else {
-		res.AddProperty("SlurmctldParameters", "conmgr_max_connections=1024,conmgr_threads=32")
+	res.AddComment("")
+
+	total := totalWorkerNodes(cluster)
+
+	{
+		connMax := max(int32(1024), nextPow2(total*2))
+		slurmCtldParams := []string{
+			fmt.Sprintf("conmgr_max_connections=%d", connMax), // maximum number of connections to be processed at any given time
+			"conmgr_threads=32",            // number of threads in thread pool used for connections on the listening sockets
+			"validate_nodeaddr_threads=32", // permit concurrent node address validation during startup
+			"enable_stepmgr",               // enable job steps to be managed by a single extern job-associated slurmstepd
+		}
+		if cluster.HasEphemeralNodes() {
+			slurmCtldParams = append(slurmCtldParams, []string{
+				"cloud_dns",            // avoid informing ip addresses of cloud nodes to client commands
+				"idle_on_node_suspend", // allow suspended nodes to be resumed by marking them idle
+			}...)
+		}
+		res.AddProperty("SlurmctldParameters", strings.Join(slurmCtldParams, ","))
 	}
+	res.AddProperty("PrologFlags", "contain") // use ProcTrack for creating a job container on all allocated workers during job allocation
+	res.AddComment("")
 
 	res.AddProperty("RebootProgram", "/opt/bin/slurm/reboot.sh")
-	res.AddProperty("ResumeTimeout", 1800)
-
-	// Power management for ephemeral nodes
+	res.AddProperty(
+		"PowerAction",
+		fmt.Sprintf(
+			"%s Location=slurmd Program=/opt/bin/slurm/worker_handoff.py",
+			consts.SlurmPowerActionWorkerHandoff,
+		),
+	)
 	res.AddComment("")
+
+	// Power management for ephemeral nodes.
+	// ResumeTimeout is rendered from SlurmConfig above, next to SuspendTime.
 	res.AddComment("POWER MANAGEMENT (ephemeral nodes)")
 	res.AddProperty("ResumeProgram", "/opt/soperator/bin/power_resume.sh")
+	res.AddProperty("ResumeFailProgram", "/opt/soperator/bin/power_resume_fail.sh")
 	res.AddProperty("SuspendProgram", "/opt/soperator/bin/power_suspend.sh")
 	res.AddProperty("SuspendTimeout", 90)
 	res.AddProperty("ResumeRate", 100)
@@ -343,13 +440,31 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	if suspendExcNodes := buildSuspendExcNodes(cluster); suspendExcNodes != "" {
 		res.AddProperty("SuspendExcNodes", suspendExcNodes)
 	}
-
 	res.AddComment("")
+
 	res.AddComment("SCHEDULING")
 	res.AddProperty("SchedulerType", "sched/backfill")
+	res.AddProperty("SchedulerParameters",
+		strings.Join([]string{
+			"nohold_on_prolog_fail", // allows jobs to be dispatched to another hosts during requeue
+			"extra_constraints",     // enables filtering nodes with the --extra option
+			"pack_serial_at_end",    // reduces resource fragmentation for some workloads with select/cons_tres plugin
+			"salloc_wait_nodes",     // wait until all allocated nodes are ready for use in salloc
+			"sbatch_wait_nodes",     // wait until all allocated nodes are ready for use in sbatch
+			"defer_batch",           // avoid attempting to schedule each batch job individually at job submit time
+			"max_rpc_cnt=100",       // maximum number of threads before deferring job scheduling
+			// sched/backfill
+			"bf_continue",            // resume mid-cycle instead of restarting from the top after releasing the lock
+			"bf_max_time=60",         // maximum time the backfill scheduler can spend before discontinuing (s)
+			"bf_max_job_test=1000",   // maximum number of jobs to attempt scheduling for
+			"bf_max_job_part=300",    // maximum number of jobs per partition to attempt starting with the scheduler
+			"bf_running_job_reserve", // creates backfill reservations for jobs running on whole nodes
+		}, ","),
+	)
 	res.AddProperty("SelectType", "select/cons_tres")
 	res.AddProperty("SelectTypeParameters", "CR_Core_Memory,CR_CORE_DEFAULT_DIST_BLOCK")
 	res.AddComment("")
+
 	res.AddComment("LOGGING")
 	res.AddProperty("SlurmctldDebug", consts.SlurmDefaultDebugLevel)
 	res.AddProperty("SlurmctldLogFile", consts.SlurmLogFile)
@@ -357,15 +472,16 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SlurmdLogFile", consts.SlurmLogFile)
 	res.AddProperty("DebugFlags", "Script,Power")
 	res.AddComment("")
+
 	res.AddComment("COMPUTE NODES")
 	res.AddComment("We're using the \"dynamic nodes\" feature: https://slurm.schedmd.com/dynamic_nodes.html")
-	res.AddProperty("MaxNodeCount", "1024")
-	res.AddProperty("MaxArraySize", "1024")
+	res.AddProperty("MaxNodeCount", max(int32(1024), nextPow2(total*2)))
+	res.AddProperty("MaxArraySize", max(int32(1024), total*5))
 	res.AddProperty("JobRequeue", 1)
 	res.AddProperty("PreemptMode", "REQUEUE")
 	res.AddProperty("PreemptType", "preempt/partition_prio")
-	res.AddComment("Partition Configuration")
 
+	res.AddComment("Partition Configuration")
 	switch cluster.PartitionConfiguration.ConfigType {
 	case slurmv1.PartitionConfigTypeCustom:
 		for _, l := range cluster.PartitionConfiguration.RawConfig {
@@ -375,6 +491,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 				res.AddProperty("PartitionName", clearLine)
 			}
 		}
+
 	case slurmv1.PartitionConfigTypeStructured:
 		AddNodesToSlurmConfig(res, cluster)
 		AddPartitionsToSlurmConfig(res, cluster)
@@ -384,20 +501,19 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		res.AddProperty("PartitionName", "main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP OverSubscribe=YES")
 		res.AddProperty("PartitionName", "hidden Nodes=ALL Default=NO PriorityTier=10 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES")
 	}
+	res.AddComment("")
 
 	if cluster.NodeAccounting.Enabled {
-		res.AddComment("")
 		res.AddComment("ACCOUNTING")
 		res.AddProperty("AccountingStorageType", "accounting_storage/slurmdbd")
 		res.AddProperty("AccountingStorageHost", naming.BuildServiceFQDN(
 			naming.BuildServiceName(consts.ComponentTypeAccounting, cluster.Name),
 			cluster.Namespace,
 		))
-		res.AddProperty("AccountingStorageUser", consts.HostnameAccounting)
 		res.AddProperty("AccountingStoragePort", consts.DefaultAccountingPort)
 		res.AddProperty("JobCompType", "jobcomp/none")
 
-		// In slurm.conf, the accounting section has many optional values
+		// In the generated Slurm config, the accounting section has many optional values
 		// that can be added or removed, and to avoid writing many if statements, we decided to use a reflector.
 		addSlurmConfigProperties(res, cluster.NodeAccounting.SlurmConfig)
 
@@ -408,10 +524,6 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			res.AddProperty("AuthAltParameters", "jwt_key="+consts.RESTJWTKeyPath)
 		}
 	}
-
-	res.AddComment("")
-	res.AddComment(fmt.Sprintf("Include %s", consts.ConfigMapKeyCustomSlurmConfig))
-	res.AddPropertyWithConnector("include", consts.ConfigMapKeyCustomSlurmConfig, renderutils.SpaceConnector)
 
 	return res
 }
@@ -448,6 +560,22 @@ func buildSuspendExcNodes(cluster *values.SlurmCluster) string {
 	}
 
 	return strings.Join(staticNodeSets, ",")
+}
+
+func totalWorkerNodes(cluster *values.SlurmCluster) int32 {
+	var total int32
+	for _, ns := range cluster.NodeSets {
+		total += ns.Spec.Replicas
+	}
+	return total
+}
+
+// nextPow2 returns the smallest power of 2 >= n (minimum 1).
+func nextPow2(n int32) int32 {
+	if n <= 1 {
+		return 1
+	}
+	return 1 << bits.Len(uint(n-1))
 }
 
 // addSlurmConfigProperties adds properties from the given struct to the config file
@@ -573,18 +701,22 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	res.AddLine(fmt.Sprintf("required chroot.so %s", consts.VolumeMountPathJail))
 
-	res.AddLine(strings.Join(
-		[]string{
-			utils.Ternary(cluster.PlugStackConfig.Pyxis.Required != nil && *cluster.PlugStackConfig.Pyxis.Required, "required", "optional"),
-			"spank_pyxis.so",
-			"runtime_path=/run/pyxis",
-			"execute_entrypoint=0",
-			"container_scope=global",
-			"sbatch_support=1",
-			fmt.Sprintf("importer=%s", cluster.PlugStackConfig.Pyxis.ImporterPath),
-		},
-		" ",
-	))
+	{
+		opts := cluster.PlugStackConfig.Pyxis.DeepCopy()
+		res.AddLine(strings.Join(
+			[]string{
+				formatBoolPtr(opts.Required, "required", "optional"),
+				"spank_pyxis.so",
+				"runtime_path=/run/pyxis",
+				"execute_entrypoint=0",
+				"container_scope=global",
+				"sbatch_support=1",
+				fmt.Sprintf("importer=%s", opts.ImporterPath),
+				fmt.Sprintf("use_squashfuse=%d", formatBoolPtr(opts.UseSquashfuse, 1, 0)),
+			},
+			" ",
+		))
+	}
 
 	{
 		opts := cluster.PlugStackConfig.NcclDebug.DeepCopy()
@@ -592,11 +724,27 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			[]string{
 				utils.Ternary(opts.Required, "required", "optional"),
 				"spanknccldebug.so",
-				fmt.Sprintf("enabled=%d", utils.Ternary(opts.Enabled != nil && *opts.Enabled, 1, 0)),
+				fmt.Sprintf("enabled=%d", formatBoolPtr(opts.Enabled, 1, 0)),
 				fmt.Sprintf("log-level=%s", utils.Ternary(opts.LogLevel != "", opts.LogLevel, "INFO")),
 				fmt.Sprintf("out-file=%d", utils.Ternary(opts.OutputToFile, 1, 0)),
-				fmt.Sprintf("out-dir=%s", utils.Ternary(opts.OutputDirectory != "", opts.OutputDirectory, "/opt/soperator-outputs/nccl_logs")),
+				fmt.Sprintf("out-dir=%s", utils.Ternary(opts.OutputDirectory != "", opts.OutputDirectory, "/opt/soperator-outputs/local/nccl_logs")),
 				fmt.Sprintf("out-stdout=%d", utils.Ternary(opts.OutputToStdOut, 1, 0)),
+			},
+			" ",
+		))
+	}
+
+	{
+		opts := cluster.PlugStackConfig.NcclInspectorPreConf.DeepCopy()
+		res.AddLine(strings.Join(
+			[]string{
+				formatBoolPtr(opts.Required, "required", "optional"),
+				"spank_nccl_inspector_preconf.so",
+				fmt.Sprintf("enabled=%d", formatBoolPtr(opts.Enabled, 1, 0)),
+				fmt.Sprintf("profiler-plugin=%s", utils.Ternary(opts.ProfilerPlugin != "", opts.ProfilerPlugin, "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so")),
+				fmt.Sprintf("dump-dir=%s", utils.Ternary(opts.DumpDir != "", opts.DumpDir, "/opt/soperator-outputs/shared/nccl_profiles/%j/%s")),
+				fmt.Sprintf("dump-verbose=%d", formatBoolPtr(opts.DumpVerbose, 1, 0)),
+				fmt.Sprintf("dump-thread-interval-microseconds=%d", utils.Ternary(opts.DumpThreadIntervalMicroseconds > 0, opts.DumpThreadIntervalMicroseconds, 1000000)),
 			},
 			" ",
 		))
@@ -618,6 +766,10 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	}
 
 	return res
+}
+
+func formatBoolPtr[T comparable](v *bool, ifTrue, ifFalse T) T {
+	return utils.Ternary(v != nil && *v, ifTrue, ifFalse)
 }
 
 func generateGresConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
@@ -644,7 +796,7 @@ func generateMPIConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 func generateRESTConfig() renderutils.ConfigFile {
 	res := &renderutils.PropertiesConfig{}
 	res.AddComment("REST API config")
-	res.AddPropertyWithConnector("include", consts.ConfigMapKeySlurmConfig, renderutils.SpaceConnector)
+	res.AddPropertyWithConnector("include", slurmConfigPath(consts.ConfigMapKeySlurmConfig), renderutils.SpaceConnector)
 	res.AddProperty("AuthType", "auth/jwt")
 	return res
 }

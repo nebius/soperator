@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.1
 
       - name: Install yq
         uses: frenck/action-setup-yq@c4b5be8b4a215c536a41d436757d9feb92836d4f # v1.0.2
@@ -39,27 +39,31 @@ jobs:
           BRANCHES=("main" "${RELEASE_BRANCHES[@]}")
           BRANCH_COUNT=${#BRANCHES[@]}
 
-          RUN_NUMBER=${{ github.run_number }}
-
           echo "Branches: ${BRANCHES[*]}"
-          echo "Run number: $RUN_NUMBER"
 
           # Defaults duplicated from defaultRunsPerTick / defaultMaxInFlight in
           # internal/e2e/config.go — keep the two in sync.
           RUNS_PER_TICK=$(echo "$E2E_CONFIG" | yq -r '.scheduler.runs_per_tick // 1')
           MAX_IN_FLIGHT=$(echo "$E2E_CONFIG" | yq -r '.scheduler.max_in_flight // 2')
 
+          # Only scheduled runs count here. A manual run occupies a project, which
+          # the selector already accounts for, but it must not affect the schedule.
+          # PR comment dispatches also run as github-actions[bot], so restrict the
+          # results to branches the scheduler owns. The actor= query parameter is
+          # avoided on purpose: it serves stale results.
+          BRANCHES_JSON=$(printf '%s\n' "${BRANCHES[@]}" | jq -R . | jq -s .)
+          RUNS=$(gh api "repos/${{ github.repository }}/actions/workflows/e2e_test.yml/runs?per_page=100" \
+            | jq --argjson branches "$BRANCHES_JSON" \
+              '[.workflow_runs[] | select(
+                .actor.login == "github-actions[bot]"
+                and (.head_branch as $branch | $branches | index($branch))
+              )]')
+
           # A run that finds no free profile waits, then fails. Dispatching on every
           # tick regardless would turn a stretch of tight capacity into a stream of
           # timed-out runs, so stop adding to the pile once enough are in flight.
           # Runs still waiting for a profile count: they are the ones at risk.
-          #
-          # Only scheduled runs count. A manual run occupies a project, which the
-          # selector already accounts for, but it must not switch off the schedule.
-          IN_FLIGHT=$(gh api "repos/${{ github.repository }}/actions/workflows/e2e_test.yml/runs?per_page=100" \
-            --jq '[.workflow_runs[]
-                   | select(.status != "completed")
-                   | select(.actor.login == "github-actions[bot]")] | length')
+          IN_FLIGHT=$(jq '[.[] | select(.status != "completed")] | length' <<<"$RUNS")
 
           DISPATCHES=$(( MAX_IN_FLIGHT - IN_FLIGHT ))
           if (( DISPATCHES > RUNS_PER_TICK )); then
@@ -83,8 +87,22 @@ jobs:
             exit 1
           fi
 
+          # Rotation pointer: the newest scheduler-dispatched run's branch — continue
+          # from the next one. The pointer advances only when something was actually
+          # dispatched, so skipped and double-dispatch ticks cannot skew the rotation.
+          # Unknown or missing branch: start from the top of the list.
+          LAST_BRANCH=$(jq -r '.[0].head_branch // ""' <<<"$RUNS")
+          START=0
+          for i in "${!BRANCHES[@]}"; do
+            if [[ "${BRANCHES[$i]}" == "$LAST_BRANCH" ]]; then
+              START=$(( (i + 1) % BRANCH_COUNT ))
+              break
+            fi
+          done
+          echo "Last scheduled branch: ${LAST_BRANCH:-none}, starting from: ${BRANCHES[$START]}"
+
           for (( i = 0; i < DISPATCHES; i++ )); do
-            BRANCH_INDEX=$(( (RUN_NUMBER + i) % BRANCH_COUNT ))
+            BRANCH_INDEX=$(( (START + i) % BRANCH_COUNT ))
             REF="${BRANCHES[$BRANCH_INDEX]}"
 
             # No profile input on purpose: the default declared on e2e_test.yml's profile input applies,

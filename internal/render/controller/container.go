@@ -47,6 +47,7 @@ func renderContainerSlurmctld(container *values.Container, customMounts []slurmv
 			Requests: container.Resources,
 		},
 		LivenessProbe:            container.LivenessProbe,
+		ReadinessProbe:           container.ReadinessProbe,
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}
@@ -63,26 +64,6 @@ func renderContainerSlurmctldWithSSSD(
 		common.RenderVolumeMountSSSDConf(),
 	)
 	return res
-}
-
-// renderContainerSlurmctldSleep renders [corev1.Container] for slurmctld in sleep mode for DaemonSet
-func renderContainerSlurmctldSleep(container *values.Container) corev1.Container {
-	return corev1.Container{
-		Name:            consts.ContainerNameSlurmctld,
-		Image:           container.Image,
-		ImagePullPolicy: container.ImagePullPolicy,
-		Command:         []string{"sleep"},
-		Args:            []string{"infinity"},
-		SecurityContext: &corev1.SecurityContext{
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{
-					consts.ContainerSecurityContextCapabilitySysAdmin,
-				},
-			},
-		},
-		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
-		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-	}
 }
 
 // renderContainerAccountingWaiter renders accounting waiting init [corev1.Container]

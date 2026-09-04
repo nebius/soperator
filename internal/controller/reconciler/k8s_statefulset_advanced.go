@@ -3,6 +3,7 @@ package reconciler
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,6 +49,18 @@ func (r *AdvancedStatefulSetReconciler) patch(existing, desired client.Object) (
 		original := dst.DeepCopy()
 
 		res := client.MergeFrom(original)
+		if len(src.Labels) > 0 {
+			if dst.Labels == nil {
+				dst.Labels = make(map[string]string, len(src.Labels))
+			}
+			maps.Copy(dst.Labels, src.Labels)
+		}
+		if len(src.Annotations) > 0 {
+			if dst.Annotations == nil {
+				dst.Annotations = make(map[string]string, len(src.Annotations))
+			}
+			maps.Copy(dst.Annotations, src.Annotations)
+		}
 
 		dst.Spec.Template.ObjectMeta.Labels = src.Spec.Template.ObjectMeta.Labels
 		// Copy annotations from the desired StatefulSet to the existing StatefulSet
@@ -57,6 +70,8 @@ func (r *AdvancedStatefulSetReconciler) patch(existing, desired client.Object) (
 		}
 		dst.Spec.Replicas = src.Spec.Replicas
 		dst.Spec.UpdateStrategy = src.Spec.UpdateStrategy
+		dst.Spec.VolumeClaimUpdateStrategy = src.Spec.VolumeClaimUpdateStrategy
+		dst.Spec.ScaleStrategy = src.Spec.ScaleStrategy
 		dst.Spec.Template.Spec = src.Spec.Template.Spec
 		dst.Spec.ReserveOrdinals = src.Spec.ReserveOrdinals
 		dst.Spec.PersistentVolumeClaimRetentionPolicy = src.Spec.PersistentVolumeClaimRetentionPolicy

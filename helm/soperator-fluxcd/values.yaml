@@ -4,8 +4,8 @@ helmRepository:
     url: oci://cr.eu-north1.nebius.cloud/soperator
     type: oci
   kruise:
-    url: https://openkruise.github.io/charts/
-    type: default
+    url: oci://cr.eu-north1.nebius.cloud/soperator
+    type: oci
   certManager:
     url: https://charts.jetstack.io
     type: default
@@ -47,10 +47,70 @@ certManager:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: v1.19.*
+  version: v1.20.*
   namespace: cert-manager-system
   releaseName: cert-manager
-  values: null
+  values:
+    # kubernetes.io/os is the chart's own default and has to be repeated here: setting
+    # nodeSelector replaces it wholesale.
+    nodeSelector:
+      kubernetes.io/os: linux
+      slurm.nebius.ai/nodeset: system
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: cert-manager
+                  app.kubernetes.io/component: controller
+    resources:
+      requests:
+        cpu: 100m
+    webhook:
+      nodeSelector:
+        kubernetes.io/os: linux
+        slurm.nebius.ai/nodeset: system
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: webhook
+                    app.kubernetes.io/component: webhook
+      resources:
+        requests:
+          cpu: 100m
+    cainjector:
+      nodeSelector:
+        kubernetes.io/os: linux
+        slurm.nebius.ai/nodeset: system
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: cainjector
+                    app.kubernetes.io/component: cainjector
+      resources:
+        requests:
+          cpu: 100m
+    startupapicheck:
+      # A one-shot Job, so it gets the pin but no anti-affinity term.
+      nodeSelector:
+        kubernetes.io/os: linux
+        slurm.nebius.ai/nodeset: system
+      resources:
+        requests:
+          cpu: 100m
   overrideValues: null
   install:
     crds: CreateReplace
@@ -78,6 +138,20 @@ backup:
       registry: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io
       repository: alpine/k8s
       tag: 1.34.0
+    nodeSelector:
+      slurm.nebius.ai/nodeset: system
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: k8up
+    resources:
+      requests:
+        cpu: 50m
   overrideValues: null
   install:
     crds: CreateReplace
@@ -116,7 +190,51 @@ mariadbOperator:
   version: 25.10.2
   namespace: mariadb-operator-system
   releaseName: mariadb-operator
-  values: null
+  values:
+    nodeSelector:
+      slurm.nebius.ai/nodeset: system
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: mariadb-operator
+    resources:
+      requests:
+        cpu: 100m
+    webhook:
+      nodeSelector:
+        slurm.nebius.ai/nodeset: system
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: mariadb-operator-webhook
+      resources:
+        requests:
+          cpu: 100m
+    certController:
+      nodeSelector:
+        slurm.nebius.ai/nodeset: system
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: mariadb-operator-cert-controller
+      resources:
+        requests:
+          cpu: 100m
   overrideValues: null
   install:
     crds: Skip
@@ -150,11 +268,66 @@ observability:
   logsProjectId: default-project-id
   metricsProjectId: default-project-id
   region: eu-north1
+  # Source of the o11y write bearer token, consumed per `observability.publicEndpointTokenKind`:
+  #   secret   - collectors reference a token Secret (e.g. maintained by the token writer, or created in Terraform)
+  #   hostPath - collectors mount a host-provided token file directly
+  tsaToken:
+    secretName: o11y-writer-sa-token
+    secretKey: accessToken
+    hostPath: /mnt/cloud-metadata
+    mountPath: /o11ytoken
+    hostPathFilename: tsa-token
+    writer:
+      enabled: true
+      interval: 5m
+      version: 2.0.0
+      driftDetection:
+        mode: warn
+      # Token source: `imds` fetches from IMDS_BASE_URL; `file` reads a mounted host token.
+      source: imds
+      # Namespaces to maintain the Secret in. Empty means enabled o11y consumer namespaces.
+      namespaces: []
+      image:
+        repository: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/alpine/curl
+        tag: "8.19.0"
+        pullPolicy: IfNotPresent
+      imdsBaseUrl: http://169.254.169.254
+      hostNetwork: true
+      tokenExpiryFile: ""
+      refreshSafetyMarginSeconds: 900
+      pollIntervalSeconds: 300
+      nodeSelector:
+        slurm.nebius.ai/nodeset: system
+      # No affinity here: this Deployment is rendered inline and its pod label carries the
+      # release name, so the anti-affinity selector is built in the template.
+      resources:
+        requests:
+          cpu: 50m
   opentelemetry:
     enabled: true
     publicEndpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
     namespace: logs-system
     extraHeaders: {}
+    # These values are rendered as sending_queue.batch settings for the in-cluster (VictoriaLogs) exporters.
+    # The chart intentionally does not use the batch processor for collector pipelines.
+    # https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/44845#issuecomment-3877056774
+    batch:
+      timeout: 1s
+      sendBatchSize: 2000
+      sendBatchMaxSize: 5000
+    # Batch settings for the public Cloud Logging exporter only.
+    # Cloud Logging rejects requests with more than 1000 log records and the
+    # collector drops rejected batches, so keep sendBatchMaxSize <= 1000.
+    publicBatch:
+      timeout: 1s
+      sendBatchSize: 500
+      sendBatchMaxSize: 1000
+    # Exporter queue sizing shared by logs, events, and jail logs collectors.
+    # queueSize is measured in telemetry items because exporter queues use sizer: items
+    # (log records for logs/events), and it applies separately to each exporter.
+    sendingQueue:
+      queueSize: 30000
+      numConsumers: 10
     metrics:
       enabled: true
       interval: 30s
@@ -162,18 +335,28 @@ observability:
     logs:
       version: 0.149.*
       interval: 15m
-      timeout: 15m
+      timeout: 30m
       install:
         remediation:
-          retries: 3
+          retries: 6
       upgrade:
         remediation:
-          retries: 3
+          retries: 6
           remediateLastFailure: true
       values:
+        enableFileStorage: true
+        useGoMemLimit: true
         jailLogs:
           enabled: true
           pollInterval: 30s
+          enableFileStorage: true
+          useGoMemLimit: true
+          deleteAfterRead:
+            enabled: true
+            # Nebius O11y agent fork option; not part of upstream filelogreceiver.
+            # Files are deleted only after they have not been modified for at least this duration.
+            # Files are node-local (worker boot disk), so this is also the on-node debugging window.
+            minAge: 4h
           resources:
             requests:
               memory: 200Mi
@@ -209,6 +392,20 @@ observability:
           retries: 3
           remediateLastFailure: true
       values:
+        enableFileStorage: true
+        useGoMemLimit: true
+        nodeSelector:
+          slurm.nebius.ai/nodeset: system
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: opentelemetry-collector
+                      component: standalone-collector
         resources:
           requests:
             memory: 128Mi
@@ -231,7 +428,7 @@ observability:
     crds:
       interval: 5m
       timeout: 5m
-      version: 0.0.3
+      version: 0.10.1
       install:
         crds: CreateReplace
         remediation:
@@ -244,54 +441,73 @@ observability:
       driftDetection:
         mode: warn
     interval: 5m
-    timeout: 5m
-    version: 0.39.*
+    timeout: 30m
+    version: 0.80.*
     namespace: monitoring-system
     releaseName: metrics
     install:
       crds: Skip
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       crds: Skip
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
-    # Source of the o11y remote-write bearer token, consumed per `observability.publicEndpointTokenKind`:
-    #   secret   - vmagent references the token via remoteWrite[].bearerTokenSecret (operator-managed),
-    #              so extra remote-write destinations can carry their own auth without conflict
-    #   hostPath - the token file is mounted from the host and passed via -remoteWrite.bearerTokenFile,
-    #              scoped to the o11y endpoint only
-    tsaToken:
-      secretName: o11y-writer-sa-token
-      secretKey: accessToken
-      hostPath: /mnt/cloud-metadata
-      mountPath: /o11ytoken
-      hostPathFilename: tsa-token
-      writer:
-        enabled: true
-        interval: 5m
-        version: 2.0.0
-        driftDetection:
-          mode: warn
-        # Token source: `imds` (fetch from IMDS_BASE_URL, may be a proxy) or
-        # `file` (read a host-provided token file mounted from `hostPath`).
-        source: file
-        # Namespaces to maintain the Secret in. Empty means the vmStack namespace.
-        namespaces: []
-        image:
-          repository: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/alpine/curl
-          tag: "8.19.0"
-          pullPolicy: IfNotPresent
-        imdsBaseUrl: http://169.254.169.254
-        # hostNetwork is needed only to reach link-local IMDS directly; set false
-        # when IMDS_BASE_URL points at a routable proxy.
-        hostNetwork: true
-        tokenExpiryFile: ""
-        refreshSafetyMarginSeconds: 900
-        pollIntervalSeconds: 300
-        resources: {}
     values:
+      kubeStateMetrics:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: slurm.nebius.ai/nodeset
+                      operator: In
+                      values:
+                        - system
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: kube-state-metrics
+        resources:
+          requests:
+            cpu: 100m
+      grafana:
+        image:
+          tag: "11.6.14-security-04"
+        nodeSelector:
+          slurm.nebius.ai/nodeset: system
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: grafana
+        resources:
+          requests:
+            cpu: 100m
+      victoriaMetricsOperator:
+        nodeSelector:
+          slurm.nebius.ai/nodeset: system
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: victoria-metrics-operator
+        resources:
+          requests:
+            cpu: 100m
       dashboardNamespaces:
         - soperator
         - soperator-system
@@ -309,6 +525,17 @@ observability:
           org_role: Admin
       vmagent:
         spec:
+          nodeSelector:
+            slurm.nebius.ai/nodeset: system
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    topologyKey: kubernetes.io/hostname
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: vmagent
           extraArgs:
             promscrape.maxScrapeSize: "33554432"
             promscrape.dropOriginalLabels: "true"
@@ -316,7 +543,7 @@ observability:
           externalLabels: {}
           remoteWriteSettings: {}
           remoteWrite:
-            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
+            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8428/api/v1/write
           resources:
             requests:
               memory: 10Gi
@@ -328,6 +555,17 @@ observability:
           volumes: []
       vmsingle:
         spec:
+          nodeSelector:
+            slurm.nebius.ai/nodeset: system
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    topologyKey: kubernetes.io/hostname
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: vmsingle
           extraArgs:
             dedup.minScrapeInterval: 30s
             maxLabelsPerTimeseries: "40"
@@ -356,7 +594,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 0.9.*
+    version: 0.13.*
     namespace: logs-system
     releaseName: vm-logs
     install:
@@ -373,6 +611,17 @@ observability:
         enabled: true
         size: 30Gi
         accessMode: ReadWriteOnce
+      nodeSelector:
+        slurm.nebius.ai/nodeset: system
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: victoria-logs-single
       resources:
         requests:
           memory: 2Gi
@@ -385,21 +634,20 @@ observability:
   dcgmExporter:
     enabled: true
     interval: 5m
-    timeout: 5m
-    version: 4.1.7
+    timeout: 30m
+    version: 5.0.0
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     install:
       crds: CreateReplace
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       crds: CreateReplace
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     values:
-      hpcJobMapDir: /var/run/nebius/slurm
       validateToolkit: true
       resources:
         limits:
@@ -409,21 +657,81 @@ observability:
           cpu: 100m
     driftDetection:
       mode: warn
+  ncclProfiles:
+    enabled: false
+    interval: 5m
+    timeout: 5m
+    version:
+      bedag: 2.0.0
+      opentelemetryCollector: 0.149.*
+    install:
+      crds: Skip
+      remediation:
+        retries: 3
+    upgrade:
+      crds: Skip
+      remediation:
+        retries: 3
+        remediateLastFailure: true
+    driftDetection:
+      mode: warn
+    releaseName: opentelemetry-collector-nccl-profiles
+    configMapOverrideValues: null
+    collectorOverrideValues: null
+    values:
+      # or nodeLocal
+      mode: shared
+      resources:
+        requests:
+          memory: 200Mi
+          cpu: 500m
+        limits:
+          memory: 1Gi
+      useGoMemLimit: true
+      nebiusO11yAgentVersion: 2.0.10
+      metricsEndpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics
+      metricsExporterTimeout: 15s
+      # These values are rendered as exporter sending_queue.batch settings.
+      # The chart intentionally does not use the batch processor for collector pipelines.
+      batch:
+        timeout: 1s
+        sendBatchSize: 2000
+        sendBatchMaxSize: 5000
+      # Measured in metric data points because the exporter queue uses sizer: items.
+      sendingQueue:
+        queueSize: 30000
+        numConsumers: 10
+      metrics:
+        enabled: true
+        interval: 30s
+        scrapeTimeout: 10s
+      dumpDir: /mnt/jail/opt/soperator-outputs/shared/nccl_profiles
+      pollInterval: 30s
+      exportLabels:
+        slurmJobId: slurm_job_id
+        slurmStepId: slurm_step_id
+        hostnamePid: hostname_pid
+      enableFileStorage: true
+      deleteAfterRead:
+        enabled: true
+        # Nebius O11y agent fork option; not part of upstream filelogreceiver.
+        # Files are deleted only after they have not been modified for at least this duration.
+        minAge: 15m
 securityProfilesOperator:
   enabled: true
   interval: 5m
-  timeout: 5m
+  timeout: 30m
   version: 0.8.5-soperator
   releaseName: security-profiles-operator
   namespace: security-profiles-operator-system
   install:
     crds: CreateReplace
     remediation:
-      retries: 3
+      retries: 6
   upgrade:
     crds: CreateReplace
     remediation:
-      retries: 3
+      retries: 6
       remediateLastFailure: true
   values:
     daemon:
@@ -433,6 +741,19 @@ securityProfilesOperator:
         requests:
           cpu: 100m
           memory: 128Mi
+    # The operator's own webhook Deployment is created by the operator rather than by its chart,
+    # so its placement cannot be set from here.
+    nodeSelector:
+      slurm.nebius.ai/nodeset: system
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: security-profiles-operator
     resources:
       limits:
         cpu: 500m
@@ -447,7 +768,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.1.7
+  version: 5.0.0
   namespace: soperator
   releaseName: soperator
   values: null
@@ -465,15 +786,15 @@ slurmCluster:
     enabled: true
     releaseName: slurm-cluster-storage
     interval: 5m
-    timeout: 5m
+    timeout: 30m
     values: null
     overrideValues: null
     install:
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     driftDetection:
       mode: warn
@@ -481,11 +802,12 @@ slurmCluster:
     mode: warn
 nodesets:
   enabled: false
+  clusterName: ""
   driftDetection:
     mode: warn
   interval: 5m
   timeout: 5m
-  version: 4.1.7
+  version: 5.0.0
   namespace: soperator
   releaseName: soperator-nodesets
   values: null
@@ -503,7 +825,7 @@ soperatorActiveChecks:
   enabled: true
   interval: 5m
   timeout: 120m
-  version: 4.1.7
+  version: 5.0.0
   releaseName: soperator-activechecks
   namespace: soperator
   overrideValues: null
@@ -522,7 +844,7 @@ soperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.1.7
+  version: 5.0.0
   namespace: "soperator-system"
   releaseName: soperator-controller
   install:
@@ -537,6 +859,18 @@ soperator:
   values:
     serviceMonitor:
       enabled: true
+    controllerManager:
+      nodeSelector:
+        slurm.nebius.ai/nodeset: system
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    control-plane: controller-manager
     manager:
       resources:
         limits:
@@ -548,17 +882,17 @@ soperator:
   kruise:
     enabled: true
     interval: 5m
-    timeout: 5m
-    version: 1.8.0
+    timeout: 30m
+    version: 1.8.3-custom
     releaseName: soperator-kruise
     install:
       crds: CreateReplace
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       crds: CreateReplace
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     overrideValues:
       crds:
@@ -568,9 +902,12 @@ soperator:
         image:
           repository: cr.eu-north1.nebius.cloud/soperator/kruise-manager
           tag: v1.8.3
+        # The chart exposes no manager.affinity, so the two replicas get the pin but no
+        # anti-affinity term.
+        nodeSelector:
+          slurm.nebius.ai/nodeset: system
         resources:
           limits:
-            cpu: 1000m
             memory: 2Gi
           requests:
             cpu: 1000m
@@ -594,26 +931,47 @@ soperator:
       remediation:
         retries: 3
         remediateLastFailure: true
-    values: null
+    values:
+      checks:
+        nodeSelector:
+          slurm.nebius.ai/nodeset: system
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      control-plane: soperatorchecks
     overrideValues: null
     driftDetection:
       mode: warn
   nodeConfigurator:
     enabled: true
     interval: 5m
-    timeout: 5m
+    timeout: 30m
     releaseName: soperator-node-configurator
     install:
       crds: Skip
       remediation:
-        retries: 3
+        retries: 6
     upgrade:
       crds: Skip
       remediation:
-        retries: 3
+        retries: 6
         remediateLastFailure: true
     values:
       rebooter:
+        # Without a priority class the rebooter runs at 0 and loses a node's spare CPU budget to
+        # whatever infrastructure Deployment lands there first, with no way to preempt it. The
+        # class sits below every Slurm pod (the lowest is slurm-login at 100002) because this is a
+        # DaemonSet on every node, not just the worker ones - it must never evict Slurm workloads.
+        priorityClassName: soperator-rebooter
+        priorityClass:
+          create: true
+          name: soperator-rebooter
+          value: 100000
         resources:
           requests:
             memory: 200Mi
@@ -646,7 +1004,7 @@ notifier:
   enabled: false
   interval: 5m
   timeout: 5m
-  version: 4.1.7
+  version: 5.0.0
   namespace: monitoring-system
   releaseName: soperator-notifier
   install:
@@ -664,20 +1022,31 @@ notifier:
     mode: warn
 csiDriverNfs:
   interval: 5m
-  timeout: 5m
+  timeout: 20m
   version: 4.11.0
   namespace: nfs-system
   releaseName: csi-driver-nfs
-  overrideValues: null
-  values: null
+  overrideValues:
+    controller:
+      nodeSelector:
+        slurm.nebius.ai/nodeset: system
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: csi-nfs-controller
   install:
     crds: Skip
     remediation:
-      retries: 3
+      retries: 6
   upgrade:
     crds: Skip
     remediation:
-      retries: 3
+      retries: 6
       remediateLastFailure: true
   driftDetection:
     mode: warn
@@ -705,7 +1074,7 @@ storageClasses:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.1.7
+  version: 5.0.0
   namespace: storage-system
   releaseName: soperator-storageclasses
   values: null
@@ -724,7 +1093,7 @@ customConfigmaps:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.1.7
+  version: 5.0.0
   namespace: soperator
   releaseName: soperator-custom-configmaps
   overrideValues: null

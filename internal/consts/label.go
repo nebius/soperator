@@ -31,9 +31,8 @@ const (
 	LabelSConfigControllerSourceValue = "true"
 
 	// Controller type labels
-	LabelControllerType            = K8sGroupNameSoperator + "/controller-type"
-	LabelControllerTypeMain        = "main"
-	LabelControllerTypePlaceholder = "placeholder"
+	LabelControllerType     = K8sGroupNameSoperator + "/controller-type"
+	LabelControllerTypeMain = "main"
 
 	DefaultTopologyLabelPrefix = "topology.nebius.com"
 	TierZeroSuffix             = "/tier-0"
@@ -43,4 +42,12 @@ const (
 	LabelJailedAggregationCommonValue = "common"
 
 	AnnotationConfigHash = K8sGroupNameSoperator + "/config-hash"
+
+	LabelSoperatorRollingUpdateEnabled = K8sGroupNameSoperator + "/rolling-update-enabled"
+	LabelSoperatorRollingUpdateValue   = "true"
+
+	LabelSoperatorWorkerOperationID            = K8sGroupNameSoperator + "/worker-operation-id"
+	LabelSoperatorWorkerOperationPhase         = K8sGroupNameSoperator + "/worker-operation-phase"
+	LabelSoperatorWorkerOperationPhaseStopping = "stopping"
+	LabelSoperatorWorkerOperationPhaseReady    = "ready"
 )

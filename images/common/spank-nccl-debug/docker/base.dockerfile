@@ -1,7 +1,7 @@
 # Or arm64v8
 ARG ARCH="amd64"
 
-ARG SLURM_VERSION="25.11.3-1"
+ARG SLURM_VERSION="26-05-3-1"
 
 FROM cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/${ARCH}/fedora:42 AS slurm-base
 LABEL org.opencontainers.image.authors="Dmitrii Starov <dstaroff@nebius.com>"

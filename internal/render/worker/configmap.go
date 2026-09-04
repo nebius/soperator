@@ -132,6 +132,7 @@ func generateSshdConfig(login *values.SlurmLogin) renderutils.ConfigFile {
 	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdRSAKeyName)
 	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdECDSAKeyName)
 	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdECDSA25519KeyName)
+	res.AddLine("# Upgrade fallback for pre-PAM images; PAM-jail images remove this at startup.")
 	res.AddLine("ChrootDirectory " + consts.VolumeMountPathJail)
 	res.AddLine("ClientAliveInterval " + consts.SSHDClientAliveInterval)
 	res.AddLine("ClientAliveCountMax " + consts.SSHDClientAliveCountMax)

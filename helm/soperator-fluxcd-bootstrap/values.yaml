@@ -15,15 +15,23 @@ helmRelease:
   timeout: 5m
   chart:
     name: helm-soperator-fluxcd
-    version: "4.1.7"
+    version: "5.0.0"
     interval: 5m
+  # This release renders nothing but the HelmReleases of the Soperator stack.
+  # helm-controller v1.5 (Flux v2.8) assesses readiness with kstatus, which waits
+  # for custom resources as well, so waiting here means waiting for the whole
+  # stack to install. That never fits into the timeout, and the resulting failure
+  # is remediated with an uninstall that wipes the entire tree. The children
+  # track their own readiness, in dependsOn order.
   install:
     createNamespace: true
     crds: Skip
+    disableWait: true
     remediation:
       retries: 3
   upgrade:
     crds: Skip
+    disableWait: true
     remediation:
       retries: 3
   valuesFrom:

@@ -23,7 +23,8 @@
   "panels": [
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Number of compute instances (nodes) reporting metrics in this cluster.",
       "fieldConfig": {
@@ -72,7 +73,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "count(count by (Hostname) (DCGM_FI_DEV_POWER_USAGE{}))",
+          "expr": "count(count by (Hostname) (DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}))",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -84,7 +85,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Total number of GPU devices reporting metrics in this cluster.",
       "fieldConfig": {
@@ -133,7 +135,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "count(DCGM_FI_DEV_POWER_USAGE{})",
+          "expr": "count(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -145,7 +147,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Average number of GPUs with VRAM allocated above 100 MiB over the selected time range — proxy for GPUs running a workload.",
       "fieldConfig": {
@@ -190,7 +193,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "avg_over_time((count(DCGM_FI_DEV_FB_USED{} > 100))[$__range:])",
+          "expr": "avg_over_time((count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"} > 100))[$__range:])",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -202,7 +205,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Average number of GPUs with VRAM at or below 100 MiB over the selected time range — no workload detected.",
       "fieldConfig": {
@@ -250,7 +254,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg_over_time((count(DCGM_FI_DEV_FB_USED{} <= 100))[$__range:])",
+          "expr": "avg_over_time((count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"} <= 100))[$__range:])",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -262,7 +266,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Average SM (Streaming Multiprocessor) active fraction across all GPUs over the selected time range. 'Compute density' reflects how many SMs are scheduled with work — not how busy the GPU is overall. Typical healthy range for real ML workloads is 40–70%, driven by the natural mix of attention, GEMM, softmax, and comm kernels. See the GPU Busy % panel for the 'is anything running' signal.",
       "fieldConfig": {
@@ -316,7 +321,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg(avg_over_time(DCGM_FI_PROF_SM_ACTIVE{}[$__range])) * 100",
+          "expr": "avg(avg_over_time(DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}[$__range])) * 100",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -328,7 +333,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Sum of GPU power draw across all nodes in the cluster in kilowatts.",
       "fieldConfig": {
@@ -372,7 +378,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "sum(avg_over_time(DCGM_FI_DEV_POWER_USAGE{}[$__range])) / 1000",
+          "expr": "sum(avg_over_time(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}[$__range])) / 1000",
           "instant": true,
           "legendFormat": "",
           "range": false,
@@ -436,7 +442,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Average, P95, and max SM active % across all GPUs in the cluster over time. 40–70% is typical for real mixed ML workloads at 15s resolution — do not treat <100% as a problem. Max line reveals stragglers: if max is high while avg is low, one node may be bottlenecking distributed training.",
       "fieldConfig": {
@@ -531,21 +538,21 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg(DCGM_FI_PROF_SM_ACTIVE{}) * 100",
+          "expr": "avg(DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "Average",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "quantile(0.95, DCGM_FI_PROF_SM_ACTIVE{}) * 100",
+          "expr": "quantile(0.95, DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "P95",
           "range": true,
           "refId": "B"
         },
         {
-          "expr": "max(DCGM_FI_PROF_SM_ACTIVE{}) * 100",
+          "expr": "max(DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "Max (straggler signal)",
           "range": true,
@@ -557,7 +564,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Count of GPUs with VRAM > 100 MiB (in use) vs. ≤ 100 MiB (idle) over time. A sudden drop in 'In Use' indicates a job crash or node removal.",
       "fieldConfig": {
@@ -662,14 +670,14 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "count(DCGM_FI_DEV_FB_USED{} > 100)",
+          "expr": "count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"} > 100)",
           "instant": false,
           "legendFormat": "In Use",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "count(DCGM_FI_DEV_FB_USED{} <= 100)",
+          "expr": "count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"} <= 100)",
           "instant": false,
           "legendFormat": "Idle",
           "range": true,
@@ -681,7 +689,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Average fraction of time a CUDA kernel was executing on each GPU (DCGM_FI_DEV_GPU_UTIL). This is the 'liveness' / 'not idle' signal — 100% means a kernel is always running, but says nothing about whether it's using the hardware efficiently. Sudden drops during training indicate NCCL timeouts, node issues, or checkpointing. Normal healthy training: 95–100%.",
       "fieldConfig": {
@@ -756,14 +765,14 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg(DCGM_FI_DEV_GPU_UTIL{})",
+          "expr": "avg(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "Average",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "min(DCGM_FI_DEV_GPU_UTIL{})",
+          "expr": "min(DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "Min (node stalled?)",
           "range": true,
@@ -775,7 +784,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Average fraction of time tensor core pipes were active (DCGM_FI_PROF_PIPE_TENSOR_ACTIVE). The single most actionable metric for LLM / transformer training: if this drops while SM Active stays up, the workload has regressed to non-tensor ops (e.g. unfused softmax, fp32 paths). Typical healthy range in bf16/fp16 LLM training: 15–50%. Much lower = fusion / precision opportunity.",
       "fieldConfig": {
@@ -850,14 +860,14 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{}) * 100",
+          "expr": "avg(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "Average",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "max(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{}) * 100",
+          "expr": "max(DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "Max",
           "range": true,
@@ -869,7 +879,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Average SM occupancy (DCGM_FI_PROF_SM_OCCUPANCY) — of the SMs that are active, how many warps they are actually running vs theoretical max. SM Active says an SM scheduled work; SM Occupancy says how full it was. Typical healthy range: 20–40%. Together with SM Active, this catches the '1 SM busy = high GPU_UTIL but nothing real happening' case described in the Trainy blog post.",
       "fieldConfig": {
@@ -944,7 +955,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg(DCGM_FI_PROF_SM_OCCUPANCY{}) * 100",
+          "expr": "avg(DCGM_FI_PROF_SM_OCCUPANCY{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "Average",
           "range": true,
@@ -956,7 +967,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Total GPU power draw across all nodes in the cluster. Sudden drops during training typically indicate checkpointing or NCCL stalls. GPU power ≈ 80% of total server power.",
       "fieldConfig": {
@@ -1030,7 +1042,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "sum(DCGM_FI_DEV_POWER_USAGE{}) / 1000",
+          "expr": "sum(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) / 1000",
           "instant": false,
           "legendFormat": "Total Power",
           "range": true,
@@ -1042,7 +1054,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Total GPU frame buffer (VRAM) used across all GPUs in the cluster. Steady high VRAM with variable power/SM-active is a sign of idle-but-loaded GPUs.",
       "fieldConfig": {
@@ -1147,14 +1160,14 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "sum(DCGM_FI_DEV_FB_USED{})",
+          "expr": "sum(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "VRAM Used",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "sum(DCGM_FI_DEV_FB_FREE{})",
+          "expr": "sum(DCGM_FI_DEV_FB_FREE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "VRAM Free",
           "range": true,
@@ -1166,7 +1179,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "SM active % for each node over time. Each line = one instance. Diverging lines reveal stragglers. Range 40–70% is typical. For clusters >128 nodes this panel is hidden in favor of the stat-grid variant below.",
       "fieldConfig": {
@@ -1257,7 +1271,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg by (Hostname) (DCGM_FI_PROF_SM_ACTIVE{}) * 100",
+          "expr": "avg by (Hostname) (DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "{{Hostname}}",
           "range": true,
@@ -1269,7 +1283,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "One tile per node, colored by average SM active % over the selected time range. 40–70% is normal for mixed ML workloads — use this view to spot outliers relative to the cluster, not to flag <100% as bad.",
       "fieldConfig": {
@@ -1329,7 +1344,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg by (Hostname) (avg_over_time(DCGM_FI_PROF_SM_ACTIVE{}[$__range])) * 100",
+          "expr": "avg by (Hostname) (avg_over_time(DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}[$__range])) * 100",
           "instant": true,
           "legendFormat": "{{Hostname}}",
           "range": false,
@@ -1341,7 +1356,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Per-node Compute Density (SM Active %) over time. One row per node, averaged across the node's GPUs. Use this to spot stragglers during a training run — rows that go cool while peers stay warm indicate NCCL waits, dataloader stalls, or unhealthy GPUs. SM Active is preferred over GPU Util here because it reflects actual compute work, not just kernel presence.",
       "fieldConfig": {
@@ -1409,7 +1425,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "avg by (Hostname) (DCGM_FI_PROF_SM_ACTIVE{}) * 100",
+          "expr": "avg by (Hostname) (DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}) * 100",
           "instant": false,
           "legendFormat": "{{Hostname}}",
           "range": true,
@@ -1434,7 +1450,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Max and average GPU core temperature across the cluster. Sustained max above 80°C warrants investigation. Non-critical overheating increases InfiniBand bit error probability and can degrade performance before triggering shutdown.",
       "fieldConfig": {
@@ -1552,14 +1569,14 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "max(DCGM_FI_DEV_GPU_TEMP{})",
+          "expr": "max(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "Max",
           "range": true,
           "refId": "A"
         },
         {
-          "expr": "avg(DCGM_FI_DEV_GPU_TEMP{})",
+          "expr": "avg(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "Average",
           "range": true,
@@ -1571,7 +1588,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Max and average GPU Memory temperature across the cluster. Sustained max above 80°C warrants investigation. Non-critical overheating increases InfiniBand bit error probability and can degrade performance before triggering shutdown.",
       "fieldConfig": {
@@ -1690,7 +1708,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "max(DCGM_FI_DEV_MEMORY_TEMP{})",
+          "expr": "max(DCGM_FI_DEV_MEMORY_TEMP{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "Max",
           "range": true,
@@ -1700,7 +1718,7 @@
         },
         {
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_MEMORY_TEMP{})",
+          "expr": "avg(DCGM_FI_DEV_MEMORY_TEMP{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})",
           "instant": false,
           "legendFormat": "Average",
           "range": true,
@@ -1713,7 +1731,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "One tile per node, colored by max GPU temperature over the selected time range. Relative color scale — hottest node shows red even on an all-healthy cluster.",
       "fieldConfig": {
@@ -1768,7 +1787,7 @@
       "pluginVersion": "11.5.1",
       "targets": [
         {
-          "expr": "max by (Hostname) (max_over_time(DCGM_FI_DEV_GPU_TEMP{}[$__range]))",
+          "expr": "max by (Hostname) (max_over_time(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"}[$__range]))",
           "instant": true,
           "legendFormat": "{{Hostname}}",
           "range": false,
@@ -1786,15 +1805,102 @@
   "templating": {
     "list": [
       {
+        "current": {
+          "selected": true,
+          "text": "VictoriaMetrics",
+          "value": "VictoriaMetrics"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "filters": [],
+        "hide": 2,
+        "label": "O11y",
+        "name": "o11y",
+        "type": "adhoc"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(node_os_info, cluster)",
+        "hide": 2,
+        "includeAll": true,
+        "label": "Cluster",
+        "multi": false,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(node_os_info, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
+        "description": "",
+        "includeAll": true,
+        "label": "Nodeset",
+        "multi": true,
+        "name": "nodeset",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
         "allowCustomValue": false,
         "current": {
           "text": "4",
           "value": "4"
         },
         "datasource": {
-          "type": "prometheus"
+          "type": "prometheus",
+          "uid": "${datasource}"
         },
-        "definition": "query_result(count(count by (Hostname) (DCGM_FI_DEV_POWER_USAGE{})))",
+        "definition": "query_result(count(count by (Hostname) (DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})))",
         "hide": 2,
         "includeAll": false,
         "label": "Instance count (hidden)",
@@ -1808,7 +1914,7 @@
         ],
         "query": {
           "qryType": 5,
-          "query": "query_result(count(count by (Hostname) (DCGM_FI_DEV_POWER_USAGE{})))",
+          "query": "query_result(count(count by (Hostname) (DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\",slurm_nodeset_name=~\"$nodeset\"})))",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "regex": "/\\s(\\d+)\\s*\\d*$/",
@@ -1827,6 +1933,6 @@
   "timezone": "browser",
   "title": "GPU Cluster Stats",
   "uid": "soperator-gpu-cluster-stats",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

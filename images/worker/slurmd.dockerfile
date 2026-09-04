@@ -2,45 +2,38 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/79
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS worker_slurmd
+# https://github.com/nebius/ml-containers/pull/98
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260819104842 AS worker_pam_builder
 
-ARG MELLANOX_REPO_URL=https://linux.mellanox.com/public/repo/doca/3.1.0
-
-# Install useful packages
-RUN DPKG_ARCH="$(dpkg --print-architecture)" && \
-    case "$DPKG_ARCH" in \
-      amd64) MLNX_ARCH=x86_64 ;; \
-      arm64) MLNX_ARCH=arm64 ;; \
-      *) echo "Unsupported architecture: $DPKG_ARCH" && exit 1 ;; \
-    esac && \
-    echo "deb ${MELLANOX_REPO_URL}/ubuntu24.04/${MLNX_ARCH} ./" > /etc/apt/sources.list.d/mellanox_doca.list && \
-    wget -qO - https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub | apt-key add - && \
-    apt-get update && \
-    apt -y install \
-        pciutils \
-        iproute2 \
-        infiniband-diags=2507mlnx58-1.2507097 \
-        kmod \
-        libncurses5-dev \
-        supervisor \
-        openssh-server && \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc \
+        libpam0g-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install OpenMPI
-ARG OPENMPI_VERSION=4.1.9a1
-COPY images/common/scripts/install_openmpi.sh /opt/bin/
-RUN chmod +x /opt/bin/install_openmpi.sh && \
-    /opt/bin/install_openmpi.sh && \
-    rm /opt/bin/install_openmpi.sh
+COPY images/common/pam_soperator_jail.c /usr/src/pam-soperator-jail/
+COPY images/common/scripts/build_pam_soperator_jail.sh /usr/src/pam-soperator-jail/
+RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
+    /usr/src/pam-soperator-jail/pam_soperator_jail.c \
+    /out
 
-RUN arch=$(uname -m) && \
-    if [ "$arch" = "x86_64" ]; then alt_arch="x86_64"; \
-    elif [ "$arch" = "aarch64" ]; then alt_arch="aarch64"; \
-    else echo "Unsupported arch: $arch" && exit 1; fi && \
-    echo "LD_LIBRARY_PATH=/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib:/lib/${alt_arch}-linux-gnu:/usr/lib/${alt_arch}-linux-gnu:/usr/local/cuda/targets/${alt_arch}-linux/lib" >> /etc/environment
-ENV PATH=${PATH}:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
+# https://github.com/nebius/ml-containers/pull/98
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260819104842 AS worker_slurmd
+
+# Install useful packages
+RUN apt-get update && \
+    apt -y install \
+        pciutils \
+        iproute2 \
+        kmod \
+        libncurses5-dev \
+        supervisor \
+        openssh-server \
+        nginx-extras \
+        libnginx-mod-http-js && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create dummy library for replacing GPU-specific libraries on CPU workers in GPU clusters
 RUN ALT_ARCH="$(uname -m)" && \
@@ -63,12 +56,20 @@ RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
-# Install NCCL debug plugin
+# Install NCCL Debug SPANK plugin
 COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
 COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
+
+# Install NCCL Inspector PreConf SPANK plugin
+COPY ansible/spank_nccl_inspector_preconf.yml /opt/ansible/spank_nccl_inspector_preconf.yml
+COPY ansible/roles/spank_nccl_inspector_preconf /opt/ansible/roles/spank_nccl_inspector_preconf
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local \
+      -e spank_nccl_inspector_preconf_dump_dir_create=false \
+      spank_nccl_inspector_preconf.yml
 
 # Install enroot
 COPY images/common/scripts/install_enroot.sh /opt/bin/
@@ -85,18 +86,18 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
     chmod 644 /etc/enroot/enroot.conf.d/custom-dirs.conf
 
 # Install slurm pyxis plugin
-ARG SLURM_VERSION
-ARG PYXIS_VERSION=0.23.0
+ARG SLURM_DEB_VERSION
+ARG PYXIS_VERSION=0.24.0
 RUN apt-get update && \
-    apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
+    apt -y install nvslurm-plugin-pyxis=${SLURM_DEB_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 ## Install nvidia-container-toolkit (for enroot usage)
-COPY ansible/nvidia-container-toolkit.yml /opt/ansible/nvidia-container-toolkit.yml
-COPY ansible/roles/nvidia-container-toolkit /opt/ansible/roles/nvidia-container-toolkit
+COPY ansible/nvidia_container_toolkit.yml /opt/ansible/nvidia_container_toolkit.yml
+COPY ansible/roles/nvidia_container_toolkit /opt/ansible/roles/nvidia_container_toolkit
 RUN cd /opt/ansible && \
-    ansible-playbook -i inventory/ -c local nvidia-container-toolkit.yml -t nvidia-container-toolkit
+    ansible-playbook -i inventory/ -c local nvidia_container_toolkit.yml -t nvidia_container_toolkit
 
 # Install Docker
 RUN apt-get update && \
@@ -105,6 +106,8 @@ RUN apt-get update && \
 
 # Copy Docker daemon config
 COPY images/worker/docker/daemon.json /etc/docker/daemon.json
+COPY images/worker/nginx/soperator-docker-proxy.conf /etc/nginx/soperator-docker-proxy.conf
+COPY images/worker/nginx/docker_proxy.js /etc/nginx/njs/docker_proxy.js
 
 # Copy script for complementing jail filesystem in runtime
 COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
@@ -112,12 +115,18 @@ COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
 # Copy script for bind-mounting slurm into the jail
 COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
-# Copy script for rebooting K8s nodes
+# Copy script for preparing an SSHD configuration compatible with the PAM jail
+COPY images/common/scripts/prepare_sshd_pam_jail_config.sh /opt/bin/slurm/
+
+# Copy scripts for rebooting K8s nodes and handing off worker operations
 COPY images/common/scripts/reboot.sh /opt/bin/slurm/
+COPY images/common/scripts/worker_handoff.py /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh && \
-    chmod +x /opt/bin/slurm/reboot.sh
+    chmod +x /opt/bin/slurm/prepare_sshd_pam_jail_config.sh && \
+    chmod +x /opt/bin/slurm/reboot.sh && \
+    chmod +x /opt/bin/slurm/worker_handoff.py
 
 # Create single folder with slurm plugins for all architectures
 RUN mkdir -p /usr/lib/slurm && \
@@ -135,6 +144,14 @@ RUN rm -rf /home
 # Delete SSH "message of the day" scripts because they aren't needed on worker nodes
 RUN rm -rf /etc/update-motd.d
 
+# Install the native PAM module that places each SSH session in its own mount
+# namespace and pivots it into /mnt/jail. Worker SSH sessions intentionally do
+# not use the login node's per-user cgroup hook.
+# Keep pam_soperator_jail last: it pivots the per-session sshd process into the
+# jail, so any PAM session modules after it would also run inside the jail.
+COPY --from=worker_pam_builder /out/ /
+RUN echo "session required pam_soperator_jail.so /mnt/jail" >> /etc/pam.d/sshd
+
 # Expose the port used for accessing slurmd
 EXPOSE 6818
 
@@ -145,16 +162,22 @@ RUN mkdir -p /var/log/slurm/multilog && \
 
 # Copy slurmd entrypoint script
 COPY images/worker/slurmd_entrypoint.sh /opt/bin/slurm/
+COPY images/worker/write_soperator_metadata.sh /opt/bin/slurm/
 
 # Copy worker init script (controller readiness + topology for ephemeral nodes)
 COPY images/worker/worker_init.py /opt/bin/slurm/
 
 # Copy supervisord entrypoint script
 COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
+COPY images/worker/docker_proxy_nginx_entrypoint.sh /opt/bin/slurm/
+COPY images/worker/dockerd_entrypoint.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
+    chmod +x /opt/bin/slurm/write_soperator_metadata.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
-    chmod +x /opt/bin/slurm/worker_init.py
+    chmod +x /opt/bin/slurm/worker_init.py && \
+    chmod +x /opt/bin/slurm/docker_proxy_nginx_entrypoint.sh && \
+    chmod +x /opt/bin/slurm/dockerd_entrypoint.sh
 
 # Start supervisord that manages both slurmd and sshd as child processes
 ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]

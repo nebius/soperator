@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -42,12 +43,10 @@ type NodeTopologyReconciler struct {
 	BaseReconciler
 	Namespace           string
 	topologyLabelPrefix string
-	// https://github.com/kubernetes-sigs/controller-runtime/issues/3044
-	APIReader client.Reader // Direct API reader for pagination
 }
 
 func NewNodeTopologyReconciler(
-	client client.Client, scheme *runtime.Scheme, namespace, topologyLabelPrefix string, apiReader client.Reader) *NodeTopologyReconciler {
+	client client.Client, scheme *runtime.Scheme, namespace, topologyLabelPrefix string) *NodeTopologyReconciler {
 	return &NodeTopologyReconciler{
 		BaseReconciler: BaseReconciler{
 			Client: client,
@@ -55,16 +54,15 @@ func NewNodeTopologyReconciler(
 		},
 		Namespace:           namespace,
 		topologyLabelPrefix: topologyLabelPrefix,
-		APIReader:           apiReader,
 	}
 }
 
 // NodeTopologyReconciler watches Kubernetes nodes via the API server.
 //
-// Upon detecting a node with a `topologyconf.slurm.nebius.ai/tier-1` label,
+// Upon detecting a node with a `topology.nebius.com/tier-1` label,
 // it records the node’s tier information in the `node-topoly-labels` ConfigMap in a
 // `nodeName: [tier-x: switchName, ...]` format.
-// For the Blackwell architecture (GBX00 racks) `topologyconf.slurm.nebius.ai/tier-1` label
+// For the Blackwell architecture (GBX00 racks) `topology.nebius.com/tier-1` label
 // is considered as NVL domain of the rack. Remaining `tier-*` labels are considered as
 // IB topology.
 //
@@ -77,9 +75,9 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
-//	  topologyconf.slurm.nebius.ai/tier-0: nvl0
-//	  topologyconf.slurm.nebius.ai/tier-1: leaf00
-//	  topologyconf.slurm.nebius.ai/tier-2: spine00
+//	  topology.nebius.com/tier-0: nvl0
+//	  topology.nebius.com/tier-1: leaf00
+//	  topology.nebius.com/tier-2: spine00
 //	name: nodeA
 //
 // ---
@@ -88,9 +86,9 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
-//	  topologyconf.slurm.nebius.ai/tier-0: nvl0
-//	  topologyconf.slurm.nebius.ai/tier-1: leaf00
-//	  topologyconf.slurm.nebius.ai/tier-2: spine00
+//	  topology.nebius.com/tier-0: nvl0
+//	  topology.nebius.com/tier-1: leaf00
+//	  topology.nebius.com/tier-2: spine00
 //	name: nodeB
 //
 // ---
@@ -99,9 +97,9 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
-//	  topologyconf.slurm.nebius.ai/tier-0: nvl1
-//	  topologyconf.slurm.nebius.ai/tier-1: leaf01
-//	  topologyconf.slurm.nebius.ai/tier-2: spine01
+//	  topology.nebius.com/tier-0: nvl1
+//	  topology.nebius.com/tier-1: leaf01
+//	  topology.nebius.com/tier-2: spine01
 //	name: nodeC
 //
 // ---
@@ -110,9 +108,9 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
-//	  topologyconf.slurm.nebius.ai/tier-0: nvl2
-//	  topologyconf.slurm.nebius.ai/tier-1: leaf02
-//	  topologyconf.slurm.nebius.ai/tier-2: spine01
+//	  topology.nebius.com/tier-0: nvl2
+//	  topology.nebius.com/tier-1: leaf02
+//	  topology.nebius.com/tier-2: spine01
 //	name: nodeD
 //
 // The resulting ResourceDistribution would distribute a ConfigMap containing:
@@ -374,40 +372,25 @@ func (r *NodeTopologyReconciler) initializeResourceDistributionWithAllNodes(ctx 
 
 	configMapData := make(map[string]string)
 
+	// Read from the manager cache: this controller already watches every Node, so the informer
+	// holds them all regardless. Paginating the same data back out of the API server bought no
+	// memory and only added round-trips and client-side throttling.
 	nodeList := &corev1.NodeList{}
-	continueToken := ""
+	if err := r.Client.List(ctx, nodeList); err != nil {
+		return fmt.Errorf("list nodes: %w", err)
+	}
 
-	for {
-		listOptions := []client.ListOption{
-			client.Limit(consts.DefaultLimit),
-		}
-		if continueToken != "" {
-			listOptions = append(listOptions, client.Continue(continueToken))
-		}
-
-		// Use APIReader instead of cached client for pagination support
-		// https://github.com/kubernetes-sigs/controller-runtime/issues/3044
-		if err := r.APIReader.List(ctx, nodeList, listOptions...); err != nil {
-			return fmt.Errorf("list nodes: %w", err)
-		}
-
-		for _, node := range nodeList.Items {
-			if _, hasTierLabel := node.Labels[r.tierOneLabel()]; hasTierLabel {
-				tierData := ExtractTierLabels(node.Labels, r.topologyLabelPrefix)
-				if len(tierData) > 0 {
-					tierDataJSON, err := json.Marshal(tierData)
-					if err != nil {
-						logger.Error(err, "Failed to serialize tier data for node", "node", node.Name)
-						continue
-					}
-					configMapData[node.Name] = string(tierDataJSON)
+	for _, node := range nodeList.Items {
+		if _, hasTierLabel := node.Labels[r.tierOneLabel()]; hasTierLabel {
+			tierData := ExtractTierLabels(node.Labels, r.topologyLabelPrefix)
+			if len(tierData) > 0 {
+				tierDataJSON, err := json.Marshal(tierData)
+				if err != nil {
+					logger.Error(err, "Failed to serialize tier data for node", "node", node.Name)
+					continue
 				}
+				configMapData[node.Name] = string(tierDataJSON)
 			}
-		}
-
-		continueToken = nodeList.Continue
-		if continueToken == "" {
-			break
 		}
 	}
 
@@ -454,6 +437,38 @@ func (r *NodeTopologyReconciler) initializeResourceDistributionWithAllNodes(ctx 
 	return nil
 }
 
+// NodeCarriesTierLabels reports whether a node carries any topology tier label, which is what makes
+// it interesting to this controller.
+func (r *NodeTopologyReconciler) NodeCarriesTierLabels(object client.Object) bool {
+	node, ok := object.(*corev1.Node)
+	if !ok {
+		return false
+	}
+	return len(ExtractTierLabels(node.Labels, r.topologyLabelPrefix)) > 0
+}
+
+// NodeTierLabelsChanged reports whether the node's tier labels differ between two versions.
+//
+// The whole tier-* set is compared, not one tier. It is exactly what ExtractTierLabels stores and
+// what shouldProcessNode accepts, and comparing less has a sharp edge: gating on tier-1 alone
+// dropped every tier-0 change, so a block topology never learned its blocks and kept its nodes in
+// the catch-all "unknown" block, while a node carrying only tier-0 was never processed at all.
+func (r *NodeTopologyReconciler) NodeTierLabelsChanged(oldObject, newObject client.Object) bool {
+	oldNode, ok := oldObject.(*corev1.Node)
+	if !ok {
+		return false
+	}
+	newNode, ok := newObject.(*corev1.Node)
+	if !ok {
+		return false
+	}
+
+	return !maps.Equal(
+		ExtractTierLabels(oldNode.Labels, r.topologyLabelPrefix),
+		ExtractTierLabels(newNode.Labels, r.topologyLabelPrefix),
+	)
+}
+
 func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	maxConcurrency int, cacheSyncTimeout time.Duration) error {
 	// Add runnable to check ResourceDistribution existence after manager starts
@@ -464,35 +479,13 @@ func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 	return ctrl.NewControllerManagedBy(mgr).Named(NodeTopologyReconcilerName).
 		For(&corev1.Node{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
-				node, ok := e.Object.(*corev1.Node)
-				if !ok {
-					return false
-				}
-				_, exists := node.Labels[r.tierOneLabel()]
-				return exists
+				return r.NodeCarriesTierLabels(e.Object)
 			},
 			UpdateFunc: func(e event.UpdateEvent) bool {
-				oldNode, ok := e.ObjectOld.(*corev1.Node)
-				if !ok {
-					return false
-				}
-				newNode, ok := e.ObjectNew.(*corev1.Node)
-				if !ok {
-					return false
-				}
-
-				_, newHasLabel := newNode.Labels[r.tierOneLabel()]
-				_, oldHasLabel := oldNode.Labels[r.tierOneLabel()]
-
-				return newHasLabel || (oldHasLabel && oldNode.Labels[r.tierOneLabel()] != newNode.Labels[r.tierOneLabel()])
+				return r.NodeTierLabelsChanged(e.ObjectOld, e.ObjectNew)
 			},
 			DeleteFunc: func(e event.DeleteEvent) bool {
-				node, ok := e.Object.(*corev1.Node)
-				if !ok {
-					return false
-				}
-				_, exists := node.Labels[r.tierOneLabel()]
-				return exists
+				return r.NodeCarriesTierLabels(e.Object)
 			},
 		})).
 		Watches(&kruisev1alpha1.ResourceDistribution{},

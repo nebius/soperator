@@ -1,0 +1,107 @@
+{
+  "meta": {
+    "plugin": {
+      "type": "openapi/slurmctld",
+      "name": "Slurm OpenAPI slurmctld",
+      "data_parser": "data_parser/v0.0.44",
+      "accounting_storage": "accounting_storage/slurmdbd"
+    },
+    "slurm": {
+      "version": {
+        "major": "25",
+        "micro": "5",
+        "minor": "11"
+      },
+      "release": "25.11.5",
+      "cluster": "soperator"
+    }
+  },
+  "statistics": {
+    "parts_packed": 1,
+    "req_time": {
+      "set": true,
+      "infinite": false,
+      "number": 1747752894
+    },
+    "req_time_start": {
+      "set": true,
+      "infinite": false,
+      "number": 1747660800
+    },
+    "server_thread_count": 3,
+    "agent_queue_size": 0,
+    "agent_count": 0,
+    "agent_thread_count": 0,
+    "dbd_agent_queue_size": 0,
+    "jobs_submitted": 1284,
+    "jobs_started": 1280,
+    "jobs_completed": 1275,
+    "jobs_canceled": 4,
+    "jobs_failed": 1,
+    "jobs_pending": 3,
+    "jobs_running": 2,
+    "schedule_cycle_max": 214748,
+    "schedule_cycle_last": 1873,
+    "schedule_cycle_sum": 6442450944,
+    "schedule_cycle_total": 52833,
+    "schedule_cycle_mean": 121938,
+    "schedule_cycle_mean_depth": 1,
+    "schedule_cycle_per_minute": 20,
+    "schedule_queue_length": 0,
+    "schedule_exit": {
+      "end_job_queue": 52800,
+      "default_queue_depth": 33,
+      "max_job_start": 0,
+      "max_rpc_cnt": 0,
+      "max_sched_time": 0,
+      "licenses": 0
+    },
+    "rpcs_by_message_type": [
+      {
+        "message_type": "REQUEST_NODE_INFO",
+        "type_id": 2007,
+        "count": 205430,
+        "queued": 0,
+        "dropped": 0,
+        "cycle_last": 0,
+        "cycle_max": 0,
+        "total_time": 6871947674,
+        "average_time": {
+          "set": true,
+          "infinite": false,
+          "number": 33452
+        }
+      },
+      {
+        "message_type": "REQUEST_JOB_INFO",
+        "type_id": 2003,
+        "count": 102715,
+        "queued": 0,
+        "dropped": 0,
+        "cycle_last": 0,
+        "cycle_max": 0,
+        "total_time": 512238,
+        "average_time": {
+          "set": true,
+          "infinite": false,
+          "number": 4987
+        }
+      }
+    ],
+    "rpcs_by_user": [
+      {
+        "user": "root",
+        "user_id": 0,
+        "count": 308145,
+        "total_time": 7384185912,
+        "average_time": {
+          "set": true,
+          "infinite": false,
+          "number": 23963
+        }
+      }
+    ]
+  },
+  "warnings": [],
+  "errors": []
+}

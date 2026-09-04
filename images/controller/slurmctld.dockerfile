@@ -2,7 +2,7 @@
 
 ARG SLURM_VERSION
 
-FROM cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/golang:1.25 AS go-base
+FROM cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/golang:1.26 AS go-base
 
 WORKDIR /build
 
@@ -30,8 +30,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -v -o power-manager ./cmd/powermanager
 
-# https://github.com/nebius/ml-containers/pull/79
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS controller_slurmctld
+# https://github.com/nebius/ml-containers/pull/98
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260819104842 AS controller_slurmctld
 
 COPY ansible/sssd.yml /opt/ansible/sssd.yml
 COPY ansible/roles/sssd /opt/ansible/roles/sssd
@@ -54,10 +54,11 @@ RUN mkdir -p /var/log/slurm/multilog && \
 COPY --from=powermanager_builder /build/power-manager /opt/soperator/bin/power-manager
 RUN chmod 755 /opt/soperator/bin/power-manager
 
-# Copy power management scripts for Slurm ResumeProgram/SuspendProgram
+# Copy power management scripts for Slurm ResumeProgram/ResumeFailProgram/SuspendProgram
 COPY images/controller/power_resume.sh /opt/soperator/bin/power_resume.sh
+COPY images/controller/power_resume_fail.sh /opt/soperator/bin/power_resume_fail.sh
 COPY images/controller/power_suspend.sh /opt/soperator/bin/power_suspend.sh
-RUN chmod 755 /opt/soperator/bin/power_resume.sh /opt/soperator/bin/power_suspend.sh
+RUN chmod 755 /opt/soperator/bin/power_resume.sh /opt/soperator/bin/power_resume_fail.sh /opt/soperator/bin/power_suspend.sh
 
 # Copy & run the entrypoint script
 COPY images/controller/slurmctld_entrypoint.sh /opt/bin/slurm/

@@ -18,16 +18,35 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 22,
+  "id": 12,
   "links": [
     {
       "asDropdown": false,
       "icon": "external link",
       "includeVars": false,
       "keepTime": true,
-      "tags": ["soperator", "gpu"],
+      "tags": [
+        "soperator",
+        "gpu"
+      ],
       "targetBlank": true,
       "title": "GPU Stats",
+      "tooltip": "",
+      "type": "dashboards",
+      "url": ""
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "soperator",
+        "nodesets",
+        "overview"
+      ],
+      "targetBlank": true,
+      "title": "Nodesets Oveview",
       "tooltip": "",
       "type": "dashboards",
       "url": ""
@@ -50,7 +69,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -64,8 +83,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "text",
-                "value": null
+                "color": "text"
               }
             ]
           }
@@ -87,7 +105,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -95,16 +115,16 @@
         "textMode": "name",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "group(\n    kube_customresource_slurmcluster_info{\n        cr_version!=\"\"\n    }\n) by(cr_version)\n",
+          "expr": "group(\n    kube_customresource_slurmcluster_info{cluster=~\"$cluster\", \n        cr_version!=\"\"\n    }\n) by(cr_version)\n",
           "instant": true,
           "legendFormat": "{{version}}",
           "range": false,
@@ -119,7 +139,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -132,8 +152,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-blue",
-                "value": null
+                "color": "super-light-blue"
               }
             ]
           }
@@ -155,7 +174,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -163,16 +184,16 @@
         "textMode": "name",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  cadvisor_version_info{}\n) by(iam_project_id)",
+          "expr": "count(\n  cadvisor_version_info{cluster=~\"$cluster\"}\n) by(iam_project_id)",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -187,7 +208,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -200,8 +221,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-blue",
-                "value": null
+                "color": "super-light-blue"
               }
             ]
           }
@@ -223,7 +243,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -231,16 +253,16 @@
         "textMode": "name",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "group(\n    kube_node_labels{label_nebius_com_gpu_name!=\"\"}\n) by (label_nebius_com_gpu_name)",
+          "expr": "group(\n    kube_node_labels{cluster=~\"$cluster\", label_nebius_com_gpu_name!=\"\"}\n) by (label_nebius_com_gpu_name)",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -255,69 +277,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
-      },
-      "description": "For GB platform only",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "super-light-purple",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 4,
-        "x": 16,
-        "y": 1
-      },
-      "id": 100,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.5.1",
-      "targets": [
-        {
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "count(\n  count by (label_slurm_nebius_ai_nodeset_name) (\n    kube_node_labels{\n      label_nebius_com_gpu_name=~\"GB.*\",\n      label_slurm_nebius_ai_nodeset_name!=\"\"\n    }\n  )\n)",
-          "instant": true,
-          "range": false,
-          "refId": "A",
-          "useCustomValues": true,
-          "useDashValues": false
-        }
-      ],
-      "title": "Racks",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "GPU Nodes",
       "fieldConfig": {
@@ -330,8 +290,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-purple",
-                "value": null
+                "color": "super-light-purple"
               }
             ]
           }
@@ -341,7 +300,7 @@
       "gridPos": {
         "h": 3,
         "w": 4,
-        "x": 20,
+        "x": 16,
         "y": 1
       },
       "id": 4,
@@ -352,7 +311,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -360,12 +321,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  slurm_node_info{\n}\n) by()",
+          "expr": "count(\n  slurm_node_info{cluster=~\"$cluster\"\n}\n) by()",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -379,7 +340,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -393,8 +354,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -417,7 +377,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -425,16 +387,16 @@
         "textMode": "value",
         "wideLayout": false
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "(\n  tlast_change_over_time(\n    (\n      group(\n        kube_customresource_slurmcluster_info{\n          cr_version!=\"\"\n        }\n      ) by(cr_version)\n    )[180d]\n  )\n    *\n  1000\n)\nand on(cr_version)\ngroup(\n  kube_customresource_slurmcluster_info{\n    cr_version!=\"\"\n  }\n) by(cr_version)",
+          "expr": "(\n  tlast_change_over_time(\n    (\n      group(\n        kube_customresource_slurmcluster_info{cluster=~\"$cluster\", \n          cr_version!=\"\"\n        }\n      ) by(cr_version)\n    )[180d]\n  )\n    *\n  1000\n)\nand on(cr_version)\ngroup(\n  kube_customresource_slurmcluster_info{cluster=~\"$cluster\", \n    cr_version!=\"\"\n  }\n) by(cr_version)",
           "instant": true,
           "legendFormat": "{{version}}",
           "range": false,
@@ -449,7 +411,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -462,8 +424,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-blue",
-                "value": null
+                "color": "super-light-blue"
               }
             ]
           }
@@ -485,7 +446,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -493,16 +456,16 @@
         "textMode": "name",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  cadvisor_version_info{}\n) by(mk8s_cluster_id)",
+          "expr": "count(\n  cadvisor_version_info{cluster=~\"$cluster\"}\n) by(mk8s_cluster_id)",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -517,7 +480,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -530,8 +493,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-purple",
-                "value": null
+                "color": "super-light-purple"
               }
             ]
           }
@@ -552,7 +514,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -560,12 +524,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  DCGM_FI_DEV_GPU_UTIL{\n    \n  }\n) by()",
+          "expr": "count(\n  DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n    \n  }\n) by()",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -579,7 +543,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "For GB platform only",
       "fieldConfig": {
@@ -592,8 +556,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-purple",
-                "value": null
+                "color": "super-light-purple"
               }
             ]
           }
@@ -614,7 +577,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -622,12 +587,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  count by (label_nebius_com_nvlink_instance_group) (\n    kube_node_labels{\n      label_nebius_com_gpu_name=~\"GB.*\",\n      label_nebius_com_nvlink_instance_group!=\"\"\n    }\n  )\n)",
+          "expr": "count(\n  count(slurm_node_nvlink_instance_group{cluster=~\"$cluster\"}) by (cluster, nvlink_instance_group)\n) by (cluster)",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -654,7 +619,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -668,8 +633,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "light-orange",
-                "value": null
+                "color": "light-orange"
               }
             ]
           },
@@ -691,7 +655,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -699,12 +665,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{\n        \n    }\n        >=\n    10\n)[1d:10m])\n/\nsum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{\n        \n    }\n)[1d:10m])\n* 100",
+          "expr": "sum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        \n    }\n        >=\n    10\n)[1d:10m])\n/\nsum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        \n    }\n)[1d:10m])\n* 100",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -719,7 +685,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "Based on number of nodes per job (nodes > 1)\n\nOver the selected time window",
       "fieldConfig": {
@@ -734,8 +700,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -761,7 +726,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["mean"],
+          "calcs": [
+            "mean"
+          ],
           "fields": "",
           "values": false
         },
@@ -769,16 +736,16 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(\n  (\n    count(\n      slurm_node_job{\n        \n      }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  1\n) by ()",
+          "expr": "avg(\n  (\n    count(\n      slurm_node_job{cluster=~\"$cluster\"\n        \n      }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{cluster=~\"$cluster\", \n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  1\n) by ()",
           "hide": false,
           "instant": false,
           "legendFormat": "__auto",
@@ -794,7 +761,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "Over the selected time window",
       "fieldConfig": {
@@ -809,8 +776,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -832,7 +798,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["mean"],
+          "calcs": [
+            "mean"
+          ],
           "fields": "",
           "values": false
         },
@@ -840,16 +808,16 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{\n    \n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      \n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"\n    \n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n      \n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "instant": false,
           "range": true,
@@ -864,7 +832,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -877,8 +845,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -899,7 +866,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -907,12 +876,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n    slurm_node_info{\n        \n        state_base=~\"IDLE|MIXED|ALLOCATED\",\n        state_is_drain=\"false\"\n    }\n) by ()\n",
+          "expr": "count(\n    slurm_node_info{cluster=~\"$cluster\", \n        \n        state_base=~\"IDLE|MIXED|ALLOCATED\",\n        state_is_drain=\"false\"\n    }\n) by ()\n",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -926,7 +895,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -940,8 +909,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -963,7 +931,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -971,12 +941,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "time() - kube_pod_created{\n  \n  namespace=~\"soperator\",\n  pod=~\"controller-[0-9]+\"\n}",
+          "expr": "time() - kube_pod_created{cluster=~\"$cluster\", \n  \n  namespace=~\"soperator\",\n  pod=~\"controller-[0-9]+\"\n}",
           "instant": true,
           "legendFormat": "{{pod}}",
           "range": false,
@@ -991,7 +961,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "Time nodes are in states where new jobs cannot be started on them",
       "fieldConfig": {
@@ -1006,8 +976,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1032,7 +1001,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1040,15 +1011,15 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_avg(sum(increase(slurm_node_unavailability_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+          "expr": "histogram_avg(sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
           "hide": false,
           "range": true,
           "refId": "B",
@@ -1062,7 +1033,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -1076,8 +1047,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "light-orange",
-                "value": null
+                "color": "light-orange"
               }
             ]
           },
@@ -1099,7 +1069,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1107,12 +1079,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{\n        \n    }\n        >=\n    10\n)[7d:1h])\n/\nsum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{\n           }\n)[7d:1h])\n* 100",
+          "expr": "sum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        \n    }\n        >=\n    10\n)[7d:1h])\n/\nsum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n           }\n)[7d:1h])\n* 100",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -1127,7 +1099,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "Based on number of nodes per job\n\nOver the selected time window",
       "fieldConfig": {
@@ -1142,8 +1114,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1169,7 +1140,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["mean"],
+          "calcs": [
+            "mean"
+          ],
           "fields": "",
           "values": false
         },
@@ -1177,16 +1150,16 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(\n  sum_over_time(\n    (\n      slurm_job_info{\n        \n        slurm_partition${partition_match_exp},\n        job_state=\"RUNNING\"\n      }\n    )[1d:1m]\n  )\n    *\n  60\n) by ()",
+          "expr": "avg(\n  sum_over_time(\n    (\n      slurm_job_info{cluster=~\"$cluster\", \n        \n        slurm_partition${partition_match_exp},\n        job_state=\"RUNNING\"\n      }\n    )[1d:1m]\n  )\n    *\n  60\n) by ()",
           "hide": false,
           "instant": false,
           "legendFormat": "__auto",
@@ -1202,7 +1175,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -1216,8 +1189,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-purple",
-                "value": null
+                "color": "super-light-purple"
               }
             ]
           },
@@ -1239,7 +1211,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1247,12 +1221,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "with (\n  filters = {}\n)\navg(\n  DCGM_FI_DEV_GPU_UTIL{filters}\n)",
+          "expr": "with (\n  filters = {}\n)\navg(\n  DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", filters}\n)",
           "instant": false,
           "range": true,
           "refId": "A",
@@ -1266,7 +1240,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -1280,8 +1254,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "light-orange",
@@ -1310,7 +1283,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1318,12 +1293,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n    slurm_node_info{\n        \n        state_base=~\"DOWN|ERROR\",\n        state_is_drain=\"true\"\n    }\n) by ()\n",
+          "expr": "count(\n    slurm_node_info{cluster=~\"$cluster\", \n        \n        state_base=~\"DOWN|ERROR\",\n        state_is_drain=\"true\"\n    }\n) by ()\n",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -1337,7 +1312,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "In selected time window",
       "fieldConfig": {
@@ -1352,8 +1327,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "light-orange",
@@ -1386,7 +1360,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1394,15 +1370,15 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(increase(max by(node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (slurm_node_fails_total{state_is_maintenance=\"false\", })[$__range]))",
+          "expr": "sum(increase(max by(node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (slurm_node_fails_total{cluster=~\"$cluster\", state_is_maintenance=\"false\", })[$__range]))",
           "format": "time_series",
           "instant": true,
           "intervalFactor": 2,
@@ -1418,7 +1394,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "Time nodes spent in `draining` state",
       "fieldConfig": {
@@ -1433,8 +1409,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1459,7 +1434,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1467,15 +1444,15 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_avg(sum(increase(slurm_node_draining_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+          "expr": "histogram_avg(sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
           "hide": false,
           "range": true,
           "refId": "B",
@@ -1489,7 +1466,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -1503,8 +1480,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-purple",
-                "value": null
+                "color": "super-light-purple"
               }
             ]
           },
@@ -1526,7 +1502,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1534,12 +1512,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "with (\n  filters = {}\n)\ncount(\n  slurm_job_info{\n    filters,\n    job_state=\"RUNNING\",\n    slurm_partition${partition_match_exp},\n  }\n)",
+          "expr": "with (\n  filters = {}\n)\ncount(\n  slurm_job_info{cluster=~\"$cluster\", \n    filters,\n    job_state=\"RUNNING\",\n    slurm_partition${partition_match_exp},\n  }\n)",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -1553,7 +1531,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "GPU Nodes",
       "fieldConfig": {
@@ -1567,8 +1545,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "super-light-purple",
-                "value": null
+                "color": "super-light-purple"
               }
             ]
           }
@@ -1589,7 +1566,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1597,12 +1576,12 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  slurm_node_info{state_base=\"ALLOCATED\"}\n) by(cluster)",
+          "expr": "count(\n  slurm_node_info{cluster=~\"$cluster\", state_base=\"ALLOCATED\"}\n) by(cluster)",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -1616,7 +1595,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1629,8 +1608,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1655,7 +1633,9 @@
         "orientation": "auto",
         "percentChangeColorMode": "standard",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1663,15 +1643,15 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\n  sum (\n    increase(\n      sum by (node_name, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n        slurm_node_gpu_seconds_total{\n          \n          state_is_maintenance=\"false\",\n          state_base=~\".*\"\n        }\n      )[7d]\n    )\n  )\n  /\n  (\n    sum (\n      increase(\n        max by (node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n          slurm_node_fails_total{\n            \n            state_is_maintenance=\"false\"\n          }\n        )[7d]\n      )\n    )\n    or\n    (\n      sum (\n        increase(\n          slurm_node_gpu_seconds_total{\n            \n            state_is_maintenance=\"false\",\n            state_base=~\".*\"\n          }[7d]\n        )\n      ) * 0\n    )\n  )\n) / 3600",
+          "expr": "(\n  sum (\n    increase(\n      sum by (node_name, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n        slurm_node_gpu_seconds_total{cluster=~\"$cluster\", \n          \n          state_is_maintenance=\"false\",\n          state_base=~\".*\"\n        }\n      )[7d]\n    )\n  )\n  /\n  (\n    sum (\n      increase(\n        max by (node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n          slurm_node_fails_total{cluster=~\"$cluster\", \n            \n            state_is_maintenance=\"false\"\n          }\n        )[7d]\n      )\n    )\n    or\n    (\n      sum (\n        increase(\n          slurm_node_gpu_seconds_total{cluster=~\"$cluster\", \n            \n            state_is_maintenance=\"false\",\n            state_base=~\".*\"\n          }[7d]\n        )\n      ) * 0\n    )\n  )\n) / 3600",
           "format": "time_series",
           "instant": true,
           "intervalFactor": 2,
@@ -1700,7 +1680,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "Proportion of GPUs with at least 10% utilization to total",
       "fieldConfig": {
@@ -1749,8 +1729,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "light-orange",
-                "value": null
+                "color": "light-orange"
               }
             ]
           }
@@ -1777,15 +1756,15 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n        }\n      >=\n    10\n  ) by(cluster)\n    /\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n        }\n  ) by(cluster)\n)\n  *\n100",
+          "expr": "(\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n      >=\n    10\n  ) by(cluster)\n    /\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n  ) by(cluster)\n)\n  *\n100",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A",
@@ -1799,7 +1778,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1846,8 +1825,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1875,15 +1853,15 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\n  sum (\n    increase(\n      sum by (node_name, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n        slurm_node_gpu_seconds_total{\n          state_is_maintenance=\"false\",\n        }\n      )[7d]\n    )\n  )\n  /\n  (\n    sum (\n      increase(\n        max by (node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n          slurm_node_fails_total{\n            state_is_maintenance=\"false\"\n          }\n        )[7d]\n      )\n    )\n    or\n    (\n      sum (\n        increase(\n          slurm_node_gpu_seconds_total{\n            state_is_maintenance=\"false\",\n          }[7d]\n        )\n      ) * 0\n    )\n  )\n) / 36",
+          "expr": "(\n  sum (\n    increase(\n      sum by (node_name, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n        slurm_node_gpu_seconds_total{cluster=~\"$cluster\", \n          state_is_maintenance=\"false\",\n        }\n      )[7d]\n    )\n  )\n  /\n  (\n    sum (\n      increase(\n        max by (node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n          slurm_node_fails_total{cluster=~\"$cluster\", \n            state_is_maintenance=\"false\"\n          }\n        )[7d]\n      )\n    )\n    or\n    (\n      sum (\n        increase(\n          slurm_node_gpu_seconds_total{cluster=~\"$cluster\", \n            state_is_maintenance=\"false\",\n          }[7d]\n        )\n      ) * 0\n    )\n  )\n) / 36",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "MTBF",
@@ -1899,7 +1877,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "Only for GPUs with at least 10% utilization",
       "fieldConfig": {
@@ -1947,8 +1925,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1980,7 +1957,10 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [10, 10],
+                  "dash": [
+                    10,
+                    10
+                  ],
                   "fill": "dash"
                 }
               },
@@ -2031,15 +2011,15 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(\n  DCGM_FI_DEV_POWER_USAGE{\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "max(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "legendFormat": "max",
           "range": true,
@@ -2050,10 +2030,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{\n      }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"\n      }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "legendFormat": "avg",
           "range": true,
@@ -2064,10 +2044,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "min(\n  DCGM_FI_DEV_POWER_USAGE{\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "min(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "legendFormat": "min",
           "range": true,
@@ -2082,7 +2062,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "P4169E866C3094E38"
+        "uid": "${datasource}"
       },
       "description": "Jobs in `PENDING` state by reason",
       "fieldConfig": {
@@ -2131,8 +2111,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2161,11 +2140,11 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(\n  slurm_job_info{\n    slurm_partition${partition_match_exp},\n    job_state=\"PENDING\"\n  }\n) by(job_state_reason)",
+          "expr": "sum(\n  slurm_job_info{cluster=~\"$cluster\", \n    slurm_partition${partition_match_exp},\n    job_state=\"PENDING\"\n  }\n) by(job_state_reason)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A",
@@ -2179,7 +2158,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -2229,8 +2208,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2262,7 +2240,10 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [10, 10],
+                  "dash": [
+                    10,
+                    10
+                  ],
                   "fill": "dash"
                 }
               },
@@ -2313,15 +2294,15 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.5.1",
+      "pluginVersion": "11.6.14+security-04",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(\n  DCGM_FI_PROF_SM_ACTIVE\n)",
+          "expr": "max(\n  DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}\n)",
           "hide": false,
           "legendFormat": "max",
           "range": true,
@@ -2332,10 +2313,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(\n  DCGM_FI_PROF_SM_ACTIVE\n)",
+          "expr": "avg(\n  DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}\n)",
           "hide": false,
           "legendFormat": "avg",
           "range": true,
@@ -2346,10 +2327,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "min(\n  DCGM_FI_PROF_SM_ACTIVE\n)",
+          "expr": "min(\n  DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}\n)",
           "hide": false,
           "legendFormat": "min",
           "range": true,
@@ -2369,308 +2350,12 @@
         "x": 0,
         "y": 39
       },
-      "id": 103,
-      "panels": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "description": "Proportion of GPUs with at least 10% utilization to total for selected racks",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "fixedColor": "light-orange",
-                "mode": "shades"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "barWidthFactor": 0.6,
-                "drawStyle": "line",
-                "fillOpacity": 20,
-                "gradientMode": "opacity",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "smooth",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "max": 100,
-              "min": 0,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "light-orange",
-                    "value": null
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 12,
-            "x": 0,
-            "y": 40
-          },
-          "id": 104,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": false
-            },
-            "tooltip": {
-              "hideZeros": false,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "11.5.1",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "VictoriaMetrics"
-              },
-              "editorMode": "code",
-              "expr": "(\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$rack\"\n    }\n      >=\n    10\n  ) by(cluster)\n    /\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$rack\"\n    }\n  ) by(cluster)\n)\n  *\n100",
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "A",
-              "useCustomValues": true,
-              "useDashValues": false
-            }
-          ],
-          "title": "Rack Utilization",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "VictoriaMetrics"
-          },
-          "description": "Only for GPUs with at least 10% utilization for selected racks",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "fixedColor": "green",
-                "mode": "fixed"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "barWidthFactor": 0.6,
-                "drawStyle": "line",
-                "fillOpacity": 50,
-                "gradientMode": "opacity",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "smooth",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "min": 0,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "watt"
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "max"
-                },
-                "properties": [
-                  {
-                    "id": "custom.fillBelowTo",
-                    "value": "min"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "avg"
-                },
-                "properties": [
-                  {
-                    "id": "custom.lineStyle",
-                    "value": {
-                      "dash": [10, 10],
-                      "fill": "dash"
-                    }
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "super-light-green",
-                      "mode": "fixed"
-                    }
-                  },
-                  {
-                    "id": "custom.fillOpacity",
-                    "value": 0
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "min"
-                },
-                "properties": [
-                  {
-                    "id": "custom.fillOpacity",
-                    "value": 0
-                  }
-                ]
-              }
-            ]
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 12,
-            "x": 12,
-            "y": 40
-          },
-          "id": 105,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": false
-            },
-            "tooltip": {
-              "hideZeros": false,
-              "mode": "multi",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "11.5.1",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "VictoriaMetrics"
-              },
-              "editorMode": "code",
-              "expr": "max(\n  DCGM_FI_DEV_POWER_USAGE{\n      slurm_nodeset_name=~\"$rack\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$rack\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
-              "hide": false,
-              "legendFormat": "max",
-              "range": true,
-              "refId": "C",
-              "useCustomValues": true,
-              "useDashValues": false
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "VictoriaMetrics"
-              },
-              "editorMode": "code",
-              "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{\n    slurm_nodeset_name=~\"$rack\"\n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$rack\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
-              "hide": false,
-              "legendFormat": "avg",
-              "range": true,
-              "refId": "B",
-              "useCustomValues": true,
-              "useDashValues": false
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "VictoriaMetrics"
-              },
-              "editorMode": "code",
-              "expr": "min(\n  DCGM_FI_DEV_POWER_USAGE{\n    slurm_nodeset_name=~\"$rack\"\n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{\n      slurm_nodeset_name=~\"$rack\"\n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
-              "hide": false,
-              "legendFormat": "min",
-              "range": true,
-              "refId": "A",
-              "useCustomValues": true,
-              "useDashValues": false
-            }
-          ],
-          "title": "Cluster Power usage",
-          "type": "timeseries"
-        }
-      ],
-      "title": "Racks",
-      "type": "row"
-    },
-    {
-      "collapsed": true,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 40
-      },
       "id": 79,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Node states breakdown:\n- **Down**: Nodes not operational (DOWN or ERROR states)\n- **Drained**: IDLE nodes with DRAIN flag\n- **Draining**: Nodes with DRAIN flag running jobs\n- **Busy**: Nodes running jobs normally (ALLOCATED or MIXED)\n- **Idle**: Nodes ready and available to accept new jobs\n- **Maintenance**: Nodes temporarily unavailable for administrative tasks",
           "fieldConfig": {
@@ -2717,8 +2402,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2840,12 +2524,17 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 48
+            "y": 143
           },
           "id": 82,
           "options": {
             "legend": {
-              "calcs": ["mean", "lastNotNull", "max", "min"],
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max",
+                "min"
+              ],
               "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
@@ -2861,10 +2550,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Down",
@@ -2875,10 +2564,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Drained",
@@ -2889,10 +2578,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Draining",
@@ -2903,10 +2592,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain!=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain!=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Busy",
@@ -2917,10 +2606,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain!=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain!=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Idle",
@@ -2931,10 +2620,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_is_maintenance=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_is_maintenance=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Maintenance",
@@ -2945,10 +2634,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{state_base=\"UNKNOWN\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"UNKNOWN\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Unknown",
@@ -2963,7 +2652,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Timeline of node problems showing Down (DOWN/ERROR states), Drained (IDLE with drain), and Draining (ALLOCATED/MIXED with drain) states. Maintenance nodes are filtered out.",
           "fieldConfig": {
@@ -3013,8 +2702,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -3026,7 +2714,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 48
+            "y": 143
           },
           "id": 83,
           "options": {
@@ -3050,10 +2738,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "with (\n  node_fails = sum by (node_name) (\n      # Down: Nodes in DOWN or ERROR state (not in maintenance)\n      count by (node_name) (slurm_node_info{state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 1 or\n      # Drained: IDLE nodes with drain flag (not in maintenance)\n      count by (node_name) (slurm_node_info{state_base=\"IDLE\", state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 2 or\n      # Draining: ALLOCATED/MIXED nodes with drain flag (not in maintenance)\n      count by (node_name) (slurm_node_info{state_base=~\"ALLOCATED|MIXED\", state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 3\n    )\n)\nnode_fails\nor\n(\n  # To show recovery as IDLE without drain state after failure\n  count by (node_name) (slurm_node_info{state_base=~\"IDLE\", state_is_drain=\"false\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 4\n  and\n  min_over_time(node_fails[15m:1m]) > 0\n)",
+              "expr": "with (\n  node_fails = sum by (node_name) (\n      # Down: Nodes in DOWN or ERROR state (not in maintenance)\n      count by (node_name) (slurm_node_info{cluster=~\"$cluster\", state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 1 or\n      # Drained: IDLE nodes with drain flag (not in maintenance)\n      count by (node_name) (slurm_node_info{cluster=~\"$cluster\", state_base=\"IDLE\", state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 2 or\n      # Draining: ALLOCATED/MIXED nodes with drain flag (not in maintenance)\n      count by (node_name) (slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 3\n    )\n)\nnode_fails\nor\n(\n  # To show recovery as IDLE without drain state after failure\n  count by (node_name) (slurm_node_info{cluster=~\"$cluster\", state_base=~\"IDLE\", state_is_drain=\"false\", state_is_maintenance!=\"true\", node_name=~\"$node_name\", }) * 4\n  and\n  min_over_time(node_fails[15m:1m]) > 0\n)",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "__auto",
@@ -3082,7 +2770,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Time nodes are in states where new jobs cannot be started on them",
           "fieldConfig": {
@@ -3131,8 +2819,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -3172,7 +2859,10 @@
                   {
                     "id": "custom.lineStyle",
                     "value": {
-                      "dash": [10, 10],
+                      "dash": [
+                        10,
+                        10
+                      ],
                       "fill": "dash"
                     }
                   },
@@ -3191,7 +2881,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 141
+            "y": 236
           },
           "id": 31,
           "options": {
@@ -3212,10 +2902,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(1, sum(increase(slurm_node_unavailability_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(1, sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "max",
               "range": true,
@@ -3226,10 +2916,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_avg(sum(increase(slurm_node_unavailability_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+              "expr": "histogram_avg(sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "avg",
               "range": true,
@@ -3240,10 +2930,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(0, sum(increase(slurm_node_unavailability_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0, sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "min",
               "range": true,
@@ -3258,7 +2948,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Time nodes spent in `draining` state",
           "fieldConfig": {
@@ -3307,8 +2997,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -3348,7 +3037,10 @@
                   {
                     "id": "custom.lineStyle",
                     "value": {
-                      "dash": [10, 10],
+                      "dash": [
+                        10,
+                        10
+                      ],
                       "fill": "dash"
                     }
                   },
@@ -3367,7 +3059,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 141
+            "y": 236
           },
           "id": 73,
           "options": {
@@ -3388,10 +3080,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(1, sum(increase(slurm_node_draining_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(1, sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "max",
               "range": true,
@@ -3402,10 +3094,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_avg(sum(increase(slurm_node_draining_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+              "expr": "histogram_avg(sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "avg",
               "range": true,
@@ -3416,10 +3108,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(0, sum(increase(slurm_node_draining_duration_seconds_bucket{}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0, sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "min",
               "range": true,
@@ -3434,7 +3126,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Lists nodes that are DOWN, in ERROR state, or have DRAIN flag set (maintenance nodes excluded).\n\n**Columns:**\n- Fail Reason: From failure counter metrics\n- State Reason: From node info (Soperator 1.22+)\n\n**Note:** Rows group events by state - same node may appear multiple times with overlapping time ranges.",
           "fieldConfig": {
@@ -3456,8 +3148,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3615,7 +3306,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 148
+            "y": 243
           },
           "id": 84,
           "options": {
@@ -3624,7 +3315,9 @@
               "countRows": false,
               "enablePagination": true,
               "fields": "",
-              "reducer": ["sum"],
+              "reducer": [
+                "sum"
+              ],
               "show": false
             },
             "frameIndex": 0,
@@ -3636,11 +3329,11 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "with (\n  filters = {},\n  running_jobs = group(slurm_job_info{filters, job_state=~\"RUNNING\"}) by (job_id, job_name),\n  node_fails = (\n    # Get nodes with problems: DOWN/ERROR states or drain flag\n    slurm_node_info{filters, state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"} or\n    slurm_node_info{filters, state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"}\n  ),\n  node_fails_with_job_id = node_fails * on (node_name) group_left(job_id) slurm_node_job{filters}\n)\n(\n  node_fails_with_job_id\n  and on (job_id)\n  (\n      running_jobs offset -60m or running_jobs offset 60m\n  )\n)\nor\nnode_fails",
+              "expr": "with (\n  filters = {},\n  running_jobs = group(slurm_job_info{cluster=~\"$cluster\", filters, job_state=~\"RUNNING\"}) by (job_id, job_name),\n  node_fails = (\n    # Get nodes with problems: DOWN/ERROR states or drain flag\n    slurm_node_info{cluster=~\"$cluster\", filters, state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"} or\n    slurm_node_info{cluster=~\"$cluster\", filters, state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"}\n  ),\n  node_fails_with_job_id = node_fails * on (node_name) group_left(job_id) slurm_node_job{cluster=~\"$cluster\", filters}\n)\n(\n  node_fails_with_job_id\n  and on (job_id)\n  (\n      running_jobs offset -60m or running_jobs offset 60m\n  )\n)\nor\nnode_fails",
               "format": "table",
               "instant": false,
               "legendFormat": "__auto",
@@ -3672,19 +3365,29 @@
               "options": {
                 "fields": {
                   "Time": {
-                    "aggregations": ["first", "last"],
+                    "aggregations": [
+                      "first",
+                      "last"
+                    ],
                     "operation": "aggregate"
                   },
                   "Time (first)": {
-                    "aggregations": ["first", "last"],
+                    "aggregations": [
+                      "first",
+                      "last"
+                    ],
                     "operation": "aggregate"
                   },
                   "fail_reason": {
-                    "aggregations": ["first"],
+                    "aggregations": [
+                      "first"
+                    ],
                     "operation": "aggregate"
                   },
                   "fail_reason (first)": {
-                    "aggregations": ["first"],
+                    "aggregations": [
+                      "first"
+                    ],
                     "operation": "aggregate"
                   },
                   "instance_id": {
@@ -3692,7 +3395,9 @@
                     "operation": "groupby"
                   },
                   "job_id": {
-                    "aggregations": ["uniqueValues"],
+                    "aggregations": [
+                      "uniqueValues"
+                    ],
                     "operation": "aggregate"
                   },
                   "node_name": {
@@ -3700,7 +3405,9 @@
                     "operation": "groupby"
                   },
                   "reason": {
-                    "aggregations": ["uniqueValues"],
+                    "aggregations": [
+                      "uniqueValues"
+                    ],
                     "operation": "aggregate"
                   },
                   "state_base": {
@@ -3735,7 +3442,9 @@
                 },
                 "mode": "reduceRow",
                 "reduce": {
-                  "include": ["job_id (uniqueValues)"],
+                  "include": [
+                    "job_id (uniqueValues)"
+                  ],
                   "reducer": "uniqueValues"
                 }
               }
@@ -3783,17 +3492,63 @@
                     "destinationType": "string",
                     "enumConfig": {
                       "text": [
-                        [["37166"]],
-                        [["37176"]],
-                        [["37174"]],
-                        [["37175"]],
-                        [["37173"]],
-                        [["37226", "37232"]],
-                        [["30590"]],
-                        [["37228", "37288"]],
-                        [["37285"]],
-                        [["37286"]],
-                        [["37359"]]
+                        [
+                          [
+                            "37166"
+                          ]
+                        ],
+                        [
+                          [
+                            "37176"
+                          ]
+                        ],
+                        [
+                          [
+                            "37174"
+                          ]
+                        ],
+                        [
+                          [
+                            "37175"
+                          ]
+                        ],
+                        [
+                          [
+                            "37173"
+                          ]
+                        ],
+                        [
+                          [
+                            "37226",
+                            "37232"
+                          ]
+                        ],
+                        [
+                          [
+                            "30590"
+                          ]
+                        ],
+                        [
+                          [
+                            "37228",
+                            "37288"
+                          ]
+                        ],
+                        [
+                          [
+                            "37285"
+                          ]
+                        ],
+                        [
+                          [
+                            "37286"
+                          ]
+                        ],
+                        [
+                          [
+                            "37359"
+                          ]
+                        ]
                       ]
                     },
                     "joinWith": "&var-slurm_job=",
@@ -3816,14 +3571,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 40
       },
       "id": 80,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Jobs in `RUNNING` state at the end of selected time window.",
           "fieldConfig": {
@@ -3846,8 +3601,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -3969,8 +3723,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "green",
-                          "value": null
+                          "color": "green"
                         },
                         {
                           "color": "#EAB839",
@@ -4023,8 +3776,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "red",
-                          "value": null
+                          "color": "red"
                         },
                         {
                           "color": "orange",
@@ -4087,8 +3839,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "light-blue",
-                          "value": null
+                          "color": "light-blue"
                         }
                       ]
                     }
@@ -4101,7 +3852,7 @@
             "h": 12,
             "w": 24,
             "x": 0,
-            "y": 49
+            "y": 144
           },
           "id": 92,
           "options": {
@@ -4110,7 +3861,9 @@
               "countRows": false,
               "enablePagination": true,
               "fields": "",
-              "reducer": ["sum"],
+              "reducer": [
+                "sum"
+              ],
               "show": false
             },
             "frameIndex": 0,
@@ -4122,11 +3875,11 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "with (\n  filters = {}\n)\n# Main job info\nslurm_job_info{\n  filters,\n  job_state=~\"RUNNING\", \n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}\n* on (job_id) group_left()\ncount by (job_id) (slurm_node_job{filters})",
+              "expr": "with (\n  filters = {}\n)\n# Main job info\nslurm_job_info{cluster=~\"$cluster\", \n  filters,\n  job_state=~\"RUNNING\", \n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}\n* on (job_id) group_left()\ncount by (job_id) (slurm_node_job{cluster=~\"$cluster\", filters})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4137,11 +3890,11 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "P4169E866C3094E38"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "with (\n  filters = {}\n)\n# Job duration\nmax by (job_id) (slurm_job_duration_seconds{filters})\n* on (job_id) group_left()\nslurm_job_info{\n  filters,\n  job_state=~\"RUNNING\", \n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}",
+              "expr": "with (\n  filters = {}\n)\n# Job duration\nmax by (job_id) (slurm_job_duration_seconds{cluster=~\"$cluster\", filters})\n* on (job_id) group_left()\nslurm_job_info{cluster=~\"$cluster\", \n  filters,\n  job_state=~\"RUNNING\", \n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}",
               "format": "table",
               "hide": false,
               "instant": true,
@@ -4152,11 +3905,11 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "P4169E866C3094E38"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "with (\n  filters = {}\n)\n# GPU Util\navg(\n  label_move(\n    DCGM_FI_DEV_GPU_UTIL{filters}\n  , 'hpc_job','job_id')\n) by (job_id)\nand on (job_id)\nslurm_job_info{\n  filters,\n  job_state=\"RUNNING\",\n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}",
+              "expr": "with (\n  filters = {}\n)\n# GPU Util\navg(\n  slurm_node_job{cluster=~\"$cluster\"}\n  * on(cluster, node_name) group_left()\n  avg(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", filters}\n  ) by (cluster, node_name)\n) by (job_id)\nand on (job_id)\nslurm_job_info{cluster=~\"$cluster\",\n  filters,\n  job_state=\"RUNNING\",\n  user_name=~\"$user_name\",\n  slurm_partition${partition_match_exp},\n}",
               "format": "table",
               "hide": false,
               "instant": true,
@@ -4167,11 +3920,11 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "P4169E866C3094E38"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "with (\n  filters = {}\n)\n# SM Util\navg(\n  label_move(\n    DCGM_FI_PROF_SM_ACTIVE{filters}\n  , 'hpc_job','job_id')\n) by (job_id)\nand on (job_id)\nslurm_job_info{\n  filters,\n  job_state=\"RUNNING\",\n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}",
+              "expr": "with (\n  filters = {}\n)\n# SM Util\navg(\n  slurm_node_job{cluster=~\"$cluster\"}\n  * on(cluster, node_name) group_left()\n  avg(\n    DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\", filters}\n  ) by (cluster, node_name)\n) by (job_id)\nand on (job_id)\nslurm_job_info{cluster=~\"$cluster\",\n  filters,\n  job_state=\"RUNNING\",\n  user_name=~\"$user_name\",\n  slurm_partition${partition_match_exp},\n}",
               "format": "table",
               "hide": false,
               "instant": true,
@@ -4194,30 +3947,45 @@
               "options": {
                 "fields": {
                   "Time": {
-                    "aggregations": ["first", "last"]
+                    "aggregations": [
+                      "first",
+                      "last"
+                    ]
                   },
                   "Value": {
-                    "aggregations": ["lastNotNull"],
+                    "aggregations": [
+                      "lastNotNull"
+                    ],
                     "operation": "aggregate"
                   },
                   "Value #A": {
-                    "aggregations": ["lastNotNull"],
+                    "aggregations": [
+                      "lastNotNull"
+                    ],
                     "operation": "aggregate"
                   },
                   "Value #B": {
-                    "aggregations": ["lastNotNull"],
+                    "aggregations": [
+                      "lastNotNull"
+                    ],
                     "operation": "aggregate"
                   },
                   "Value #C": {
-                    "aggregations": ["mean"],
+                    "aggregations": [
+                      "mean"
+                    ],
                     "operation": "aggregate"
                   },
                   "Value #D": {
-                    "aggregations": ["mean"],
+                    "aggregations": [
+                      "mean"
+                    ],
                     "operation": "aggregate"
                   },
                   "finished_time": {
-                    "aggregations": ["first"],
+                    "aggregations": [
+                      "first"
+                    ],
                     "operation": "aggregate"
                   },
                   "job_id": {
@@ -4225,31 +3993,47 @@
                     "operation": "groupby"
                   },
                   "job_name": {
-                    "aggregations": ["first"],
+                    "aggregations": [
+                      "first"
+                    ],
                     "operation": "aggregate"
                   },
                   "job_state": {
-                    "aggregations": ["first"]
+                    "aggregations": [
+                      "first"
+                    ]
                   },
                   "job_state_reason": {
-                    "aggregations": ["first"]
+                    "aggregations": [
+                      "first"
+                    ]
                   },
                   "slurm_job_info": {
-                    "aggregations": ["last"],
+                    "aggregations": [
+                      "last"
+                    ],
                     "operation": "aggregate"
                   },
                   "slurm_partition": {
-                    "aggregations": ["firstNotNull"],
+                    "aggregations": [
+                      "firstNotNull"
+                    ],
                     "operation": "aggregate"
                   },
                   "start_time": {
-                    "aggregations": ["first"]
+                    "aggregations": [
+                      "first"
+                    ]
                   },
                   "submit_time": {
-                    "aggregations": ["first"]
+                    "aggregations": [
+                      "first"
+                    ]
                   },
                   "user_name": {
-                    "aggregations": ["firstNotNull"],
+                    "aggregations": [
+                      "firstNotNull"
+                    ],
                     "operation": "aggregate"
                   }
                 },
@@ -4323,7 +4107,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "For jobs with at least 4 nodes",
           "fieldConfig": {
@@ -4372,8 +4156,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -4389,7 +4172,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 61
+            "y": 156
           },
           "id": 19,
           "options": {
@@ -4410,10 +4193,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "(\n  sum(\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp},\n      job_state=~\"COMPLETED\"\n    }\n      and on(job_id)\n    (\n      count(\n        slurm_node_job{ }\n      ) by(job_id)\n        >=\n      0\n    )\n  ) by (cluster)\n    /\n  sum(\n    slurm_job_info{\n      slurm_partition${partition_match_exp},\n      job_state=~\"COMPLETED|FAILED|CANCELLED|TIMEOUT|DEADLINE\",\n    }\n      and on(job_id)\n    (\n      count(\n        slurm_node_job{ }\n      ) by(job_id)\n        >=\n      0\n    )\n  ) by (cluster)\n) \n  *\n100",
+              "expr": "(\n  sum(\n    slurm_job_info{cluster=~\"$cluster\", \n      \n      slurm_partition${partition_match_exp},\n      job_state=~\"COMPLETED\"\n    }\n      and on(job_id)\n    (\n      count(\n        slurm_node_job{cluster=~\"$cluster\" }\n      ) by(job_id)\n        >=\n      0\n    )\n  ) by (cluster)\n    /\n  sum(\n    slurm_job_info{cluster=~\"$cluster\", \n      slurm_partition${partition_match_exp},\n      job_state=~\"COMPLETED|FAILED|CANCELLED|TIMEOUT|DEADLINE\",\n    }\n      and on(job_id)\n    (\n      count(\n        slurm_node_job{cluster=~\"$cluster\" }\n      ) by(job_id)\n        >=\n      0\n    )\n  ) by (cluster)\n) \n  *\n100",
               "hide": false,
               "legendFormat": "__auto",
               "range": true,
@@ -4428,7 +4211,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Based on number of nodes per job (nodes > 1)",
           "fieldConfig": {
@@ -4476,8 +4259,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -4505,7 +4287,10 @@
                   {
                     "id": "custom.lineStyle",
                     "value": {
-                      "dash": [10, 10],
+                      "dash": [
+                        10,
+                        10
+                      ],
                       "fill": "dash"
                     }
                   },
@@ -4540,7 +4325,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 61
+            "y": 156
           },
           "id": 10,
           "options": {
@@ -4561,10 +4346,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(\n  (\n    count(\n      slurm_node_job{\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  0\n) by()",
+              "expr": "max(\n  (\n    count(\n      slurm_node_job{cluster=~\"$cluster\"\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{cluster=~\"$cluster\", \n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  0\n) by()",
               "hide": false,
               "legendFormat": "max",
               "range": true,
@@ -4575,10 +4360,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "avg(\n  (\n    count(\n      slurm_node_job{\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  0\n) by()",
+              "expr": "avg(\n  (\n    count(\n      slurm_node_job{cluster=~\"$cluster\"\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{cluster=~\"$cluster\", \n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  0\n) by()",
               "hide": false,
               "legendFormat": "avg",
               "range": true,
@@ -4589,10 +4374,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "min(\n  (\n    count(\n      slurm_node_job{\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{\n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  0\n) by()",
+              "expr": "min(\n  (\n    count(\n      slurm_node_job{cluster=~\"$cluster\"\n            }\n    ) by(job_id)\n      * on(job_id)\n    slurm_job_info{cluster=~\"$cluster\", \n      \n      slurm_partition${partition_match_exp}\n    }\n  )\n    >\n  0\n) by()",
               "hide": false,
               "legendFormat": "min",
               "range": true,
@@ -4607,7 +4392,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Excluding system jobs",
           "fieldConfig": {
@@ -4655,8 +4440,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -4684,7 +4468,10 @@
                   {
                     "id": "custom.lineStyle",
                     "value": {
-                      "dash": [10, 10],
+                      "dash": [
+                        10,
+                        10
+                      ],
                       "fill": "dash"
                     }
                   },
@@ -4719,7 +4506,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 68
+            "y": 163
           },
           "id": 74,
           "options": {
@@ -4740,10 +4527,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "max(\n  slurm_job_duration_seconds\n  and on(job_id)\n  slurm_job_info{slurm_partition${partition_match_exp} }\n)",
+              "expr": "max(\n  slurm_job_duration_seconds{cluster=~\"$cluster\"}\n  and on(job_id)\n  slurm_job_info{cluster=~\"$cluster\", slurm_partition${partition_match_exp} }\n)",
               "hide": false,
               "legendFormat": "max",
               "range": true,
@@ -4754,10 +4541,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "avg(\n  slurm_job_duration_seconds{ }\n    and on(job_id)\n  slurm_job_info{slurm_partition${partition_match_exp} }\n)",
+              "expr": "avg(\n  slurm_job_duration_seconds{cluster=~\"$cluster\" }\n    and on(job_id)\n  slurm_job_info{cluster=~\"$cluster\", slurm_partition${partition_match_exp} }\n)",
               "hide": false,
               "legendFormat": "avg",
               "range": true,
@@ -4768,10 +4555,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "min(\n  slurm_job_duration_seconds{ }\n    and on(job_id)\n  slurm_job_info{slurm_partition${partition_match_exp} }\n)",
+              "expr": "min(\n  slurm_job_duration_seconds{cluster=~\"$cluster\" }\n    and on(job_id)\n  slurm_job_info{cluster=~\"$cluster\", slurm_partition${partition_match_exp} }\n)",
               "hide": false,
               "legendFormat": "min",
               "range": true,
@@ -4786,7 +4573,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "P4169E866C3094E38"
+            "uid": "${datasource}"
           },
           "description": "Over the entire selected range (excluding system jobs)",
           "fieldConfig": {
@@ -4813,8 +4600,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -4829,7 +4615,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 68
+            "y": 163
           },
           "id": 77,
           "options": {
@@ -4852,7 +4638,7 @@
             {
               "editorMode": "code",
               "exemplar": false,
-              "expr": "histogram(\n    count(slurm_node_job) by (job_id)\n    and on(job_id)\n    slurm_job_info{\n      slurm_partition${partition_match_exp}\n    }\n)",
+              "expr": "histogram(\n    count(slurm_node_job{cluster=~\"$cluster\"}) by (job_id)\n    and on(job_id)\n    slurm_job_info{cluster=~\"$cluster\", \n      slurm_partition${partition_match_exp}\n    }\n)",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -4869,7 +4655,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "% of workers that where not drawing much power when job was in `RUNNING` state\n\nonly jobs with `>=70%` under-utilized workers for more than `20m` are shown",
           "fieldConfig": {
@@ -4907,8 +4693,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -4920,7 +4705,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 75
+            "y": 170
           },
           "id": 72,
           "options": {
@@ -4944,18 +4729,18 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "disableTextWrap": false,
               "editorMode": "code",
               "exemplar": false,
-              "expr": "floor(\n    avg_over_time(\n  (\n    (\n      (\n        round((count(DCGM_FI_DEV_FB_USED{hpc_job!=\"\"} > 2) by(hpc_job) / 8) > 2)\n          -\n        round(\n          (count(DCGM_FI_DEV_POWER_USAGE{hpc_job!=\"\"} > 120) by(hpc_job) / 8)\n            >\n          2\n        )\n      )\n        /\n      round((count(DCGM_FI_DEV_FB_USED{hpc_job!=\"\", } > 2) by(hpc_job) / 8) > 2)\n    )\n      *\n    100\n  )[1h:1m]\n) >=  70\n)\n  and on(hpc_job)\nlabel_move(slurm_job_info{job_state=\"RUNNING\"}, 'job_id', 'hpc_job')\nand on (hpc_job)\ncount_over_time( #filter out short durations\navg_over_time((\n  (\n    (\n      (\n        round((count(DCGM_FI_DEV_FB_USED{hpc_job!=\"\"} > 2) by(hpc_job) / 8) > 2)\n          -\n        round(\n          (count(DCGM_FI_DEV_POWER_USAGE{hpc_job!=\"\"} > 120) by(hpc_job) / 8)\n            >\n          2\n        )\n      )\n        /\n      round((count(DCGM_FI_DEV_FB_USED{hpc_job!=\"\"} > 2) by(hpc_job) / 8) > 2)\n    )\n      *\n    100\n  )[1h:1m]\n) > 70\n  and on(hpc_job)\nlabel_move(slurm_job_info{job_state=\"RUNNING\"}, 'job_id', 'hpc_job')\n)[1h:1m]\n) > 20",
+              "expr": "with (\n  gpus_total = count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\"}) by (cluster, node_name),\n  mem_frac = count(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\"} > 2) by (cluster, node_name) / gpus_total,\n  power_frac = count(DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"} > 120) by (cluster, node_name) / gpus_total,\n  workers_with_mem = round(sum(slurm_node_job{cluster=~\"$cluster\"} * on(cluster, node_name) group_left() mem_frac) by (job_id) > 2),\n  workers_with_power = round(sum(slurm_node_job{cluster=~\"$cluster\"} * on(cluster, node_name) group_left() power_frac) by (job_id) > 2),\n  underutil_pct = (workers_with_mem - workers_with_power) / workers_with_mem * 100,\n  running_jobs = slurm_job_info{cluster=~\"$cluster\", job_state=\"RUNNING\"}\n)\nfloor(avg_over_time(underutil_pct[1h:1m]) >= 70)\nand on(job_id) running_jobs\nand on (job_id)\ncount_over_time( #filter out short durations\n  (avg_over_time(underutil_pct[1h:1m]) > 70 and on(job_id) running_jobs)[1h:1m]\n) > 20",
               "format": "time_series",
               "fullMetaSearch": false,
               "hide": false,
               "includeNullMetadata": true,
               "intervalFactor": 2,
-              "legendFormat": "{{hpc_job}}",
+              "legendFormat": "{{job_id}}",
               "range": true,
               "refId": "A",
               "useBackend": false,
@@ -4969,7 +4754,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Paginated",
           "fieldConfig": {
@@ -5104,8 +4889,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5120,7 +4904,7 @@
             "h": 22,
             "w": 12,
             "x": 12,
-            "y": 76
+            "y": 171
           },
           "id": 90,
           "options": {
@@ -5145,10 +4929,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "with (\n    filters = {slurm_partition${partition_match_exp}},\n)\nsum by (job_id,)(\n  count by (job_id, job_name) (slurm_job_info{job_state=\"PENDING\", filters}) * 1 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"CONFIGURING\",filters}) * 2 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"RUNNING\", filters}) * 3 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"COMPLETING\", filters}) * 4 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"COMPLETED\", filters}) * 5 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"CANCELLED\", filters}) * 6 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"FAILED\", filters}) * 7 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"TIMEOUT\", filters}) * 8 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"PREEMPTED\", filters}) * 9 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"NODE_FAIL\", filters}) * 10 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"BOOT_FAIL\", filters}) * 11 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"DEADLINE\", filters}) * 12 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"OUT_OF_MEMORY\", filters}) * 13 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"REQUEUED\", filters}) * 14 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"RESIZING\", filters}) * 15 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"SUSPENDED\", filters}) * 16 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"STOPPED\", filters}) * 17 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"POWER_UP_NODE\", filters}) * 18 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"SIGNALING\", filters}) * 19 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"STAGE_OUT\", filters}) * 20 or\n  count by (job_id, job_name) (slurm_job_info{job_state=\"UPDATE_DB\", filters}) * 21\n)",
+              "expr": "with (\n    filters = {slurm_partition${partition_match_exp}},\n)\nsum by (job_id,)(\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"PENDING\", filters}) * 1 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"CONFIGURING\",filters}) * 2 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"RUNNING\", filters}) * 3 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"COMPLETING\", filters}) * 4 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"COMPLETED\", filters}) * 5 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"CANCELLED\", filters}) * 6 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"FAILED\", filters}) * 7 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"TIMEOUT\", filters}) * 8 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"PREEMPTED\", filters}) * 9 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"NODE_FAIL\", filters}) * 10 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"BOOT_FAIL\", filters}) * 11 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"DEADLINE\", filters}) * 12 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"OUT_OF_MEMORY\", filters}) * 13 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"REQUEUED\", filters}) * 14 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"RESIZING\", filters}) * 15 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"SUSPENDED\", filters}) * 16 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"STOPPED\", filters}) * 17 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"POWER_UP_NODE\", filters}) * 18 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"SIGNALING\", filters}) * 19 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"STAGE_OUT\", filters}) * 20 or\n  count by (job_id, job_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"UPDATE_DB\", filters}) * 21\n)",
               "format": "time_series",
               "hide": false,
               "legendFormat": "{{job_id}}",
@@ -5164,7 +4948,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -5210,8 +4994,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5227,12 +5010,17 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 82
+            "y": 177
           },
           "id": 87,
           "options": {
             "legend": {
-              "calcs": ["mean", "lastNotNull", "max", "min"],
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max",
+                "min"
+              ],
               "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
@@ -5248,10 +5036,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count by(job_state) (slurm_job_info{user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
+              "expr": "count by(job_state) (slurm_job_info{cluster=~\"$cluster\", user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{job_state}}",
@@ -5267,7 +5055,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -5313,8 +5101,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5330,12 +5117,17 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 90
+            "y": 185
           },
           "id": 88,
           "options": {
             "legend": {
-              "calcs": ["mean", "lastNotNull", "max", "min"],
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max",
+                "min"
+              ],
               "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
@@ -5351,10 +5143,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count by(slurm_partition) (slurm_job_info{job_state=\"RUNNING\", user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
+              "expr": "count by(slurm_partition) (slurm_job_info{cluster=~\"$cluster\", job_state=\"RUNNING\", user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{slurm_partition}}",
@@ -5370,7 +5162,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Shows jobs in terminal states (COMPLETED, CANCELLED, FAILED, TIMEOUT). All times are displayed in the current Grafana timezone.",
           "fieldConfig": {
@@ -5392,8 +5184,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -5590,7 +5381,7 @@
             "h": 12,
             "w": 24,
             "x": 0,
-            "y": 98
+            "y": 193
           },
           "id": 91,
           "options": {
@@ -5599,7 +5390,9 @@
               "countRows": false,
               "enablePagination": true,
               "fields": "",
-              "reducer": ["sum"],
+              "reducer": [
+                "sum"
+              ],
               "show": false
             },
             "frameIndex": 0,
@@ -5611,10 +5404,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "with (\n  filters = {}\n)\nslurm_job_info{\n  filters,\n  job_state=~\"COMPLETED|CANCELLED|FAILED|TIMEOUT\", \n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}\n* on (job_id) group_left()\ncount by (job_id) (slurm_node_job{filters}) ",
+              "expr": "with (\n  filters = {}\n)\nslurm_job_info{cluster=~\"$cluster\", \n  filters,\n  job_state=~\"COMPLETED|CANCELLED|FAILED|TIMEOUT\", \n  user_name=~\"$user_name\", \n  slurm_partition${partition_match_exp}, \n}\n* on (job_id) group_left()\ncount by (job_id) (slurm_node_job{cluster=~\"$cluster\", filters}) ",
               "format": "table",
               "instant": false,
               "range": true,
@@ -5648,7 +5441,10 @@
               "options": {
                 "fields": {
                   "Time": {
-                    "aggregations": ["first", "last"],
+                    "aggregations": [
+                      "first",
+                      "last"
+                    ],
                     "operation": "aggregate"
                   },
                   "Value": {
@@ -5656,7 +5452,9 @@
                     "operation": "groupby"
                   },
                   "finished_time": {
-                    "aggregations": ["first"],
+                    "aggregations": [
+                      "first"
+                    ],
                     "operation": "aggregate"
                   },
                   "job_id": {
@@ -5664,35 +5462,51 @@
                     "operation": "groupby"
                   },
                   "job_name": {
-                    "aggregations": ["first"],
+                    "aggregations": [
+                      "first"
+                    ],
                     "operation": "aggregate"
                   },
                   "job_state": {
-                    "aggregations": ["first"],
+                    "aggregations": [
+                      "first"
+                    ],
                     "operation": "aggregate"
                   },
                   "job_state_reason": {
-                    "aggregations": ["first"],
+                    "aggregations": [
+                      "first"
+                    ],
                     "operation": "aggregate"
                   },
                   "slurm_job_info": {
-                    "aggregations": ["last"],
+                    "aggregations": [
+                      "last"
+                    ],
                     "operation": "aggregate"
                   },
                   "slurm_partition": {
-                    "aggregations": ["first"],
+                    "aggregations": [
+                      "first"
+                    ],
                     "operation": "aggregate"
                   },
                   "start_time": {
-                    "aggregations": ["first"],
+                    "aggregations": [
+                      "first"
+                    ],
                     "operation": "aggregate"
                   },
                   "submit_time": {
-                    "aggregations": ["first"],
+                    "aggregations": [
+                      "first"
+                    ],
                     "operation": "aggregate"
                   },
                   "user_name": {
-                    "aggregations": ["first"],
+                    "aggregations": [
+                      "first"
+                    ],
                     "operation": "aggregate"
                   }
                 },
@@ -5829,14 +5643,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 41
       },
       "id": 93,
       "panels": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -5882,8 +5696,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5899,12 +5712,16 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 50
+            "y": 145
           },
           "id": 85,
           "options": {
             "legend": {
-              "calcs": ["lastNotNull", "max", "min"],
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "min"
+              ],
               "displayMode": "table",
               "placement": "right",
               "showLegend": true
@@ -5920,10 +5737,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count by(user_name) (slurm_job_info{job_state=\"RUNNING\", user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
+              "expr": "count by(user_name) (slurm_job_info{cluster=~\"$cluster\", job_state=\"RUNNING\", user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{user_name}}",
@@ -5939,7 +5756,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -5985,8 +5802,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -6002,12 +5818,16 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 50
+            "y": 145
           },
           "id": 86,
           "options": {
             "legend": {
-              "calcs": ["lastNotNull", "max", "min"],
+              "calcs": [
+                "lastNotNull",
+                "max",
+                "min"
+              ],
               "displayMode": "table",
               "placement": "right",
               "showLegend": true
@@ -6023,10 +5843,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count by(user_name) (slurm_job_info{user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
+              "expr": "count by(user_name) (slurm_job_info{cluster=~\"$cluster\", user_name=~\"$user_name\", slurm_partition${partition_match_exp}, })",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{user_name}}",
@@ -6042,7 +5862,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -6089,8 +5909,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -6102,12 +5921,15 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 58
+            "y": 153
           },
           "id": 94,
           "options": {
             "legend": {
-              "calcs": ["max", "min"],
+              "calcs": [
+                "max",
+                "min"
+              ],
               "displayMode": "table",
               "placement": "right",
               "showLegend": true
@@ -6123,10 +5945,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "with (\n  filters = {}\n)\navg(\n  label_move(DCGM_FI_DEV_GPU_UTIL{filters, hpc_job!=\"\"}, 'hpc_job','job_id')\n  * on (job_id) group_left(user_name)\n  slurm_job_info{\n    filters,\n    job_state=\"RUNNING\",\n    user_name=~\"$user_name\", \n    slurm_partition${partition_match_exp}\n  }\n) by (user_name)",
+              "expr": "with (\n  filters = {}\n)\navg(\n  (\n    slurm_node_job{cluster=~\"$cluster\"}\n    * on(cluster, node_name) group_left()\n    avg(\n      DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", filters}\n    ) by (cluster, node_name)\n  )\n  * on (job_id) group_left(user_name)\n  slurm_job_info{cluster=~\"$cluster\",\n    filters,\n    job_state=\"RUNNING\",\n    user_name=~\"$user_name\",\n    slurm_partition${partition_match_exp}\n  }\n) by (user_name)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "__auto",
@@ -6142,7 +5964,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Users who have run some jobs",
           "fieldConfig": {
@@ -6190,8 +6012,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -6233,7 +6054,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 58
+            "y": 153
           },
           "id": 75,
           "options": {
@@ -6253,7 +6074,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "count(\n    count(\n        slurm_job_info{\n            \n            slurm_partition${partition_match_exp}\n        }\n    ) by (user_name)\n) by ()",
+              "expr": "count(\n    count(\n        slurm_job_info{cluster=~\"$cluster\", \n            \n            slurm_partition${partition_match_exp}\n        }\n    ) by (user_name)\n) by ()",
               "legendFormat": "count",
               "range": true,
               "refId": "A",
@@ -6267,7 +6088,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -6326,12 +6147,15 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 66
+            "y": 161
           },
           "id": 95,
           "options": {
             "legend": {
-              "calcs": ["max", "min"],
+              "calcs": [
+                "max",
+                "min"
+              ],
               "displayMode": "table",
               "placement": "right",
               "showLegend": true
@@ -6347,10 +6171,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "with (\n  filters = {}\n)\ncount(\n  slurm_node_job{filters}\n  * on (job_id) group_left(user_name)\n  slurm_job_info{\n    filters,\n    job_state=\"RUNNING\",\n    user_name=~\"$user_name\", \n    slurm_partition${partition_match_exp}\n  }\n) by (user_name)",
+              "expr": "with (\n  filters = {}\n)\ncount(\n  slurm_node_job{cluster=~\"$cluster\", filters}\n  * on (job_id) group_left(user_name)\n  slurm_job_info{cluster=~\"$cluster\", \n    filters,\n    job_state=\"RUNNING\",\n    user_name=~\"$user_name\", \n    slurm_partition${partition_match_exp}\n  }\n) by (user_name)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "__auto",
@@ -6369,52 +6193,63 @@
     }
   ],
   "preload": false,
-  "schemaVersion": 40,
-  "tags": ["nebius", "soperator", "overview", "cluster"],
+  "schemaVersion": 41,
+  "tags": [
+    "nebius",
+    "soperator",
+    "overview",
+    "cluster"
+  ],
   "templating": {
     "list": [
       {
-        "allowCustomValue": false,
         "current": {
-          "text": ["All"],
-          "value": ["$__all"]
+          "text": "VictoriaMetrics",
+          "value": "VictoriaMetrics"
         },
-        "definition": "label_values(kube_node_labels{label_nebius_com_gpu_name=~\"GB.*\"},label_slurm_nebius_ai_nodeset_name)",
-        "description": "For GB platforms",
-        "includeAll": true,
-        "label": "Rack",
-        "multi": true,
-        "name": "rack",
+        "hide": 2,
+        "includeAll": false,
+        "label": "Datasource",
+        "name": "datasource",
         "options": [],
-        "query": {
-          "qryType": 1,
-          "query": "label_values(kube_node_labels{label_nebius_com_gpu_name=~\"GB.*\"},label_slurm_nebius_ai_nodeset_name)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
+        "query": "prometheus",
         "refresh": 1,
         "regex": "",
-        "type": "query"
+        "type": "datasource"
       },
       {
-        "allowCustomValue": false,
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "filters": [],
+        "hide": 2,
+        "label": "O11y",
+        "name": "o11y",
+        "type": "adhoc"
+      },
+      {
+        "allValue": ".*",
         "current": {
+          "selected": true,
           "text": "All",
-          "value": ["$__all"]
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "VictoriaMetrics"
+          "uid": "${datasource}"
         },
-        "definition": "label_values(slurm_node_info{node_name=~\"$rack-.*\"}, node_name)",
-        "description": "",
+        "definition": "label_values(node_os_info, cluster)",
+        "hide": 2,
         "includeAll": true,
-        "label": "Worker Node",
-        "multi": true,
-        "name": "node_name",
+        "label": "Cluster",
+        "multi": false,
+        "name": "cluster",
         "options": [],
         "query": {
-          "qryType": 5,
-          "query": "label_values(slurm_node_info{node_name=~\"$rack-.*\"}, node_name)",
+          "qryType": 1,
+          "query": "label_values(node_os_info, cluster)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -6427,13 +6262,70 @@
         "allowCustomValue": false,
         "current": {
           "text": "All",
-          "value": ["$__all"]
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "VictoriaMetrics"
+          "uid": "${datasource}"
         },
-        "definition": "label_values(slurm_job_info,user_name)",
+        "definition": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
+        "description": "",
+        "includeAll": true,
+        "label": "Nodeset",
+        "multi": true,
+        "name": "nodeset",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(slurm_node_info{cluster=~\"$cluster\", nodeset_name=~\"$nodeset\"}, node_name)",
+        "description": "",
+        "includeAll": true,
+        "label": "Worker Node",
+        "multi": true,
+        "name": "node_name",
+        "options": [],
+        "query": {
+          "qryType": 5,
+          "query": "label_values(slurm_node_info{cluster=~\"$cluster\", nodeset_name=~\"$nodeset\"}, node_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "allowCustomValue": false,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(slurm_job_info{cluster=~\"$cluster\"},user_name)",
         "description": "",
         "includeAll": true,
         "label": "Job Username",
@@ -6442,7 +6334,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(slurm_job_info,user_name)",
+          "query": "label_values(slurm_job_info{cluster=~\"$cluster\"},user_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -6481,11 +6373,15 @@
     "to": "now"
   },
   "timepicker": {
-    "refresh_intervals": ["30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m"
+    ]
   },
   "timezone": "browser",
   "title": "Cluster Health & Overview",
   "uid": "soperator-cluster-health",
-  "version": 1,
-  "weekStart": ""
+  "version": 2
 }

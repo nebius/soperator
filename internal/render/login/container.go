@@ -18,6 +18,7 @@ func renderContainerSshd(
 	container *values.Container,
 	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
 	containerSSSD *values.Container,
+	userIsolation *slurmv1.LoginUserIsolation,
 	appArmorProfile string,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
@@ -29,6 +30,9 @@ func renderContainerSshd(
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
 		renderVolumeMountSshdConfigs(),
+	}
+	if userIsolation != nil && ptr.Deref(userIsolation.Enabled, false) {
+		volumeMounts = append(volumeMounts, renderVolumeMountUserIsolation())
 	}
 	if containerSSSD != nil {
 		volumeMounts = append(volumeMounts,

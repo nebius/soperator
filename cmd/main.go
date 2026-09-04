@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -36,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
@@ -53,8 +53,13 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
 	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
+	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
+	"nebius.ai/slurm-operator/internal/controller/updatecontroller"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/controllersenabled"
+	metricsopts "nebius.ai/slurm-operator/internal/metrics"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 	webhookv1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	webhookv1alpha1 "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -180,7 +185,7 @@ func main() {
 		controllersSpec = controllersFlag
 		controllersSource = "flag"
 	}
-	availableControllers := []string{"cluster", "nodeconfigurator", "nodeset", "topology"}
+	availableControllers := []string{"cluster", "nodeconfigurator", "nodeset", "rollingupdate", "topology"}
 	controllersSet, err := controllersenabled.New(
 		controllersSpec,
 		availableControllers,
@@ -223,12 +228,8 @@ func main() {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
-		Metrics: metricsserver.Options{
-			BindAddress:   metricsAddr,
-			SecureServing: secureMetrics,
-			TLSOpts:       tlsOpts,
-		},
+		Scheme:                  scheme,
+		Metrics:                 metricsopts.ServerOptions(metricsAddr, secureMetrics, tlsOpts),
 		WebhookServer:           webhookServer,
 		HealthProbeBindAddress:  probeAddr,
 		LeaderElection:          enableLeaderElection,
@@ -247,6 +248,7 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 		Cache: cache.Options{
 			DefaultNamespaces: watchNsCacheByName,
+			ByObject:          controllerconfig.NodeCacheByObject(),
 		},
 	})
 	if err != nil {
@@ -311,6 +313,29 @@ func main() {
 	}
 	// endregion Reconciler/NodeSet
 
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
+
+	if controllersSet.Enabled("rollingupdate") {
+		if err = soperatorchecks.NewSlurmAPIClientsController(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
+			slurmAPIClients,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
+		}
+
+		if err = updatecontroller.NewRollingUpdateReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(updatecontroller.RollingUpdateControllerName),
+			slurmAPIClients,
+		).
+			SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create controller", "controller", updatecontroller.RollingUpdateControllerName)
+		}
+	}
+
 	// region Reconciler/Topology
 	if controllersSet.Enabled("topology") {
 		if err = topologyconfcontroller.NewNodeTopologyReconciler(
@@ -318,7 +343,6 @@ func main() {
 			mgr.GetScheme(),
 			soperatorNamespace,
 			topologyLabelPrefix,
-			mgr.GetAPIReader(),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err,
 				"unable to create controller",
@@ -330,6 +354,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			soperatorNamespace,
+			mgr.GetEventRecorder(topologyconfcontroller.WorkerTopologyReconcilerName),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err,
 				"unable to create controller",

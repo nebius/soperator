@@ -286,64 +286,6 @@ func TestRenderConfigMapSecurityLimits(t *testing.T) {
 	}
 }
 
-func TestRenderSlurmConfigMapAndTopology(t *testing.T) {
-	tests := []struct {
-		name                     string
-		cluster                  values.SlurmCluster
-		expectedTopologyPlugin   string
-		unexpectedTopologyPlugin string
-	}{
-		{
-			name: "No topology config",
-			cluster: values.SlurmCluster{
-				SlurmConfig: slurmv1.SlurmConfig{
-					TopologyPlugin: "",
-				},
-			},
-			expectedTopologyPlugin:   "",
-			unexpectedTopologyPlugin: "",
-		},
-		{
-			name: "Override topology plugin",
-			cluster: values.SlurmCluster{
-				SlurmConfig: slurmv1.SlurmConfig{
-					TopologyPlugin: "topology/block",
-				},
-			},
-			expectedTopologyPlugin:   "topology/block",
-			unexpectedTopologyPlugin: "topology/tree",
-		},
-		{
-			name: "ConfigMap exists but topology config inside",
-			cluster: values.SlurmCluster{
-				SlurmConfig: slurmv1.SlurmConfig{
-					TopologyPlugin: "",
-				},
-			},
-			expectedTopologyPlugin:   "",
-			unexpectedTopologyPlugin: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-
-			result := RenderConfigMapSlurmConfigs(&tt.cluster)
-			assert.NotNil(t, result)
-
-			if tt.expectedTopologyPlugin == "" {
-				assert.NotContains(t, result.Data[consts.ConfigMapKeySlurmConfig], "TopologyPlugin")
-			} else {
-				assert.Contains(t, result.Data[consts.ConfigMapKeySlurmConfig], "TopologyPlugin="+tt.expectedTopologyPlugin)
-			}
-
-			if tt.unexpectedTopologyPlugin != "" {
-				assert.NotContains(t, result.Data[consts.ConfigMapKeySlurmConfig], "TopologyPlugin="+tt.unexpectedTopologyPlugin)
-			}
-		})
-	}
-}
-
 func TestRenderSlurmConfigMapWithLargeSuspendTime(t *testing.T) {
 	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{
 		SlurmConfig: slurmv1.SlurmConfig{
@@ -351,10 +293,98 @@ func TestRenderSlurmConfigMapWithLargeSuspendTime(t *testing.T) {
 		},
 	})
 
-	slurmConfig := result.Data[consts.ConfigMapKeySlurmConfig]
+	slurmConfig := result.Data[consts.ConfigMapKeySlurmBaseConfig]
 	assert.Contains(t, slurmConfig, "SuspendTime=1000000000")
 	assert.NotContains(t, slurmConfig, "SuspendTime=-1")
 	assert.NotContains(t, slurmConfig, "SuspendTime=INFINITE")
+}
+
+func TestRenderSlurmConfigMapResumeTimeout(t *testing.T) {
+	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{
+		SlurmConfig: slurmv1.SlurmConfig{ResumeTimeout: ptr.To[int32](3600)},
+	})
+
+	slurmConfig := result.Data[consts.ConfigMapKeySlurmBaseConfig]
+	assert.Contains(t, slurmConfig, "ResumeTimeout=3600")
+	assert.Equal(t, 1, strings.Count(slurmConfig, "ResumeTimeout="),
+		"ResumeTimeout must be rendered once, from SlurmConfig")
+}
+
+func TestRenderSlurmConfigMapResumeFailProgram(t *testing.T) {
+	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{})
+
+	slurmConfig := result.Data[consts.ConfigMapKeySlurmBaseConfig]
+	assert.Contains(t, slurmConfig, "ResumeFailProgram=/opt/soperator/bin/power_resume_fail.sh",
+		"without it Slurm leaves the pod running after ResumeTimeout")
+	assert.Contains(t, slurmConfig, "ResumeProgram=/opt/soperator/bin/power_resume.sh")
+	assert.Contains(t, slurmConfig, "SuspendProgram=/opt/soperator/bin/power_suspend.sh")
+}
+
+func TestRenderSlurmConfigMapRebootPrograms(t *testing.T) {
+	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{})
+
+	slurmConfig := result.Data[consts.ConfigMapKeySlurmBaseConfig]
+	assert.Contains(t, slurmConfig, "RebootProgram=/opt/bin/slurm/reboot.sh")
+	assert.Contains(t, slurmConfig,
+		"PowerAction=soperator-worker-handoff Location=slurmd Program=/opt/bin/slurm/worker_handoff.py")
+}
+
+func TestRenderConfigMapSlurmConfigs_FileNamesAndWarnings(t *testing.T) {
+	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{})
+
+	assert.Contains(t, result.Data, consts.ConfigMapKeySlurmConfig)
+	assert.Contains(t, result.Data, consts.ConfigMapKeySlurmBaseConfig)
+	assert.Contains(t, result.Data, consts.ConfigMapKeySlurmK8sExtraConfig)
+	for _, staleName := range []string{
+		"custom_slurm.conf",
+		"autogen_slurm.conf",
+		"slurm.gen.conf",
+		"override_slurm.conf",
+	} {
+		assert.NotContains(t, result.Data, staleName)
+	}
+
+	entrypointConfig := result.Data[consts.ConfigMapKeySlurmConfig]
+	baseInclude := "include " + slurmConfigPath(consts.ConfigMapKeySlurmBaseConfig)
+	extraInclude := "include " + slurmConfigPath(consts.ConfigMapKeySlurmK8sExtraConfig)
+	assert.Contains(t, entrypointConfig, SlurmConfigEntrypointWarning())
+	assert.Contains(t, entrypointConfig, baseInclude)
+	assert.Contains(t, entrypointConfig, extraInclude)
+	assert.Less(t, strings.Index(entrypointConfig, baseInclude), strings.Index(entrypointConfig, extraInclude))
+	assert.Contains(t, result.Data[consts.ConfigMapKeySlurmBaseConfig], ManagedSlurmConfigWarning())
+	assert.NotContains(t, result.Data[consts.ConfigMapKeySlurmBaseConfig], "include "+slurmConfigPath(consts.ConfigMapKeySlurmK8sExtraConfig))
+	assert.Contains(t, result.Data[consts.ConfigMapKeySlurmK8sExtraConfig], "Overrides are generated by Soperator.")
+	assert.Contains(t, result.Data[consts.ConfigMapKeyRESTConfig], "include "+slurmConfigPath(consts.ConfigMapKeySlurmConfig))
+	warningText := strings.Join([]string{
+		result.Data[consts.ConfigMapKeySlurmConfig],
+		result.Data[consts.ConfigMapKeySlurmBaseConfig],
+		result.Data[consts.ConfigMapKeySlurmK8sExtraConfig],
+	}, "\n")
+	for _, forbidden := range []string{"SlurmCluster", "customSlurmConfig", "Helm", "spec."} {
+		assert.NotContains(t, warningText, forbidden)
+	}
+
+	for _, key := range []string{
+		consts.ConfigMapKeyRESTConfig,
+		consts.ConfigMapKeyCGroupConfig,
+		consts.ConfigMapKeySpankConfig,
+		consts.ConfigMapKeyGresConfig,
+		consts.ConfigMapKeyMPIConfig,
+	} {
+		assert.Contains(t, result.Data[key], ManagedSlurmConfigWarning())
+	}
+
+	for _, warning := range []string{
+		ManagedSlurmConfigWarning(),
+		SlurmConfigEntrypointWarning(),
+		result.Data[consts.ConfigMapKeySlurmK8sExtraConfig],
+	} {
+		for _, line := range strings.Split(warning, "\n") {
+			if strings.HasPrefix(line, "#") {
+				assert.LessOrEqual(t, len(line), 80)
+			}
+		}
+	}
 }
 
 func TestRenderSlurmConfig_MetricsType(t *testing.T) {
@@ -388,7 +418,7 @@ func TestRenderSlurmConfig_MetricsType(t *testing.T) {
 				},
 			}
 			result := RenderConfigMapSlurmConfigs(cluster)
-			conf := result.Data[consts.ConfigMapKeySlurmConfig]
+			conf := result.Data[consts.ConfigMapKeySlurmBaseConfig]
 			if tt.expectLine {
 				assert.Contains(t, conf, "MetricsType=metrics/openmetrics")
 			} else {
@@ -406,7 +436,7 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "optional spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 importer=")
+		assert.Contains(t, result, "optional spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 importer= use_squashfuse=0")
 	})
 
 	t.Run("Pyxis options", func(t *testing.T) {
@@ -419,20 +449,34 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 importer=/opt/importer.sh")
+		assert.Contains(t, result, "required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 importer=/opt/importer.sh use_squashfuse=0")
 	})
 
-	t.Run("NCCL no options", func(t *testing.T) {
+	t.Run("Pyxis direct SquashFS options", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{
+			PlugStackConfig: slurmv1.PlugStackConfig{
+				Pyxis: slurmv1.PluginConfigPyxis{
+					Required:      ptr.To(true),
+					UseSquashfuse: ptr.To(true),
+					ImporterPath:  "/opt/importer.sh",
+				},
+			},
+		}).Render()
+		assert.NotEmpty(t, result)
+		assert.Contains(t, result, "required spank_pyxis.so runtime_path=/run/pyxis execute_entrypoint=0 container_scope=global sbatch_support=1 importer=/opt/importer.sh use_squashfuse=1")
+	})
+
+	t.Run("NCCL Debug no options", func(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
 			PlugStackConfig: slurmv1.PlugStackConfig{
 				NcclDebug: slurmv1.PluginConfigNcclDebug{},
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "optional spanknccldebug.so enabled=0 log-level=INFO out-file=0 out-dir=/opt/soperator-outputs/nccl_logs out-stdout=0")
+		assert.Contains(t, result, "optional spanknccldebug.so enabled=0 log-level=INFO out-file=0 out-dir=/opt/soperator-outputs/local/nccl_logs out-stdout=0")
 	})
 
-	t.Run("NCCL options", func(t *testing.T) {
+	t.Run("NCCL Debug options", func(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
 			PlugStackConfig: slurmv1.PlugStackConfig{
 				NcclDebug: slurmv1.PluginConfigNcclDebug{
@@ -449,6 +493,33 @@ func TestRenderPlugstack(t *testing.T) {
 		assert.Contains(t, result, "required spanknccldebug.so enabled=1 log-level=TRACE out-file=1 out-dir=/tmp out-stdout=1")
 	})
 
+	t.Run("NCCL Inspector Pre-Configuration no options", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{
+			PlugStackConfig: slurmv1.PlugStackConfig{
+				NcclInspectorPreConf: slurmv1.PluginConfigNcclInspectorPreConf{},
+			},
+		}).Render()
+		assert.NotEmpty(t, result)
+		assert.Contains(t, result, "optional spank_nccl_inspector_preconf.so enabled=0 profiler-plugin=/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so dump-dir=/opt/soperator-outputs/shared/nccl_profiles/%j/%s dump-verbose=0 dump-thread-interval-microseconds=1000000")
+	})
+
+	t.Run("NCCL Inspector Pre-Configuration options", func(t *testing.T) {
+		result := generateSpankConfig(&values.SlurmCluster{
+			PlugStackConfig: slurmv1.PlugStackConfig{
+				NcclInspectorPreConf: slurmv1.PluginConfigNcclInspectorPreConf{
+					Required:                       ptr.To(true),
+					Enabled:                        ptr.To(true),
+					ProfilerPlugin:                 "/usr/lib/a.so",
+					DumpDir:                        "/tmp",
+					DumpVerbose:                    ptr.To(true),
+					DumpThreadIntervalMicroseconds: 500,
+				},
+			},
+		}).Render()
+		assert.NotEmpty(t, result)
+		assert.Contains(t, result, "required spank_nccl_inspector_preconf.so enabled=1 profiler-plugin=/usr/lib/a.so dump-dir=/tmp dump-verbose=1 dump-thread-interval-microseconds=500")
+	})
+
 	t.Run("Custom not provided", func(t *testing.T) {
 		result := generateSpankConfig(&values.SlurmCluster{
 			PlugStackConfig: slurmv1.PlugStackConfig{
@@ -456,7 +527,7 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Equal(t, 3, len(strings.Split(result, "\n")))
+		assert.Equal(t, 4, len(strings.Split(result, "\n")))
 	})
 
 	t.Run("Custom no options", func(t *testing.T) {
@@ -468,7 +539,7 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Equal(t, 4, len(strings.Split(result, "\n")))
+		assert.Equal(t, 5, len(strings.Split(result, "\n")))
 		assert.Contains(t, result, "optional /lol/kek.so")
 	})
 
@@ -491,7 +562,7 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Equal(t, 5, len(strings.Split(result, "\n")))
+		assert.Equal(t, 6, len(strings.Split(result, "\n")))
 		assert.Contains(t, result, "required /lol/kek.so lol=kek")
 		assert.Contains(t, result, "required /kek/lol.so kek=lol")
 	})
@@ -591,14 +662,15 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 								},
 							},
 							NodeConfig: slurmv1alpha1.NodeConfig{
-								Features: []string{"a", "b"},
-								Static:   "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1 Feature=c,d",
+								Features:   []string{"a", "b"},
+								AutoResume: ptr.To(false),
+								Static:     "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1 Feature=c,d",
 							},
 						},
 					},
 				},
 			},
-			expected: "NodeName=nodeA-0 State=CLOUD NodeHostname=nodeA-0 NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=a,b Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 AutoResume=Off Feature=a,b Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Single nodeset with multiple replicas",
@@ -627,9 +699,7 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeB-0 State=CLOUD NodeHostname=nodeB-0 NodeAddr=nodeB-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeB-1 State=CLOUD NodeHostname=nodeB-1 NodeAddr=nodeB-1.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeB-2 State=CLOUD NodeHostname=nodeB-2 NodeAddr=nodeB-2.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeB-[0-2] State=CLOUD NodeAddr=nodeB-[0-2].slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Multiple nodesets with varying replicas",
@@ -675,9 +745,8 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeC-0 State=CLOUD NodeHostname=nodeC-0 NodeAddr=nodeC-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeC-1 State=CLOUD NodeHostname=nodeC-1 NodeAddr=nodeC-1.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeD-0 State=CLOUD NodeHostname=nodeD-0 NodeAddr=nodeD-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=16384 Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeC-[0-1] State=CLOUD NodeAddr=nodeC-[0-1].slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeD-0 State=CLOUD NodeAddr=nodeD-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=16384 Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Nodeset with zero replicas",
@@ -891,11 +960,32 @@ func TestAddNodeSetsToSlurmConfig(t *testing.T) {
 	}
 }
 
+// gpuNodeSetWithReplicas builds a NodeSet a user-defined topology can cover: CPU-only NodeSets are
+// pulled out of those and described by the generated flat topology instead.
+func gpuNodeSetWithReplicas(name string, replicas int32) slurmv1alpha1.NodeSet {
+	nodeSet := nodeSetWithReplicas(name, replicas)
+	nodeSet.Spec.GPU.Enabled = true
+	return nodeSet
+}
+
+func nodeSetWithReplicas(name string, replicas int32) slurmv1alpha1.NodeSet {
+	return slurmv1alpha1.NodeSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "soperator",
+		},
+		Spec: slurmv1alpha1.NodeSetSpec{
+			Replicas: replicas,
+		},
+	}
+}
+
 func TestAddPartitionsToSlurmConfig(t *testing.T) {
 	tests := []struct {
-		name     string
-		cluster  *values.SlurmCluster
-		expected string
+		name        string
+		cluster     *values.SlurmCluster
+		expected    []string
+		notExpected []string
 	}{
 		{
 			name: "Single partition with isAll",
@@ -915,7 +1005,95 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "PartitionName=main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP",
+			expected: []string{"PartitionName=main Nodes=ALL Default=YES PriorityTier=10 MaxTime=INFINITE State=UP"},
+		},
+		{
+			name: "Partition bound to a named topology",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{gpuNodeSetWithReplicas("h100", 4)},
+				Topology: &slurmv1.Topology{
+					Topologies: []slurmv1.NamedTopology{
+						{Name: "ib-gpu", Topo: slurmv1.TopologyPlugin{Type: consts.SlurmTopologyTypeBlock}},
+					},
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "gpu",
+							IsAll:       true,
+							TopologyRef: "ib-gpu",
+							Config:      "Default=YES State=UP",
+						},
+					},
+				},
+			},
+			expected: []string{"PartitionName=gpu Nodes=ALL Topology=ib-gpu Default=YES State=UP"},
+		},
+		{
+			name: "Partition bound to a declared but unpopulated topology keeps the binding",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{gpuNodeSetWithReplicas("h100", 4)},
+				Topology: &slurmv1.Topology{
+					Topologies: []slurmv1.NamedTopology{
+						{
+							Name:        "ghost",
+							Topo:        slurmv1.TopologyPlugin{Type: consts.SlurmTopologyTypeBlock},
+							NodeSetRefs: []string{"never-applied"},
+						},
+					},
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "spooky",
+							IsAll:       true,
+							TopologyRef: "ghost",
+							Config:      "Default=YES State=UP",
+						},
+					},
+				},
+			},
+			// The topology is written out empty until its NodeSets arrive, so the binding still
+			// resolves and must not be dropped.
+			expected: []string{"PartitionName=spooky Nodes=ALL Topology=ghost Default=YES State=UP"},
+		},
+		{
+			name: "Partition referencing an undefined topology drops the binding",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{gpuNodeSetWithReplicas("h100", 4)},
+				Topology: &slurmv1.Topology{
+					Topologies: []slurmv1.NamedTopology{
+						{Name: "ib-gpu", Topo: slurmv1.TopologyPlugin{Type: consts.SlurmTopologyTypeBlock}},
+					},
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "gpu",
+							IsAll:       true,
+							TopologyRef: "not-applied-yet",
+							Config:      "Default=YES State=UP",
+						},
+					},
+				},
+			},
+			expected:    []string{"PartitionName=gpu Nodes=ALL Default=YES State=UP"},
+			notExpected: []string{"Topology=not-applied-yet"},
 		},
 		{
 			name: "Single partition with nodeset refs",
@@ -923,6 +1101,10 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 				NamespacedName: types.NamespacedName{
 					Namespace: "soperator",
 					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					nodeSetWithReplicas("nodeA", 1),
+					nodeSetWithReplicas("nodeB", 3),
 				},
 				PartitionConfiguration: values.PartitionConfiguration{
 					ConfigType: "structured",
@@ -935,7 +1117,7 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "PartitionName=gpu Nodes=nodeA,nodeB Default=NO PriorityTier=5 State=UP",
+			expected: []string{"PartitionName=gpu Nodes=nodeA,nodeB Default=NO PriorityTier=5 State=UP"},
 		},
 		{
 			name: "Multiple partitions with varying configurations",
@@ -943,6 +1125,9 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 				NamespacedName: types.NamespacedName{
 					Namespace: "soperator",
 					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					nodeSetWithReplicas("nodeC", 2),
 				},
 				PartitionConfiguration: values.PartitionConfiguration{
 					ConfigType: "structured",
@@ -960,7 +1145,10 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "PartitionName=all-nodes Nodes=ALL Default=NO PriorityTier=1 State=UP",
+			expected: []string{
+				"PartitionName=high-priority Nodes=nodeC Default=YES PriorityTier=10 State=UP",
+				"PartitionName=all-nodes Nodes=ALL Default=NO PriorityTier=1 State=UP",
+			},
 		},
 		{
 			name: "Partition with no nodeset refs and not isAll",
@@ -979,7 +1167,96 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "#WARNING: Partition invalid has no nodeset refs and is not 'all', skipping",
+			expected: []string{"#WARNING: Partition invalid has no nodeset refs and is not 'all', skipping"},
+		},
+		{
+			name: "Partition referencing a nodeset that does not exist yet",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					nodeSetWithReplicas("nodeA", 1),
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "gpu",
+							NodeSetRefs: []string{"nodeA", "missing"},
+							Config:      "Default=NO State=UP",
+						},
+					},
+				},
+			},
+			expected: []string{
+				"#WARNING: Partition gpu references NodeSet missing ignored: NodeSet does not exist",
+				"PartitionName=gpu Nodes=nodeA Default=NO State=UP",
+			},
+			notExpected: []string{"Nodes=nodeA,missing"},
+		},
+		{
+			name: "Partition referencing a nodeset with zero replicas",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					nodeSetWithReplicas("nodeA", 2),
+					nodeSetWithReplicas("scaled-down", 0),
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "gpu",
+							NodeSetRefs: []string{"scaled-down", "nodeA"},
+							Config:      "Default=NO State=UP",
+						},
+					},
+				},
+			},
+			expected: []string{
+				"#WARNING: Partition gpu references NodeSet scaled-down ignored: NodeSet has no replicas",
+				"PartitionName=gpu Nodes=nodeA Default=NO State=UP",
+			},
+		},
+		{
+			name: "Partition losing all of its nodeset refs keeps an empty node list",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					nodeSetWithReplicas("nodeA", 1),
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "gpu",
+							NodeSetRefs: []string{"missing", "also-missing"},
+							Config:      "Default=NO State=UP",
+						},
+						{
+							Name:        "cpu",
+							NodeSetRefs: []string{"nodeA"},
+							Config:      "Default=YES State=UP",
+						},
+					},
+				},
+			},
+			expected: []string{
+				"#WARNING: Partition gpu references NodeSet missing ignored: NodeSet does not exist",
+				"#WARNING: Partition gpu references NodeSet also-missing ignored: NodeSet does not exist",
+				"#WARNING: Partition gpu has no usable nodeset refs, rendering it without nodes",
+				`PartitionName=gpu Nodes="" Default=NO State=UP`,
+				"PartitionName=cpu Nodes=nodeA Default=YES State=UP",
+			},
+			notExpected: []string{"Nodes=missing"},
 		},
 		{
 			name: "No partitions defined",
@@ -993,7 +1270,7 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 					Partitions: []slurmv1.Partition{},
 				},
 			},
-			expected: "#WARNING: No partitions defined in structured configuration!",
+			expected: []string{"#WARNING: No partitions defined in structured configuration!"},
 		},
 	}
 
@@ -1003,9 +1280,11 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 			AddPartitionsToSlurmConfig(res, tt.cluster)
 			result := res.Render()
 
-			// Check if the expected string is present in the result
-			if !strings.Contains(result, tt.expected) {
-				t.Errorf("Expected string not found in result.\nExpected to contain:\n%s\n\nGot:\n%s", tt.expected, result)
+			for _, expected := range tt.expected {
+				assert.Contains(t, result, expected)
+			}
+			for _, notExpected := range tt.notExpected {
+				assert.NotContains(t, result, notExpected)
 			}
 		})
 	}

@@ -2,8 +2,24 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/79
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS login_sshd
+# https://github.com/nebius/ml-containers/pull/98
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260819104842 AS login_pam_builder
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc \
+        libpam0g-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY images/common/pam_soperator_jail.c /usr/src/pam-soperator-jail/
+COPY images/common/scripts/build_pam_soperator_jail.sh /usr/src/pam-soperator-jail/
+RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
+    /usr/src/pam-soperator-jail/pam_soperator_jail.c \
+    /out
+
+# https://github.com/nebius/ml-containers/pull/98
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260819104842 AS login_sshd
 
 # Install OpenSSH server
 # Create root .ssh directory
@@ -36,12 +52,20 @@ RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
-# Install NCCL debug plugin
+# Install NCCL Debug SPANK plugin
 COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
 COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
+
+# Install NCCL Inspector PreConf SPANK plugin
+COPY ansible/spank_nccl_inspector_preconf.yml /opt/ansible/spank_nccl_inspector_preconf.yml
+COPY ansible/roles/spank_nccl_inspector_preconf /opt/ansible/roles/spank_nccl_inspector_preconf
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local \
+      -e spank_nccl_inspector_preconf_dump_dir_create=false \
+      spank_nccl_inspector_preconf.yml
 
 # Install enroot
 COPY images/common/scripts/install_enroot.sh /opt/bin/
@@ -57,11 +81,11 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
     chown 0:0 /etc/enroot/enroot.conf.d/custom-dirs.conf && \
     chmod 644 /etc/enroot/enroot.conf.d/custom-dirs.conf
 
-ARG SLURM_VERSION
-ARG PYXIS_VERSION=0.23.0
+ARG SLURM_DEB_VERSION
+ARG PYXIS_VERSION=0.24.0
 # Install slurm pyxis plugin
 RUN apt-get update && \
-    apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
+    apt -y install nvslurm-plugin-pyxis=${SLURM_DEB_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -71,8 +95,12 @@ COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
 # Copy script for bind-mounting slurm into the jail
 COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
+# Copy script for preparing an SSHD configuration compatible with the PAM jail
+COPY images/common/scripts/prepare_sshd_pam_jail_config.sh /opt/bin/slurm/
+
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
-    chmod +x /opt/bin/slurm/bind_slurm_common.sh
+    chmod +x /opt/bin/slurm/bind_slurm_common.sh && \
+    chmod +x /opt/bin/slurm/prepare_sshd_pam_jail_config.sh
 
 # Update linker cache
 RUN ldconfig
@@ -83,6 +111,19 @@ RUN rm -rf /home
 
 # Delete SSH "message of the day" scripts because they will be linked from jail
 RUN rm -rf /etc/update-motd.d
+
+# Install the native PAM module that places each SSH session in its own mount
+# namespace and pivots it into /mnt/jail.
+COPY --from=login_pam_builder /out/ /
+
+# Install the per-user cgroup isolation PAM hook.
+# It is a no-op unless enabled via the SlurmCluster `login.userIsolation` field.
+# Keep pam_soperator_jail last: it pivots the per-session sshd process into the
+# jail, so any PAM session modules after it would also run inside the jail.
+COPY images/login/user_isolation_pam_hook.sh /opt/bin/slurm/
+RUN chmod +x /opt/bin/slurm/user_isolation_pam_hook.sh && \
+    echo "session optional pam_exec.so quiet log=/proc/1/fd/1 /opt/bin/slurm/user_isolation_pam_hook.sh" >> /etc/pam.d/sshd && \
+    echo "session required pam_soperator_jail.so /mnt/jail" >> /etc/pam.d/sshd
 
 # Expose the port used for accessing sshd
 EXPOSE 22

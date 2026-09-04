@@ -1,0 +1,211 @@
+suite: test control-plane placement
+templates:
+  - templates/cert-manager.yaml
+  - templates/mariadb-operator.yaml
+  - templates/backup.yaml
+  - templates/security-profiles-operator.yaml
+  - templates/csi-driver-nfs.yaml
+  - templates/kruise.yaml
+  - templates/soperator.yaml
+  - templates/soperatorchecks.yaml
+  - templates/vm-logs.yaml
+  - templates/vm-stack.yaml
+  - templates/opentelemetry-collector-events.yaml
+tests:
+  - it: should pin cert-manager and its companions to system nodes
+    template: templates/cert-manager.yaml
+    asserts:
+      - equal:
+          path: spec.values.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      # The chart's own Windows guard must survive the merge.
+      - equal:
+          path: spec.values.nodeSelector["kubernetes.io/os"]
+          value: linux
+      - equal:
+          path: spec.values.webhook.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.values.cainjector.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.values.startupapicheck.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+
+  - it: should spread cert-manager replicas across nodes
+    template: templates/cert-manager.yaml
+    asserts:
+      - equal:
+          path: spec.values.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].weight
+          value: 100
+      - equal:
+          path: spec.values.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.topologyKey
+          value: kubernetes.io/hostname
+      - equal:
+          path: spec.values.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchLabels["app.kubernetes.io/name"]
+          value: cert-manager
+      - equal:
+          path: spec.values.webhook.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchLabels["app.kubernetes.io/name"]
+          value: webhook
+
+  - it: should not give the one-shot startupapicheck job an anti-affinity term
+    template: templates/cert-manager.yaml
+    asserts:
+      - notExists:
+          path: spec.values.startupapicheck.affinity
+
+  - it: should pin the mariadb operator, its webhook and its cert controller
+    template: templates/mariadb-operator.yaml
+    asserts:
+      - equal:
+          path: spec.values.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.values.webhook.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.values.certController.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      # The placement must not displace the webhook settings the chart already sets.
+      - equal:
+          path: spec.values.webhook.cert.certManager.enabled
+          value: true
+
+  - it: should pin k8up
+    template: templates/backup.yaml
+    asserts:
+      - equal:
+          path: spec.values.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+
+  - it: should pin the security profiles operator but leave its DaemonSet alone
+    template: templates/security-profiles-operator.yaml
+    asserts:
+      - equal:
+          path: spec.values.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.values.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchLabels.app
+          value: security-profiles-operator
+      - notExists:
+          path: spec.values.daemon.nodeSelector
+
+  - it: should pin only the csi-driver-nfs controller, never the node plugin
+    template: templates/csi-driver-nfs.yaml
+    asserts:
+      - equal:
+          path: spec.values.controller.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - notExists:
+          path: spec.values.node
+
+  - it: should pin the kruise manager without an anti-affinity term
+    template: templates/kruise.yaml
+    asserts:
+      - equal:
+          path: spec.values.manager.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      # The kruise chart has no manager.affinity value to set.
+      - notExists:
+          path: spec.values.manager.affinity
+      - equal:
+          path: spec.values.manager.replicas
+          value: 2
+
+  - it: should pin the soperator controller manager
+    template: templates/soperator.yaml
+    asserts:
+      - equal:
+          path: spec.values.controllerManager.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.values.controllerManager.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchLabels["control-plane"]
+          value: controller-manager
+      - equal:
+          path: spec.values.controllerManager.manager.resources.requests.cpu
+          value: 500m
+
+  - it: should pin soperatorchecks
+    template: templates/soperatorchecks.yaml
+    asserts:
+      - equal:
+          path: spec.values.checks.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.values.checks.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchLabels["control-plane"]
+          value: soperatorchecks
+
+  - it: should pin the vm-logs server
+    template: templates/vm-logs.yaml
+    asserts:
+      - equal:
+          path: spec.values.server.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.values.server.resources.requests.cpu
+          value: 1000m
+
+  - it: should pin the events collector
+    template: templates/opentelemetry-collector-events.yaml
+    asserts:
+      - equal:
+          path: spec.values.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.values.mode
+          value: deployment
+
+  - it: should pin grafana, the vm operator, vmagent and vmsingle
+    template: templates/vm-stack.yaml
+    asserts:
+      - equal:
+          path: spec.values.grafana.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.values.victoria-metrics-operator.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.values.vmagent.spec.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.values.vmsingle.spec.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      # The rest of the vmsingle spec must still be there.
+      - equal:
+          path: spec.values.vmsingle.spec.retentionPeriod
+          value: 30d
+
+  - it: should add an anti-affinity term to kube-state-metrics without dropping its node affinity
+    template: templates/vm-stack.yaml
+    asserts:
+      - equal:
+          path: spec.values.kube-state-metrics.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: slurm.nebius.ai/nodeset
+      - equal:
+          path: spec.values.kube-state-metrics.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchLabels["app.kubernetes.io/name"]
+          value: kube-state-metrics
+
+  # csi-driver-nfs carries its placement in overrideValues, which the template renders verbatim,
+  # so clearing them is how you opt out.
+  - it: should drop the csi-driver-nfs placement when its overrideValues are cleared
+    template: templates/csi-driver-nfs.yaml
+    set:
+      csiDriverNfs.overrideValues: null
+    asserts:
+      - notExists:
+          path: spec.values.controller
+
+  # overrideValues is the documented full escape hatch, so it drops the pin along with
+  # everything else the template would have rendered.
+  - it: should let overrideValues replace the placement
+    template: templates/backup.yaml
+    set:
+      backup.overrideValues:
+        k8up:
+          skipWithoutAnnotation: false
+    asserts:
+      - notExists:
+          path: spec.values.nodeSelector
+      - equal:
+          path: spec.values.k8up.skipWithoutAnnotation
+          value: false
