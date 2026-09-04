@@ -13,12 +13,13 @@ import (
 
 // NodeSetDef describes a single worker nodeset in the e2e profile.
 type NodeSetDef struct {
-	Name             string `json:"name"`
-	Platform         string `json:"platform"`
-	Preset           string `json:"preset"`
-	Size             int    `json:"size"`
-	InfinibandFabric string `json:"infiniband_fabric"`
-	Preemptible      bool   `json:"preemptible"`
+	Name               string                 `json:"name"`
+	Platform           string                 `json:"platform"`
+	Preset             string                 `json:"preset"`
+	Size               int                    `json:"size"`
+	InfinibandFabric   string                 `json:"infiniband_fabric"`
+	Preemptible        bool                   `json:"preemptible"`
+	TerraformOverrides map[string]interface{} `json:"terraform_overrides,omitempty"`
 }
 
 type CapacityStrategy string
@@ -42,15 +43,17 @@ func NormalizeLabel(label string) string {
 	return strings.TrimPrefix(strings.ToLower(strings.TrimSpace(label)), LabelPrefix)
 }
 
-// Profile holds infrastructure-specific settings loaded from the PROFILE env var.
+// Profile holds infrastructure-specific settings loaded from E2E_PROFILE_YAML.
 // JSON tags are required by sigs.k8s.io/yaml.
 type Profile struct {
-	NebiusProjectID  string           `json:"nebius_project_id"`
-	NebiusRegion     string           `json:"nebius_region"`
-	NebiusTenantID   string           `json:"nebius_tenant_id"`
-	CapacityStrategy CapacityStrategy `json:"capacity_strategy"`
-	Labels           []string         `json:"labels"`
-	NodeSets         []NodeSetDef     `json:"nodesets"`
+	NebiusProjectID            string           `json:"nebius_project_id"`
+	NebiusRegion               string           `json:"nebius_region"`
+	NebiusTenantID             string           `json:"nebius_tenant_id"`
+	NebiusProfile              string           `json:"nebius_profile,omitempty"`
+	TerraformBackendS3Endpoint string           `json:"terraform_backend_s3_endpoint,omitempty"`
+	CapacityStrategy           CapacityStrategy `json:"capacity_strategy"`
+	Labels                     []string         `json:"labels"`
+	NodeSets                   []NodeSetDef     `json:"nodesets"`
 }
 
 // HasLabel reports whether the profile carries the given label.

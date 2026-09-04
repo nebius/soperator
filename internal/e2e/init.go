@@ -15,6 +15,10 @@ import (
 )
 
 func Init(ctx context.Context, cfg Config) (tf *tfexec.Terraform, varFilePath string, cleanup func(), err error) {
+	if err := overrideTerraformBackendS3Endpoint(cfg.PathToInstallation, cfg.Profile.TerraformBackendS3Endpoint); err != nil {
+		return nil, "", nil, err
+	}
+
 	tf, varFilePath, cleanup, err = setupTerraform(cfg)
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("setup terraform: %w", err)

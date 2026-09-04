@@ -238,12 +238,12 @@ func candidatesFor(cfg E2EConfig, label string) ([]string, error) {
 	return candidates, nil
 }
 
-// newNebiusSDK signs in with the NEBIUS_IAM_TOKEN env var when it is set, and
-// otherwise the way the Nebius CLI would: from the standard config file. On a
-// service-account profile the SDK keeps the exchanged token fresh on its own,
-// which matters when the selector waits for longer than one token stays valid.
-func newNebiusSDK(ctx context.Context) (*gosdk.SDK, error) {
-	if token := os.Getenv("NEBIUS_IAM_TOKEN"); token != "" {
+// newNebiusSDK uses the named Nebius CLI profile when one is configured for the
+// E2E profile. Legacy profiles without one keep using NEBIUS_IAM_TOKEN or the
+// default CLI profile. Service-account profiles keep exchanged tokens fresh,
+// which matters when the selector waits longer than one token stays valid.
+func newNebiusSDK(ctx context.Context, profileName string) (*gosdk.SDK, error) {
+	if token := os.Getenv("NEBIUS_IAM_TOKEN"); token != "" && profileName == "" {
 		sdk, err := gosdk.New(ctx, gosdk.WithCredentials(gosdk.IAMToken(token)))
 		if err != nil {
 			return nil, fmt.Errorf("create nebius sdk with env token: %w", err)
@@ -251,9 +251,14 @@ func newNebiusSDK(ctx context.Context) (*gosdk.SDK, error) {
 		return sdk, nil
 	}
 
-	sdk, err := gosdk.New(ctx, gosdk.WithConfigReader(reader.NewConfigReader(reader.WithoutFileCache())))
+	configReader := reader.NewConfigReader(reader.WithoutFileCache())
+	if profileName != "" {
+		configReader = reader.NewConfigReader(reader.WithoutFileCache(), reader.WithProfileName(profileName))
+	}
+	sdk, err := gosdk.New(ctx, gosdk.WithConfigReader(configReader))
 	if err != nil {
-		return nil, fmt.Errorf("create nebius sdk (needs ~/.nebius/config.yaml or NEBIUS_IAM_TOKEN): %w", err)
+		return nil, fmt.Errorf("create nebius sdk for profile %q (needs ~/.nebius/config.yaml or NEBIUS_IAM_TOKEN): %w",
+			profileName, err)
 	}
 	return sdk, nil
 }
@@ -265,12 +270,11 @@ func SelectProfile(ctx context.Context, cfg E2EConfig, label string) (name strin
 		return "", Profile{}, err
 	}
 
-	sdk, err := newNebiusSDK(ctx)
-	if err != nil {
-		return "", Profile{}, err
-	}
+	sdks := make(map[string]*gosdk.SDK)
 	defer func() {
-		_ = sdk.Close()
+		for _, sdk := range sdks {
+			_ = sdk.Close()
+		}
 	}()
 
 	return selectProfile(ctx, cfg, label, selectOptions{
@@ -278,6 +282,15 @@ func SelectProfile(ctx context.Context, cfg E2EConfig, label string) (name strin
 		poll:    time.Duration(cfg.Selector.PollSeconds) * time.Second,
 		claims:  ActiveClaims,
 		oracle: func(profile Profile, reserved map[affinityKey]uint64) (bool, error) {
+			sdk, ok := sdks[profile.NebiusProfile]
+			if !ok {
+				var err error
+				sdk, err = newNebiusSDK(ctx, profile.NebiusProfile)
+				if err != nil {
+					return false, err
+				}
+				sdks[profile.NebiusProfile] = sdk
+			}
 			return hasCapacity(ctx, sdk, profile, reserved)
 		},
 		pick: rand.IntN,
