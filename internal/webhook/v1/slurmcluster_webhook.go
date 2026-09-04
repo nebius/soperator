@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -54,14 +55,44 @@ var _ admission.Validator[*slurmv1.SlurmCluster] = &SlurmClusterCustomValidator{
 func (v *SlurmClusterCustomValidator) ValidateCreate(_ context.Context, slurmCluster *slurmv1.SlurmCluster) (admission.Warnings, error) {
 	slurmClusterLog.Info("Validation for SlurmCluster upon creation", "name", slurmCluster.GetName())
 
-	return nil, validateLoginUserIsolation(slurmCluster)
+	return nil, validateSlurmCluster(slurmCluster)
 }
 
 // ValidateUpdate implements admission.Validator so a webhook will be registered for the type SlurmCluster.
 func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, _, newSlurmCluster *slurmv1.SlurmCluster) (admission.Warnings, error) {
 	slurmClusterLog.Info("Validation for SlurmCluster upon update", "name", newSlurmCluster.GetName())
 
-	return nil, validateLoginUserIsolation(newSlurmCluster)
+	return nil, validateSlurmCluster(newSlurmCluster)
+}
+
+func validateSlurmCluster(cluster *slurmv1.SlurmCluster) error {
+	if err := validateLoginUserIsolation(cluster); err != nil {
+		return err
+	}
+	return validateLoginAutoscaling(cluster)
+}
+
+func validateLoginAutoscaling(cluster *slurmv1.SlurmCluster) error {
+	login := &cluster.Spec.SlurmNodes.Login
+	autoscaling := login.Autoscaling
+	if autoscaling == nil || !autoscaling.Enabled {
+		return nil
+	}
+	if autoscaling.MaxReplicas < autoscaling.MinReplicas {
+		return fmt.Errorf(
+			"login.autoscaling.maxReplicas (%d) must be at least minReplicas (%d)",
+			autoscaling.MaxReplicas,
+			autoscaling.MinReplicas,
+		)
+	}
+	if autoscaling.TargetCPUUtilizationPercentage < 1 || autoscaling.TargetCPUUtilizationPercentage > 100 {
+		return fmt.Errorf("login.autoscaling.targetCPUUtilizationPercentage must be between 1 and 100")
+	}
+	cpuRequest, ok := login.Sshd.Resources[corev1.ResourceCPU]
+	if !ok || cpuRequest.Sign() <= 0 {
+		return fmt.Errorf("login.sshd.resources.cpu must be greater than zero when autoscaling is enabled")
+	}
+	return nil
 }
 
 // validateLoginUserIsolation checks the effective per-user memory limits.

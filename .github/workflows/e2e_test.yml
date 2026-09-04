@@ -151,7 +151,7 @@ jobs:
 
     env:
       PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/soperator/installations/example"
-      TERRAFORM_REPO: "nebius/nebius-solution-library"
+      TERRAFORM_REPO: "nebius/nebius-solutions-library"
       TERRAFORM_REPO_REF: "${{ github.event.inputs.terraform_repo_ref || github.ref_name }}"
       SOPERATOR_E2E_REPO: "${{ github.repository }}"
       SOPERATOR_E2E_REPO_BRANCH: "${{ inputs.soperator_e2e_repo_branch || 'main' }}"

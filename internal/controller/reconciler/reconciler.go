@@ -6,6 +6,7 @@ import (
 	"maps"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -201,6 +202,8 @@ func (r Reconciler) reconcile(
 				existing = &kruisev1b1.StatefulSet{}
 			case *appsv1.Deployment:
 				existing = &appsv1.Deployment{}
+			case *autoscalingv2.HorizontalPodAutoscaler:
+				existing = &autoscalingv2.HorizontalPodAutoscaler{}
 			case *prometheusv1.PodMonitor:
 				existing = &prometheusv1.PodMonitor{}
 			case *prometheusv1.ServiceMonitor:
