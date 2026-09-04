@@ -39,6 +39,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Load profile: %v", err)
 	}
+	if err := activateNebiusProfile(profile); err != nil {
+		log.Fatalf("Activate Nebius profile: %v", err)
+	}
 
 	switch os.Args[1] {
 	case "check-capacity":
@@ -62,6 +65,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("%s: %v", os.Args[1], err)
 	}
+}
+
+func activateNebiusProfile(profile e2e.Profile) error {
+	if profile.NebiusProfile == "" {
+		return nil
+	}
+	if err := os.Setenv("NEBIUS_PROFILE", profile.NebiusProfile); err != nil {
+		return fmt.Errorf("set NEBIUS_PROFILE: %w", err)
+	}
+	return nil
 }
 
 func loadFullConfig(profile e2e.Profile) e2e.Config {
@@ -118,7 +131,8 @@ func runSelectProfile(ctx context.Context) error {
 		return err
 	}
 
-	log.Printf("Profile %s: project=%s region=%s", name, profile.NebiusProjectID, profile.NebiusRegion)
+	log.Printf("Profile %s: project=%s region=%s nebius-profile=%s",
+		name, profile.NebiusProjectID, profile.NebiusRegion, profile.NebiusProfile)
 
 	body, err := profile.YAML()
 	if err != nil {
@@ -177,6 +191,7 @@ func writeOutputs(name string, profile e2e.Profile, body string) error {
 		{"nebius_project_id", profile.NebiusProjectID},
 		{"nebius_region", profile.NebiusRegion},
 		{"nebius_tenant_id", profile.NebiusTenantID},
+		{"nebius_profile", profile.NebiusProfile},
 	}
 
 	path := os.Getenv("GITHUB_OUTPUT")

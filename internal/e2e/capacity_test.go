@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,4 +49,14 @@ func TestGPUDemands_GB300(t *testing.T) {
 			nodesetNames: []string{"worker"},
 		},
 	}, demands)
+}
+
+func TestCheckCapacity_CPUProfileDoesNotRequireCredentials(t *testing.T) {
+	profile := Profile{
+		NodeSets: []NodeSetDef{
+			{Name: "worker", Platform: "cpu-d3", Preset: "16vcpu-64gb", Size: 1},
+		},
+	}
+
+	assert.NoError(t, CheckCapacity(context.Background(), profile))
 }

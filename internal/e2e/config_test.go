@@ -116,6 +116,7 @@ profiles:
     nebius_project_id: project-gb300
     nebius_region: eu-north1
     nebius_tenant_id: tenant-gb300
+    nebius_profile: testing
     capacity_strategy: cancel
     labels:
       - gb300
@@ -145,6 +146,7 @@ profiles:
 	require.NoError(t, err)
 	profile, ok := config.Profiles["MAN_GB300"]
 	require.True(t, ok)
+	assert.Equal(t, "testing", profile.NebiusProfile)
 	assert.False(t, profile.HasLabel(autoSelectLabel))
 	require.Len(t, profile.NodeSets, 1)
 	wantOverrides := map[string]interface{}{
@@ -169,6 +171,7 @@ profiles:
 	reparsed, err := ParseProfile(roundTrip)
 	require.NoError(t, err)
 	assert.Equal(t, wantOverrides, reparsed.NodeSets[0].TerraformOverrides)
+	assert.Equal(t, "testing", reparsed.NebiusProfile)
 }
 
 func TestParseProfile_LegacyGPUProfiles(t *testing.T) {
@@ -197,10 +200,12 @@ nodesets:
 			require.Len(t, profile.NodeSets, 1)
 			assert.Equal(t, tt.platform, profile.NodeSets[0].Platform)
 			assert.Equal(t, tt.preset, profile.NodeSets[0].Preset)
+			assert.Empty(t, profile.NebiusProfile)
 			assert.Nil(t, profile.NodeSets[0].TerraformOverrides)
 
 			roundTrip, err := profile.YAML()
 			require.NoError(t, err)
+			assert.NotContains(t, roundTrip, "nebius_profile")
 			assert.NotContains(t, roundTrip, "terraform_overrides")
 		})
 	}
