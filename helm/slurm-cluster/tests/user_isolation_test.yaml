@@ -2,50 +2,52 @@ suite: test login user isolation rendering
 templates:
   - templates/slurm-cluster-cr.yaml
 tests:
-  - it: should render user isolation disabled by default
-    asserts:
-      - equal:
-          path: spec.slurmNodes.login.userIsolation.enabled
-          value: false
-      - equal:
-          path: spec.slurmNodes.login.userIsolation.cpuWeight
-          value: 100
-      # Memory limits are unset by default: when the feature is enabled, the
-      # operator derives them from the sshd container memory limit (80% high /
-      # 90% max).
-      - notExists:
-          path: spec.slurmNodes.login.userIsolation.memoryHigh
-      - notExists:
-          path: spec.slurmNodes.login.userIsolation.memoryMax
-
-  - it: should render user isolation enabled with derived memory limits when turned on
-    set:
-      slurmNodes:
-        login:
-          userIsolation:
-            enabled: true
+  - it: should render user isolation enabled by default
     asserts:
       - equal:
           path: spec.slurmNodes.login.userIsolation.enabled
           value: true
+      - equal:
+          path: spec.slurmNodes.login.userIsolation.cpuWeight
+          value: 100
+      # Memory limits are unset by default: when the feature is enabled, the
+      # operator derives them from the sshd container memory limit (40% high /
+      # 50% max).
       - notExists:
           path: spec.slurmNodes.login.userIsolation.memoryHigh
       - notExists:
           path: spec.slurmNodes.login.userIsolation.memoryMax
 
-  - it: should render user isolation with memory limits when enabled
+  - it: should not render memoryHigh, memoryMax and cpuWeight if unset
     set:
       slurmNodes:
         login:
           userIsolation:
             enabled: true
+            memoryHigh: null
+            memoryMax: null
+            cpuWeight: null
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.login.userIsolation.memoryHigh
+      - notExists:
+          path: spec.slurmNodes.login.userIsolation.memoryMax
+      - notExists:
+          path: spec.slurmNodes.login.userIsolation.cpuWeight
+
+  - it: should render user isolation settings as is
+    set:
+      slurmNodes:
+        login:
+          userIsolation:
+            enabled: false
             memoryHigh: "2Gi"
             memoryMax: "3Gi"
             cpuWeight: 250
     asserts:
       - equal:
           path: spec.slurmNodes.login.userIsolation.enabled
-          value: true
+          value: false
       - equal:
           path: spec.slurmNodes.login.userIsolation.memoryHigh
           value: "2Gi"
