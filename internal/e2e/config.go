@@ -46,13 +46,14 @@ func NormalizeLabel(label string) string {
 // Profile holds infrastructure-specific settings loaded from E2E_PROFILE_YAML.
 // JSON tags are required by sigs.k8s.io/yaml.
 type Profile struct {
-	NebiusProjectID  string           `json:"nebius_project_id"`
-	NebiusRegion     string           `json:"nebius_region"`
-	NebiusTenantID   string           `json:"nebius_tenant_id"`
-	NebiusProfile    string           `json:"nebius_profile,omitempty"`
-	CapacityStrategy CapacityStrategy `json:"capacity_strategy"`
-	Labels           []string         `json:"labels"`
-	NodeSets         []NodeSetDef     `json:"nodesets"`
+	NebiusProjectID            string           `json:"nebius_project_id"`
+	NebiusRegion               string           `json:"nebius_region"`
+	NebiusTenantID             string           `json:"nebius_tenant_id"`
+	NebiusProfile              string           `json:"nebius_profile,omitempty"`
+	TerraformBackendS3Endpoint string           `json:"terraform_backend_s3_endpoint,omitempty"`
+	CapacityStrategy           CapacityStrategy `json:"capacity_strategy"`
+	Labels                     []string         `json:"labels"`
+	NodeSets                   []NodeSetDef     `json:"nodesets"`
 }
 
 // HasLabel reports whether the profile carries the given label.

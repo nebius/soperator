@@ -29,14 +29,21 @@ func TestWriteOutputsIncludesNebiusProfile(t *testing.T) {
 	assert.Contains(t, string(contents), "nebius_profile=testing\n")
 }
 
-func TestActivateNebiusProfile(t *testing.T) {
+func TestActivateProfileEnvironment(t *testing.T) {
 	t.Setenv("NEBIUS_PROFILE", "production")
-	require.NoError(t, activateNebiusProfile(e2e.Profile{NebiusProfile: "testing"}))
+	t.Setenv("AWS_ENDPOINT_URL", "https://storage.production.example")
+	require.NoError(t, activateProfileEnvironment(e2e.Profile{
+		NebiusProfile:              "testing",
+		TerraformBackendS3Endpoint: "https://storage.testing.example",
+	}))
 	assert.Equal(t, "testing", os.Getenv("NEBIUS_PROFILE"))
+	assert.Equal(t, "https://storage.testing.example", os.Getenv("AWS_ENDPOINT_URL"))
 }
 
-func TestActivateNebiusProfile_LegacyProfileKeepsEnvironment(t *testing.T) {
+func TestActivateProfileEnvironment_LegacyProfileKeepsEnvironment(t *testing.T) {
 	t.Setenv("NEBIUS_PROFILE", "production")
-	require.NoError(t, activateNebiusProfile(e2e.Profile{}))
+	t.Setenv("AWS_ENDPOINT_URL", "https://storage.production.example")
+	require.NoError(t, activateProfileEnvironment(e2e.Profile{}))
 	assert.Equal(t, "production", os.Getenv("NEBIUS_PROFILE"))
+	assert.Equal(t, "https://storage.production.example", os.Getenv("AWS_ENDPOINT_URL"))
 }

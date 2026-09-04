@@ -39,8 +39,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Load profile: %v", err)
 	}
-	if err := activateNebiusProfile(profile); err != nil {
-		log.Fatalf("Activate Nebius profile: %v", err)
+	if err := activateProfileEnvironment(profile); err != nil {
+		log.Fatalf("Activate profile environment: %v", err)
 	}
 
 	switch os.Args[1] {
@@ -67,12 +67,16 @@ func main() {
 	}
 }
 
-func activateNebiusProfile(profile e2e.Profile) error {
-	if profile.NebiusProfile == "" {
-		return nil
+func activateProfileEnvironment(profile e2e.Profile) error {
+	if profile.NebiusProfile != "" {
+		if err := os.Setenv("NEBIUS_PROFILE", profile.NebiusProfile); err != nil {
+			return fmt.Errorf("set NEBIUS_PROFILE: %w", err)
+		}
 	}
-	if err := os.Setenv("NEBIUS_PROFILE", profile.NebiusProfile); err != nil {
-		return fmt.Errorf("set NEBIUS_PROFILE: %w", err)
+	if profile.TerraformBackendS3Endpoint != "" {
+		if err := os.Setenv("AWS_ENDPOINT_URL", profile.TerraformBackendS3Endpoint); err != nil {
+			return fmt.Errorf("set AWS_ENDPOINT_URL: %w", err)
+		}
 	}
 	return nil
 }

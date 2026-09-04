@@ -117,6 +117,7 @@ profiles:
     nebius_region: eu-north1
     nebius_tenant_id: tenant-gb300
     nebius_profile: testing
+    terraform_backend_s3_endpoint: https://storage.testing.example
     capacity_strategy: cancel
     labels:
       - gb300
@@ -147,6 +148,7 @@ profiles:
 	profile, ok := config.Profiles["MAN_GB300"]
 	require.True(t, ok)
 	assert.Equal(t, "testing", profile.NebiusProfile)
+	assert.Equal(t, "https://storage.testing.example", profile.TerraformBackendS3Endpoint)
 	assert.False(t, profile.HasLabel(autoSelectLabel))
 	require.Len(t, profile.NodeSets, 1)
 	wantOverrides := map[string]interface{}{
@@ -172,6 +174,7 @@ profiles:
 	require.NoError(t, err)
 	assert.Equal(t, wantOverrides, reparsed.NodeSets[0].TerraformOverrides)
 	assert.Equal(t, "testing", reparsed.NebiusProfile)
+	assert.Equal(t, "https://storage.testing.example", reparsed.TerraformBackendS3Endpoint)
 }
 
 func TestParseProfile_LegacyGPUProfiles(t *testing.T) {
@@ -201,11 +204,13 @@ nodesets:
 			assert.Equal(t, tt.platform, profile.NodeSets[0].Platform)
 			assert.Equal(t, tt.preset, profile.NodeSets[0].Preset)
 			assert.Empty(t, profile.NebiusProfile)
+			assert.Empty(t, profile.TerraformBackendS3Endpoint)
 			assert.Nil(t, profile.NodeSets[0].TerraformOverrides)
 
 			roundTrip, err := profile.YAML()
 			require.NoError(t, err)
 			assert.NotContains(t, roundTrip, "nebius_profile")
+			assert.NotContains(t, roundTrip, "terraform_backend_s3_endpoint")
 			assert.NotContains(t, roundTrip, "terraform_overrides")
 		})
 	}
