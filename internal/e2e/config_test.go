@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -106,6 +107,103 @@ func TestValidate_CapacityStrategyUnknown(t *testing.T) {
 	p := validProfile()
 	p.CapacityStrategy = "unknown"
 	assert.ErrorContains(t, p.Validate(), "unknown capacity_strategy")
+}
+
+func TestLoadE2EConfig_GB300TerraformOverrides(t *testing.T) {
+	raw := `
+profiles:
+  MAN_GB300:
+    nebius_project_id: project-gb300
+    nebius_region: eu-north1
+    nebius_tenant_id: tenant-gb300
+    capacity_strategy: cancel
+    labels:
+      - gb300
+    nodesets:
+      - name: worker
+        platform: gpu-gb300
+        preset: 4gpu-112vcpu-800gb
+        size: 2
+        infiniband_fabric: gb300-fabric
+        terraform_overrides:
+          nvlink:
+            enabled: true
+            type: GB300
+          placement_policy_nodes:
+            - provider-node-1
+            - provider-node-2
+          local_nvme:
+            enabled: true
+            device_count: 4
+            device_capacity_gigabytes: 7680
+          future_worker_field:
+            arbitrary: value
+`
+
+	t.Setenv("E2E_CONFIG", raw)
+	config, err := LoadE2EConfig()
+	require.NoError(t, err)
+	profile, ok := config.Profiles["MAN_GB300"]
+	require.True(t, ok)
+	assert.False(t, profile.HasLabel(autoSelectLabel))
+	require.Len(t, profile.NodeSets, 1)
+	wantOverrides := map[string]interface{}{
+		"nvlink": map[string]interface{}{
+			"enabled": true,
+			"type":    "GB300",
+		},
+		"placement_policy_nodes": []interface{}{"provider-node-1", "provider-node-2"},
+		"local_nvme": map[string]interface{}{
+			"enabled":                   true,
+			"device_count":              float64(4),
+			"device_capacity_gigabytes": float64(7680),
+		},
+		"future_worker_field": map[string]interface{}{
+			"arbitrary": "value",
+		},
+	}
+	assert.Equal(t, wantOverrides, profile.NodeSets[0].TerraformOverrides)
+
+	roundTrip, err := profile.YAML()
+	require.NoError(t, err)
+	reparsed, err := ParseProfile(roundTrip)
+	require.NoError(t, err)
+	assert.Equal(t, wantOverrides, reparsed.NodeSets[0].TerraformOverrides)
+}
+
+func TestParseProfile_LegacyGPUProfiles(t *testing.T) {
+	tests := []struct {
+		name     string
+		platform string
+		preset   string
+	}{
+		{name: "H100", platform: "gpu-h100-sxm", preset: "8gpu-128vcpu-1600gb"},
+		{name: "H200", platform: "gpu-h200-sxm", preset: "8gpu-128vcpu-1600gb"},
+		{name: "B200", platform: "gpu-b200-sxm", preset: "8gpu-224vcpu-1800gb"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw := fmt.Sprintf(`
+nodesets:
+  - name: worker
+    platform: %s
+    preset: %s
+    size: 2
+`, tt.platform, tt.preset)
+
+			profile, err := ParseProfile(raw)
+			require.NoError(t, err)
+			require.Len(t, profile.NodeSets, 1)
+			assert.Equal(t, tt.platform, profile.NodeSets[0].Platform)
+			assert.Equal(t, tt.preset, profile.NodeSets[0].Preset)
+			assert.Nil(t, profile.NodeSets[0].TerraformOverrides)
+
+			roundTrip, err := profile.YAML()
+			require.NoError(t, err)
+			assert.NotContains(t, roundTrip, "terraform_overrides")
+		})
+	}
 }
 
 func TestNormalizeProfileName(t *testing.T) {

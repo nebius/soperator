@@ -32,6 +32,7 @@ on:
           - "@auto-select"
           - MAN_H100
           - MAN_H200
+          - MAN_GB300
           - KCS_B200
           - MDC_B200
           - KCS_CPU

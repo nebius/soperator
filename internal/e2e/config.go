@@ -13,12 +13,13 @@ import (
 
 // NodeSetDef describes a single worker nodeset in the e2e profile.
 type NodeSetDef struct {
-	Name             string `json:"name"`
-	Platform         string `json:"platform"`
-	Preset           string `json:"preset"`
-	Size             int    `json:"size"`
-	InfinibandFabric string `json:"infiniband_fabric"`
-	Preemptible      bool   `json:"preemptible"`
+	Name               string                 `json:"name"`
+	Platform           string                 `json:"platform"`
+	Preset             string                 `json:"preset"`
+	Size               int                    `json:"size"`
+	InfinibandFabric   string                 `json:"infiniband_fabric"`
+	Preemptible        bool                   `json:"preemptible"`
+	TerraformOverrides map[string]interface{} `json:"terraform_overrides,omitempty"`
 }
 
 type CapacityStrategy string
