@@ -94,7 +94,7 @@ func TestValidateSlurmClusterUserIsolation(t *testing.T) {
 	})
 
 	t.Run("admits explicit memoryHigh below derived memoryMax", func(t *testing.T) {
-		memoryHigh := resource.MustParse("8Gi")
+		memoryHigh := resource.MustParse("4Gi")
 		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
 			Enabled:    ptr.To(true),
 			MemoryHigh: &memoryHigh,
@@ -103,7 +103,7 @@ func TestValidateSlurmClusterUserIsolation(t *testing.T) {
 	})
 
 	t.Run("rejects explicit memoryMax below derived memoryHigh", func(t *testing.T) {
-		memoryMax := resource.MustParse("7Gi")
+		memoryMax := resource.MustParse("3Gi")
 		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
 			Enabled:   ptr.To(true),
 			MemoryMax: &memoryMax,

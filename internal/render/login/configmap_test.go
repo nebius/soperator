@@ -107,9 +107,9 @@ func TestGenerateUserIsolationConfig_DerivedMemoryDefaults(t *testing.T) {
 	rendered := generateUserIsolationConfig(cluster).Render()
 	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_ENABLED=true")
 	// Unset memory limits are derived from the sshd container memory limit (10Gi):
-	// memory.high = 80%, memory.max = 90%.
-	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_MEMORY_HIGH=8589934592")
-	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_MEMORY_MAX=9663676416")
+	// memory.high = 40%, memory.max = 50%.
+	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_MEMORY_HIGH=4294967296")
+	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_MEMORY_MAX=5368709120")
 	// CPUWeight falls back to 100 when the CRD default was not applied.
 	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_CPU_WEIGHT=100")
 }

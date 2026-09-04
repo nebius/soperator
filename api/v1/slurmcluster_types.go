@@ -1147,7 +1147,7 @@ type LoginUserIsolation struct {
 	// MemoryHigh is the per-user memory throttling threshold (cgroup v2 memory.high).
 	// The kernel throttles and reclaims a user's memory above this value before OOM.
 	// Must be lower than the sshd container memory limit.
-	// When unset, it is derived as 80% of the sshd container memory limit
+	// When unset, it is derived as 40% of the sshd container memory limit
 	//
 	// +kubebuilder:validation:Optional
 	MemoryHigh *resource.Quantity `json:"memoryHigh,omitempty"`
@@ -1155,9 +1155,7 @@ type LoginUserIsolation struct {
 	// MemoryMax is the per-user hard memory limit (cgroup v2 memory.max).
 	// The OOM killer is scoped to the user's own cgroup when this limit is hit.
 	// Must be lower than the sshd container memory limit.
-	// When unset, it is derived as 90% of the sshd container memory limit,
-	// which keeps OOM events scoped to a single user without restricting
-	// how much of the container's memory a lone user may use
+	// When unset, it is derived as 50% of the sshd container memory limit
 	//
 	// +kubebuilder:validation:Optional
 	MemoryMax *resource.Quantity `json:"memoryMax,omitempty"`
