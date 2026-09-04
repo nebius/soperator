@@ -105,6 +105,8 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		cluster.Name,
 		cluster.Spec.Maintenance,
 		cluster.Spec.UseDefaultAppArmorProfile,
+		cluster.Spec.ExtraLabels,
+		cluster.Spec.ExtraAnnotations,
 	)
 
 	nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(ctx, r.Client, client.ObjectKeyFromObject(cluster))

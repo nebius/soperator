@@ -3,6 +3,7 @@ package common
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"path"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +29,7 @@ func RenderVolumeClaimTemplates(
 	namespace,
 	clusterName string,
 	pvcTemplateSpecs []values.PVCTemplateSpec,
+	extraLabels, extraAnnotations map[string]string,
 ) []corev1.PersistentVolumeClaim {
 	var res []corev1.PersistentVolumeClaim
 	for _, template := range pvcTemplateSpecs {
@@ -36,7 +38,9 @@ func RenderVolumeClaimTemplates(
 		}
 		res = append(
 			res,
-			renderVolumeClaimTemplate(componentType, namespace, clusterName, template.Name, *template.Spec),
+			renderVolumeClaimTemplate(
+				componentType, namespace, clusterName, template.Name, *template.Spec, extraLabels, extraAnnotations,
+			),
 		)
 	}
 
@@ -49,12 +53,17 @@ func renderVolumeClaimTemplate(
 	clusterName,
 	pvcName string,
 	pvcClaimSpec corev1.PersistentVolumeClaimSpec,
+	extraLabels, extraAnnotations map[string]string,
 ) corev1.PersistentVolumeClaim {
+	labels := RenderLabels(componentType, clusterName)
+	MergeExtraLabels(labels, extraLabels)
+
 	return corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      pvcName,
-			Namespace: namespace,
-			Labels:    RenderLabels(componentType, clusterName),
+			Name:        pvcName,
+			Namespace:   namespace,
+			Labels:      labels,
+			Annotations: maps.Clone(extraAnnotations),
 		},
 		Spec: pvcClaimSpec,
 	}

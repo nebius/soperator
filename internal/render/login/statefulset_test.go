@@ -115,3 +115,61 @@ func TestRenderStatefulSet_PriorityClass(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderStatefulSet_CustomLabelsAndAnnotations(t *testing.T) {
+	namespace := "test-namespace"
+	clusterName := "test-cluster"
+	nodeFilters := []slurmv1.K8sNodeFilter{{Name: "test-filter"}}
+	secrets := &slurmv1.Secrets{}
+	volumeSources := []slurmv1.VolumeSource{
+		{
+			Name:         "test-volume",
+			VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{}},
+		},
+	}
+
+	login := &values.SlurmLogin{
+		SlurmNode: slurmv1.SlurmNode{
+			K8sNodeFilterName: "test-filter",
+		},
+		Labels:      map[string]string{"gcore.com/project-id": "123"},
+		Annotations: map[string]string{"gcore.com/note": "abc"},
+		ContainerSshd: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "test-sshd-image",
+				Port:  22,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+				},
+			},
+		},
+		ContainerMunge: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "test-munge-image",
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+				},
+			},
+		},
+		VolumeJail:      slurmv1.NodeVolume{VolumeSourceName: &[]string{"test-volume"}[0]},
+		StatefulSet:     values.StatefulSet{Name: "test-login", Replicas: 1},
+		HeadlessService: values.Service{Name: "test-headless"},
+	}
+
+	result, err := RenderStatefulSet(namespace, clusterName, true, nodeFilters, secrets, volumeSources, login)
+	if err != nil {
+		t.Fatalf("RenderStatefulSet() error = %v", err)
+	}
+
+	if got := result.Labels["gcore.com/project-id"]; got != "123" {
+		t.Errorf("StatefulSet label = %v, want 123", got)
+	}
+	if got := result.Spec.Template.Labels["gcore.com/project-id"]; got != "123" {
+		t.Errorf("Pod template label = %v, want 123", got)
+	}
+	if got := result.Spec.Template.Annotations["gcore.com/note"]; got != "abc" {
+		t.Errorf("Pod template annotation = %v, want abc", got)
+	}
+}

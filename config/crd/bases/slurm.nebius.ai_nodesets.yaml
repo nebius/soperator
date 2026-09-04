@@ -12209,6 +12209,12 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              workerLabels:
+                additionalProperties:
+                  type: string
+                description: WorkerLabels represent K8S labels that should be added
+                  to the worker pods.
+                type: object
             required:
             - munge
             - slurmd
