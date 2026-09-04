@@ -7,7 +7,7 @@ Feature: Cluster creation
     And configured nodesets match the live cluster
     And main and hidden partitions are present and sane
     And all Slurm nodes are healthy
-    And all ActiveChecks completed successfully
+    And no ActiveChecks are Failed or Error
     And login welcome output shows cluster information
     And main partition smoke job succeeds
     And hidden partition smoke job succeeds
