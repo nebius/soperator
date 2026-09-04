@@ -447,6 +447,21 @@ content would otherwise read as confirming the new one.
 
 #### Watching it happen
 
+Every published change to `topology.yaml` is recorded on the SlurmCluster, in its own namespace and
+under its own name, with a summary of how node membership moved:
+
+```
+kubectl -n <ns> describe slurmcluster <name>
+...
+Events:
+  Type    Reason             Age   From                     Message
+  Normal  TopologyRendered   2m    workertopology-reconciler Published topology.yaml: +block-nvl72 (2 nodes); tree-ib 6 nodes (+0 -2)
+```
+
+This is the only signal for a node moved between topologies: membership is not part of the structure
+fingerprint, so such an edit asks for no reconfigure. The operator log carries the same change with
+the node names spelled out, under `Topology config changed, publishing it`.
+
 Every performed reconfigure is recorded as a Kubernetes event on each `JailedConfig` it covered, so
 it is visible without reading operator logs:
 
@@ -458,7 +473,16 @@ Events:
   Normal  Reconfigured   1m    jailedconfig-controller slurmctld re-read the configs written for this JailedConfig
 ```
 
-A failed one is recorded as a `Warning` with reason `ReconfigureFailed` and the error.
+A failed one is recorded as a `Warning` with reason `ReconfigureFailed`, naming the config that
+triggered the reconfigure, why it was due, and the error. When the failure is nodes not coming back,
+the error names them:
+
+```
+nodes did not restart within 5m0s: worker-[3-5]: context deadline exceeded
+```
+
+Repeated failures aggregate into one event with a count, so `kubectl get events` shows how long a
+request has been failing without comparing timestamps by hand.
 
 #### Misconfigurations reported as events
 
@@ -472,18 +496,55 @@ them without digging through operator logs:
 | `UnresolvedTopologyRef` | A partition's `topologyRef` names a topology that is not in the rendered config. The binding is dropped and the partition falls back to the cluster default. |
 | `ClusterDefaultConflict` | Several topologies set `clusterDefault`. The first one stays the default, the rest are cleared. |
 
+`TopologyRendered` is emitted on the same object but is not a problem report: it records a normal
+publish.
+
 #### What a reconfigure does not do
 
 It does not move already-registered nodes between topologies. Re-reading the file lays the nodes out
 as written, but slurmctld then applies each node's own `Topology=` registration on top, and treats
 that registration as the complete list: a node is removed from every topology its registration does
-not name. Workers compute that registration once, in their init container.
+not name.
 
-So a node that was running before a topology was added stays out of it until its pod restarts, no
-matter how many times the cluster is reconfigured. Adding a topology and expecting existing nodes to
-join it is the one case where the file and the running cluster legitimately disagree — check
-`scontrol show node <name> | grep -i topology` against the file before assuming the config failed to
-arrive.
+### How a node's registration is kept correct
+
+The `Topology=` field of `scontrol show node` is the node's own registration, not a view of the
+file. Two things maintain it, and they divide the work:
+
+- The worker registers itself when its pod starts, from its init container. This is the fast path,
+  and it is the only one that runs before slurmd does.
+- The operator converges it. On every reconcile it compares the rendered config against what
+  slurmctld reports and corrects the difference, so a registration that was lost or is out of date
+  heals within a reconcile.
+
+The converging half exists because the fast path is fragile in one specific way: a worker registers
+before its slurmd comes up, which means Slurm still considers the node powered down. If a
+reconfigure lands in that window, slurmctld discards the registration while restoring node state —
+it deliberately does not preserve dynamic topology for a powered-down node — and nothing in the pod
+recomputes it. That is a race a worker cannot win on its own, and it is why the file alone is not
+enough either: a node's own registration overrides whatever the file says about it.
+
+The push is cheap by construction. The desired side comes from the file, the current side from the
+node cache the operator already refreshes, and nodes needing the same value are sent as one hostlist
+request — so a steady cluster costs no request at all, and a re-render costs one request per changed
+switch rather than one per node. It never triggers a reconfigure: `scontrol update` changes the live
+tree in place.
+
+Two cases are deliberately left alone. Nodes that are powered down are skipped, because a
+registration written to them would be discarded exactly as described above; they are picked up once
+they come up. Nodes the config places in the catch-all `unknown` unit are skipped too, since that
+unit means the placement is not known yet, and asserting it into slurmctld would replace "no answer"
+with a wrong one.
+
+| Reason | Meaning |
+| --- | --- |
+| `NodeTopologyPushed` | The operator corrected one or more registrations to match the config. |
+| `NodeTopologyPushFailed` | A registration could not be written. The note names the nodes, the value and the error. |
+
+A push waits until the reconfigure for the current structure has been confirmed. Registering a node
+into a topology slurmctld has not read yet fails for every node in it, because the set of named
+topologies is fixed when the process starts and only a reconfigure — which re-execs slurmctld — can
+extend it.
 
 ## Troubleshooting
 

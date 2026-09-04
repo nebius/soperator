@@ -1,7 +1,6 @@
 Feature: Slurm tree-topology scheduling
 
-  # Remove @unstable after worker topology registration is fixed.
-  @gpu @tree_topology @unstable @soperator_version_>=5.0.0
+  @gpu @tree_topology @soperator_version_>=5.0.0
   Scenario: A switch limit rejects a cross-leaf allocation
     Given the cluster is configured with a tree topology spanning multiple leaf switches
     And the operator published the topology config

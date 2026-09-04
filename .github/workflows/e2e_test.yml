@@ -568,6 +568,17 @@ jobs:
           kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sacct --format=JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode -S now-6hours || true
           kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
 
+      - name: Slurm Topology State
+        if: always()
+        shell: bash
+        run: |
+          echo "=== Slurm control show nodes ==="
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- scontrol show nodes || true
+          echo "=== Slurm control show topoconf ==="
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- scontrol show topoconf || true
+          echo "=== Slurm control show topology tree-ib ==="
+          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- scontrol show topology tree-ib || true
+
       - name: Collect Full Kubernetes Cluster Info
         if: always()
         shell: bash
