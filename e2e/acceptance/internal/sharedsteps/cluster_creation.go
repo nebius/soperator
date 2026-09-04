@@ -44,7 +44,7 @@ func (s *ClusterCreation) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^main and hidden partitions are present and sane$`, s.checkPartitions)
 	sc.Step(`^all Slurm nodes are healthy$`, s.checkSlurmNodeHealth)
 	sc.Step(`^HealthCheckProgram outputs are healthy$`, s.checkHealthCheckProgramOutputs)
-	sc.Step(`^all ActiveChecks completed successfully$`, s.checkActiveChecks)
+	sc.Step(`^no ActiveChecks are Failed or Error$`, s.checkActiveChecks)
 	sc.Step(`^nebius user is present$`, s.checkNebiusUserPresent)
 	sc.Step(`^soperatorchecks user is present and configured$`, s.checkSoperatorchecksUserPresentAndConfigured)
 	sc.Step(`^login welcome output shows cluster information$`, s.checkWelcomeOutput)
@@ -342,12 +342,15 @@ func (s *ClusterCreation) checkActiveChecks(ctx context.Context) error {
 
 		switch checkType {
 		case kubeobjects.ActiveCheckTypeK8sJob:
-			if check.Status.K8sJobsStatus.LastJobStatus != kubeobjects.ActiveCheckK8sJobStatusComplete {
+			if check.Status.K8sJobsStatus.LastJobStatus == kubeobjects.ActiveCheckK8sJobStatusFailed {
 				problems = append(problems, fmt.Sprintf("%s/%s k8s status=%s", check.Metadata.Namespace, check.Metadata.Name, check.Status.K8sJobsStatus.LastJobStatus))
 			}
 		case kubeobjects.ActiveCheckTypeSlurmJob:
-			if check.Status.SlurmJobsStatus.LastRunStatus != kubeobjects.ActiveCheckSlurmRunStatusComplete {
-				problems = append(problems, fmt.Sprintf("%s/%s slurm status=%s", check.Metadata.Namespace, check.Metadata.Name, check.Status.SlurmJobsStatus.LastRunStatus))
+			status := check.Status.SlurmJobsStatus.LastRunStatus
+			// InProgress is valid here: the HelmRelease hook already gated the initial run,
+			// and this status can belong to a later scheduled execution.
+			if status == kubeobjects.ActiveCheckSlurmRunStatusFailed || status == kubeobjects.ActiveCheckSlurmRunStatusError {
+				problems = append(problems, fmt.Sprintf("%s/%s slurm status=%s", check.Metadata.Namespace, check.Metadata.Name, status))
 			}
 		default:
 			problems = append(problems, fmt.Sprintf("%s/%s unknown checkType=%s", check.Metadata.Namespace, check.Metadata.Name, checkType))

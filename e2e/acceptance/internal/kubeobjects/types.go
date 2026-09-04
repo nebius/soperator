@@ -21,6 +21,7 @@ const (
 	ActiveCheckTypeSlurmJob = "slurmJob"
 
 	ActiveCheckK8sJobStatusComplete = "Complete"
+	ActiveCheckK8sJobStatusFailed   = "Failed"
 
 	ActiveCheckSlurmRunStatusComplete  = "Complete"
 	ActiveCheckSlurmRunStatusFailed    = "Failed"

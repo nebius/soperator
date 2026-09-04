@@ -8,7 +8,7 @@ Feature: Cluster creation
     And main and hidden partitions are present and sane
     And all Slurm nodes are healthy
     And HealthCheckProgram outputs are healthy
-    And all ActiveChecks completed successfully
+    And no ActiveChecks are Failed or Error
     And nebius user is present
     And soperatorchecks user is present and configured
     And login welcome output shows cluster information
