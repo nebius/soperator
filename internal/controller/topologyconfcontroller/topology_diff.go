@@ -26,14 +26,23 @@ type topologyChange struct {
 	Detail string
 }
 
+// parseTopologyEntries reads back a rendered topology.yaml.
+func parseTopologyEntries(rendered string) ([]topologyYAMLEntry, error) {
+	var entries []topologyYAMLEntry
+	if err := yaml.Unmarshal([]byte(rendered), &entries); err != nil {
+		return nil, fmt.Errorf("unmarshal topology.yaml: %w", err)
+	}
+	return entries, nil
+}
+
 // topologyMembership maps every topology in a rendered topology.yaml to the nodes it covers.
 //
 // Flat topologies map to no node: they list none by design, and every node not named elsewhere
 // belongs to them.
 func topologyMembership(rendered string) (map[string][]string, error) {
-	var entries []topologyYAMLEntry
-	if err := yaml.Unmarshal([]byte(rendered), &entries); err != nil {
-		return nil, fmt.Errorf("unmarshal topology.yaml membership: %w", err)
+	entries, err := parseTopologyEntries(rendered)
+	if err != nil {
+		return nil, err
 	}
 
 	membership := make(map[string][]string, len(entries))

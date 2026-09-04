@@ -1351,5 +1351,45 @@ class TestTopologyHostnameWait(unittest.TestCase):
         self.assertEqual(result, ("worker-0", ""))
 
 
+class TestRegistrationMatchesTheOperator(unittest.TestCase):
+    """Pin the exact registration strings the worker produces.
+
+    The operator computes the same values from the rendered topology.yaml and pushes them through
+    slurmrestd to correct a registration that was lost. If the two ever disagree they overwrite each
+    other on every reconcile, so the expected strings here are duplicated verbatim in
+    TestDesiredRegistrations* in internal/controller/topologyconfcontroller/node_registration_test.go
+    and the two sets must be changed together.
+    """
+
+    FABRIC = "fab"
+    LABELS = '{"tier-1": "leaf-a", "tier-2": "spine", "tier-0": "block-0"}'
+
+    def test_tree_registration(self):
+        result = worker_init.build_bound_topology(
+            self.LABELS, [("tree-ib", "tree")], self.FABRIC
+        )
+        self.assertEqual(result, "topology=tree-ib:fab:spine:leaf-a")
+
+    def test_block_registration(self):
+        result = worker_init.build_bound_topology(
+            self.LABELS, [("block-nvl72", "block")], self.FABRIC
+        )
+        self.assertEqual(result, "topology=block-nvl72:block-0")
+
+    def test_several_topologies_are_joined_in_config_order(self):
+        result = worker_init.build_bound_topology(
+            self.LABELS, [("tree-ib", "tree"), ("block-nvl72", "block")], self.FABRIC
+        )
+        self.assertEqual(
+            result, "topology=tree-ib:fab:spine:leaf-a,block-nvl72:block-0"
+        )
+
+    def test_flat_contributes_nothing(self):
+        result = worker_init.build_bound_topology(
+            self.LABELS, [("flat", "flat")], self.FABRIC
+        )
+        self.assertEqual(result, "")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

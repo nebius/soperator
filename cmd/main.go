@@ -313,7 +313,9 @@ func main() {
 
 	slurmAPIClients := slurmapi.NewClientSet(context.Background())
 
-	if controllersSet.Enabled("rollingupdate") {
+	// Set up whenever anything downstream needs to talk to Slurm: it is what populates the client
+	// set and starts the shared node cache.
+	if controllersSet.Enabled("rollingupdate") || controllersSet.Enabled("topology") {
 		if err = soperatorchecks.NewSlurmAPIClientsController(
 			mgr.GetClient(),
 			mgr.GetScheme(),
@@ -322,7 +324,9 @@ func main() {
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
 		}
+	}
 
+	if controllersSet.Enabled("rollingupdate") {
 		if err = updatecontroller.NewRollingUpdateReconciler(
 			mgr.GetClient(),
 			mgr.GetScheme(),
@@ -354,6 +358,7 @@ func main() {
 			mgr.GetScheme(),
 			soperatorNamespace,
 			mgr.GetEventRecorder(topologyconfcontroller.WorkerTopologyReconcilerName),
+			slurmAPIClients,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err,
 				"unable to create controller",

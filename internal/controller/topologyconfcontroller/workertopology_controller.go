@@ -35,6 +35,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/render/common"
 	renderutils "nebius.ai/slurm-operator/internal/render/utils"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 )
 
@@ -53,8 +54,9 @@ var (
 
 type WorkerTopologyReconciler struct {
 	BaseReconciler
-	namespace string
-	recorder  events.EventRecorder
+	namespace       string
+	recorder        events.EventRecorder
+	slurmAPIClients *slurmapi.ClientSet
 }
 
 // Event reasons reported against the SlurmCluster whose topology is misconfigured. They exist
@@ -71,7 +73,13 @@ const (
 	// anything else the operator logs.
 	reasonTopologyRendered = "TopologyRendered"
 
-	actionRenderTopology = "RenderTopology"
+	// reasonNodeTopologyPushed and reasonNodeTopologyPushFailed report the converging half: the
+	// operator correcting a worker's registration in slurmctld to match the rendered config.
+	reasonNodeTopologyPushed     = "NodeTopologyPushed"
+	reasonNodeTopologyPushFailed = "NodeTopologyPushFailed"
+
+	actionRenderTopology       = "RenderTopology"
+	actionRegisterNodeTopology = "RegisterNodeTopology"
 )
 
 // Link represents a connection in the topology
@@ -83,14 +91,16 @@ type Link struct {
 
 func NewWorkerTopologyReconciler(
 	client client.Client, scheme *runtime.Scheme, namespace string, recorder events.EventRecorder,
+	slurmAPIClients *slurmapi.ClientSet,
 ) *WorkerTopologyReconciler {
 	return &WorkerTopologyReconciler{
 		BaseReconciler: BaseReconciler{
 			Client: client,
 			Scheme: scheme,
 		},
-		namespace: namespace,
-		recorder:  recorder,
+		namespace:       namespace,
+		recorder:        recorder,
+		slurmAPIClients: slurmAPIClients,
 	}
 }
 
@@ -177,6 +187,13 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if err := r.ensureJailedConfig(ctx, req.Namespace, topoConfigName, slurmCluster.Name, configKey, desiredStructure); err != nil {
 			return ctrl.Result{}, fmt.Errorf("ensure JailedConfig: %w", err)
 		}
+		// Reached on every quiet reconcile, and that is the point: this is where a registration
+		// lost to a reconfigure gets noticed and put back.
+		if err := r.convergeNodeRegistrations(
+			ctx, req.Namespace, topoConfigName, slurmCluster, desiredTopology, desiredStructure,
+		); err != nil {
+			return ctrl.Result{}, err
+		}
 		return DefaultRequeueResult, nil
 	}
 
@@ -202,8 +219,39 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, fmt.Errorf("ensure JailedConfig: %w", err)
 	}
 
+	if err := r.convergeNodeRegistrations(
+		ctx, req.Namespace, topoConfigName, slurmCluster, desiredTopology, desiredStructure,
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	logger.Info("Reconciliation completed successfully")
 	return DefaultRequeueResult, nil
+}
+
+// convergeNodeRegistrations reads back the JailedConfig the reconcile just wrote and pushes the
+// node registrations it now allows. The read is a cache hit, and it is needed because the
+// annotation that says whether slurmctld has this structure is only settled by ensureJailedConfig.
+func (r *WorkerTopologyReconciler) convergeNodeRegistrations(
+	ctx context.Context, namespace, topoConfigName string, slurmCluster *slurmv1.SlurmCluster,
+	desiredTopology, desiredStructure string,
+) error {
+	if r.slurmAPIClients == nil {
+		return nil
+	}
+
+	jailedConfig := &v1alpha1.JailedConfig{}
+	key := client.ObjectKey{Namespace: namespace, Name: topoConfigName}
+	if err := r.Client.Get(ctx, key, jailedConfig); err != nil {
+		return fmt.Errorf("get JailedConfig %s: %w", topoConfigName, err)
+	}
+
+	if err := r.pushNodeRegistrations(
+		ctx, slurmCluster, jailedConfig, renderManagedTopologyConfig(desiredTopology), desiredStructure,
+	); err != nil {
+		return fmt.Errorf("push node registrations: %w", err)
+	}
+	return nil
 }
 
 // isClusterReconciliationNeeded reports whether the cluster describes a network topology at all.

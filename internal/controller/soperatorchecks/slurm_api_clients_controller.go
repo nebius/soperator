@@ -28,6 +28,11 @@ var (
 	SlurmAPIClientsControllerName = "soperatorchecks.slurmapiclients"
 )
 
+// nodeCacheRefreshInterval bounds how stale the shared view of Slurm nodes can be. Consumers read
+// from the cache instead of asking slurmrestd, so this is the only node-listing traffic the
+// operator generates no matter how many of them there are.
+const nodeCacheRefreshInterval = 30 * time.Second
+
 type SlurmAPIClientsController struct {
 	*reconciler.Reconciler
 
@@ -85,6 +90,16 @@ func (c *SlurmAPIClientsController) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	c.slurmAPIClients.AddClient(req.NamespacedName, slurmAPIClient)
+
+	// Started with the client rather than by whoever reads it first: several controllers depend on
+	// the cache, and tying its lifetime to any one of them makes their availability depend on which
+	// optional feature happens to be enabled.
+	if nc := c.slurmAPIClients.EnsureNodeCache(
+		req.NamespacedName, nodeCacheRefreshInterval,
+		log.Log.WithName("NodeCache").WithValues("cluster", req.NamespacedName),
+	); nc == nil {
+		logger.Info("Could not start the Slurm node cache", "cluster", req.NamespacedName)
+	}
 
 	return ctrl.Result{}, nil
 }
