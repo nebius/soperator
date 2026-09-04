@@ -15,17 +15,27 @@ func NewArgsScope(run func(context.Context, ...string) (string, error)) ArgsScop
 }
 
 func (s argsScope) Run(ctx context.Context, args ...string) (string, error) {
-	return s.run(ctx, args...)
+	return runWithDefaultTimeout(ctx, func(commandCtx context.Context) (string, error) {
+		return s.run(commandCtx, args...)
+	})
 }
 
-func (s argsScope) RunWithRetry(ctx context.Context, attempts int, delay time.Duration, args ...string) (string, error) {
+func (s argsScope) RunWithRetry(
+	ctx context.Context,
+	attempts int,
+	delay time.Duration,
+	timeout time.Duration,
+	args ...string,
+) (string, error) {
 	return retry(ctx, attempts, delay, func(attemptCtx context.Context) (string, error) {
-		return s.Run(attemptCtx, args...)
+		return runWithTimeout(attemptCtx, timeout, func(commandCtx context.Context) (string, error) {
+			return s.run(commandCtx, args...)
+		})
 	})
 }
 
 func (s argsScope) RunWithDefaultRetry(ctx context.Context, args ...string) (string, error) {
-	return s.RunWithRetry(ctx, DefaultRetryAttempts, DefaultRetryDelay, args...)
+	return s.RunWithRetry(ctx, DefaultRetryAttempts, DefaultRetryDelay, DefaultCommandTimeout, args...)
 }
 
 type commandScope struct {
@@ -38,17 +48,46 @@ func NewCommandScope(run func(context.Context, string) (string, error)) CommandS
 }
 
 func (s commandScope) Run(ctx context.Context, command string) (string, error) {
-	return s.run(ctx, command)
+	return runWithDefaultTimeout(ctx, func(commandCtx context.Context) (string, error) {
+		return s.run(commandCtx, command)
+	})
 }
 
-func (s commandScope) RunWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error) {
+func (s commandScope) RunWithRetry(
+	ctx context.Context,
+	command string,
+	attempts int,
+	delay time.Duration,
+	timeout time.Duration,
+) (string, error) {
 	return retry(ctx, attempts, delay, func(attemptCtx context.Context) (string, error) {
-		return s.Run(attemptCtx, command)
+		return runWithTimeout(attemptCtx, timeout, func(commandCtx context.Context) (string, error) {
+			return s.run(commandCtx, command)
+		})
 	})
 }
 
 func (s commandScope) RunWithDefaultRetry(ctx context.Context, command string) (string, error) {
-	return s.RunWithRetry(ctx, command, DefaultRetryAttempts, DefaultRetryDelay)
+	return s.RunWithRetry(ctx, command, DefaultRetryAttempts, DefaultRetryDelay, DefaultCommandTimeout)
+}
+
+func runWithDefaultTimeout(ctx context.Context, run func(context.Context) (string, error)) (string, error) {
+	if _, ok := ctx.Deadline(); ok {
+		return run(ctx)
+	}
+
+	return runWithTimeout(ctx, DefaultCommandTimeout, run)
+}
+
+func runWithTimeout(
+	ctx context.Context,
+	timeout time.Duration,
+	run func(context.Context) (string, error),
+) (string, error) {
+	commandCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	return run(commandCtx)
 }
 
 func retry(ctx context.Context, attempts int, delay time.Duration, run func(context.Context) (string, error)) (string, error) {

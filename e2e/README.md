@@ -199,7 +199,8 @@ that need fresh cluster state should query Kubernetes or Slurm through
 External runners can use `github.com/nebius/soperator/e2e/acceptance/framework` for
 common Kubernetes, Slurm, and worker primitives:
 
-- `Exec`: command execution interface.
+- `Exec`: command execution interface. `Run` uses a 10-minute timeout when its context has no deadline,
+  `RunWithDefaultRetry` uses 10 minutes per attempt, and `RunWithRetry` accepts a custom per-attempt timeout.
 - `Runtime`: `Exec` plus polling and logging, used by shared steps and external suites.
 - `ClusterInfo`: static SlurmCluster name and target Soperator version.
 - `KubectlClient`, including `GetJSON`, `NodeSets`, `WorkerPods`, and

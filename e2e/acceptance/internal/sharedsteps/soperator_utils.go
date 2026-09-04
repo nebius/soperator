@@ -146,7 +146,13 @@ func (s *SoperatorUtils) queryWorkerHostByNameAndInstanceID(ctx context.Context)
 			framework.ShellQuote(query.value),
 			framework.ShellQuote(`grep -l '^kubelet$' /proc/[0-9]*/comm`),
 		)
-		output, err := s.runtime.Jail().RunWithRetry(ctx, command, 2, 2*time.Second)
+		output, err := s.runtime.Jail().RunWithRetry(
+			ctx,
+			command,
+			2,
+			2*time.Second,
+			framework.DefaultCommandTimeout,
+		)
 		if err != nil {
 			return fmt.Errorf("query worker host by %s: %w", query.label, err)
 		}

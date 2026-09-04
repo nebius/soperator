@@ -6,19 +6,20 @@ import (
 )
 
 const (
-	DefaultRetryAttempts = 5
-	DefaultRetryDelay    = 10 * time.Second
+	DefaultCommandTimeout = 10 * time.Minute
+	DefaultRetryAttempts  = 5
+	DefaultRetryDelay     = 10 * time.Second
 )
 
 type CommandScope interface {
 	Run(ctx context.Context, command string) (string, error)
-	RunWithRetry(ctx context.Context, command string, attempts int, delay time.Duration) (string, error)
+	RunWithRetry(ctx context.Context, command string, attempts int, delay, timeout time.Duration) (string, error)
 	RunWithDefaultRetry(ctx context.Context, command string) (string, error)
 }
 
 type ArgsScope interface {
 	Run(ctx context.Context, args ...string) (string, error)
-	RunWithRetry(ctx context.Context, attempts int, delay time.Duration, args ...string) (string, error)
+	RunWithRetry(ctx context.Context, attempts int, delay, timeout time.Duration, args ...string) (string, error)
 	RunWithDefaultRetry(ctx context.Context, args ...string) (string, error)
 }
 

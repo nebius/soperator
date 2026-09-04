@@ -95,7 +95,13 @@ func (s *PackageInstallation) logInstallFailureDiagnostics(ctx context.Context, 
 	}
 
 	for _, command := range commands {
-		output, err := s.runtime.Jail().RunWithRetry(ctx, command, 2, 10*time.Second)
+		output, err := s.runtime.Jail().RunWithRetry(
+			ctx,
+			command,
+			2,
+			10*time.Second,
+			framework.DefaultCommandTimeout,
+		)
 		if err != nil {
 			s.runtime.Logf("package installation debug command failed (%s): %v", command, err)
 			continue

@@ -13,10 +13,6 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
-const (
-	commandTimeout = 10 * time.Minute
-)
-
 type world struct {
 	logPrefix string
 
@@ -78,12 +74,9 @@ func (w *world) WorkerPod(pod framework.WorkerPodInfo) framework.CommandScope {
 }
 
 func (w *world) Run(ctx context.Context, name string, args ...string) (string, error) {
-	cmdCtx, cancel := context.WithTimeout(ctx, commandTimeout)
-	defer cancel()
-
 	w.logf("run: %s %s", name, strings.Join(args, " "))
 
-	cmd := exec.CommandContext(cmdCtx, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
