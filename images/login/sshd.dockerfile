@@ -2,8 +2,8 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/98
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260819104842 AS login_pam_builder
+# https://github.com/nebius/ml-containers/pull/101
+FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260904073226 AS login_pam_builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -18,8 +18,8 @@ RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
     /usr/src/pam-soperator-jail/pam_soperator_jail.c \
     /out
 
-# https://github.com/nebius/ml-containers/pull/98
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260819104842 AS login_sshd
+# https://github.com/nebius/ml-containers/pull/101
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260904075914 AS login_sshd
 
 # Install OpenSSH server
 # Create root .ssh directory
