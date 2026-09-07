@@ -264,8 +264,18 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					if maintenanceActive {
 						desiredReplicas = ptr.To(consts.ZeroReplicas)
 					} else if autoscalingActive {
-						// A nil override tells the StatefulSet reconciler to preserve the live HPA-managed replica count.
-						desiredReplicas = nil
+						currentReplicas, err := r.getLoginCurrentReplicas(stepCtx, clusterValues)
+						if err != nil {
+							return err
+						}
+						if currentReplicas == 0 {
+							// HPA pauses scaling when the target's desired replica count is zero (for example, after maintenance).
+							// Set it to minReplicas to reactivate autoscaling.
+							desiredReplicas = ptr.To(clusterValues.NodeLogin.Autoscaling.MinReplicas)
+						} else {
+							// A nil override tells the StatefulSet reconciler to preserve the live HPA-managed replica count.
+							desiredReplicas = nil
+						}
 					}
 
 					desired, err := login.RenderStatefulSet(
@@ -327,6 +337,24 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 	}
 	logger.Info("Reconciled Slurm Login")
 	return nil
+}
+
+func (r SlurmClusterReconciler) getLoginCurrentReplicas(
+	ctx context.Context,
+	clusterValues *values.SlurmCluster,
+) (int32, error) {
+	current := &kruisev1b1.StatefulSet{}
+	err := r.Get(ctx, types.NamespacedName{
+		Namespace: clusterValues.Namespace,
+		Name:      clusterValues.NodeLogin.StatefulSet.Name,
+	}, current)
+	if apierrors.IsNotFound(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("get login StatefulSet: %w", err)
+	}
+	return ptr.Deref(current.Spec.Replicas, 0), nil
 }
 
 // ValidateLogin checks that Slurm login are reconciled with the desired state correctly
