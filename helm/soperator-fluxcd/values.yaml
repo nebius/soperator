@@ -374,7 +374,7 @@ observability:
         resources:
           requests:
             memory: 200Mi
-            cpu: 100m
+            cpu: 50m
           limits:
             memory: 200Mi
       overrideValues: null
@@ -897,6 +897,18 @@ soperator:
     overrideValues:
       crds:
         managed: true
+      daemon:
+        nodeSelector: {}
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: slurm.nebius.ai/nodeset
+                      operator: In
+                      values:
+                        - worker
+                        - controller
       manager:
         replicas: 2
         image:
