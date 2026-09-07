@@ -33,6 +33,7 @@ func FeaturePaths() []string {
 		"features/internal_ssh.feature",
 		"features/package_installation.feature",
 		"features/gpu_profiling.feature",
+		"features/system_settings.feature",
 		"features/soperator_utils.feature",
 		"features/nodeset_ephemeral_mode_transition.feature",
 		"features/node_replacement.feature",
