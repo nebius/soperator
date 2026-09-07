@@ -16811,6 +16811,10 @@ spec:
                         - maxReplicas
                         - minReplicas
                         type: object
+                        x-kubernetes-validations:
+                        - message: maxReplicas must be at least minReplicas when autoscaling
+                            is enabled
+                          rule: '!self.enabled || self.maxReplicas >= self.minReplicas'
                       customInitContainers:
                         description: CustomInitContainers represent additional init
                           containers that should be added to created Pods
@@ -20839,6 +20843,13 @@ spec:
                     - sshdServiceType
                     - volumes
                     type: object
+                    x-kubernetes-validations:
+                    - message: sshd.resources.cpu must be greater than zero when autoscaling
+                        is enabled
+                      rule: '!has(self.autoscaling) || !self.autoscaling.enabled ||
+                        (has(self.sshd.resources) && ''cpu'' in self.sshd.resources
+                        && quantity(string(self.sshd.resources[''cpu''])).compareTo(quantity(''0''))
+                        > 0)'
                   rest:
                     description: Rest represents the Slurm REST API node configuration
                     properties:

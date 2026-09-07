@@ -1069,6 +1069,7 @@ type SlurmNodeControllerVolumes struct {
 }
 
 // SlurmNodeLogin defines the configuration for the Slurm login node
+// +kubebuilder:validation:XValidation:rule="!has(self.autoscaling) || !self.autoscaling.enabled || (has(self.sshd.resources) && 'cpu' in self.sshd.resources && quantity(string(self.sshd.resources['cpu'])).compareTo(quantity('0')) > 0)",message="sshd.resources.cpu must be greater than zero when autoscaling is enabled"
 type SlurmNodeLogin struct {
 	SlurmNode `json:",inline"`
 
@@ -1139,6 +1140,7 @@ type SlurmNodeLogin struct {
 
 // LoginAutoscaling defines CPU-based horizontal scaling for login pods.
 // When enabled, its replica bounds override the configured login replica count.
+// +kubebuilder:validation:XValidation:rule="!self.enabled || self.maxReplicas >= self.minReplicas",message="maxReplicas must be at least minReplicas when autoscaling is enabled"
 type LoginAutoscaling struct {
 	// Enabled turns on horizontal scaling for login pods
 	//
