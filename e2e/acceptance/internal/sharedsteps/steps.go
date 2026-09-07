@@ -32,7 +32,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewSoperatorUtils(runtime, selector),
 		NewNodeSetEphemeralModeTransition(info, runtime, kubectl),
 		NewNodeReplacement(runtime, slurm, selector),
-		NewDockerContainers(runtime, slurm, selector),
+		NewDockerContainers(info, runtime, slurm, kubectl, selector),
 		NewEnrootContainers(runtime, slurm, selector),
 		NewPassiveChecks(info, runtime, slurm, selector),
 		NewActiveChecks(info, runtime, slurm, kubectl, selector),

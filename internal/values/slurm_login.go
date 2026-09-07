@@ -2,6 +2,7 @@ package values
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -33,6 +34,7 @@ type SlurmLogin struct {
 	CustomVolumeMounts []slurmv1.NodeVolumeMount
 
 	UserIsolation *slurmv1.LoginUserIsolation
+	DockerEnabled bool
 
 	UseDefaultAppArmorProfile bool
 	Maintenance               *consts.MaintenanceMode
@@ -88,6 +90,7 @@ func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.Mai
 		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
 		Maintenance:               maintenance,
 		UserIsolation:             login.UserIsolation.DeepCopy(),
+		DockerEnabled:             login.Docker != nil && ptr.Deref(login.Docker.Enabled, false),
 	}
 	if login.Sssd != nil {
 		containerSSSD := buildContainerFrom(

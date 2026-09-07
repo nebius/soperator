@@ -43,8 +43,7 @@ type SlurmNodeSet struct {
 
 	GPU *slurmv1alpha1.GPUSpec
 
-	// DockerEnabled defines whether Docker components (dockerd, docker-proxy sidecar,
-	// docker CLI in jail) are enabled for the NodeSet workers.
+	// DockerEnabled defines whether dockerd, its supervised proxy, and the Docker CLI are enabled for the NodeSet workers.
 	DockerEnabled bool
 
 	StatefulSet     StatefulSet

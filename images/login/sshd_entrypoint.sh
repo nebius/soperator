@@ -34,12 +34,20 @@ setup_user_isolation() {
     local cgroup_mount="/sys/fs/cgroup"
 
     if [ ! -f "${conf}" ]; then
+        if [ "${SOPERATOR_DOCKER_ENABLED:-false}" = "true" ]; then
+            echo "Login Docker: ${conf} is required" >&2
+            return 1
+        fi
         echo "User isolation: ${conf} not found, skipping"
         return 0
     fi
     # shellcheck disable=SC1090
     . "${conf}" || return 1
     if [ "${SOPERATOR_USER_ISOLATION_ENABLED:-false}" != "true" ]; then
+        if [ "${SOPERATOR_DOCKER_ENABLED:-false}" = "true" ]; then
+            echo "Login Docker: user isolation must be enabled" >&2
+            return 1
+        fi
         echo "User isolation: disabled"
         return 0
     fi
@@ -52,8 +60,13 @@ setup_user_isolation() {
 
     # Resolve this container's own cgroup: with a host cgroup namespace,
     # /sys/fs/cgroup is the node's root tree and must not be touched directly.
-    local cgroup_base
-    cgroup_base="${cgroup_mount}$(sed -n 's/^0:://p' /proc/self/cgroup)"
+    local cgroup_base cgroup_relative
+    cgroup_relative="$(sed -n 's/^0:://p' /proc/self/cgroup)"
+    if [ -z "${cgroup_relative}" ]; then
+        echo "User isolation: cannot resolve the container cgroup"
+        return 1
+    fi
+    cgroup_base="${cgroup_mount}${cgroup_relative}"
     cgroup_base="${cgroup_base%/}"
     if [ ! -d "${cgroup_base}" ] || [ ! -w "${cgroup_base}/cgroup.procs" ]; then
         echo "User isolation: container cgroup ${cgroup_base} is not writable"
@@ -64,6 +77,9 @@ setup_user_isolation() {
     # before enabling controllers. Retry until empty — a leftover PID makes
     # the subtree_control writes fail with EBUSY.
     mkdir -p "${cgroup_base}/init" "${cgroup_base}/users"
+    if [ "${SOPERATOR_DOCKER_ENABLED:-false}" = "true" ]; then
+        mkdir -p "${cgroup_base}/docker-unattributed"
+    fi
     local pid
     for _ in 1 2 3 4 5; do
         while IFS= read -r pid; do
@@ -100,13 +116,48 @@ setup_user_isolation() {
             echo "User isolation: ${controller} controller not enabled for users/"
             return 1
         fi
+        if [ "${SOPERATOR_DOCKER_ENABLED:-false}" = "true" ]; then
+            if ! echo "+${controller}" > "${cgroup_base}/docker-unattributed/cgroup.subtree_control" 2>/dev/null; then
+                echo "Login Docker: cannot enable ${controller} controller for unattributed workloads"
+                return 1
+            fi
+        fi
     done
+
+    # The pids controller is useful for Docker, but some Kubernetes runtimes do
+    # not delegate it. Keep memory and CPU as the required baseline.
+    if [ "${SOPERATOR_DOCKER_ENABLED:-false}" = "true" ] && \
+        grep -qw pids "${cgroup_base}/cgroup.controllers"; then
+        echo "+pids" > "${cgroup_base}/cgroup.subtree_control" 2>/dev/null || true
+        echo "+pids" > "${cgroup_base}/users/cgroup.subtree_control" 2>/dev/null || true
+        echo "+pids" > "${cgroup_base}/docker-unattributed/cgroup.subtree_control" 2>/dev/null || true
+    fi
 
     # The sentinel activates the PAM hook; its content is the cgroup base path.
     echo "${cgroup_base}" > /run/soperator-user-isolation.ready
     echo "User isolation: per-user cgroup delegation is ready at ${cgroup_base}"
+    if [ "${SOPERATOR_DOCKER_ENABLED:-false}" = "true" ]; then
+        echo "${cgroup_relative%/}" > /run/soperator-docker-cgroup-base
+        echo "Login Docker: cgroup routing is ready below ${cgroup_base}"
+    fi
 }
 setup_user_isolation
+
+prepare_login_docker() {
+    if [ "${SOPERATOR_DOCKER_ENABLED:-false}" != "true" ]; then
+        return 0
+    fi
+    if ! mountpoint -q /mnt/image-storage; then
+        echo "Login Docker: /mnt/image-storage is not a mount point" >&2
+        return 1
+    fi
+    if ! install -d -m 0711 /mnt/image-storage/docker; then
+        echo "Login Docker: cannot prepare /mnt/image-storage/docker" >&2
+        return 1
+    fi
+    echo "Login Docker: data root is ready at /mnt/image-storage/docker"
+}
+prepare_login_docker
 
 # TODO: Since 1.29 kubernetes supports native sidecar containers. We can remove it in feature releases
 echo "Waiting until munge started"
@@ -120,5 +171,9 @@ effective_sshd_config_dir=$(mktemp -d /run/soperator-ssh-configs.XXXXXX)
 mount --bind "${effective_sshd_config_dir}" "${source_sshd_config_dir}"
 /usr/sbin/sshd -t -f "${source_sshd_config_dir}/sshd_config"
 
+if [ "${SOPERATOR_DOCKER_ENABLED:-false}" = "true" ]; then
+    echo "Start sshd, dockerd, and Docker proxy under supervisord"
+    exec /usr/bin/supervisord -c /etc/supervisor/soperator-login.conf
+fi
 echo "Start sshd daemon"
 exec /usr/sbin/sshd -D -e -f "${source_sshd_config_dir}/sshd_config"

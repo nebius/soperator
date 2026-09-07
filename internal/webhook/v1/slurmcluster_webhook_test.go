@@ -26,6 +26,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 	. "nebius.ai/slurm-operator/internal/webhook/v1"
 )
 
@@ -160,6 +161,81 @@ func TestValidateSlurmClusterUserIsolation(t *testing.T) {
 			Enabled:   ptr.To(false),
 			MemoryMax: &memoryMax,
 		}))
+		assert.NoError(t, err)
+	})
+}
+
+func TestValidateSlurmClusterLoginDocker(t *testing.T) {
+	validator := &SlurmClusterCustomValidator{}
+	clusterWith := func(
+		docker *slurmv1.LoginDocker,
+		isolation *slurmv1.LoginUserIsolation,
+		mounts ...slurmv1.NodeVolumeMount,
+	) *slurmv1.SlurmCluster {
+		return &slurmv1.SlurmCluster{
+			Spec: slurmv1.SlurmClusterSpec{
+				SlurmNodes: slurmv1.SlurmNodes{
+					Login: slurmv1.SlurmNodeLogin{
+						Docker:        docker,
+						UserIsolation: isolation,
+						Volumes:       slurmv1.SlurmNodeLoginVolumes{JailSubMounts: mounts},
+					},
+				},
+			},
+		}
+	}
+
+	enabled := &slurmv1.LoginDocker{Enabled: ptr.To(true)}
+	isolation := &slurmv1.LoginUserIsolation{Enabled: ptr.To(true)}
+
+	t.Run("admits omitted Docker without prerequisites", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(nil, nil))
+		assert.NoError(t, err)
+	})
+
+	t.Run("admits disabled Docker without prerequisites", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(
+			&slurmv1.LoginDocker{Enabled: ptr.To(false)},
+			nil,
+		))
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects reserved Docker environment", func(t *testing.T) {
+		cluster := clusterWith(nil, nil)
+		cluster.Spec.SlurmNodes.Login.Sshd.CustomEnv = []corev1.EnvVar{{
+			Name:  consts.EnvDockerEnabled,
+			Value: "true",
+		}}
+		_, err := validator.ValidateCreate(context.Background(), cluster)
+		assert.ErrorContains(t, err, "managed by Soperator")
+	})
+
+	t.Run("rejects enabled Docker without user isolation", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(enabled, nil))
+		assert.ErrorContains(t, err, "userIsolation.enabled=true")
+	})
+
+	t.Run("rejects enabled Docker without image storage", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(enabled, isolation))
+		assert.ErrorContains(t, err, consts.ImageStorageMountPath)
+	})
+
+	t.Run("rejects read-only image storage", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(
+			enabled,
+			isolation,
+			slurmv1.NodeVolumeMount{MountPath: consts.ImageStorageMountPath, ReadOnly: true},
+		))
+		assert.ErrorContains(t, err, "as writable")
+	})
+
+	t.Run("admits enabled Docker with prerequisites", func(t *testing.T) {
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(
+			enabled,
+			isolation,
+			slurmv1.NodeVolumeMount{MountPath: consts.ImageStorageMountPath},
+		))
 		assert.NoError(t, err)
 	})
 }

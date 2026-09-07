@@ -1,0 +1,11 @@
+{
+  "data-root": "/mnt/image-storage/docker",
+  "exec-opts": [
+    "native.cgroupdriver=cgroupfs"
+  ],
+  "group": "root",
+  "hosts": [
+    "unix:///run/soperator-dockerd.sock"
+  ],
+  "bip": "169.254.0.1/16"
+}

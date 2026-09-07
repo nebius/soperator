@@ -19,6 +19,8 @@ func renderContainerSshd(
 	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
 	containerSSSD *values.Container,
 	userIsolation *slurmv1.LoginUserIsolation,
+	dockerEnabled bool,
+	dockerImageStorageMount slurmv1.NodeVolumeMount,
 	appArmorProfile string,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
@@ -34,6 +36,9 @@ func renderContainerSshd(
 	if userIsolation != nil && ptr.Deref(userIsolation.Enabled, false) {
 		volumeMounts = append(volumeMounts, renderVolumeMountUserIsolation())
 	}
+	if dockerEnabled {
+		volumeMounts = append(volumeMounts, common.RenderVolumeMount(dockerImageStorageMount, ""))
+	}
 	if containerSSSD != nil {
 		volumeMounts = append(volumeMounts,
 			common.RenderVolumeMountSSSDSocket(),
@@ -42,22 +47,28 @@ func renderContainerSshd(
 	}
 	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(jailSubMounts, consts.VolumeMountPathJailUpper)...)
 	volumeMounts = append(volumeMounts, common.RenderVolumeMounts(customMounts, "")...)
+	env := []corev1.EnvVar{
+		{
+			Name:  "SLURM_CLUSTER_WITH_GPU",
+			Value: strconv.FormatBool(clusterWithGPU),
+		},
+	}
+	if dockerEnabled {
+		env = append(env, corev1.EnvVar{
+			Name:  consts.EnvDockerEnabled,
+			Value: "true",
+		})
+	}
+	env = append(env, container.CustomEnv...)
+
 	// Create a copy of the container's limits and add non-CPU resources from Requests
 	limits := common.CopyNonCPUResources(container.Resources)
 	return corev1.Container{
-		Name:    consts.ContainerNameSshd,
-		Image:   container.Image,
-		Command: container.Command,
-		Args:    container.Args,
-		Env: append(
-			[]corev1.EnvVar{
-				{
-					Name:  "SLURM_CLUSTER_WITH_GPU",
-					Value: strconv.FormatBool(clusterWithGPU),
-				},
-			},
-			container.CustomEnv...,
-		),
+		Name:            consts.ContainerNameSshd,
+		Image:           container.Image,
+		Command:         container.Command,
+		Args:            container.Args,
+		Env:             env,
 		ImagePullPolicy: container.ImagePullPolicy,
 		Ports: []corev1.ContainerPort{{
 			Name:          container.Name,

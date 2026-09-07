@@ -9,7 +9,6 @@ const (
 	ContainerNameREST              = Slurmrestd
 	ContainerNameSshd              = SshdName
 	ContainerNameWorkerInit        = "worker-init"
-	ContainerNameDockerProxy       = "docker-proxy"
 	ContainerNameWaitForDatabase   = "wait-for-database"
 	ContainerNameWaitForAccounting = "wait-for-accounting"
 	ContainerNamePopulateJail      = populateJail

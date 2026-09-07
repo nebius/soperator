@@ -56,9 +56,18 @@ type SlurmClusterSpec struct {
 
 type SlurmClusterNodes struct {
 	Accounting SlurmClusterAccounting `json:"accounting"`
+	Login      SlurmClusterLogin      `json:"login"`
 }
 
 type SlurmClusterAccounting struct {
+	Enabled bool `json:"enabled"`
+}
+
+type SlurmClusterLogin struct {
+	Docker SlurmClusterLoginDocker `json:"docker"`
+}
+
+type SlurmClusterLoginDocker struct {
 	Enabled bool `json:"enabled"`
 }
 
