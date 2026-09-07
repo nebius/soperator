@@ -395,6 +395,10 @@ spec:
         enabled: false
       prometheus-node-exporter:
         enabled: {{ .Values.observability.vmStack.values.prometheusNodeExporter.enabled }}
+        vmScrape:
+          spec:
+            # Legacy Endpoints truncate services with more than 1,000 backends.
+            discoveryRole: endpointslice
         extraArgs:
           {{- toYaml .Values.observability.vmStack.values.prometheusNodeExporter.extraArgs | nindent 10 }}
       victoria-metrics-operator:

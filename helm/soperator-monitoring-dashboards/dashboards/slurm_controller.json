@@ -6828,7 +6828,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Pod-level network throughput on controller-0 (RX = receive, TX = transmit). Source is the `node-exporter` sidecar running in the controller pod, scraped via `VMPodScrape` `custom-node-exporter`. Excludes `lo`. Note: this is **pod-level** traffic (slurmctld + sidecars), distinct from the host-level Network row below which shows the whole K8s node.",
+          "description": "Pod-level network throughput on the selected controller pod (RX = receive, TX = transmit). Source is the `node-exporter` sidecar running in that pod. Excludes `lo`. Note: this is **pod-level** traffic (slurmctld + sidecars), distinct from the host-level Network row below which shows the whole K8s node.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6911,7 +6911,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_bytes_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_bytes_total{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{pod}} {{device}} RX",
               "range": true,
               "refId": "A"
@@ -6922,7 +6922,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * irate(node_network_transmit_bytes_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "-1 * irate(node_network_transmit_bytes_total{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{pod}} {{device}} TX",
               "range": true,
               "refId": "B"
@@ -7019,7 +7019,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "node_netstat_Tcp_CurrEstab{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}",
+              "expr": "node_netstat_Tcp_CurrEstab{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\"}",
               "legendFormat": "{{pod}} established",
               "range": true,
               "refId": "A"
@@ -7116,7 +7116,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_packets_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_packets_total{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{pod}} {{device}} RX",
               "range": true,
               "refId": "A"
@@ -7127,7 +7127,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "-1 * irate(node_network_transmit_packets_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "-1 * irate(node_network_transmit_packets_total{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{pod}} {{device}} TX",
               "range": true,
               "refId": "B"
@@ -7224,7 +7224,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_Tcp_RetransSegs{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_Tcp_RetransSegs{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\"}[$__rate_interval])",
               "legendFormat": "{{pod}} retrans",
               "range": true,
               "refId": "A"
@@ -7235,7 +7235,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\"}[$__rate_interval])",
               "legendFormat": "{{pod}} SYN retrans",
               "range": true,
               "refId": "B"
@@ -7332,7 +7332,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_errs_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_errs_total{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{device}} RX errs",
               "range": true,
               "refId": "A"
@@ -7343,7 +7343,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_drop_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "irate(node_network_receive_drop_total{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{device}} RX drops",
               "range": true,
               "refId": "B"
@@ -7354,7 +7354,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_transmit_errs_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "irate(node_network_transmit_errs_total{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{device}} TX errs",
               "range": true,
               "refId": "C"
@@ -7365,7 +7365,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_transmit_drop_total{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\", device!=\"lo\"}[$__rate_interval])",
+              "expr": "irate(node_network_transmit_drop_total{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\", device!=\"lo\"}[$__rate_interval])",
               "legendFormat": "{{device}} TX drops",
               "range": true,
               "refId": "D"
@@ -7462,7 +7462,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_ListenDrops{cluster=~\"$cluster\", pod=~\"controller-.*\", job=\"soperator/custom-node-exporter\"}[$__rate_interval])",
+              "expr": "irate(node_netstat_TcpExt_ListenDrops{cluster=~\"$cluster\", namespace=\"soperator\", pod=\"$pod\"}[$__rate_interval])",
               "legendFormat": "{{pod}} listen drops",
               "range": true,
               "refId": "A"
@@ -8240,15 +8240,15 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": "controller-0",
-          "value": "controller-0"
+          "text": "",
+          "value": ""
         },
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_pod_info{cluster=~\"$cluster\", namespace=~\"soperator\", pod=~\"controller-[0-9]+\"}, pod)",
-        "description": "Controller pod to inspect. Discovered from kube_pod_info; defaults to controller-0.",
+        "definition": "label_values(kube_pod_container_status_running{cluster=~\"$cluster\", namespace=\"soperator\", container=\"slurmctld\"}, pod)",
+        "description": "Controller pod to inspect. Discovers pods with a slurmctld container regardless of pod naming or container running state.",
         "includeAll": false,
         "label": "Controller Pod",
         "multi": false,
@@ -8256,7 +8256,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(kube_pod_info{cluster=~\"$cluster\", namespace=~\"soperator\", pod=~\"controller-[0-9]+\"}, pod)",
+          "query": "label_values(kube_pod_container_status_running{cluster=~\"$cluster\", namespace=\"soperator\", container=\"slurmctld\"}, pod)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
