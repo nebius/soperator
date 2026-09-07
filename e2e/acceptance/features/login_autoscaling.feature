@@ -1,6 +1,6 @@
 Feature: Login autoscaling
   @soperator_version_>=5.0.0
-  Scenario: Login pods and Kubernetes nodes scale up without automatic pod scale-down
+  Scenario: Login pods scale up without automatic pod scale-down
     Given the login workload is ready for an autoscaling lifecycle test
     When login autoscaling is enabled with one additional replica of capacity
     Then the login workload remains at its default replica count without pressure

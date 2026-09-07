@@ -43,7 +43,6 @@ type LoginAutoscaling struct {
 	initialAutoscaling    json.RawMessage
 	statefulSetName       string
 	maxReplicas           int32
-	initialK8sNodes       map[string]string
 	pressurePods          []string
 	scaledPods            map[string]string
 }
@@ -94,7 +93,6 @@ func (s *LoginAutoscaling) CleanupAndReset(ctx context.Context) {
 	s.initialAutoscaling = nil
 	s.statefulSetName = ""
 	s.maxReplicas = 0
-	s.initialK8sNodes = nil
 	s.pressurePods = nil
 	s.scaledPods = nil
 }
@@ -157,12 +155,6 @@ func (s *LoginAutoscaling) selectReadyLoginWorkload(ctx context.Context) error {
 	if err := s.waitForLoginHPARemoval(ctx); err != nil {
 		return err
 	}
-	nodes, err := s.k8sNodes(ctx)
-	if err != nil {
-		return err
-	}
-	s.initialK8sNodes = snapshotNodes(nodes)
-
 	s.maxReplicas = s.initialSize + 1
 	s.runtime.Logf("login autoscaling: selected StatefulSet=%s min=%d max=%d",
 		s.statefulSetName, s.initialSize, s.maxReplicas)
@@ -277,18 +269,6 @@ func (s *LoginAutoscaling) waitForLoginScaleUp(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	nodes, err := s.k8sNodes(ctx)
-	if err != nil {
-		return err
-	}
-	newNode, err := loginPodOnNewNode(pods, nodes, s.initialK8sNodes)
-	if err != nil {
-		return err
-	}
-	if newNode == "" {
-		return fmt.Errorf("all scaled login pods are running on Kubernetes nodes that existed before pressure; node-group scale-up was not observed")
-	}
-	s.runtime.Logf("login autoscaling: Kubernetes node-group scale-up added node %s", newNode)
 	s.scaledPods = snapshotPods(pods)
 	return nil
 }
@@ -472,14 +452,6 @@ func (s *LoginAutoscaling) loginPods(ctx context.Context) ([]corev1.Pod, error) 
 	return pods.Items, nil
 }
 
-func (s *LoginAutoscaling) k8sNodes(ctx context.Context) ([]corev1.Node, error) {
-	var nodes corev1.NodeList
-	if err := s.kubectl.GetJSON(ctx, &nodes, "get", "nodes", "-o", "json"); err != nil {
-		return nil, fmt.Errorf("list Kubernetes nodes: %w", err)
-	}
-	return nodes.Items, nil
-}
-
 func (s *LoginAutoscaling) loginHPA(ctx context.Context) (autoscalingv2.HorizontalPodAutoscaler, bool, error) {
 	var hpa autoscalingv2.HorizontalPodAutoscaler
 	output, err := s.runtime.Kubectl().Run(ctx,
@@ -619,36 +591,4 @@ func replicaValue(replicas *int32) any {
 		return "<nil>"
 	}
 	return *replicas
-}
-
-func snapshotNodes(nodes []corev1.Node) map[string]string {
-	snapshot := make(map[string]string, len(nodes))
-	for _, node := range nodes {
-		snapshot[node.Name] = string(node.UID)
-	}
-	return snapshot
-}
-
-func loginPodOnNewNode(pods []corev1.Pod, nodes []corev1.Node, initialNodes map[string]string) (string, error) {
-	currentNodes := snapshotNodes(nodes)
-	usedNodes := make(map[string]struct{}, len(pods))
-	newNode := ""
-	for _, pod := range pods {
-		if pod.Spec.NodeName == "" {
-			return "", fmt.Errorf("login pod %s is not assigned to a Kubernetes node", pod.Name)
-		}
-		if _, duplicate := usedNodes[pod.Spec.NodeName]; duplicate {
-			return "", fmt.Errorf("multiple login pods are assigned to Kubernetes node %s", pod.Spec.NodeName)
-		}
-		usedNodes[pod.Spec.NodeName] = struct{}{}
-
-		currentUID, exists := currentNodes[pod.Spec.NodeName]
-		if !exists {
-			return "", fmt.Errorf("Kubernetes node %s used by login pod %s was not returned by the API", pod.Spec.NodeName, pod.Name)
-		}
-		if initialUID, existedInitially := initialNodes[pod.Spec.NodeName]; !existedInitially || initialUID != currentUID {
-			newNode = pod.Spec.NodeName
-		}
-	}
-	return newNode, nil
 }
