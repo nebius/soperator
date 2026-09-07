@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-if [ "${SOPERATOR_DOCKER_ENABLED:-true}" != "true" ]; then
+if [ "${SOPERATOR_DOCKER_ENABLED:-false}" != "true" ]; then
     echo "Not starting dockerd: Docker is disabled on this NodeSet because it has no image-storage disks"
     exit 0
 fi

@@ -46,3 +46,84 @@ func waitForSSHTestUserOnWorker(
 		},
 	)
 }
+
+func ensureSSHTestIdentity(
+	ctx context.Context,
+	runtime framework.Runtime,
+	userName,
+	keyName,
+	keyComment string,
+) error {
+	setupIdentity := fmt.Sprintf(`
+set -euo pipefail
+install -d -m 0700 "${HOME}/.ssh"
+key="${HOME}/.ssh/%s"
+authorized_keys="${HOME}/.ssh/authorized_keys"
+rm -f "${key}" "${key}.pub"
+touch "${authorized_keys}"
+sed -i '\# %s$#d' "${authorized_keys}"
+ssh-keygen -q -t ecdsa -N '' -C %s -f "${key}"
+cat "${key}.pub" >> "${authorized_keys}"
+chmod 0600 "${authorized_keys}"
+`, keyName, keyComment, framework.ShellQuote(keyComment))
+	command := fmt.Sprintf(
+		"su - %s -c %s",
+		framework.ShellQuote(userName),
+		framework.ShellQuote(framework.BashLC(setupIdentity)),
+	)
+	if _, err := runtime.Jail().Run(ctx, command); err != nil {
+		return fmt.Errorf("prepare SSH identity for %s: %w", userName, err)
+	}
+
+	return nil
+}
+
+func removeSSHTestIdentity(
+	ctx context.Context,
+	runtime framework.Runtime,
+	userName,
+	keyName,
+	keyComment string,
+) error {
+	cleanupIdentity := fmt.Sprintf(`
+key="${HOME}/.ssh/%s"
+authorized_keys="${HOME}/.ssh/authorized_keys"
+rm -f "${key}" "${key}.pub"
+if [ -f "${authorized_keys}" ]; then
+    sed -i '\# %s$#d' "${authorized_keys}"
+fi
+`, keyName, keyComment)
+	command := fmt.Sprintf(
+		"if id %s >/dev/null 2>&1; then su - %s -c %s; fi",
+		framework.ShellQuote(userName),
+		framework.ShellQuote(userName),
+		framework.ShellQuote(framework.BashLC(cleanupIdentity)),
+	)
+	_, err := runtime.Jail().Run(ctx, command)
+	return err
+}
+
+func runSSHCommand(
+	ctx context.Context,
+	runtime framework.Runtime,
+	userName,
+	keyName,
+	host string,
+	timeout time.Duration,
+	remoteCommand string,
+) (string, error) {
+	sshCommand := fmt.Sprintf(
+		"timeout %.0f ssh -i ~/.ssh/%s -o IdentitiesOnly=yes -o BatchMode=yes -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null %s %s",
+		timeout.Seconds(),
+		keyName,
+		framework.ShellQuote(host),
+		framework.ShellQuote(framework.BashLC(remoteCommand)),
+	)
+	command := fmt.Sprintf(
+		"su - %s -c %s",
+		framework.ShellQuote(userName),
+		framework.ShellQuote(sshCommand),
+	)
+
+	return runtime.Jail().Run(ctx, command)
+}

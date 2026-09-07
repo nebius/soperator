@@ -5,16 +5,7 @@ set -euxo pipefail
 # Runs once at the job beginning without `SLURM_STEP_ID` and for each step with `SLURM_STEP_ID`.
 
 if [ "${SLURM_LOCALID}" = "0" ]; then
-    cgroup=$(cat /proc/self/cgroup)
-    cgroup="${cgroup#0::}"
-    # drop basename until it is user
-    while [ -n "$cgroup" ] && [ "${cgroup##*/}" != "user" ]; do
-    cgroup="${cgroup%/*}"
-    done
-    if [ -n "$cgroup" ]; then
-        echo export "DOCKER_HOST=unix:///var/run/soperator-docker.sock"
-        echo export "DOCKER_CUSTOM_HEADERS=Cgroup-Parent=$cgroup"
-    fi
+    echo export "DOCKER_HOST=unix:///var/run/soperator-docker.sock"
 
     export CHECKS_OUTPUTS_BASE_DIR="/opt/soperator-outputs/local"
     task_prolog="$CHECKS_OUTPUTS_BASE_DIR/task_prolog"

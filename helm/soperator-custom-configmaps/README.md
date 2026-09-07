@@ -6,7 +6,7 @@ This Helm chart deploys custom ConfigMaps for the Soperator deployment.
 
 The chart contains configuration files that are deployed as Kubernetes ConfigMaps:
 
-- **supervisord.conf** - Supervisord configuration for managing slurmd, sshd, and dockerd processes
+- **supervisord.conf** - Supervisord configuration for managing slurmd, sshd, dockerd, and the Docker proxy
 - **daemon.json** - Docker daemon configuration with NVIDIA runtime support
 - **enroot.conf** - Enroot container configuration paths
 - **95-nebius-o11y** - MOTD (Message of the Day) script for Nebius observability
@@ -14,6 +14,8 @@ The chart contains configuration files that are deployed as Kubernetes ConfigMap
 ## Configuration Files Location
 
 All configuration files are stored in the `config-files/` directory and are automatically included in their respective ConfigMaps during deployment.
+
+The Docker programs use `NodeSet.spec.docker.enabled` at runtime, so this ConfigMap can be shared by NodeSets with different Docker settings.
 
 ## Installation
 
@@ -40,9 +42,6 @@ configMaps:
   imageStorage:
     enabled: true
 
-docker:
-  enabled: true
-
 enroot:
   useDedicatedImageStorage: true
 ```
@@ -58,7 +57,6 @@ enroot:
 | `configMaps.motd.name` | Name of MOTD ConfigMap | `motd-nebius-o11y` |
 | `configMaps.imageStorage.enabled` | Enable image storage ConfigMap | `true` |
 | `configMaps.imageStorage.name` | Name of image storage ConfigMap | `image-storage` |
-| `docker.enabled` | Start the Docker daemon on worker nodes; disable on clusters deployed without image-storage disks | `true` |
 | `enroot.useDedicatedImageStorage` | Store Enroot cache/data/runtime under `/mnt/image-storage/enroot`; when false, cache uses shared `/var/cache/enroot/user-$(id -u)` and data/runtime use Enroot defaults | `true` |
 
 ## Deployed ConfigMaps
