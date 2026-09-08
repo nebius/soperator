@@ -61,6 +61,85 @@ func TestIsContainerCreateRequest(t *testing.T) {
 	}
 }
 
+func TestIsBuildRequest(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		want   bool
+	}{
+		{name: "unversioned", method: http.MethodPost, path: "/build", want: true},
+		{name: "versioned", method: http.MethodPost, path: "/v1.56/build", want: true},
+		{name: "trailing slash", method: http.MethodPost, path: "/v1.56/build/", want: true},
+		{name: "wrong method", method: http.MethodGet, path: "/v1.56/build"},
+		{name: "missing version minor", method: http.MethodPost, path: "/v1/build"},
+		{name: "invalid version", method: http.MethodPost, path: "/vNaN/build"},
+		{name: "extra segment", method: http.MethodPost, path: "/prefix/v1.56/build"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			request := httptest.NewRequestWithContext(t.Context(), test.method, test.path, nil)
+			if got := isBuildRequest(request); got != test.want {
+				t.Fatalf("isBuildRequest(%s %q) = %t, want %t", test.method, test.path, got, test.want)
+			}
+		})
+	}
+}
+
+func TestApplyBuildCgroupParent(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name       string
+		rawQuery   string
+		parent     string
+		wantParent string
+		wantRemote string
+	}{
+		{
+			name:       "add missing parent",
+			rawQuery:   "remote=example.com",
+			parent:     "/base/users/user-1004/docker",
+			wantParent: "/base/users/user-1004/docker",
+			wantRemote: "example.com",
+		},
+		{
+			name:       "override forged parent",
+			rawQuery:   "cgroupparent=%2Fescape&remote=example.com",
+			parent:     "/base/users/user-1004/docker",
+			wantParent: "/base/users/user-1004/docker",
+			wantRemote: "example.com",
+		},
+		{
+			name:       "remove forged parent without attribution",
+			rawQuery:   "cgroupparent=%2Fanother-job&remote=example.com",
+			wantRemote: "example.com",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			request := httptest.NewRequestWithContext(
+				t.Context(),
+				http.MethodPost,
+				"/v1.56/build?"+test.rawQuery,
+				nil,
+			)
+			applyBuildCgroupParent(request, test.parent)
+			query := request.URL.Query()
+			if got := query.Get("cgroupparent"); got != test.wantParent {
+				t.Fatalf("cgroupparent = %q, want %q", got, test.wantParent)
+			}
+			if got := query.Get("remote"); got != test.wantRemote {
+				t.Fatalf("remote = %q, want %q", got, test.wantRemote)
+			}
+		})
+	}
+}
+
 func TestApplyCgroupParent(t *testing.T) {
 	t.Parallel()
 
@@ -247,6 +326,43 @@ func TestProxyForcesResolvedCgroupAndRemovesHeader(t *testing.T) {
 	}
 	if want := "/slurm/job_7/step_0/user"; got != want {
 		t.Fatalf("upstream CgroupParent = %q, want %q", got, want)
+	}
+}
+
+func TestProxyForcesResolvedBuildCgroup(t *testing.T) {
+	t.Parallel()
+
+	upstreamQuery := make(chan url.Values, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		upstreamQuery <- request.URL.Query()
+		writer.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	resolver := &staticResolver{resolution: cgroupResolution{parent: "/base/users/user-1004/docker"}}
+	proxy := newTestProxy(t, upstream.URL, resolver)
+	request := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodPost,
+		"http://proxy/v1.56/build?cgroupparent=%2Fescape&remote=example.com",
+		nil,
+	)
+	request = withPeerCredentials(request, peerCredentials{pid: 42, uid: 1004, gid: 1004})
+	response := httptest.NewRecorder()
+	proxy.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	if resolver.calls != 1 {
+		t.Fatalf("resolver calls = %d, want 1", resolver.calls)
+	}
+
+	query := <-upstreamQuery
+	if got := query.Get("cgroupparent"); got != "/base/users/user-1004/docker" {
+		t.Fatalf("upstream cgroupparent = %q, want %q", got, "/base/users/user-1004/docker")
+	}
+	if got := query.Get("remote"); got != "example.com" {
+		t.Fatalf("upstream remote = %q, want %q", got, "example.com")
 	}
 }
 
