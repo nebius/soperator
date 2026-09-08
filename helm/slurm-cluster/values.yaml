@@ -883,6 +883,7 @@ slurmScripts:
   #       "command": "./example.sh",
   #       "platforms": ["any"],
   #       "skip_for_cpu_jobs": false,
+  #       "skip_for_partial_cpu_jobs": false,
   #       "skip_for_partial_gpu_jobs": false,
   #       "contexts": ["prolog"],
   #       "node_states": ["any"],
