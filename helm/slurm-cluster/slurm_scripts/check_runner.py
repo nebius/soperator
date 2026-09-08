@@ -2,6 +2,7 @@ import functools
 import json
 import logging
 import os
+import re
 import string
 import subprocess
 import sys
@@ -51,6 +52,10 @@ class Check(typing.NamedTuple):
     # Whether to skip this check for jobs that don't allocate any GPUs.
     # Allows to skip the check for CPU-only jobs in "prolog" and "epilog" contexts even if the node is equipped with GPUs.
     skip_for_cpu_jobs: bool = False
+
+    # Whether to skip this check for CPU-only jobs that don't allocate all effective CPUs on this node.
+    # Applies in "prolog" and "epilog"; also skips when CPU allocation data is unavailable.
+    skip_for_partial_cpu_jobs: bool = False
 
     # Whether to skip this check for jobs that don't allocate all available GPUs.
     # CPU-only jobs are not considered "partial GPU"
@@ -124,12 +129,15 @@ class NodeInfo(typing.NamedTuple):
     reason: str = ""
     comment: str = ""
     real_memory_bytes: int = 0
+    effective_cpus: int = 0
 
 # Get environment variables
 try:
     SLURMD_NODENAME = os.environ["SLURMD_NODENAME"]
     SLURM_JOB_ID = os.environ.get("SLURM_JOB_ID", "") # Not available in the "hc_program" context
     SLURM_JOB_GPUS = os.environ.get("SLURM_JOB_GPUS", "") # Not available in the "hc_program context"
+    SLURM_JOB_CPUS_PER_NODE = os.environ.get("SLURM_JOB_CPUS_PER_NODE", "")
+    SLURM_JOB_NODELIST = os.environ.get("SLURM_JOB_NODELIST", "")
     SLURM_JOB_COMMENT = os.environ.get("SLURM_JOB_COMMENT", "") # Not available in the "hc_program context"
     CHECKS_OUTPUTS_BASE_DIR = os.environ["CHECKS_OUTPUTS_BASE_DIR"]
     CHECKS_CONTEXT = os.environ["CHECKS_CONTEXT"]
@@ -196,6 +204,7 @@ def filter_applicable_checks(checks: list[Check]) -> list[Check]:
     checks = filter_by_platform(checks)
     # Filter by skip_for_partial_gpu_jobs (needs platform tags)
     checks = filter_by_skip_for_partial_gpu_jobs(checks)
+    checks = filter_by_skip_for_partial_cpu_jobs(checks)
     # Filter by node_state (needs node info)
     checks = filter_by_node_state(checks)
     return checks
@@ -255,6 +264,32 @@ def filter_by_skip_for_partial_gpu_jobs(checks: list[Check]) -> list[Check]:
             f"{job_alloc_gpus}xGPU" not in node_platform_tags
         )
     ]
+
+def filter_by_skip_for_partial_cpu_jobs(checks: list[Check]) -> list[Check]:
+    if all(not check.skip_for_partial_cpu_jobs for check in checks):
+        return checks
+    if not job_related_run() or get_job_alloc_gpus() > 0:
+        return checks
+
+    job_alloc_cpus = get_job_alloc_cpus()
+    node_effective_cpus = get_node_info().effective_cpus
+    if (
+        type(job_alloc_cpus) is not int or type(node_effective_cpus) is not int or
+        job_alloc_cpus <= 0 or node_effective_cpus <= 0
+    ):
+        logging.warning(
+            f"Skipping checks with skip_for_partial_cpu_jobs for job {SLURM_JOB_ID} on node {SLURMD_NODENAME}: "
+            f"CPU allocation data is unavailable or invalid (job CPUs={job_alloc_cpus}, effective CPUs={node_effective_cpus})"
+        )
+    elif job_alloc_cpus < node_effective_cpus:
+        logging.info(
+            f"Skipping checks with skip_for_partial_cpu_jobs for job {SLURM_JOB_ID} on node {SLURMD_NODENAME}: "
+            f"Job allocates {job_alloc_cpus} of {node_effective_cpus} effective CPUs"
+        )
+    else:
+        return checks
+
+    return [check for check in checks if not check.skip_for_partial_cpu_jobs]
 
 def filter_by_node_state(checks: list[Check]) -> list[Check]:
     # Skip if all checks don't care
@@ -454,7 +489,8 @@ def get_node_info() -> NodeInfo:
             state_flags=node.get("state", []),
             reason=node.get("reason", ""),
             comment=node.get("comment", ""),
-            real_memory_bytes=(real_memory_mib * 1024 * 1024)
+            real_memory_bytes=(real_memory_mib * 1024 * 1024),
+            effective_cpus=node.get("effective_cpus", 0)
         )
         logging.info(f"Slurm node info: {json.dumps(info._asdict(), indent=2)}")
         return info
@@ -469,6 +505,43 @@ def get_job_alloc_gpus() -> int:
     if SLURM_JOB_GPUS == "":
         return 0
     return len(SLURM_JOB_GPUS.split(","))
+
+# SLURM_JOB_CPUS_PER_NODE is ordered like SLURM_JOB_NODELIST, e.g. "64(x2),32".
+@functools.lru_cache(maxsize=1)
+def get_job_alloc_cpus() -> int:
+    try:
+        cpu_runs = []
+        for entry in SLURM_JOB_CPUS_PER_NODE.split(","):
+            match = re.fullmatch(r"([1-9][0-9]*)(?:\(x([1-9][0-9]*)\))?", entry.strip())
+            if not match:
+                raise ValueError("parse SLURM_JOB_CPUS_PER_NODE")
+            cpu_runs.append((int(match[1]), int(match[2] or "1")))
+        if not SLURM_JOB_NODELIST:
+            raise ValueError("read SLURM_JOB_NODELIST")
+
+        nodes = expand_hostlist(SLURM_JOB_NODELIST)
+        if len(nodes) != sum(repeats for _, repeats in cpu_runs) or nodes.count(SLURMD_NODENAME) != 1:
+            raise ValueError("match CPU allocation to the current node")
+        node_index = nodes.index(SLURMD_NODENAME)
+        for cpus, repeats in cpu_runs:
+            if node_index < repeats:
+                return cpus
+            node_index -= repeats
+    except Exception as e:
+        logging.warning(f"Read CPU allocation from job environment for node {SLURMD_NODENAME}: {e}")
+    return 0
+
+def expand_hostlist(expression: str) -> list[str]:
+    # Feature expressions need a controller RPC; job node lists contain concrete node names and ranges.
+    if "{" in expression or "}" in expression:
+        raise ValueError("expand node list without querying slurmctld")
+    if "[" not in expression and "]" not in expression:
+        return expression.split(",")
+    result = subprocess.run(
+        ["scontrol", "show", "hostnames", expression],
+        check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10
+    )
+    return result.stdout.splitlines()
 
 # Open the directory where checks are located
 def chdir_into_checks_dir():
