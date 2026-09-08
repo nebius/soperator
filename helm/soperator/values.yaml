@@ -5,6 +5,8 @@ controllerManager:
       - --metrics-bind-address=:8443
       - --metrics-secure=true
       - --leader-elect
+      - --rest-config-qps=30
+      - --rest-config-burst=50
     controllersEnabled:
       cluster: true
       nodeconfigurator: true

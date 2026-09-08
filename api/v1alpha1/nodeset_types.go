@@ -6,6 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"nebius.ai/slurm-operator/internal/consts"
@@ -40,6 +41,10 @@ type NodeSetList struct {
 
 // NodeSetStatus defines the observed state of SlurmCluster
 type NodeSetStatus struct {
+	// AppliedPowerState identifies the power state whose pods PowerStateReady describes.
+	// Only the latest observation is retained; it is removed when ephemeral mode is disabled.
+	AppliedPowerState *AppliedPowerState `json:"appliedPowerState,omitempty"`
+
 	// Conditions represent the observations of a NodeSet's current state.
 	// Known types are: ConditionNodeSetConfigUpdated, ConditionNodeSetConfigDynamicUpdated, ConditionNodeSetStatefulSetUpdated, ConditionNodeSetPodsReady, and ConditionNodeSetStatefulSetTerminated.
 	//
@@ -69,6 +74,18 @@ type NodeSetStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
+// AppliedPowerState identifies an observed NodeSetPowerState without retaining per-operation history.
+type AppliedPowerState struct {
+	UID        types.UID `json:"uid"`
+	Generation int64     `json:"generation"`
+
+	// ActiveNodes records the desired ordinals of this observed generation.
+	// An empty list means all nodes are inactive; omission means the snapshot is unavailable.
+	// +kubebuilder:validation:Optional
+	// +listType=set
+	ActiveNodes []int32 `json:"activeNodes"`
+}
+
 // SetCondition sets the given condition in the NodeSetStatus conditions slice.
 // It initializes the conditions slice if it is nil.
 // Returns true if the condition was added or updated, false otherwise.
@@ -88,6 +105,9 @@ func (s *NodeSetStatus) SetCondition(condition metav1.Condition) bool {
 
 const (
 	KindNodeSet = "NodeSet"
+
+	// ConditionNodeSetPowerReady reports whether all pods match the applied power state.
+	ConditionNodeSetPowerReady = "PowerStateReady"
 
 	// PhaseNodeSetPending is set when CR is created but not yet processed.
 	PhaseNodeSetPending = "Pending"

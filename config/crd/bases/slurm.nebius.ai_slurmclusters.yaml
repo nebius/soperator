@@ -3926,6 +3926,13 @@ spec:
                       power-save and scontrol power down cannot trigger SuspendProgram.
                     format: int32
                     type: integer
+                  suspendTimeout:
+                    default: 90
+                    description: SuspendTimeout is the number of seconds allowed for
+                      ephemeral nodes to shut down.
+                    format: int32
+                    minimum: 1
+                    type: integer
                   taskPluginParam:
                     default: ""
                     description: Additional parameters for the task plugin

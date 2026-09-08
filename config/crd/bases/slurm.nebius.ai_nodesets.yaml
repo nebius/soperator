@@ -12223,6 +12223,33 @@ spec:
           status:
             description: NodeSetStatus defines the observed state of SlurmCluster
             properties:
+              appliedPowerState:
+                description: |-
+                  AppliedPowerState identifies the power state whose pods PowerStateReady describes.
+                  Only the latest observation is retained; it is removed when ephemeral mode is disabled.
+                properties:
+                  activeNodes:
+                    description: |-
+                      ActiveNodes records the desired ordinals of this observed generation.
+                      An empty list means all nodes are inactive; omission means the snapshot is unavailable.
+                    items:
+                      format: int32
+                      type: integer
+                    type: array
+                    x-kubernetes-list-type: set
+                  generation:
+                    format: int64
+                    type: integer
+                  uid:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                required:
+                - generation
+                - uid
+                type: object
               conditions:
                 description: |-
                   Conditions represent the observations of a NodeSet's current state.

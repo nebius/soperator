@@ -12,6 +12,12 @@ import (
 )
 
 func Test_buildSlurmConfigFrom(t *testing.T) {
+	t.Run("defaults and preserves SuspendTimeout", func(t *testing.T) {
+		result := buildSlurmConfigFrom(&slurmv1.SlurmConfig{})
+		require.Equal(t, int32(90), *result.SuspendTimeout)
+		result = buildSlurmConfigFrom(&slurmv1.SlurmConfig{SuspendTimeout: ptr.To[int32](300)})
+		require.Equal(t, int32(300), *result.SuspendTimeout)
+	})
 	t.Run("keeps an explicit ResumeTimeout", func(t *testing.T) {
 		result := buildSlurmConfigFrom(&slurmv1.SlurmConfig{
 			ResumeTimeout: ptr.To[int32](3600),
@@ -36,6 +42,7 @@ func Test_buildSlurmConfigFrom(t *testing.T) {
 		buildSlurmConfigFrom(spec)
 
 		assert.Nil(t, spec.ResumeTimeout)
+		assert.Nil(t, spec.SuspendTimeout)
 	})
 
 	t.Run("carries other fields through unchanged", func(t *testing.T) {

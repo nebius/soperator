@@ -11,6 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/strings/slices"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -428,12 +429,22 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 
 	// Power management for ephemeral nodes.
-	// ResumeTimeout is rendered from SlurmConfig above, next to SuspendTime.
+	// Slurm loads the action arguments and timeouts together on reconfigure.
 	res.AddComment("POWER MANAGEMENT (ephemeral nodes)")
-	res.AddProperty("ResumeProgram", "/opt/soperator/bin/power_resume.sh")
-	res.AddProperty("ResumeFailProgram", "/opt/soperator/bin/power_resume_fail.sh")
-	res.AddProperty("SuspendProgram", "/opt/soperator/bin/power_suspend.sh")
-	res.AddProperty("SuspendTimeout", 90)
+	for _, action := range []struct {
+		name, property, script string
+		timeout                int32
+	}{
+		{"soperator-resume", "ResumeProgram", "power_resume.sh", ptr.Deref(cluster.SlurmConfig.ResumeTimeout, consts.SlurmDefaultResumeTimeout)},
+		{"soperator-resume-fail", "ResumeFailProgram", "power_resume_fail.sh", ptr.Deref(cluster.SlurmConfig.SuspendTimeout, consts.SlurmDefaultSuspendTimeout)},
+		{"soperator-suspend", "SuspendProgram", "power_suspend.sh", ptr.Deref(cluster.SlurmConfig.SuspendTimeout, consts.SlurmDefaultSuspendTimeout)},
+	} {
+		res.AddProperty("PowerAction", fmt.Sprintf(
+			`%s Location=slurmctld Program="/usr/bin/env POWER_MANAGER_TIMEOUT=%d /opt/soperator/bin/%s"`,
+			action.name, action.timeout, action.script,
+		))
+		res.AddProperty(action.property, action.name)
+	}
 	res.AddProperty("ResumeRate", 100)
 	res.AddProperty("SuspendRate", 100)
 	res.AddProperty("ReconfigFlags", "KeepPowerSaveSettings")
