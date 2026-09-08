@@ -139,6 +139,7 @@ func (s *Topology) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^every partition is bound to a topology Slurm loaded$`, s.partitionsAreBound)
 	sc.Step(`^every running worker is registered into the topologies that list it$`, s.registrationsMatchTheConfig)
 	sc.Step(`^a job runs in a partition of every topology$`, s.jobRunsInEveryTopology)
+	sc.Step(`^eventually no worker is listed under unknown in Slurm topoconf$`, s.noWorkersUnderUnknown)
 
 	sc.Step(`^Slurm loaded the tree topology$`, s.slurmLoadedTheTreeTopology)
 	sc.Step(`^two configured workers on different leaf switches are requested without a switch limit$`, s.requestCrossLeafWorkers)
@@ -501,6 +502,20 @@ func (s *Topology) loadedMatchesRendered() error {
 		return fmt.Errorf("slurmctld loaded %q, the operator rendered %q", got, want)
 	}
 	return nil
+}
+
+func (s *Topology) noWorkersUnderUnknown(ctx context.Context) error {
+	return s.runtime.WaitFor(ctx, "Slurm topoconf to list no workers under unknown",
+		topologyConvergeTimeout, framework.DefaultPollInterval,
+		func(waitCtx context.Context) (bool, error) {
+			if err := s.readLoadedTopologies(waitCtx); err != nil {
+				return false, err
+			}
+			if err := validateNoWorkersUnderUnknown(s.loaded); err != nil {
+				return false, err
+			}
+			return true, nil
+		})
 }
 
 func (s *Topology) partitionsAreBound(ctx context.Context) error {
