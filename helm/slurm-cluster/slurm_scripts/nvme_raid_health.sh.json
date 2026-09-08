@@ -8,10 +8,10 @@
   "contexts": ["hc_program"],
   "node_states": ["any"],
   "on_fail": "drain",
-  "on_ok": "undrain",
+  "on_ok": "none",
   "reason_base": "$name",
   "reason_append_details": true,
-  "run_in_jail": true,
+  "run_in_jail": false,
   "log": "slurm_scripts/$worker.$name.$context.out",
   "need_env": []
 }
