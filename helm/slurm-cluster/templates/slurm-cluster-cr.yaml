@@ -494,6 +494,13 @@ spec:
         cpuWeight: {{ .cpuWeight }}
         {{- end }}
       {{- end }}
+      {{- with .Values.slurmNodes.login.autoscaling }}
+      autoscaling:
+        enabled: {{ .enabled }}
+        minReplicas: {{ .minReplicas }}
+        maxReplicas: {{ .maxReplicas }}
+        targetCPUUtilizationPercentage: {{ if hasKey . "targetCPUUtilizationPercentage" }}{{ .targetCPUUtilizationPercentage }}{{ else }}70{{ end }}
+      {{- end }}
     exporter:
       enabled: {{ .Values.slurmNodes.exporter.enabled }}
       size: {{ required ".Values.slurmNodes.exporter.size must be provided." .Values.slurmNodes.exporter.size }}

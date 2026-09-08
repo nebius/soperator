@@ -1069,6 +1069,7 @@ type SlurmNodeControllerVolumes struct {
 }
 
 // SlurmNodeLogin defines the configuration for the Slurm login node
+// +kubebuilder:validation:XValidation:rule="!has(self.autoscaling) || !self.autoscaling.enabled || (has(self.sshd.resources) && 'cpu' in self.sshd.resources && quantity(string(self.sshd.resources['cpu'])).compareTo(quantity('0')) > 0)",message="sshd.resources.cpu must be greater than zero when autoscaling is enabled"
 type SlurmNodeLogin struct {
 	SlurmNode `json:",inline"`
 
@@ -1130,6 +1131,41 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Optional
 	UserIsolation *LoginUserIsolation `json:"userIsolation,omitempty"`
+
+	// Autoscaling defines CPU-based horizontal scaling for login pods
+	//
+	// +kubebuilder:validation:Optional
+	Autoscaling *LoginAutoscaling `json:"autoscaling,omitempty"`
+}
+
+// LoginAutoscaling defines CPU-based horizontal scaling for login pods.
+// When enabled, its replica bounds override the configured login replica count.
+// +kubebuilder:validation:XValidation:rule="!self.enabled || self.maxReplicas >= self.minReplicas",message="maxReplicas must be at least minReplicas when autoscaling is enabled"
+type LoginAutoscaling struct {
+	// Enabled turns on horizontal scaling for login pods
+	//
+	// +kubebuilder:validation:Required
+	Enabled bool `json:"enabled"`
+
+	// MinReplicas is the minimum number of login pods
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=1
+	MinReplicas int32 `json:"minReplicas"`
+
+	// MaxReplicas is the maximum number of login pods
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=1
+	MaxReplicas int32 `json:"maxReplicas"`
+
+	// TargetCPUUtilizationPercentage is the target average SSHD CPU utilization
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	// +kubebuilder:default=70
+	TargetCPUUtilizationPercentage int32 `json:"targetCPUUtilizationPercentage,omitempty"`
 }
 
 // LoginUserIsolation defines per-user cgroup v2 limits applied to each SSH session on login nodes.

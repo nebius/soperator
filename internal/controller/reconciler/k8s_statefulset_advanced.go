@@ -46,6 +46,13 @@ func (r *AdvancedStatefulSetReconciler) Reconcile(
 
 func (r *AdvancedStatefulSetReconciler) patch(existing, desired client.Object) (client.Patch, error) {
 	patchImpl := func(dst, src *kruisev1b1.StatefulSet) client.Patch {
+		// A nil desired replica count means that another controller owns the scale
+		// subresource. Copying the live value into desired also protects it when a
+		// dependency change makes the generic reconciler perform a full Update.
+		if src.Spec.Replicas == nil {
+			src.Spec.Replicas = dst.Spec.Replicas
+		}
+
 		original := dst.DeepCopy()
 
 		res := client.MergeFrom(original)

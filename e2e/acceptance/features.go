@@ -29,6 +29,7 @@ func FeaturePaths() []string {
 		"features/accounting.feature",
 		"features/slurm_config.feature",
 		"features/slurm_config_updates.feature",
+		"features/login_autoscaling.feature",
 		"features/observability.feature",
 		"features/internal_ssh.feature",
 		"features/package_installation.feature",

@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -246,6 +247,37 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					stepLogger := log.FromContext(stepCtx)
 					stepLogger.V(1).Info("Reconciling")
 
+					autoscalingEnabled := clusterValues.NodeLogin.IsAutoscalingEnabled()
+					maintenanceActive := check.IsMaintenanceActive(clusterValues.NodeLogin.Maintenance)
+					autoscalingActive := autoscalingEnabled && !maintenanceActive
+					if !autoscalingActive {
+						if err := r.HorizontalPodAutoscaler.Cleanup(
+							stepCtx,
+							cluster,
+							clusterValues.NodeLogin.StatefulSet.Name,
+						); err != nil {
+							return fmt.Errorf("cleaning up login HorizontalPodAutoscaler: %w", err)
+						}
+					}
+
+					desiredReplicas := ptr.To(clusterValues.NodeLogin.StatefulSet.Replicas)
+					if maintenanceActive {
+						desiredReplicas = ptr.To(consts.ZeroReplicas)
+					} else if autoscalingActive {
+						currentReplicas, err := r.getLoginCurrentReplicas(stepCtx, clusterValues)
+						if err != nil {
+							return err
+						}
+						if currentReplicas == 0 {
+							// HPA pauses scaling when the target's desired replica count is zero (for example, after maintenance).
+							// Set it to minReplicas to reactivate autoscaling.
+							desiredReplicas = ptr.To(clusterValues.NodeLogin.Autoscaling.MinReplicas)
+						} else {
+							// A nil override tells the StatefulSet reconciler to preserve the live HPA-managed replica count.
+							desiredReplicas = nil
+						}
+					}
+
 					desired, err := login.RenderStatefulSet(
 						clusterValues.Namespace,
 						clusterValues.Name,
@@ -254,6 +286,7 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 						&clusterValues.Secrets,
 						clusterValues.VolumeSources,
 						&clusterValues.NodeLogin,
+						desiredReplicas,
 					)
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")
@@ -269,9 +302,26 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
-					if err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...); err != nil {
+					err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...)
+					if err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
 						return fmt.Errorf("reconciling login StatefulSet: %w", err)
+					}
+
+					if autoscalingActive {
+						desiredHPA, renderErr := login.RenderHorizontalPodAutoscaler(
+							clusterValues.Namespace,
+							clusterValues.NodeLogin.StatefulSet.Name,
+							clusterValues.NodeLogin.Autoscaling.MinReplicas,
+							clusterValues.NodeLogin.Autoscaling.MaxReplicas,
+							clusterValues.NodeLogin.Autoscaling.TargetCPUUtilizationPercentage,
+						)
+						if renderErr != nil {
+							return fmt.Errorf("rendering login HorizontalPodAutoscaler: %w", renderErr)
+						}
+						if err = r.HorizontalPodAutoscaler.Reconcile(stepCtx, cluster, &desiredHPA); err != nil {
+							return fmt.Errorf("reconciling login HorizontalPodAutoscaler: %w", err)
+						}
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -287,6 +337,24 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 	}
 	logger.Info("Reconciled Slurm Login")
 	return nil
+}
+
+func (r SlurmClusterReconciler) getLoginCurrentReplicas(
+	ctx context.Context,
+	clusterValues *values.SlurmCluster,
+) (int32, error) {
+	current := &kruisev1b1.StatefulSet{}
+	err := r.Get(ctx, types.NamespacedName{
+		Namespace: clusterValues.Namespace,
+		Name:      clusterValues.NodeLogin.StatefulSet.Name,
+	}, current)
+	if apierrors.IsNotFound(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("get login StatefulSet: %w", err)
+	}
+	return ptr.Deref(current.Spec.Replicas, 0), nil
 }
 
 // ValidateLogin checks that Slurm login are reconciled with the desired state correctly
@@ -333,7 +401,8 @@ func (r SlurmClusterReconciler) ValidateLogin(
 		var (
 			condition metav1.Condition
 		)
-		if existing.Status.AvailableReplicas == clusterValues.NodeLogin.StatefulSet.Replicas {
+		desiredReplicas := desiredLoginReplicas(existing, clusterValues.NodeLogin.StatefulSet.Replicas)
+		if existing.Status.AvailableReplicas == desiredReplicas {
 			condition = metav1.Condition{
 				Type:    slurmv1.ConditionClusterLoginAvailable,
 				Status:  metav1.ConditionTrue,
@@ -358,6 +427,13 @@ func (r SlurmClusterReconciler) ValidateLogin(
 	}
 
 	return res, nil
+}
+
+func desiredLoginReplicas(statefulSet *kruisev1b1.StatefulSet, fallback int32) int32 {
+	if statefulSet.Spec.Replicas != nil {
+		return *statefulSet.Spec.Replicas
+	}
+	return fallback
 }
 
 func (r SlurmClusterReconciler) getLoginStatefulSetDependencies(

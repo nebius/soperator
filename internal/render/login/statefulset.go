@@ -10,7 +10,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -18,7 +17,9 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// RenderStatefulSet renders new [kruisev1b1.StatefulSet] containing Slurm login pods
+// RenderStatefulSet renders a new [kruisev1b1.StatefulSet] containing Slurm login pods.
+// A nil desiredReplicas value means that replicas are managed externally and must
+// be preserved by the Advanced StatefulSet reconciler.
 func RenderStatefulSet(
 	namespace,
 	clusterName string,
@@ -27,6 +28,7 @@ func RenderStatefulSet(
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	login *values.SlurmLogin,
+	desiredReplicas *int32,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeLogin, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName)
@@ -41,11 +43,6 @@ func RenderStatefulSet(
 		clusterName, secrets, volumeSources, login)
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
-	}
-
-	replicas := &login.StatefulSet.Replicas
-	if check.IsMaintenanceActive(login.Maintenance) {
-		replicas = ptr.To(consts.ZeroReplicas)
 	}
 
 	sshAppArmorProfile := login.ContainerSshd.AppArmorProfile
@@ -73,7 +70,7 @@ func RenderStatefulSet(
 		Spec: kruisev1b1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
 			ServiceName:         login.HeadlessService.Name,
-			Replicas:            replicas,
+			Replicas:            desiredReplicas,
 			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
@@ -98,7 +95,7 @@ func RenderStatefulSet(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
-					Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameSshd),
+					Annotations: renderPodAnnotations(),
 				},
 				Spec: corev1.PodSpec{
 					HostUsers:        login.HostUsers,
@@ -137,4 +134,10 @@ func RenderStatefulSet(
 	}
 
 	return res, nil
+}
+
+func renderPodAnnotations() map[string]string {
+	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNameSshd)
+	annotations["cluster-autoscaler.kubernetes.io/safe-to-evict"] = "false"
+	return annotations
 }

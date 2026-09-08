@@ -82,6 +82,9 @@ needs. You can simply change a single value in the YAML manifest, and watch the 
 
 Node groups of each type (Worker, Login, and Controller) can be changed independently and on the fly.
 
+Login pods also support [CPU-based autoscaling](login-autoscaling.md), with configurable
+replica bounds and no automatic scale-down when CPU utilization falls.
+
 
 ### High Availability
 Kubernetes brings some level of HA out of the box. If a Pod or container dies (e.g. Slurm controller), Kubernetes

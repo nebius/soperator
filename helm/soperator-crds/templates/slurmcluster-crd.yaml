@@ -44355,6 +44355,43 @@ spec:
                   login:
                     description: Login represents the Slurm login node configuration
                     properties:
+                      autoscaling:
+                        description: Autoscaling defines CPU-based horizontal scaling
+                          for login pods
+                        properties:
+                          enabled:
+                            description: Enabled turns on horizontal scaling for login
+                              pods
+                            type: boolean
+                          maxReplicas:
+                            description: MaxReplicas is the maximum number of login
+                              pods
+                            format: int32
+                            minimum: 1
+                            type: integer
+                          minReplicas:
+                            description: MinReplicas is the minimum number of login
+                              pods
+                            format: int32
+                            minimum: 1
+                            type: integer
+                          targetCPUUtilizationPercentage:
+                            default: 70
+                            description: TargetCPUUtilizationPercentage is the target
+                              average SSHD CPU utilization
+                            format: int32
+                            maximum: 100
+                            minimum: 1
+                            type: integer
+                        required:
+                        - enabled
+                        - maxReplicas
+                        - minReplicas
+                        type: object
+                        x-kubernetes-validations:
+                        - message: maxReplicas must be at least minReplicas when autoscaling
+                            is enabled
+                          rule: '!self.enabled || self.maxReplicas >= self.minReplicas'
                       customInitContainers:
                         description: CustomInitContainers represent additional init
                           containers that should be added to created Pods
@@ -48383,6 +48420,13 @@ spec:
                     - sshdServiceType
                     - volumes
                     type: object
+                    x-kubernetes-validations:
+                    - message: sshd.resources.cpu must be greater than zero when autoscaling
+                        is enabled
+                      rule: '!has(self.autoscaling) || !self.autoscaling.enabled ||
+                        (has(self.sshd.resources) && ''cpu'' in self.sshd.resources
+                        && quantity(string(self.sshd.resources[''cpu''])).compareTo(quantity(''0''))
+                        > 0)'
                   rest:
                     description: Rest represents the Slurm REST API node configuration
                     properties:

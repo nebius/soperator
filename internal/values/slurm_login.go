@@ -33,6 +33,7 @@ type SlurmLogin struct {
 	CustomVolumeMounts []slurmv1.NodeVolumeMount
 
 	UserIsolation *slurmv1.LoginUserIsolation
+	Autoscaling   *slurmv1.LoginAutoscaling
 
 	UseDefaultAppArmorProfile bool
 	Maintenance               *consts.MaintenanceMode
@@ -88,6 +89,7 @@ func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.Mai
 		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
 		Maintenance:               maintenance,
 		UserIsolation:             login.UserIsolation.DeepCopy(),
+		Autoscaling:               login.Autoscaling.DeepCopy(),
 	}
 	if login.Sssd != nil {
 		containerSSSD := buildContainerFrom(
@@ -107,4 +109,8 @@ func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.Mai
 	}
 
 	return res
+}
+
+func (l SlurmLogin) IsAutoscalingEnabled() bool {
+	return l.Autoscaling != nil && l.Autoscaling.Enabled
 }

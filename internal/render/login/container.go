@@ -80,6 +80,15 @@ func renderContainerSshd(
 			Limits:   limits,
 			Requests: container.Resources,
 		},
+		// Give Kubernetes Service endpoint routing time to stop sending new connections
+		// to the terminating pod before SSHD exits.
+		Lifecycle: &corev1.Lifecycle{
+			PreStop: &corev1.LifecycleHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{"/bin/sh", "-c", "sleep 15"},
+				},
+			},
+		},
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}
