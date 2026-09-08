@@ -158,57 +158,8 @@ func TestRenderStatefulSet_PriorityClass(t *testing.T) {
 }
 
 func TestRenderStatefulSetDocker(t *testing.T) {
-	newLogin := func(dockerEnabled, withStorage bool) *values.SlurmLogin {
-		login := &values.SlurmLogin{
-			SlurmNode: slurmv1.SlurmNode{K8sNodeFilterName: "test-filter"},
-			ContainerSshd: values.Container{NodeContainer: slurmv1.NodeContainer{
-				Image: "test-sshd-image",
-				Resources: corev1.ResourceList{
-					corev1.ResourceMemory: resource.MustParse("1Gi"),
-				},
-			}},
-			ContainerMunge: values.Container{NodeContainer: slurmv1.NodeContainer{Image: "test-munge-image"}},
-			VolumeJail:     slurmv1.NodeVolume{VolumeSourceName: ptr.To("test-volume")},
-			StatefulSet:    values.StatefulSet{Name: "test-login", Replicas: 1},
-			HeadlessService: values.Service{
-				Name: "test-headless",
-			},
-			SSHDConfigMapName: "test-sshd-config",
-			DockerEnabled:     dockerEnabled,
-		}
-		if dockerEnabled {
-			login.UserIsolation = &slurmv1.LoginUserIsolation{Enabled: ptr.To(true)}
-		}
-		if withStorage {
-			login.JailSubMounts = []slurmv1.NodeVolumeMount{
-				{
-					Name:                    "image-storage",
-					MountPath:               consts.ImageStorageMountPath,
-					VolumeClaimTemplateSpec: &corev1.PersistentVolumeClaimSpec{},
-				},
-			}
-		}
-		return login
-	}
-
-	render := func(login *values.SlurmLogin) (corev1.PodSpec, error) {
-		result, err := RenderStatefulSet(
-			"test-namespace",
-			"test-cluster",
-			false,
-			[]slurmv1.K8sNodeFilter{{Name: "test-filter"}},
-			&slurmv1.Secrets{},
-			[]slurmv1.VolumeSource{{
-				Name:         "test-volume",
-				VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
-			}},
-			login,
-		)
-		return result.Spec.Template.Spec, err
-	}
-
 	t.Run("disabled preserves the existing pod shape", func(t *testing.T) {
-		podSpec, err := render(newLogin(false, false))
+		podSpec, err := renderTestLogin(newTestLogin(false, false), false)
 		if err != nil {
 			t.Fatalf("RenderStatefulSet() error = %v", err)
 		}
@@ -224,41 +175,41 @@ func TestRenderStatefulSetDocker(t *testing.T) {
 	})
 
 	t.Run("enabled requires image storage", func(t *testing.T) {
-		_, err := render(newLogin(true, false))
+		_, err := renderTestLogin(newTestLogin(true, false), false)
 		if err == nil {
 			t.Fatal("RenderStatefulSet() error = nil, want missing image-storage error")
 		}
 	})
 
 	t.Run("enabled requires user isolation", func(t *testing.T) {
-		login := newLogin(true, true)
+		login := newTestLogin(true, true)
 		login.UserIsolation = nil
-		_, err := render(login)
+		_, err := renderTestLogin(login, false)
 		if err == nil {
 			t.Fatal("RenderStatefulSet() error = nil, want missing user-isolation error")
 		}
 	})
 
 	t.Run("reserved Docker environment is rejected", func(t *testing.T) {
-		login := newLogin(false, false)
+		login := newTestLogin(false, false)
 		login.ContainerSshd.CustomEnv = []corev1.EnvVar{{Name: consts.EnvDockerEnabled, Value: "true"}}
-		_, err := render(login)
+		_, err := renderTestLogin(login, false)
 		if err == nil {
 			t.Fatal("RenderStatefulSet() error = nil, want reserved environment error")
 		}
 	})
 
 	t.Run("enabled rejects read-only image storage", func(t *testing.T) {
-		login := newLogin(true, true)
+		login := newTestLogin(true, true)
 		login.JailSubMounts[0].ReadOnly = true
-		_, err := render(login)
+		_, err := renderTestLogin(login, false)
 		if err == nil {
 			t.Fatal("RenderStatefulSet() error = nil, want read-only image-storage error")
 		}
 	})
 
 	t.Run("enabled keeps one container and mounts storage directly", func(t *testing.T) {
-		podSpec, err := render(newLogin(true, true))
+		podSpec, err := renderTestLogin(newTestLogin(true, true), false)
 		if err != nil {
 			t.Fatalf("RenderStatefulSet() error = %v", err)
 		}
@@ -283,6 +234,53 @@ func TestRenderStatefulSetDocker(t *testing.T) {
 			}
 		}
 	})
+}
+
+func newTestLogin(dockerEnabled, withStorage bool) *values.SlurmLogin {
+	login := &values.SlurmLogin{
+		SlurmNode: slurmv1.SlurmNode{K8sNodeFilterName: "test-filter"},
+		ContainerSshd: values.Container{NodeContainer: slurmv1.NodeContainer{
+			Image: "test-sshd-image",
+			Resources: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		}},
+		ContainerMunge:    values.Container{NodeContainer: slurmv1.NodeContainer{Image: "test-munge-image"}},
+		VolumeJail:        slurmv1.NodeVolume{VolumeSourceName: ptr.To("test-volume")},
+		StatefulSet:       values.StatefulSet{Name: "test-login", Replicas: 1},
+		HeadlessService:   values.Service{Name: "test-headless"},
+		SSHDConfigMapName: "test-sshd-config",
+		DockerEnabled:     dockerEnabled,
+	}
+	if dockerEnabled {
+		login.UserIsolation = &slurmv1.LoginUserIsolation{Enabled: ptr.To(true)}
+	}
+	if withStorage {
+		login.JailSubMounts = []slurmv1.NodeVolumeMount{{
+			Name:                    "image-storage",
+			MountPath:               consts.ImageStorageMountPath,
+			VolumeClaimTemplateSpec: &corev1.PersistentVolumeClaimSpec{},
+		}}
+	}
+	return login
+}
+
+func renderTestLogin(login *values.SlurmLogin, compileIntoContainer bool) (corev1.PodSpec, error) {
+	desiredReplicas := login.StatefulSet.Replicas
+	result, err := RenderStatefulSet(
+		"test-namespace",
+		"test-cluster",
+		compileIntoContainer,
+		[]slurmv1.K8sNodeFilter{{Name: "test-filter"}},
+		&slurmv1.Secrets{},
+		[]slurmv1.VolumeSource{{
+			Name:         "test-volume",
+			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+		}},
+		login,
+		&desiredReplicas,
+	)
+	return result.Spec.Template.Spec, err
 }
 
 func loginEnvValue(env []corev1.EnvVar, name string) string {

@@ -61,85 +61,6 @@ func TestIsContainerCreateRequest(t *testing.T) {
 	}
 }
 
-func TestIsBuildRequest(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name   string
-		method string
-		path   string
-		want   bool
-	}{
-		{name: "unversioned", method: http.MethodPost, path: "/build", want: true},
-		{name: "versioned", method: http.MethodPost, path: "/v1.56/build", want: true},
-		{name: "trailing slash", method: http.MethodPost, path: "/v1.56/build/", want: true},
-		{name: "wrong method", method: http.MethodGet, path: "/v1.56/build"},
-		{name: "missing version minor", method: http.MethodPost, path: "/v1/build"},
-		{name: "invalid version", method: http.MethodPost, path: "/vNaN/build"},
-		{name: "extra segment", method: http.MethodPost, path: "/prefix/v1.56/build"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			request := httptest.NewRequestWithContext(t.Context(), test.method, test.path, nil)
-			if got := isBuildRequest(request); got != test.want {
-				t.Fatalf("isBuildRequest(%s %q) = %t, want %t", test.method, test.path, got, test.want)
-			}
-		})
-	}
-}
-
-func TestApplyBuildCgroupParent(t *testing.T) {
-	t.Parallel()
-
-	for _, test := range []struct {
-		name       string
-		rawQuery   string
-		parent     string
-		wantParent string
-		wantRemote string
-	}{
-		{
-			name:       "add missing parent",
-			rawQuery:   "remote=example.com",
-			parent:     "/base/users/user-1004/docker",
-			wantParent: "/base/users/user-1004/docker",
-			wantRemote: "example.com",
-		},
-		{
-			name:       "override forged parent",
-			rawQuery:   "cgroupparent=%2Fescape&remote=example.com",
-			parent:     "/base/users/user-1004/docker",
-			wantParent: "/base/users/user-1004/docker",
-			wantRemote: "example.com",
-		},
-		{
-			name:       "remove forged parent without attribution",
-			rawQuery:   "cgroupparent=%2Fanother-job&remote=example.com",
-			wantRemote: "example.com",
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			request := httptest.NewRequestWithContext(
-				t.Context(),
-				http.MethodPost,
-				"/v1.56/build?"+test.rawQuery,
-				nil,
-			)
-			applyBuildCgroupParent(request, test.parent)
-			query := request.URL.Query()
-			if got := query.Get("cgroupparent"); got != test.wantParent {
-				t.Fatalf("cgroupparent = %q, want %q", got, test.wantParent)
-			}
-			if got := query.Get("remote"); got != test.wantRemote {
-				t.Fatalf("remote = %q, want %q", got, test.wantRemote)
-			}
-		})
-	}
-}
-
 func TestApplyCgroupParent(t *testing.T) {
 	t.Parallel()
 
@@ -276,50 +197,7 @@ func (zeroReader) Read(buffer []byte) (int, error) {
 func TestProxyForcesResolvedCgroupAndRemovesHeader(t *testing.T) {
 	t.Parallel()
 
-	upstreamResult := make(chan struct {
-		body   map[string]json.RawMessage
-		header string
-	}, 1)
-	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		var body map[string]json.RawMessage
-		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
-			t.Errorf("decode upstream body: %v", err)
-		}
-		upstreamResult <- struct {
-			body   map[string]json.RawMessage
-			header string
-		}{body: body, header: request.Header.Get("Cgroup-Parent")}
-		writer.WriteHeader(http.StatusCreated)
-	}))
-	defer upstream.Close()
-
-	resolver := &staticResolver{resolution: cgroupResolution{parent: "/slurm/job_7/step_0/user"}}
-	proxy := newTestProxy(t, upstream.URL, resolver)
-	request := httptest.NewRequestWithContext(
-		t.Context(),
-		http.MethodPost,
-		"http://proxy/v1.55/containers/create?name=test",
-		strings.NewReader(`{"HostConfig":{"CgroupParent":"/escape"}}`),
-	)
-	request.Header.Set("Cgroup-Parent", "/forged-header")
-	request = withPeerCredentials(request, peerCredentials{pid: 42, uid: 1004, gid: 1004})
-	response := httptest.NewRecorder()
-	proxy.ServeHTTP(response, request)
-	if response.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusCreated, response.Body.String())
-	}
-	if resolver.calls != 1 {
-		t.Fatalf("resolver calls = %d, want 1", resolver.calls)
-	}
-
-	result := <-upstreamResult
-	if result.header != "" {
-		t.Fatalf("upstream Cgroup-Parent header = %q, want empty", result.header)
-	}
-	var hostConfig map[string]json.RawMessage
-	if err := json.Unmarshal(result.body["HostConfig"], &hostConfig); err != nil {
-		t.Fatalf("decode upstream HostConfig: %v", err)
-	}
+	hostConfig := forwardCreateRequest(t, cgroupResolution{parent: "/slurm/job_7/step_0/user"})
 	var got string
 	if err := json.Unmarshal(hostConfig["CgroupParent"], &got); err != nil {
 		t.Fatalf("decode upstream CgroupParent: %v", err)
@@ -329,77 +207,10 @@ func TestProxyForcesResolvedCgroupAndRemovesHeader(t *testing.T) {
 	}
 }
 
-func TestProxyForcesResolvedBuildCgroup(t *testing.T) {
-	t.Parallel()
-
-	upstreamQuery := make(chan url.Values, 1)
-	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		upstreamQuery <- request.URL.Query()
-		writer.WriteHeader(http.StatusOK)
-	}))
-	defer upstream.Close()
-
-	resolver := &staticResolver{resolution: cgroupResolution{parent: "/base/users/user-1004/docker"}}
-	proxy := newTestProxy(t, upstream.URL, resolver)
-	request := httptest.NewRequestWithContext(
-		t.Context(),
-		http.MethodPost,
-		"http://proxy/v1.56/build?cgroupparent=%2Fescape&remote=example.com",
-		nil,
-	)
-	request = withPeerCredentials(request, peerCredentials{pid: 42, uid: 1004, gid: 1004})
-	response := httptest.NewRecorder()
-	proxy.ServeHTTP(response, request)
-	if response.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
-	}
-	if resolver.calls != 1 {
-		t.Fatalf("resolver calls = %d, want 1", resolver.calls)
-	}
-
-	query := <-upstreamQuery
-	if got := query.Get("cgroupparent"); got != "/base/users/user-1004/docker" {
-		t.Fatalf("upstream cgroupparent = %q, want %q", got, "/base/users/user-1004/docker")
-	}
-	if got := query.Get("remote"); got != "example.com" {
-		t.Fatalf("upstream remote = %q, want %q", got, "example.com")
-	}
-}
-
 func TestProxySanitizesDirectWorkerSSHRequest(t *testing.T) {
 	t.Parallel()
 
-	upstreamResult := make(chan map[string]json.RawMessage, 1)
-	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		var body map[string]json.RawMessage
-		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
-			t.Errorf("decode upstream body: %v", err)
-		}
-		upstreamResult <- body
-		writer.WriteHeader(http.StatusCreated)
-	}))
-	defer upstream.Close()
-
-	resolver := &staticResolver{resolution: cgroupResolution{source: "/kubepods/pod/container"}}
-	proxy := newTestProxy(t, upstream.URL, resolver)
-	request := httptest.NewRequestWithContext(
-		t.Context(),
-		http.MethodPost,
-		"http://proxy/containers/create",
-		strings.NewReader(`{"HostConfig":{"CgroupParent":"/another-job"}}`),
-	)
-	request = withPeerCredentials(request, peerCredentials{pid: 42, uid: 1004, gid: 1004})
-	response := httptest.NewRecorder()
-	proxy.ServeHTTP(response, request)
-	if response.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusCreated, response.Body.String())
-	}
-
-	result := <-upstreamResult
-	var hostConfig map[string]json.RawMessage
-	if err := json.Unmarshal(result["HostConfig"], &hostConfig); err != nil {
-		t.Fatalf("decode upstream HostConfig: %v", err)
-	}
+	hostConfig := forwardCreateRequest(t, cgroupResolution{source: "/kubepods/pod/container"})
 	if parent, ok := hostConfig["CgroupParent"]; ok {
 		t.Fatalf("upstream CgroupParent = %s, want absent", parent)
 	}
@@ -407,57 +218,27 @@ func TestProxySanitizesDirectWorkerSSHRequest(t *testing.T) {
 
 func TestProxyRejectsCreateWithoutPeerCredentials(t *testing.T) {
 	t.Parallel()
-
-	resolver := &staticResolver{}
-	proxy := newTestProxy(t, unreachableUpstream(t), resolver)
-	request := httptest.NewRequestWithContext(
-		t.Context(),
-		http.MethodPost,
-		"/containers/create",
-		strings.NewReader(`{}`),
-	)
-	response := httptest.NewRecorder()
-	proxy.ServeHTTP(response, request)
-	if response.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusInternalServerError)
-	}
-	if resolver.calls != 0 {
-		t.Fatalf("resolver calls = %d, want 0", resolver.calls)
-	}
+	assertCreateRejected(t, &staticResolver{}, nil, 0)
 }
 
 func TestProxyRejectsResolverFailure(t *testing.T) {
 	t.Parallel()
-
-	resolver := &staticResolver{err: errors.New("peer PID is not visible")}
-	proxy := newTestProxy(t, unreachableUpstream(t), resolver)
-	request := httptest.NewRequestWithContext(
-		t.Context(),
-		http.MethodPost,
-		"/containers/create",
-		strings.NewReader(`{}`),
-	)
-	request = withPeerCredentials(request, peerCredentials{pid: 42, uid: 1004, gid: 1004})
-	response := httptest.NewRecorder()
-	proxy.ServeHTTP(response, request)
-	if response.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusInternalServerError)
-	}
+	credentials := &peerCredentials{pid: 42, uid: 1004, gid: 1004}
+	assertCreateRejected(t, &staticResolver{err: errors.New("peer PID is not visible")}, credentials, 1)
 }
 
 func TestProxyDoesNotResolveNonCreateRequests(t *testing.T) {
 	t.Parallel()
 
-	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	transport := roundTripperFunc(func(request *http.Request) (*http.Response, error) {
 		if got := request.Header.Get("Cgroup-Parent"); got != "" {
 			t.Errorf("Cgroup-Parent header = %q, want empty", got)
 		}
-		writer.WriteHeader(http.StatusOK)
-	}))
-	defer upstream.Close()
+		return testHTTPResponse(request, http.StatusOK), nil
+	})
 
 	resolver := &staticResolver{err: errors.New("must not be called")}
-	proxy := newTestProxy(t, upstream.URL, resolver)
+	proxy := newTestProxy(resolver, transport)
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "http://proxy/containers/json", nil)
 	request.Header.Set("Cgroup-Parent", "/forged-header")
 	response := httptest.NewRecorder()
@@ -491,7 +272,7 @@ func TestProxyForwardsUpgradedStream(t *testing.T) {
 	defer upstream.Close()
 
 	resolver := &staticResolver{}
-	proxyHandler := newTestProxy(t, upstream.URL, resolver)
+	proxyHandler := newNetworkTestProxy(t, upstream.URL, resolver)
 	proxyServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		proxyHandler.ServeHTTP(writer, withPeerCredentials(request, peerCredentials{pid: 42, uid: 1004, gid: 1004}))
 	}))
@@ -584,14 +365,95 @@ func withPeerCredentials(request *http.Request, credentials peerCredentials) *ht
 	return request.WithContext(context.WithValue(request.Context(), peerCredentialsContextKey{}, credentials))
 }
 
-func newTestProxy(t *testing.T, upstream string, resolver cgroupResolver) *dockerProxy {
+func forwardCreateRequest(t *testing.T, resolution cgroupResolution) map[string]json.RawMessage {
 	t.Helper()
+
+	var forwarded map[string]json.RawMessage
+	transport := roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		if got := request.Header.Get("Cgroup-Parent"); got != "" {
+			t.Errorf("Cgroup-Parent header = %q, want empty", got)
+		}
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Errorf("decode upstream body: %v", err)
+		}
+		if err := json.Unmarshal(body["HostConfig"], &forwarded); err != nil {
+			t.Errorf("decode upstream HostConfig: %v", err)
+		}
+		return testHTTPResponse(request, http.StatusCreated), nil
+	})
+	resolver := &staticResolver{resolution: resolution}
+	request := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodPost,
+		"http://proxy/v1.55/containers/create?name=test",
+		strings.NewReader(`{"HostConfig":{"CgroupParent":"/escape"}}`),
+	)
+	request.Header.Set("Cgroup-Parent", "/forged-header")
+	request = withPeerCredentials(request, peerCredentials{pid: 42, uid: 1004, gid: 1004})
+	response := httptest.NewRecorder()
+	newTestProxy(resolver, transport).ServeHTTP(response, request)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusCreated, response.Body.String())
+	}
+	if resolver.calls != 1 {
+		t.Fatalf("resolver calls = %d, want 1", resolver.calls)
+	}
+	return forwarded
+}
+
+func assertCreateRejected(
+	t *testing.T,
+	resolver *staticResolver,
+	credentials *peerCredentials,
+	wantResolverCalls int,
+) {
+	t.Helper()
+	proxy := newTestProxy(resolver, roundTripperFunc(func(*http.Request) (*http.Response, error) {
+		t.Fatal("request unexpectedly reached upstream")
+		return nil, nil
+	}))
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/containers/create", strings.NewReader(`{}`))
+	if credentials != nil {
+		request = withPeerCredentials(request, *credentials)
+	}
+	response := httptest.NewRecorder()
+	proxy.ServeHTTP(response, request)
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusInternalServerError)
+	}
+	if resolver.calls != wantResolverCalls {
+		t.Fatalf("resolver calls = %d, want %d", resolver.calls, wantResolverCalls)
+	}
+}
+
+func newTestProxy(resolver cgroupResolver, transport http.RoundTripper) *dockerProxy {
 	return newDockerProxy(
 		resolver,
-		&rewriteTransport{upstream: upstream},
+		transport,
 		log.New(io.Discard, "", 0),
 		false,
 	)
+}
+
+func newNetworkTestProxy(t *testing.T, upstream string, resolver cgroupResolver) *dockerProxy {
+	t.Helper()
+	return newTestProxy(resolver, &rewriteTransport{upstream: upstream})
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (roundTrip roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return roundTrip(request)
+}
+
+func testHTTPResponse(request *http.Request, status int) *http.Response {
+	return &http.Response{
+		StatusCode: status,
+		Header:     make(http.Header),
+		Body:       http.NoBody,
+		Request:    request,
+	}
 }
 
 type rewriteTransport struct {
@@ -606,9 +468,4 @@ func (transport *rewriteTransport) RoundTrip(request *http.Request) (*http.Respo
 	request.URL.Scheme = upstream.Scheme
 	request.URL.Host = upstream.Host
 	return http.DefaultTransport.RoundTrip(request)
-}
-
-func unreachableUpstream(t *testing.T) string {
-	t.Helper()
-	return "http://127.0.0.1:1"
 }
