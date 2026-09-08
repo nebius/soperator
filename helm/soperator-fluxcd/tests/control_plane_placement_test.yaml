@@ -99,6 +99,37 @@ tests:
       - notExists:
           path: spec.values.node
 
+  - it: should tolerate Slurm and GPU nodes without tolerating NFS nodes
+    template: templates/security-profiles-operator.yaml
+    asserts:
+      - equal:
+          path: spec.values.daemon.tolerations
+          value:
+            - key: slurm.nebius.ai/nodeset
+              operator: Equal
+              value: controller
+              effect: NoSchedule
+            - key: slurm.nebius.ai/nodeset
+              operator: Equal
+              value: login
+              effect: NoSchedule
+            - key: slurm.nebius.ai/nodeset
+              operator: Equal
+              value: accounting
+              effect: NoSchedule
+            - key: nvidia.com/gpu
+              operator: Exists
+              effect: NoSchedule
+
+  - it: should allow clearing SPO tolerations
+    template: templates/security-profiles-operator.yaml
+    set:
+      securityProfilesOperator.values.daemon.tolerations: []
+    asserts:
+      - equal:
+          path: spec.values.daemon.tolerations
+          value: []
+
   - it: should pin the kruise manager without an anti-affinity term
     template: templates/kruise.yaml
     asserts:

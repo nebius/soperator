@@ -735,6 +735,23 @@ securityProfilesOperator:
       remediateLastFailure: true
   values:
     daemon:
+      # SPO also applies these tolerations to its webhook. Exclude the NFS nodeset.
+      tolerations:
+        - key: slurm.nebius.ai/nodeset
+          operator: Equal
+          value: controller
+          effect: NoSchedule
+        - key: slurm.nebius.ai/nodeset
+          operator: Equal
+          value: login
+          effect: NoSchedule
+        - key: slurm.nebius.ai/nodeset
+          operator: Equal
+          value: accounting
+          effect: NoSchedule
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       resources:
         limits:
           memory: 128Mi
