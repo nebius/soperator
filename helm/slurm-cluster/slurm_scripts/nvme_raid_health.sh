@@ -3,6 +3,7 @@
 set -euxo pipefail
 
 DMESG_SINCE="${NVME_RAID_DMESG_SINCE:-15 minutes ago}"
+MOUNT_POINT="${NVME_RAID_MOUNT_POINT:-}"
 probe_file=""
 
 cleanup_probe_file() {
@@ -11,47 +12,36 @@ cleanup_probe_file() {
     fi
 }
 
-discover_nvme_disks() {
-    mapfile -t nvme_disks < <(
-        lsblk -dn -o NAME,TYPE 2>/dev/null | awk '$2 == "disk" && $1 ~ /^nvme/ { print "/dev/" $1 }'
-    )
-}
+discover_md_array() {
+    local mount_point="$1"
+    local source
+    local md_name
+    local md_dir
 
-discover_md_arrays() {
-    local md_sys md_name
+    if [[ ! -d "${mount_point}" ]]; then
+        echo "NVMe RAID mount point ${mount_point} does not exist" >&3
+        exit 1
+    fi
 
-    mapfile -t md_arrays < <(
-        for md_sys in /sys/block/md*; do
-            [[ -d "${md_sys}" ]] || continue
-            md_name="${md_sys##*/}"
-            if find "${md_sys}/slaves" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | grep -q '^nvme'; then
-                printf '/dev/%s\n' "${md_name}"
-            fi
-        done
-    )
-}
+    if ! source="$(findmnt -rn -T "${mount_point}" -o SOURCE 2>/dev/null)" || [[ -z "${source}" ]]; then
+        echo "Could not determine the backing device for NVMe RAID mount point ${mount_point}" >&3
+        exit 1
+    fi
 
-discover_mount_points() {
-    local md_array
-    local mounts=()
+    md_array="${source%%\[*}"
+    md_array="$(readlink -f "${md_array}" 2>/dev/null || printf '%s' "${md_array}")"
+    md_name="${md_array##*/}"
+    md_dir="/sys/block/${md_name}"
 
-    mount_points=()
+    if [[ ! -d "${md_dir}/md" ]]; then
+        echo "NVMe RAID mount point ${mount_point} is backed by ${source}, not a RAID array" >&3
+        exit 1
+    fi
 
-    for md_array in "${md_arrays[@]}"; do
-        mapfile -t mounts < <(findmnt -rn -S "${md_array}" -o TARGET 2>/dev/null || true)
-        if [[ ${#mounts[@]} -eq 0 ]]; then
-            mapfile -t mounts < <(lsblk -nr -o MOUNTPOINT "${md_array}" 2>/dev/null | awk 'NF { print $0 }' || true)
-        fi
-
-        if [[ ${#mounts[@]} -eq 0 ]]; then
-            echo "No mount point found for RAID array ${md_array}" >&3
-            exit 1
-        fi
-
-        mount_points+=("${mounts[@]}")
-    done
-
-    mapfile -t mount_points < <(printf '%s\n' "${mount_points[@]}" | awk 'NF && !seen[$0]++')
+    if ! find "${md_dir}/slaves" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | grep -q '^nvme'; then
+        echo "RAID array ${md_array} backing ${mount_point} has no NVMe members" >&3
+        exit 1
+    fi
 }
 
 check_dmesg() {
@@ -151,32 +141,17 @@ trap cleanup_probe_file EXIT
 
 echo "[$(date)] Checking NVMe RAID health"
 
-discover_nvme_disks
-if [[ ${#nvme_disks[@]} -eq 0 ]]; then
-    echo "No NVMe disks detected, skipping"
+if [[ -z "${MOUNT_POINT}" ]]; then
+    echo "NVME_RAID_MOUNT_POINT is not set, skipping NVMe RAID health check"
     exit 0
 fi
-echo "Detected NVMe disks: ${nvme_disks[*]}"
 
-discover_md_arrays
-if [[ ${#md_arrays[@]} -eq 0 ]]; then
-    echo "No NVMe-backed RAID arrays detected, skipping"
-    exit 0
-fi
-echo "Detected NVMe-backed RAID arrays: ${md_arrays[*]}"
+discover_md_array "${MOUNT_POINT}"
+echo "NVMe RAID mount point ${MOUNT_POINT} is backed by ${md_array}"
 
-discover_mount_points
-echo "Detected NVMe RAID mount points: ${mount_points[*]}"
-
-for mount_point in "${mount_points[@]}"; do
-    check_mount_rw "${mount_point}"
-done
-
+check_md_array "${md_array}"
+check_mount_rw "${MOUNT_POINT}"
 check_dmesg
-
-for md_array in "${md_arrays[@]}"; do
-    check_md_array "${md_array}"
-done
 
 echo "NVMe RAID health check passed"
 exit 0
