@@ -280,38 +280,85 @@ jobs:
           which python
           python --version
 
-      - name: Find latest successful build run on current branch
+      - name: Find latest valid build run on current branch
         id: find_build
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: ${{ github.ref_name }}
         run: |
-          echo "Looking for successful build run on branch: ${{ github.ref_name }}"
+          readonly CANDIDATE_LIMIT=15
 
-          run_info=$(gh api -X GET \
-            "/repos/${{ github.repository }}/actions/workflows/one_job.yml/runs" \
-            -F branch="${{ github.ref_name }}" \
+          echo "Looking for a valid successful build run on branch: $TARGET_BRANCH"
+
+          runs=$(.github/workflows/scripts/retry.sh gh api \
+            -H "Cache-Control: no-cache" \
+            -X GET \
+            "/repos/$REPOSITORY/actions/workflows/one_job.yml/runs" \
+            -F branch="$TARGET_BRANCH" \
             -F status=success \
-            -F per_page=1 \
-            --jq '.workflow_runs[0] | {id: .id, head_sha: .head_sha, created_at: .created_at, html_url: .html_url}')
+            -F per_page="$CANDIDATE_LIMIT")
 
-          run_id=$(jq -r '.id' <<<"$run_info")
+          selected_run=""
+          artifact_expires_at=""
+          while IFS= read -r candidate; do
+            run_id=$(jq -r '.id' <<<"$candidate")
+            artifacts=$(.github/workflows/scripts/retry.sh gh api \
+              -H "Cache-Control: no-cache" \
+              -X GET \
+              "/repos/$REPOSITORY/actions/runs/$run_id/artifacts" \
+              -F per_page=100)
 
-          if [[ "$run_id" == "null" || -z "$run_id" ]]; then
-            echo "::error::No successful build found on branch ${{ github.ref_name }}"
+            artifact=$(jq -c '
+              [.artifacts[]
+                | select(
+                    .name == "version"
+                    and .expired == false
+                    and .expires_at != null
+                    and (.expires_at | fromdateiso8601) > now
+                  )
+              ]
+              | sort_by(.expires_at)
+              | last // empty
+            ' <<<"$artifacts")
+
+            if [[ -z "$artifact" ]]; then
+              echo "Skipping build $run_id: no non-expired version artifact"
+              continue
+            fi
+
+            selected_run="$candidate"
+            artifact_expires_at=$(jq -r '.expires_at' <<<"$artifact")
+            break
+          done < <(jq -c --arg branch "$TARGET_BRANCH" '
+            [.workflow_runs[]
+              | select(
+                  .head_branch == $branch
+                  and .status == "completed"
+                  and .conclusion == "success"
+                )
+            ]
+            | sort_by([.created_at, .id])
+            | reverse[]
+          ' <<<"$runs")
+
+          if [[ -z "$selected_run" ]]; then
+            echo "::error::No valid successful build with a non-expired version artifact found among up to $CANDIDATE_LIMIT candidates on branch $TARGET_BRANCH"
             exit 1
           fi
 
-          head_sha=$(jq -r '.head_sha' <<<"$run_info")
-          created_at=$(jq -r '.created_at' <<<"$run_info")
-          html_url=$(jq -r '.html_url' <<<"$run_info")
+          run_id=$(jq -r '.id' <<<"$selected_run")
+          head_sha=$(jq -r '.head_sha' <<<"$selected_run")
+          created_at=$(jq -r '.created_at' <<<"$selected_run")
+          html_url=$(jq -r '.html_url' <<<"$selected_run")
 
-          echo "Found build: $run_id"
+          echo "Found build: $run_id (created $created_at, version artifact expires $artifact_expires_at)"
 
-          echo "run_id=$run_id" >> $GITHUB_OUTPUT
-          echo "head_sha=$head_sha" >> $GITHUB_OUTPUT
-          echo "created_at=$created_at" >> $GITHUB_OUTPUT
-          echo "html_url=$html_url" >> $GITHUB_OUTPUT
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "created_at=$created_at" >> "$GITHUB_OUTPUT"
+          echo "html_url=$html_url" >> "$GITHUB_OUTPUT"
 
       - name: Download artifact with version
         shell: bash
