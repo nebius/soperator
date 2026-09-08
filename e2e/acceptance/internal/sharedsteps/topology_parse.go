@@ -174,6 +174,31 @@ func topologyStructure(entries []topologyEntry) string {
 	return strings.Join(parts, ",")
 }
 
+func validateNoWorkersUnderUnknown(entries []topologyEntry) error {
+	var problems []string
+	check := func(topology, name, nodes string) {
+		if name != "unknown" && !strings.HasSuffix(name, ".unknown") {
+			return
+		}
+		if len(splitSlurmList(nodes)) > 0 {
+			problems = append(problems, fmt.Sprintf("%s/%s: %s", topology, name, nodes))
+		}
+	}
+	for _, entry := range entries {
+		for _, sw := range entry.Switches {
+			check(entry.Name, sw.Name, sw.Nodes)
+		}
+		for _, block := range entry.Blocks {
+			check(entry.Name, block.Name, block.Nodes)
+		}
+	}
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		return fmt.Errorf("workers remain under unknown in Slurm topoconf: %s", strings.Join(problems, "; "))
+	}
+	return nil
+}
+
 func topologyByName(entries []topologyEntry, name string) (topologyEntry, bool) {
 	for _, entry := range entries {
 		if entry.Name == name {

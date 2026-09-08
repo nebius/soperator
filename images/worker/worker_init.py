@@ -671,6 +671,7 @@ def apply_node_topology(hostname: str, topology: str) -> None:
         # covered only by flat topologies.
         if topology:
             cmd.append(f"{topology}")
+        cmd.append("State=POWER_UP")
         logger.info("Running: %s", " ".join(cmd))
         result: subprocess.CompletedProcess[str] = subprocess.run(
             cmd,

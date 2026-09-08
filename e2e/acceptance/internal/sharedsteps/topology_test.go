@@ -165,6 +165,46 @@ func TestParseTopologyEntriesReadsTopoconfTheSameWay(t *testing.T) {
 	assert.Equal(t, topologyStructure(rendered), topologyStructure(loaded))
 }
 
+func TestValidateNoWorkersUnderUnknown(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		unit    string
+		nodes   string
+		wantErr bool
+	}{
+		{name: "bare unknown", unit: "unknown", nodes: "worker-0", wantErr: true},
+		{name: "fabric unknown hostlist", unit: "fabric.unknown", nodes: "worker-[0-3]", wantErr: true},
+		{name: "empty unknown", unit: "unknown"},
+		{name: "null unknown", unit: "fabric.unknown", nodes: "(null)"},
+		{name: "whitespace unknown", unit: "unknown", nodes: "  "},
+		{name: "known unit", unit: "leaf-a", nodes: "worker-0"},
+		{name: "unknown substring", unit: "unknown-leaf", nodes: "worker-0"},
+	} {
+		for _, kind := range []string{topologyKindTree, topologyKindBlock} {
+			t.Run(tt.name+"/"+kind, func(t *testing.T) {
+				entry := topologyEntry{Name: "fabric", Kind: kind}
+				if kind == topologyKindTree {
+					entry.Switches = []topologySwitch{{Name: tt.unit, Nodes: tt.nodes}}
+				} else {
+					entry.Blocks = []topologyUnit{{Name: tt.unit, Nodes: tt.nodes}}
+				}
+				err := validateNoWorkersUnderUnknown([]topologyEntry{entry})
+				if tt.wantErr {
+					require.ErrorContains(t, err, "fabric/"+tt.unit+": "+tt.nodes)
+				} else {
+					require.NoError(t, err)
+				}
+			})
+		}
+	}
+
+	t.Run("loaded topoconf", func(t *testing.T) {
+		entries, err := parseTopologyEntries(loadedTopologyConfig)
+		require.NoError(t, err)
+		require.ErrorContains(t, validateNoWorkersUnderUnknown(entries), "tree-ib/fabric.unknown: worker-2")
+	})
+}
+
 func TestParseTopologyEntriesRejectsMalformedConfigs(t *testing.T) {
 	for name, raw := range map[string]string{
 		"empty":         "",
