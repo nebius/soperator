@@ -184,17 +184,15 @@ fi
 printf '%%s\n' \
     "FROM ${image}" \
     'ARG CACHE_BUST' \
-    'RUN test -n "$CACHE_BUST" && cat /proc/self/cgroup > /build-cgroup' \
+    'RUN test -n "$CACHE_BUST" && echo BUILD_OK > /build-result' \
     > "${build_context}/Dockerfile"
 docker build \
     --no-cache \
-    --cgroup-parent=/escape \
     --build-arg "CACHE_BUST=${name}" \
     --tag "${build_image}" \
     "${build_context}" >/dev/null
-build_cgroup=$(docker run --rm "${build_image}" cat /build-cgroup)
-echo "EXPECTED_USER_BUILD_CGROUP=/users/user-$(id -u)/docker/buildkit/"
-echo "BUILD_CGROUP=${build_cgroup}"
+docker run --rm "${build_image}" grep -qx BUILD_OK /build-result
+echo "BUILD_OK=true"
 
 docker run -d --name "${name}" "${image}" sleep 300 >/dev/null
 container_pid=$(docker inspect --format '{{.State.Pid}}' "${name}")
@@ -246,17 +244,7 @@ func (s *DockerContainers) dockerUsesTheLoginProxyImageStorageAndTheUsersCgroup(
 			strings.TrimSpace(s.loginSSHOutput),
 		)
 	}
-	expectedBuildCgroup := dockerSSHOutputValue(s.loginSSHOutput, "EXPECTED_USER_BUILD_CGROUP")
-	buildCgroup := dockerSSHOutputValue(s.loginSSHOutput, "BUILD_CGROUP")
-	if expectedBuildCgroup == "" || !strings.Contains(buildCgroup, expectedBuildCgroup) {
-		return fmt.Errorf(
-			"login Docker build cgroup %q does not contain per-user parent %q; output: %s",
-			buildCgroup,
-			expectedBuildCgroup,
-			strings.TrimSpace(s.loginSSHOutput),
-		)
-	}
-	for _, marker := range []string{"EXEC_OK", "ATTACHED_RUN_OK"} {
+	for _, marker := range []string{"BUILD_OK=true", "EXEC_OK", "ATTACHED_RUN_OK"} {
 		if !strings.Contains(s.loginSSHOutput, marker) {
 			return fmt.Errorf("login Docker output does not contain %q: %s", marker, strings.TrimSpace(s.loginSSHOutput))
 		}

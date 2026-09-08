@@ -75,9 +75,7 @@ func newDockerProxy(
 }
 
 func (proxy *dockerProxy) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	containerCreate := isContainerCreateRequest(request)
-	build := isBuildRequest(request)
-	if containerCreate || build {
+	if isContainerCreateRequest(request) {
 		credentials, ok := request.Context().Value(peerCredentialsContextKey{}).(peerCredentials)
 		if !ok || credentials.err != nil {
 			http.Error(writer, "Cannot determine Docker client identity", http.StatusInternalServerError)
@@ -100,9 +98,7 @@ func (proxy *dockerProxy) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			)
 		}
 
-		if build {
-			applyBuildCgroupParent(request, resolution.parent)
-		} else if err := applyCgroupParent(request, resolution.parent); err != nil {
+		if err := applyCgroupParent(request, resolution.parent); err != nil {
 			var tooLarge *requestBodyTooLargeError
 			if errors.As(err, &tooLarge) {
 				http.Error(writer, err.Error(), http.StatusRequestEntityTooLarge)
@@ -128,24 +124,8 @@ func isContainerCreateRequest(request *http.Request) bool {
 	if len(parts) != 3 || parts[1] != "containers" || parts[2] != "create" {
 		return false
 	}
-	return isDockerAPIVersion(parts[0])
-}
-
-func isBuildRequest(request *http.Request) bool {
-	if request.Method != http.MethodPost {
-		return false
-	}
-
-	parts := strings.Split(strings.Trim(request.URL.Path, "/"), "/")
-	if len(parts) == 1 {
-		return parts[0] == "build"
-	}
-	return len(parts) == 2 && parts[1] == "build" && isDockerAPIVersion(parts[0])
-}
-
-func isDockerAPIVersion(value string) bool {
-	versionParts := strings.Split(strings.TrimPrefix(value, "v"), ".")
-	if !strings.HasPrefix(value, "v") || len(versionParts) != 2 {
+	versionParts := strings.Split(strings.TrimPrefix(parts[0], "v"), ".")
+	if !strings.HasPrefix(parts[0], "v") || len(versionParts) != 2 {
 		return false
 	}
 	for _, versionPart := range versionParts {
@@ -156,19 +136,6 @@ func isDockerAPIVersion(value string) bool {
 		}
 	}
 	return true
-}
-
-// applyBuildCgroupParent removes a client-provided value when no attributed
-// parent is available and otherwise forces BuildKit RUN steps into the same
-// cgroup hierarchy used for containers created through the proxy.
-func applyBuildCgroupParent(request *http.Request, parent string) {
-	query := request.URL.Query()
-	if parent == "" {
-		query.Del("cgroupparent")
-	} else {
-		query.Set("cgroupparent", parent)
-	}
-	request.URL.RawQuery = query.Encode()
 }
 
 type requestBodyTooLargeError struct {

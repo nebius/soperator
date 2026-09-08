@@ -99,7 +99,13 @@ func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
 		}
 	}
 	if s.sshIdentitySet {
-		if cleanupErr := s.removeEnrootSSHTestIdentity(ctx); cleanupErr != nil {
+		if cleanupErr := removeSSHTestIdentity(
+			ctx,
+			s.runtime,
+			sshUserName,
+			enrootSSHKeyName,
+			enrootSSHKeyComment,
+		); cleanupErr != nil {
 			s.runtime.Logf("cleanup: remove Enroot SSH test identity: %v", cleanupErr)
 		}
 	}
@@ -115,48 +121,14 @@ func (s *EnrootContainers) anEnrootSSHTestUserExists(ctx context.Context) error 
 		return err
 	}
 
-	setupIdentity := fmt.Sprintf(`
-set -euo pipefail
-install -d -m 0700 "${HOME}/.ssh"
-key="${HOME}/.ssh/%s"
-authorized_keys="${HOME}/.ssh/authorized_keys"
-rm -f "${key}" "${key}.pub"
-touch "${authorized_keys}"
-sed -i '\# %s$#d' "${authorized_keys}"
-ssh-keygen -q -t ecdsa -N '' -C %s -f "${key}"
-cat "${key}.pub" >> "${authorized_keys}"
-chmod 0600 "${authorized_keys}"
-`, enrootSSHKeyName, enrootSSHKeyComment, framework.ShellQuote(enrootSSHKeyComment))
-	command := fmt.Sprintf(
-		"su - %s -c %s",
-		framework.ShellQuote(sshUserName),
-		framework.ShellQuote(framework.BashLC(setupIdentity)),
-	)
 	s.sshIdentitySet = true
-	if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
-		return fmt.Errorf("prepare SSH identity for %s: %w", sshUserName, err)
-	}
-
-	return nil
-}
-
-func (s *EnrootContainers) removeEnrootSSHTestIdentity(ctx context.Context) error {
-	cleanupIdentity := fmt.Sprintf(`
-key="${HOME}/.ssh/%s"
-authorized_keys="${HOME}/.ssh/authorized_keys"
-rm -f "${key}" "${key}.pub"
-if [ -f "${authorized_keys}" ]; then
-    sed -i '\# %s$#d' "${authorized_keys}"
-fi
-`, enrootSSHKeyName, enrootSSHKeyComment)
-	command := fmt.Sprintf(
-		"if id %s >/dev/null 2>&1; then su - %s -c %s; fi",
-		framework.ShellQuote(sshUserName),
-		framework.ShellQuote(sshUserName),
-		framework.ShellQuote(framework.BashLC(cleanupIdentity)),
+	return ensureSSHTestIdentity(
+		ctx,
+		s.runtime,
+		sshUserName,
+		enrootSSHKeyName,
+		enrootSSHKeyComment,
 	)
-	_, err := s.runtime.Jail().Run(ctx, command)
-	return err
 }
 
 func (s *EnrootContainers) theUserImportsAnEnrootImageOverSSH(ctx context.Context, target string) error {
@@ -217,20 +189,15 @@ func (s *EnrootContainers) runEnrootSSHCommand(ctx context.Context, remoteComman
 		return "", fmt.Errorf("run Enroot SSH command: target host is empty")
 	}
 
-	sshCommand := fmt.Sprintf(
-		"timeout %.0f ssh -i ~/.ssh/%s -o IdentitiesOnly=yes -o BatchMode=yes -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null %s %s",
-		enrootSSHSmokeTimeout.Seconds(),
+	return runSSHCommand(
+		ctx,
+		s.runtime,
+		sshUserName,
 		enrootSSHKeyName,
-		framework.ShellQuote(s.sshEnrootHost),
-		framework.ShellQuote(framework.BashLC(remoteCommand)),
+		s.sshEnrootHost,
+		enrootSSHSmokeTimeout,
+		remoteCommand,
 	)
-	command := fmt.Sprintf(
-		"su - %s -c %s",
-		framework.ShellQuote(sshUserName),
-		framework.ShellQuote(sshCommand),
-	)
-
-	return s.runtime.Jail().Run(ctx, command)
 }
 
 func (s *EnrootContainers) removeEnrootSSHImage(ctx context.Context) error {
