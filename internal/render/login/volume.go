@@ -1,6 +1,8 @@
 package login
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -90,6 +92,37 @@ func renderVolumesAndClaimTemplateSpecs(
 	}
 
 	return volumes, pvcTemplateSpecs, nil
+}
+
+func resolveDockerImageStorageMount(login *values.SlurmLogin) (slurmv1.NodeVolumeMount, error) {
+	for _, env := range login.ContainerSshd.CustomEnv {
+		if env.Name == consts.EnvDockerEnabled {
+			return slurmv1.NodeVolumeMount{}, fmt.Errorf(
+				"remove environment variable %q from login.sshd.customEnv because it is managed by Soperator",
+				consts.EnvDockerEnabled,
+			)
+		}
+	}
+
+	if !login.DockerEnabled {
+		return slurmv1.NodeVolumeMount{}, nil
+	}
+	if login.UserIsolation == nil || !ptr.Deref(login.UserIsolation.Enabled, false) {
+		return slurmv1.NodeVolumeMount{}, fmt.Errorf("configure login.userIsolation.enabled=true when login Docker is enabled")
+	}
+
+	for i := range login.JailSubMounts {
+		mount := &login.JailSubMounts[i]
+		if mount.MountPath != consts.ImageStorageMountPath {
+			continue
+		}
+		if mount.ReadOnly {
+			return slurmv1.NodeVolumeMount{}, fmt.Errorf("configure login Docker image storage at %s as writable", consts.ImageStorageMountPath)
+		}
+		return *mount, nil
+	}
+
+	return slurmv1.NodeVolumeMount{}, fmt.Errorf("configure a writable login jail sub-mount at %s when login Docker is enabled", consts.ImageStorageMountPath)
 }
 
 // region configs

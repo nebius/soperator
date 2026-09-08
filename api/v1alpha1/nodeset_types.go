@@ -250,6 +250,8 @@ type NodeSetSpec struct {
 
 	// ConfigMapRefSupervisord defines the config name of Supervisord for the slurmd container.
 	// Specifying a custom name allows providing custom config for the Supervisord.
+	// When Docker is enabled, the custom config must start both dockerd_entrypoint.sh and
+	// docker_proxy_entrypoint.sh in worker mode.
 	//
 	// If omitted, the default name and values of config will be used.
 	//

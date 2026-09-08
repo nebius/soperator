@@ -1,0 +1,15 @@
+suite: test supervisord configuration
+templates:
+  - templates/configmap-supervisord.yaml
+tests:
+  - it: should start Docker through the guarded worker launchers
+    asserts:
+      - matchRegex:
+          path: data["supervisord.conf"]
+          pattern: 'command=/opt/bin/slurm/dockerd_entrypoint\.sh chroot /mnt/jail /usr/bin/dockerd'
+      - matchRegex:
+          path: data["supervisord.conf"]
+          pattern: 'command=/opt/bin/slurm/docker_proxy_entrypoint\.sh worker'
+      - notMatchRegex:
+          path: data["supervisord.conf"]
+          pattern: 'docker_proxy_nginx_entrypoint\.sh'

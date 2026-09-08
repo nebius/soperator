@@ -646,7 +646,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			SupervisorDConfigMapName:     "supervisord-config",
 			SSHDConfigMapName:            "sshd-config",
 			GPU:                          &slurmv1alpha1.GPUSpec{Enabled: false},
-			DockerEnabled:                true,
+			DockerEnabled:                false,
 			EphemeralNodes:               ephemeralNodes,
 			EphemeralTopologyWaitTimeout: waitTimeout,
 		}
@@ -716,7 +716,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			// Verify init container count
 			assert.Len(t, result.Spec.Template.Spec.InitContainers, tt.expectedInitContainerCount,
 				"expected %d init containers", tt.expectedInitContainerCount)
-			assert.Len(t, result.Spec.Template.Spec.Containers, 2, "expected slurmd and docker-proxy containers")
+			assert.Len(t, result.Spec.Template.Spec.Containers, 1, "expected only the supervised slurmd container")
 
 			// Verify worker-init container has topology command when topology plugin is enabled
 			var hasWaitForTopology bool
@@ -757,7 +757,6 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 				"topology-node-labels volume presence mismatch")
 
 			var hasRuntimeVolume bool
-			var hasDockerProxyContainer bool
 			for _, volume := range result.Spec.Template.Spec.Volumes {
 				if volume.Name == consts.VolumeNameRuntime {
 					hasRuntimeVolume = true
@@ -765,14 +764,6 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 				}
 			}
 			for _, container := range result.Spec.Template.Spec.Containers {
-				if container.Name == consts.ContainerNameDockerProxy {
-					hasDockerProxyContainer = true
-					assert.Equal(t, nodeSet.ContainerSlurmd.Image, container.Image)
-					assert.Equal(t, []string{"/opt/bin/slurm/docker_proxy_nginx_entrypoint.sh"}, container.Command)
-					assert.Len(t, container.VolumeMounts, 1)
-					assert.Equal(t, consts.VolumeNameRuntime, container.VolumeMounts[0].Name)
-					assert.Equal(t, consts.VolumeMountPathRuntime, container.VolumeMounts[0].MountPath)
-				}
 				if container.Name == consts.ContainerNameSlurmd {
 					var hasRuntimeMount bool
 					for _, mount := range container.VolumeMounts {
@@ -785,7 +776,6 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 				}
 			}
 			assert.True(t, hasRuntimeVolume, "runtime volume should be present")
-			assert.True(t, hasDockerProxyContainer, "docker-proxy sidecar should be present")
 		})
 	}
 }
@@ -835,11 +825,11 @@ func TestRenderNodeSetStatefulSet_DockerEnabled(t *testing.T) {
 		dockerEnabled bool
 	}{
 		{
-			name:          "docker enabled renders docker-proxy sidecar",
+			name:          "docker enabled is passed to supervised worker processes",
 			dockerEnabled: true,
 		},
 		{
-			name:          "docker disabled omits docker-proxy sidecar",
+			name:          "docker disabled is passed to supervised worker processes",
 			dockerEnabled: false,
 		},
 	}
@@ -856,17 +846,11 @@ func TestRenderNodeSetStatefulSet_DockerEnabled(t *testing.T) {
 			)
 			assert.NoError(t, err)
 
-			var hasDockerProxyContainer bool
-			for _, container := range result.Spec.Template.Spec.Containers {
-				if container.Name == consts.ContainerNameDockerProxy {
-					hasDockerProxyContainer = true
-				}
-				if container.Name == consts.ContainerNameSlurmd {
-					assertEnvValue(t, container.Env, consts.EnvDockerEnabled, strconv.FormatBool(tt.dockerEnabled))
-				}
+			if assert.Len(t, result.Spec.Template.Spec.Containers, 1) {
+				container := result.Spec.Template.Spec.Containers[0]
+				assert.Equal(t, consts.ContainerNameSlurmd, container.Name)
+				assertEnvValue(t, container.Env, consts.EnvDockerEnabled, strconv.FormatBool(tt.dockerEnabled))
 			}
-			assert.Equal(t, tt.dockerEnabled, hasDockerProxyContainer,
-				"docker-proxy sidecar presence mismatch")
 		})
 	}
 }
@@ -925,23 +909,25 @@ func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 		t.Fatal("slurmd container not found")
 	})
 
-	t.Run("rejects a custom override of Soperator metadata", func(t *testing.T) {
-		nodeSet := createNodeSet()
-		nodeSet.ContainerSlurmd.CustomEnv = []corev1.EnvVar{{
-			Name:  consts.EnvNodeRealMemoryBytes,
-			Value: "1",
-		}}
+	for _, envName := range []string{consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes} {
+		t.Run("rejects a custom override of "+envName, func(t *testing.T) {
+			nodeSet := createNodeSet()
+			nodeSet.ContainerSlurmd.CustomEnv = []corev1.EnvVar{{
+				Name:  envName,
+				Value: "1",
+			}}
 
-		_, err := worker.RenderNodeSetStatefulSet(
-			"test-cluster",
-			nodeSet,
-			&slurmv1.Secrets{},
-			consts.CGroupV2,
-			false,
-			false,
-		)
-		assert.ErrorContains(t, err, "is managed by Soperator")
-	})
+			_, err := worker.RenderNodeSetStatefulSet(
+				"test-cluster",
+				nodeSet,
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				false,
+				false,
+			)
+			assert.ErrorContains(t, err, "is managed by Soperator")
+		})
+	}
 }
 
 func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testing.T) {

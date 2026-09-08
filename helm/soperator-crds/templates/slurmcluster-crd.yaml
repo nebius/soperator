@@ -16243,6 +16243,8 @@ spec:
                 description: |-
                   ConfigMapRefSupervisord defines the config name of Supervisord for the slurmd container.
                   Specifying a custom name allows providing custom config for the Supervisord.
+                  When Docker is enabled, the custom config must start both dockerd_entrypoint.sh and
+                  docker_proxy_entrypoint.sh in worker mode.
 
                   If omitted, the default name and values of config will be used.
                 type: string
@@ -45893,6 +45895,17 @@ spec:
                           - name
                           type: object
                         type: array
+                      docker:
+                        description: |-
+                          Docker defines Docker support for SSH sessions on login nodes.
+                          A writable jail sub-mount at /mnt/image-storage and login user isolation are required when enabled.
+                        properties:
+                          enabled:
+                            default: false
+                            description: Enabled starts a rootful Docker daemon and
+                              routes container workloads into per-user cgroups.
+                            type: boolean
+                        type: object
                       hostUsers:
                         description: HostUsers controls if the pod containers can
                           use the host user namespace

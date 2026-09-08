@@ -1,5 +1,12 @@
 Feature: Docker containers
   @soperator_version_>=5.0.0
+  Scenario: Docker containers can run over login SSH
+    Given login Docker is enabled
+    And a Docker SSH test user exists
+    When the user runs Docker lifecycle commands over SSH on the login node
+    Then Docker uses the login proxy, image storage, and the user's cgroup
+
+  @soperator_version_>=5.0.0
   Scenario: Docker container lifecycle uses local storage
     Given a long-running Docker container job is submitted on two workers
     When the Docker container job is running

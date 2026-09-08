@@ -77,3 +77,45 @@ func TestPathIsUnder(t *testing.T) {
 		})
 	}
 }
+
+func TestDockerCgroupParentBelongsToJob(t *testing.T) {
+	tests := []struct {
+		name   string
+		value  string
+		jobID  string
+		wanted bool
+	}{
+		{
+			name:   "Slurm job user cgroup",
+			value:  "/kubepods.slice/pod.scope/slurm/uid_1000/job_42/step_0/user",
+			jobID:  "42",
+			wanted: true,
+		},
+		{
+			name:   "different Slurm job",
+			value:  "/kubepods.slice/pod.scope/slurm/uid_1000/job_43/step_0/user",
+			jobID:  "42",
+			wanted: false,
+		},
+		{
+			name:   "task cgroup instead of user parent",
+			value:  "/kubepods.slice/pod.scope/slurm/uid_1000/job_42/step_0/user/task_0",
+			jobID:  "42",
+			wanted: false,
+		},
+		{
+			name:   "dockerd default",
+			value:  "",
+			jobID:  "42",
+			wanted: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := dockerCgroupParentBelongsToJob(test.value, test.jobID); got != test.wanted {
+				t.Fatalf("dockerCgroupParentBelongsToJob(%q, %q) = %t, want %t", test.value, test.jobID, got, test.wanted)
+			}
+		})
+	}
+}

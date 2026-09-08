@@ -237,8 +237,9 @@ func renderContainerNodeSetSlurmd(
 	}
 
 	for _, env := range nodeSet.ContainerSlurmd.CustomEnv {
-		if env.Name == consts.EnvNodeRealMemoryBytes {
-			return corev1.Container{}, fmt.Errorf("environment variable %q is managed by Soperator", consts.EnvNodeRealMemoryBytes)
+		switch env.Name {
+		case consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes:
+			return corev1.Container{}, fmt.Errorf("environment variable %q is managed by Soperator", env.Name)
 		}
 	}
 
@@ -301,20 +302,6 @@ func renderContainerNodeSetSlurmd(
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}, nil
-}
-
-func renderContainerNodeSetDockerProxy(nodeSet *values.SlurmNodeSet) corev1.Container {
-	return corev1.Container{
-		Name:            consts.ContainerNameDockerProxy,
-		Image:           nodeSet.ContainerSlurmd.Image,
-		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
-		Command:         []string{"/opt/bin/slurm/docker_proxy_nginx_entrypoint.sh"},
-		VolumeMounts: []corev1.VolumeMount{
-			renderVolumeMountRuntime(),
-		},
-		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
-		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
-	}
 }
 
 func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {

@@ -2,6 +2,18 @@
 
 ARG SLURM_VERSION
 
+FROM cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/golang:1.26 AS docker_proxy_builder
+
+WORKDIR /build
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY cmd/soperator-docker-proxy cmd/soperator-docker-proxy
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux \
+    go build -v -o soperator-docker-proxy ./cmd/soperator-docker-proxy
+
 # https://github.com/nebius/ml-containers/pull/101
 FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260904073226 AS worker_pam_builder
 
@@ -29,9 +41,7 @@ RUN apt-get update && \
         kmod \
         libncurses5-dev \
         supervisor \
-        openssh-server \
-        nginx-extras \
-        libnginx-mod-http-js && \
+        openssh-server && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -106,8 +116,6 @@ RUN apt-get update && \
 
 # Copy Docker daemon config
 COPY images/worker/docker/daemon.json /etc/docker/daemon.json
-COPY images/worker/nginx/soperator-docker-proxy.conf /etc/nginx/soperator-docker-proxy.conf
-COPY images/worker/nginx/docker_proxy.js /etc/nginx/njs/docker_proxy.js
 
 # Copy script for complementing jail filesystem in runtime
 COPY images/common/scripts/complement_jail.sh /opt/bin/slurm/
@@ -169,15 +177,17 @@ COPY images/worker/worker_init.py /opt/bin/slurm/
 
 # Copy supervisord entrypoint script
 COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
-COPY images/worker/docker_proxy_nginx_entrypoint.sh /opt/bin/slurm/
+COPY images/common/scripts/docker_proxy_entrypoint.sh /opt/bin/slurm/
 COPY images/worker/dockerd_entrypoint.sh /opt/bin/slurm/
+COPY --from=docker_proxy_builder /build/soperator-docker-proxy /usr/bin/soperator-docker-proxy
 
 RUN chmod +x /opt/bin/slurm/slurmd_entrypoint.sh && \
     chmod +x /opt/bin/slurm/write_soperator_metadata.sh && \
     chmod +x /opt/bin/slurm/supervisord_entrypoint.sh && \
     chmod +x /opt/bin/slurm/worker_init.py && \
-    chmod +x /opt/bin/slurm/docker_proxy_nginx_entrypoint.sh && \
-    chmod +x /opt/bin/slurm/dockerd_entrypoint.sh
+    chmod +x /opt/bin/slurm/docker_proxy_entrypoint.sh && \
+    chmod +x /opt/bin/slurm/dockerd_entrypoint.sh && \
+    chmod +x /usr/bin/soperator-docker-proxy
 
 # Start supervisord that manages both slurmd and sshd as child processes
 ENTRYPOINT ["/opt/bin/slurm/supervisord_entrypoint.sh"]

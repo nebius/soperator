@@ -160,7 +160,7 @@ Sends notifications about cluster events and alerts to external services.
 Deploys custom configuration files as Kubernetes ConfigMaps that are mounted into cluster nodes.
 
 **Configurations**:
-- `supervisord.conf` - Process management for slurmd, sshd, dockerd
+- `supervisord.conf` - Process management for slurmd, sshd, dockerd, and the Docker proxy
 - `daemon.json` - Docker daemon configuration with NVIDIA runtime
 - `enroot.conf` - Enroot container runtime configuration
 - `95-nebius-o11y` - MOTD (Message of the Day) for observability

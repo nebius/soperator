@@ -36,6 +36,10 @@ func RenderStatefulSet(
 		login.K8sNodeFilterName,
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
 	)
+	dockerImageStorageMount, err := resolveDockerImageStorageMount(login)
+	if err != nil {
+		return kruisev1b1.StatefulSet{}, fmt.Errorf("resolving login Docker configuration: %w", err)
+	}
 
 	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(
 		clusterName, secrets, volumeSources, login)
@@ -115,6 +119,8 @@ func RenderStatefulSet(
 							login.CustomVolumeMounts,
 							login.ContainerSSSD,
 							login.UserIsolation,
+							login.DockerEnabled,
+							dockerImageStorageMount,
 							sshAppArmorProfile,
 						),
 					},
