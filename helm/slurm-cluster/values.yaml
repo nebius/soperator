@@ -1,6 +1,9 @@
 clusterName: "slurm1"
 # Additional annotations for the cluster
 annotations: {}
+# Custom labels/annotations applied to every Pod and the spool PVC
+extraLabels: {}
+extraAnnotations: {}
 # Add appArmor profile to the cluster
 useDefaultAppArmorProfile: false
 # Maintenance defines the maintenance window for the cluster.

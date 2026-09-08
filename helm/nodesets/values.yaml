@@ -312,6 +312,9 @@ nodesets:
     workerAnnotations:
       prometheus.io/scrape: "true"
       prometheus.io/port: "9090"
+    # Additional labels to be added to the worker pods
+    # Optional, defaults to empty dict
+    workerLabels: {}
     # A list of custom init containers for worker pods
     # Each item must be a corev1.Container spec
     # Optional, defaults to empty list

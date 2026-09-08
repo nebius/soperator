@@ -24,3 +24,15 @@ func RenderMatchLabels(componentType consts.ComponentType, clusterName string) m
 		consts.LabelComponentKey: componentType.String(),
 	}
 }
+
+// MergeExtraLabels adds extra into labels without overriding any key already present in labels.
+// labels is expected to already contain every key the operator relies on (e.g. the ones used to
+// build the resource's selector), so user-supplied extra labels can't collide with them and wedge
+// an immutable selector on update.
+func MergeExtraLabels(labels, extra map[string]string) {
+	for k, v := range extra {
+		if _, exists := labels[k]; !exists {
+			labels[k] = v
+		}
+	}
+}

@@ -1,6 +1,7 @@
 package accounting
 
 import (
+	"maps"
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
@@ -65,10 +66,16 @@ func BasePodTemplateSpec(
 		common.RenderContainerMunge(&accounting.ContainerMunge),
 	)
 
+	labels := maps.Clone(matchLabels)
+	common.MergeExtraLabels(labels, accounting.Labels)
+
+	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNameAccounting)
+	maps.Copy(annotations, accounting.Annotations)
+
 	res := &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:      matchLabels,
-			Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameAccounting),
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: corev1.PodSpec{
 			HostUsers:         accounting.HostUsers,
