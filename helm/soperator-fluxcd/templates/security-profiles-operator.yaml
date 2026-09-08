@@ -34,7 +34,7 @@ spec:
   {{- else }}
     daemon:
       tolerations:
-        - operator: Exists
+        {{- toYaml (.Values.securityProfilesOperator.values.daemon.tolerations | default list) | nindent 8 }}
       {{- if .Values.securityProfilesOperator.values.daemon.resources }}
       resources:
         {{- toYaml .Values.securityProfilesOperator.values.daemon.resources | nindent 8 }}
