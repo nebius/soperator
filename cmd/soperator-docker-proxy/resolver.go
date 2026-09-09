@@ -13,9 +13,12 @@ import (
 )
 
 const (
-	modeLogin          = "login"
-	modeWorker         = "worker"
-	minimumLoginUserID = 1000
+	modeLogin           = "login"
+	modeWorker          = "worker"
+	minimumLoginUserID  = 1000
+	slurmStepdScope     = "slurmstepd.scope"
+	sluidLength         = 14
+	sluidBase32Alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 )
 
 type cgroupResolution struct {
@@ -121,7 +124,7 @@ func slurmDockerCgroupParent(cgroupPath string) (string, bool) {
 		jobIndex := -1
 		stepIndex := -1
 		for index := 0; index < userIndex; index++ {
-			if isSlurmJobComponent(parts[index]) {
+			if isSlurmJobComponent(parts, index) {
 				jobIndex = index
 			}
 			if isSlurmStepComponent(parts[index]) {
@@ -135,8 +138,23 @@ func slurmDockerCgroupParent(cgroupPath string) (string, bool) {
 	return "", false
 }
 
-func isSlurmJobComponent(component string) bool {
-	return hasNumericSuffix(component, "job_")
+func isSlurmJobComponent(parts []string, index int) bool {
+	if hasNumericSuffix(parts[index], "job_") {
+		return true
+	}
+	return index > 0 && parts[index-1] == slurmStepdScope && isSLUID(parts[index])
+}
+
+func isSLUID(value string) bool {
+	if len(value) != sluidLength || value[0] != 's' {
+		return false
+	}
+	for _, character := range value[1:] {
+		if !strings.ContainsRune(sluidBase32Alphabet, character) {
+			return false
+		}
+	}
+	return true
 }
 
 func isSlurmStepComponent(component string) bool {

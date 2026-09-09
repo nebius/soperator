@@ -66,13 +66,24 @@ func TestWorkerCgroupResolver(t *testing.T) {
 	}
 
 	resolver := workerCgroupResolver{procRoot: procRoot}
-	t.Run("Slurm task", func(t *testing.T) {
+	t.Run("Slurm 25.11 task", func(t *testing.T) {
 		writePeerCgroup(t, 42, "0::/kubepods/pod/container/slurm/uid_1004/job_77/step_0/user/task_0\n")
 		resolution, err := resolver.Resolve(peerCredentials{pid: 42, uid: 1004})
 		if err != nil {
 			t.Fatalf("Resolve() error = %v", err)
 		}
 		if want := "/kubepods/pod/container/slurm/uid_1004/job_77/step_0/user"; resolution.parent != want {
+			t.Fatalf("parent = %q, want %q", resolution.parent, want)
+		}
+	})
+
+	t.Run("Slurm 26.05 task", func(t *testing.T) {
+		writePeerCgroup(t, 43, "0::/kubepods.slice/pod.scope/container.scope/system.slice/slurmstepd.scope/s8G5M22WGXB100/step_0/user/task_0\n")
+		resolution, err := resolver.Resolve(peerCredentials{pid: 43, uid: 1004})
+		if err != nil {
+			t.Fatalf("Resolve() error = %v", err)
+		}
+		if want := "/kubepods.slice/pod.scope/container.scope/system.slice/slurmstepd.scope/s8G5M22WGXB100/step_0/user"; resolution.parent != want {
 			t.Fatalf("parent = %q, want %q", resolution.parent, want)
 		}
 	})
@@ -168,6 +179,12 @@ func TestSlurmDockerCgroupParent(t *testing.T) {
 			ok:   true,
 		},
 		{
+			name: "Slurm 26.05 observed SLUID task",
+			path: "/kubepods.slice/kubepods-burstable.slice/pod.scope/container.scope/system.slice/slurmstepd.scope/s8G5M22WGXB100/step_0/user/task_0",
+			want: "/kubepods.slice/kubepods-burstable.slice/pod.scope/container.scope/system.slice/slurmstepd.scope/s8G5M22WGXB100/step_0/user",
+			ok:   true,
+		},
+		{
 			name: "current Slurm batch step contract",
 			path: "/kubepods/pod/container/slurm/uid_1004/job_77/step_batch/user/task_0",
 			want: "/kubepods/pod/container/slurm/uid_1004/job_77/step_batch/user",
@@ -208,6 +225,14 @@ func TestSlurmDockerCgroupParent(t *testing.T) {
 		{
 			name: "unknown step",
 			path: "/kubepods/pod/container/job_77/step_other/user/task_0",
+		},
+		{
+			name: "SLUID outside slurmstepd scope",
+			path: "/kubepods/pod/container/other.scope/s8G5M22WGXB100/step_0/user/task_0",
+		},
+		{
+			name: "malformed SLUID",
+			path: "/kubepods/pod/container/system.slice/slurmstepd.scope/s8G5M22WGXB10O/step_0/user/task_0",
 		},
 	}
 
