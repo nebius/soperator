@@ -188,6 +188,54 @@ func TestKubectlClientWorkerPodsRejectsDuplicateHostname(t *testing.T) {
 	assert.ErrorContains(t, err, "both declare spec.hostname=worker-0")
 }
 
+func TestKubectlClientWorkerContainerEnvironmentVariable(t *testing.T) {
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00pod\x00worker-0\x00-n\x00soperator\x00-o\x00json": `{
+			"metadata": {"name": "worker-0"},
+			"spec": {
+				"containers": [
+					{"name": "slurmd", "env": [
+						{"name": "NVIDIA_DRIVER_CAPABILITIES", "value": "compute,graphics,utility,video"}
+					]}
+				]
+			}
+		}`,
+	}}
+
+	value, err := NewKubectlClient(exec).WorkerContainerEnvironmentVariable(
+		t.Context(),
+		WorkerPodInfo{PodName: "worker-0"},
+		"slurmd",
+		"NVIDIA_DRIVER_CAPABILITIES",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "compute,graphics,utility,video", value)
+}
+
+func TestKubectlClientWorkerContainerEnvironmentVariableRejectsValueFrom(t *testing.T) {
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00pod\x00worker-0\x00-n\x00soperator\x00-o\x00json": `{
+			"metadata": {"name": "worker-0"},
+			"spec": {
+				"containers": [
+					{"name": "slurmd", "env": [
+						{"name": "NVIDIA_DRIVER_CAPABILITIES", "valueFrom": {"secretKeyRef": {"name": "gpu", "key": "capabilities"}}}
+					]}
+				]
+			}
+		}`,
+	}}
+
+	_, err := NewKubectlClient(exec).WorkerContainerEnvironmentVariable(
+		t.Context(),
+		WorkerPodInfo{PodName: "worker-0"},
+		"slurmd",
+		"NVIDIA_DRIVER_CAPABILITIES",
+	)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "valueFrom is not supported")
+}
+
 type kubectlClientTestExec struct {
 	kubectl map[string]string
 }

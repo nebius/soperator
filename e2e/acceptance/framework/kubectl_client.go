@@ -180,3 +180,57 @@ func (c *KubectlClient) WorkerPodForSlurmNode(ctx context.Context, slurmNodeName
 	}
 	return WorkerPodInfo{}, fmt.Errorf("worker pod for Slurm node %q was not found", target)
 }
+
+func (c *KubectlClient) WorkerContainerEnvironmentVariable(
+	ctx context.Context,
+	pod WorkerPodInfo,
+	containerName,
+	variableName string,
+) (string, error) {
+	podName := strings.TrimSpace(pod.PodName)
+	if podName == "" {
+		return "", fmt.Errorf("worker pod name is empty")
+	}
+	containerName = strings.TrimSpace(containerName)
+	if containerName == "" {
+		return "", fmt.Errorf("container name is empty")
+	}
+	variableName = strings.TrimSpace(variableName)
+	if variableName == "" {
+		return "", fmt.Errorf("environment variable name is empty")
+	}
+
+	var workerPod corev1.Pod
+	if err := c.GetJSON(ctx, &workerPod,
+		"get", "pod", podName, "-n", SoperatorNamespace, "-o", "json"); err != nil {
+		return "", fmt.Errorf("get worker pod %s/%s: %w", SoperatorNamespace, podName, err)
+	}
+
+	for _, container := range workerPod.Spec.Containers {
+		if container.Name != containerName {
+			continue
+		}
+		for _, variable := range container.Env {
+			if variable.Name != variableName {
+				continue
+			}
+			if variable.ValueFrom != nil {
+				return "", fmt.Errorf(
+					"resolve environment variable %s from container %s in worker pod %s: valueFrom is not supported",
+					variableName,
+					containerName,
+					podName,
+				)
+			}
+			return variable.Value, nil
+		}
+		return "", fmt.Errorf(
+			"find environment variable %s in container %s of worker pod %s",
+			variableName,
+			containerName,
+			podName,
+		)
+	}
+
+	return "", fmt.Errorf("find container %s in worker pod %s", containerName, podName)
+}
