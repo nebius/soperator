@@ -145,7 +145,7 @@ PartitionName=main Nodes=ALL Default=YES State=UP
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `name` | yes | Identifies the topology. Partitions reference it, and workers register into it with `scontrol update ... Topology=<name>:<unit>`. |
+| `name` | yes | Identifies the topology. Partitions reference it, and workers join it at slurmd registration with `--conf "topology=<name>:<unit>"`. |
 | `topo.type` | yes | `tree`, `block` or `flat`. |
 | `topo.blockSizes` | no | Planning base block size followed by any higher-level sizes to enforce. Each successive value must be a power of two larger than the previous one. Only for `type: block`. |
 | `clusterDefault` | no | Marks the topology used by partitions without a `topologyRef` and by cluster-wide operations not tied to a partition. |
@@ -308,14 +308,20 @@ ConfigMap, and the plugin type decides which labels a topology reads:
 - `tree` walks the contiguous `tier-1`..`tier-N` chain, highest tier closest to the root. `tier-0`
   names a block rather than a switch and is left out of the tree.
 
-Workers register themselves into their topology with `scontrol update ... Topology=<name>:<unit>`,
-and the unit they pick is the one the rendered config places them in: the `tier-1` switch for a
-tree, the `tier-0` block for a block topology. A node covered by several topologies registers into
-all of them at once:
+Workers join their topology as part of slurmd registration, and the unit they pick is the one the
+rendered config places them in: the `tier-1` switch for a tree, the `tier-0` block for a block
+topology. A node covered by several topologies joins all of them at once:
 
 ```
-scontrol update NodeName=h100-0 Topology=ib-gpu:nvl0,eth-cpu:root:leaf01
+slurmd --conf "topology=ib-gpu:nvl0,eth-cpu:root:leaf01"
 ```
+
+The init container resolves the value: it waits for the operator to publish a topology placing this
+worker, then leaves the specification on the volume it shares with the slurmd container, which
+passes it to `slurmd --conf`. Registration carries it, rather than a `scontrol update` issued
+beforehand, because such an update moves the node into a state where slurmctld discards the
+`InstanceId` and `Extra` that registration brings with it. Resolving it in the init container also
+keeps the wait off slurmd's own startup.
 
 Nodes with no usable labels, and nodes whose pods are not scheduled yet, land in a catch-all
 `unknown` unit per fabric, so the topology stays complete across the pod lifecycle. That is why a
@@ -401,9 +407,9 @@ only on those clusters and skips it on 5.0.0 and later.
 Two different mechanisms keep the running cluster in step with the file, and it is worth knowing
 which one is doing the work.
 
-A node moving between switches is pushed straight into the running slurmctld by the worker itself
-with `scontrol update ... Topology=`. No re-read is involved, and none is wanted: restarting slurmd
-across the cluster because one pod was rescheduled would be a poor trade.
+A node moving between switches travels with its own slurmd registration, which is what a
+rescheduled pod performs on startup anyway. No re-read is involved, and none is wanted: re-reading
+the file across the cluster because one pod moved would be a poor trade.
 
 A structural change cannot be learned that way, so the operator asks sconfigcontroller for a
 `scontrol reconfigure`. The request is recorded in the topology `JailedConfig` as a `Reconfigure`
@@ -429,7 +435,7 @@ flat=flat:[]:true,tree-ib=tree:[]:false,block-nvl72=block:[18]:false
 | topologies reordered in the spec | |
 
 The right-hand column is deliberate: those are node membership changes, and membership travels
-through the worker's own `scontrol update`, not through a cluster-wide re-read.
+with the worker's own slurmd registration, not through a cluster-wide re-read.
 
 #### Two further gates
 
@@ -475,9 +481,9 @@ them without digging through operator logs:
 #### What a reconfigure does not do
 
 It does not move already-registered nodes between topologies. Re-reading the file lays the nodes out
-as written, but slurmctld then applies each node's own `Topology=` registration on top, and treats
-that registration as the complete list: a node is removed from every topology its registration does
-not name. Workers compute that registration once, in their init container.
+as written, but slurmctld then applies each node's own registered topology on top, and treats it as
+the complete list: a node is removed from every topology its registration does not name. Workers
+compute that value once, in their init container.
 
 So a node that was running before a topology was added stays out of it until its pod restarts, no
 matter how many times the cluster is reconfigured. Adding a topology and expecting existing nodes to

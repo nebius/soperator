@@ -71,7 +71,6 @@ func TestRenderNodeSetStatefulSet_SSSD(t *testing.T) {
 	}
 
 	result, err := worker.RenderNodeSetStatefulSet(
-		"test-cluster",
 		nodeSet,
 		&slurmv1.Secrets{},
 		consts.CGroupV2,

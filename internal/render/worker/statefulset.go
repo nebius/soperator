@@ -26,7 +26,6 @@ import (
 
 // RenderNodeSetStatefulSet renders new [kruisev1b1.StatefulSet] containing NodeSet worker pods
 func RenderNodeSetStatefulSet(
-	clusterName string,
 	nodeSet *values.SlurmNodeSet,
 	secrets *slurmv1.Secrets,
 	cgroupVersion string,
@@ -64,7 +63,6 @@ func RenderNodeSetStatefulSet(
 	}
 	initContainers = append(initContainers,
 		RenderContainerWorkerInit(
-			clusterName,
 			&nodeSet.ContainerSlurmd,
 			topologyPluginEnabled,
 			nodeSet.GPU.Enabled,

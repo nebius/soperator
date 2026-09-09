@@ -17,6 +17,44 @@ from pathlib import Path
 import worker_init
 
 
+class TestWriteTopologyConf(unittest.TestCase):
+    """The topology is handed to slurmd through a file, not pushed with scontrol."""
+
+    def test_writes_the_specification_for_slurmd(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            conf = os.path.join(tmp, "soperator", "slurmd_topology")
+            with mock.patch.dict(os.environ, {"SLURMD_TOPOLOGY_PATH": conf}):
+                worker_init.write_slurmd_topology("topology=default:root:leaf")
+            self.assertEqual(Path(conf).read_text(), "topology=default:root:leaf")
+
+    def test_writes_an_empty_file_when_no_topology_places_the_worker(self):
+        """An empty file still records that the resolution ran, which "no file" would not."""
+        with tempfile.TemporaryDirectory() as tmp:
+            conf = os.path.join(tmp, "soperator", "slurmd_topology")
+            with mock.patch.dict(os.environ, {"SLURMD_TOPOLOGY_PATH": conf}):
+                worker_init.write_slurmd_topology("")
+            self.assertTrue(Path(conf).is_file())
+            self.assertEqual(Path(conf).read_text(), "")
+
+    def test_registration_is_not_pushed_with_scontrol(self):
+        """Nothing touches the node state before slurmd registers."""
+        with tempfile.TemporaryDirectory() as tmp:
+            conf = os.path.join(tmp, "slurmd_topology")
+            with mock.patch.dict(os.environ, {"SLURMD_TOPOLOGY_PATH": conf}), mock.patch(
+                "worker_init.subprocess.run"
+            ) as mock_run:
+                worker_init.write_slurmd_topology("topology=default:root:leaf")
+            mock_run.assert_not_called()
+
+    def test_path_defaults_to_the_shared_runtime_volume(self):
+        env = os.environ.copy()
+        env.pop("SLURMD_TOPOLOGY_PATH", None)
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(
+                worker_init.get_slurmd_topology_path(), Path("/run/soperator/slurmd_topology")
+            )
+
+
 class TestFormatSlurmTopology(unittest.TestCase):
     """Tests for format_slurm_topology function."""
 
@@ -954,9 +992,9 @@ class TestTopologyIntegration(unittest.TestCase):
         self.assertEqual(formatted, "topology=default:root:spine01:leaf01")
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_config")
-    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.write_slurmd_topology")
     def test_wait_for_topology_block_json_applies_tier_zero(
-        self, mock_apply, mock_wait_hostname):
+        self, mock_write, mock_wait_hostname):
         """A block topology registers the node under its tier-0 block."""
         node_name = "gpu-node-003"
         topology = '{"tier-0":"block1","tier-1":"leaf01","tier-2":"spine01"}'
@@ -988,7 +1026,7 @@ class TestTopologyIntegration(unittest.TestCase):
             worker_init.wait_for_topology()
 
         mock_wait_hostname.assert_called_once_with("worker-0", 180, 5, config_path)
-        mock_apply.assert_called_once_with("worker-0", "topology=block-nvl72:block1")
+        mock_write.assert_called_once_with("topology=block-nvl72:block1")
 
 
 class TestEdgeCases(unittest.TestCase):
@@ -1166,7 +1204,7 @@ class TestParseTopologyBindings(unittest.TestCase):
 class TestCpuOnlyWorkerInMultiTopology(unittest.TestCase):
     """A CPU-only worker appears in no node list, so it must not wait for its hostname."""
 
-    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.write_slurmd_topology")
     @mock.patch("worker_init.wait_for_hostname_in_topology_config")
     @mock.patch("worker_init.is_gpu_enabled", return_value=False)
     @mock.patch(
@@ -1175,13 +1213,13 @@ class TestCpuOnlyWorkerInMultiTopology(unittest.TestCase):
     )
     @mock.patch.dict(os.environ, {"HOSTNAME": "cpu-0"})
     def test_skips_the_hostname_wait_and_the_registration(
-        self, mock_wait_file, mock_gpu, mock_wait_hostname, mock_apply
+        self, mock_wait_file, mock_gpu, mock_wait_hostname, mock_write
     ):
         worker_init.wait_for_topology()
 
         mock_wait_file.assert_called_once()
         mock_wait_hostname.assert_not_called()
-        mock_apply.assert_called_once_with("cpu-0", "")
+        mock_write.assert_called_once_with("")
 
 
 
@@ -1243,10 +1281,10 @@ class TestTopologyHostnameWait(unittest.TestCase):
         )
         mock_sleep.assert_called_once_with(1)
 
-    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.write_slurmd_topology")
     @mock.patch("worker_init.wait_for_hostname_in_topology_config")
     def test_gpu_worker_skips_the_wait_and_registers_nothing(
-        self, mock_wait_hostname, mock_apply
+        self, mock_wait_hostname, mock_write
     ):
         node_name = "gpu-node-001"
 
@@ -1265,12 +1303,12 @@ class TestTopologyHostnameWait(unittest.TestCase):
             worker_init.wait_for_topology()
 
         mock_wait_hostname.assert_not_called()
-        mock_apply.assert_called_once_with("worker-0", "")
+        mock_write.assert_called_once_with("")
 
-    @mock.patch("worker_init.apply_node_topology")
+    @mock.patch("worker_init.write_slurmd_topology")
     @mock.patch("worker_init.wait_for_hostname_in_topology_config")
     def test_placeholder_waits_even_without_nodes(
-        self, mock_wait_hostname, mock_apply
+        self, mock_wait_hostname, mock_write
     ):
         node_name = "gpu-node-001"
 
@@ -1292,7 +1330,7 @@ class TestTopologyHostnameWait(unittest.TestCase):
             worker_init.wait_for_topology()
 
         mock_wait_hostname.assert_called_once_with("worker-0", 180, 5, config_path)
-        mock_apply.assert_called_once_with("worker-0", "")
+        mock_write.assert_called_once_with("")
 
 
 if __name__ == "__main__":
