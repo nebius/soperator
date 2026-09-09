@@ -83,10 +83,10 @@ func BuildAppArmorProfileName(clusterName, namespace string) string {
 	}.String()
 }
 
-func BuildStatefulSetName(componentType consts.ComponentType) string {
+func BuildStatefulSetName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,
-		clusterName:   "",
+		clusterName:   clusterName,
 		entity:        "",
 	}.String()
 }
@@ -99,17 +99,18 @@ func BuildNodeSetStatefulSetName(nodeSetName string) string {
 	}.String()
 }
 
-func BuildDaemonSetName(componentType consts.ComponentType) string {
+func BuildDaemonSetName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,
-		clusterName:   "",
+		clusterName:   clusterName,
 		entity:        "",
 	}.String()
 }
 
-func BuildDeploymentName(componentType consts.ComponentType) string {
+func BuildDeploymentName(componentType consts.ComponentType, clusterName string) string {
 	return namedEntity{
 		componentType: &componentType,
+		clusterName:   clusterName,
 		entity:        "",
 	}.String()
 }
@@ -175,6 +176,14 @@ func BuildConfigMapSecurityLimitsName(componentType consts.ComponentType, cluste
 	}.String()
 }
 
+func BuildConfigMapUserIsolationName(clusterName string) string {
+	return namedEntity{
+		componentType: &consts.ComponentTypeLogin,
+		clusterName:   clusterName,
+		entity:        consts.ConfigMapNameUserIsolation,
+	}.String()
+}
+
 func BuildConfigMapSecurityLimitsForNodeSetName(clusterName, nodeSetName string) string {
 	return namedEntity{
 		clusterName:        clusterName,
@@ -237,12 +246,16 @@ func BuildVolumeMountSpoolPath(directory string) string {
 	return path.Join(consts.VolumeMountPathSpool, directory)
 }
 
-func BuildServiceAccountWorkerName(clusterName string) string {
-	return clusterName + "-worker-sa"
+func BuildServiceAccountNodeSetName(clusterName, nodeSetName string) string {
+	return fmt.Sprintf("%s-%s-nodeset-sa", clusterName, nodeSetName)
 }
 
-func BuildRoleWorkerName(clusterName string) string {
-	return clusterName + "-worker-events-role"
+func BuildRoleNodeSetName(clusterName, nodeSetName string) string {
+	return fmt.Sprintf("%s-%s-nodeset-role", clusterName, nodeSetName)
+}
+
+func BuildRoleBindingNodeSetName(clusterName, nodeSetName string) string {
+	return fmt.Sprintf("%s-%s-nodeset-role-binding", clusterName, nodeSetName)
 }
 
 func BuildServiceAccountActiveCheckName(clusterName string) string {

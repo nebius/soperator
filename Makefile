@@ -37,7 +37,8 @@ CHART_FLUXCD_BOOTSTRAP_PATH					= $(CHART_PATH)/soperator-fluxcd-bootstrap
 CHART_STORAGECLASSES						= $(CHART_PATH)/storageclasses
 CHART_BACKUP_CONFIG							= $(CHART_PATH)/soperator-backup-config
 
-SLURM_VERSION		= 25.11.3
+SLURM_VERSION		= 26.05.3-nebius-2
+SLURM_DEB_VERSION	= 26.05.3-nebius-2
 NFS_VERSION_BASE	= $(shell cat VERSION_NFS)
 VERSION_BASE		= $(shell cat VERSION)
 
@@ -119,6 +120,10 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run tests.
 	go test ./...
 
+.PHONY: test-python
+test-python: ## Temporarily retained while removing Python unit tests from CI.
+	@echo "Python unit tests are disabled in CI."
+
 .PHONY: test-coverage
 test-coverage: manifests generate fmt vet envtest ## Run tests and generate test coverage.
 	go test ./... -coverprofile cover.out
@@ -156,6 +161,8 @@ helm: generate manifests kustomize helmify ## Update soperator Helm chart
 		in_metadata && /^  name:/ {print; if (!done) {print "  {{- if .Values.certManager.enabled }}"; print "  annotations:"; print "    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include \"soperator.fullname\" . }}-serving-cert"; print "  {{- end }}"; done=1}; next} \
 		in_metadata && /^  annotations:/ {next} \
 		in_metadata && /^    cert-manager/ {next} \
+		in_metadata && /^  \{\{- if .Values.certManager.enabled \}\}/ {next} \
+		in_metadata && /^  \{\{- end \}\}/ {next} \
 		in_metadata && /^  labels:/ {in_metadata=0} \
 		{print}' \
 		$(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml > $(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml.tmp && \
@@ -167,6 +174,8 @@ helm: generate manifests kustomize helmify ## Update soperator Helm chart
 		in_metadata && /^  name:/ {print; if (!done) {print "  {{- if .Values.certManager.enabled }}"; print "  annotations:"; print "    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include \"soperator.fullname\" . }}-serving-cert"; print "  {{- end }}"; done=1}; next} \
 		in_metadata && /^  annotations:/ {next} \
 		in_metadata && /^    cert-manager/ {next} \
+		in_metadata && /^  \{\{- if .Values.certManager.enabled \}\}/ {next} \
+		in_metadata && /^  \{\{- end \}\}/ {next} \
 		in_metadata && /^  labels:/ {in_metadata=0} \
 		{print}' \
 		$(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml > $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml.tmp && \
@@ -417,6 +426,7 @@ endif
 		-t "$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)-$(ARCH)" \
 		-f images/$(DOCKERFILE) \
 		--build-arg SLURM_VERSION="$(SLURM_VERSION)" \
+		--build-arg SLURM_DEB_VERSION="$(SLURM_DEB_VERSION)" \
 		--progress=plain \
 		--push \
 		--cache-from=type=registry,ref=$${CACHE_REF} \
@@ -572,8 +582,8 @@ FLUX			?= $(LOCALBIN)/flux
 
 ## Tool Versions
 KUSTOMIZE_VERSION			?= v5.5.0
-CONTROLLER_TOOLS_VERSION	?= v0.19.0
-ENVTEST_VERSION				?= release-0.17
+CONTROLLER_TOOLS_VERSION	?= v0.21.0
+ENVTEST_VERSION				?= release-0.24
 GOLANGCI_LINT_VERSION		?= v2.12.2  # Should be in sync with the github CI step.
 HELMIFY_VERSION				?= 0.4.13
 HELM_VERSION				?= v3.18.3
@@ -617,7 +627,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
 $(ENVTEST): $(LOCALBIN)
-	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.22
+	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
@@ -708,6 +718,9 @@ KIND_CLUSTER_NAME	?= soperator-dev
 KIND_NODES			?= 2
 KIND_K8S_VERSION	?= v1.31.0
 KIND_CONTEXT		?= kind-$(KIND_CLUSTER_NAME)
+# The soperator-fluxcd chart pins its control-plane workloads to the system nodeset, so every kind
+# node carries the label - otherwise those pods stay Pending and their HelmReleases never go Ready.
+KIND_NODESET_LABEL	?= slurm.nebius.ai/nodeset: system
 KUBECTL_CTX			= $(KUBECTL) --context $(KIND_CONTEXT)
 
 .PHONY: kind-create
@@ -721,8 +734,12 @@ kind-create: install-kind ## Create kind cluster with specified number of nodes
 	@echo "apiVersion: kind.x-k8s.io/v1alpha4" >> /tmp/kind-config.yaml
 	@echo "nodes:" >> /tmp/kind-config.yaml
 	@echo "- role: control-plane" >> /tmp/kind-config.yaml
+	@echo "  labels:" >> /tmp/kind-config.yaml
+	@echo "    $(KIND_NODESET_LABEL)" >> /tmp/kind-config.yaml
 	@for i in $$(seq 1 $$(($(KIND_NODES) - 1))); do \
 		echo "- role: worker" >> /tmp/kind-config.yaml; \
+		echo "  labels:" >> /tmp/kind-config.yaml; \
+		echo "    $(KIND_NODESET_LABEL)" >> /tmp/kind-config.yaml; \
 	done
 	@$(KIND) create cluster --name $(KIND_CLUSTER_NAME) --config /tmp/kind-config.yaml --image kindest/node:$(KIND_K8S_VERSION)
 	@rm /tmp/kind-config.yaml

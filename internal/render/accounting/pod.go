@@ -65,13 +65,14 @@ func BasePodTemplateSpec(
 		common.RenderContainerMunge(&accounting.ContainerMunge),
 	)
 
-	return &corev1.PodTemplateSpec{
+	res := &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      matchLabels,
 			Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameAccounting),
 		},
 		Spec: corev1.PodSpec{
 			HostUsers:         accounting.HostUsers,
+			ImagePullSecrets:  accounting.ContainerAccounting.ImagePullSecrets,
 			Affinity:          nodeFilter.Affinity,
 			Tolerations:       nodeFilter.Tolerations,
 			NodeSelector:      nodeFilter.NodeSelector,
@@ -83,5 +84,7 @@ func BasePodTemplateSpec(
 			},
 			Volumes: volumes,
 		},
-	}, nil
+	}
+
+	return res, nil
 }

@@ -34,11 +34,19 @@ spec:
   {{- else }}
     nodeConfigurator:
       enabled: false
+  {{- $rebooter := .Values.soperator.nodeConfigurator.values.rebooter | default dict }}
     rebooter:
       enabled: true
-      {{- if and .Values.soperator.nodeConfigurator.values.rebooter .Values.soperator.nodeConfigurator.values.rebooter.resources }}
-      resources: 
-      {{- toYaml .Values.soperator.nodeConfigurator.values.rebooter.resources | nindent 8 }}
+      {{- with $rebooter.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      {{- with $rebooter.priorityClass }}
+      priorityClass:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $rebooter.resources }}
+      resources:
+      {{- toYaml . | nindent 8 }}
       {{- end }}
       generateRBAC: true
       logFormat: json

@@ -5,6 +5,7 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strconv"
 
 	appspub "github.com/openkruise/kruise-api/apps/pub"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -31,11 +32,13 @@ func RenderNodeSetStatefulSet(
 	cgroupVersion string,
 	clusterWithGPU bool,
 	topologyPluginEnabled bool,
-	topologyPlugin string,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	labels[consts.LabelNodeSetKey] = nodeSet.Name
 	labels[consts.LabelWorkerKey] = consts.LabelWorkerValue
+	labels[consts.LabelSoperatorRollingUpdateEnabled] = strconv.FormatBool(
+		nodeSet.UpdateStrategy == consts.UpdateStrategySlurmAwareRollingUpdate,
+	)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	matchLabels[consts.LabelNodeSetKey] = nodeSet.Name
 
@@ -66,7 +69,8 @@ func RenderNodeSetStatefulSet(
 			topologyPluginEnabled,
 			nodeSet.GPU.Enabled,
 			topologyTimeOut,
-			topologyPlugin,
+			nodeSet.TopologyFabric,
+			nodeSet.WorkerInitRandomDelaySeconds,
 		),
 	)
 
@@ -91,6 +95,11 @@ func RenderNodeSetStatefulSet(
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}
 
+	containers := []corev1.Container{slurmdContainer}
+	if nodeSet.DockerEnabled {
+		containers = append(containers, renderContainerNodeSetDockerProxy(nodeSet))
+	}
+
 	replicas := &nodeSet.StatefulSet.Replicas
 	var reserveOrdinals []intstr.IntOrString
 
@@ -111,17 +120,16 @@ func RenderNodeSetStatefulSet(
 			},
 		},
 		PriorityClassName:  nodeSet.PriorityClass,
-		ServiceAccountName: naming.BuildServiceAccountWorkerName(nodeSet.ParentalCluster.Name),
+		ServiceAccountName: naming.BuildServiceAccountNodeSetName(nodeSet.ParentalCluster.Name, nodeSet.Name),
+		ImagePullSecrets:   nodeSet.ImagePullSecrets,
 		Affinity:           nodeSet.Affinity,
 		NodeSelector:       nodeSet.NodeSelector,
 		Tolerations:        nodeSet.Tolerations,
 		InitContainers:     initContainers,
-		Containers: []corev1.Container{
-			slurmdContainer,
-		},
-		Volumes:   volumes,
-		Subdomain: nodeSet.ServiceUmbrella.Name,
-		DNSPolicy: corev1.DNSClusterFirst,
+		Containers:         containers,
+		Volumes:            volumes,
+		Subdomain:          nodeSet.ServiceUmbrella.Name,
+		DNSPolicy:          corev1.DNSClusterFirst,
 		DNSConfig: &corev1.PodDNSConfig{
 			Searches: []string{
 				naming.BuildServiceFQDN(nodeSet.ServiceUmbrella.Name, nodeSet.ParentalCluster.Namespace),
@@ -150,8 +158,12 @@ func RenderNodeSetStatefulSet(
 			WhenScaled:  kruisev1b1.DeletePersistentVolumeClaimRetentionPolicyType,
 		}
 	}
+	updateStrategy, volumeClaimUpdateStrategy, err := renderUpdateStrategies(nodeSet)
+	if err != nil {
+		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering update strategies: %w", err)
+	}
 
-	return kruisev1b1.StatefulSet{
+	res := kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        nodeSet.StatefulSet.Name,
 			Namespace:   nodeSet.ParentalCluster.Namespace,
@@ -163,15 +175,10 @@ func RenderNodeSetStatefulSet(
 			ServiceName:         nodeSet.ServiceUmbrella.Name,
 			Replicas:            replicas,
 			ReserveOrdinals:     reserveOrdinals,
-			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
-				Type: appsv1.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
-					MaxUnavailable:  &nodeSet.StatefulSet.MaxUnavailable,
-					PodUpdatePolicy: kruisev1b1.InPlaceIfPossiblePodUpdateStrategyType,
-					Partition:       ptr.To(int32(0)),
-					MinReadySeconds: ptr.To(int32(0)),
-				},
+			ScaleStrategy: &kruisev1b1.StatefulSetScaleStrategy{
+				MaxUnavailable: &nodeSet.StatefulSet.MaxUnavailable,
 			},
+			UpdateStrategy: updateStrategy,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: matchLabels,
 			},
@@ -181,9 +188,7 @@ func RenderNodeSetStatefulSet(
 				nodeSet.ParentalCluster.Name,
 				pvcTemplateSpecs,
 			),
-			VolumeClaimUpdateStrategy: kruisev1b1.VolumeClaimUpdateStrategy{
-				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
-			},
+			VolumeClaimUpdateStrategy: volumeClaimUpdateStrategy,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
@@ -193,7 +198,38 @@ func RenderNodeSetStatefulSet(
 			},
 			PersistentVolumeClaimRetentionPolicy: pvcRetentionPolicy,
 		},
-	}, nil
+	}
+
+	return res, nil
+}
+
+func renderUpdateStrategies(nodeSet *values.SlurmNodeSet) (kruisev1b1.StatefulSetUpdateStrategy, kruisev1b1.VolumeClaimUpdateStrategy, error) {
+	switch nodeSet.UpdateStrategy {
+	case "", consts.UpdateStrategyRollingUpdate:
+		return kruisev1b1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
+					MaxUnavailable:  &nodeSet.StatefulSet.MaxUnavailable,
+					PodUpdatePolicy: kruisev1b1.InPlaceIfPossiblePodUpdateStrategyType,
+					Partition:       ptr.To(int32(0)),
+					MinReadySeconds: ptr.To(int32(0)),
+				},
+			},
+			kruisev1b1.VolumeClaimUpdateStrategy{
+				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+			},
+			nil
+	case consts.UpdateStrategySlurmAwareRollingUpdate:
+		return kruisev1b1.StatefulSetUpdateStrategy{
+				Type: appsv1.OnDeleteStatefulSetStrategyType,
+			},
+			kruisev1b1.VolumeClaimUpdateStrategy{
+				Type: kruisev1b1.OnPVCDeleteVolumeClaimUpdateStrategyType,
+			},
+			nil
+	default:
+		return kruisev1b1.StatefulSetUpdateStrategy{}, kruisev1b1.VolumeClaimUpdateStrategy{}, fmt.Errorf("unsupported update strategy %q", nodeSet.UpdateStrategy)
+	}
 }
 
 func renderNodeSetAnnotations(nodeSet *values.SlurmNodeSet) map[string]string {

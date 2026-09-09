@@ -9,7 +9,7 @@ fi
 
 export CHECKS_CONTEXT="epilog"
 export CHECKS_CONFIG="/opt/slurm_scripts/checks.json"
-export CHECKS_OUTPUTS_BASE_DIR="/opt/soperator-outputs"
+export CHECKS_OUTPUTS_BASE_DIR="/opt/soperator-outputs/local"
 export CHECKS_RUNNER_OUTPUT="/mnt/jail$CHECKS_OUTPUTS_BASE_DIR/slurm_scripts/$SLURMD_NODENAME.check_runner.$CHECKS_CONTEXT.out"
 export PATH="$PATH"
 

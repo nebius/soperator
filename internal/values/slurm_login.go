@@ -32,14 +32,14 @@ type SlurmLogin struct {
 	JailSubMounts      []slurmv1.NodeVolumeMount
 	CustomVolumeMounts []slurmv1.NodeVolumeMount
 
+	UserIsolation *slurmv1.LoginUserIsolation
+	Autoscaling   *slurmv1.LoginAutoscaling
+
 	UseDefaultAppArmorProfile bool
 	Maintenance               *consts.MaintenanceMode
 }
 
-func buildSlurmLoginFrom(
-	clusterName string, maintenance *consts.MaintenanceMode,
-	login *slurmv1.SlurmNodeLogin, useDefaultAppArmorProfile bool,
-) SlurmLogin {
+func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.MaintenanceMode, login *slurmv1.SlurmNodeLogin, useDefaultAppArmorProfile bool) SlurmLogin {
 	svc := buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeLogin, clusterName))
 	svc.Type = login.SshdServiceType
 	svc.Annotations = login.SshdServiceAnnotations
@@ -76,7 +76,7 @@ func buildSlurmLoginFrom(
 		Service:              svc,
 		HeadlessService:      headlessSvc,
 		StatefulSet: buildStatefulSetFrom(
-			naming.BuildStatefulSetName(consts.ComponentTypeLogin),
+			naming.BuildStatefulSetName(consts.ComponentTypeLogin, namePrefix),
 			login.SlurmNode.Size,
 		),
 		SSHDConfigMapName:         sshdConfigMapName,
@@ -88,6 +88,8 @@ func buildSlurmLoginFrom(
 		VolumeJail:                *login.Volumes.Jail.DeepCopy(),
 		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
 		Maintenance:               maintenance,
+		UserIsolation:             login.UserIsolation.DeepCopy(),
+		Autoscaling:               login.Autoscaling.DeepCopy(),
 	}
 	if login.Sssd != nil {
 		containerSSSD := buildContainerFrom(
@@ -107,4 +109,8 @@ func buildSlurmLoginFrom(
 	}
 
 	return res
+}
+
+func (l SlurmLogin) IsAutoscalingEnabled() bool {
+	return l.Autoscaling != nil && l.Autoscaling.Enabled
 }

@@ -1,0 +1,166 @@
+name: PR E2E Command
+
+run-name: "PR #${{ github.event.issue.number }} E2E command by @${{ github.event.comment.user.login }}"
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  dispatch:
+    name: Dispatch E2E
+    if: |
+      github.event.issue.pull_request
+      && startsWith(github.event.comment.body, '/e2e')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.issue.number }}
+      COMMENTER: ${{ github.event.comment.user.login }}
+      COMMENT_BODY: ${{ github.event.comment.body }}
+      TERRAFORM_REPOSITORY: nebius/nebius-solution-library
+
+    steps:
+      - name: Authorize requester
+        shell: bash
+        run: |
+          permission=$(gh api \
+            "repos/$REPOSITORY/collaborators/$COMMENTER/permission" \
+            --jq '.permission')
+
+          case "$permission" in
+            admin|maintain|write)
+              ;;
+            *)
+              echo "::error::$COMMENTER is not allowed to trigger E2E"
+              exit 1
+              ;;
+          esac
+
+      - name: Validate request
+        id: request
+        shell: bash
+        run: |
+          fail_with_comment() {
+            local message="$1"
+            gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "$message"
+            echo "::error::$message"
+            exit 1
+          }
+
+          if [[ "$COMMENT_BODY" =~ ^/e2e([[:blank:]]+([^[:space:]]+))?[[:blank:]]*$ ]]; then
+            terraform_ref="${BASH_REMATCH[2]:-main}"
+          else
+            fail_with_comment 'Usage: `/e2e` or `/e2e <terraform-branch>`.'
+          fi
+
+          if ! git check-ref-format --branch "$terraform_ref" >/dev/null 2>&1; then
+            fail_with_comment "Terraform branch \`$terraform_ref\` is not a valid Git branch name."
+          fi
+
+          pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
+          pr_state=$(jq -r '.state' <<<"$pr")
+          head_ref=$(jq -r '.head.ref' <<<"$pr")
+          head_sha=$(jq -r '.head.sha' <<<"$pr")
+          head_repo=$(jq -r '.head.repo.full_name' <<<"$pr")
+
+          if [[ "$pr_state" != "open" ]]; then
+            fail_with_comment "PR #$PR_NUMBER is not open."
+          fi
+          if [[ "$head_repo" != "$REPOSITORY" ]]; then
+            fail_with_comment 'The `/e2e` command does not support fork PRs.'
+          fi
+
+          if ! git ls-remote --exit-code --heads \
+            "https://github.com/$TERRAFORM_REPOSITORY.git" \
+            "refs/heads/$terraform_ref" >/dev/null; then
+            fail_with_comment \
+              "Terraform branch \`$terraform_ref\` does not exist in \`$TERRAFORM_REPOSITORY\`."
+          fi
+
+          build=$(gh api -X GET \
+            "repos/$REPOSITORY/actions/workflows/one_job.yml/runs" \
+            -F event=pull_request_target \
+            -F head_sha="$head_sha" \
+            -F per_page=1 \
+            --jq '.workflow_runs[0]')
+
+          if [[ -z "$build" || "$build" == "null" ]]; then
+            fail_with_comment \
+              "No Build All run was found for the current PR commit \`${head_sha:0:12}\`."
+          fi
+
+          build_id=$(jq -r '.id' <<<"$build")
+          build_status=$(jq -r '.status' <<<"$build")
+          build_conclusion=$(jq -r '.conclusion' <<<"$build")
+          build_url=$(jq -r '.html_url' <<<"$build")
+
+          if [[ "$build_status" != "completed" || "$build_conclusion" != "success" ]]; then
+            fail_with_comment \
+              "Build All for \`${head_sha:0:12}\` is \`$build_status/$build_conclusion\`. Retry \`/e2e\` after it succeeds: $build_url"
+          fi
+
+          version_artifacts=$(gh api \
+            "repos/$REPOSITORY/actions/runs/$build_id/artifacts" \
+            --jq '[.artifacts[] | select(.name == "version" and .expired == false)] | length')
+          if [[ "$version_artifacts" == "0" ]]; then
+            fail_with_comment \
+              "Build All for \`${head_sha:0:12}\` has no usable \`version\` artifact: $build_url"
+          fi
+
+          {
+            echo "head_ref=$head_ref"
+            echo "head_sha=$head_sha"
+            echo "terraform_ref=$terraform_ref"
+            echo "build_url=$build_url"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch E2E
+        shell: bash
+        env:
+          HEAD_REF: ${{ steps.request.outputs.head_ref }}
+          HEAD_SHA: ${{ steps.request.outputs.head_sha }}
+          TERRAFORM_REF: ${{ steps.request.outputs.terraform_ref }}
+          BUILD_URL: ${{ steps.request.outputs.build_url }}
+        run: |
+          current_head_sha=$(gh api \
+            "repos/$REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '.head.sha')
+          if [[ "$current_head_sha" != "$HEAD_SHA" ]]; then
+            message="The PR head changed while validating \`/e2e\`. Retry the command after Build All succeeds for the new commit."
+            gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "$message"
+            echo "::error::$message"
+            exit 1
+          fi
+
+          if ! gh workflow run e2e_test.yml \
+            --repo "$REPOSITORY" \
+            --ref "$HEAD_REF" \
+            -f "terraform_repo_ref=$TERRAFORM_REF" \
+            -f "soperator_e2e_repo_branch=$HEAD_REF" \
+            -f profile=@auto-select \
+            -f run_unstable_tests=false \
+            -f is_scheduled=false; then
+            message="Could not dispatch E2E for \`$HEAD_REF\`. See the command workflow logs for details."
+            gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "$message"
+            exit 1
+          fi
+
+          workflow_url="$GITHUB_SERVER_URL/$REPOSITORY/actions/workflows/e2e_test.yml"
+          message=$(printf '%s\n\n%s\n%s\n%s\n%s\n%s\n\n%s' \
+            'E2E was dispatched with:' \
+            "- Soperator branch: \`$HEAD_REF\`" \
+            "- Terraform branch: \`$TERRAFORM_REF\`" \
+            "- Soperator E2E branch: \`$HEAD_REF\`" \
+            '- Profile: `@auto-select`' \
+            '- Unstable tests: `false`' \
+            "[Build All]($BUILD_URL) · [E2E runs]($workflow_url)")
+          gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "$message"

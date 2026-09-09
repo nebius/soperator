@@ -1,0 +1,66 @@
+suite: test login user isolation rendering
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should render user isolation disabled by default
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.userIsolation.enabled
+          value: false
+      - equal:
+          path: spec.slurmNodes.login.userIsolation.cpuWeight
+          value: 100
+      # Memory limits are unset by default: when the feature is enabled, the
+      # operator derives them from the sshd container memory limit (80% high /
+      # 90% max).
+      - notExists:
+          path: spec.slurmNodes.login.userIsolation.memoryHigh
+      - notExists:
+          path: spec.slurmNodes.login.userIsolation.memoryMax
+
+  - it: should render user isolation enabled with derived memory limits when turned on
+    set:
+      slurmNodes:
+        login:
+          userIsolation:
+            enabled: true
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.userIsolation.enabled
+          value: true
+      - notExists:
+          path: spec.slurmNodes.login.userIsolation.memoryHigh
+      - notExists:
+          path: spec.slurmNodes.login.userIsolation.memoryMax
+
+  - it: should render user isolation with memory limits when enabled
+    set:
+      slurmNodes:
+        login:
+          userIsolation:
+            enabled: true
+            memoryHigh: "2Gi"
+            memoryMax: "3Gi"
+            cpuWeight: 250
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.userIsolation.enabled
+          value: true
+      - equal:
+          path: spec.slurmNodes.login.userIsolation.memoryHigh
+          value: "2Gi"
+      - equal:
+          path: spec.slurmNodes.login.userIsolation.memoryMax
+          value: "3Gi"
+      - equal:
+          path: spec.slurmNodes.login.userIsolation.cpuWeight
+          value: 250
+
+  - it: should not render user isolation section when values block is removed
+    set:
+      slurmNodes:
+        login:
+          userIsolation: null
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.login.userIsolation

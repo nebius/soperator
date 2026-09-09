@@ -4,7 +4,6 @@
   "platforms": ["any"],
   "skip_for_cpu_jobs": false,
   "skip_for_partial_gpu_jobs": false,
-  "skip_for_reservation_prefixes": [],
   "contexts": ["none"],
   "node_states": ["any"],
   "on_fail": "none",

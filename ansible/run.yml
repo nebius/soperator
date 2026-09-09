@@ -11,6 +11,7 @@
     nccl_tests_version: "{{ lookup('env','NCCL_TESTS_VERSION') }}" # https://github.com/nebius/ml-containers/blob/main/ansible/roles/nccl-tests/defaults/main.yml#L3
     perftest_cuda_version: "{{ cuda_version }}"
     slurm_version: "{{ lookup('env','SLURM_VERSION') }}"
+    slurm_apt_version: "{{ lookup('env','SLURM_DEB_VERSION') }}"
 
     ansible_connection: community.general.chroot
     ansible_host: /mnt/jail
@@ -22,24 +23,25 @@
   roles:
     - repos
     - python
-    - common-packages
+    - common_packages
+    - squashfuse
     - cuda
-    - cuda-samples
-    - nccl-tests
+    - cuda_samples
+    - nccl_tests
     - dcgmi
-    - perftest
     - nvtop
-    - docker-cli
-    - openmpi
+    - docker_cli
+    - doca_ofed
     - dcgmi
     - gdrcopy
-    - nvidia-container-toolkit
-    - soperator-scripts
-    - slurm-divert
-    - slurm-client
-    - slurm-divert # role doubled here, because we need to do that after Slurm version upgrade
+    - nvidia_container_toolkit
+    - soperator_scripts
+    - slurm_divert
+    - slurm_client
+    - spank_nccl_inspector_preconf
+    - slurm_divert # role doubled here, because we need to do that after Slurm version upgrade
     - sssd
     - motd
-    - nc-health-checker
+    - nc_health_checker
   tags:
-    - run-all-upgrade
+    - run_all_upgrade

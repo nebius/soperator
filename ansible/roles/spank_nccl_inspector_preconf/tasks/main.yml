@@ -1,0 +1,21 @@
+---
+
+- name: Ensure NCCL Inspector PreConf SPANK plugin is installed
+  ansible.builtin.apt:
+    name:
+      - spank-nccl-inspector-preconf
+    state: present
+    update_cache: true
+  tags:
+    - spank-nccl-inspector-preconf
+
+- name: Ensure default NCCL Inspector PreConf profile directory exists
+  ansible.builtin.file:
+    path: "{{ spank_nccl_inspector_preconf_dump_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ spank_nccl_inspector_preconf_dump_dir_mode }}"
+  when: spank_nccl_inspector_preconf_dump_dir_create | bool
+  tags:
+    - spank-nccl-inspector-preconf

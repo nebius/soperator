@@ -20,12 +20,15 @@ func renderVolumesAndClaimTemplateSpecsForNodeSet(
 	volumes = []corev1.Volume{
 		common.RenderVolumeMungeKey(nodeSet.ParentalCluster.Name),
 		common.RenderVolumeMungeSocket(),
+		renderVolumeRuntime(),
 		common.RenderVolumeSecurityLimitsForNodeSet(nodeSet.ParentalCluster.Name, nodeSet.Name),
 		common.RenderVolumeSshdKeys(secrets.SshdKeysName),
 		common.RenderVolumeSshdRootKeys(nodeSet.ParentalCluster.Name),
 		common.RenderVolumeInMemory(nodeSet.ContainerSlurmd.Resources.Memory()),
 		common.RenderVolumeTmpDisk(),
 		renderVolumeBoot(),
+		renderVolumeHostLogJournal(),
+		renderVolumeSoperatorOutputs(),
 		renderVolumeSharedMemory(nodeSet.SharedMemorySize),
 		renderVolumeSysctl(nodeSet.ParentalCluster.Name),
 		renderSupervisordConfigMap(nodeSet.SupervisorDConfigMapName),
@@ -102,6 +105,41 @@ func renderSupervisordConfigMap(name string) corev1.Volume {
 	}
 }
 
+func renderVolumeRuntime() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameRuntime,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	}
+}
+
+func renderVolumeHostLogJournal() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameHostLogJournal,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: consts.VolumeHostPathJournal,
+				Type: ptr.To(corev1.HostPathType("")),
+			},
+		},
+	}
+}
+
+// renderVolumeSoperatorOutputs renders [corev1.Volume] backed by the worker boot disk
+// for node-local Soperator log outputs, bound into the jail at /opt/soperator-outputs/local
+func renderVolumeSoperatorOutputs() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameSoperatorOutputs,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: consts.VolumeHostPathSoperatorOutputs,
+				Type: ptr.To(corev1.HostPathDirectoryOrCreate),
+			},
+		},
+	}
+}
+
 // endregion Volumes & claims
 
 // region Nvidia
@@ -151,6 +189,21 @@ func renderVolumeMountBoot() corev1.VolumeMount {
 		Name:             consts.VolumeNameBoot,
 		MountPath:        consts.VolumeMountPathBoot,
 		MountPropagation: ptr.To(corev1.MountPropagationHostToContainer),
+	}
+}
+
+func renderVolumeMountHostLogJournal() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameHostLogJournal,
+		MountPath: consts.VolumeMountPathHostLogJournal,
+		ReadOnly:  true,
+	}
+}
+
+func renderVolumeMountSoperatorOutputs() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameSoperatorOutputs,
+		MountPath: consts.VolumeMountPathSoperatorOutputs,
 	}
 }
 

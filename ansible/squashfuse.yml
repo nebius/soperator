@@ -1,0 +1,11 @@
+---
+
+- name: Install SquashFS FUSE support
+  hosts:
+    - all
+    - localhost
+  become: true
+  roles:
+    - squashfuse
+  tags:
+    - squashfuse

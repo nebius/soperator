@@ -11,6 +11,7 @@ import (
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/worker"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -76,9 +77,12 @@ func TestRenderNodeSetStatefulSet_SSSD(t *testing.T) {
 		consts.CGroupV2,
 		false,
 		false,
-		"",
 	)
 	assert.NoError(t, err)
+	assert.Equal(t,
+		naming.BuildServiceAccountNodeSetName("test-cluster", nodeSet.Name),
+		result.Spec.Template.Spec.ServiceAccountName,
+	)
 
 	assert.Len(t, result.Spec.Template.Spec.InitContainers, 3)
 	assert.Equal(t, consts.ContainerNameSSSD, result.Spec.Template.Spec.InitContainers[1].Name)

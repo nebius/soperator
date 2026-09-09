@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: jailedconfigs.slurm.nebius.ai
 spec:
   group: slurm.nebius.ai
@@ -118,8 +118,8 @@ spec:
                   updateActions are optional: it is a list of action to perform after materializing files
                   They will be performed sequentially, in same order as in spec
                   `Reconfigure` will call reconfigure endpoint and wait until slurmd restarts on every node
-                  See https://slurm.schedmd.com/rest_api.html#slurmV0043GetReconfigure
-                  See https://slurm.schedmd.com/rest_api.html#slurmV0043GetNodes
+                  See https://slurm.schedmd.com/rest_api.html#slurmV0044GetReconfigure
+                  See https://slurm.schedmd.com/rest_api.html#slurmV0044GetNodes
                 items:
                   description: UpdateAction is a single action that can be performed
                     after materializing files
@@ -134,6 +134,13 @@ spec:
           status:
             description: status defines the observed state of JailedConfig
             properties:
+              appliedHash:
+                description: |-
+                  AppliedHash fingerprints the payload last written to the jail and, when the config asks for
+                  them, whose update actions completed. It is what lets a reconciliation tell a real config
+                  change from a re-run over identical content, so an unchanged config does not reconfigure the
+                  cluster again.
+                type: string
               conditions:
                 description: Current state of jailed config
                 items:

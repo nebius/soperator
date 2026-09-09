@@ -58,8 +58,6 @@ func TestUpdateTopologyConfigMap(t *testing.T) {
 			Scheme: scheme,
 		},
 		Namespace: "default",
-		// Use the same fakeClient as APIReader for tests
-		APIReader: fakeClient,
 	}
 
 	ctx := context.TODO()
@@ -123,8 +121,6 @@ func TestRemoveTopologyConfigMap(t *testing.T) {
 			Scheme: scheme,
 		},
 		Namespace: "default",
-		// Use the same fakeClient as APIReader for tests
-		APIReader: fakeClient,
 	}
 
 	ctx := context.TODO()

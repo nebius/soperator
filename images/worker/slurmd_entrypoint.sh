@@ -42,6 +42,9 @@ else
     export TOPO_SWITCH_TIER2="unknown"
 fi
 
+echo "Export Soperator node metadata"
+/opt/bin/slurm/write_soperator_metadata.sh
+
 echo "Evaluate variables in the Slurm node 'Extra' field"
 evaluated_extra=$(eval echo "$SLURM_NODE_EXTRA")
 

@@ -1,0 +1,68 @@
+suite: test controller-runtime protected metrics
+release:
+  name: test-soperatorchecks
+  namespace: soperator-system
+templates:
+  - templates/deployment.yaml
+  - templates/metrics-auth-rbac.yaml
+
+tests:
+  - it: should expose secure metrics from the manager without a sidecar
+    template: templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: manager
+      - hasDocuments:
+          count: 1
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --metrics-bind-address=:8443
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --metrics-secure=true
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            containerPort: 8443
+            name: https
+            protocol: TCP
+
+  - it: should grant the manager auth review permissions for protected metrics
+    template: templates/metrics-auth-rbac.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: ClusterRole
+        documentIndex: 0
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - authentication.k8s.io
+            resources:
+              - tokenreviews
+            verbs:
+              - create
+        documentIndex: 0
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - authorization.k8s.io
+            resources:
+              - subjectaccessreviews
+            verbs:
+              - create
+        documentIndex: 0
+      - isKind:
+          of: ClusterRoleBinding
+        documentIndex: 1
+      - equal:
+          path: subjects[0].name
+          value: test-soperatorchecks-checks
+        documentIndex: 1

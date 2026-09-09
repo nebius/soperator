@@ -1,15 +1,58 @@
 package accounting
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/values"
 )
+
+func Test_DeriveMariaDbBufferPoolSizeMi(t *testing.T) {
+	tests := []struct {
+		name     string
+		memory   *resource.Quantity
+		expected int64
+	}{
+		{
+			name:     "nil memory falls back to legacy size",
+			memory:   nil,
+			expected: 32768,
+		},
+		{
+			name:     "zero memory falls back to legacy size",
+			memory:   &resource.Quantity{},
+			expected: 32768,
+		},
+		{
+			name:     "4Gi derives half",
+			memory:   ptr.To(resource.MustParse("4Gi")),
+			expected: 2048,
+		},
+		{
+			name:     "1G floors to whole MiB",
+			memory:   ptr.To(resource.MustParse("1G")),
+			expected: 476,
+		},
+		{
+			name:     "tiny memory falls back to legacy size",
+			memory:   ptr.To(resource.MustParse("1Mi")),
+			expected: 32768,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, deriveMariaDbBufferPoolSizeMi(tt.memory))
+		})
+	}
+}
 
 func Test_GetMariaDbConfig(t *testing.T) {
 	mariaDb := slurmv1.MariaDbOperator{
@@ -84,6 +127,10 @@ func Test_RenderMariaDb(t *testing.T) {
 			NodeContainer: slurmv1.NodeContainer{
 				Image: imageMariaDb,
 				Port:  portMariadb,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceCPU:    resource.MustParse("1"),
+				},
 			},
 		},
 		SlurmNode: slurmv1.SlurmNode{
@@ -115,4 +162,35 @@ func Test_RenderMariaDb(t *testing.T) {
 	assert.Equal(t, true, mariaDb.Spec.PasswordSecretKeyRef.Generate)
 	assert.Equal(t, consts.MariaDbSecretRootName, mariaDb.Spec.RootPasswordSecretKeyRef.SecretKeySelector.Name)
 	assert.Equal(t, consts.MariaDbPasswordKey, mariaDb.Spec.RootPasswordSecretKeyRef.SecretKeySelector.Key)
+	assert.Equal(t, fmt.Sprintf(consts.MariaDbMyCnfTemplate, int64(2048)), *mariaDb.Spec.MyCnf)
+}
+
+func Test_RenderMariaDb_NoResources(t *testing.T) {
+	nodeFilterName := "cpu"
+	accounting := &values.SlurmAccounting{
+		MariaDb: slurmv1.MariaDbOperator{
+			Enabled: true,
+		},
+		SlurmNode: slurmv1.SlurmNode{
+			K8sNodeFilterName: nodeFilterName,
+		},
+	}
+	nodeFilters := []slurmv1.K8sNodeFilter{
+		{
+			Name: nodeFilterName,
+		},
+	}
+
+	mariaDb, err := RenderMariaDb("test-namespace", "test-cluster", accounting, nodeFilters)
+
+	assert.NoError(t, err)
+	legacyMyCnf := `[mariadb]
+bind-address=*
+default_storage_engine=InnoDB
+innodb_default_row_format=DYNAMIC
+innodb_buffer_pool_size=32768M
+innodb_log_file_size=64M
+innodb_lock_wait_timeout=900
+max_allowed_packet=16M`
+	assert.Equal(t, legacyMyCnf, *mariaDb.Spec.MyCnf)
 }

@@ -63,10 +63,10 @@ func renderInitContainerSConfigController(
 		Args: []string{
 			`echo "Waiting for populate-jail to complete..."
 timeout=600; elapsed=0
-while [ ! -f /mnt/jail/.populated ] && [ $elapsed -lt $timeout ]; do
+while [ ! -f /mnt/jail/etc/soperator-jail-populated ] && [ $elapsed -lt $timeout ]; do
     sleep 5; elapsed=$((elapsed + 5))
 done
-if [ ! -f /mnt/jail/.populated ]; then
+if [ ! -f /mnt/jail/etc/soperator-jail-populated ]; then
     echo "ERROR: populate-jail did not complete within ${timeout}s"
     exit 1
 fi
