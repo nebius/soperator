@@ -411,7 +411,7 @@ func assertCreateRejected(
 	t.Helper()
 	proxy := newTestProxy(resolver, roundTripperFunc(func(*http.Request) (*http.Response, error) {
 		t.Fatal("request unexpectedly reached upstream")
-		return nil, nil
+		return nil, errors.New("unexpected upstream request")
 	}))
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/containers/create", strings.NewReader(`{}`))
 	if credentials != nil {

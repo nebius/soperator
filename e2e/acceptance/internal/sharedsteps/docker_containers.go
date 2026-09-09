@@ -175,6 +175,8 @@ trap cleanup EXIT
 echo "DOCKER_HOST=${DOCKER_HOST:-}"
 echo "DOCKER_ROOT=$(docker info --format '{{.DockerRootDir}}')"
 echo "DOCKER_CGROUP_DRIVER=$(docker info --format '{{.CgroupDriver}}')"
+echo "EXPECTED_SESSION_CGROUP=/users/user-$(id -u)/sessions"
+echo "SESSION_CGROUP=$(sed -n 's/^0:://p' /proc/self/cgroup)"
 if docker -H unix:///run/soperator-dockerd.sock version >/dev/null 2>&1; then
     echo "PRIVATE_SOCKET_BLOCKED=false"
 else
@@ -232,6 +234,17 @@ func (s *DockerContainers) dockerUsesTheLoginProxyImageStorageAndTheUsersCgroup(
 				strings.TrimSpace(s.loginSSHOutput),
 			)
 		}
+	}
+
+	expectedSessionCgroup := dockerSSHOutputValue(s.loginSSHOutput, "EXPECTED_SESSION_CGROUP")
+	sessionCgroup := dockerSSHOutputValue(s.loginSSHOutput, "SESSION_CGROUP")
+	if expectedSessionCgroup == "" || !strings.HasSuffix(sessionCgroup, expectedSessionCgroup) {
+		return fmt.Errorf(
+			"login Docker SSH session cgroup %q does not end with %q; output: %s",
+			sessionCgroup,
+			expectedSessionCgroup,
+			strings.TrimSpace(s.loginSSHOutput),
+		)
 	}
 
 	expectedCgroup := dockerSSHOutputValue(s.loginSSHOutput, "EXPECTED_USER_CGROUP")
