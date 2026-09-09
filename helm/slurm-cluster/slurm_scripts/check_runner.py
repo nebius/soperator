@@ -565,7 +565,7 @@ def drain_node(reason):
     try:
 
         subprocess.run(
-            ["scontrol", "update", f"NodeName={SLURMD_NODENAME}", "State=drain", f"Reason=\"{reason}\""],
+            ["scontrol", "update", f"NodeName={SLURMD_NODENAME}", "State=drain", f"Reason={reason}"],
             check=False, stderr=subprocess.DEVNULL
         )
         # Invalidate cache for the Slurm node info
@@ -591,7 +591,7 @@ def comment_node(comment):
     logging.info(f"Comment Slurm node {SLURMD_NODENAME}: {comment}")
     try:
         subprocess.run(
-            ["scontrol", "update", f"NodeName={SLURMD_NODENAME}", f"Comment=\"{comment}\""],
+            ["scontrol", "update", f"NodeName={SLURMD_NODENAME}", f"Comment={comment}"],
             check=False, stderr=subprocess.DEVNULL
         )
         # Invalidate cache for the Slurm node info
@@ -604,7 +604,7 @@ def uncomment_node():
     logging.info(f"Uncomment Slurm node {SLURMD_NODENAME}")
     try:
         subprocess.run(
-            ["scontrol", "update", f"NodeName={SLURMD_NODENAME}", "Comment=\"\""],
+            ["scontrol", "update", f"NodeName={SLURMD_NODENAME}", "Comment="],
             check=False, stderr=subprocess.DEVNULL
         )
         # Invalidate cache for the Slurm node info
