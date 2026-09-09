@@ -515,13 +515,20 @@ jobs:
       - pre-build
     if: needs.changes.outputs.should_build == 'true'
     runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.allow_failure }}
 
     strategy:
       fail-fast: false
       matrix:
         platform: [ linux/amd64, linux/arm64 ]
-        cuda_version: [ "12.9.0", "13.0.2" ]
+        cuda_version: [ "12.9.0", "13.0.2", "13.0.3" ]
         include:
+          - cuda_version: "12.9.0"
+            allow_failure: false
+          - cuda_version: "13.0.2"
+            allow_failure: false
+          - cuda_version: "13.0.3"
+            allow_failure: true
           - platform: linux/amd64
             runner: ubuntu-24.04
             arch: amd64
@@ -718,11 +725,19 @@ jobs:
       - pre-build
       - build-jail-images
     runs-on: ubuntu-24.04
+    continue-on-error: ${{ matrix.allow_failure }}
 
     strategy:
       fail-fast: false
       matrix:
-        cuda_version: ["12.9.0", "13.0.2"]
+        cuda_version: ["12.9.0", "13.0.2", "13.0.3"]
+        include:
+          - cuda_version: "12.9.0"
+            allow_failure: false
+          - cuda_version: "13.0.2"
+            allow_failure: false
+          - cuda_version: "13.0.3"
+            allow_failure: true
 
     env:
       UNSTABLE: ${{ needs.pre-build.outputs.unstable }}
