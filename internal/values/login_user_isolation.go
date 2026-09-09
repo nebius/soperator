@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	loginUserIsolationMemoryHighPercent int64 = 80
-	loginUserIsolationMemoryMaxPercent  int64 = 90
+	loginUserIsolationMemoryHighPercent int64 = 40
+	loginUserIsolationMemoryMaxPercent  int64 = 50
 )
 
 // ResolveLoginUserIsolationMemoryLimits returns the effective limits after applying derived defaults.
