@@ -227,7 +227,7 @@ tests:
           path: spec.k8sJobSpec.jobContainer.env
           content:
             name: NCCL_TESTS_VERSION
-            value: "2.17.6"
+            value: "2.20.0"
 
   - it: should use flat override when ncclTestsVersion is set
     documentSelector:
