@@ -85,55 +85,45 @@ func TestValidateSlurmClusterUserIsolation(t *testing.T) {
 	}
 
 	t.Run("admits limits below the container memory limit", func(t *testing.T) {
+		memoryHigh := resource.MustParse("4Gi")
 		memoryMax := resource.MustParse("8Gi")
 		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
-			Enabled:   ptr.To(true),
-			MemoryMax: &memoryMax,
+			Enabled:    ptr.To(true),
+			MemoryHigh: &memoryHigh,
+			MemoryMax:  &memoryMax,
 		}))
 		assert.NoError(t, err)
 	})
 
-	t.Run("admits explicit memoryHigh below derived memoryMax", func(t *testing.T) {
-		memoryHigh := resource.MustParse("8Gi")
+	t.Run("rejects memoryHigh above memoryMax", func(t *testing.T) {
+		memoryHigh := resource.MustParse("4Gi")
+		memoryMax := resource.MustParse("3Gi")
 		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
 			Enabled:    ptr.To(true),
 			MemoryHigh: &memoryHigh,
-		}))
-		assert.NoError(t, err)
-	})
-
-	t.Run("rejects explicit memoryMax below derived memoryHigh", func(t *testing.T) {
-		memoryMax := resource.MustParse("7Gi")
-		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
-			Enabled:   ptr.To(true),
-			MemoryMax: &memoryMax,
-		}))
-		assert.ErrorContains(t, err, "must not exceed memoryMax")
-	})
-
-	t.Run("rejects explicit memoryHigh above derived memoryMax", func(t *testing.T) {
-		memoryHigh := resource.MustParse("8500Mi")
-		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
-			Enabled:    ptr.To(true),
-			MemoryHigh: &memoryHigh,
+			MemoryMax:  &memoryMax,
 		}))
 		assert.ErrorContains(t, err, "must not exceed memoryMax")
 	})
 
 	t.Run("rejects memoryMax at or above the container memory limit", func(t *testing.T) {
+		memoryHigh := resource.MustParse("4Gi")
 		memoryMax := resource.MustParse("9Gi")
 		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
-			Enabled:   ptr.To(true),
-			MemoryMax: &memoryMax,
+			Enabled:    ptr.To(true),
+			MemoryHigh: &memoryHigh,
+			MemoryMax:  &memoryMax,
 		}))
 		assert.ErrorContains(t, err, "memoryMax")
 	})
 
 	t.Run("rejects memoryHigh at or above the container memory limit", func(t *testing.T) {
 		memoryHigh := resource.MustParse("10Gi")
+		memoryMax := resource.MustParse("10Gi")
 		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
 			Enabled:    ptr.To(true),
 			MemoryHigh: &memoryHigh,
+			MemoryMax:  &memoryMax,
 		}))
 		assert.ErrorContains(t, err, "memoryHigh")
 	})
@@ -141,7 +131,13 @@ func TestValidateSlurmClusterUserIsolation(t *testing.T) {
 	for _, field := range []string{"memoryHigh", "memoryMax"} {
 		t.Run("rejects non-positive "+field, func(t *testing.T) {
 			quantity := resource.MustParse("-1Gi")
-			isolation := &slurmv1.LoginUserIsolation{Enabled: ptr.To(true)}
+			memoryHigh := resource.MustParse("1Gi")
+			memoryMax := resource.MustParse("8Gi")
+			isolation := &slurmv1.LoginUserIsolation{
+				Enabled:    ptr.To(true),
+				MemoryHigh: &memoryHigh,
+				MemoryMax:  &memoryMax,
+			}
 			switch field {
 			case "memoryHigh":
 				isolation.MemoryHigh = &quantity
@@ -155,10 +151,12 @@ func TestValidateSlurmClusterUserIsolation(t *testing.T) {
 	}
 
 	t.Run("ignores limits when isolation is disabled", func(t *testing.T) {
+		memoryHigh := resource.MustParse("100Gi")
 		memoryMax := resource.MustParse("100Gi")
 		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
-			Enabled:   ptr.To(false),
-			MemoryMax: &memoryMax,
+			Enabled:    ptr.To(false),
+			MemoryHigh: &memoryHigh,
+			MemoryMax:  &memoryMax,
 		}))
 		assert.NoError(t, err)
 	})
