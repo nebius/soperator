@@ -1,6 +1,6 @@
 Feature: Default Slurm configuration
 
-  @soperator_version_>=4.0.0
+  @essential @soperator_version_>=4.0.0
   Scenario: Stable Soperator defaults are applied
     When the effective Slurm configuration is read
     Then it contains the following settings:

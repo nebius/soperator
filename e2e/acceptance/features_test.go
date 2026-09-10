@@ -44,6 +44,50 @@ func TestSharedFeaturesHaveValidVersionTags(t *testing.T) {
 	assert.NotEmpty(t, paths)
 }
 
+func TestSharedFeaturesHaveExpectedEssentialScenarios(t *testing.T) {
+	want := []string{
+		"A regular user can SSH to a worker without extra options",
+		"A static NodeSet can transition to ephemeral mode and back",
+		"A user job is recorded with its allocated resources",
+		"Additional processes do not increase a login user's CPU share",
+		"CPU jobs run expected Prolog and Epilog passive checks",
+		"Docker container lifecycle uses local storage",
+		"Enroot and Pyxis cache images and clean up runtime state",
+		"Enroot containers can access GPUs",
+		"Every configured topology can schedule a job",
+		"GPU jobs run passive GPU health checks",
+		"GPU workers expose the required NVIDIA driver capabilities",
+		"Login SSH sessions expose the default resource-limit profile",
+		"Partitions and workers use their configured topologies",
+		"Required kernel settings are visible in SSH sessions and Slurm jobs",
+		"Stable Soperator defaults are applied",
+		"The operator publishes and Slurm loads the configured topologies",
+		"The provisioned cluster is ready for acceptance tests",
+		"kube-state-metrics scrape config is consumed by the vm-stack chart",
+	}
+
+	var got []string
+	for _, path := range FeaturePaths() {
+		content, err := fs.ReadFile(acceptanceFeatures, path)
+		require.NoError(t, err)
+
+		doc, err := gherkin.ParseGherkinDocument(strings.NewReader(string(content)), (&messages.Incrementing{}).NewId)
+		require.NoError(t, err)
+		for _, child := range doc.Feature.Children {
+			if child.Scenario == nil {
+				continue
+			}
+			if slices.ContainsFunc(child.Scenario.Tags, func(tag *messages.Tag) bool {
+				return tag.Name == "@essential"
+			}) {
+				got = append(got, child.Scenario.Name)
+			}
+		}
+	}
+
+	assert.ElementsMatch(t, want, got)
+}
+
 // manualFeatures are embedded scenarios deliberately kept out of the default suite: they need a
 // cluster shaped a particular way, or they change the cluster while they run, so they are started
 // by hand with --scenario instead of by every e2e run.

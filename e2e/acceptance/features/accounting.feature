@@ -1,6 +1,6 @@
 Feature: Slurm accounting
 
-  @soperator_version_>=4.0.0
+  @essential @soperator_version_>=4.0.0
   Scenario: A user job is recorded with its allocated resources
     Given Slurm accounting is reachable and the cluster is registered
     And an acceptance test user exists

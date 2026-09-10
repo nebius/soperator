@@ -1,5 +1,5 @@
 Feature: Passive checks
-  @soperator_version_>=4.0.0
+  @essential @soperator_version_>=4.0.0
   Scenario: CPU jobs run expected Prolog and Epilog passive checks
     Given a worker is selected
     When a CPU-only Slurm job runs on the selected worker
@@ -35,7 +35,7 @@ Feature: Passive checks
     Then the selected worker no longer has alloc_mem_used reason
     And the selected worker is usable after alloc_mem_used
 
-  @gpu @soperator_version_>=5.0.0
+  @essential @gpu @soperator_version_>=5.0.0
   Scenario: GPU jobs run passive GPU health checks
     Given a GPU worker is selected
     When a small GPU Slurm job runs on the selected GPU worker

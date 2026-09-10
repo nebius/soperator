@@ -14,6 +14,7 @@ func TestParseOptionsDefaults(t *testing.T) {
 	assert.Equal(t, "dev-context", opts.KubectlContext)
 	assert.Equal(t, "soperator", opts.SlurmClusterName)
 	assert.False(t, opts.RunUnstableTests)
+	assert.False(t, opts.RunEssentialTests)
 	assert.Empty(t, opts.SoperatorVersion)
 	assert.Empty(t, opts.ScenarioPaths)
 	assert.Empty(t, opts.ReportDir)
@@ -25,6 +26,7 @@ func TestParseOptionsExplicitValues(t *testing.T) {
 		"--slurm-cluster-name", "custom",
 		"--soperator-version", "4.1.5-reb85d0e5",
 		"--run-unstable=true",
+		"--run-essential=true",
 		"--scenario", "features/internal_ssh.feature:3",
 		"--scenario=features/observability.feature:3",
 		"--report-dir", "reports",
@@ -35,8 +37,26 @@ func TestParseOptionsExplicitValues(t *testing.T) {
 	assert.Equal(t, "custom", opts.SlurmClusterName)
 	assert.Equal(t, "4.1.5-reb85d0e5", opts.SoperatorVersion)
 	assert.True(t, opts.RunUnstableTests)
+	assert.True(t, opts.RunEssentialTests)
 	assert.Equal(t, []string{"features/internal_ssh.feature:3", "features/observability.feature:3"}, opts.ScenarioPaths)
 	assert.Equal(t, "reports", opts.ReportDir)
+}
+
+func TestSuiteFromOptionsSelectsEssentialScenarios(t *testing.T) {
+	suite := suiteFromOptions(options{RunEssentialTests: true}, "5.0.0")
+
+	assert.Equal(t, "@essential", suite.Tags)
+	assert.True(t, suite.ExcludeUnstable)
+}
+
+func TestSuiteFromOptionsCanIncludeUnstableEssentialScenarios(t *testing.T) {
+	suite := suiteFromOptions(options{
+		RunEssentialTests: true,
+		RunUnstableTests:  true,
+	}, "5.0.0")
+
+	assert.Equal(t, "@essential", suite.Tags)
+	assert.False(t, suite.ExcludeUnstable)
 }
 
 func TestParseOptionsRequiresKubectlContext(t *testing.T) {

@@ -14,12 +14,13 @@ import (
 const defaultSlurmClusterName = "soperator"
 
 type options struct {
-	KubectlContext   string
-	SlurmClusterName string
-	SoperatorVersion string
-	RunUnstableTests bool
-	ScenarioPaths    []string
-	ReportDir        string
+	KubectlContext    string
+	SlurmClusterName  string
+	SoperatorVersion  string
+	RunUnstableTests  bool
+	RunEssentialTests bool
+	ScenarioPaths     []string
+	ReportDir         string
 }
 
 type scenarioPathFlag []string
@@ -52,13 +53,7 @@ func Run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	suite := acceptance.SoperatorSuite(targetSoperatorVersion)
-	if len(opts.ScenarioPaths) > 0 {
-		suite.Source.Paths = opts.ScenarioPaths
-	}
-	if opts.RunUnstableTests {
-		suite.ExcludeUnstable = false
-	}
+	suite := suiteFromOptions(opts, targetSoperatorVersion)
 
 	runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 		KubectlContext:         opts.KubectlContext,
@@ -73,6 +68,20 @@ func Run(ctx context.Context, args []string) error {
 	return runner.Run(ctx)
 }
 
+func suiteFromOptions(opts options, targetSoperatorVersion string) acceptance.SuiteConfig {
+	suite := acceptance.SoperatorSuite(targetSoperatorVersion)
+	if len(opts.ScenarioPaths) > 0 {
+		suite.Source.Paths = opts.ScenarioPaths
+	}
+	if opts.RunEssentialTests {
+		suite.Tags = "@essential"
+	}
+	if opts.RunUnstableTests {
+		suite.ExcludeUnstable = false
+	}
+	return suite
+}
+
 func parseOptions(args []string) (options, error) {
 	opts := options{
 		SlurmClusterName: defaultSlurmClusterName,
@@ -84,6 +93,7 @@ func parseOptions(args []string) (options, error) {
 	fs.StringVar(&opts.SlurmClusterName, "slurm-cluster-name", opts.SlurmClusterName, "SlurmCluster resource name")
 	fs.StringVar(&opts.SoperatorVersion, "soperator-version", "", "target Soperator version; when omitted, Flux HelmRelease discovery is used")
 	fs.BoolVar(&opts.RunUnstableTests, "run-unstable", false, "run scenarios tagged @unstable")
+	fs.BoolVar(&opts.RunEssentialTests, "run-essential", false, "run only scenarios tagged @essential")
 	fs.Var((*scenarioPathFlag)(&opts.ScenarioPaths), "scenario", "feature file or exact Scenario line to run, e.g. features/internal_ssh.feature:3; may be repeated")
 	fs.StringVar(&opts.ReportDir, "report-dir", "", "optional directory for Cucumber and JUnit reports")
 
