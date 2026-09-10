@@ -204,7 +204,18 @@ kubectl port-forward -n monitoring-system svc/metrics-grafana 3000:80
 ```
 
 Pre-configured Dashboards:
+
 - Victoria Metrics K8s Stack: Grafana, Kubelet, Kubernetes system, Node Exporter, VictoriaMetrics health
-- Soperator Custom: Cluster health, Jobs overview, Workers stats and overview
+- Soperator Custom: Cluster Health & Overview, Slurm Controller, Jobs overview, Workers stats and overview
+
+Cluster Health & Overview and Slurm Controller each include **Nodes by Categories**
+and **Nodes by State** panels. They share mutually exclusive category definitions
+and stacking order: the first shows category totals, while the second shows exact
+Slurm state combinations within each category, including cloud and power-state
+flags. Powered down groups DOWN, POWERED_DOWN, POWER_UP, and POWERING_UP;
+Other/error includes ERROR, NOT_RESPONDING, INVALID, FAIL, and otherwise
+unclassified nodes.
+See [Grafana Dashboards](slurm-exporter.md#grafana-dashboards) for definitions
+and example legends.
 
 Dashboards are auto-discovered from ConfigMaps with label `grafana_dashboard: "1"` in monitored namespaces.

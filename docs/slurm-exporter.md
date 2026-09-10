@@ -94,10 +94,10 @@ Boolean state flag label convention:
 
 | Metric Name & Type | Description & Labels |
 |-------------------|---------------------|
-| **slurm_node_info**<br>*Gauge* | Provides detailed information about SLURM nodes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `instance_id` - Kubernetes instance identifier<br>• `nodeset_name` - Name of the Soperator NodeSet from the worker Pod's `slurm.nebius.ai/nodeset` label, including for pending Pods; empty when the worker Pod is unavailable<br>• `state_base` - Base node state (IDLE, ALLOCATED, DOWN, ERROR, MIXED, UNKNOWN)<br>• `state_is_drain` - Whether node is in drain state ("true"/"false")<br>• `state_is_maintenance` - Whether node is in maintenance state ("true"/"false")<br>• `state_is_reserved` - Whether node is in reserved state ("true"/"false")<br>• `state_is_completing` - Whether node is in completing state ("true" or empty)<br>• `state_is_fail` - Whether node is in fail state ("true" or empty)<br>• `state_is_planned` - Whether node is in planned state ("true" or empty)<br>• `state_is_not_responding` - Whether the node is marked as not responding ("true" or empty)<br>• `state_is_invalid` - Whether the node state is considered invalid by SLURM ("true" or empty)<br>• `state_is_cloud` - Whether the node is a cloud node powered on/off dynamically via Slurm power saving ("true" or empty)<br>• `state_is_power_down` - Whether the node is pending power down ("true" or empty)<br>• `state_is_power_drain` - Whether the node is draining as part of power down ("true" or empty)<br>• `state_is_powered_down` - Whether the node is currently powered down ("true" or empty)<br>• `state_is_powering_down` - Whether the node is transitioning to powered down ("true" or empty)<br>• `state_is_powering_up` - Whether the node is transitioning to powered up ("true" or empty)<br>• `state_is_power_up` - Whether the node is pending power up ("true" or empty)<br>• `is_unavailable` - Computed by the exporter: "true" when the node is considered unavailable (DOWN+* or IDLE+DRAIN+*), empty string otherwise. Power-managed nodes (powering up/down or powered down) are never reported as unavailable<br>• `reservation_name` - Reservation that currently includes the node (trimmed to 50 characters)<br>• `address` - IP address of the node<br>• `reason` - Reason for current node state (empty string if node has no reason set)<br>• `comment` - Comment set on the node (e.g., by active checks when GPU health check fails) |
+| **slurm_node_info**<br>*Gauge* | Provides detailed information about SLURM nodes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `instance_id` - Kubernetes instance identifier<br>• `nodeset_name` - Name of the Soperator NodeSet from the worker Pod's `slurm.nebius.ai/nodeset` label, including for pending Pods; empty when the worker Pod is unavailable<br>• `state_base` - Base node state (for example, IDLE, ALLOCATED, DOWN, ERROR, MIXED, UNKNOWN)<br>• `state_is_drain` - Whether node is in drain state ("true"/"false")<br>• `state_is_maintenance` - Whether node is in maintenance state ("true"/"false")<br>• `state_is_reserved` - Whether node is in reserved state ("true"/"false")<br>• `state_is_completing` - Whether node is in completing state ("true" or empty)<br>• `state_is_fail` - Whether node is in fail state ("true" or empty)<br>• `state_is_planned` - Whether node is in planned state ("true" or empty)<br>• `state_is_not_responding` - Whether the node is marked as not responding ("true" or empty)<br>• `state_is_invalid` - Whether the node state is considered invalid by SLURM ("true" or empty)<br>• `state_is_cloud` - Whether the node is a cloud node powered on/off dynamically via Slurm power saving ("true" or empty)<br>• `state_is_power_down` - Whether the node is pending power down ("true" or empty)<br>• `state_is_power_drain` - Whether the node is draining as part of power down ("true" or empty)<br>• `state_is_powered_down` - Whether the node is currently powered down ("true" or empty)<br>• `state_is_powering_down` - Whether the node is transitioning to powered down ("true" or empty)<br>• `state_is_powering_up` - Whether the node is transitioning to powered up ("true" or empty)<br>• `state_is_power_up` - Whether the node is pending power up ("true" or empty)<br>• `is_unavailable` - Computed by the exporter: "true" for DOWN, UNKNOWN, ERROR, NOT_RESPONDING, FAIL, INVALID, or IDLE+DRAIN, empty string otherwise. Power-managed nodes (powering up/down or powered down) are never reported as unavailable<br>• `reservation_name` - Reservation that currently includes the node (trimmed to 50 characters)<br>• `address` - IP address of the node<br>• `reason` - Reason for current node state (empty string if node has no reason set)<br>• `comment` - Comment set on the node (e.g., by active checks when GPU health check fails) |
 | **slurm_node_gpu_seconds_total**<br>*Counter* | Total GPU seconds accumulated on SLURM nodes<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `state_base` - Base node state<br>• `state_is_drain` - Drain state flag<br>• `state_is_maintenance` - Maintenance state flag<br>• `state_is_reserved` - Reserved state flag |
 | **slurm_node_fails_total**<br>*Counter* | Total number of node state transitions to failed states (DOWN/DRAIN). Power-managed nodes (powering up/down or powered down) are excluded, since their DOWN/DRAIN states are part of the normal cloud lifecycle<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br>• `state_base` - Base node state at time of failure<br>• `state_is_drain` - Drain state flag<br>• `state_is_maintenance` - Maintenance state flag<br>• `state_is_reserved` - Reserved state flag<br>• `reason` - Reason for the node failure |
-| **slurm_node_unavailability_duration_seconds**<br>*Histogram* | Duration of completed node unavailability events (DOWN+* or IDLE+DRAIN+*). Power-managed nodes (powering up/down or powered down) are excluded, since their DOWN/DRAIN states are part of the normal cloud lifecycle<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br><br>**Note:** Observations are recorded when unavailability events complete. Duration tracking is reset on exporter restarts, which may affect accuracy |
+| **slurm_node_unavailability_duration_seconds**<br>*Histogram* | Duration of completed node unavailability events, using the exporter’s `is_unavailable` definition. Power-managed nodes (powering up/down or powered down) are excluded, since their DOWN/DRAIN states are part of the normal cloud lifecycle<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br><br>**Note:** Observations are recorded when unavailability events complete. Duration tracking is reset on exporter restarts, which may affect accuracy |
 | **slurm_node_draining_duration_seconds**<br>*Histogram* | Duration of completed node draining events (DRAIN+ALLOCATED or DRAIN+MIXED)<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node<br><br>**Note:** Observations are recorded when draining events complete. Duration tracking is reset on exporter restarts, which may affect accuracy |
 | **slurm_node_cpus_total**<br>*Gauge* | Total number of CPUs on the node<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node |
 | **slurm_node_cpus_allocated**<br>*Gauge* | Number of CPUs currently allocated on the node<br><br>**Labels:**<br>• `node_name` - Name of the SLURM node |
@@ -214,6 +214,46 @@ go run ./cmd/exporter/main.go --cluster-name=soperator --kubeconfig-path=$HOME/.
 curl localhost:8080/metrics
 ```
 
-## Grafana Dashboard Example
+## Grafana Dashboards
 
-The SLURM Exporter integrates with existing Grafana dashboards. Here's an example based on the production dashboard from [nebius-solutions-library](https://github.com/nebius/nebius-solutions-library/blob/release/soperator/soperator/modules/monitoring/templates/dashboards/cluster_health.json).
+The [Cluster Health & Overview](../helm/soperator-monitoring-dashboards/dashboards/cluster_health.json)
+and [Slurm Controller](../helm/soperator-monitoring-dashboards/dashboards/slurm_controller.json)
+dashboards include two complementary panels based on `slurm_node_info`:
+
+- **Nodes by Categories** shows totals for mutually exclusive categories.
+- **Nodes by State** breaks each category down into exact combinations of
+  `state_base` and exported `state_is_*` flags. Legends include the category and
+  only flags set to `"true"`, for example `Busy: MIXED+CLOUD` or
+  `Powered down: IDLE+CLOUD+POWERED_DOWN`.
+
+Both panels share category definitions and the same bottom-to-top stacking order:
+Busy, Draining, Idle, Drained, Other/error, Maintenance, Powered down. Each
+node contributes to one category and one state combination at a time. Overlapping
+flags do not double-count nodes. Only exported flags are represented; Slurm flags
+not exposed by the exporter cannot appear in the legend.
+
+### Node categories
+
+The error conditions in Other/error take precedence over Powered down, which
+takes precedence over Maintenance and the remaining categories. Otherwise,
+unclassified nodes also fall into Other/error. Allocated resources means a base
+state of `ALLOCATED` or `MIXED`; unfinished job cleanup means `COMPLETING` is set.
+A flag is set only when its metric label equals `"true"`; `"false"` and absent
+labels both mean it is not set.
+
+| Category | Definition |
+| --- | --- |
+| Powered down | Base state `DOWN`, or any of `POWERED_DOWN`, `POWER_UP`, or `POWERING_UP`, without an Other/error error condition. Includes startup and DOWN states; does not imply every node is physically powered off. |
+| Maintenance | Marked for maintenance, without an error or Powered down condition. |
+| Draining | Has DRAIN and allocated resources or unfinished job cleanup, without maintenance, error, or Powered down conditions. |
+| Drained | Base state IDLE with DRAIN and no unfinished job cleanup, without maintenance, error, or Powered down conditions. |
+| Busy | Has allocated resources or unfinished job cleanup, without DRAIN, maintenance, error, or Powered down conditions. |
+| Idle | Base state IDLE without unfinished job cleanup, DRAIN, maintenance, error, or Powered down conditions. Includes reserved and planned nodes; does not guarantee eligibility for every job. |
+| Other/error | Base state `ERROR`, or any of `NOT_RESPONDING`, `INVALID` (invalid registration), or `FAIL`. Also includes all otherwise unclassified nodes. |
+
+`CLOUD`, `RESERVED`, `PLANNED`, `POWER_DOWN`, `POWERING_DOWN`, and `POWER_DRAIN` do not
+determine the category. For example, `MIXED+CLOUD+DRAIN+POWER_DOWN` is Draining,
+and `IDLE+DRAIN+COMPLETING` remains Draining until job cleanup finishes.
+POWER_DOWN and POWERING_DOWN alone do not place a node in Powered down; its base
+state and other flags still determine the category. This is a dashboard grouping, not a guarantee
+that the node can accept new jobs.

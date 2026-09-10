@@ -2357,7 +2357,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Node states breakdown:\n- **Down**: Nodes not operational (DOWN or ERROR states)\n- **Drained**: IDLE nodes with DRAIN flag\n- **Draining**: Nodes with DRAIN flag running jobs\n- **Busy**: Nodes running jobs normally (ALLOCATED or MIXED)\n- **Idle**: Nodes ready and available to accept new jobs\n- **Maintenance**: Nodes temporarily unavailable for administrative tasks",
+          "description": "Node categories are mutually exclusive:\n- Other/error: ERROR, NOT_RESPONDING, INVALID (invalid registration), or FAIL; these conditions take precedence over all other categories. Also includes otherwise unclassified nodes.\n- Powered down: DOWN, POWERED_DOWN, POWER_UP, or POWERING_UP, unless an Other/error error condition is present. This grouping does not imply every node is physically powered off.\n- Maintenance: Nodes marked for maintenance, excluding the error and powered-down conditions above.\n- Draining: Nodes with DRAIN and allocated resources (ALLOCATED or MIXED) or unfinished job cleanup (COMPLETING), excluding the conditions above.\n- Drained: IDLE nodes with DRAIN, no COMPLETING, and none of the conditions above.\n- Busy: Nodes with allocated resources or unfinished job cleanup, without DRAIN and none of the conditions above.\n- Idle: IDLE nodes without COMPLETING or DRAIN and none of the conditions above. Includes reserved and planned nodes; does not guarantee eligibility for every job.\nCLOUD, RESERVED, PLANNED, POWER_DOWN, POWERING_DOWN, and POWER_DRAIN do not determine the category.\n\nNodes by Categories and Nodes by State use the same category definitions and the same bottom-to-top stacking order: Busy → Draining → Idle → Drained → Other/error → Maintenance → Powered down. Nodes by Categories shows totals per category; Nodes by State breaks each category down into exact state combinations.\n\nNodes by Categories uses query order (A–G) for its series and bottom-to-top stacking order. It does not use numbering prefixes or ordering transformations.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2372,21 +2372,22 @@
                 "barAlignment": 0,
                 "barWidthFactor": 0.6,
                 "drawStyle": "line",
-                "fillOpacity": 50,
-                "gradientMode": "opacity",
+                "fillOpacity": 70,
+                "gradientMode": "none",
                 "hideFrom": {
                   "legend": false,
                   "tooltip": false,
                   "viz": false
                 },
                 "insertNulls": false,
-                "lineInterpolation": "linear",
+                "lineInterpolation": "stepAfter",
                 "lineWidth": 1,
                 "pointSize": 5,
                 "scaleDistribution": {
                   "type": "linear"
                 },
                 "showPoints": "never",
+                "showValues": false,
                 "spanNulls": false,
                 "stacking": {
                   "group": "A",
@@ -2402,7 +2403,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": 0
                   },
                   {
                     "color": "red",
@@ -2410,19 +2412,20 @@
                   }
                 ]
               },
-              "unit": "short"
+              "unit": "short",
+              "decimals": 0
             },
             "overrides": [
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Down"
+                  "options": "Powered down"
                 },
                 "properties": [
                   {
                     "id": "color",
                     "value": {
-                      "fixedColor": "rgba(242, 73, 92, 1)",
+                      "fixedColor": "#8F3BB8",
                       "mode": "fixed"
                     }
                   }
@@ -2506,13 +2509,13 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Unknown"
+                  "options": "Other/error"
                 },
                 "properties": [
                   {
                     "id": "color",
                     "value": {
-                      "fixedColor": "rgba(163, 74, 163, 1)",
+                      "fixedColor": "#F2495C",
                       "mode": "fixed"
                     }
                   }
@@ -2528,6 +2531,10 @@
           },
           "id": 82,
           "options": {
+            "annotations": {
+              "clustering": -1,
+              "multiLane": false
+            },
             "legend": {
               "calcs": [
                 "mean",
@@ -2536,6 +2543,8 @@
                 "min"
               ],
               "displayMode": "table",
+              "enableFacetedFilter": false,
+              "overflow": "ellipsis",
               "placement": "bottom",
               "showLegend": true
             },
@@ -2553,10 +2562,10 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_not_responding!=\"true\", state_is_invalid!=\"true\", state_is_fail!=\"true\", state_is_powered_down!=\"true\", state_is_power_up!=\"true\", state_is_powering_up!=\"true\", state_is_maintenance!=\"true\", state_is_drain!=\"true\"} or slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base!~\"DOWN|ERROR\", state_is_not_responding!=\"true\", state_is_invalid!=\"true\", state_is_fail!=\"true\", state_is_powered_down!=\"true\", state_is_power_up!=\"true\", state_is_powering_up!=\"true\", state_is_maintenance!=\"true\", state_is_drain!=\"true\", state_is_completing=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "Down",
+              "legendFormat": "Busy",
               "range": true,
               "refId": "A",
               "useDashValues": false
@@ -2567,10 +2576,10 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_not_responding!=\"true\", state_is_invalid!=\"true\", state_is_fail!=\"true\", state_is_powered_down!=\"true\", state_is_power_up!=\"true\", state_is_powering_up!=\"true\", state_is_maintenance!=\"true\", state_is_drain=\"true\"} or slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base!~\"DOWN|ERROR\", state_is_not_responding!=\"true\", state_is_invalid!=\"true\", state_is_fail!=\"true\", state_is_powered_down!=\"true\", state_is_power_up!=\"true\", state_is_powering_up!=\"true\", state_is_maintenance!=\"true\", state_is_drain=\"true\", state_is_completing=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "Drained",
+              "legendFormat": "Draining",
               "range": true,
               "refId": "B",
               "useDashValues": false
@@ -2581,10 +2590,10 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base=\"IDLE\", state_is_not_responding!=\"true\", state_is_invalid!=\"true\", state_is_fail!=\"true\", state_is_powered_down!=\"true\", state_is_power_up!=\"true\", state_is_powering_up!=\"true\", state_is_maintenance!=\"true\", state_is_drain!=\"true\", state_is_completing!=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "Draining",
+              "legendFormat": "Idle",
               "range": true,
               "refId": "C",
               "useDashValues": false
@@ -2595,10 +2604,10 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=~\"ALLOCATED|MIXED\", state_is_maintenance!=\"true\", state_is_drain!=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base=\"IDLE\", state_is_not_responding!=\"true\", state_is_invalid!=\"true\", state_is_fail!=\"true\", state_is_powered_down!=\"true\", state_is_power_up!=\"true\", state_is_powering_up!=\"true\", state_is_maintenance!=\"true\", state_is_drain=\"true\", state_is_completing!=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "Busy",
+              "legendFormat": "Drained",
               "range": true,
               "refId": "D",
               "useDashValues": false
@@ -2609,10 +2618,10 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"IDLE\", state_is_maintenance!=\"true\", state_is_drain!=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base=\"ERROR\"} or slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_is_not_responding=\"true\"} or slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_is_invalid=\"true\"} or slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_is_fail=\"true\"} or slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base!~\"IDLE|ALLOCATED|MIXED|DOWN|ERROR\", state_is_not_responding!=\"true\", state_is_invalid!=\"true\", state_is_fail!=\"true\", state_is_powered_down!=\"true\", state_is_power_up!=\"true\", state_is_powering_up!=\"true\", state_is_maintenance!=\"true\", state_is_completing!=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "Idle",
+              "legendFormat": "Other/error",
               "range": true,
               "refId": "E",
               "useDashValues": false
@@ -2623,7 +2632,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_is_maintenance=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base!~\"DOWN|ERROR\", state_is_not_responding!=\"true\", state_is_invalid!=\"true\", state_is_fail!=\"true\", state_is_powered_down!=\"true\", state_is_power_up!=\"true\", state_is_powering_up!=\"true\", state_is_maintenance=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "Maintenance",
@@ -2637,16 +2646,582 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "count(slurm_node_info{cluster=~\"$cluster\", state_base=\"UNKNOWN\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"})",
+              "expr": "count(slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base=\"DOWN\", state_is_not_responding!=\"true\", state_is_invalid!=\"true\", state_is_fail!=\"true\"} or slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base!=\"ERROR\", state_is_not_responding!=\"true\", state_is_invalid!=\"true\", state_is_fail!=\"true\", state_is_powered_down=\"true\"} or slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base!=\"ERROR\", state_is_not_responding!=\"true\", state_is_invalid!=\"true\", state_is_fail!=\"true\", state_is_power_up=\"true\"} or slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\", state_base!=\"ERROR\", state_is_not_responding!=\"true\", state_is_invalid!=\"true\", state_is_fail!=\"true\", state_is_powering_up=\"true\"})",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "Unknown",
+              "legendFormat": "Powered down",
               "range": true,
               "refId": "G",
               "useDashValues": false
             }
           ],
+          "title": "Nodes by Categories",
+          "transformations": [],
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Node counts by exact Slurm scheduling state and exported flags, grouped by the same categories as Nodes by Categories. Legends include the category followed by the native state combination.\nERROR, NOT_RESPONDING, INVALID (invalid registration), and FAIL take precedence and map to Other/error. Otherwise DOWN, POWERED_DOWN, POWER_UP, and POWERING_UP map to Powered down. POWER_DOWN and POWERING_DOWN do not determine the category.\n\nNodes by Categories and Nodes by State use the same category definitions and the same bottom-to-top stacking order: Busy → Draining → Idle → Drained → Other/error → Maintenance → Powered down. Nodes by Categories shows totals per category; Nodes by State breaks each category down into exact state combinations.\n\nColors share the category palette. Busy MIXED nodes use lighter blue than ALLOCATED; the exact MIXED+CLOUD combination uses an intermediate blue. Power-up flags use lighter shades; power-down flags use darker shades; base DOWN uses the darkest shade. COMPLETING in Busy/Draining and RESERVED/PLANNED in Idle use slightly darker shades. Power shading takes precedence over these details, and base DOWN takes precedence over all other shading. Unmatched series are bright pink.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "#FF69B4",
+                "mode": "fixed"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 70,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "stepAfter",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "showValues": false,
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 0,
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Busy: /"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#1F78C1",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Draining: /"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#FFC107",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Idle: /"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#33A249",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Drained: /"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#FF9830",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Other\\/error: /"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#F2495C",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Maintenance: /"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#808080",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Powered down: /"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#8F3BB8",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Busy: MIXED(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#62A1D4",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Busy: MIXED\\+CLOUD$/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#418DCA",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Idle: .*\\+(?:RESERVED|PLANNED)(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#2B8A3E",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Busy: .*\\+COMPLETING(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#19609A",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Draining: .*\\+COMPLETING(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#CC9A06",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Powered down: .*\\+(?:POWER_UP|POWERING_UP)(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#B176CD",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Other\\/error: .*\\+(?:POWER_UP|POWERING_UP)(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#F6808D",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Busy: .*\\+(?:POWER_DOWN|POWERING_DOWN|POWER_DRAIN)(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#175A91",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Draining: .*\\+(?:POWER_DOWN|POWERING_DOWN|POWER_DRAIN)(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#BF9105",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Idle: .*\\+(?:POWER_DOWN|POWERING_DOWN|POWER_DRAIN)(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#267A37",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Drained: .*\\+(?:POWER_DOWN|POWERING_DOWN|POWER_DRAIN)(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#BF7224",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Other\\/error: .*\\+(?:POWER_DOWN|POWERING_DOWN|POWER_DRAIN)(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#B63745",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Maintenance: .*\\+(?:POWER_DOWN|POWERING_DOWN|POWER_DRAIN)(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#606060",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Powered down: .*\\+(?:POWER_DOWN|POWERING_DOWN|POWER_DRAIN)(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#6B2C8A",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Powered down: DOWN(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#4F2065",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/^Other\\/error: DOWN(?:\\+|$)/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "#852833",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 151
+          },
+          "id": 103,
+          "options": {
+            "annotations": {
+              "clustering": -1,
+              "multiLane": false
+            },
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max",
+                "min"
+              ],
+              "displayMode": "table",
+              "enableFacetedFilter": false,
+              "overflow": "ellipsis",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "hideZeros": false,
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.5.1",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "count by (state_base, state_is_cloud, state_is_drain, state_is_maintenance, state_is_reserved, state_is_completing, state_is_fail, state_is_planned, state_is_not_responding, state_is_invalid, state_is_power_down, state_is_power_drain, state_is_powered_down, state_is_powering_down, state_is_powering_up, state_is_power_up) (slurm_node_info{node_name=~\"$node_name\", cluster=~\"$cluster\"})",
+              "format": "time_series",
+              "instant": false,
+              "intervalFactor": 2,
+              "legendFormat": "{{state_base}}+CLOUD={{state_is_cloud}}+DRAIN={{state_is_drain}}+MAINTENANCE={{state_is_maintenance}}+RESERVED={{state_is_reserved}}+COMPLETING={{state_is_completing}}+FAIL={{state_is_fail}}+PLANNED={{state_is_planned}}+NOT_RESPONDING={{state_is_not_responding}}+INVALID={{state_is_invalid}}+POWER_DOWN={{state_is_power_down}}+POWER_DRAIN={{state_is_power_drain}}+POWERED_DOWN={{state_is_powered_down}}+POWERING_DOWN={{state_is_powering_down}}+POWERING_UP={{state_is_powering_up}}+POWER_UP={{state_is_power_up}}",
+              "range": true,
+              "refId": "A",
+              "useDashValues": false
+            }
+          ],
           "title": "Nodes by State",
+          "transformations": [
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "/\\+[A-Z_]+=(?!true(?:\\+|$))[^+]*/g",
+                "renamePattern": ""
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "/=true/g",
+                "renamePattern": ""
+              }
+            },
+            {
+              "id": "joinByField",
+              "options": {
+                "byField": "Time",
+                "mode": "outer"
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "/^(?!Time$|time$)(.+)$/",
+                "renamePattern": "5_Other/error: $1"
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "/^[1-9]_[^:]+: ((?=(?:ALLOCATED|MIXED)(?:\\+|$)|.*\\+COMPLETING(?:\\+|$)).+)$/",
+                "renamePattern": "1_Busy: $1"
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "/^[1-9]_[^:]+: ((?=IDLE(?:\\+|$))(?!.*\\+COMPLETING(?:\\+|$)).+)$/",
+                "renamePattern": "3_Idle: $1"
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "/^[1-9]_[^:]+: ((?=IDLE(?:\\+|$))(?=.*\\+DRAIN(?:\\+|$))(?!.*\\+COMPLETING(?:\\+|$)).+)$/",
+                "renamePattern": "4_Drained: $1"
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "/^[1-9]_[^:]+: ((?=.*\\+DRAIN(?:\\+|$))(?=(?:ALLOCATED|MIXED)(?:\\+|$)|.*\\+COMPLETING(?:\\+|$)).+)$/",
+                "renamePattern": "2_Draining: $1"
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "/^[1-9]_[^:]+: ((?=.*\\+MAINTENANCE(?:\\+|$)).+)$/",
+                "renamePattern": "6_Maintenance: $1"
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "/^[1-9]_[^:]+: ((?=DOWN(?:\\+|$)|.*\\+(?:POWERED_DOWN|POWER_UP|POWERING_UP)(?:\\+|$)).+)$/",
+                "renamePattern": "7_Powered down: $1"
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "/^[1-9]_[^:]+: ((?=ERROR(?:\\+|$)|.*\\+(?:NOT_RESPONDING|INVALID|FAIL)(?:\\+|$)).+)$/",
+                "renamePattern": "5_Other/error: $1"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "orderBy": [
+                  {
+                    "desc": false,
+                    "type": "name"
+                  }
+                ],
+                "orderByMode": "auto",
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "renameByRegex",
+              "options": {
+                "regex": "/^[1-9]_/",
+                "renamePattern": ""
+              }
+            }
+          ],
           "type": "timeseries"
         },
         {
@@ -3056,7 +3631,7 @@
             ]
           },
           "gridPos": {
-            "h": 7,
+            "h": 8,
             "w": 12,
             "x": 12,
             "y": 236
@@ -3306,7 +3881,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 243
+            "y": 244
           },
           "id": 84,
           "options": {
