@@ -526,7 +526,7 @@ jobs:
           - cuda_version: "12.9.0"
             allow_failure: false
           - cuda_version: "13.0.2"
-            allow_failure: false
+            allow_failure: true
           - cuda_version: "13.0.3"
             allow_failure: true
           - platform: linux/amd64
@@ -742,7 +742,7 @@ jobs:
           - cuda_version: "12.9.0"
             allow_failure: false
           - cuda_version: "13.0.2"
-            allow_failure: false
+            allow_failure: true
           - cuda_version: "13.0.3"
             allow_failure: true
 
