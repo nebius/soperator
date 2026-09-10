@@ -724,6 +724,13 @@ jobs:
     needs:
       - pre-build
       - build-jail-images
+    if: >-
+      ${{
+        always() &&
+        needs.pre-build.result == 'success' &&
+        needs.build-jail-images.result != 'skipped' &&
+        needs.build-jail-images.result != 'cancelled'
+      }}
     runs-on: ubuntu-24.04
     continue-on-error: ${{ matrix.allow_failure }}
 
