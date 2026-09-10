@@ -300,6 +300,10 @@ func (r NodeSetReconciler) executeReconciliation(
 	cluster *slurmv1.SlurmCluster,
 	clusterWithGPU bool,
 ) error {
+	// Install protection before creating workers or enabling Slurm-aware updates.
+	if err := r.reconcilePodDisruptionBudget(ctx, nodeSet, nodeSetValues); err != nil {
+		return err
+	}
 	steps := []utils.MultiStepExecutionStep{
 		{
 			Name: "Security limits ConfigMap",

@@ -24,6 +24,7 @@ import (
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,6 +61,7 @@ import (
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=create;delete;get;list;patch;update;watch
 // +kubebuilder:rbac:groups=core,resources=podtemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 
 // NodeSetReconciler reconciles a NodeSet object
@@ -147,6 +149,7 @@ func (r *NodeSetReconciler) createResourceChecks(saPredicate predicate.Funcs) []
 				&rbacv1.Role{},
 				&rbacv1.RoleBinding{},
 				&kruisev1b1.StatefulSet{},
+				&policyv1.PodDisruptionBudget{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
 		},
