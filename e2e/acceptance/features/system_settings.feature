@@ -1,6 +1,6 @@
 Feature: System settings
 
-  @essential @soperator_version_>=4.0.0
+  @soperator_version_>=4.0.0
   Scenario: Login SSH sessions expose the default resource-limit profile
     When root collects direct and nested Bash resource limits over SSH to the login node
     Then direct and nested login SSH resource limits match the expected default profile
@@ -12,7 +12,7 @@ Feature: System settings
     When root collects direct and nested Bash resource limits over SSH to the worker
     Then direct and nested worker SSH resource limits match the compute profile
 
-  @unstable @soperator_version_>=4.0.0
+  @essential @unstable @soperator_version_>=4.0.0
   Scenario: Native Slurm jobs expose the compute resource-limit profile
     Given a healthy worker is selected for system-settings checks
     When a native Slurm job collects direct and nested Bash resource limits

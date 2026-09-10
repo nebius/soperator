@@ -83,6 +83,9 @@ essential scenarios are still excluded; pass `--run-unstable` to include them.
 When combined with `--scenario`, the selected scenario must also carry the
 `@essential` tag.
 
+The selected-worker node replacement scenario is both essential and unstable,
+so it runs only when both `--run-essential` and `--run-unstable` are set.
+
 Note: The node replacement scenario uses the local `nebius` CLI to check
 instance removal.
 

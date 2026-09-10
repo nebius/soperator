@@ -1,5 +1,5 @@
 Feature: Docker containers
-  @essential @soperator_version_>=5.0.0
+  @soperator_version_>=5.0.0
   Scenario: Docker container lifecycle uses local storage
     Given a long-running Docker container job is submitted on two workers
     When the Docker container job is running

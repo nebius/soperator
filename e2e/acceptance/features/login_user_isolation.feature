@@ -1,5 +1,5 @@
 Feature: Login user isolation
-  @essential @soperator_version_>=5.0.0
+  @soperator_version_>=5.0.0
   Scenario: Additional processes do not increase a login user's CPU share
     Given two regular users can SSH to the login node for CPU isolation testing
     When both users run workloads at twice the login CPU capacity

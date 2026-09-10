@@ -47,26 +47,37 @@ func TestSharedFeaturesHaveValidVersionTags(t *testing.T) {
 func TestSharedFeaturesHaveExpectedEssentialScenarios(t *testing.T) {
 	want := []string{
 		"A regular user can SSH to a worker without extra options",
-		"A static NodeSet can transition to ephemeral mode and back",
+		"A maintenance event replaces the selected worker node",
 		"A user job is recorded with its allocated resources",
-		"Additional processes do not increase a login user's CPU share",
 		"CPU jobs run expected Prolog and Epilog passive checks",
-		"Docker container lifecycle uses local storage",
-		"Enroot and Pyxis cache images and clean up runtime state",
 		"Enroot containers can access GPUs",
 		"Every configured topology can schedule a job",
 		"GPU jobs run passive GPU health checks",
 		"GPU workers expose the required NVIDIA driver capabilities",
-		"Login SSH sessions expose the default resource-limit profile",
+		"Native Slurm jobs expose the compute resource-limit profile",
 		"Partitions and workers use their configured topologies",
 		"Required kernel settings are visible in SSH sessions and Slurm jobs",
 		"Stable Soperator defaults are applied",
 		"The operator publishes and Slurm loads the configured topologies",
 		"The provisioned cluster is ready for acceptance tests",
-		"kube-state-metrics scrape config is consumed by the vm-stack chart",
 	}
 
-	var got []string
+	assert.ElementsMatch(t, want, sharedScenariosWithTags(t, "@essential"))
+}
+
+func TestSharedFeaturesHaveExpectedUnstableEssentialScenarios(t *testing.T) {
+	want := []string{
+		"A maintenance event replaces the selected worker node",
+		"Native Slurm jobs expose the compute resource-limit profile",
+	}
+
+	assert.ElementsMatch(t, want, sharedScenariosWithTags(t, "@essential", "@unstable"))
+}
+
+func sharedScenariosWithTags(t *testing.T, requiredTags ...string) []string {
+	t.Helper()
+
+	var scenarios []string
 	for _, path := range FeaturePaths() {
 		content, err := fs.ReadFile(acceptanceFeatures, path)
 		require.NoError(t, err)
@@ -77,15 +88,24 @@ func TestSharedFeaturesHaveExpectedEssentialScenarios(t *testing.T) {
 			if child.Scenario == nil {
 				continue
 			}
-			if slices.ContainsFunc(child.Scenario.Tags, func(tag *messages.Tag) bool {
-				return tag.Name == "@essential"
-			}) {
-				got = append(got, child.Scenario.Name)
+			if scenarioHasTags(child.Scenario, requiredTags...) {
+				scenarios = append(scenarios, child.Scenario.Name)
 			}
 		}
 	}
 
-	assert.ElementsMatch(t, want, got)
+	return scenarios
+}
+
+func scenarioHasTags(scenario *messages.Scenario, requiredTags ...string) bool {
+	for _, requiredTag := range requiredTags {
+		if !slices.ContainsFunc(scenario.Tags, func(tag *messages.Tag) bool {
+			return tag.Name == requiredTag
+		}) {
+			return false
+		}
+	}
+	return true
 }
 
 // manualFeatures are embedded scenarios deliberately kept out of the default suite: they need a
