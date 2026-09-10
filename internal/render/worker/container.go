@@ -11,6 +11,7 @@ import (
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/utils/sliceutils"
+	"nebius.ai/slurm-operator/internal/utils/stringutils"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -92,6 +93,31 @@ func RenderContainerWorkerInit(
 		Command:                  command,
 		VolumeMounts:             volumeMounts,
 		Env:                      env,
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+	}
+}
+
+// Wait for the host socket before creating slurmd so the NVIDIA runtime can discover and inject it.
+func renderContainerNvidiaPersistencedWaiter(container *values.Container) corev1.Container {
+	return corev1.Container{
+		Name:            consts.ContainerNameWaitForNvidiaPersistenced,
+		Image:           container.Image,
+		ImagePullPolicy: container.ImagePullPolicy,
+		Command:         []string{"/bin/sh", "-ec"},
+		Args: []string{
+			// language=bash
+			fmt.Sprintf(stringutils.Dedent(`
+			until [ -S %s/nvidia-persistenced/socket ]; do
+			    echo "Waiting for the NVIDIA persistenced socket on the host..."
+			    sleep 5
+			done
+			echo "NVIDIA persistenced socket is ready"
+			`), consts.VolumeMountPathHostRun),
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			renderVolumeMountHostRun(),
+		},
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}

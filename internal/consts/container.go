@@ -1,22 +1,23 @@
 package consts
 
 const (
-	ContainerNameSlurmctld         = SlurmctldName
-	ContainerNameAccounting        = AccountingName
-	ContainerNameMunge             = Munge
-	ContainerNameSSSD              = "sssd"
-	ContainerNameSlurmd            = SlurmdName
-	ContainerNameREST              = Slurmrestd
-	ContainerNameSshd              = SshdName
-	ContainerNameWorkerInit        = "worker-init"
-	ContainerNameDockerProxy       = "docker-proxy"
-	ContainerNameWaitForDatabase   = "wait-for-database"
-	ContainerNameWaitForAccounting = "wait-for-accounting"
-	ContainerNamePopulateJail      = populateJail
-	ContainerNameExporter          = Exporter
-	ContainerNameRebooter          = "rebooter"
-	ContainerNameCustom            = "custom-container"
-	ContainerNameSConfigController = SConfigControllerName
+	ContainerNameSlurmctld                 = SlurmctldName
+	ContainerNameAccounting                = AccountingName
+	ContainerNameMunge                     = Munge
+	ContainerNameSSSD                      = "sssd"
+	ContainerNameSlurmd                    = SlurmdName
+	ContainerNameREST                      = Slurmrestd
+	ContainerNameSshd                      = SshdName
+	ContainerNameWorkerInit                = "worker-init"
+	ContainerNameWaitForNvidiaPersistenced = "wait-for-nvidia-persistenced"
+	ContainerNameDockerProxy               = "docker-proxy"
+	ContainerNameWaitForDatabase           = "wait-for-database"
+	ContainerNameWaitForAccounting         = "wait-for-accounting"
+	ContainerNamePopulateJail              = populateJail
+	ContainerNameExporter                  = Exporter
+	ContainerNameRebooter                  = "rebooter"
+	ContainerNameCustom                    = "custom-container"
+	ContainerNameSConfigController         = SConfigControllerName
 
 	ContainerSecurityContextCapabilitySysAdmin = "SYS_ADMIN"
 	ContainerSecurityContextCapabilitySetFcap  = "SETFCAP"

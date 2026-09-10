@@ -67,6 +67,7 @@ const (
 	VolumeNameSysctl                   = sysctl
 	VolumeNameSupervisordConfigMap     = "supervisord-config"
 	VolumeNameRuntime                  = "runtime"
+	VolumeNameHostRun                  = "host-run"
 	VolumeNameInMemorySubmount         = "in-memory"
 	VolumeNameTmpDisk                  = "tmp-disk"
 	VolumeNameHostLogJournal           = hostLogJournal
@@ -100,6 +101,8 @@ const (
 	VolumeMountSubPathSysctl                = sysctlConfFile
 	VolumeMountPathSupervisordConfig        = "/etc/supervisor/conf.d/"
 	VolumeMountPathRuntime                  = "/run"
+	VolumeHostPathRun                       = "/run"
+	VolumeMountPathHostRun                  = "/host-run"
 	VolumeMountPathInMemorySubmount         = VolumeMountPathJailUpper + "/mnt/memory"
 	VolumeMountPathTmpDisk                  = "/tmp"
 	VolumeHostPathJournal                   = "/var/log/journal"

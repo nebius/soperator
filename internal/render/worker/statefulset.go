@@ -61,6 +61,9 @@ func RenderNodeSetStatefulSet(
 			common.SSSDLdapCAConfigMap(nodeSet.SSSDLdapCAConfigMapName),
 		))
 	}
+	if nodeSet.GPU.Enabled {
+		initContainers = append(initContainers, renderContainerNvidiaPersistencedWaiter(&nodeSet.ContainerSlurmd))
+	}
 	initContainers = append(initContainers,
 		RenderContainerWorkerInit(
 			&nodeSet.ContainerSlurmd,
