@@ -508,7 +508,6 @@ func (r NodeSetReconciler) executeReconciliation(
 					len(cluster.Spec.Topology.Topologies) > 0
 
 				desired, err := worker.RenderNodeSetStatefulSet(
-					cluster.Name,
 					nodeSetValues,
 					&secrets,
 					cluster.Spec.CgroupVersion,

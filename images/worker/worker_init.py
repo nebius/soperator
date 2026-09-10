@@ -6,6 +6,12 @@ Supports two modes:
   wait-controller  - Wait for Slurm controller (slurmctld) to be ready
   wait-topology    - Wait for topology data from ConfigMap (for ephemeral nodes)
 
+The worker joins its topology through slurmd registration rather than a separate scontrol update:
+an update issued before slurmd starts perturbs the node state that slurmctld inspects when it
+decides whether to store the InstanceId and Extra that registration carries. wait-topology resolves
+the specification and leaves it on a volume shared with the slurmd container, so that waiting for
+the topology config never delays slurmd's own startup.
+
 Environment Variables (all modes):
     WORKER_INIT_RANDOM_DELAY_SECONDS: Upper bound of a random startup delay applied before
         running any command. The actual delay is picked uniformly from
@@ -21,6 +27,8 @@ Environment Variables (wait-topology):
     TOPOLOGY_CONFIGMAP_PATH: Path to mounted ConfigMap (default: /tmp/slurm/topology-node-labels)
     TOPOLOGY_WAIT_TIMEOUT: Max wait time in seconds (default: 180)
     TOPOLOGY_POLL_INTERVAL: Poll interval in seconds (default: 5)
+    SLURMD_TOPOLOGY_PATH: File the resolved specification is written to
+        (default: /run/soperator/slurmd_topology)
 """
 
 import argparse
@@ -49,6 +57,11 @@ SLURM_CONFIG_LINK_SOURCE: Path = Path("/mnt/jail/etc/slurm")
 SLURM_CONFIG_LINK_TARGET: Path = Path("/etc/slurm")
 SLURM_CONFIG_PATH: Path = Path("/etc/slurm/slurm_base.conf.noedit")
 SLURM_TOPOLOGY_YAML_PATH: Path = Path("/etc/slurm/topology.yaml")
+
+# Handed to the slurmd container through a shared volume, so that the wait for the topology config
+# happens in this init container rather than in front of slurmd. It holds the bare "topology=..."
+# fragment the entrypoint passes to slurmd as --conf.
+DEFAULT_SLURMD_TOPOLOGY_PATH: Path = Path("/run/soperator/slurmd_topology")
 
 TOPOLOGY_PLUGIN_TREE: str = "topology/tree"
 TOPOLOGY_PLUGIN_BLOCK: str = "topology/block"
@@ -135,19 +148,6 @@ def get_controller_max_attempts() -> int:
 def get_controller_poll_interval() -> int:
     """Get the poll interval in seconds for controller readiness checks."""
     return int(os.environ.get("CONTROLLER_POLL_INTERVAL", "5"))
-
-
-def get_node_addr() -> str:
-    pod_name: str = get_from_env_required("K8S_POD_NAME")
-    logger.info("Using K8S_POD_NAME=%s for NodeAddr construction", pod_name)
-
-    service_name: str = get_from_env_required("K8S_SERVICE_NAME")
-    logger.info("Using K8S_SERVICE_NAME=%s for NodeAddr construction", service_name)
-
-    pod_namespace: str = get_from_env_required("K8S_POD_NAMESPACE")
-    logger.info("Using K8S_POD_NAMESPACE=%s for NodeAddr construction", pod_namespace)
-
-    return f"nodeaddr={pod_name}.{service_name}.{pod_namespace}.svc"
 
 
 def wait_for_controller() -> None:
@@ -652,54 +652,28 @@ def _format_tier_topology(
     return ""
 
 
-def apply_node_topology(hostname: str, topology: str) -> None:
-    """Apply topology and clear manual drain state for a resumed worker.
+def get_slurmd_topology_path() -> Path:
+    """Get the path the resolved topology specification is written to."""
+    return Path(
+        os.environ.get("SLURMD_TOPOLOGY_PATH", str(DEFAULT_SLURMD_TOPOLOGY_PATH))
+    )
 
-    Users may drain POWERED_DOWN workers to prevent Slurm from automatically
-    powering them up for queued jobs. When this worker is actually resumed,
-    clear that drain marker so it can schedule jobs again.
+
+def write_slurmd_topology(topology: str) -> None:
+    """Hand the topology to the slurmd container, which passes it to slurmd as --conf.
+
+    An empty file is written when no topology places this worker: the entrypoint distinguishes that
+    from a resolution that never ran, which must not be mistaken for "no topology".
     """
+    path: Path = get_slurmd_topology_path()
     try:
-        node_addr: str = get_node_addr()
-        cmd = [
-            "scontrol",
-            "update",
-            f"nodename={hostname}",
-            f"{node_addr}",
-        ]
-        # An empty topology means there is no unit to register into, which is the case for a worker
-        # covered only by flat topologies.
-        if topology:
-            cmd.append(f"{topology}")
-        cmd.append("State=POWER_UP")
-        logger.info("Running: %s", " ".join(cmd))
-        result: subprocess.CompletedProcess[str] = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if result.returncode != 0:
-            output: str = (result.stdout + result.stderr).strip()
-            if "Invalid node name" in output:
-                logger.warning(
-                    "scontrol update: node %s not yet registered (dynamic node first start), skipping: %s",
-                    hostname,
-                    output,
-                )
-                return
-            logger.error(
-                "scontrol update failed (rc=%d): %s", result.returncode, output
-            )
-            sys.exit(1)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(topology)
+    except OSError as e:
+        logger.error("Failed to write topology %s: %s", path, e)
+        sys.exit(1)
 
-        logger.info("Topology applied successfully for worker %s", hostname)
-    except subprocess.TimeoutExpired:
-        logger.error("scontrol update timed out")
-        sys.exit(1)
-    except FileNotFoundError:
-        logger.error("scontrol command not found")
-        sys.exit(1)
+    logger.info("Wrote topology %r to %s", topology, path)
 
 
 def wait_for_topology_file(wait_timeout: int, poll_interval: int) -> Path:
@@ -830,11 +804,11 @@ def is_gpu_enabled() -> bool:
 
 
 def wait_for_topology() -> None:
-    """Wait until this node is placed in the topology config, then register it via scontrol.
+    """Wait until this node is placed in the topology config, then hand its unit to slurmd.
 
     A worker joins whichever topologies the rendered config lists it in, which keeps it in step with
     the file by construction. A CPU-only worker is listed by none -- tree and block topologies
-    describe fabrics, and it sits on none -- so it waits for the config and registers nothing.
+    describe fabrics, and it sits on none -- so it waits for the config and joins nothing.
     """
     hostname: str = get_from_env_required("HOSTNAME")
 
@@ -848,7 +822,7 @@ def wait_for_topology() -> None:
             "Node %s is CPU-only, no topology lists it; skipping topology registration",
             hostname,
         )
-        apply_node_topology(hostname, "")
+        write_slurmd_topology("")
         return
 
     # A placeholder tree or block has no node list yet, but waiting is still necessary to avoid
@@ -868,7 +842,7 @@ def wait_for_topology() -> None:
             config_path,
             hostname,
         )
-        apply_node_topology(hostname, "")
+        write_slurmd_topology("")
         return
 
     node_name: str = get_node_name()
@@ -935,7 +909,7 @@ def wait_for_topology() -> None:
             hostname,
         )
 
-    apply_node_topology(hostname, topology)
+    write_slurmd_topology(topology)
 
 
 # endregion Topology functions

@@ -20,9 +20,9 @@ import (
 
 // RenderContainerWorkerInit renders init [corev1.Container] for worker nodes.
 // It runs a script that waits for the controller to be ready before allowing the main slurmd container to start.
-// If topology is enabled, it also waits for the topology configuration to be ready before allowing slurmd to start.
+// If topology is enabled, it also resolves the topology this worker registers into and leaves it on
+// the runtime volume, so that slurmd starts without waiting for the topology config itself.
 func RenderContainerWorkerInit(
-	clusterName string,
 	container *values.Container,
 	topologyEnabled, gpuEnabled bool,
 	waitTimeoutSeconds int32,
@@ -38,46 +38,25 @@ func RenderContainerWorkerInit(
 		command = append(command, "wait-topology")
 	}
 
-	volumeMounts := []corev1.VolumeMount{
+	var volumeMounts []corev1.VolumeMount
+	if topologyEnabled {
+		// The runtime volume carries the resolved topology to slurmd. It is mounted first because
+		// the munge socket below sits inside it, and a nested mount must follow its parent.
+		volumeMounts = append(volumeMounts,
+			renderVolumeMountRuntime(),
+			corev1.VolumeMount{
+				Name:      consts.VolumeNameTopologyNodeLabels,
+				MountPath: consts.VolumeMountPathTopologyNodeLabels,
+				ReadOnly:  true,
+			},
+		)
+	}
+	volumeMounts = append(volumeMounts,
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
-	}
-	if topologyEnabled {
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      consts.VolumeNameTopologyNodeLabels,
-			MountPath: consts.VolumeMountPathTopologyNodeLabels,
-			ReadOnly:  true,
-		})
-	}
+	)
 
 	env := []corev1.EnvVar{
-		{
-			Name: "K8S_NODE_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: corev1.SchemeGroupVersion.Version,
-					FieldPath:  "spec.nodeName",
-				},
-			},
-		},
-		{
-			Name: "K8S_POD_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: corev1.SchemeGroupVersion.Version,
-					FieldPath:  "metadata.name",
-				},
-			},
-		},
-		{
-			Name: "K8S_POD_NAMESPACE",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: corev1.SchemeGroupVersion.Version,
-					FieldPath:  "metadata.namespace",
-				},
-			},
-		},
 		{
 			Name:  "CONTROLLER_MAX_ATTEMPTS",
 			Value: "60",
@@ -86,10 +65,17 @@ func RenderContainerWorkerInit(
 			Name:  "CONTROLLER_POLL_INTERVAL",
 			Value: "5",
 		},
-		{
-			Name:  "K8S_SERVICE_NAME",
-			Value: naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName),
-		},
+	}
+
+	if gpuEnabled {
+		env = append(env, corev1.EnvVar{
+			Name:  "NODESET_GPU_ENABLED",
+			Value: "true",
+		})
+	}
+
+	if topologyEnabled {
+		env = append(env, renderNodeSetTopologyEnv(topologyFabric, waitTimeoutSeconds)...)
 	}
 
 	if randomDelaySeconds > 0 {
@@ -97,42 +83,6 @@ func RenderContainerWorkerInit(
 			Name:  "WORKER_INIT_RANDOM_DELAY_SECONDS",
 			Value: strconv.Itoa(int(randomDelaySeconds)),
 		})
-	}
-
-	if gpuEnabled {
-		env = append(env,
-			corev1.EnvVar{
-				Name:  "NODESET_GPU_ENABLED",
-				Value: "true",
-			},
-		)
-	}
-
-	if topologyEnabled {
-		env = append(env,
-			corev1.EnvVar{
-				Name:  "TOPOLOGY_CONFIGMAP_PATH",
-				Value: consts.VolumeMountPathTopologyNodeLabels,
-			},
-			corev1.EnvVar{
-				Name:  "TOPOLOGY_WAIT_TIMEOUT",
-				Value: strconv.Itoa(int(waitTimeoutSeconds)),
-			},
-			corev1.EnvVar{
-				Name:  "TOPOLOGY_POLL_INTERVAL",
-				Value: "5",
-			},
-		)
-		fabric := topologyFabric
-		if fabric == "" {
-			fabric = consts.SlurmTopologyDefaultFabric
-		}
-		env = append(env,
-			corev1.EnvVar{
-				Name:  "SLURM_TOPOLOGY_FABRIC",
-				Value: fabric,
-			},
-		)
 	}
 
 	return corev1.Container{
@@ -259,14 +209,17 @@ func renderContainerNodeSetSlurmd(
 		Command:         nodeSet.ContainerSlurmd.Command,
 		Args:            nodeSet.ContainerSlurmd.Args,
 		Env: append(
-			renderNodeSetSlurmdEnv(
-				cgroupVersion,
-				clusterWithGPU,
-				nodeSet.GPU.Enabled,
-				nodeSet.GPU.Nvidia.GDRCopyEnabled,
-				nodeSet.DockerEnabled,
-				nodeSet.NodeExtra,
-				realMemoryBytes,
+			append(
+				renderNodeSetSlurmdEnv(
+					cgroupVersion,
+					clusterWithGPU,
+					nodeSet.GPU.Enabled,
+					nodeSet.GPU.Nvidia.GDRCopyEnabled,
+					nodeSet.DockerEnabled,
+					nodeSet.NodeExtra,
+					realMemoryBytes,
+				),
+				renderSlurmdTopologyEnv(topologyEnabled)...,
 			),
 			nodeSet.ContainerSlurmd.CustomEnv...,
 		),
@@ -329,6 +282,64 @@ func renderVolumeMountRuntime() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameRuntime,
 		MountPath: consts.VolumeMountPathRuntime,
+	}
+}
+
+// renderSlurmdTopologyEnv points slurmd at the topology worker-init resolved for it.
+func renderSlurmdTopologyEnv(topologyEnabled bool) []corev1.EnvVar {
+	if !topologyEnabled {
+		return nil
+	}
+
+	return []corev1.EnvVar{
+		{
+			Name:  "SLURM_TOPOLOGY_ENABLED",
+			Value: "true",
+		},
+		{
+			Name:  "SLURMD_TOPOLOGY_PATH",
+			Value: consts.SlurmdTopologyPath,
+		},
+	}
+}
+
+// renderNodeSetTopologyEnv renders the environment the topology resolver reads in worker-init.
+func renderNodeSetTopologyEnv(topologyFabric string, waitTimeoutSeconds int32) []corev1.EnvVar {
+	fabric := topologyFabric
+	if fabric == "" {
+		fabric = consts.SlurmTopologyDefaultFabric
+	}
+
+	return []corev1.EnvVar{
+		{
+			Name: "K8S_NODE_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "spec.nodeName",
+				},
+			},
+		},
+		{
+			Name:  "TOPOLOGY_CONFIGMAP_PATH",
+			Value: consts.VolumeMountPathTopologyNodeLabels,
+		},
+		{
+			Name:  "TOPOLOGY_WAIT_TIMEOUT",
+			Value: strconv.Itoa(int(waitTimeoutSeconds)),
+		},
+		{
+			Name:  "TOPOLOGY_POLL_INTERVAL",
+			Value: "5",
+		},
+		{
+			Name:  "SLURM_TOPOLOGY_FABRIC",
+			Value: fabric,
+		},
+		{
+			Name:  "SLURMD_TOPOLOGY_PATH",
+			Value: consts.SlurmdTopologyPath,
+		},
 	}
 }
 
