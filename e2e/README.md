@@ -55,6 +55,8 @@ All flags:
   versions, for example `4.1.5-reb85d0e5`.
 - `--run-unstable`: optional, defaults to `false`; when false, scenarios tagged
   `@unstable` are excluded.
+- `--run-essential`: optional, defaults to `false`; when true, only scenarios
+  tagged `@essential` are run.
 - `--scenario`: optional. Runs all compatible scenarios in the provided feature
   file, or the single scenario at an exact `Scenario:` line, for example
   `features/internal_ssh.feature:3`. May be repeated.
@@ -75,6 +77,14 @@ bin/acceptance --kubectl-context <dev-context> --scenario features/internal_ssh.
 
 The `--scenario` flag is for local/manual investigation only. The GitHub
 Actions e2e workflow does not pass it.
+
+`--run-essential` composes with the other selectors. By default, unstable
+essential scenarios are still excluded; pass `--run-unstable` to include them.
+When combined with `--scenario`, the selected scenario must also carry the
+`@essential` tag.
+
+The selected-worker node replacement scenario is both essential and unstable,
+so it runs only when both `--run-essential` and `--run-unstable` are set.
 
 Note: The node replacement scenario uses the local `nebius` CLI to check
 instance removal.

@@ -24,7 +24,7 @@ Feature: Enroot containers
     When the repeated Enroot container job is cancelled
     Then Enroot runtime state is cleaned up
 
-  @gpu @soperator_version_>=5.0.0
+  @essential @gpu @soperator_version_>=5.0.0
   Scenario: Enroot containers can access GPUs
     Given an Enroot GPU smoke job is submitted on one GPU worker
     Then the Enroot GPU smoke job succeeds and reports visible GPUs

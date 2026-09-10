@@ -44,6 +44,70 @@ func TestSharedFeaturesHaveValidVersionTags(t *testing.T) {
 	assert.NotEmpty(t, paths)
 }
 
+func TestSharedFeaturesHaveExpectedEssentialScenarios(t *testing.T) {
+	want := []string{
+		"A regular user can SSH to a worker without extra options",
+		"A maintenance event replaces the selected worker node",
+		"A user job is recorded with its allocated resources",
+		"CPU jobs run expected Prolog and Epilog passive checks",
+		"Enroot containers can access GPUs",
+		"Every configured topology can schedule a job",
+		"GPU jobs run passive GPU health checks",
+		"GPU workers expose the required NVIDIA driver capabilities",
+		"Native Slurm jobs expose the compute resource-limit profile",
+		"Partitions and workers use their configured topologies",
+		"Required kernel settings are visible in SSH sessions and Slurm jobs",
+		"Stable Soperator defaults are applied",
+		"The operator publishes and Slurm loads the configured topologies",
+		"The provisioned cluster is ready for acceptance tests",
+	}
+
+	assert.ElementsMatch(t, want, sharedScenariosWithTags(t, "@essential"))
+}
+
+func TestSharedFeaturesHaveExpectedUnstableEssentialScenarios(t *testing.T) {
+	want := []string{
+		"A maintenance event replaces the selected worker node",
+		"Native Slurm jobs expose the compute resource-limit profile",
+	}
+
+	assert.ElementsMatch(t, want, sharedScenariosWithTags(t, "@essential", "@unstable"))
+}
+
+func sharedScenariosWithTags(t *testing.T, requiredTags ...string) []string {
+	t.Helper()
+
+	var scenarios []string
+	for _, path := range FeaturePaths() {
+		content, err := fs.ReadFile(acceptanceFeatures, path)
+		require.NoError(t, err)
+
+		doc, err := gherkin.ParseGherkinDocument(strings.NewReader(string(content)), (&messages.Incrementing{}).NewId)
+		require.NoError(t, err)
+		for _, child := range doc.Feature.Children {
+			if child.Scenario == nil {
+				continue
+			}
+			if scenarioHasTags(child.Scenario, requiredTags...) {
+				scenarios = append(scenarios, child.Scenario.Name)
+			}
+		}
+	}
+
+	return scenarios
+}
+
+func scenarioHasTags(scenario *messages.Scenario, requiredTags ...string) bool {
+	for _, requiredTag := range requiredTags {
+		if !slices.ContainsFunc(scenario.Tags, func(tag *messages.Tag) bool {
+			return tag.Name == requiredTag
+		}) {
+			return false
+		}
+	}
+	return true
+}
+
 // manualFeatures are embedded scenarios deliberately kept out of the default suite: they need a
 // cluster shaped a particular way, or they change the cluster while they run, so they are started
 // by hand with --scenario instead of by every e2e run.

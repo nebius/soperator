@@ -41,6 +41,11 @@ on:
         required: false
         default: "false"
         type: string
+      run_essential_tests:
+        description: "Run only acceptance scenarios tagged @essential"
+        required: false
+        default: "false"
+        type: string
 
 permissions:
   contents: read
@@ -159,6 +164,7 @@ jobs:
       PROFILE_NAME: ${{ needs.resolve-profile.outputs.profile_name }}
       E2E_PROFILE_YAML: ${{ needs.resolve-profile.outputs.profile_yaml }}
       RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
+      RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
       SLURM_CLUSTER_NAME: "soperator"
 
     steps:
@@ -510,6 +516,9 @@ jobs:
           )
           if [[ "$RUN_UNSTABLE_TESTS" == "true" ]]; then
             args+=(--run-unstable)
+          fi
+          if [[ "$RUN_ESSENTIAL_TESTS" == "true" ]]; then
+            args+=(--run-essential)
           fi
           bin/acceptance "${args[@]}"
 
