@@ -6,17 +6,22 @@ from acceptance_summary import NS_PER_SEC, render_comment
 from e2e_pr_comment import render_final, render_start
 
 
-def cucumber_step(name, status, seconds=1):
-    return {
+def cucumber_step(name, status, seconds=1, error_message="", line=4):
+    step = {
         "keyword": "Given ",
         "name": name,
+        "line": line,
         "result": {"status": status, "duration": seconds * NS_PER_SEC},
     }
+    if error_message:
+        step["result"]["error_message"] = error_message
+    return step
 
 
 def cucumber_scenario(feature, name, steps):
     return {
         "name": feature,
+        "uri": "features/example.feature:3",
         "elements": [{"name": name, "steps": steps}],
     }
 
@@ -72,7 +77,12 @@ class AcceptanceCommentTest(unittest.TestCase):
                 "containers [see] GPUs",
                 [
                     cucumber_step("the cluster exists", "passed", 2),
-                    cucumber_step("the GPU smoke job succeeds", "failed", 65),
+                    cucumber_step(
+                        "the GPU smoke job succeeds",
+                        "failed",
+                        65,
+                        "pod gpu-smoke is not Ready",
+                    ),
                 ],
             ),
             cucumber_scenario(
@@ -88,9 +98,56 @@ class AcceptanceCommentTest(unittest.TestCase):
 
         result = output.getvalue()
         self.assertIn("1 passed · 1 failed · 1 skipped", result)
-        self.assertIn("Enroot \\*GPU\\* / containers \\[see\\] GPUs", result)
-        self.assertIn("First failing step: Given the GPU smoke job succeeds", result)
-        self.assertIn("Duration: 1m 7s", result)
+        self.assertIn("--- Failed steps:", result)
+        self.assertIn(
+            "Scenario: containers [see] GPUs # features/example.feature:3",
+            result,
+        )
+        self.assertIn(
+            "Given the GPU smoke job succeeds # features/example.feature:3:4",
+            result,
+        )
+        self.assertIn("Error: pod gpu-smoke is not Ready", result)
+        self.assertNotIn("Duration:", result)
+
+    def test_renders_multiline_error_with_safe_code_fence(self):
+        features = [
+            cucumber_scenario(
+                "Cluster creation",
+                "cluster is ready",
+                [
+                    cucumber_step(
+                        "all pods are Ready",
+                        "failed",
+                        error_message="first line\ncontains ``` from command output",
+                    )
+                ],
+            )
+        ]
+        output = io.StringIO()
+
+        render_comment(features, output)
+
+        result = output.getvalue()
+        self.assertIn("````text\n", result)
+        self.assertIn("      Error: first line\n", result)
+        self.assertIn("             contains ``` from command output\n", result)
+
+    def test_truncates_long_error_message(self):
+        features = [
+            cucumber_scenario(
+                "Feature",
+                "Scenario",
+                [cucumber_step("failure", "failed", error_message="x" * 5_000)],
+            )
+        ]
+        output = io.StringIO()
+
+        render_comment(features, output)
+
+        result = output.getvalue()
+        self.assertIn("… (truncated; see workflow run)", result)
+        self.assertNotIn("x" * 4_001, result)
 
     def test_limits_failed_scenarios(self):
         features = [
@@ -106,8 +163,8 @@ class AcceptanceCommentTest(unittest.TestCase):
         render_comment(features, output)
 
         result = output.getvalue()
-        self.assertEqual(result.count("First failing step:"), 10)
-        self.assertIn("2 more failed scenarios; see the workflow run.", result)
+        self.assertEqual(result.count("  Scenario:"), 10)
+        self.assertIn("  2 more failed scenarios; see the workflow run.", result)
 
 
 class E2EPRCommentTest(unittest.TestCase):

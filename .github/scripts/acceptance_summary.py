@@ -17,33 +17,16 @@ _STATUS_PRIORITY = {
     "passed": 1,
 }
 
-_MARKDOWN_SPECIAL = re.compile(r"([\\`*_[\]<>|])")
 _FAILED_SCENARIO_LIMIT = 10
+_ERROR_MESSAGE_LIMIT = 4_000
 
 
 def fmt_s(ns):
     return f"{(ns or 0) / NS_PER_SEC:.1f}s"
 
 
-def fmt_duration(ns):
-    seconds = (ns or 0) / NS_PER_SEC
-    if seconds < 60:
-        return f"{seconds:.1f}s"
-
-    total_seconds = round(seconds)
-    hours, remainder = divmod(total_seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    if hours:
-        return f"{hours}h {minutes}m {seconds}s"
-    return f"{minutes}m {seconds}s"
-
-
 def cell(s):
     return str(s).replace("|", "\\|")
-
-
-def markdown(s):
-    return _MARKDOWN_SPECIAL.sub(r"\\\1", str(s))
 
 
 def scenario_status(steps):
@@ -62,6 +45,7 @@ def scenarios(features):
             yield {
                 "feature": feature.get("name", ""),
                 "name": scenario.get("name", ""),
+                "uri": feature.get("uri", ""),
                 "steps": steps,
                 "status": scenario_status(steps),
                 "duration": sum(
@@ -93,14 +77,68 @@ def render_summary(features, out):
             )
 
 
-def first_failing_step(steps):
+def failed_step(steps):
     for step in steps:
-        status = step.get("result", {}).get("status", "")
+        result = step.get("result", {})
+        status = result.get("status", "")
         if status not in ("", "passed", "skipped"):
-            keyword = step.get("keyword", "").strip()
-            name = step.get("name", "")
-            return f"{keyword} {name}".strip()
-    return "unknown"
+            return step
+    return None
+
+
+def truncate_error_message(message):
+    message = str(message).strip()
+    truncation_notice = "\n… (truncated; see workflow run)"
+    if len(message) > _ERROR_MESSAGE_LIMIT:
+        message = message[: _ERROR_MESSAGE_LIMIT - len(truncation_notice)]
+        message += truncation_notice
+    return message
+
+
+def render_failed_steps(failed_scenarios, remaining, out):
+    lines = ["--- Failed steps:"]
+    for scenario in failed_scenarios:
+        step = failed_step(scenario["steps"])
+        scenario_location = scenario["uri"] or "unknown"
+        lines.extend(
+            [
+                "",
+                f"  Scenario: {scenario['name']} # {scenario_location}",
+            ]
+        )
+        if step is None:
+            lines.append("    unknown")
+            continue
+
+        keyword = step.get("keyword", "").strip()
+        name = step.get("name", "")
+        step_label = f"{keyword} {name}".strip()
+        step_line = step.get("line")
+        step_location = scenario_location
+        if scenario_location != "unknown" and step_line is not None:
+            step_location = f"{scenario_location}:{step_line}"
+        lines.append(f"    {step_label} # {step_location}")
+
+        error_message = step.get("result", {}).get("error_message", "")
+        if error_message:
+            error_lines = truncate_error_message(error_message).split("\n")
+            lines.append(f"      Error: {error_lines[0]}")
+            lines.extend(f"             {line}" for line in error_lines[1:])
+
+    if remaining > 0:
+        lines.extend(
+            [
+                "",
+                f"  {remaining} more failed scenarios; see the workflow run.",
+            ]
+        )
+
+    body = "\n".join(lines)
+
+    backtick_runs = re.findall(r"`+", body)
+    fence_length = max(3, max(map(len, backtick_runs), default=0) + 1)
+    fence = "`" * fence_length
+    out.write(f"{fence}text\n{body}\n{fence}\n")
 
 
 def render_comment(features, out):
@@ -121,19 +159,12 @@ def render_comment(features, out):
 
     out.write("\n<details>\n")
     out.write(f"<summary>Failed scenarios ({len(failed_scenarios)})</summary>\n\n")
-    for scenario in failed_scenarios[:_FAILED_SCENARIO_LIMIT]:
-        out.write(
-            f"- **{markdown(scenario['feature'])} / {markdown(scenario['name'])}**\n"
-        )
-        out.write(
-            "  - First failing step: "
-            f"{markdown(first_failing_step(scenario['steps']))}\n"
-        )
-        out.write(f"  - Duration: {fmt_duration(scenario['duration'])}\n")
-
     remaining = len(failed_scenarios) - _FAILED_SCENARIO_LIMIT
-    if remaining > 0:
-        out.write(f"- {remaining} more failed scenarios; see the workflow run.\n")
+    render_failed_steps(
+        failed_scenarios[:_FAILED_SCENARIO_LIMIT],
+        remaining,
+        out,
+    )
     out.write("\n</details>\n")
 
 
