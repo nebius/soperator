@@ -159,7 +159,7 @@ tests:
       ncclTestsVersion: ""
       ncclTestsVersions:
         "12.9.0": "2.16.4"
-        "13.0.2": "2.17.6"
+        "13.0.3": "2.20.0"
       images:
         k8sJob: "test-image:latest"
         sansible: "sansible-image:latest"
@@ -189,17 +189,17 @@ tests:
             name: NCCL_TESTS_VERSION
             value: "2.16.4"
 
-  - it: should resolve NCCL tests version from map for CUDA 13.0.2
+  - it: should resolve NCCL tests version from map for CUDA 13.0.3
     documentSelector:
       path: metadata.name
       value: test-cluster-test-nccl-map-lookup-alt
     set:
       slurmClusterRefName: test-cluster
-      cudaVersion: "13.0.2"
+      cudaVersion: "13.0.3"
       ncclTestsVersion: ""
       ncclTestsVersions:
         "12.9.0": "2.16.4"
-        "13.0.2": "2.17.6"
+        "13.0.3": "2.20.0"
       images:
         k8sJob: "test-image:latest"
         sansible: "sansible-image:latest"
@@ -227,7 +227,7 @@ tests:
           path: spec.k8sJobSpec.jobContainer.env
           content:
             name: NCCL_TESTS_VERSION
-            value: "2.17.6"
+            value: "2.20.0"
 
   - it: should use flat override when ncclTestsVersion is set
     documentSelector:
