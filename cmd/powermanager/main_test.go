@@ -17,10 +17,83 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"reflect"
 	"sort"
 	"testing"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 )
+
+func TestNodeSetIsEphemeral(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		ephemeral      *bool
+		missingNodeSet bool
+		want           bool
+	}{
+		{name: "ephemeral", ephemeral: ptr.To(true), want: true},
+		{name: "non-ephemeral", ephemeral: ptr.To(false)},
+		{name: "unset defaults to non-ephemeral"},
+		{name: "missing nodeset", missingNodeSet: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			builder := fake.NewClientBuilder().WithScheme(scheme)
+			if !tc.missingNodeSet {
+				nodeSet := &slurmv1alpha1.NodeSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "test"},
+				}
+				nodeSet.Spec.EphemeralNodes = tc.ephemeral
+				builder.WithObjects(nodeSet)
+			}
+
+			got, err := nodeSetIsEphemeral(context.Background(), builder.Build(), "test", "worker")
+			if err != nil {
+				t.Fatalf("nodeSetIsEphemeral returned error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("nodeSetIsEphemeral = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCheckNodesStatus(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		missingPowerState bool
+		checkAdded        bool
+		ordinal           int32
+		wantDone          bool
+		wantErr           bool
+	}{
+		{name: "missing state", missingPowerState: true, checkAdded: true, wantErr: true},
+		{name: "added", checkAdded: true, wantDone: true},
+		{name: "pending addition", checkAdded: true, ordinal: 1},
+		{name: "removed", ordinal: 1, wantDone: true},
+		{name: "pending removal"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			builder := fake.NewClientBuilder().WithScheme(scheme)
+			if !tc.missingPowerState {
+				powerState := &slurmv1alpha1.NodeSetPowerState{
+					ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "test"},
+				}
+				powerState.Spec.ActiveNodes = []int32{0}
+				builder.WithObjects(powerState)
+			}
+
+			done, err := checkNodesStatus(context.Background(), builder.Build(), "test", "worker", []int32{tc.ordinal}, tc.checkAdded)
+			if done != tc.wantDone || (err != nil) != tc.wantErr {
+				t.Fatalf("checkNodesStatus = (%v, %v), want (%v, error=%v)", done, err, tc.wantDone, tc.wantErr)
+			}
+		})
+	}
+}
 
 func TestParseNodeList(t *testing.T) {
 	tests := []struct {

@@ -255,6 +255,10 @@ func waitForNodes(ctx context.Context, namespace, nodes string, timeout time.Dur
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
+	// Whether a NodeSet is ephemeral does not change while a power action runs, so it is resolved
+	// once per NodeSet rather than on every tick.
+	ephemeral := make(map[string]bool, len(nodesByNodeSet))
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -262,6 +266,22 @@ func waitForNodes(ctx context.Context, namespace, nodes string, timeout time.Dur
 		case <-ticker.C:
 			allDone := true
 			for nodeSetName, ordinals := range nodesByNodeSet {
+				isEphemeral, known := ephemeral[nodeSetName]
+				if !known {
+					var err error
+					isEphemeral, err = nodeSetIsEphemeral(ctx, client, namespace, nodeSetName)
+					if err != nil {
+						log.V(1).Info("Error reading NodeSet, will retry", "nodeSet", nodeSetName, "error", err)
+						allDone = false
+						continue
+					}
+					ephemeral[nodeSetName] = isEphemeral
+				}
+				// Power actions skip non-ephemeral NodeSets, so there is no update to wait for.
+				if !isEphemeral {
+					continue
+				}
+
 				done, err := checkNodesStatus(ctx, client, namespace, nodeSetName, ordinals, waitForAdded)
 				if err != nil {
 					log.V(1).Info("Error checking activeNodes, will retry", "nodeSet", nodeSetName, "error", err)
@@ -279,6 +299,23 @@ func waitForNodes(ctx context.Context, namespace, nodes string, timeout time.Dur
 			}
 		}
 	}
+}
+
+// nodeSetIsEphemeral reports whether power actions apply to the NodeSet. A NodeSet that is gone
+// counts as non-ephemeral: nothing will update its NodeSetPowerState either.
+func nodeSetIsEphemeral(ctx context.Context, client ctrlclient.Client, namespace, nodeSetName string) (bool, error) {
+	nodeSet := &slurmv1alpha1.NodeSet{}
+	if err := client.Get(ctx, ctrlclient.ObjectKey{
+		Namespace: namespace,
+		Name:      nodeSetName,
+	}, nodeSet); err != nil {
+		if ctrlclient.IgnoreNotFound(err) == nil {
+			return false, nil
+		}
+		return false, fmt.Errorf("get NodeSet: %w", err)
+	}
+
+	return nodeSet.Spec.EphemeralNodes != nil && *nodeSet.Spec.EphemeralNodes, nil
 }
 
 // checkNodesStatus checks if all specified ordinals are in or not in the NodeSetPowerState's activeNodes.
