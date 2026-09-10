@@ -24,6 +24,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	fakes "nebius.ai/slurm-operator/internal/controller/sconfigcontroller/fake"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
+	slurmpattern "nebius.ai/slurm-operator/internal/utils/slurm/pattern"
 )
 
 const (
@@ -242,4 +243,71 @@ func TestReconfigureEmitsEvent(t *testing.T) {
 
 		assert.Empty(t, g.recorder.Events, "no reconfigure ran, so there is nothing to report")
 	})
+}
+
+// TestReconfigureIsDueReportsWhy pins that the trigger is nameable. A reconfigure restarts
+// slurmctld, so an unexpected one must be explainable from the default logs and the event, without
+// turning on debug after the fact.
+func TestReconfigureIsDueReportsWhy(t *testing.T) {
+	withRequest := func(hash string, generation int64) *slurmv1alpha1.JailedConfig {
+		jc := &slurmv1alpha1.JailedConfig{}
+		jc.Generation = generation
+		jc.Spec.UpdateActions = []slurmv1alpha1.UpdateAction{slurmv1alpha1.UpdateActionReconfigure}
+		jc.Status.AppliedHash = hash
+		return jc
+	}
+
+	t.Run("a config that asks for nothing is not due and needs no reason", func(t *testing.T) {
+		due, reason := reconfigureIsDue(&slurmv1alpha1.JailedConfig{}, "h1")
+
+		assert.False(t, due)
+		assert.Empty(t, reason)
+	})
+
+	t.Run("changed content names itself", func(t *testing.T) {
+		due, reason := reconfigureIsDue(withRequest("h1", 1), "h2")
+
+		assert.True(t, due)
+		assert.Equal(t, reconfigureReasonContentChanged, reason)
+	})
+
+	t.Run("an unsatisfied request names itself", func(t *testing.T) {
+		// Same content, but no reconfigure has been confirmed for this generation yet.
+		due, reason := reconfigureIsDue(withRequest("h1", 1), "h1")
+
+		assert.True(t, due)
+		assert.Equal(t, reconfigureReasonUnsatisfied, reason)
+	})
+
+	t.Run("a satisfied request over unchanged content is not due", func(t *testing.T) {
+		jc := withRequest("h1", 7)
+		jc.Status.Conditions = []metav1.Condition{{
+			Type:               string(slurmv1alpha1.ReconfigurePerformed),
+			Status:             metav1.ConditionTrue,
+			Reason:             slurmv1alpha1.ReasonSuccess,
+			ObservedGeneration: 7,
+		}}
+
+		due, reason := reconfigureIsDue(jc, "h1")
+
+		assert.False(t, due)
+		assert.Empty(t, reason)
+	})
+}
+
+// The nodes that never restarted are the point of the timeout error: without them it says only
+// that something, somewhere, did not come back.
+func TestPendingNodeNamesAreSortedForTheTimeoutError(t *testing.T) {
+	names := pendingNodeNames(map[string]int64{
+		"worker-2": 3,
+		"worker-0": 1,
+		"worker-1": 2,
+	})
+
+	assert.Equal(t, []string{"worker-0", "worker-1", "worker-2"}, names)
+	assert.Equal(t, "worker-[0-2]", slurmpattern.Merge(names))
+}
+
+func TestPendingNodeNamesOfAnEmptyMap(t *testing.T) {
+	assert.Empty(t, pendingNodeNames(map[string]int64{}))
 }
