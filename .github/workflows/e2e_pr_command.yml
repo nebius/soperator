@@ -92,36 +92,6 @@ jobs:
               "Terraform branch \`$terraform_ref\` does not exist in \`$TERRAFORM_REPOSITORY\`."
           fi
 
-          build=$(gh api -X GET \
-            "repos/$REPOSITORY/actions/workflows/one_job.yml/runs" \
-            -F event=pull_request_target \
-            -F head_sha="$head_sha" \
-            -F per_page=1 \
-            --jq '.workflow_runs[0]')
-
-          if [[ -z "$build" || "$build" == "null" ]]; then
-            fail_with_comment \
-              "No Build All run was found for the current PR commit \`${head_sha:0:12}\`."
-          fi
-
-          build_id=$(jq -r '.id' <<<"$build")
-          build_status=$(jq -r '.status' <<<"$build")
-          build_conclusion=$(jq -r '.conclusion' <<<"$build")
-          build_url=$(jq -r '.html_url' <<<"$build")
-
-          if [[ "$build_status" != "completed" || "$build_conclusion" != "success" ]]; then
-            fail_with_comment \
-              "Build All for \`${head_sha:0:12}\` is \`$build_status/$build_conclusion\`. Retry \`/$e2e_command\` after it succeeds: $build_url"
-          fi
-
-          version_artifacts=$(gh api \
-            "repos/$REPOSITORY/actions/runs/$build_id/artifacts" \
-            --jq '[.artifacts[] | select(.name == "version" and .expired == false)] | length')
-          if [[ "$version_artifacts" == "0" ]]; then
-            fail_with_comment \
-              "Build All for \`${head_sha:0:12}\` has no usable \`version\` artifact: $build_url"
-          fi
-
           {
             echo "head_ref=$head_ref"
             echo "head_sha=$head_sha"
