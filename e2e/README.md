@@ -107,7 +107,7 @@ bin/acceptance collect-artifacts \
 The common snapshot contains Kubernetes, Soperator, redacted FluxCD, Slurm,
 and jail diagnostics. Add `--nebius-project-id <project-id>` to include Managed
 Kubernetes clusters and node groups. When that optional flag is omitted, the
-command does not create or invoke an `mk8s` collector.
+`mk8s` collector creates no files and does not invoke the Nebius CLI.
 
 Collectors are dependency-bound and reusable by another E2E runtime:
 

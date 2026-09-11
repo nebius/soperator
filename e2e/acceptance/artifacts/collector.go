@@ -62,13 +62,14 @@ func CollectAll(ctx context.Context, root string, collectors ...Collector) error
 }
 
 // CommonCollectors returns the shared cluster diagnostics.
-func CommonCollectors(runtime framework.Runtime) []Collector {
+func CommonCollectors(runtime framework.Runtime, nebiusProjectID string) []Collector {
 	return []Collector{
 		NewKubernetesCollector(runtime.Kubectl()),
 		NewSoperatorCollector(runtime.Kubectl()),
 		NewFluxCDCollector(runtime.Kubectl()),
 		NewSlurmCollector(runtime.Controller()),
 		NewJailCollector(runtime.Kubectl()),
+		NewMK8sCollector(runtime.Local(), nebiusProjectID),
 	}
 }
 

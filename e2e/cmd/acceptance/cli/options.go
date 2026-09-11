@@ -107,10 +107,7 @@ func collectArtifacts(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	collectors := artifacts.CommonCollectors(runtime)
-	if opts.NebiusProjectID != "" {
-		collectors = append(collectors, artifacts.NewMK8sCollector(runtime.Local(), opts.NebiusProjectID))
-	}
+	collectors := artifacts.CommonCollectors(runtime, opts.NebiusProjectID)
 	return artifacts.CollectAll(ctx, opts.OutputDir, collectors...)
 }
 

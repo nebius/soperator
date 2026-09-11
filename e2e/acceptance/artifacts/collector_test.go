@@ -9,12 +9,24 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
 type testCollector struct {
 	name string
 	err  error
 }
+
+type commonCollectorsRuntime struct {
+	framework.Runtime
+	args    framework.ArgsScope
+	command framework.CommandScope
+}
+
+func (r *commonCollectorsRuntime) Kubectl() framework.ArgsScope       { return r.args }
+func (r *commonCollectorsRuntime) Local() framework.ArgsScope         { return r.args }
+func (r *commonCollectorsRuntime) Controller() framework.CommandScope { return r.command }
 
 func (c testCollector) Name() string {
 	return c.name
@@ -52,4 +64,22 @@ func TestCollectAllRejectsDuplicateSanitizedNames(t *testing.T) {
 	)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "duplicated")
+}
+
+func TestCommonCollectorsIncludeOptionalMK8s(t *testing.T) {
+	runtime := &commonCollectorsRuntime{
+		args: framework.NewArgsScope(func(context.Context, ...string) (string, error) {
+			return "", nil
+		}),
+		command: framework.NewCommandScope(func(context.Context, string) (string, error) {
+			return "", nil
+		}),
+	}
+	collectors := CommonCollectors(runtime, "")
+
+	var names []string
+	for _, collector := range collectors {
+		names = append(names, collector.Name())
+	}
+	assert.Equal(t, []string{"kubernetes", "soperator", "fluxcd", "slurm", "jail", "mk8s"}, names)
 }

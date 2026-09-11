@@ -7,8 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
+)
+
+const (
+	jailCopyAttempts = 3
+	jailCopyDelay    = 5 * time.Second
 )
 
 type jailCollector struct {
@@ -110,7 +116,7 @@ func (c *jailCollector) copyFromPod(ctx context.Context, pod, container, source,
 		args = append(args, "-c", container)
 	}
 	args = append(args, fmt.Sprintf("%s/%s:%s", framework.SoperatorNamespace, pod, source), destination)
-	if _, err := c.kubectl.Run(ctx, args...); err != nil {
+	if _, err := c.kubectl.RunWithRetry(ctx, jailCopyAttempts, jailCopyDelay, args...); err != nil {
 		return fmt.Errorf("copy %s from pod %s: %w", source, pod, err)
 	}
 	return nil

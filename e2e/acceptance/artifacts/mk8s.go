@@ -33,7 +33,7 @@ func (c *mk8sCollector) Name() string { return "mk8s" }
 
 func (c *mk8sCollector) Collect(ctx context.Context, destination string) error {
 	if c.projectID == "" {
-		return fmt.Errorf("Nebius project ID is required")
+		return nil
 	}
 	clustersJSON, err := c.local.Run(ctx,
 		"nebius", "mk8s", "cluster", "list", "--parent-id", c.projectID, "--format", "json")
