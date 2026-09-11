@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -99,6 +100,12 @@ func collectArtifacts(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("parse collect-artifacts args: %w", err)
 	}
+	if opts.KubectlContext == "" {
+		log.Printf("artifacts: skip Kubernetes-bound collectors: kubectl context is not provided")
+		return artifacts.CollectAll(ctx, opts.OutputDir,
+			artifacts.NewMK8sCollector(acceptance.NewLocalArgsScope(), opts.NebiusProjectID),
+		)
+	}
 	targetVersion, err := resolveTargetSoperatorVersion(ctx, opts.KubectlContext, opts.SoperatorVersion)
 	if err != nil {
 		return err
@@ -153,7 +160,7 @@ func parseCollectOptions(args []string) (collectOptions, error) {
 	opts := collectOptions{SlurmClusterName: defaultSlurmClusterName}
 	fs := flag.NewFlagSet("acceptance collect-artifacts", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	fs.StringVar(&opts.KubectlContext, "kubectl-context", "", "kubectl context to collect from")
+	fs.StringVar(&opts.KubectlContext, "kubectl-context", "", "optional kubectl context; when omitted, only MK8s artifacts are collected")
 	fs.StringVar(&opts.SlurmClusterName, "slurm-cluster-name", opts.SlurmClusterName, "SlurmCluster resource name")
 	fs.StringVar(&opts.SoperatorVersion, "soperator-version", "", "target Soperator version; when omitted, Flux HelmRelease discovery is used")
 	fs.StringVar(&opts.NebiusProjectID, "nebius-project-id", "", "optional Nebius project ID for Managed Kubernetes artifacts")
@@ -169,8 +176,11 @@ func parseCollectOptions(args []string) (collectOptions, error) {
 	opts.SoperatorVersion = strings.TrimSpace(opts.SoperatorVersion)
 	opts.NebiusProjectID = strings.TrimSpace(opts.NebiusProjectID)
 	opts.OutputDir = strings.TrimSpace(opts.OutputDir)
-	if err := validateCommonOptions(opts.KubectlContext, opts.OutputDir); err != nil {
-		return collectOptions{}, err
+	if opts.OutputDir == "" {
+		return collectOptions{}, fmt.Errorf("--output-dir is required")
+	}
+	if opts.KubectlContext == "" && opts.NebiusProjectID == "" {
+		return collectOptions{}, fmt.Errorf("at least one of --kubectl-context or --nebius-project-id is required")
 	}
 	return opts, nil
 }

@@ -71,13 +71,6 @@ func (c *jailCollector) collectSharedJail(ctx context.Context, destination, pod 
 		}
 	}
 
-	scenarioSource := "/mnt/jail" + framework.AcceptanceScenarioArtifactsDir
-	if _, err := c.kubectl.Run(ctx, "exec", "-n", framework.SoperatorNamespace, pod, "--", "test", "-d", scenarioSource); err == nil {
-		if err := c.copyFromPod(ctx, pod, "", scenarioSource+"/.", filepath.Join(destination, "scenarios")); err != nil {
-			failures = append(failures, err)
-		}
-	}
-
 	return errors.Join(failures...)
 }
 

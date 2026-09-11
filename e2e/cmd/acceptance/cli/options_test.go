@@ -50,6 +50,20 @@ func TestParseCollectOptionsProjectIsOptional(t *testing.T) {
 	assert.Equal(t, "snapshot", opts.OutputDir)
 }
 
+func TestParseCollectOptionsAllowsProjectWithoutKubernetesContext(t *testing.T) {
+	opts, err := parseCollectOptions([]string{"--nebius-project-id", "project-id", "--output-dir", "snapshot"})
+	require.NoError(t, err)
+
+	assert.Empty(t, opts.KubectlContext)
+	assert.Equal(t, "project-id", opts.NebiusProjectID)
+}
+
+func TestParseCollectOptionsRequiresAtLeastOneArtifactSource(t *testing.T) {
+	_, err := parseCollectOptions([]string{"--output-dir", "snapshot"})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "at least one of --kubectl-context or --nebius-project-id is required")
+}
+
 func TestSuiteFromOptionsSelectsEssentialScenarios(t *testing.T) {
 	suite := suiteFromOptions(runOptions{RunEssentialTests: true}, "5.0.0")
 	assert.Equal(t, "@essential", suite.Tags)
