@@ -75,7 +75,6 @@ jobs:
           pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
           pr_state=$(jq -r '.state' <<<"$pr")
           head_ref=$(jq -r '.head.ref' <<<"$pr")
-          head_sha=$(jq -r '.head.sha' <<<"$pr")
           head_repo=$(jq -r '.head.repo.full_name' <<<"$pr")
 
           if [[ "$pr_state" != "open" ]]; then
@@ -94,8 +93,6 @@ jobs:
 
           {
             echo "head_ref=$head_ref"
-            echo "head_sha=$head_sha"
-            echo "e2e_command=/$e2e_command"
             echo "terraform_ref=$terraform_ref"
             echo "run_essential_tests=$run_essential_tests"
           } >> "$GITHUB_OUTPUT"
@@ -104,26 +101,9 @@ jobs:
         shell: bash
         env:
           HEAD_REF: ${{ steps.request.outputs.head_ref }}
-          HEAD_SHA: ${{ steps.request.outputs.head_sha }}
-          E2E_COMMAND: ${{ steps.request.outputs.e2e_command }}
           TERRAFORM_REF: ${{ steps.request.outputs.terraform_ref }}
           RUN_ESSENTIAL_TESTS: ${{ steps.request.outputs.run_essential_tests }}
         run: |
-          current_head_sha=$(gh api \
-            "repos/$REPOSITORY/pulls/$PR_NUMBER" \
-            --jq '.head.sha')
-          if [[ "$current_head_sha" != "$HEAD_SHA" ]]; then
-            message="The PR head changed while validating \`$E2E_COMMAND\`. Retry the command after Build All succeeds for the new commit."
-            gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "$message"
-            echo "::error::$message"
-            exit 1
-          fi
-
-          essential_input=()
-          if [[ "$RUN_ESSENTIAL_TESTS" == "true" ]]; then
-            essential_input=(-f run_essential_tests=true)
-          fi
-
           if ! gh workflow run e2e_test.yml \
             --repo "$REPOSITORY" \
             --ref "$HEAD_REF" \
@@ -131,7 +111,7 @@ jobs:
             -f "soperator_e2e_repo_branch=$HEAD_REF" \
             -f profile=@auto-select \
             -f run_unstable_tests=false \
-            "${essential_input[@]}" \
+            -f "run_essential_tests=$RUN_ESSENTIAL_TESTS" \
             -f is_scheduled=false \
             -f "pr_number=$PR_NUMBER"; then
             message="Could not dispatch E2E for \`$HEAD_REF\`. See the command workflow logs for details."
