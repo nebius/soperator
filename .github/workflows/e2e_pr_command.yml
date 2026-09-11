@@ -56,11 +56,15 @@ jobs:
             exit 1
           }
 
-          if [[ "$COMMENT_BODY" =~ ^/(e2e-essential|e2e)([[:blank:]]+([^[:space:]]+))?[[:blank:]]*$ ]]; then
+          usage='Usage: `/e2e [terraform-branch] [--scenarios="<selectors>"]` or `/e2e-essential [terraform-branch] [--scenarios="<selectors>"]`. Separate selectors with commas, semicolons, or whitespace. Double quotes are optional for lists without whitespace. Example: `/e2e --scenarios="features/internal_ssh.feature:3, features/observability.feature"`.'
+          comment_body="${COMMENT_BODY//[[:space:]]/ }"
+          request_pattern="^/(e2e-essential|e2e)([[:blank:]]+([^[:space:]\"-][^[:space:]\"]*))?([[:blank:]]+--scenarios=(\"([^\"]*)\"|([^[:space:]\"']*)))?[[:blank:]]*$"
+          if [[ "$comment_body" =~ $request_pattern ]]; then
             e2e_command="${BASH_REMATCH[1]}"
             terraform_ref="${BASH_REMATCH[3]:-main}"
+            scenarios="${BASH_REMATCH[6]:-${BASH_REMATCH[7]:-}}"
           else
-            fail_with_comment 'Usage: `/e2e`, `/e2e <terraform-branch>`, `/e2e-essential`, or `/e2e-essential <terraform-branch>`.'
+            fail_with_comment "$usage"
           fi
 
           run_essential_tests=false
@@ -95,6 +99,7 @@ jobs:
             echo "head_ref=$head_ref"
             echo "terraform_ref=$terraform_ref"
             echo "run_essential_tests=$run_essential_tests"
+            echo "scenarios=$scenarios"
           } >> "$GITHUB_OUTPUT"
 
       - name: Dispatch E2E
@@ -103,6 +108,7 @@ jobs:
           HEAD_REF: ${{ steps.request.outputs.head_ref }}
           TERRAFORM_REF: ${{ steps.request.outputs.terraform_ref }}
           RUN_ESSENTIAL_TESTS: ${{ steps.request.outputs.run_essential_tests }}
+          SCENARIOS: ${{ steps.request.outputs.scenarios }}
         run: |
           if ! gh workflow run e2e_test.yml \
             --repo "$REPOSITORY" \
@@ -112,6 +118,7 @@ jobs:
             -f profile=@auto-select \
             -f run_unstable_tests=false \
             -f "run_essential_tests=$RUN_ESSENTIAL_TESTS" \
+            -f "scenarios=$SCENARIOS" \
             -f is_scheduled=false \
             -f "pr_number=$PR_NUMBER"; then
             message="Could not dispatch E2E for \`$HEAD_REF\`. See the command workflow logs for details."
