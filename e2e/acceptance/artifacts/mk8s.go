@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"path/filepath"
 	"strings"
 
@@ -33,6 +34,7 @@ func (c *mk8sCollector) Name() string { return "mk8s" }
 
 func (c *mk8sCollector) Collect(ctx context.Context, destination string) error {
 	if c.projectID == "" {
+		log.Printf("artifacts: skip mk8s collector: Nebius project ID is not provided")
 		return nil
 	}
 	clustersJSON, err := c.local.Run(ctx,
