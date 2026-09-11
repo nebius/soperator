@@ -526,7 +526,7 @@ jobs:
           - cuda_version: "12.9.0"
             allow_failure: false
           - cuda_version: "13.0.3"
-            allow_failure: false
+            allow_failure: ${{ github.base_ref == 'soperator-release-4.0' || github.base_ref == 'soperator-release-4.1' }}
           - platform: linux/amd64
             runner: ubuntu-24.04
             arch: amd64
@@ -740,7 +740,7 @@ jobs:
           - cuda_version: "12.9.0"
             allow_failure: false
           - cuda_version: "13.0.3"
-            allow_failure: false
+            allow_failure: ${{ github.base_ref == 'soperator-release-4.0' || github.base_ref == 'soperator-release-4.1' }}
 
     env:
       UNSTABLE: ${{ needs.pre-build.outputs.unstable }}
