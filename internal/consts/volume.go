@@ -13,6 +13,9 @@ const (
 	nvidia = "nvidia"
 	boot   = "boot"
 
+	hostLogJournal   = "hostlog-journal"
+	soperatorOutputs = "soperator-outputs"
+
 	SssdConfig = "sssd.conf"
 
 	sshConfigs             = "ssh-configs"
@@ -22,6 +25,8 @@ const (
 	authorizedKeys         = "authorized_keys"
 	securityLimits         = "security-limits"
 	securityLimitsConfFile = "limits.conf"
+	userIsolation          = "user-isolation"
+	userIsolationConfFile  = userIsolation + ".conf"
 
 	sysctl              = "sysctl"
 	sysctlConfFile      = sysctl + ".conf"
@@ -57,11 +62,15 @@ const (
 	VolumeNameSSSDSocket               = "sssd-socket"
 	VolumeMountPathSSHDKeys            = "/etc/ssh/sshd_keys"
 	VolumeNameSecurityLimits           = securityLimits
+	VolumeNameUserIsolation            = userIsolation
 	VolumeNameSharedMemory             = "dev-shm"
 	VolumeNameSysctl                   = sysctl
 	VolumeNameSupervisordConfigMap     = "supervisord-config"
+	VolumeNameRuntime                  = "runtime"
 	VolumeNameInMemorySubmount         = "in-memory"
 	VolumeNameTmpDisk                  = "tmp-disk"
+	VolumeNameHostLogJournal           = hostLogJournal
+	VolumeNameSoperatorOutputs         = soperatorOutputs
 	VolumeNameSlurmdbdSSLCACertificate = "slurmdbd-ssl-ca-cert"
 	VolumeNameSlurmdbdSSLClientKey     = "slurmdbd-ssl-client-key"
 
@@ -84,12 +93,19 @@ const (
 	VolumeMountSubPathSSHRootKeys           = authorizedKeys
 	VolumeMountPathSecurityLimits           = "/etc/security/" + securityLimitsConfFile
 	VolumeMountSubPathSecurityLimits        = securityLimitsConfFile
+	VolumeMountPathUserIsolation            = "/etc/soperator/" + userIsolationConfFile
+	VolumeMountSubPathUserIsolation         = userIsolationConfFile
 	VolumeMountPathSharedMemory             = "/dev/shm"
 	VolumeMountPathSysctl                   = "/etc/" + sysctlConfFile
 	VolumeMountSubPathSysctl                = sysctlConfFile
 	VolumeMountPathSupervisordConfig        = "/etc/supervisor/conf.d/"
+	VolumeMountPathRuntime                  = "/run"
 	VolumeMountPathInMemorySubmount         = VolumeMountPathJailUpper + "/mnt/memory"
 	VolumeMountPathTmpDisk                  = "/tmp"
+	VolumeHostPathJournal                   = "/var/log/journal"
+	VolumeMountPathHostLogJournal           = VolumeMountPathJailUpper + "/var/hostlog/journal"
+	VolumeHostPathSoperatorOutputs          = "/var/log/" + soperatorOutputs
+	VolumeMountPathSoperatorOutputs         = VolumeMountPathJailUpper + "/opt/" + soperatorOutputs + "/local"
 	VolumeMountPathSlurmdbdSSLCACertificate = "/mnt/" + slurmdbdSSLCACertificate
 	VolumeMountPathSlurmdbdSSLClientKey     = "/mnt/" + slurmdbdSSLClientKey
 )

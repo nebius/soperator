@@ -1,0 +1,120 @@
+name: PR E2E Command
+
+run-name: "PR #${{ github.event.issue.number }} E2E command by @${{ github.event.comment.user.login }}"
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  dispatch:
+    name: Dispatch E2E
+    if: |
+      github.event.issue.pull_request
+      && startsWith(github.event.comment.body, '/e2e')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.issue.number }}
+      COMMENTER: ${{ github.event.comment.user.login }}
+      COMMENT_BODY: ${{ github.event.comment.body }}
+      TERRAFORM_REPOSITORY: nebius/nebius-solution-library
+
+    steps:
+      - name: Authorize requester
+        shell: bash
+        run: |
+          permission=$(gh api \
+            "repos/$REPOSITORY/collaborators/$COMMENTER/permission" \
+            --jq '.permission')
+
+          case "$permission" in
+            admin|maintain|write)
+              ;;
+            *)
+              echo "::error::$COMMENTER is not allowed to trigger E2E"
+              exit 1
+              ;;
+          esac
+
+      - name: Validate request
+        id: request
+        shell: bash
+        run: |
+          fail_with_comment() {
+            local message="$1"
+            gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "$message"
+            echo "::error::$message"
+            exit 1
+          }
+
+          if [[ "$COMMENT_BODY" =~ ^/(e2e-essential|e2e)([[:blank:]]+([^[:space:]]+))?[[:blank:]]*$ ]]; then
+            e2e_command="${BASH_REMATCH[1]}"
+            terraform_ref="${BASH_REMATCH[3]:-main}"
+          else
+            fail_with_comment 'Usage: `/e2e`, `/e2e <terraform-branch>`, `/e2e-essential`, or `/e2e-essential <terraform-branch>`.'
+          fi
+
+          run_essential_tests=false
+          if [[ "$e2e_command" == "e2e-essential" ]]; then
+            run_essential_tests=true
+          fi
+
+          if ! git check-ref-format --branch "$terraform_ref" >/dev/null 2>&1; then
+            fail_with_comment "Terraform branch \`$terraform_ref\` is not a valid Git branch name."
+          fi
+
+          pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
+          pr_state=$(jq -r '.state' <<<"$pr")
+          head_ref=$(jq -r '.head.ref' <<<"$pr")
+          head_repo=$(jq -r '.head.repo.full_name' <<<"$pr")
+
+          if [[ "$pr_state" != "open" ]]; then
+            fail_with_comment "PR #$PR_NUMBER is not open."
+          fi
+          if [[ "$head_repo" != "$REPOSITORY" ]]; then
+            fail_with_comment "The \`/$e2e_command\` command does not support fork PRs."
+          fi
+
+          if ! git ls-remote --exit-code --heads \
+            "https://github.com/$TERRAFORM_REPOSITORY.git" \
+            "refs/heads/$terraform_ref" >/dev/null; then
+            fail_with_comment \
+              "Terraform branch \`$terraform_ref\` does not exist in \`$TERRAFORM_REPOSITORY\`."
+          fi
+
+          {
+            echo "head_ref=$head_ref"
+            echo "terraform_ref=$terraform_ref"
+            echo "run_essential_tests=$run_essential_tests"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch E2E
+        shell: bash
+        env:
+          HEAD_REF: ${{ steps.request.outputs.head_ref }}
+          TERRAFORM_REF: ${{ steps.request.outputs.terraform_ref }}
+          RUN_ESSENTIAL_TESTS: ${{ steps.request.outputs.run_essential_tests }}
+        run: |
+          if ! gh workflow run e2e_test.yml \
+            --repo "$REPOSITORY" \
+            --ref "$HEAD_REF" \
+            -f "terraform_repo_ref=$TERRAFORM_REF" \
+            -f "soperator_e2e_repo_branch=$HEAD_REF" \
+            -f profile=@auto-select \
+            -f run_unstable_tests=false \
+            -f "run_essential_tests=$RUN_ESSENTIAL_TESTS" \
+            -f is_scheduled=false \
+            -f "pr_number=$PR_NUMBER"; then
+            message="Could not dispatch E2E for \`$HEAD_REF\`. See the command workflow logs for details."
+            gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "$message"
+            exit 1
+          fi

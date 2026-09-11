@@ -1,0 +1,81 @@
+suite: test sconfigcontroller protected metrics
+templates:
+  - templates/sconfigcontroller-metrics-service.yaml
+  - templates/sconfigcontroller-servicemonitor.yaml
+  - templates/sconfigcontroller-metrics-auth-rbac.yaml
+
+tests:
+  - it: should expose the secure metrics service
+    template: templates/sconfigcontroller-metrics-service.yaml
+    set:
+      clusterName: test-cluster
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.ports[0].name
+          value: https-metrics
+      - equal:
+          path: spec.ports[0].port
+          value: 8443
+      - equal:
+          path: spec.ports[0].targetPort
+          value: https
+
+  - it: should scrape sconfigcontroller metrics over authenticated https
+    template: templates/sconfigcontroller-servicemonitor.yaml
+    set:
+      clusterName: test-cluster
+    asserts:
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: spec.endpoints[0].port
+          value: https-metrics
+      - equal:
+          path: spec.endpoints[0].scheme
+          value: https
+      - equal:
+          path: spec.endpoints[0].bearerTokenFile
+          value: /var/run/secrets/kubernetes.io/serviceaccount/token
+      - equal:
+          path: spec.endpoints[0].tlsConfig.insecureSkipVerify
+          value: true
+
+  - it: should grant auth review permissions to the sconfigcontroller service account
+    template: templates/sconfigcontroller-metrics-auth-rbac.yaml
+    set:
+      clusterName: test-cluster
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: ClusterRole
+        documentIndex: 0
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - authentication.k8s.io
+            resources:
+              - tokenreviews
+            verbs:
+              - create
+        documentIndex: 0
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - authorization.k8s.io
+            resources:
+              - subjectaccessreviews
+            verbs:
+              - create
+        documentIndex: 0
+      - isKind:
+          of: ClusterRoleBinding
+        documentIndex: 1
+      - equal:
+          path: subjects[0].name
+          value: test-cluster-sconfigcontroller
+        documentIndex: 1

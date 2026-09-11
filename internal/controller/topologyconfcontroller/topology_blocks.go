@@ -2,7 +2,6 @@ package topologyconfcontroller
 
 import (
 	"context"
-	"fmt"
 	"sort"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -26,48 +25,47 @@ func (b TopologyBlocks) AddNode(block, worker string) {
 	b.blocks[block] = append(b.blocks[block], worker)
 }
 
-// RenderConfigLines formats each populated block as a Slurm topology.conf line:
-//
-//	BlockName=<tier-0 label> Nodes=<comma-separated worker list>
-//
-// https://slurm.schedmd.com/topology.conf.html#SECTION_EXAMPLE
-func (b TopologyBlocks) RenderConfigLines() []string {
+// RenderBlocks flattens the topology into the block entries of a block topology, in the shape
+// topology.yaml expects.
+func (b TopologyBlocks) RenderBlocks() []blockYAML {
 	if len(b.blocks) == 0 {
 		return nil
 	}
 
-	lines := make([]string, 0, len(b.blocks))
-
+	blocks := make([]blockYAML, 0, len(b.blocks))
 	for blockName, workers := range b.blocks {
 		if len(workers) == 0 {
 			continue
 		}
-		lines = append(
-			lines,
-			fmt.Sprintf(
-				"BlockName=%s Nodes=%s",
-				blockName,
-				slurmpattern.Merge(workers),
-			),
-		)
+		blocks = append(blocks, blockYAML{
+			// Block names are external tier-0 labels; sanitize them like switch names. The
+			// worker list must stay verbatim to match real Slurm node names.
+			Block: slurmSafeSwitchName(blockName),
+			Nodes: slurmpattern.Merge(workers),
+		})
 	}
-	sort.Strings(lines)
+	sort.Slice(blocks, func(i, j int) bool { return blocks[i].Block < blocks[j].Block })
 
-	return lines
+	return blocks
 }
 
 // BuildTopologyBlocks builds the block topology in two stages, mirroring BuildTopologyGraph.
 //
-// Stage 1 places every Slurm node from allNodeNames into the synthetic "unknown" block, keeping
+// Stage 1 places every Slurm node from allNodeNames into its fabric's "unknown" block, keeping
 // the topology complete and stable regardless of pod lifecycle. Stage 2 overlays real blocks:
 // GPU pods scheduled to a K8s node carrying a "tier-0" label (gpuPodsByNode) are moved from
 // "unknown" into that block. Non-GPU nodes and unscheduled or unlabeled GPU nodes stay in
 // "unknown".
+//
+// Blocks themselves have no root hierarchy, so real tier-0 blocks are fabric-agnostic. Only the
+// catch-all "unknown" block is split per fabric (via fabricByNode, keyed by Slurm node name) so
+// powered-down nodes from different fabrics don't get lumped into one block.
 func BuildTopologyBlocks(
 	ctx context.Context,
 	labelsByNode map[string]NodeTopologyLabels,
 	gpuPodsByNode map[string][]string,
 	allNodeNames []string,
+	fabricByNode map[string]string,
 ) TopologyBlocks {
 	logger := log.FromContext(ctx).WithName(WorkerTopologyReconcilerName)
 	blocks := newTopologyBlocks()
@@ -93,13 +91,12 @@ func BuildTopologyBlocks(
 		}
 	}
 
-	// Stage 1: every node not placed into a real block goes into "unknown".
-	const unknownBlockName = "unknown"
+	// Stage 1: every node not placed into a real block goes into its fabric's "unknown" block.
 	for _, name := range allNodeNames {
 		if _, ok := placed[name]; ok {
 			continue
 		}
-		blocks.AddNode(unknownBlockName, name)
+		blocks.AddNode(unknownSwitchName(fabricOf(fabricByNode, name)), name)
 	}
 
 	return blocks

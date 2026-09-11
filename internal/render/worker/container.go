@@ -20,13 +20,14 @@ import (
 
 // RenderContainerWorkerInit renders init [corev1.Container] for worker nodes.
 // It runs a script that waits for the controller to be ready before allowing the main slurmd container to start.
-// If topology is enabled, it also waits for the topology configuration to be ready before allowing slurmd to start.
+// If topology is enabled, it also resolves the topology this worker registers into and leaves it on
+// the runtime volume, so that slurmd starts without waiting for the topology config itself.
 func RenderContainerWorkerInit(
-	clusterName string,
 	container *values.Container,
 	topologyEnabled, gpuEnabled bool,
 	waitTimeoutSeconds int32,
-	topologyPlugin string,
+	topologyFabric string,
+	randomDelaySeconds int32,
 ) corev1.Container {
 	command := []string{
 		"python3",
@@ -37,46 +38,25 @@ func RenderContainerWorkerInit(
 		command = append(command, "wait-topology")
 	}
 
-	volumeMounts := []corev1.VolumeMount{
+	var volumeMounts []corev1.VolumeMount
+	if topologyEnabled {
+		// The runtime volume carries the resolved topology to slurmd. It is mounted first because
+		// the munge socket below sits inside it, and a nested mount must follow its parent.
+		volumeMounts = append(volumeMounts,
+			renderVolumeMountRuntime(),
+			corev1.VolumeMount{
+				Name:      consts.VolumeNameTopologyNodeLabels,
+				MountPath: consts.VolumeMountPathTopologyNodeLabels,
+				ReadOnly:  true,
+			},
+		)
+	}
+	volumeMounts = append(volumeMounts,
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
-	}
-	if topologyEnabled {
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      consts.VolumeNameTopologyNodeLabels,
-			MountPath: consts.VolumeMountPathTopologyNodeLabels,
-			ReadOnly:  true,
-		})
-	}
+	)
 
 	env := []corev1.EnvVar{
-		{
-			Name: "K8S_NODE_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: corev1.SchemeGroupVersion.Version,
-					FieldPath:  "spec.nodeName",
-				},
-			},
-		},
-		{
-			Name: "K8S_POD_NAME",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: corev1.SchemeGroupVersion.Version,
-					FieldPath:  "metadata.name",
-				},
-			},
-		},
-		{
-			Name: "K8S_POD_NAMESPACE",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: corev1.SchemeGroupVersion.Version,
-					FieldPath:  "metadata.namespace",
-				},
-			},
-		},
 		{
 			Name:  "CONTROLLER_MAX_ATTEMPTS",
 			Value: "60",
@@ -85,44 +65,24 @@ func RenderContainerWorkerInit(
 			Name:  "CONTROLLER_POLL_INTERVAL",
 			Value: "5",
 		},
-		{
-			Name:  "K8S_SERVICE_NAME",
-			Value: naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName),
-		},
 	}
 
 	if gpuEnabled {
-		env = append(env,
-			corev1.EnvVar{
-				Name:  "NODESET_GPU_ENABLED",
-				Value: "true",
-			},
-		)
+		env = append(env, corev1.EnvVar{
+			Name:  "NODESET_GPU_ENABLED",
+			Value: "true",
+		})
 	}
 
 	if topologyEnabled {
-		env = append(env,
-			corev1.EnvVar{
-				Name:  "TOPOLOGY_CONFIGMAP_PATH",
-				Value: consts.VolumeMountPathTopologyNodeLabels,
-			},
-			corev1.EnvVar{
-				Name:  "TOPOLOGY_WAIT_TIMEOUT",
-				Value: strconv.Itoa(int(waitTimeoutSeconds)),
-			},
-			corev1.EnvVar{
-				Name:  "TOPOLOGY_POLL_INTERVAL",
-				Value: "5",
-			},
-		)
-		if topologyPlugin != "" {
-			env = append(env,
-				corev1.EnvVar{
-					Name:  "SLURM_TOPOLOGY_PLUGIN",
-					Value: topologyPlugin,
-				},
-			)
-		}
+		env = append(env, renderNodeSetTopologyEnv(topologyFabric, waitTimeoutSeconds)...)
+	}
+
+	if randomDelaySeconds > 0 {
+		env = append(env, corev1.EnvVar{
+			Name:  "WORKER_INIT_RANDOM_DELAY_SECONDS",
+			Value: strconv.Itoa(int(randomDelaySeconds)),
+		})
 	}
 
 	return corev1.Container{
@@ -145,6 +105,7 @@ func renderContainerNodeSetSlurmd(
 	clusterWithGPU bool,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
+		renderVolumeMountRuntime(),
 		common.RenderVolumeMountSpool(consts.ComponentTypeWorker, consts.SlurmdName),
 		common.RenderVolumeMountJail(),
 		common.RenderVolumeMountMungeSocket(),
@@ -154,6 +115,8 @@ func renderContainerNodeSetSlurmd(
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
 		renderVolumeMountBoot(),
+		renderVolumeMountHostLogJournal(),
+		renderVolumeMountSoperatorOutputs(),
 		renderVolumeMountSharedMemory(),
 		renderVolumeMountSysctl(),
 		renderVolumeMountSupervisordConfigMap(),
@@ -223,6 +186,14 @@ func renderContainerNodeSetSlurmd(
 		return corev1.Container{}, fmt.Errorf("checking resource requests: %w", err)
 	}
 
+	for _, env := range nodeSet.ContainerSlurmd.CustomEnv {
+		if env.Name == consts.EnvNodeRealMemoryBytes {
+			return corev1.Container{}, fmt.Errorf("environment variable %q is managed by Soperator", consts.EnvNodeRealMemoryBytes)
+		}
+	}
+
+	realMemoryBytes := common.RenderRealMemorySlurmd(resources) * 1024 * 1024
+
 	appArmorProfile := nodeSet.ContainerSlurmd.AppArmorProfile
 	if nodeSet.AppArmorProfileUseDefault {
 		appArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(nodeSet.ParentalCluster.Name, nodeSet.ParentalCluster.Namespace))
@@ -238,12 +209,17 @@ func renderContainerNodeSetSlurmd(
 		Command:         nodeSet.ContainerSlurmd.Command,
 		Args:            nodeSet.ContainerSlurmd.Args,
 		Env: append(
-			renderNodeSetSlurmdEnv(
-				cgroupVersion,
-				clusterWithGPU,
-				nodeSet.GPU.Enabled,
-				nodeSet.GPU.Nvidia.GDRCopyEnabled,
-				nodeSet.NodeExtra,
+			append(
+				renderNodeSetSlurmdEnv(
+					cgroupVersion,
+					clusterWithGPU,
+					nodeSet.GPU.Enabled,
+					nodeSet.GPU.Nvidia.GDRCopyEnabled,
+					nodeSet.DockerEnabled,
+					nodeSet.NodeExtra,
+					realMemoryBytes,
+				),
+				renderSlurmdTopologyEnv(topologyEnabled)...,
 			),
 			nodeSet.ContainerSlurmd.CustomEnv...,
 		),
@@ -280,6 +256,20 @@ func renderContainerNodeSetSlurmd(
 	}, nil
 }
 
+func renderContainerNodeSetDockerProxy(nodeSet *values.SlurmNodeSet) corev1.Container {
+	return corev1.Container{
+		Name:            consts.ContainerNameDockerProxy,
+		Image:           nodeSet.ContainerSlurmd.Image,
+		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
+		Command:         []string{"/opt/bin/slurm/docker_proxy_nginx_entrypoint.sh"},
+		VolumeMounts: []corev1.VolumeMount{
+			renderVolumeMountRuntime(),
+		},
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+	}
+}
+
 func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameSupervisordConfigMap,
@@ -288,12 +278,79 @@ func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
 	}
 }
 
+func renderVolumeMountRuntime() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameRuntime,
+		MountPath: consts.VolumeMountPathRuntime,
+	}
+}
+
+// renderSlurmdTopologyEnv points slurmd at the topology worker-init resolved for it.
+func renderSlurmdTopologyEnv(topologyEnabled bool) []corev1.EnvVar {
+	if !topologyEnabled {
+		return nil
+	}
+
+	return []corev1.EnvVar{
+		{
+			Name:  "SLURM_TOPOLOGY_ENABLED",
+			Value: "true",
+		},
+		{
+			Name:  "SLURMD_TOPOLOGY_PATH",
+			Value: consts.SlurmdTopologyPath,
+		},
+	}
+}
+
+// renderNodeSetTopologyEnv renders the environment the topology resolver reads in worker-init.
+func renderNodeSetTopologyEnv(topologyFabric string, waitTimeoutSeconds int32) []corev1.EnvVar {
+	fabric := topologyFabric
+	if fabric == "" {
+		fabric = consts.SlurmTopologyDefaultFabric
+	}
+
+	return []corev1.EnvVar{
+		{
+			Name: "K8S_NODE_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: corev1.SchemeGroupVersion.Version,
+					FieldPath:  "spec.nodeName",
+				},
+			},
+		},
+		{
+			Name:  "TOPOLOGY_CONFIGMAP_PATH",
+			Value: consts.VolumeMountPathTopologyNodeLabels,
+		},
+		{
+			Name:  "TOPOLOGY_WAIT_TIMEOUT",
+			Value: strconv.Itoa(int(waitTimeoutSeconds)),
+		},
+		{
+			Name:  "TOPOLOGY_POLL_INTERVAL",
+			Value: "5",
+		},
+		{
+			Name:  "SLURM_TOPOLOGY_FABRIC",
+			Value: fabric,
+		},
+		{
+			Name:  "SLURMD_TOPOLOGY_PATH",
+			Value: consts.SlurmdTopologyPath,
+		},
+	}
+}
+
 func renderNodeSetSlurmdEnv(
 	cgroupVersion string,
 	clusterWithGPU bool,
 	nodeSetGPUEnabled bool,
 	enableGDRCopy bool,
+	dockerEnabled bool,
 	slurmNodeExtra string,
+	realMemoryBytes int64,
 ) []corev1.EnvVar {
 	envVar := []corev1.EnvVar{
 		{
@@ -312,6 +369,14 @@ func renderNodeSetSlurmdEnv(
 		{
 			Name:  "NODESET_GPU_ENABLED",
 			Value: strconv.FormatBool(nodeSetGPUEnabled),
+		},
+		{
+			Name:  consts.EnvDockerEnabled,
+			Value: strconv.FormatBool(dockerEnabled),
+		},
+		{
+			Name:  consts.EnvNodeRealMemoryBytes,
+			Value: strconv.FormatInt(realMemoryBytes, 10),
 		},
 	}
 

@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -47,8 +48,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 					Name:        "node",
 					ClusterName: "slurm-cluster",
 					InstanceID:  "k8s-node",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateDRAIN: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateDRAIN: {},
 					},
 					Reason: ptr.To(slurmapi.NodeReason{
 						Reason:    fmt.Sprintf("%s: extra", consts.SlurmNodeReasonKillTaskFailed),
@@ -66,8 +67,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 						Name:        "node",
 						ClusterName: "slurm-cluster",
 						InstanceID:  "k8s-node",
-						States: map[api.V0041NodeState]struct{}{
-							api.V0041NodeStateDRAIN: {},
+						States: map[api.V0044NodeState]struct{}{
+							api.V0044NodeStateDRAIN: {},
 						},
 						Reason: ptr.To(slurmapi.NodeReason{
 							Reason:         consts.SlurmNodeReasonKillTaskFailed,
@@ -101,8 +102,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 					Name:        "node",
 					ClusterName: "slurm-cluster",
 					InstanceID:  "k8s-node",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateIDLE: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateIDLE: {},
 					},
 					Reason: ptr.To(slurmapi.NodeReason{
 						Reason:    consts.SlurmNodeReasonKillTaskFailed,
@@ -126,8 +127,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 					Name:        "node",
 					ClusterName: "slurm-cluster",
 					InstanceID:  "k8s-node",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateDRAIN: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateDRAIN: {},
 					},
 					Reason: nil,
 				},
@@ -144,7 +145,7 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 			apiClient := slurmapifake.NewMockClient(t)
 			apiClient.On("ListNodes", ctx).Return(tt.listNodesOut, tt.listNodesErr)
 
-			slurmAPIClients := slurmapi.NewClientSet()
+			slurmAPIClients := slurmapi.NewClientSet(context.Background())
 			slurmAPIClients.AddClient(tt.slurmClusterName, apiClient)
 			c := &SlurmNodesController{
 				slurmAPIClients: slurmAPIClients,
@@ -186,39 +187,39 @@ func TestSlurmNodesController_processSetUnhealthy_waitsForFullyDrainedSlurmNode(
 
 	tests := []struct {
 		name               string
-		slurmNodeStates    map[api.V0041NodeState]struct{}
+		slurmNodeStates    map[api.V0044NodeState]struct{}
 		wantHardwareIssues bool
 	}{
 		{
 			name: "allocated drained node waits",
-			slurmNodeStates: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateALLOCATED: {},
-				api.V0041NodeStateDRAIN:     {},
+			slurmNodeStates: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateALLOCATED: {},
+				api.V0044NodeStateDRAIN:     {},
 			},
 			wantHardwareIssues: false,
 		},
 		{
 			name: "mixed drained node waits",
-			slurmNodeStates: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateMIXED: {},
-				api.V0041NodeStateDRAIN: {},
+			slurmNodeStates: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateMIXED: {},
+				api.V0044NodeStateDRAIN: {},
 			},
 			wantHardwareIssues: false,
 		},
 		{
 			name: "completing idle drained node waits",
-			slurmNodeStates: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateIDLE:       {},
-				api.V0041NodeStateDRAIN:      {},
-				api.V0041NodeStateCOMPLETING: {},
+			slurmNodeStates: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateIDLE:       {},
+				api.V0044NodeStateDRAIN:      {},
+				api.V0044NodeStateCOMPLETING: {},
 			},
 			wantHardwareIssues: false,
 		},
 		{
 			name: "idle drained node is marked unhealthy",
-			slurmNodeStates: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateIDLE:  {},
-				api.V0041NodeStateDRAIN: {},
+			slurmNodeStates: map[api.V0044NodeState]struct{}{
+				api.V0044NodeStateIDLE:  {},
+				api.V0044NodeStateDRAIN: {},
 			},
 			wantHardwareIssues: true,
 		},
@@ -230,7 +231,6 @@ func TestSlurmNodesController_processSetUnhealthy_waitsForFullyDrainedSlurmNode(
 				t,
 				ctx,
 				tt.slurmNodeStates,
-				true,
 			)
 
 			err := controller.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmNode)
@@ -241,16 +241,15 @@ func TestSlurmNodesController_processSetUnhealthy_waitsForFullyDrainedSlurmNode(
 	}
 }
 
-func TestSlurmNodesController_processHealthCheckFailed_withoutExtensiveCheckWaitsForFullyDrainedSlurmNode(t *testing.T) {
+func TestSlurmNodesController_processHealthCheckFailed_waitsForFullyDrainedSlurmNode(t *testing.T) {
 	ctx := context.Background()
 	controller, k8sClient, slurmClusterName, k8sNode, slurmNode := newSlurmNodesControllerForUnhealthyTest(
 		t,
 		ctx,
-		map[api.V0041NodeState]struct{}{
-			api.V0041NodeStateALLOCATED: {},
-			api.V0041NodeStateDRAIN:     {},
+		map[api.V0044NodeState]struct{}{
+			api.V0044NodeStateALLOCATED: {},
+			api.V0044NodeStateDRAIN:     {},
 		},
-		false,
 	)
 
 	err := controller.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, slurmNode, slurmNode.Reason)
@@ -297,22 +296,22 @@ func TestSlurmNodesController_processSetUnhealthy_reassignedInstanceUndrains(t *
 
 	apiClient := slurmapifake.NewMockClient(t)
 	apiClient.On(
-		"SlurmV0041PostNodeWithResponse",
+		"SlurmV0044PostNodeWithResponse",
 		ctx,
 		"worker-0",
-		mock.MatchedBy(func(body api.SlurmV0041PostNodeJSONRequestBody) bool {
+		mock.MatchedBy(func(body api.SlurmV0044PostNodeJSONRequestBody) bool {
 			return body.State != nil &&
 				len(*body.State) == 1 &&
-				(*body.State)[0] == api.V0041UpdateNodeMsgStateUNDRAIN &&
+				(*body.State)[0] == api.V0044UpdateNodeMsgStateUNDRAIN &&
 				body.Comment == nil
 		}),
-	).Return(&api.SlurmV0041PostNodeResponse{
-		JSON200: &api.V0041OpenapiResp{
-			Errors: &[]api.V0041OpenapiError{},
+	).Return(&api.SlurmV0044PostNodeResponse{
+		JSON200: &api.V0044OpenapiResp{
+			Errors: &[]api.V0044OpenapiError{},
 		},
 	}, nil).Once()
 
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
 	slurmAPIClients.AddClient(slurmClusterName, apiClient)
 
 	controller := NewSlurmNodesController(
@@ -321,7 +320,6 @@ func TestSlurmNodesController_processSetUnhealthy_reassignedInstanceUndrains(t *
 		record.NewFakeRecorder(10),
 		slurmAPIClients,
 		time.Minute,
-		true,
 		true,
 		apiReader,
 		"",
@@ -347,11 +345,10 @@ func TestSlurmNodesController_processSetUnhealthy_setsHardwareConditionWhenAssig
 	controller, k8sClient, slurmClusterName, k8sNode, slurmNode := newSlurmNodesControllerForUnhealthyTest(
 		t,
 		ctx,
-		map[api.V0041NodeState]struct{}{
-			api.V0041NodeStateIDLE:  {},
-			api.V0041NodeStateDRAIN: {},
+		map[api.V0044NodeState]struct{}{
+			api.V0044NodeStateIDLE:  {},
+			api.V0044NodeStateDRAIN: {},
 		},
-		true,
 	)
 
 	err := controller.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmNode)
@@ -398,9 +395,8 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodFallsBackToSet
 		client,
 		scheme,
 		record.NewFakeRecorder(10),
-		slurmapi.NewClientSet(),
+		slurmapi.NewClientSet(context.Background()),
 		time.Minute,
-		true,
 		true,
 		apiReader,
 		"",
@@ -447,22 +443,22 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodUndrainsWhenCu
 
 	apiClient := slurmapifake.NewMockClient(t)
 	apiClient.On(
-		"SlurmV0041PostNodeWithResponse",
+		"SlurmV0044PostNodeWithResponse",
 		ctx,
 		"worker-0",
-		mock.MatchedBy(func(body api.SlurmV0041PostNodeJSONRequestBody) bool {
+		mock.MatchedBy(func(body api.SlurmV0044PostNodeJSONRequestBody) bool {
 			return body.State != nil &&
 				len(*body.State) == 1 &&
-				(*body.State)[0] == api.V0041UpdateNodeMsgStateUNDRAIN &&
+				(*body.State)[0] == api.V0044UpdateNodeMsgStateUNDRAIN &&
 				body.Comment == nil
 		}),
-	).Return(&api.SlurmV0041PostNodeResponse{
-		JSON200: &api.V0041OpenapiResp{
-			Errors: &[]api.V0041OpenapiError{},
+	).Return(&api.SlurmV0044PostNodeResponse{
+		JSON200: &api.V0044OpenapiResp{
+			Errors: &[]api.V0044OpenapiError{},
 		},
 	}, nil).Once()
 
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
 	slurmAPIClients.AddClient(slurmClusterName, apiClient)
 
 	controller := NewSlurmNodesController(
@@ -471,7 +467,6 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodUndrainsWhenCu
 		record.NewFakeRecorder(10),
 		slurmAPIClients,
 		time.Minute,
-		true,
 		true,
 		apiReader,
 		"",
@@ -495,8 +490,7 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodUndrainsWhenCu
 func newSlurmNodesControllerForUnhealthyTest(
 	t *testing.T,
 	ctx context.Context,
-	slurmNodeStates map[api.V0041NodeState]struct{},
-	enableExtensiveCheck bool,
+	slurmNodeStates map[api.V0044NodeState]struct{},
 ) (*SlurmNodesController, ctrlclient.Client, types.NamespacedName, *corev1.Node, slurmapi.Node) {
 	t.Helper()
 
@@ -549,7 +543,7 @@ func newSlurmNodesControllerForUnhealthyTest(
 		States: slurmNodeStates,
 	}, nil).Once()
 
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(ctx)
 	slurmAPIClients.AddClient(slurmClusterName, apiClient)
 
 	controller := NewSlurmNodesController(
@@ -559,7 +553,6 @@ func newSlurmNodesControllerForUnhealthyTest(
 		slurmAPIClients,
 		time.Minute,
 		true,
-		enableExtensiveCheck,
 		k8sClient,
 		"",
 	)
@@ -569,7 +562,8 @@ func newSlurmNodesControllerForUnhealthyTest(
 		InstanceID: k8sNode.Name,
 		Comment:    "gpu health check failed",
 		Reason: ptr.To(slurmapi.NodeReason{
-			ChangedAt: drainTime,
+			OriginalReason: "[node_problem] gpu health check failed: failed",
+			ChangedAt:      drainTime,
 		}),
 	}
 }
@@ -585,4 +579,93 @@ func hasHardwareIssuesSuspected(t *testing.T, ctx context.Context, k8sClient ctr
 		}
 	}
 	return false
+}
+
+func TestSlurmNodesController_processK8SNodesMaintenance_readsNodesFromCache(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	slurmClusterName := types.NamespacedName{Namespace: "test-ns", Name: "test-cluster"}
+
+	newNode := func(name string, conditions ...corev1.NodeCondition) *corev1.Node {
+		return &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status:     corev1.NodeStatus{Conditions: conditions},
+		}
+	}
+	newWorkerPod := func(name, nodeName string) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: slurmClusterName.Namespace,
+				Name:      name,
+				Labels: map[string]string{
+					consts.LabelWorkerKey:   consts.LabelWorkerValue,
+					consts.LabelInstanceKey: slurmClusterName.Name,
+				},
+			},
+			Spec: corev1.PodSpec{NodeName: nodeName},
+		}
+	}
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(
+			newNode("instance-maintenance", corev1.NodeCondition{
+				Type:   consts.DefaultMaintenanceConditionType,
+				Status: corev1.ConditionTrue,
+			}),
+			newNode("instance-healthy"),
+			newWorkerPod("worker-0", "instance-maintenance"),
+			newWorkerPod("worker-1", "instance-healthy"),
+		).
+		WithIndex(&corev1.Pod{}, "spec.nodeName", func(obj ctrlclient.Object) []string {
+			return []string{obj.(*corev1.Pod).Spec.NodeName}
+		}).
+		Build()
+
+	apiClient := slurmapifake.NewMockClient(t)
+	apiClient.On(
+		"SlurmV0044PostNodeWithResponse",
+		ctx,
+		"worker-0",
+		mock.MatchedBy(func(body api.SlurmV0044PostNodeJSONRequestBody) bool {
+			return body.State != nil &&
+				len(*body.State) == 1 &&
+				(*body.State)[0] == api.V0044UpdateNodeMsgStateDRAIN
+		}),
+	).Return(&api.SlurmV0044PostNodeResponse{
+		JSON200: &api.V0044OpenapiResp{Errors: &[]api.V0044OpenapiError{}},
+	}, nil).Once()
+	apiClient.On("GetNode", ctx, "worker-0").Return(slurmapi.Node{
+		Name:   "worker-0",
+		States: map[api.V0044NodeState]struct{}{api.V0044NodeStateIDLE: {}, api.V0044NodeStateDRAIN: {}},
+	}, nil).Once()
+
+	slurmAPIClients := slurmapi.NewClientSet(ctx)
+	slurmAPIClients.AddClient(slurmClusterName, apiClient)
+
+	controller := NewSlurmNodesController(
+		k8sClient,
+		scheme,
+		record.NewFakeRecorder(10),
+		slurmAPIClients,
+		time.Minute,
+		true,
+		// Nodes must come from the cached client, so an empty uncached reader is enough here.
+		fake.NewClientBuilder().WithScheme(scheme).Build(),
+		"",
+	)
+
+	require.NoError(t, controller.processK8SNodesMaintenance(ctx))
+
+	var maintained corev1.Node
+	require.NoError(t, k8sClient.Get(ctx, types.NamespacedName{Name: "instance-maintenance"}, &maintained))
+	require.True(t, slices.ContainsFunc(maintained.Status.Conditions, func(c corev1.NodeCondition) bool {
+		return c.Type == consts.SoperatorChecksK8SNodeMaintenance && c.Status == corev1.ConditionTrue
+	}))
+
+	var healthy corev1.Node
+	require.NoError(t, k8sClient.Get(ctx, types.NamespacedName{Name: "instance-healthy"}, &healthy))
+	require.Empty(t, healthy.Status.Conditions)
 }

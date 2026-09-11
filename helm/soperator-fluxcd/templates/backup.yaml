@@ -38,6 +38,19 @@ spec:
   {{- if .Values.backup.overrideValues }}
     {{- toYaml .Values.backup.overrideValues | nindent 4 }}
   {{- else }}
+  {{- $backup := .Values.backup.values | default dict }}
+    {{- with $backup.nodeSelector }}
+    nodeSelector:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $backup.affinity }}
+    affinity:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $backup.resources }}
+    resources:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
     k8up:
       backupImage:
         repository: cr.eu-north1.nebius.cloud/soperator-proxy-ghcr-io/k8up-io/k8up

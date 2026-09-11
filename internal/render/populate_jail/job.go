@@ -59,6 +59,7 @@ func RenderPopulateJailJob(
 					Tolerations:       nodeFilter.Tolerations,
 					RestartPolicy:     "Never",
 					PriorityClassName: populateJail.PriorityClass,
+					ImagePullSecrets:  populateJail.ContainerPopulateJail.ImagePullSecrets,
 					Volumes:           volumes,
 					Containers:        []corev1.Container{renderContainerPopulateJail(populateJail)},
 				},

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/utils/ptr"
@@ -24,9 +24,9 @@ func TestNodeFromAPI(t *testing.T) {
 				Name:        "worker-1",
 				ClusterName: "",
 				InstanceID:  "computeinstance-xxxxxxxxxxxxx",
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateIDLE:        {},
-					api.V0041NodeStateDYNAMICNORM: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateIDLE:        {},
+					api.V0044NodeStateDYNAMICNORM: {},
 				},
 				Reason:              nil,
 				Partitions:          []string{"main"},
@@ -52,7 +52,7 @@ func TestNodeFromAPI(t *testing.T) {
 			data, err := os.ReadFile(tt.filename)
 			require.NoError(t, err)
 
-			var apiNode api.V0041Node
+			var apiNode api.V0044Node
 			err = json.Unmarshal(data, &apiNode)
 			require.NoError(t, err)
 

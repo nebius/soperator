@@ -18,6 +18,7 @@ func renderContainerSshd(
 	container *values.Container,
 	jailSubMounts, customMounts []slurmv1.NodeVolumeMount,
 	containerSSSD *values.Container,
+	userIsolation *slurmv1.LoginUserIsolation,
 	appArmorProfile string,
 ) corev1.Container {
 	volumeMounts := []corev1.VolumeMount{
@@ -29,6 +30,9 @@ func renderContainerSshd(
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
 		renderVolumeMountSshdConfigs(),
+	}
+	if userIsolation != nil && ptr.Deref(userIsolation.Enabled, false) {
+		volumeMounts = append(volumeMounts, renderVolumeMountUserIsolation())
 	}
 	if containerSSSD != nil {
 		volumeMounts = append(volumeMounts,
@@ -75,6 +79,15 @@ func renderContainerSshd(
 		Resources: corev1.ResourceRequirements{
 			Limits:   limits,
 			Requests: container.Resources,
+		},
+		// Give Kubernetes Service endpoint routing time to stop sending new connections
+		// to the terminating pod before SSHD exits.
+		Lifecycle: &corev1.Lifecycle{
+			PreStop: &corev1.LifecycleHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{"/bin/sh", "-c", "sleep 15"},
+				},
+			},
 		},
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,

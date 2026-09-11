@@ -10,11 +10,14 @@ spec:
     matchLabels:
       app.kubernetes.io/name: sconfigcontroller-metrics
   endpoints:
-    - port: http-metrics
+    - port: https-metrics
       path: /metrics
-      scheme: http
+      scheme: https
       interval: {{ .Values.sConfigController.serviceMonitor.interval }}
       scrapeTimeout: {{ .Values.sConfigController.serviceMonitor.scrapeTimeout }}
+      tlsConfig:
+        insecureSkipVerify: true
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}

@@ -17,8 +17,11 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
+	"fmt"
+	"math"
 	"os"
 	"reflect"
 	"strings"
@@ -31,12 +34,12 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
@@ -53,8 +56,13 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
 	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
+	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
+	"nebius.ai/slurm-operator/internal/controller/updatecontroller"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/controllersenabled"
+	metricsopts "nebius.ai/slurm-operator/internal/metrics"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 	webhookv1 "nebius.ai/slurm-operator/internal/webhook/v1"
 	webhookv1alpha1 "nebius.ai/slurm-operator/internal/webhook/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -134,6 +142,8 @@ func main() {
 
 		cacheSyncTimeout time.Duration
 		maxConcurrency   int
+		restConfigQPS    float64
+		restConfigBurst  int
 	)
 
 	var watchNsCacheByName map[string]cache.Config
@@ -163,7 +173,13 @@ func main() {
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.StringVar(&controllersFlag, "controllers", "", "A comma-separated list of controllers to enable or disable. Use '*' for all, and '-name' to disable. Overrides SLURM_OPERATOR_CONTROLLERS if set.")
+	flag.Float64Var(&restConfigQPS, "rest-config-qps", 30, "Kubernetes API requests per second shared by manager clients")
+	flag.IntVar(&restConfigBurst, "rest-config-burst", 50, "Kubernetes API request burst shared by manager clients")
 	flag.Parse()
+	if float32(restConfigQPS) <= 0 || math.IsNaN(restConfigQPS) || math.IsInf(restConfigQPS, 0) || restConfigQPS > math.MaxFloat32 || restConfigBurst <= 0 {
+		fmt.Fprintln(os.Stderr, "REST config QPS and burst must be positive and finite")
+		os.Exit(1)
+	}
 	opts := getZapOpts(logFormat, logLevel)
 	zapLogger := zap.New(opts...)
 	ctrl.SetLogger(zapLogger)
@@ -180,7 +196,7 @@ func main() {
 		controllersSpec = controllersFlag
 		controllersSource = "flag"
 	}
-	availableControllers := []string{"cluster", "nodeconfigurator", "nodeset", "topology"}
+	availableControllers := []string{"cluster", "nodeconfigurator", "nodeset", "rollingupdate", "topology"}
 	controllersSet, err := controllersenabled.New(
 		controllersSpec,
 		availableControllers,
@@ -222,16 +238,18 @@ func main() {
 		}
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
-		Metrics: metricsserver.Options{
-			BindAddress:   metricsAddr,
-			SecureServing: secureMetrics,
-			TLSOpts:       tlsOpts,
-		},
+	config := ctrl.GetConfigOrDie()
+	config.QPS = float32(restConfigQPS)
+	config.Burst = restConfigBurst
+	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.QPS, config.Burst)
+	setupLog.Info("Configured Kubernetes API rate limits", "qps", config.QPS, "burst", config.Burst)
+	mgr, err := ctrl.NewManager(config, ctrl.Options{
+		Scheme:                  scheme,
+		Metrics:                 metricsopts.ServerOptions(metricsAddr, secureMetrics, tlsOpts),
 		WebhookServer:           webhookServer,
 		HealthProbeBindAddress:  probeAddr,
 		LeaderElection:          enableLeaderElection,
+		LeaderElectionConfig:    controllerconfig.LeaderElectionConfig(config),
 		LeaderElectionID:        "e21479ae.nebius.ai",
 		LeaderElectionNamespace: soperatorNamespace,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
@@ -247,6 +265,7 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 		Cache: cache.Options{
 			DefaultNamespaces: watchNsCacheByName,
+			ByObject:          controllerconfig.NodeCacheByObject(),
 		},
 	})
 	if err != nil {
@@ -311,6 +330,29 @@ func main() {
 	}
 	// endregion Reconciler/NodeSet
 
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
+
+	if controllersSet.Enabled("rollingupdate") {
+		if err = soperatorchecks.NewSlurmAPIClientsController(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
+			slurmAPIClients,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
+		}
+
+		if err = updatecontroller.NewRollingUpdateReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor(updatecontroller.RollingUpdateControllerName),
+			slurmAPIClients,
+		).
+			SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create controller", "controller", updatecontroller.RollingUpdateControllerName)
+		}
+	}
+
 	// region Reconciler/Topology
 	if controllersSet.Enabled("topology") {
 		if err = topologyconfcontroller.NewNodeTopologyReconciler(
@@ -318,7 +360,6 @@ func main() {
 			mgr.GetScheme(),
 			soperatorNamespace,
 			topologyLabelPrefix,
-			mgr.GetAPIReader(),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err,
 				"unable to create controller",
@@ -330,6 +371,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			soperatorNamespace,
+			mgr.GetEventRecorder(topologyconfcontroller.WorkerTopologyReconcilerName),
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err,
 				"unable to create controller",

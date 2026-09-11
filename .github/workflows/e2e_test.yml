@@ -15,6 +15,11 @@ on:
         required: false
         default: ""
         type: string
+      soperator_e2e_repo_branch:
+        description: "E2E repo branch"
+        required: false
+        default: "main"
+        type: string
       # Keep the options in sync with the profiles and labels in E2E_CONFIG.
       # The default is what scheduler dispatches resolve with too — they omit
       # this input, and the code refuses an empty profile rather than assuming one.
@@ -36,12 +41,71 @@ on:
         required: false
         default: "false"
         type: string
+      run_essential_tests:
+        description: "Run only acceptance scenarios tagged @essential"
+        required: false
+        default: "false"
+        type: string
+      pr_number:
+        description: "PR to update with the E2E result"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
   actions: write
 
 jobs:
+  report-pr-start:
+    name: Report E2E start to PR
+    if: inputs.pr_number != ''
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      comment_id: ${{ steps.comment.outputs.comment_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Create or update PR comment
+        id: comment
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          SOPERATOR_BRANCH: ${{ github.ref_name }}
+          TERRAFORM_BRANCH: ${{ inputs.terraform_repo_ref || github.ref_name }}
+          SOPERATOR_E2E_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
+          REQUESTED_PROFILE: ${{ inputs.profile }}
+          RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
+          RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
+        run: |
+          marker="<!-- soperator-e2e-run:${GITHUB_RUN_ID} -->"
+          python3 .github/scripts/e2e_pr_comment.py start > /tmp/e2e-pr-comment.md
+
+          comment_id=$(gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" \
+            | jq -r --arg marker "$marker" \
+              '[.[][] | select(.body | contains($marker))][0].id // empty')
+
+          payload=$(jq --null-input --rawfile body /tmp/e2e-pr-comment.md '{body: $body}')
+          if [[ -n "$comment_id" ]]; then
+            response=$(gh api --method PATCH \
+              "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" \
+              --input - <<<"$payload")
+          else
+            response=$(gh api --method POST \
+              "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+              --input - <<<"$payload")
+          fi
+
+          echo "comment_id=$(jq -r '.id' <<<"$response")" >> "$GITHUB_OUTPUT"
+
   resolve-profile:
     runs-on: ubuntu-latest
     environment: e2e
@@ -61,10 +125,10 @@ jobs:
       E2E_RUN_METADATA_PATH: /tmp/e2e-run-metadata.json
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install GO
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: false
@@ -117,12 +181,14 @@ jobs:
           PROFILE_NAME: ${{ steps.resolve.outputs.profile_name }}
           PROFILE_YAML: ${{ steps.resolve.outputs.profile_yaml }}
           TERRAFORM_REPO_REF: ${{ github.event.inputs.terraform_repo_ref || github.ref_name }}
+          SOPERATOR_E2E_REPO_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
         run: |
           {
             echo "### Run Parameters"
             echo ""
             echo "- Branch: \`${{ github.ref_name }}\`"
             echo "- Terraform branch: \`$TERRAFORM_REPO_REF\`"
+            echo "- Soperator E2E repo branch: \`$SOPERATOR_E2E_REPO_BRANCH\`"
             echo "- Profile: \`$PROFILE_NAME\`"
             echo ""
             echo '```yaml'
@@ -133,6 +199,10 @@ jobs:
   e2e-test:
     needs: resolve-profile
     name: e2e-test (${{ needs.resolve-profile.outputs.profile_name }})
+    outputs:
+      acceptance_outcome: ${{ steps.acceptance.outcome }}
+      acceptance_report_available: ${{ steps.acceptance_summary.outputs.report_available }}
+      acceptance_summary: ${{ steps.acceptance_summary.outputs.comment }}
     concurrency:
       # Per-project mutex: runs targeting the same Nebius project are serialized,
       # different projects can run concurrently. Queued runs wait, never cancel in-progress ones.
@@ -144,21 +214,26 @@ jobs:
 
     env:
       PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/soperator/installations/example"
-      TERRAFORM_REPO: "nebius/nebius-solution-library"
+      TERRAFORM_REPO: "nebius/nebius-solutions-library"
       TERRAFORM_REPO_REF: "${{ github.event.inputs.terraform_repo_ref || github.ref_name }}"
+      SOPERATOR_E2E_REPO: "${{ github.repository }}"
+      SOPERATOR_E2E_REPO_BRANCH: "${{ inputs.soperator_e2e_repo_branch || 'main' }}"
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
       PROFILE_NAME: ${{ needs.resolve-profile.outputs.profile_name }}
       E2E_PROFILE_YAML: ${{ needs.resolve-profile.outputs.profile_yaml }}
       RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
+      RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
+      SLURM_CLUSTER_NAME: "soperator"
+      E2E_ARTIFACTS_DIR: "${{ github.workspace }}/e2e-artifacts"
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Install GO
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: "go.mod"
           cache: false
@@ -174,6 +249,20 @@ jobs:
 
       - name: Build e2e binary
         run: go build -o bin/e2e ./cmd/e2e
+
+      - name: Checkout Soperator E2E source
+        # For now the Soperator E2E source still lives in this repository. When
+        # it moves to a separate repository, this checkout/build pair should
+        # point there and keep using SOPERATOR_E2E_REPO_BRANCH.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.SOPERATOR_E2E_REPO }}
+          ref: ${{ env.SOPERATOR_E2E_REPO_BRANCH }}
+          path: soperator-e2e
+
+      - name: Build acceptance binary
+        working-directory: "${{ github.workspace }}/soperator-e2e/e2e"
+        run: go build -o "${{ github.workspace }}/bin/acceptance" ./cmd/acceptance
 
       - name: Export profile outputs
         shell: bash
@@ -382,8 +471,48 @@ jobs:
           echo "SOPERATOR_VERSION=$SOPERATOR_VERSION" >> $GITHUB_ENV
           echo "SOPERATOR_UNSTABLE=$SOPERATOR_UNSTABLE" >> $GITHUB_ENV
 
+      - name: Initialize E2E artifacts
+        shell: bash
+        env:
+          NEBIUS_PROJECT_ID: ${{ needs.resolve-profile.outputs.nebius_project_id }}
+          NEBIUS_REGION: ${{ needs.resolve-profile.outputs.nebius_region }}
+        run: |
+          mkdir -p \
+            "$E2E_ARTIFACTS_DIR/metadata" \
+            "$E2E_ARTIFACTS_DIR/terraform" \
+            "$E2E_ARTIFACTS_DIR/acceptance" \
+            "$E2E_ARTIFACTS_DIR/snapshots/before-acceptance" \
+            "$E2E_ARTIFACTS_DIR/snapshots/before-destroy"
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg ref "$GITHUB_REF_NAME" \
+            --arg sha "$GITHUB_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg run_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg profile "$PROFILE_NAME" \
+            --arg nebius_project_id "$NEBIUS_PROJECT_ID" \
+            --arg nebius_region "$NEBIUS_REGION" \
+            --arg soperator_version "$SOPERATOR_VERSION" \
+            --arg terraform_ref "$TERRAFORM_REPO_REF" \
+            --arg acceptance_ref "$SOPERATOR_E2E_REPO_BRANCH" \
+            '{
+              repository: $repository,
+              ref: $ref,
+              sha: $sha,
+              run_id: $run_id,
+              run_attempt: $run_attempt,
+              run_url: $run_url,
+              profile: $profile,
+              nebius_project_id: $nebius_project_id,
+              nebius_region: $nebius_region,
+              soperator_version: $soperator_version,
+              terraform_ref: $terraform_ref,
+              acceptance_ref: $acceptance_ref
+            }' > "$E2E_ARTIFACTS_DIR/metadata/run.json"
+
       - name: Checkout Terraform repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.TERRAFORM_REPO }}
           ref: ${{ env.TERRAFORM_REPO_REF }}
@@ -410,6 +539,7 @@ jobs:
 
       - name: Cleanup previous Terraform state
         timeout-minutes: 30
+        shell: bash
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
@@ -423,10 +553,11 @@ jobs:
           # Destroy any leftover resources from a previous run using the saved terraform bundle
           # (the exact code that created the state), falling back to the current checkout.
           # Runs before init so the new run starts from a clean, empty state.
-          bin/e2e cleanup-previous
+          bin/e2e cleanup-previous 2>&1 | tee "$E2E_ARTIFACTS_DIR/terraform/cleanup-previous.log"
 
       - name: Terraform Init
         timeout-minutes: 30
+        shell: bash
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
@@ -437,10 +568,12 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          bin/e2e init
+          bin/e2e init 2>&1 | tee "$E2E_ARTIFACTS_DIR/terraform/init.log"
 
       - name: Terraform Apply
+        id: terraform_apply
         timeout-minutes: 90
+        shell: bash
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
@@ -452,7 +585,7 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          bin/e2e apply
+          bin/e2e apply 2>&1 | tee "$E2E_ARTIFACTS_DIR/terraform/apply.log"
 
       - name: Kill leftover Terraform processes
         if: always()
@@ -473,201 +606,82 @@ jobs:
           # provider plugin comm names are truncated, match by full cmdline
           pkill -9 -f terraform-provider || true
 
-      - name: Acceptance Tests
-        timeout-minutes: 90
-        env:
-          E2E_REPORT_DIR: e2e-reports/acceptance
+      - name: Collect artifacts before acceptance
+        if: steps.terraform_apply.outcome == 'success'
+        continue-on-error: true
+        shell: bash
         run: |
-          bin/e2e acceptance
+          kubectl_context="$(kubectl config current-context 2>/dev/null || true)"
+          bin/acceptance collect-artifacts \
+            --kubectl-context "$kubectl_context" \
+            --slurm-cluster-name "$SLURM_CLUSTER_NAME" \
+            --soperator-version "$SOPERATOR_VERSION" \
+            --nebius-project-id "$NEBIUS_PROJECT_ID" \
+            --output-dir "$E2E_ARTIFACTS_DIR/snapshots/before-acceptance"
+
+      - name: Acceptance Tests
+        id: acceptance
+        timeout-minutes: 120
+        shell: bash
+        run: |
+          kubectl_context="$(kubectl config current-context 2>/dev/null || true)"
+          args=(
+            run
+            --kubectl-context "$kubectl_context"
+            --slurm-cluster-name "$SLURM_CLUSTER_NAME"
+            --soperator-version "$SOPERATOR_VERSION"
+            --output-dir "$E2E_ARTIFACTS_DIR/acceptance"
+          )
+          if [[ "$RUN_UNSTABLE_TESTS" == "true" ]]; then
+            args+=(--run-unstable)
+          fi
+          if [[ "$RUN_ESSENTIAL_TESTS" == "true" ]]; then
+            args+=(--run-essential)
+          fi
+          bin/acceptance "${args[@]}" 2>&1 | tee "$E2E_ARTIFACTS_DIR/acceptance/acceptance.log"
 
       - name: Acceptance Summary
+        id: acceptance_summary
         if: always()
         shell: bash
         run: |
-          json="e2e-reports/acceptance/acceptance.cucumber.json"
+          json="$E2E_ARTIFACTS_DIR/acceptance/soperator.cucumber.json"
           if [[ ! -f "$json" ]]; then
             echo "no cucumber report at $json"
+            echo "report_available=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           python3 .github/scripts/acceptance_summary.py "$json" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload Acceptance Reports
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: acceptance-reports
-          path: e2e-reports/acceptance/
-          retention-days: 14
-
-      - name: K8s Cluster Info and NodeGroups
-        if: always()
-        shell: bash
-        run: |
-          echo "=== K8s Clusters ==="
-          clusters_table=$(nebius mk8s cluster list --parent-id "$NEBIUS_PROJECT_ID" --format table)
-          echo "$clusters_table"
-
-          clusters_json=$(nebius mk8s cluster list --parent-id "$NEBIUS_PROJECT_ID" --format json)
-          cluster_ids=$(echo "$clusters_json" | jq -r '.items[].metadata.id // empty')
-
+          comment=$(python3 .github/scripts/acceptance_summary.py \
+            "$json" --format comment)
           {
-            echo "### K8s Clusters"
-            echo '```'
-            echo "$clusters_table"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo 'report_available=true'
+            echo 'comment<<EOF'
+            echo "$comment"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
-          for cluster_id in $cluster_ids; do
-            echo ""
-            echo "--- Node groups for cluster: $cluster_id ---"
-            ng_json=$(nebius mk8s node-group list --parent-id "$cluster_id" --page-size 1000 --format json)
-
-            # Summary table
-            summary=$(echo "$ng_json" | jq -r '
-              ["ID", "NAME", "STATE", "READY/TARGET"],
-              ["--", "----", "-----", "------------"],
-              (.items[] |
-                [
-                  .metadata.id,
-                  .metadata.name,
-                  .status.state,
-                  "\(.status.ready_node_count // "?")/\(.status.target_node_count // "?")"
-                ]
-              ) | @tsv')
-            echo "$summary" | column -t
-
-            {
-              echo "### Node Groups: $cluster_id"
-              echo '```'
-              echo "$summary" | column -t
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-
-            # Full JSON for non-RUNNING node groups
-            not_running=$(echo "$ng_json" | jq '[.items[] | select(.status.state != "RUNNING")]')
-            if [ "$(echo "$not_running" | jq 'length')" -gt 0 ]; then
-              echo ""
-              echo "=== Non-RUNNING node groups (full details) ==="
-              echo "$not_running" | jq .
-            fi
-          done
-
-      - name: "K8s Cluster: Pods"
+      - name: Collect artifacts before destroy
         if: always()
-        shell: bash
-        run: kubectl get pods -A -o wide
-
-      - name: "K8s Cluster: Events"
-        if: always()
-        shell: bash
-        run: kubectl get events -A --sort-by='.lastTimestamp'
-
-      - name: "K8s Cluster: Nodes"
-        if: always()
+        continue-on-error: true
         shell: bash
         run: |
-          kubectl get nodes
-          echo ""
-          kubectl get nodes -o yaml
-
-      - name: "K8s Cluster: Jobs"
-        if: always()
-        shell: bash
-        run: |
-          kubectl -n soperator get job
-          echo ""
-          kubectl -n soperator get job -o yaml
-
-      - name: "K8s Cluster: Helm Releases"
-        if: always()
-        shell: bash
-        run: |
-          kubectl get helmreleases -n flux-system
-          echo ""
-          kubectl get helmreleases -n flux-system -o yaml
-
-      - name: "K8s Cluster: Slurm Cluster CRs"
-        if: always()
-        shell: bash
-        run: |
-          kubectl get slurmclusters -A
-          echo ""
-          kubectl get slurmclusters -A -o yaml
-
-      - name: "K8s Cluster: Slurm Active Checks CRs"
-        if: always()
-        shell: bash
-        run: |
-          kubectl get activechecks -A
-          echo ""
-          kubectl get activechecks -A -o yaml
-
-      - name: Slurm Cluster State
-        if: always()
-        shell: bash
-        run: |
-          kubectl exec -n soperator controller-0 -- sinfo -N || true
-          kubectl exec -n soperator controller-0 -- squeue || true
-          kubectl exec -n soperator controller-0 -- sdiag || true
-          kubectl exec -n soperator controller-0 -- sacct --format=JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode -S now-6hours || true
-          kubectl exec -n soperator controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
-
-      - name: Collect Full Kubernetes Cluster Info
-        if: always()
-        shell: bash
-        run: |
-          mkdir -p ./cluster-info
-          kubectl cluster-info dump --namespaces=kruise-system,soperator-system,soperator,flux-system,cert-manager-system --output-directory=./cluster-info
-
-      - name: Upload Full Kubernetes Cluster Info
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: cluster-info
-          path: ./cluster-info
-          retention-days: 7
-
-      - name: Collect Jail Files
-        if: always()
-        shell: bash
-        run: |
-          mkdir -p ./jail/etc/slurm ./jail/opt/soperator-outputs
-          SCONFIG_POD=$(kubectl get pod -n soperator \
-            -l app.kubernetes.io/component=sconfigcontroller \
-            --field-selector=status.phase=Running \
-            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-          if [[ -n "$SCONFIG_POD" ]]; then
-            echo "Copying jail files from $SCONFIG_POD"
-            kubectl exec -n soperator "$SCONFIG_POD" -- find /mnt/jail -maxdepth 4 -not -path '*/proc/*' > ./jail/tree.txt 2>&1 || true
-            .github/workflows/scripts/retry.sh \
-              kubectl cp "soperator/$SCONFIG_POD:/mnt/jail/etc/slurm/" ./jail/etc/slurm
-            .github/workflows/scripts/retry.sh \
-              kubectl cp "soperator/$SCONFIG_POD:/mnt/jail/opt/soperator-outputs" ./jail/opt/soperator-outputs
-          else
-            echo "No running sconfigcontroller pod found, skipping jail files collection"
-          fi
-
-      - name: Zip Jail
-        if: always()
-        run: |
-          zip -r jail jail
-
-      - name: Upload Jail
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          archive: false
-          name: jail
-          path: jail.zip
-          retention-days: 7
+          kubectl_context="$(kubectl config current-context 2>/dev/null || true)"
+          bin/acceptance collect-artifacts \
+            --kubectl-context "$kubectl_context" \
+            --slurm-cluster-name "$SLURM_CLUSTER_NAME" \
+            --soperator-version "$SOPERATOR_VERSION" \
+            --nebius-project-id "$NEBIUS_PROJECT_ID" \
+            --output-dir "$E2E_ARTIFACTS_DIR/snapshots/before-destroy"
 
       - name: Terraform Destroy
         if: always()
         timeout-minutes: 30
+        shell: bash
         env:
           # Keep Terraform core diagnostics while excluding provider DEBUG logs,
           # which may contain raw credentials such as short-lived IAM tokens.
-          TF_DESTROY_LOG_PATH: ${{ runner.temp }}/tf-destroy.log
+          TF_DESTROY_LOG_PATH: ${{ env.E2E_ARTIFACTS_DIR }}/terraform/destroy-debug.log
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
@@ -679,24 +693,15 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          bin/e2e destroy
-
-      - name: Upload Terraform Destroy debug log
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: tf-destroy-debug-log
-          path: ${{ runner.temp }}/tf-destroy.log
-          if-no-files-found: ignore
-          retention-days: 7
-          # Debug log is plain text terraform DEBUG output, highly
-          # compressible, and runner CPU is free, so max out the DEFLATE level.
-          compression-level: 9
+          bin/e2e destroy 2>&1 | tee "$E2E_ARTIFACTS_DIR/terraform/destroy.log"
 
       - name: Force cleanup compute instances on failure
         if: failure()
         shell: bash
         run: |
+          mkdir -p "$E2E_ARTIFACTS_DIR/terraform"
+          exec > >(tee -a "$E2E_ARTIFACTS_DIR/terraform/force-cleanup.log") 2>&1
+
           echo "=== Node groups state before cleanup ==="
           clusters_json=$(nebius mk8s cluster list --parent-id "$NEBIUS_PROJECT_ID" --format json 2>/dev/null || true)
           cluster_ids=$(echo "$clusters_json" | jq -r '.items[].metadata.id // empty' 2>/dev/null || true)
@@ -734,6 +739,15 @@ jobs:
           done
 
           echo "=== Cleanup complete ==="
+
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-artifacts
+          path: ${{ env.E2E_ARTIFACTS_DIR }}/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Add build info to job summary
         if: always()
@@ -819,17 +833,81 @@ jobs:
             fi
           } >> $GITHUB_STEP_SUMMARY
 
+  report-pr-result:
+    name: Report E2E result to PR
+    needs: [report-pr-start, resolve-profile, e2e-test]
+    if: always() && inputs.pr_number != ''
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Update PR comment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          COMMENT_ID: ${{ needs.report-pr-start.outputs.comment_id }}
+          SOPERATOR_BRANCH: ${{ github.ref_name }}
+          TERRAFORM_BRANCH: ${{ inputs.terraform_repo_ref || github.ref_name }}
+          SOPERATOR_E2E_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
+          REQUESTED_PROFILE: ${{ inputs.profile }}
+          RESOLVED_PROFILE: ${{ needs.resolve-profile.outputs.profile_name }}
+          RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
+          RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
+          RESOLVE_RESULT: ${{ needs.resolve-profile.result }}
+          E2E_RESULT: ${{ needs.e2e-test.result }}
+          ACCEPTANCE_OUTCOME: ${{ needs.e2e-test.outputs.acceptance_outcome }}
+          ACCEPTANCE_REPORT_AVAILABLE: ${{ needs.e2e-test.outputs.acceptance_report_available }}
+          ACCEPTANCE_SUMMARY: ${{ needs.e2e-test.outputs.acceptance_summary }}
+        run: |
+          gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
+            | jq '{jobs: [.[].jobs[]]}' > /tmp/e2e-jobs.json
+          printf '%s\n' "$ACCEPTANCE_SUMMARY" > /tmp/acceptance-comment.md
+          python3 .github/scripts/e2e_pr_comment.py final \
+            --jobs /tmp/e2e-jobs.json \
+            --acceptance-summary /tmp/acceptance-comment.md \
+            > /tmp/e2e-pr-comment.md
+
+          comment_id="$COMMENT_ID"
+          if [[ -z "$comment_id" ]]; then
+            marker="<!-- soperator-e2e-run:${GITHUB_RUN_ID} -->"
+            comment_id=$(gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" \
+              | jq -r --arg marker "$marker" \
+                '[.[][] | select(.body | contains($marker))][0].id // empty')
+          fi
+
+          payload=$(jq --null-input --rawfile body /tmp/e2e-pr-comment.md '{body: $body}')
+          if [[ -n "$comment_id" ]]; then
+            gh api --method PATCH \
+              "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" \
+              --input - <<<"$payload"
+          else
+            gh api --method POST \
+              "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+              --input - <<<"$payload"
+          fi
+
   notify-failure:
     name: Notify Slack on E2E failure
     needs: [resolve-profile, e2e-test]
     # Only fire when the run targeted the default terraform branch (empty input
-    # falls back to github.ref_name in e2e-test). Custom terraform branches are
-    # usually experiments and shouldn't page e2e owners on failure.
+    # falls back to github.ref_name in e2e-test) and default Soperator E2E
+    # branch. Custom branches are usually experiments and shouldn't page e2e
+    # owners on failure.
     if: |
       always() &&
       (needs.resolve-profile.result == 'failure' || needs.e2e-test.result == 'failure') &&
       (github.ref_name == 'main' || startsWith(github.ref_name, 'soperator-release-')) &&
-      (inputs.terraform_repo_ref == '' || inputs.terraform_repo_ref == github.ref_name)
+      (inputs.terraform_repo_ref == '' || inputs.terraform_repo_ref == github.ref_name) &&
+      (inputs.soperator_e2e_repo_branch == '' || inputs.soperator_e2e_repo_branch == 'main')
     runs-on: ubuntu-latest
     environment: e2e
     steps:

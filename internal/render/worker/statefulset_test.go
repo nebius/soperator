@@ -1,12 +1,15 @@
 package worker_test
 
 import (
+	"strconv"
 	"testing"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -39,27 +42,36 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 	}
 
 	t.Run("with topology enabled", func(t *testing.T) {
-		result := worker.RenderContainerWorkerInit(
-			"test-cluster",
-			container,
-			true,
-			true,
-			300,
-			consts.SlurmTopologyBlock,
-		)
+		result := worker.RenderContainerWorkerInit(container, true, true, 300, "fab-test", 0)
 
 		assert.Equal(t, consts.ContainerNameWorkerInit, result.Name)
 		assert.Equal(t, container.Image, result.Image)
 		assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller", "wait-topology"}, result.Command)
-		assert.Equal(t, 11, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 4 topology
-		assert.Equal(t, 3, len(result.VolumeMounts))
-		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
+		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_FABRIC", "fab-test")
+		assertEnvValue(t, result.Env, "TOPOLOGY_WAIT_TIMEOUT", "300")
+
+		// The resolved topology is handed to slurmd through the runtime volume, so that slurmd
+		// starts without waiting for the topology config itself.
+		assertEnvValue(t, result.Env, "SLURMD_TOPOLOGY_PATH", consts.SlurmdTopologyPath)
+
+		// The plugin is a property of each topology in the config, not of the cluster, so the
+		// worker no longer needs to be told one.
+		for _, envVar := range result.Env {
+			assert.NotEqual(t, "SLURM_TOPOLOGY_PLUGIN", envVar.Name)
+		}
+
+		// The topologies a worker joins are derived at runtime from the topology config it already
+		// waits for; carrying them in the pod spec would roll the NodeSet on every topology edit.
+		for _, envVar := range result.Env {
+			assert.NotEqual(t, "SLURM_TOPOLOGY_BINDINGS", envVar.Name)
+		}
 
 		expectedMounts := map[string]string{
 			consts.VolumeNameJail:               consts.VolumeMountPathJail,
 			consts.VolumeNameMungeSocket:        consts.VolumeMountPathMungeSocket,
 			consts.VolumeNameTopologyNodeLabels: consts.VolumeMountPathTopologyNodeLabels,
+			consts.VolumeNameRuntime:            consts.VolumeMountPathRuntime,
 		}
 		assert.Equal(t, len(expectedMounts), len(result.VolumeMounts))
 		for _, mount := range result.VolumeMounts {
@@ -67,25 +79,30 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			assert.True(t, exists, "Unexpected volume mount: %s", mount.Name)
 			assert.Equal(t, expectedPath, mount.MountPath, "Wrong mount path for volume %s", mount.Name)
 		}
+
+		// The munge socket lives inside the runtime volume. A runtime empty dir mounted after it
+		// would hide the socket, leaving scontrol ping unable to authenticate for the whole
+		// controller wait.
+		var runtimeIndex, mungeIndex int
+		for i, mount := range result.VolumeMounts {
+			switch mount.Name {
+			case consts.VolumeNameRuntime:
+				runtimeIndex = i
+			case consts.VolumeNameMungeSocket:
+				mungeIndex = i
+			}
+		}
+		assert.Less(t, runtimeIndex, mungeIndex,
+			"%s must be mounted before the %s nested in it", consts.VolumeNameRuntime, consts.VolumeNameMungeSocket)
 	})
 
 	t.Run("without topology", func(t *testing.T) {
-		result := worker.RenderContainerWorkerInit(
-			"test-cluster",
-			container,
-			false,
-			false,
-			0,
-			"",
-		)
+		result := worker.RenderContainerWorkerInit(container, false, false, 0, "", 0)
 
 		assert.Equal(t, consts.ContainerNameWorkerInit, result.Name)
-		assert.Equal(t, container.Image, result.Image)
-		assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller"}, result.Command,
 			"wait-topology should not be present when topology is disabled")
-		assert.Equal(t, 6, len(result.Env), "only controller-related env vars expected")
-		assert.Equal(t, 2, len(result.VolumeMounts), "topology volume mount should not be present")
+		assert.Equal(t, 2, len(result.Env), "only controller-related env vars expected")
 
 		expectedMounts := map[string]string{
 			consts.VolumeNameJail:        consts.VolumeMountPathJail,
@@ -98,86 +115,33 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 			assert.Equal(t, expectedPath, mount.MountPath, "Wrong mount path for volume %s", mount.Name)
 		}
 
-		// Verify no topology env vars
 		for _, envVar := range result.Env {
 			assert.NotContains(t, []string{
 				"TOPOLOGY_CONFIGMAP_PATH",
 				"TOPOLOGY_WAIT_TIMEOUT",
 				"TOPOLOGY_POLL_INTERVAL",
+				"SLURMD_TOPOLOGY_PATH",
 				"SLURM_TOPOLOGY_PLUGIN",
+				"SLURM_TOPOLOGY_FABRIC",
 			}, envVar.Name,
 				"topology env var %s should not be present when topology is disabled", envVar.Name)
 		}
 	})
-}
 
-func Test_RenderContainerWorkerInit_K8SServiceName(t *testing.T) {
-	container := &values.Container{
-		NodeContainer: slurmv1.NodeContainer{
-			Image:           "test-image",
-			ImagePullPolicy: corev1.PullIfNotPresent,
-		},
-	}
+	t.Run("random delay env present when positive", func(t *testing.T) {
+		result := worker.RenderContainerWorkerInit(container, false, false, 0, "", 120)
 
-	findEnv := func(envs []corev1.EnvVar, name string) (corev1.EnvVar, bool) {
-		for _, e := range envs {
-			if e.Name == name {
-				return e, true
-			}
+		assertEnvValue(t, result.Env, "WORKER_INIT_RANDOM_DELAY_SECONDS", "120")
+	})
+
+	t.Run("random delay env absent when zero", func(t *testing.T) {
+		result := worker.RenderContainerWorkerInit(container, false, false, 0, "", 0)
+
+		for _, envVar := range result.Env {
+			assert.NotEqual(t, "WORKER_INIT_RANDOM_DELAY_SECONDS", envVar.Name,
+				"random delay env var should not be present when delay is 0")
 		}
-		return corev1.EnvVar{}, false
-	}
-
-	tests := []struct {
-		name            string
-		clusterName     string
-		gpuEnabled      bool
-		expectedService string
-	}{
-		{
-			name:            "uses nodeset service name with gpu enabled",
-			clusterName:     "my-cluster",
-			gpuEnabled:      true,
-			expectedService: "my-cluster-nodeset-svc",
-		},
-		{
-			name:            "uses nodeset service name without gpu",
-			clusterName:     "my-cluster",
-			gpuEnabled:      false,
-			expectedService: "my-cluster-nodeset-svc",
-		},
-		{
-			name:            "different cluster name with gpu enabled",
-			clusterName:     "prod",
-			gpuEnabled:      true,
-			expectedService: "prod-nodeset-svc",
-		},
-		{
-			name:            "different cluster name without gpu",
-			clusterName:     "prod",
-			gpuEnabled:      false,
-			expectedService: "prod-nodeset-svc",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := worker.RenderContainerWorkerInit(
-				tt.clusterName,
-				container,
-				false,
-				tt.gpuEnabled,
-				0,
-				"",
-			)
-
-			env, found := findEnv(result.Env, "K8S_SERVICE_NAME")
-			assert.True(t, found, "K8S_SERVICE_NAME env var must be present")
-			assert.Equal(t, tt.expectedService, env.Value,
-				"K8S_SERVICE_NAME should be %q for gpuEnabled=%v, got %q",
-				tt.expectedService, tt.gpuEnabled, env.Value)
-		})
-	}
+	})
 }
 
 func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
@@ -251,13 +215,11 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 			}
 
 			result, err := worker.RenderNodeSetStatefulSet(
-				"test-cluster",
 				nodeSet,
 				&slurmv1.Secrets{},
 				consts.CGroupV2,
 				tt.clusterWithGPU,
 				false,
-				"",
 			)
 			assert.NoError(t, err)
 
@@ -304,13 +266,11 @@ func TestRenderNodeSetStatefulSet_NvidiaIMEXCLIMount(t *testing.T) {
 	}
 
 	result, err := worker.RenderNodeSetStatefulSet(
-		"test-cluster",
 		nodeSet,
 		&slurmv1.Secrets{},
 		consts.CGroupV2,
 		true,
 		false,
-		"",
 	)
 	assert.NoError(t, err)
 
@@ -363,13 +323,11 @@ func TestRenderNodeSetStatefulSet_NvidiaIMEXNotMountedForCPUWorker(t *testing.T)
 	}
 
 	result, err := worker.RenderNodeSetStatefulSet(
-		"test-cluster",
 		nodeSet,
 		&slurmv1.Secrets{},
 		consts.CGroupV2,
 		false,
 		false,
-		"",
 	)
 	assert.NoError(t, err)
 
@@ -443,6 +401,125 @@ func assertNoVolumeMount(t *testing.T, mounts []corev1.VolumeMount, name string)
 	}
 }
 
+func TestRenderNodeSetStatefulSet_HostJournalMount(t *testing.T) {
+	nodeSet := &values.SlurmNodeSet{
+		Name: "test-nodeset",
+		ParentalCluster: client.ObjectKey{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
+		},
+		ContainerSlurmd: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image:           "test-image",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory:           resource.MustParse("1Gi"),
+					corev1.ResourceCPU:              resource.MustParse("100m"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+		ContainerMunge: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "munge-image",
+			},
+		},
+		VolumeSpool: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+		},
+		VolumeJail: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+		},
+		StatefulSet: values.StatefulSet{
+			Replicas: 1,
+		},
+		ServiceUmbrella:          values.Service{Name: "test-umbrella"},
+		SupervisorDConfigMapName: "supervisord-config",
+		SSHDConfigMapName:        "sshd-config",
+		GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+	}
+
+	result, err := worker.RenderNodeSetStatefulSet(
+		nodeSet,
+		&slurmv1.Secrets{},
+		consts.CGroupV2,
+		false,
+		false,
+	)
+	assert.NoError(t, err)
+
+	var journalVolume *corev1.Volume
+	for i := range result.Spec.Template.Spec.Volumes {
+		volume := &result.Spec.Template.Spec.Volumes[i]
+		if volume.Name == consts.VolumeNameHostLogJournal {
+			journalVolume = volume
+			break
+		}
+	}
+	if assert.NotNil(t, journalVolume, "worker pod should have host journal volume") &&
+		assert.NotNil(t, journalVolume.HostPath, "host journal volume should be HostPath") {
+		assert.Equal(t, consts.VolumeHostPathJournal, journalVolume.HostPath.Path)
+		if assert.NotNil(t, journalVolume.HostPath.Type) {
+			assert.Empty(t, *journalVolume.HostPath.Type)
+		}
+	}
+
+	var slurmdContainer *corev1.Container
+	for i := range result.Spec.Template.Spec.Containers {
+		container := &result.Spec.Template.Spec.Containers[i]
+		if container.Name == consts.ContainerNameSlurmd {
+			slurmdContainer = container
+			break
+		}
+	}
+	if !assert.NotNil(t, slurmdContainer, "worker pod should have slurmd container") {
+		return
+	}
+
+	var journalMount *corev1.VolumeMount
+	for i := range slurmdContainer.VolumeMounts {
+		mount := &slurmdContainer.VolumeMounts[i]
+		if mount.Name == consts.VolumeNameHostLogJournal {
+			journalMount = mount
+			break
+		}
+	}
+	if assert.NotNil(t, journalMount, "slurmd container should mount host journal") {
+		assert.Equal(t, consts.VolumeMountPathHostLogJournal, journalMount.MountPath)
+		assert.Equal(t, consts.VolumeMountPathJailUpper+"/var/hostlog/journal", journalMount.MountPath)
+		assert.True(t, journalMount.ReadOnly)
+	}
+
+	var outputsVolume *corev1.Volume
+	for i := range result.Spec.Template.Spec.Volumes {
+		volume := &result.Spec.Template.Spec.Volumes[i]
+		if volume.Name == consts.VolumeNameSoperatorOutputs {
+			outputsVolume = volume
+			break
+		}
+	}
+	if assert.NotNil(t, outputsVolume, "worker pod should have soperator-outputs volume") &&
+		assert.NotNil(t, outputsVolume.HostPath, "soperator-outputs volume should be HostPath") {
+		assert.Equal(t, "/var/log/soperator-outputs", outputsVolume.HostPath.Path)
+		if assert.NotNil(t, outputsVolume.HostPath.Type) {
+			assert.Equal(t, corev1.HostPathDirectoryOrCreate, *outputsVolume.HostPath.Type)
+		}
+	}
+
+	var outputsMount *corev1.VolumeMount
+	for i := range slurmdContainer.VolumeMounts {
+		mount := &slurmdContainer.VolumeMounts[i]
+		if mount.Name == consts.VolumeNameSoperatorOutputs {
+			outputsMount = mount
+			break
+		}
+	}
+	if assert.NotNil(t, outputsMount, "slurmd container should mount soperator-outputs") {
+		assert.Equal(t, consts.VolumeMountPathJailUpper+"/opt/soperator-outputs/local", outputsMount.MountPath)
+		assert.False(t, outputsMount.ReadOnly)
+	}
+}
+
 func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 	createNodeSet := func(ephemeralNodes *bool, waitTimeout int32) *values.SlurmNodeSet {
 		return &values.SlurmNodeSet{
@@ -479,6 +556,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			SupervisorDConfigMapName:     "supervisord-config",
 			SSHDConfigMapName:            "sshd-config",
 			GPU:                          &slurmv1alpha1.GPUSpec{Enabled: false},
+			DockerEnabled:                true,
 			EphemeralNodes:               ephemeralNodes,
 			EphemeralTopologyWaitTimeout: waitTimeout,
 		}
@@ -491,7 +569,8 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 		topologyPluginEnabled      bool
 		expectedInitContainerCount int
 		expectTopologyVolumes      bool
-		expectWaitForTopology      bool
+		expectTopologyEnv          bool
+		expectedWaitTimeout        string
 	}{
 		{
 			name:                       "topology plugin enabled with timeout",
@@ -500,7 +579,8 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			topologyPluginEnabled:      true,
 			expectedInitContainerCount: 2, // munge + worker-init
 			expectTopologyVolumes:      true,
-			expectWaitForTopology:      true,
+			expectTopologyEnv:          true,
+			expectedWaitTimeout:        "300",
 		},
 		{
 			name:                       "topology plugin enabled with zero timeout uses default",
@@ -509,7 +589,8 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			topologyPluginEnabled:      true,
 			expectedInitContainerCount: 2, // munge + worker-init
 			expectTopologyVolumes:      true,
-			expectWaitForTopology:      true, // default timeout is applied
+			expectTopologyEnv:          true,
+			expectedWaitTimeout:        "180", // default timeout is applied
 		},
 		{
 			name:                       "topology plugin disabled",
@@ -518,7 +599,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			topologyPluginEnabled:      false,
 			expectedInitContainerCount: 2, // munge + worker-init
 			expectTopologyVolumes:      false,
-			expectWaitForTopology:      false,
+			expectTopologyEnv:          false,
 		},
 		{
 			name:                       "topology plugin disabled with ephemeral nodes",
@@ -527,7 +608,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			topologyPluginEnabled:      false,
 			expectedInitContainerCount: 2,     // munge + worker-init
 			expectTopologyVolumes:      false, // no volume without topology plugin
-			expectWaitForTopology:      false, // no wait-topology without topology plugin
+			expectTopologyEnv:          false, // no resolver env without topology plugin
 		},
 	}
 
@@ -536,39 +617,75 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			nodeSet := createNodeSet(tt.ephemeralNodes, tt.waitTimeout)
 
 			result, err := worker.RenderNodeSetStatefulSet(
-				"test-cluster",
 				nodeSet,
 				&slurmv1.Secrets{},
 				consts.CGroupV2,
 				true,
 				tt.topologyPluginEnabled,
-				consts.SlurmTopologyBlock,
 			)
 			assert.NoError(t, err)
 
 			// Verify init container count
 			assert.Len(t, result.Spec.Template.Spec.InitContainers, tt.expectedInitContainerCount,
 				"expected %d init containers", tt.expectedInitContainerCount)
+			assert.Len(t, result.Spec.Template.Spec.Containers, 2, "expected slurmd and docker-proxy containers")
 
-			// Verify worker-init container has topology command when topology plugin is enabled
-			var hasWaitForTopology bool
+			// worker-init resolves the topology and leaves it on the runtime volume; slurmd only
+			// learns where to read it from, so it never waits for the topology config.
 			var workerInitContainer *corev1.Container
-			for _, container := range result.Spec.Template.Spec.InitContainers {
+			for i, container := range result.Spec.Template.Spec.InitContainers {
 				if container.Name == consts.ContainerNameWorkerInit {
-					workerInitContainer = &container
-					for _, arg := range container.Command {
-						if arg == "wait-topology" {
-							hasWaitForTopology = true
-							break
-						}
-					}
+					workerInitContainer = &result.Spec.Template.Spec.InitContainers[i]
 					break
 				}
 			}
-			assert.Equal(t, tt.expectWaitForTopology, hasWaitForTopology,
+			assert.NotNil(t, workerInitContainer, "worker-init container should be present")
+
+			var hasWaitForTopology bool
+			for _, arg := range workerInitContainer.Command {
+				if arg == "wait-topology" {
+					hasWaitForTopology = true
+					break
+				}
+			}
+			assert.Equal(t, tt.expectTopologyEnv, hasWaitForTopology,
 				"wait-topology command presence mismatch")
-			if tt.expectWaitForTopology && assert.NotNil(t, workerInitContainer) {
-				assertEnvValue(t, workerInitContainer.Env, "SLURM_TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
+
+			var slurmdContainer *corev1.Container
+			for i, container := range result.Spec.Template.Spec.Containers {
+				if container.Name == consts.ContainerNameSlurmd {
+					slurmdContainer = &result.Spec.Template.Spec.Containers[i]
+					break
+				}
+			}
+			assert.NotNil(t, slurmdContainer, "slurmd container should be present")
+
+			var slurmdHasTopologyEnv bool
+			for _, envVar := range slurmdContainer.Env {
+				if envVar.Name == "SLURM_TOPOLOGY_ENABLED" {
+					slurmdHasTopologyEnv = true
+					break
+				}
+			}
+			assert.Equal(t, tt.expectTopologyEnv, slurmdHasTopologyEnv,
+				"slurmd topology env presence mismatch")
+
+			if tt.expectTopologyEnv {
+				assertEnvValue(t, workerInitContainer.Env, "TOPOLOGY_CONFIGMAP_PATH",
+					consts.VolumeMountPathTopologyNodeLabels)
+				assertEnvValue(t, workerInitContainer.Env, "TOPOLOGY_WAIT_TIMEOUT", tt.expectedWaitTimeout)
+				assertEnvValue(t, workerInitContainer.Env, "SLURMD_TOPOLOGY_PATH", consts.SlurmdTopologyPath)
+				assertEnvValue(t, slurmdContainer.Env, "SLURMD_TOPOLOGY_PATH", consts.SlurmdTopologyPath)
+
+				// Both ends of the handoff must see the same volume.
+				var initHasRuntimeMount bool
+				for _, mount := range workerInitContainer.VolumeMounts {
+					if mount.Name == consts.VolumeNameRuntime {
+						initHasRuntimeMount = true
+						break
+					}
+				}
+				assert.True(t, initHasRuntimeMount, "worker-init should mount the shared runtime volume")
 			}
 
 			// Verify topology-related volumes
@@ -586,8 +703,190 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			}
 			assert.Equal(t, tt.expectTopologyVolumes, hasTopologyNodeLabelsVolume,
 				"topology-node-labels volume presence mismatch")
+
+			var hasRuntimeVolume bool
+			var hasDockerProxyContainer bool
+			for _, volume := range result.Spec.Template.Spec.Volumes {
+				if volume.Name == consts.VolumeNameRuntime {
+					hasRuntimeVolume = true
+					assert.NotNil(t, volume.EmptyDir, "runtime volume should be EmptyDir")
+				}
+			}
+			for _, container := range result.Spec.Template.Spec.Containers {
+				if container.Name == consts.ContainerNameDockerProxy {
+					hasDockerProxyContainer = true
+					assert.Equal(t, nodeSet.ContainerSlurmd.Image, container.Image)
+					assert.Equal(t, []string{"/opt/bin/slurm/docker_proxy_nginx_entrypoint.sh"}, container.Command)
+					assert.Len(t, container.VolumeMounts, 1)
+					assert.Equal(t, consts.VolumeNameRuntime, container.VolumeMounts[0].Name)
+					assert.Equal(t, consts.VolumeMountPathRuntime, container.VolumeMounts[0].MountPath)
+				}
+				if container.Name == consts.ContainerNameSlurmd {
+					var hasRuntimeMount bool
+					for _, mount := range container.VolumeMounts {
+						if mount.Name == consts.VolumeNameRuntime && mount.MountPath == consts.VolumeMountPathRuntime {
+							hasRuntimeMount = true
+							break
+						}
+					}
+					assert.True(t, hasRuntimeMount, "slurmd container should mount shared runtime volume")
+				}
+			}
+			assert.True(t, hasRuntimeVolume, "runtime volume should be present")
+			assert.True(t, hasDockerProxyContainer, "docker-proxy sidecar should be present")
 		})
 	}
+}
+
+func TestRenderNodeSetStatefulSet_DockerEnabled(t *testing.T) {
+	createNodeSet := func(dockerEnabled bool) *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           "test-image",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory:           resource.MustParse("1Gi"),
+						corev1.ResourceCPU:              resource.MustParse("100m"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image: "munge-image",
+				},
+			},
+			VolumeSpool: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+			},
+			VolumeJail: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+			},
+			StatefulSet: values.StatefulSet{
+				Replicas: 1,
+			},
+			SupervisorDConfigMapName: "supervisord-config",
+			SSHDConfigMapName:        "sshd-config",
+			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+			DockerEnabled:            dockerEnabled,
+		}
+	}
+
+	tests := []struct {
+		name          string
+		dockerEnabled bool
+	}{
+		{
+			name:          "docker enabled renders docker-proxy sidecar",
+			dockerEnabled: true,
+		},
+		{
+			name:          "docker disabled omits docker-proxy sidecar",
+			dockerEnabled: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := worker.RenderNodeSetStatefulSet(
+				createNodeSet(tt.dockerEnabled),
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				false,
+				false,
+			)
+			assert.NoError(t, err)
+
+			var hasDockerProxyContainer bool
+			for _, container := range result.Spec.Template.Spec.Containers {
+				if container.Name == consts.ContainerNameDockerProxy {
+					hasDockerProxyContainer = true
+				}
+				if container.Name == consts.ContainerNameSlurmd {
+					assertEnvValue(t, container.Env, consts.EnvDockerEnabled, strconv.FormatBool(tt.dockerEnabled))
+				}
+			}
+			assert.Equal(t, tt.dockerEnabled, hasDockerProxyContainer,
+				"docker-proxy sidecar presence mismatch")
+		})
+	}
+}
+
+func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
+	createNodeSet := func() *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image: "test-image",
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("1G"),
+						corev1.ResourceCPU:    resource.MustParse("1"),
+					},
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{Image: "munge-image"},
+			},
+			VolumeSpool: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+			},
+			VolumeJail: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+			},
+			StatefulSet:              values.StatefulSet{Replicas: 1},
+			SupervisorDConfigMapName: "supervisord-config",
+			SSHDConfigMapName:        "sshd-config",
+			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+		}
+	}
+
+	t.Run("exports the rendered Slurm RealMemory in bytes", func(t *testing.T) {
+		result, err := worker.RenderNodeSetStatefulSet(
+			createNodeSet(),
+			&slurmv1.Secrets{},
+			consts.CGroupV2,
+			false,
+			false,
+		)
+		assert.NoError(t, err)
+
+		for _, container := range result.Spec.Template.Spec.Containers {
+			if container.Name == consts.ContainerNameSlurmd {
+				// Slurm RealMemory is expressed in whole MiB: 1G becomes 953 MiB.
+				assertEnvValue(t, container.Env, consts.EnvNodeRealMemoryBytes, "999292928")
+				return
+			}
+		}
+		t.Fatal("slurmd container not found")
+	})
+
+	t.Run("rejects a custom override of Soperator metadata", func(t *testing.T) {
+		nodeSet := createNodeSet()
+		nodeSet.ContainerSlurmd.CustomEnv = []corev1.EnvVar{{
+			Name:  consts.EnvNodeRealMemoryBytes,
+			Value: "1",
+		}}
+
+		_, err := worker.RenderNodeSetStatefulSet(
+			nodeSet,
+			&slurmv1.Secrets{},
+			consts.CGroupV2,
+			false,
+			false,
+		)
+		assert.ErrorContains(t, err, "is managed by Soperator")
+	})
 }
 
 func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testing.T) {
@@ -681,13 +980,11 @@ func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testin
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := worker.RenderNodeSetStatefulSet(
-				"test-cluster",
 				tt.nodeSet,
 				&slurmv1.Secrets{},
 				consts.CGroupV2,
 				true,
 				false,
-				"",
 			)
 			assert.NoError(t, err)
 			if assert.NotNil(t, result.Spec.PersistentVolumeClaimRetentionPolicy) {
@@ -696,6 +993,115 @@ func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testin
 			}
 		})
 	}
+}
+
+func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
+	makeNodeSet := func(maxUnavailable intstr.IntOrString) *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           "test-image",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory:           resource.MustParse("1Gi"),
+						corev1.ResourceCPU:              resource.MustParse("100m"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{Image: "munge-image"},
+			},
+			VolumeSpool: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"}},
+			VolumeJail:  corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"}},
+			StatefulSet: values.StatefulSet{
+				Replicas:       1,
+				MaxUnavailable: maxUnavailable,
+			},
+			SupervisorDConfigMapName: "supervisord-config",
+			SSHDConfigMapName:        "sshd-config",
+			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+		}
+	}
+
+	tests := []struct {
+		name           string
+		maxUnavailable intstr.IntOrString
+	}{
+		{
+			name:           "absolute MaxUnavailable is propagated to scale and update strategies",
+			maxUnavailable: intstr.FromInt32(500),
+		},
+		{
+			name:           "percentage MaxUnavailable is propagated to scale and update strategies",
+			maxUnavailable: intstr.FromString("10%"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := worker.RenderNodeSetStatefulSet(
+				makeNodeSet(tt.maxUnavailable),
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				true,
+				false,
+			)
+			assert.NoError(t, err)
+
+			if assert.NotNil(t, result.Spec.ScaleStrategy) &&
+				assert.NotNil(t, result.Spec.ScaleStrategy.MaxUnavailable) {
+				assert.Equal(t, tt.maxUnavailable, *result.Spec.ScaleStrategy.MaxUnavailable,
+					"ScaleStrategy.MaxUnavailable should mirror StatefulSet.MaxUnavailable")
+			}
+
+			if assert.NotNil(t, result.Spec.UpdateStrategy.RollingUpdate) &&
+				assert.NotNil(t, result.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable) {
+				assert.Equal(t, tt.maxUnavailable, *result.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
+					"UpdateStrategy.RollingUpdate.MaxUnavailable should mirror StatefulSet.MaxUnavailable")
+			}
+
+			assert.Equal(t, "false", result.Labels[consts.LabelSoperatorRollingUpdateEnabled])
+		})
+	}
+
+	t.Run("slurm-aware rolling update uses onDelete internally", func(t *testing.T) {
+		nodeSet := makeNodeSet(intstr.FromString("20%"))
+		nodeSet.UpdateStrategy = consts.UpdateStrategySlurmAwareRollingUpdate
+
+		result, err := worker.RenderNodeSetStatefulSet(
+			nodeSet,
+			&slurmv1.Secrets{},
+			consts.CGroupV2,
+			true,
+			false,
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, appsv1.OnDeleteStatefulSetStrategyType, result.Spec.UpdateStrategy.Type)
+		assert.Nil(t, result.Spec.UpdateStrategy.RollingUpdate)
+		assert.Equal(t, kruisev1b1.OnPVCDeleteVolumeClaimUpdateStrategyType, result.Spec.VolumeClaimUpdateStrategy.Type)
+		assert.Equal(t, consts.LabelSoperatorRollingUpdateValue, result.Labels[consts.LabelSoperatorRollingUpdateEnabled])
+		assert.Equal(t, intstr.FromString("20%"), *result.Spec.ScaleStrategy.MaxUnavailable)
+	})
+
+	t.Run("unsupported strategy returns an error", func(t *testing.T) {
+		nodeSet := makeNodeSet(intstr.FromString("20%"))
+		nodeSet.UpdateStrategy = consts.UpdateStrategy("unsupported")
+
+		_, err := worker.RenderNodeSetStatefulSet(
+			nodeSet,
+			&slurmv1.Secrets{},
+			consts.CGroupV2,
+			true,
+			false,
+		)
+		assert.ErrorContains(t, err, `unsupported update strategy "unsupported"`)
+	})
 }
 
 func TestRenderNodeSetStatefulSet_EphemeralNodesReserveOrdinals(t *testing.T) {
@@ -790,13 +1196,11 @@ func TestRenderNodeSetStatefulSet_EphemeralNodesReserveOrdinals(t *testing.T) {
 			nodeSet := createNodeSetWithActiveNodes(tt.ephemeralNodes, tt.activeNodes)
 
 			result, err := worker.RenderNodeSetStatefulSet(
-				"test-cluster",
 				nodeSet,
 				&slurmv1.Secrets{},
 				consts.CGroupV2,
 				true,
 				false,
-				"",
 			)
 			assert.NoError(t, err)
 
