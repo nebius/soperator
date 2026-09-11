@@ -178,6 +178,9 @@ func main() {
 	klog.SetLogger(zapLogger.WithName("klog"))
 
 	setupLog := ctrl.Log.WithName("setup")
+
+	setupLog.Info("SCHED-2368 dummy validation log")
+
 	var err error
 	controllersSpec := os.Getenv("SLURM_OPERATOR_CONTROLLERS")
 	controllersSource := "env"
