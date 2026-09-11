@@ -2,6 +2,7 @@ package updatecontroller
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -22,10 +24,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	clientfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/render/common"
+	"nebius.ai/slurm-operator/internal/render/worker"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
+	"nebius.ai/slurm-operator/internal/values"
 )
 
 func TestContainerCrashLoopBackOff(t *testing.T) {
@@ -49,10 +55,10 @@ func TestContainerCrashLoopBackOff(t *testing.T) {
 	assert.False(t, containerCrashLoopBackOff(statuses, "missing"))
 }
 
-func TestRollingUpdateEnabledRequiresOnDeleteStrategy(t *testing.T) {
+func TestRollingUpdateEnabledRequiresWorkerAndOnDeleteStrategy(t *testing.T) {
 	sts := testStatefulSet()
 	sts.Labels = map[string]string{
-		consts.LabelSoperatorRollingUpdateEnabled: consts.LabelSoperatorRollingUpdateValue,
+		consts.LabelWorkerKey: consts.LabelWorkerValue,
 	}
 
 	assert.True(t, rollingUpdateEnabled(sts))
@@ -65,7 +71,10 @@ func TestRollingUpdateEnabledRequiresOnDeleteStrategy(t *testing.T) {
 	sts.Spec.UpdateStrategy = kruisev1b1.StatefulSetUpdateStrategy{
 		Type: appsv1.OnDeleteStatefulSetStrategyType,
 	}
-	sts.Labels[consts.LabelSoperatorRollingUpdateEnabled] = "false"
+	sts.Labels[consts.LabelWorkerKey] = "false"
+	assert.False(t, rollingUpdateEnabled(sts))
+
+	delete(sts.Labels, consts.LabelWorkerKey)
 	assert.False(t, rollingUpdateEnabled(sts))
 }
 
@@ -239,13 +248,7 @@ func TestProcessRollingUpdateDeletesCrashLoopingWorkerInit(t *testing.T) {
 	}
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, nil)
-	err := reconciler.processRollingUpdate(
-		context.Background(),
-		"cluster",
-		"new-revision",
-		testStatefulSet(),
-		[]corev1.Pod{pod},
-	)
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &pod)
 }
@@ -258,13 +261,7 @@ func TestProcessRollingUpdateDeletesPodWithCompletedWorkerHandoff(t *testing.T) 
 	}
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, nil)
-	err := reconciler.processRollingUpdate(
-		context.Background(),
-		"cluster",
-		"new-revision",
-		testStatefulSet(),
-		[]corev1.Pod{pod},
-	)
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &pod)
 }
@@ -288,13 +285,7 @@ func TestProcessRollingUpdateDeletesSafelyOfflineCrashLoopingSlurmd(t *testing.T
 	}}, nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processRollingUpdate(
-		context.Background(),
-		"cluster",
-		"new-revision",
-		testStatefulSet(),
-		[]corev1.Pod{pod},
-	)
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &pod)
 	slurmClient.AssertExpectations(t)
@@ -323,13 +314,7 @@ func TestProcessRollingUpdateDeletesSafelyOfflineRebootHandoff(t *testing.T) {
 	}}, nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processRollingUpdate(
-		context.Background(),
-		"cluster",
-		"new-revision",
-		testStatefulSet(),
-		[]corev1.Pod{pod},
-	)
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &pod)
 	slurmClient.AssertExpectations(t)
@@ -389,13 +374,7 @@ func TestProcessRollingUpdateContinuesWithinBudgetAfterSafeDelete(t *testing.T) 
 		&candidatePod,
 		&waitingPod,
 	)
-	err := reconciler.processRollingUpdate(
-		context.Background(),
-		"cluster",
-		"new-revision",
-		sts,
-		[]corev1.Pod{deletingPod, candidatePod, waitingPod},
-	)
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", sts, []workerReplacement{{pod: deletingPod, operationID: "new-revision"}, {pod: candidatePod, operationID: "new-revision"}, {pod: waitingPod, operationID: "new-revision"}})
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &deletingPod)
 
@@ -430,13 +409,7 @@ func TestProcessRollingUpdateKeepsSafelyOfflineUnmanagedRebootWithoutHandoff(t *
 	}}, nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processRollingUpdate(
-		context.Background(),
-		"cluster",
-		"new-revision",
-		testStatefulSet(),
-		[]corev1.Pod{pod},
-	)
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
 	require.NoError(t, err)
 
 	got := &corev1.Pod{}
@@ -464,13 +437,7 @@ func TestProcessRollingUpdateDeletesSafelyOfflineManagedRebootWithoutHandoff(t *
 	}}, nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processRollingUpdate(
-		context.Background(),
-		"cluster",
-		"new-revision",
-		testStatefulSet(),
-		[]corev1.Pod{pod},
-	)
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &pod)
 	slurmClient.AssertExpectations(t)
@@ -491,13 +458,7 @@ func TestProcessRollingUpdateKeepsCrashLoopingSlurmdWithAllocations(t *testing.T
 	}}, nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processRollingUpdate(
-		context.Background(),
-		"cluster",
-		"new-revision",
-		testStatefulSet(),
-		[]corev1.Pod{pod},
-	)
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
 	require.NoError(t, err)
 
 	got := &corev1.Pod{}
@@ -527,13 +488,7 @@ func TestProcessRollingUpdateStartsRevisionScopedWorkerOperation(t *testing.T) {
 	}).Return(nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processRollingUpdate(
-		context.Background(),
-		"cluster",
-		"new-revision",
-		sts,
-		[]corev1.Pod{pod},
-	)
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", sts, []workerReplacement{{pod: pod, operationID: "new-revision"}})
 	require.NoError(t, err)
 
 	got := &corev1.Pod{}
@@ -553,13 +508,7 @@ func TestProcessRollingUpdateFailsWhenPodIsMissingFromSlurmNodeList(t *testing.T
 	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{}, nil).Once()
 
 	reconciler, _ := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processRollingUpdate(
-		context.Background(),
-		"cluster",
-		"new-revision",
-		testStatefulSet(),
-		[]corev1.Pod{pod},
-	)
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
 	require.EqualError(t, err, "slurm node worker-0 is missing from list nodes response")
 	slurmClient.AssertExpectations(t)
 }
@@ -575,13 +524,7 @@ func TestProcessRollingUpdateUndrainsStaleDrainBeforeReboot(t *testing.T) {
 	slurmClient.On("UndrainNode", mock.Anything, pod.Name).Return(nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processRollingUpdate(
-		context.Background(),
-		"cluster",
-		"new-revision",
-		testStatefulSet(),
-		[]corev1.Pod{pod},
-	)
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
 	require.NoError(t, err)
 
 	got := &corev1.Pod{}
@@ -629,13 +572,7 @@ func TestProcessRollingUpdateContinuesWithinBudgetAfterUndrain(t *testing.T) {
 		&undrainedPod,
 		&candidatePod,
 	)
-	err := reconciler.processRollingUpdate(
-		context.Background(),
-		"cluster",
-		"new-revision",
-		sts,
-		[]corev1.Pod{undrainedPod, candidatePod},
-	)
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", sts, []workerReplacement{{pod: undrainedPod, operationID: "new-revision"}, {pod: candidatePod, operationID: "new-revision"}})
 	require.NoError(t, err)
 	slurmClient.AssertExpectations(t)
 }
@@ -643,14 +580,15 @@ func TestProcessRollingUpdateContinuesWithinBudgetAfterUndrain(t *testing.T) {
 func TestReconcileUndrainsStaleDrainAfterUpdate(t *testing.T) {
 	sts := testStatefulSet()
 	sts.Labels = map[string]string{
-		consts.LabelSoperatorRollingUpdateEnabled: consts.LabelSoperatorRollingUpdateValue,
-		consts.LabelInstanceKey:                   "cluster",
+		consts.LabelWorkerKey:   consts.LabelWorkerValue,
+		consts.LabelInstanceKey: "cluster",
 	}
 	sts.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"app": "worker"}}
 	sts.Status.UpdateRevision = "new-revision"
 	sts.Status.UpdatedReplicas = 1
 
 	pod := testOutdatedPod()
+	pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(sts, kruisev1b1.GroupVersion.WithKind("StatefulSet"))}
 	pod.Labels = map[string]string{
 		"app":                      "worker",
 		"controller-revision-hash": sts.Status.UpdateRevision,
@@ -773,4 +711,324 @@ func assertPodDeleted(t *testing.T, kubeClient client.Client, pod *corev1.Pod) {
 	t.Helper()
 	err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(pod), &corev1.Pod{})
 	assert.True(t, apierrors.IsNotFound(err), "expected pod to be deleted, got: %v", err)
+}
+
+func testK8sNodeRolloutReconciler(t *testing.T, slurmClient slurmapi.Client) (*RollingUpdateReconciler, *kruisev1b1.StatefulSet, *corev1.Pod, *corev1.Node) {
+	t.Helper()
+	sts := testStatefulSet()
+	sts.UID = "statefulset-uid"
+	sts.Labels = map[string]string{
+		consts.LabelWorkerKey:   consts.LabelWorkerValue,
+		consts.LabelInstanceKey: "cluster",
+	}
+	sts.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"app": "worker"}}
+	sts.Status.UpdateRevision = "current-revision"
+	sts.Status.UpdatedReplicas = 1
+	sts.Status.ReadyReplicas = 1
+	pod := testOutdatedPod()
+	pod.UID = "worker-uid"
+	pod.Labels = common.RenderMatchLabels(consts.ComponentTypeNodeSet, "cluster")
+	pod.Labels[consts.LabelNodeSetKey] = "workers"
+	pod.Labels["app"] = "worker"
+	pod.Labels["controller-revision-hash"] = sts.Status.UpdateRevision
+	pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(sts, kruisev1b1.GroupVersion.WithKind("StatefulSet"))}
+	pod.Spec.NodeName = "node-0"
+	pod.Status.Phase = corev1.PodRunning
+	pod.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: pod.Spec.NodeName}, Spec: corev1.NodeSpec{Unschedulable: true}}
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kruisev1b1.AddToScheme(scheme))
+	kubeClient := clientfake.NewClientBuilder().WithScheme(scheme).WithObjects(sts, &pod, node).
+		WithIndex(&corev1.Pod{}, workerPodNodeNameIndex, func(obj client.Object) []string {
+			return []string{obj.(*corev1.Pod).Spec.NodeName}
+		}).Build()
+	clients := slurmapi.NewClientSet(context.Background())
+	if slurmClient != nil {
+		clients.AddClient(types.NamespacedName{Namespace: sts.Namespace, Name: "cluster"}, slurmClient)
+	}
+	return NewRollingUpdateReconciler(kubeClient, scheme, record.NewFakeRecorder(10), clients), sts, &pod, node
+}
+
+func TestReconcileK8sNodeRolloutWaitsForHandoffBeforeAllowingEviction(t *testing.T) {
+	ctx := context.Background()
+	slurmClient := &slurmapifake.MockClient{}
+	r, sts, pod, _ := testK8sNodeRolloutReconciler(t, slurmClient)
+	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)}
+	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{{
+		Name: pod.Name, States: nodeStates(api.V0044NodeStateALLOCATED),
+		AllocCPUs: ptr.To(int32(16)), AllocMemoryMB: ptr.To(int64(1024)),
+	}}, nil).Once()
+	slurmClient.On("RebootNodes", mock.Anything, slurmapi.RebootNodesRequest{
+		NodeList: pod.Name, ASAP: true, Reason: defaultRebootReason, PowerAction: consts.SlurmPowerActionWorkerHandoff,
+	}).Return(nil).Once()
+	result, err := r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, time.Minute, result.RequeueAfter)
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+	operationID := "node-rollout-" + string(pod.UID)
+	assert.Equal(t, consts.LabelSoperatorWorkerOperationPhaseStopping, workerOperationPhase(pod, operationID))
+	assert.True(t, workerPDBSelectsPod(t, pod))
+
+	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{{
+		Name: pod.Name, States: nodeStates(api.V0044NodeStateALLOCATED, api.V0044NodeStateREBOOTREQUESTED),
+		AllocCPUs: ptr.To(int32(16)), AllocMemoryMB: ptr.To(int64(1024)),
+	}}, nil).Once()
+	_, err = r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+	assert.True(t, workerPDBSelectsPod(t, pod))
+
+	// This acknowledgement comes from the existing Slurm worker handoff script.
+	pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseReady
+	require.NoError(t, r.Update(ctx, pod))
+	assert.False(t, workerPDBSelectsPod(t, pod), "handoff acknowledgement itself releases PDB protection")
+	versionBeforeReconcile := pod.ResourceVersion
+	_, err = r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+	assert.False(t, workerPDBSelectsPod(t, pod))
+	assert.Nil(t, pod.DeletionTimestamp, "the node drainer performs eviction")
+	assert.Equal(t, versionBeforeReconcile, pod.ResourceVersion, "ready requires no second label or patch")
+	version := pod.ResourceVersion
+	_, err = r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+	assert.Equal(t, version, pod.ResourceVersion, "waiting for eviction is idempotent")
+	slurmClient.AssertExpectations(t)
+}
+
+func TestReconcileK8sNodeRolloutPreservesHandoffAndCompletesAfterUncordon(t *testing.T) {
+	ctx := context.Background()
+	slurmClient := &slurmapifake.MockClient{}
+	r, sts, pod, node := testK8sNodeRolloutReconciler(t, slurmClient)
+	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)}
+	pod.Labels[consts.LabelSoperatorWorkerOperationID] = "previous-revision"
+	pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseStopping
+	require.NoError(t, r.Update(ctx, pod))
+	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{{
+		Name: pod.Name, States: nodeStates(api.V0044NodeStateALLOCATED, api.V0044NodeStateREBOOTREQUESTED),
+	}}, nil).Once()
+	_, err := r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+	assert.Equal(t, "previous-revision", pod.Labels[consts.LabelSoperatorWorkerOperationID])
+	assert.True(t, workerPDBSelectsPod(t, pod))
+
+	node.Spec.Unschedulable = false
+	require.NoError(t, r.Update(ctx, node))
+	pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseReady
+	require.NoError(t, r.Update(ctx, pod))
+	_, err = r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	assertPodDeleted(t, r.Client, pod)
+	slurmClient.AssertNotCalled(t, "RebootNodes", mock.Anything, mock.Anything)
+	slurmClient.AssertExpectations(t)
+}
+
+func TestReconcileK8sNodeRolloutReleasedWorkerConsumesSharedUpdateBudget(t *testing.T) {
+	ctx := context.Background()
+	slurmClient := &slurmapifake.MockClient{}
+	r, sts, pod, _ := testK8sNodeRolloutReconciler(t, slurmClient)
+	sts.Spec.Replicas = ptr.To(int32(2))
+	sts.Status.ReadyReplicas = 2
+	setMaxUnavailable(sts, intstr.FromInt32(1))
+	require.NoError(t, r.Update(ctx, sts))
+	pod.Labels[consts.LabelSoperatorWorkerOperationID] = "node-rollout-" + string(pod.UID)
+	pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseReady
+	require.NoError(t, r.Update(ctx, pod))
+	other := pod.DeepCopy()
+	other.Name = "worker-1"
+	other.UID = "other-worker-uid"
+	other.ResourceVersion = ""
+	other.Spec.NodeName = "other-node"
+	require.NoError(t, r.Create(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: other.Spec.NodeName}}))
+	delete(other.Labels, consts.LabelSoperatorWorkerOperationID)
+	delete(other.Labels, consts.LabelSoperatorWorkerOperationPhase)
+	other.Labels["controller-revision-hash"] = "old-revision"
+	require.NoError(t, r.Create(ctx, other))
+	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{{
+		Name: other.Name, States: nodeStates(api.V0044NodeStateIDLE),
+	}}, nil).Once()
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)})
+	require.NoError(t, err)
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(other), other))
+	assert.Empty(t, other.Labels[consts.LabelSoperatorWorkerOperationID])
+	slurmClient.AssertNotCalled(t, "RebootNodes", mock.Anything, mock.Anything)
+	slurmClient.AssertExpectations(t)
+}
+
+func TestReconcileK8sNodeRolloutFailsClosedWhenSlurmIsUnavailable(t *testing.T) {
+	ctx := context.Background()
+	slurmClient := &slurmapifake.MockClient{}
+	r, sts, pod, _ := testK8sNodeRolloutReconciler(t, slurmClient)
+	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node(nil), errors.New("unavailable")).Once()
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)})
+	require.ErrorContains(t, err, "unavailable")
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+	assert.True(t, workerPDBSelectsPod(t, pod))
+	slurmClient.AssertExpectations(t)
+}
+
+func TestReconcileK8sNodeRolloutKeepsOfflineWorkerWithAllocationsProtected(t *testing.T) {
+	ctx := context.Background()
+	slurmClient := &slurmapifake.MockClient{}
+	r, sts, pod, _ := testK8sNodeRolloutReconciler(t, slurmClient)
+	pod.Status.ContainerStatuses = []corev1.ContainerStatus{crashLoopingContainerStatus(consts.ContainerNameSlurmd)}
+	require.NoError(t, r.Status().Update(ctx, pod))
+	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{{
+		Name: pod.Name, States: nodeStates(api.V0044NodeStateDOWN),
+		AllocCPUs: ptr.To(int32(4)), AllocMemoryMB: ptr.To(int64(1024)),
+	}}, nil).Once()
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)})
+	require.NoError(t, err)
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+	assert.True(t, workerPDBSelectsPod(t, pod))
+	slurmClient.AssertExpectations(t)
+}
+
+func TestReconcileK8sNodeRolloutUnreadyWorkerCanDrainWithExhaustedBudget(t *testing.T) {
+	ctx := context.Background()
+	slurmClient := &slurmapifake.MockClient{}
+	r, sts, pod, _ := testK8sNodeRolloutReconciler(t, slurmClient)
+	pod.Status.Conditions[0].Status = corev1.ConditionFalse
+	require.NoError(t, r.Status().Update(ctx, pod))
+	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{{
+		Name: pod.Name, States: nodeStates(api.V0044NodeStateALLOCATED),
+		AllocCPUs: ptr.To(int32(16)), AllocMemoryMB: ptr.To(int64(1024)),
+	}}, nil).Once()
+	slurmClient.On("RebootNodes", mock.Anything, mock.Anything).Return(nil).Once()
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)})
+	require.NoError(t, err)
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+	assert.Equal(t, consts.LabelSoperatorWorkerOperationPhaseStopping, pod.Labels[consts.LabelSoperatorWorkerOperationPhase])
+	assert.True(t, workerPDBSelectsPod(t, pod))
+	slurmClient.AssertExpectations(t)
+}
+
+func TestPlanWorkerPodReplacementsIgnoresUnownedPodsAndFreshReplacement(t *testing.T) {
+	_, sts, pod, node := testK8sNodeRolloutReconciler(t, nil)
+	unowned := pod.DeepCopy()
+	unowned.OwnerReferences = nil
+	k8sNodeCordonStates := map[string]bool{node.Name: true}
+	replacements := planWorkerPodReplacements(sts, []corev1.Pod{*unowned}, k8sNodeCordonStates)
+	assert.Empty(t, replacements)
+
+	k8sNodeCordonStates[node.Name] = false
+	pod.UID = "replacement-uid"
+	replacements = planWorkerPodReplacements(sts, []corev1.Pod{*pod}, k8sNodeCordonStates)
+	assert.Empty(t, replacements)
+}
+
+func TestMarkWorkerOperationReadyRejectsStalePodVersion(t *testing.T) {
+	ctx := context.Background()
+	r, _, pod, _ := testK8sNodeRolloutReconciler(t, nil)
+	stale := pod.DeepCopy()
+	pod.Labels[consts.LabelSoperatorWorkerOperationID] = "new-operation"
+	require.NoError(t, r.Update(ctx, pod))
+	err := r.markWorkerOperationReady(ctx, stale, "previous-operation")
+	require.True(t, apierrors.IsConflict(err), "expected a stale pod version conflict, got: %v", err)
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+	assert.True(t, workerPDBSelectsPod(t, pod))
+}
+
+func TestReconcileK8sNodeRolloutTerminatingWorkerConsumesOneBudgetSlot(t *testing.T) {
+	ctx := context.Background()
+	slurmClient := &slurmapifake.MockClient{}
+	r, sts, pod, _ := testK8sNodeRolloutReconciler(t, slurmClient)
+	sts.Spec.Replicas = ptr.To(int32(2))
+	sts.Status.ReadyReplicas = 1
+	setMaxUnavailable(sts, intstr.FromInt32(2))
+	require.NoError(t, r.Update(ctx, sts))
+	terminating := pod.DeepCopy()
+	terminating.Name = "terminating-worker"
+	terminating.UID = "terminating-uid"
+	terminating.ResourceVersion = ""
+	terminating.Finalizers = []string{"test.soperator/hold-deletion"}
+	require.NoError(t, r.Create(ctx, terminating))
+	require.NoError(t, r.Delete(ctx, terminating))
+	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{{
+		Name: pod.Name, States: nodeStates(api.V0044NodeStateIDLE),
+	}}, nil).Once()
+	slurmClient.On("RebootNodes", mock.Anything, mock.Anything).Return(nil).Once()
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)})
+	require.NoError(t, err)
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+	assert.Equal(t, consts.LabelSoperatorWorkerOperationPhaseStopping, pod.Labels[consts.LabelSoperatorWorkerOperationPhase])
+	slurmClient.AssertExpectations(t)
+}
+
+func workerPDBSelectsPod(t *testing.T, pod *corev1.Pod) bool {
+	t.Helper()
+	pdb := worker.RenderPodDisruptionBudget(&values.SlurmNodeSet{
+		Name:            "workers",
+		ParentalCluster: client.ObjectKey{Namespace: "default", Name: "cluster"},
+		StatefulSet:     values.StatefulSet{Name: "workers"},
+	})
+	selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
+	require.NoError(t, err)
+	return selector.Matches(labels.Set(pod.Labels))
+}
+
+func TestReconcileK8sNodeRolloutRecoveryUsesWorkerOperationAndSurvivesUncordon(t *testing.T) {
+	for _, containerName := range []string{consts.ContainerNameWorkerInit, consts.ContainerNameSlurmd} {
+		t.Run(containerName, func(t *testing.T) {
+			ctx := context.Background()
+			slurmClient := &slurmapifake.MockClient{}
+			r, sts, pod, k8sNode := testK8sNodeRolloutReconciler(t, slurmClient)
+			if containerName == consts.ContainerNameWorkerInit {
+				pod.Status.InitContainerStatuses = []corev1.ContainerStatus{crashLoopingContainerStatus(containerName)}
+			} else {
+				pod.Status.ContainerStatuses = []corev1.ContainerStatus{crashLoopingContainerStatus(containerName)}
+				slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{{
+					Name: pod.Name, States: nodeStates(api.V0044NodeStateDOWN),
+					AllocCPUs: ptr.To(int32(0)), AllocMemoryMB: ptr.To(int64(0)),
+				}}, nil).Once()
+			}
+			require.NoError(t, r.Status().Update(ctx, pod))
+			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)}
+			_, err := r.Reconcile(ctx, req)
+			require.NoError(t, err)
+			require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+			operationID := "node-rollout-" + string(pod.UID)
+			assert.Equal(t, operationID, pod.Labels[consts.LabelSoperatorWorkerOperationID])
+			assert.Equal(t, consts.LabelSoperatorWorkerOperationPhaseReady, workerOperationPhase(pod, operationID))
+			assert.False(t, workerPDBSelectsPod(t, pod))
+			assert.Nil(t, pod.DeletionTimestamp)
+
+			version := pod.ResourceVersion
+			_, err = r.Reconcile(ctx, req)
+			require.NoError(t, err)
+			require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+			assert.Equal(t, version, pod.ResourceVersion)
+
+			k8sNode.Spec.Unschedulable = false
+			require.NoError(t, r.Update(ctx, k8sNode))
+			_, err = r.Reconcile(ctx, req)
+			require.NoError(t, err)
+			assertPodDeleted(t, r.Client, pod)
+			slurmClient.AssertExpectations(t)
+		})
+	}
+}
+
+func TestReconcileStopsWhenK8sNodeReadFails(t *testing.T) {
+	ctx := context.Background()
+	r, sts, pod, _ := testK8sNodeRolloutReconciler(t, nil)
+	readErr := errors.New("node cache unavailable")
+	kubeClient := clientfake.NewClientBuilder().WithScheme(r.Scheme).WithObjects(sts, pod).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if _, ok := obj.(*corev1.Node); ok {
+					return readErr
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+		}).Build()
+	r.Client = kubeClient
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)})
+	require.ErrorIs(t, err, readErr)
+	require.NoError(t, kubeClient.Get(ctx, client.ObjectKeyFromObject(pod), pod))
+	assert.Empty(t, pod.Labels[consts.LabelSoperatorWorkerOperationID])
+	assert.True(t, workerPDBSelectsPod(t, pod))
 }

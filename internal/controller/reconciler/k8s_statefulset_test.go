@@ -328,8 +328,8 @@ func TestAdvancedStatefulSetPatchCopiesUpdateStrategy(t *testing.T) {
 func TestAdvancedStatefulSetPatchUpdatesTopLevelMetadata(t *testing.T) {
 	existing := &kruisev1b1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
 		Labels: map[string]string{
-			"rolling-update-enabled": "false",
-			"external-label":         "preserved",
+			"managed-label":  "old",
+			"external-label": "preserved",
 		},
 		Annotations: map[string]string{
 			"managed-annotation": "old",
@@ -338,7 +338,7 @@ func TestAdvancedStatefulSetPatchUpdatesTopLevelMetadata(t *testing.T) {
 	}}
 	desired := &kruisev1b1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
 		Labels: map[string]string{
-			"rolling-update-enabled": "true",
+			"managed-label": "new",
 		},
 		Annotations: map[string]string{
 			"managed-annotation": "new",
@@ -350,8 +350,8 @@ func TestAdvancedStatefulSetPatchUpdatesTopLevelMetadata(t *testing.T) {
 		t.Fatalf("patch returned error: %v", err)
 	}
 
-	if got := existing.Labels["rolling-update-enabled"]; got != "true" {
-		t.Fatalf("expected rolling-update-enabled=true, got %q", got)
+	if got := existing.Labels["managed-label"]; got != "new" {
+		t.Fatalf("expected managed-label=new, got %q", got)
 	}
 	if got := existing.Annotations["managed-annotation"]; got != "new" {
 		t.Fatalf("expected managed-annotation=new, got %q", got)
