@@ -61,14 +61,14 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	tfVars["production"] = false
 	tfVars["company_name"] = "e2e-test"
 
-	tfVars["filestore_jail"] = map[string]interface{}{
+	tfVars["filesystem_jail"] = map[string]interface{}{
 		"spec": map[string]interface{}{
 			"size_gibibytes":       2048,
 			"block_size_kibibytes": 4,
 		},
 	}
 
-	tfVars["filestore_jail_submounts"] = []interface{}{
+	tfVars["filesystem_jail_submounts"] = []interface{}{
 		map[string]interface{}{
 			"name":       "data",
 			"mount_path": "/data",
