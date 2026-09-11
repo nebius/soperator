@@ -21,8 +21,8 @@ func NewSlurmClient(runtime Runtime) *SlurmClient {
 }
 
 // SbatchOptions describes a Slurm batch submission from an acceptance test.
-// SubmitBatch adds -o/-e pointing inside OutputDir, which defaults to
-// AcceptanceJobOutputDir.
+// SubmitBatch adds -o/-e pointing inside OutputDir. When OutputDir is empty,
+// scenario artifacts take precedence over AcceptanceJobOutputDir.
 type SbatchOptions struct {
 	JobName      string   // required; used in output filename
 	Nodes        int      // -N (omitted if 0)
@@ -32,7 +32,7 @@ type SbatchOptions struct {
 	ExtraFlags   []string // verbatim flags appended before --wrap
 	Wrap         string   // --wrap body
 	RunAsUser    string   // submit through sudo -iu (omitted if empty)
-	OutputDir    string   // defaults to AcceptanceJobOutputDir
+	OutputDir    string   // explicit output directory; defaults to scenario artifacts, then AcceptanceJobOutputDir
 }
 
 // SbatchJob is the handle returned by SubmitBatch. StdoutPath and StderrPath
@@ -64,7 +64,12 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	}
 	outputDir := strings.TrimSpace(opts.OutputDir)
 	if outputDir == "" {
-		outputDir = AcceptanceJobOutputDir
+		if artifacts, ok := ScenarioArtifacts(ctx); ok {
+			outputDir = artifacts.JailDir
+		}
+		if outputDir == "" {
+			outputDir = AcceptanceJobOutputDir
+		}
 	}
 	runAsUser := strings.TrimSpace(opts.RunAsUser)
 

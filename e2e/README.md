@@ -26,7 +26,9 @@ go -C e2e build -o ../bin/acceptance ./cmd/acceptance
 Run the shared suite against an existing cluster:
 
 ```bash
-bin/acceptance --kubectl-context <dev-context>
+bin/acceptance run \
+  --kubectl-context <dev-context> \
+  --output-dir e2e-artifacts/acceptance
 ```
 
 The target Soperator version controls which version-tagged scenarios are run.
@@ -46,7 +48,7 @@ Flux discovery reads the standard Soperator HelmRelease
 cannot resolve a version, the CLI fails before running scenarios and asks for
 `--soperator-version`.
 
-All flags:
+`run` flags:
 
 - `--kubectl-context`: required. All local kubectl calls use this context.
 - `--slurm-cluster-name`: optional, defaults to `soperator`.
@@ -60,8 +62,8 @@ All flags:
 - `--scenario`: optional. Runs all compatible scenarios in the provided feature
   file, or the single scenario at an exact `Scenario:` line, for example
   `features/internal_ssh.feature:3`. May be repeated.
-- `--report-dir`: optional. When set, the runner writes Cucumber and JUnit
-  reports into that directory.
+- `--output-dir`: required. The runner writes Cucumber and JUnit reports plus
+  per-scenario artifacts into this directory.
 
 CPU/GPU scenarios are selected by tags like other scenarios. Steps that need a
 specific worker kind query live Slurm and NodeSet state at scenario time. They
@@ -72,7 +74,10 @@ also fail on partial degradation.
 For focused manual runs on a dev cluster, pass the scenario location:
 
 ```bash
-bin/acceptance --kubectl-context <dev-context> --scenario features/internal_ssh.feature:3
+bin/acceptance run \
+  --kubectl-context <dev-context> \
+  --output-dir e2e-artifacts/acceptance \
+  --scenario features/internal_ssh.feature:3
 ```
 
 The `--scenario` flag is for local/manual investigation only. The GitHub
@@ -88,6 +93,38 @@ so it runs only when both `--run-essential` and `--run-unstable` are set.
 
 Note: The node replacement scenario uses the local `nebius` CLI to check
 instance removal.
+
+Collect a reusable cluster snapshot before or after acceptance:
+
+```bash
+bin/acceptance collect-artifacts \
+  --kubectl-context <dev-context> \
+  --slurm-cluster-name soperator \
+  --soperator-version 5.0.0 \
+  --output-dir e2e-artifacts/snapshots/before-destroy
+```
+
+The common snapshot contains Kubernetes, Soperator, redacted FluxCD, Slurm,
+and jail diagnostics. Add `--nebius-project-id <project-id>` to include Managed
+Kubernetes clusters and node groups. When that optional flag is omitted, the
+`mk8s` collector creates no files and does not invoke the Nebius CLI.
+If Terraform fails before a Kubernetes context is available, omit
+`--kubectl-context` and provide `--nebius-project-id`; the command will skip the
+Kubernetes-bound collectors and still capture Managed Kubernetes state.
+
+Collectors are dependency-bound and reusable by another E2E runtime:
+
+```go
+type Collector interface {
+	Name() string
+	Collect(ctx context.Context, destination string) error
+}
+```
+
+Managed E2E can compose the common constructors with collectors built from its
+own runtime dependencies. `artifacts.CollectAll` runs all collectors, keeps
+successful output when another collector fails, and records the failure in the
+affected collector directory.
 
 ## Reusable Runner API
 
@@ -105,6 +142,7 @@ runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 	KubectlContext:         kubectlContext,
 	SlurmClusterName:       "soperator",
 	TargetSoperatorVersion: "5.0.0",
+	OutputDir:              "e2e-artifacts/acceptance",
 	Suites:                 []acceptance.SuiteConfig{suite},
 })
 ```
@@ -114,6 +152,9 @@ target cluster. `SlurmClusterName` defaults to `soperator` when omitted.
 `TargetSoperatorVersion` is normalized once and stored in static
 `framework.ClusterInfo`. The caller controls scenario selection through
 `SuiteConfig.Source.Paths` and Godog tag filtering through `SuiteConfig.Tags`.
+When `OutputDir` is set, each scenario receives matching runner and jail paths
+through `framework.ScenarioArtifacts(ctx)`. Product-specific steps can write
+their own files directly to those paths without registering a collector.
 
 `acceptance.SoperatorSuite(targetSoperatorVersion)` embeds the public Soperator
 feature files, registers public Soperator steps, enables the default shared

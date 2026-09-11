@@ -224,6 +224,7 @@ jobs:
       RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
       RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
       SLURM_CLUSTER_NAME: "soperator"
+      E2E_ARTIFACTS_DIR: "${{ github.workspace }}/e2e-artifacts"
 
     steps:
       - name: Checkout repository
@@ -470,6 +471,46 @@ jobs:
           echo "SOPERATOR_VERSION=$SOPERATOR_VERSION" >> $GITHUB_ENV
           echo "SOPERATOR_UNSTABLE=$SOPERATOR_UNSTABLE" >> $GITHUB_ENV
 
+      - name: Initialize E2E artifacts
+        shell: bash
+        env:
+          NEBIUS_PROJECT_ID: ${{ needs.resolve-profile.outputs.nebius_project_id }}
+          NEBIUS_REGION: ${{ needs.resolve-profile.outputs.nebius_region }}
+        run: |
+          mkdir -p \
+            "$E2E_ARTIFACTS_DIR/metadata" \
+            "$E2E_ARTIFACTS_DIR/terraform" \
+            "$E2E_ARTIFACTS_DIR/acceptance" \
+            "$E2E_ARTIFACTS_DIR/snapshots/before-acceptance" \
+            "$E2E_ARTIFACTS_DIR/snapshots/before-destroy"
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg ref "$GITHUB_REF_NAME" \
+            --arg sha "$GITHUB_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg run_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg profile "$PROFILE_NAME" \
+            --arg nebius_project_id "$NEBIUS_PROJECT_ID" \
+            --arg nebius_region "$NEBIUS_REGION" \
+            --arg soperator_version "$SOPERATOR_VERSION" \
+            --arg terraform_ref "$TERRAFORM_REPO_REF" \
+            --arg acceptance_ref "$SOPERATOR_E2E_REPO_BRANCH" \
+            '{
+              repository: $repository,
+              ref: $ref,
+              sha: $sha,
+              run_id: $run_id,
+              run_attempt: $run_attempt,
+              run_url: $run_url,
+              profile: $profile,
+              nebius_project_id: $nebius_project_id,
+              nebius_region: $nebius_region,
+              soperator_version: $soperator_version,
+              terraform_ref: $terraform_ref,
+              acceptance_ref: $acceptance_ref
+            }' > "$E2E_ARTIFACTS_DIR/metadata/run.json"
+
       - name: Checkout Terraform repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -498,6 +539,7 @@ jobs:
 
       - name: Cleanup previous Terraform state
         timeout-minutes: 30
+        shell: bash
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
@@ -511,10 +553,11 @@ jobs:
           # Destroy any leftover resources from a previous run using the saved terraform bundle
           # (the exact code that created the state), falling back to the current checkout.
           # Runs before init so the new run starts from a clean, empty state.
-          bin/e2e cleanup-previous
+          bin/e2e cleanup-previous 2>&1 | tee "$E2E_ARTIFACTS_DIR/terraform/cleanup-previous.log"
 
       - name: Terraform Init
         timeout-minutes: 30
+        shell: bash
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
@@ -525,10 +568,12 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          bin/e2e init
+          bin/e2e init 2>&1 | tee "$E2E_ARTIFACTS_DIR/terraform/init.log"
 
       - name: Terraform Apply
+        id: terraform_apply
         timeout-minutes: 90
+        shell: bash
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
@@ -540,7 +585,7 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          bin/e2e apply
+          bin/e2e apply 2>&1 | tee "$E2E_ARTIFACTS_DIR/terraform/apply.log"
 
       - name: Kill leftover Terraform processes
         if: always()
@@ -561,17 +606,31 @@ jobs:
           # provider plugin comm names are truncated, match by full cmdline
           pkill -9 -f terraform-provider || true
 
+      - name: Collect artifacts before acceptance
+        if: steps.terraform_apply.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          kubectl_context="$(kubectl config current-context 2>/dev/null || true)"
+          bin/acceptance collect-artifacts \
+            --kubectl-context "$kubectl_context" \
+            --slurm-cluster-name "$SLURM_CLUSTER_NAME" \
+            --soperator-version "$SOPERATOR_VERSION" \
+            --nebius-project-id "$NEBIUS_PROJECT_ID" \
+            --output-dir "$E2E_ARTIFACTS_DIR/snapshots/before-acceptance"
+
       - name: Acceptance Tests
         id: acceptance
         timeout-minutes: 120
         shell: bash
         run: |
-          kubectl_context="$(kubectl config current-context)"
+          kubectl_context="$(kubectl config current-context 2>/dev/null || true)"
           args=(
+            run
             --kubectl-context "$kubectl_context"
             --slurm-cluster-name "$SLURM_CLUSTER_NAME"
             --soperator-version "$SOPERATOR_VERSION"
-            --report-dir e2e-reports/acceptance
+            --output-dir "$E2E_ARTIFACTS_DIR/acceptance"
           )
           if [[ "$RUN_UNSTABLE_TESTS" == "true" ]]; then
             args+=(--run-unstable)
@@ -579,14 +638,14 @@ jobs:
           if [[ "$RUN_ESSENTIAL_TESTS" == "true" ]]; then
             args+=(--run-essential)
           fi
-          bin/acceptance "${args[@]}"
+          bin/acceptance "${args[@]}" 2>&1 | tee "$E2E_ARTIFACTS_DIR/acceptance/acceptance.log"
 
       - name: Acceptance Summary
         id: acceptance_summary
         if: always()
         shell: bash
         run: |
-          json="e2e-reports/acceptance/soperator.cucumber.json"
+          json="$E2E_ARTIFACTS_DIR/acceptance/soperator.cucumber.json"
           if [[ ! -f "$json" ]]; then
             echo "no cucumber report at $json"
             echo "report_available=false" >> "$GITHUB_OUTPUT"
@@ -602,199 +661,27 @@ jobs:
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
-      - name: Upload Acceptance Reports
+      - name: Collect artifacts before destroy
         if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: acceptance-reports
-          path: e2e-reports/acceptance/
-          retention-days: 14
-
-      - name: K8s Cluster Info and NodeGroups
-        if: always()
+        continue-on-error: true
         shell: bash
         run: |
-          echo "=== K8s Clusters ==="
-          clusters_table=$(nebius mk8s cluster list --parent-id "$NEBIUS_PROJECT_ID" --format table)
-          echo "$clusters_table"
-
-          clusters_json=$(nebius mk8s cluster list --parent-id "$NEBIUS_PROJECT_ID" --format json)
-          cluster_ids=$(echo "$clusters_json" | jq -r '.items[].metadata.id // empty')
-
-          {
-            echo "### K8s Clusters"
-            echo '```'
-            echo "$clusters_table"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          for cluster_id in $cluster_ids; do
-            echo ""
-            echo "--- Node groups for cluster: $cluster_id ---"
-            ng_json=$(nebius mk8s node-group list --parent-id "$cluster_id" --page-size 1000 --format json)
-
-            # Summary table
-            summary=$(echo "$ng_json" | jq -r '
-              ["ID", "NAME", "STATE", "READY/TARGET"],
-              ["--", "----", "-----", "------------"],
-              (.items[] |
-                [
-                  .metadata.id,
-                  .metadata.name,
-                  .status.state,
-                  "\(.status.ready_node_count // "?")/\(.status.target_node_count // "?")"
-                ]
-              ) | @tsv')
-            echo "$summary" | column -t
-
-            {
-              echo "### Node Groups: $cluster_id"
-              echo '```'
-              echo "$summary" | column -t
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-
-            # Full JSON for non-RUNNING node groups
-            not_running=$(echo "$ng_json" | jq '[.items[] | select(.status.state != "RUNNING")]')
-            if [ "$(echo "$not_running" | jq 'length')" -gt 0 ]; then
-              echo ""
-              echo "=== Non-RUNNING node groups (full details) ==="
-              echo "$not_running" | jq .
-            fi
-          done
-
-      - name: "K8s Cluster: Pods"
-        if: always()
-        shell: bash
-        run: kubectl get pods -A -o wide
-
-      - name: "K8s Cluster: Events"
-        if: always()
-        shell: bash
-        run: kubectl get events -A --sort-by='.lastTimestamp'
-
-      - name: "K8s Cluster: Nodes"
-        if: always()
-        shell: bash
-        run: |
-          kubectl get nodes
-          echo ""
-          kubectl get nodes -o yaml
-
-      - name: "K8s Cluster: Jobs"
-        if: always()
-        shell: bash
-        run: |
-          kubectl -n soperator get job
-          echo ""
-          kubectl -n soperator get job -o yaml
-
-      - name: "K8s Cluster: Helm Releases"
-        if: always()
-        shell: bash
-        run: |
-          kubectl get helmreleases -n flux-system
-          echo ""
-          kubectl get helmreleases -n flux-system -o yaml
-
-      - name: "K8s Cluster: Slurm Cluster CRs"
-        if: always()
-        shell: bash
-        run: |
-          kubectl get slurmclusters -A
-          echo ""
-          kubectl get slurmclusters -A -o yaml
-
-      - name: "K8s Cluster: Slurm Active Checks CRs"
-        if: always()
-        shell: bash
-        run: |
-          kubectl get activechecks -A
-          echo ""
-          kubectl get activechecks -A -o yaml
-
-      - name: Slurm Cluster State
-        if: always()
-        shell: bash
-        run: |
-          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sinfo -N || true
-          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- squeue || true
-          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sdiag || true
-          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sacct --format=JobID,JobName,Partition,Account,AllocCPUS,State,ExitCode -S now-6hours || true
-          kubectl exec -n soperator ${SLURM_CLUSTER_NAME}-controller-0 -- sacct --parsable2 --allusers --starttime=now-6hours | column -t -s'|'
-
-      - name: Collect Full Kubernetes Cluster Info
-        if: always()
-        shell: bash
-        run: |
-          mkdir -p ./cluster-info
-          kubectl cluster-info dump --namespaces=kruise-system,soperator-system,soperator,flux-system,cert-manager-system --output-directory=./cluster-info
-
-      - name: Upload Full Kubernetes Cluster Info
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: cluster-info
-          path: ./cluster-info
-          retention-days: 7
-
-      - name: Collect Jail Files
-        if: always()
-        shell: bash
-        run: |
-          mkdir -p ./jail/etc/slurm ./jail/opt/soperator-outputs
-          SCONFIG_POD=$(kubectl get pod -n soperator \
-            -l app.kubernetes.io/component=sconfigcontroller \
-            --field-selector=status.phase=Running \
-            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-          if [[ -n "$SCONFIG_POD" ]]; then
-            echo "Copying jail files from $SCONFIG_POD"
-            kubectl exec -n soperator "$SCONFIG_POD" -- find /mnt/jail -maxdepth 4 -not -path '*/proc/*' > ./jail/tree.txt 2>&1 || true
-            .github/workflows/scripts/retry.sh \
-              kubectl cp "soperator/$SCONFIG_POD:/mnt/jail/etc/slurm/" ./jail/etc/slurm
-            .github/workflows/scripts/retry.sh \
-              kubectl cp "soperator/$SCONFIG_POD:/mnt/jail/opt/soperator-outputs" ./jail/opt/soperator-outputs
-          else
-            echo "No running sconfigcontroller pod found, skipping jail files collection"
-          fi
-          # soperator-outputs/local is node-local (worker boot disk), invisible through the
-          # shared jail — collect it from every worker pod via its host mount.
-          WORKER_PODS=$(kubectl get pods -n soperator \
-            -l slurm.nebius.ai/worker=true \
-            --field-selector=status.phase=Running \
-            -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)
-          for pod in $WORKER_PODS; do
-            echo "Copying node-local soperator-outputs from $pod"
-            mkdir -p "./jail/workers/$pod"
-            kubectl cp -c slurmd \
-              "soperator/$pod:/mnt/jail.upper/opt/soperator-outputs/local" \
-              "./jail/workers/$pod" || true
-          done
-
-      - name: Zip Jail
-        if: always()
-        run: |
-          zip -r jail jail
-
-      - name: Upload Jail
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          archive: false
-          name: jail
-          path: jail.zip
-          retention-days: 7
+          kubectl_context="$(kubectl config current-context 2>/dev/null || true)"
+          bin/acceptance collect-artifacts \
+            --kubectl-context "$kubectl_context" \
+            --slurm-cluster-name "$SLURM_CLUSTER_NAME" \
+            --soperator-version "$SOPERATOR_VERSION" \
+            --nebius-project-id "$NEBIUS_PROJECT_ID" \
+            --output-dir "$E2E_ARTIFACTS_DIR/snapshots/before-destroy"
 
       - name: Terraform Destroy
         if: always()
         timeout-minutes: 30
+        shell: bash
         env:
-          # Opt in to terraform DEBUG logging only for the destroy flow.
-          # bin/e2e destroy reads this and calls tf.SetLogPath() on the
-          # terraform-exec handle — otherwise terraform-exec strips TF_LOG from
-          # the subprocess env. Init/Apply steps don't set this, so they stay
-          # clean. See internal/e2e/destroy.go.
-          TF_DESTROY_LOG_PATH: ${{ runner.temp }}/tf-destroy.log
+          # Keep Terraform core diagnostics while excluding provider DEBUG logs,
+          # which may contain raw credentials such as short-lived IAM tokens.
+          TF_DESTROY_LOG_PATH: ${{ env.E2E_ARTIFACTS_DIR }}/terraform/destroy-debug.log
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
           source .envrc
@@ -806,24 +693,15 @@ jobs:
           aws configure set region $NEBIUS_REGION
           aws configure set endpoint_url https://storage.$NEBIUS_REGION.nebius.cloud:443
 
-          bin/e2e destroy
-
-      - name: Upload Terraform Destroy debug log
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: tf-destroy-debug-log
-          path: ${{ runner.temp }}/tf-destroy.log
-          if-no-files-found: ignore
-          retention-days: 7
-          # Debug log is plain text terraform DEBUG output, highly
-          # compressible, and runner CPU is free, so max out the DEFLATE level.
-          compression-level: 9
+          bin/e2e destroy 2>&1 | tee "$E2E_ARTIFACTS_DIR/terraform/destroy.log"
 
       - name: Force cleanup compute instances on failure
         if: failure()
         shell: bash
         run: |
+          mkdir -p "$E2E_ARTIFACTS_DIR/terraform"
+          exec > >(tee -a "$E2E_ARTIFACTS_DIR/terraform/force-cleanup.log") 2>&1
+
           echo "=== Node groups state before cleanup ==="
           clusters_json=$(nebius mk8s cluster list --parent-id "$NEBIUS_PROJECT_ID" --format json 2>/dev/null || true)
           cluster_ids=$(echo "$clusters_json" | jq -r '.items[].metadata.id // empty' 2>/dev/null || true)
@@ -861,6 +739,15 @@ jobs:
           done
 
           echo "=== Cleanup complete ==="
+
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-artifacts
+          path: ${{ env.E2E_ARTIFACTS_DIR }}/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Add build info to job summary
         if: always()

@@ -3,6 +3,8 @@ package acceptance
 import (
 	"context"
 	"errors"
+	"os"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -251,6 +253,41 @@ func TestRunnerRunConfiguredSuitesErrorsWhenAllSuitesAreEmpty(t *testing.T) {
 	err = runner.runConfiguredSuites(context.Background(), testClusterInfo(), nil, runner.suites)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "no acceptance scenarios compatible with Soperator version 5.0.0")
+}
+
+func TestRunnerMakesScenarioArtifactPathsAvailableToSteps(t *testing.T) {
+	outputDir := t.TempDir()
+	var observed framework.ScenarioArtifactPaths
+	runner, err := NewRunner(RunnerConfig{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: testTargetSoperatorVersion,
+		OutputDir:              outputDir,
+		Suites: []SuiteConfig{
+			{
+				Name:   "sample",
+				Source: testRunnableFeatureSource("features/passing.feature", "scenario artifacts are available"),
+				StepRegistrars: []StepRegistrar{
+					func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, _ framework.Runtime) {
+						sc.Step(`^scenario artifacts are available$`, func(ctx context.Context) error {
+							var ok bool
+							observed, ok = framework.ScenarioArtifacts(ctx)
+							if !ok {
+								return errors.New("scenario artifacts are missing")
+							}
+							return nil
+						})
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, runner.runConfiguredSuites(context.Background(), testClusterInfo(), nil, runner.suites))
+	assert.True(t, strings.HasPrefix(observed.RunnerDir, outputDir+"/scenarios/sample/"))
+	assert.True(t, strings.HasPrefix(observed.JailDir, framework.AcceptanceScenarioArtifactsDir+"/sample/"))
+	_, err = os.Stat(observed.RunnerDir)
+	require.NoError(t, err)
 }
 
 func testSampleSuite() SuiteConfig {

@@ -119,7 +119,7 @@ func (s *GPUProfiling) theSoperatorchecksUserSubmitsAnNsightComputeProfilingJob(
 		TasksPerNode: 1,
 		Wrap:         wrap,
 		RunAsUser:    gpuProfilingUser,
-		OutputDir:    gpuProfilingOutputDir,
+		OutputDir:    gpuProfilingArtifactDir(ctx),
 	})
 	if err != nil {
 		return err
@@ -141,7 +141,8 @@ func (s *GPUProfiling) theSoperatorchecksUserSubmitsAFullNodeNsightSystemsProfil
 	if s.worker.Name == "" {
 		return fmt.Errorf("GPU profiling worker is not selected")
 	}
-	reportBase := path.Join(gpuProfilingOutputDir, fmt.Sprintf("nsys-%d", time.Now().UnixNano()))
+	outputDir := gpuProfilingArtifactDir(ctx)
+	reportBase := path.Join(outputDir, fmt.Sprintf("nsys-%d", time.Now().UnixNano()))
 	wrap := fmt.Sprintf(
 		"test \"$(id -u)\" -ne 0 && test \"$(id -un)\" = %s && "+
 			"nsys profile --trace=cuda,nvtx -o %s all_reduce_perf -b 512M -e 8G -f 2 -g %d",
@@ -157,7 +158,7 @@ func (s *GPUProfiling) theSoperatorchecksUserSubmitsAFullNodeNsightSystemsProfil
 		TasksPerNode: 1,
 		Wrap:         wrap,
 		RunAsUser:    gpuProfilingUser,
-		OutputDir:    gpuProfilingOutputDir,
+		OutputDir:    outputDir,
 	})
 	if err != nil {
 		return err
@@ -167,6 +168,13 @@ func (s *GPUProfiling) theSoperatorchecksUserSubmitsAFullNodeNsightSystemsProfil
 	s.runtime.Logf("Nsight Systems: worker=%s GPUs=%d job_id=%s report=%s stdout=%s stderr=%s",
 		s.worker.Name, s.worker.SlurmNode.GPUCount, job.ID, s.reportPath, job.StdoutPath, job.StderrPath)
 	return nil
+}
+
+func gpuProfilingArtifactDir(ctx context.Context) string {
+	if artifacts, ok := framework.ScenarioArtifacts(ctx); ok {
+		return artifacts.JailDir
+	}
+	return gpuProfilingOutputDir
 }
 
 func (s *GPUProfiling) theNsightSystemsProfilingJobSucceedsAndProducesAReport(ctx context.Context) error {

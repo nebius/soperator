@@ -46,6 +46,7 @@ type SoperatorUtils struct {
 	taskInfoOutput       string
 	reportPath           string
 	reportAttempted      bool
+	preserveReport       bool
 }
 
 func NewSoperatorUtils(runtime framework.Runtime, selector *framework.WorkerSelector) *SoperatorUtils {
@@ -71,7 +72,7 @@ func (s *SoperatorUtils) CleanupAndReset(ctx context.Context) {
 			s.runtime.Logf("cleanup: remove NVIDIA bug report from worker %s: %v", s.worker.Name, err)
 		}
 	}
-	if s.reportPath != "" {
+	if s.reportPath != "" && !s.preserveReport {
 		if _, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("rm -f %s", framework.ShellQuote(s.reportPath))); err != nil {
 			s.runtime.Logf("cleanup: remove downloaded NVIDIA bug report %s: %v", s.reportPath, err)
 		}
@@ -83,6 +84,7 @@ func (s *SoperatorUtils) CleanupAndReset(ctx context.Context) {
 	s.taskInfoOutput = ""
 	s.reportPath = ""
 	s.reportAttempted = false
+	s.preserveReport = false
 }
 
 func (s *SoperatorUtils) selectWorker(ctx context.Context) error {
@@ -184,8 +186,14 @@ func (s *SoperatorUtils) downloadNVIDIABugReport(ctx context.Context) error {
 	}
 
 	s.reportAttempted = true
-	s.reportPath = path.Join("/tmp", s.worker.Name+"-nvidia-bug-report.log.gz")
-	command := fmt.Sprintf("cd /tmp && %s -i %s",
+	reportDir := "/tmp"
+	if artifacts, ok := framework.ScenarioArtifacts(ctx); ok {
+		reportDir = artifacts.JailDir
+		s.preserveReport = true
+	}
+	s.reportPath = path.Join(reportDir, s.worker.Name+"-nvidia-bug-report.log.gz")
+	command := fmt.Sprintf("cd %s && %s -i %s",
+		framework.ShellQuote(reportDir),
 		framework.ShellQuote(path.Join(soperatorUtilsDir, "worker_nvidia_bug_report.sh")),
 		framework.ShellQuote(s.worker.SlurmNode.InstanceID),
 	)

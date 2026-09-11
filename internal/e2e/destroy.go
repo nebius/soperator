@@ -17,10 +17,10 @@ import (
 // so this opt-in path is the only way to get terraform logs out of bin/e2e
 // destroy. The file is typically uploaded as a CI artifact afterwards.
 //
-// The resulting file contains terraform DEBUG output: operational identifiers
-// (tenant/project/cluster/bucket IDs) and AWS-style access key IDs in SigV4
-// Authorization headers. Raw secrets, bearer tokens, and HTTP bodies are not
-// captured at DEBUG level, but treat the artifact as semi-sensitive.
+// Only Terraform core logging is enabled. Provider DEBUG logging is excluded
+// because providers may log raw credentials such as short-lived IAM tokens.
+// Core logs still contain operational identifiers and must be treated as
+// internal diagnostics.
 const tfDestroyLogPathEnvVar = "TF_DESTROY_LOG_PATH"
 
 func Destroy(ctx context.Context, cfg Config) error {
@@ -46,14 +46,17 @@ func enableTFDestroyLogging(tf *tfexec.Terraform) {
 	if path == "" {
 		return
 	}
+	// SetLogCore must precede SetLogPath. Otherwise terraform-exec enables global
+	// TRACE logging by default, which also enables unsafe provider logging.
+	if err := tf.SetLogCore("DEBUG"); err != nil {
+		log.Printf("SetLogCore(DEBUG) failed, continuing without terraform debug logging: %v", err)
+		return
+	}
 	if err := tf.SetLogPath(path); err != nil {
 		log.Printf("SetLogPath(%q) failed, continuing without terraform debug logging: %v", path, err)
 		return
 	}
-	if err := tf.SetLog("DEBUG"); err != nil {
-		log.Printf("SetLog(DEBUG) failed, terraform debug logging may remain disabled: %v", err)
-	}
-	log.Printf("Terraform debug logging enabled, writing to %s", path)
+	log.Printf("Terraform core debug logging enabled, writing to %s", path)
 }
 
 func destroyWithK8sRecovery(ctx context.Context, tf *tfexec.Terraform, varFilePath, nebiusProjectID string) error {

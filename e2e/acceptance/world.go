@@ -25,6 +25,11 @@ type world struct {
 	soperatorVersion string
 }
 
+// NewLocalArgsScope creates a local process scope without requiring a Kubernetes runtime.
+func NewLocalArgsScope() framework.ArgsScope {
+	return (&world{logPrefix: "acceptance"}).Local()
+}
+
 func (w *world) Logf(format string, args ...any) {
 	w.logf(format, args...)
 }

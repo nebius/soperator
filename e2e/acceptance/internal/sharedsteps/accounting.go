@@ -259,10 +259,20 @@ func (s *Accounting) submitAccountingSmokeJob(ctx context.Context) error {
 	if s.worker.Name == "" {
 		return fmt.Errorf("worker for accounting smoke job is not selected")
 	}
-	stdoutPath := accountingTestUserHome + "/e2e-accounting.out"
-	stderrPath := accountingTestUserHome + "/e2e-accounting.err"
+	outputDir := accountingTestUserHome
+	prepareOutputDir := ""
+	if artifacts, ok := framework.ScenarioArtifacts(ctx); ok {
+		outputDir = artifacts.JailDir
+		prepareOutputDir = fmt.Sprintf("install -d -o %s -g %s -m 0777 %s && ",
+			framework.ShellQuote(accountingTestUser),
+			framework.ShellQuote(accountingTestUser),
+			framework.ShellQuote(outputDir),
+		)
+	}
+	stdoutPath := outputDir + "/e2e-accounting.out"
+	stderrPath := outputDir + "/e2e-accounting.err"
 	command := strings.Join([]string{
-		"sudo", "-iu", framework.ShellQuote(accountingTestUser), "--", "sbatch",
+		prepareOutputDir + "sudo", "-iu", framework.ShellQuote(accountingTestUser), "--", "sbatch",
 		"--parsable",
 		"--job-name=" + framework.ShellQuote(accountingTestJobName),
 		"--account=" + framework.ShellQuote(accountingTestAccount),
