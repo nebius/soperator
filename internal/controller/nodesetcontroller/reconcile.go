@@ -115,14 +115,16 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	clusterWithGPU := values.BuildClusterWithGPUFromNodeSets(nodeSets)
 
 	// region Ephemeral nodes power state
+	var appliedPowerState *slurmv1alpha1.NodeSetPowerState
 	ephemeralNodesEnabled := nodeSetValues.EphemeralNodes != nil && *nodeSetValues.EphemeralNodes
 	if ephemeralNodesEnabled {
-		activeNodes, err := r.reconcileNodeSetPowerState(ctx, nodeSet)
+		powerState, err := r.reconcileNodeSetPowerState(ctx, nodeSet)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("reconciling NodeSetPowerState: %w", err)
 		}
-		nodeSetValues.ActiveNodes = activeNodes
-		logger.V(1).Info("Ephemeral nodes power state reconciled", "activeNodes", activeNodes)
+		appliedPowerState = powerState
+		nodeSetValues.ActiveNodes = powerState.Spec.ActiveNodes
+		logger.V(1).Info("Ephemeral nodes power state reconciled", "activeNodes", powerState.Spec.ActiveNodes)
 	}
 	// endregion Ephemeral nodes power state
 
@@ -176,6 +178,18 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		return ctrl.Result{}, fmt.Errorf("validating Slurm workers: %w", err)
 	}
 	// endregion Validation
+
+	if appliedPowerState != nil {
+		ready, err := r.reconcilePowerStateReady(ctx, nodeSet, &nodeSetValues, appliedPowerState)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if !ready {
+			res.RequeueAfter = 10 * time.Second
+		}
+	} else if err := r.clearPowerStateReady(ctx, nodeSet); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// region Phase computation
 	// Always update phase after validation so it reflects current conditions,
@@ -231,7 +245,6 @@ func computePhase(nodeSet *slurmv1alpha1.NodeSet) string {
 }
 
 func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv1alpha1.NodeSet) error {
-	patch := client.MergeFrom(nodeSet.DeepCopy())
 	needToUpdate := false
 
 	for _, conditionType := range []string{
@@ -262,9 +275,11 @@ func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv
 		return nil
 	}
 
-	if err := r.Status().Patch(ctx, nodeSet, patch); err != nil {
-		log.FromContext(ctx).Error(err, "Failed to patch status")
-		return fmt.Errorf("patching %s status: %w", slurmv1alpha1.KindNodeSet, err)
+	// A merge patch omits unchanged zero-valued replicas, but a new NodeSet has no
+	// status.replicas yet and the CRD requires it when initializing status.
+	if err := r.Status().Update(ctx, nodeSet); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to update status")
+		return fmt.Errorf("update %s status: %w", slurmv1alpha1.KindNodeSet, err)
 	}
 
 	return nil
@@ -711,7 +726,7 @@ func (r NodeSetReconciler) getWorkersStatefulSetDependencies(
 func (r *NodeSetReconciler) reconcileNodeSetPowerState(
 	ctx context.Context,
 	nodeSet *slurmv1alpha1.NodeSet,
-) ([]int32, error) {
+) (*slurmv1alpha1.NodeSetPowerState, error) {
 	logger := log.FromContext(ctx)
 
 	powerStateName := nodeSet.Name
@@ -790,7 +805,7 @@ func (r *NodeSetReconciler) reconcileNodeSetPowerState(
 		"activeNodes", existing.Spec.ActiveNodes,
 	)
 
-	return existing.Spec.ActiveNodes, nil
+	return existing, nil
 }
 
 func (r *NodeSetReconciler) deleteNodeSetPowerState(

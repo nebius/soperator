@@ -18,7 +18,6 @@ package nodesetcontroller
 
 import (
 	"context"
-	errorsStd "errors"
 	"fmt"
 	"time"
 
@@ -28,7 +27,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -93,6 +91,9 @@ func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, name string, maxConcurrency int, cacheSyncTimeout time.Duration) error {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Pod{}, powerPodOwnerIndex, powerPodOwnerKeys); err != nil {
+		return err
+	}
 	if err := r.setupConfigMapIndexer(mgr); err != nil {
 		return err
 	}
@@ -122,7 +123,7 @@ func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, name string, maxC
 	controllerBuilder.Watches(
 		&slurmv1alpha1.NodeSetPowerState{},
 		handler.EnqueueRequestsFromMapFunc(r.findNodeSetForPowerState),
-		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		builder.WithPredicates(predicate.GenerationChangedPredicate{}),
 	)
 
 	resourceChecks := r.createResourceChecks(controllercommon.CreateServiceAccountPredicate())
@@ -194,28 +195,7 @@ func (r *NodeSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		err = fmt.Errorf("reconciling %s: %w", slurmv1alpha1.KindNodeSet, err)
 	}
 
-	statusErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		innerNodeSet := &slurmv1alpha1.NodeSet{}
-		innerErr := r.Get(ctx, req.NamespacedName, innerNodeSet)
-		if innerErr != nil {
-			if apierrors.IsNotFound(innerErr) {
-				logger.V(1).Info("Resource not found. Ignoring since object must be deleted")
-				return nil
-			}
-			// Error reading the object - requeue the request.
-			logger.Error(innerErr, "Failed to get resource")
-			return fmt.Errorf("getting %s: %w", slurmv1alpha1.KindNodeSet, innerErr)
-		}
-
-		return r.Status().Update(ctx, innerNodeSet)
-	})
-	if statusErr != nil {
-		logger.Error(statusErr, "Failed to update resource status")
-		result = ctrl.Result{}
-		err = fmt.Errorf("updating %s status: %w", slurmv1alpha1.KindNodeSet, statusErr)
-	}
-
-	return result, errorsStd.Join(err, statusErr)
+	return result, err
 }
 
 // patchStatus patches the status of the NodeSet object using the provided patcher function.

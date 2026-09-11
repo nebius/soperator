@@ -152,6 +152,8 @@ populateJail:
   #    volumeSourceName: "jail-snapshot"
   overwrite: false
 slurmConfig:
+  resumeTimeout: 1800
+  suspendTimeout: 90
   defMemPerNode: 0
   defCpuPerGPU: 4
   completeWait: 5

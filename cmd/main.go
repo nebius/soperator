@@ -20,6 +20,8 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
+	"fmt"
+	"math"
 	"os"
 	"reflect"
 	"strings"
@@ -32,6 +34,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -139,6 +142,8 @@ func main() {
 
 		cacheSyncTimeout time.Duration
 		maxConcurrency   int
+		restConfigQPS    float64
+		restConfigBurst  int
 	)
 
 	var watchNsCacheByName map[string]cache.Config
@@ -168,7 +173,13 @@ func main() {
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.StringVar(&controllersFlag, "controllers", "", "A comma-separated list of controllers to enable or disable. Use '*' for all, and '-name' to disable. Overrides SLURM_OPERATOR_CONTROLLERS if set.")
+	flag.Float64Var(&restConfigQPS, "rest-config-qps", 30, "Kubernetes API requests per second shared by manager clients")
+	flag.IntVar(&restConfigBurst, "rest-config-burst", 50, "Kubernetes API request burst shared by manager clients")
 	flag.Parse()
+	if float32(restConfigQPS) <= 0 || math.IsNaN(restConfigQPS) || math.IsInf(restConfigQPS, 0) || restConfigQPS > math.MaxFloat32 || restConfigBurst <= 0 {
+		fmt.Fprintln(os.Stderr, "REST config QPS and burst must be positive and finite")
+		os.Exit(1)
+	}
 	opts := getZapOpts(logFormat, logLevel)
 	zapLogger := zap.New(opts...)
 	ctrl.SetLogger(zapLogger)
@@ -227,12 +238,18 @@ func main() {
 		}
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	config := ctrl.GetConfigOrDie()
+	config.QPS = float32(restConfigQPS)
+	config.Burst = restConfigBurst
+	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.QPS, config.Burst)
+	setupLog.Info("Configured Kubernetes API rate limits", "qps", config.QPS, "burst", config.Burst)
+	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:                  scheme,
 		Metrics:                 metricsopts.ServerOptions(metricsAddr, secureMetrics, tlsOpts),
 		WebhookServer:           webhookServer,
 		HealthProbeBindAddress:  probeAddr,
 		LeaderElection:          enableLeaderElection,
+		LeaderElectionConfig:    controllerconfig.LeaderElectionConfig(config),
 		LeaderElectionID:        "e21479ae.nebius.ai",
 		LeaderElectionNamespace: soperatorNamespace,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily

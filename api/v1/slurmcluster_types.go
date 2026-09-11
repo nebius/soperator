@@ -204,6 +204,12 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=1800
 	ResumeTimeout *int32 `json:"resumeTimeout,omitempty"`
+
+	// SuspendTimeout is the number of seconds allowed for ephemeral nodes to shut down.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=90
+	SuspendTimeout *int32 `json:"suspendTimeout,omitempty"`
 }
 
 // Topology contains topology-related parameters for Slurm.

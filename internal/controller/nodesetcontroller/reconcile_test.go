@@ -139,9 +139,9 @@ func TestReconcileNodeSetPowerState_AllowsZeroInitialEphemeralNodes(t *testing.T
 		),
 	}
 
-	activeNodes, err := r.reconcileNodeSetPowerState(context.Background(), nodeSet)
+	observedPowerState, err := r.reconcileNodeSetPowerState(context.Background(), nodeSet)
 	require.NoError(t, err)
-	assert.Empty(t, activeNodes)
+	assert.Empty(t, observedPowerState.Spec.ActiveNodes)
 
 	var powerState slurmv1alpha1.NodeSetPowerState
 	err = fakeClient.Get(context.Background(), client.ObjectKey{

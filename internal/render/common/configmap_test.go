@@ -314,10 +314,10 @@ func TestRenderSlurmConfigMapResumeFailProgram(t *testing.T) {
 	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{})
 
 	slurmConfig := result.Data[consts.ConfigMapKeySlurmBaseConfig]
-	assert.Contains(t, slurmConfig, "ResumeFailProgram=/opt/soperator/bin/power_resume_fail.sh",
+	assert.Contains(t, slurmConfig, "ResumeFailProgram=soperator-resume-fail",
 		"without it Slurm leaves the pod running after ResumeTimeout")
-	assert.Contains(t, slurmConfig, "ResumeProgram=/opt/soperator/bin/power_resume.sh")
-	assert.Contains(t, slurmConfig, "SuspendProgram=/opt/soperator/bin/power_suspend.sh")
+	assert.Contains(t, slurmConfig, "ResumeProgram=soperator-resume")
+	assert.Contains(t, slurmConfig, "SuspendProgram=soperator-suspend")
 }
 
 func TestRenderSlurmConfigMapRebootPrograms(t *testing.T) {
@@ -1459,4 +1459,11 @@ NodeName=worker-h100-[0-3] AutoDetect=off Name=gpu Type=nvidia_h100 File=/dev/nv
 			}
 		})
 	}
+}
+
+func TestRenderSlurmConfigMapSuspendTimeout(t *testing.T) {
+	cluster := &values.SlurmCluster{SlurmConfig: slurmv1.SlurmConfig{SuspendTimeout: ptr.To[int32](300)}}
+	config := generateSlurmConfig(cluster).Render()
+	assert.Contains(t, config, "SuspendTimeout=300")
+	assert.Equal(t, 1, strings.Count(config, "SuspendTimeout="))
 }
