@@ -30,10 +30,10 @@ var suiteNamePattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 // Runner executes a configured Godog acceptance suite against a Soperator cluster.
 type Runner struct {
 	suites                 []SuiteConfig
-	kubectlContext         string
 	slurmClusterName       string
 	targetSoperatorVersion string
-	reportDir              string
+	outputDir              string
+	runtime                framework.Runtime
 }
 
 // RunnerConfig configures an acceptance suite run.
@@ -41,7 +41,7 @@ type RunnerConfig struct {
 	KubectlContext         string
 	SlurmClusterName       string
 	TargetSoperatorVersion string
-	ReportDir              string
+	OutputDir              string
 	Suites                 []SuiteConfig
 }
 
@@ -72,25 +72,28 @@ func NewRunner(config RunnerConfig) (*Runner, error) {
 	if len(suites) == 0 {
 		return nil, fmt.Errorf("at least one suite is required")
 	}
+	runtime, err := NewRuntime(kubectlContext, slurmClusterName, normalizedTargetVersion)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Runner{
 		suites:                 suites,
-		kubectlContext:         kubectlContext,
 		slurmClusterName:       slurmClusterName,
 		targetSoperatorVersion: normalizedTargetVersion,
-		reportDir:              strings.TrimSpace(config.ReportDir),
+		outputDir:              strings.TrimSpace(config.OutputDir),
+		runtime:                runtime,
 	}, nil
 }
 
 // Run executes the configured acceptance suite.
 func (r *Runner) Run(ctx context.Context) error {
-	w := newWorld(r.kubectlContext, r.slurmClusterName, r.targetSoperatorVersion)
 	info := &framework.ClusterInfo{
 		SlurmClusterName:       r.slurmClusterName,
 		TargetSoperatorVersion: r.targetSoperatorVersion,
 	}
 
-	return r.runConfiguredSuites(ctx, info, w, r.suites)
+	return r.runConfiguredSuites(ctx, info, r.runtime, r.suites)
 }
 
 func (r *Runner) runConfiguredSuites(ctx context.Context, info *framework.ClusterInfo, runtime framework.Runtime, suites []SuiteConfig) error {
@@ -209,16 +212,21 @@ func (r *Runner) suiteFeaturePaths(info *framework.ClusterInfo, suite SuiteConfi
 }
 
 func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runtime framework.Runtime, suite SuiteConfig, features []string) error {
-	format, err := reports.Format(r.reportDir, suite.Name)
+	format, err := reports.Format(r.outputDir, suite.Name)
 	if err != nil {
 		return fmt.Errorf("suite %q report format: %w", suite.Name, err)
 	}
 
+	var jail framework.CommandScope
+	if runtime != nil {
+		jail = runtime.Jail()
+	}
+	artifactsManager := framework.NewArtifactsManager(r.outputDir, jail)
 	tags := r.suiteTagFilter(suite)
 	godogSuite := godog.TestSuite{
 		Name: suite.Name,
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
-			r.initializeSuiteScenario(sc, info, runtime, suite)
+			r.initializeSuiteScenario(sc, info, runtime, suite, artifactsManager)
 		},
 		Options: &godog.Options{
 			Format:         format,
@@ -240,12 +248,38 @@ func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runt
 	return nil
 }
 
-func (r *Runner) initializeSuiteScenario(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime framework.Runtime, suite SuiteConfig) {
+func (r *Runner) initializeSuiteScenario(
+	sc *godog.ScenarioContext,
+	info *framework.ClusterInfo,
+	runtime framework.Runtime,
+	suite SuiteConfig,
+	artifactsManager *framework.ArtifactsManager,
+) {
+	registerScenarioArtifacts(sc, suite.Name, runtime, artifactsManager)
 	registerTimingHooks(sc)
 	registerSkipHook(sc)
 	for _, register := range suite.StepRegistrars {
 		register(sc, info, runtime)
 	}
+}
+
+func registerScenarioArtifacts(
+	sc *godog.ScenarioContext,
+	suiteName string,
+	runtime framework.Runtime,
+	manager *framework.ArtifactsManager,
+) {
+	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
+		preparedCtx, err := manager.PrepareScenario(ctx, suiteName, scenario.Uri, scenario.Name, scenario.Id)
+		if err != nil {
+			if runtime != nil {
+				runtime.Logf("Prepare artifacts for scenario %q: %v", scenario.Name, err)
+			} else {
+				log.Printf("acceptance: prepare artifacts for scenario %q: %v", scenario.Name, err)
+			}
+		}
+		return preparedCtx, nil
+	})
 }
 
 func registerSkipHook(sc *godog.ScenarioContext) {
@@ -304,6 +338,23 @@ func newWorld(kubectlContext, slurmClusterName, soperatorVersion string) *world 
 		slurmClusterName: slurmClusterName,
 		soperatorVersion: soperatorVersion,
 	}
+}
+
+// NewRuntime constructs the shared acceptance runtime.
+func NewRuntime(kubectlContext, slurmClusterName, targetSoperatorVersion string) (framework.Runtime, error) {
+	slurmClusterName = strings.TrimSpace(slurmClusterName)
+	if slurmClusterName == "" {
+		slurmClusterName = defaultSlurmClusterName
+	}
+	targetSoperatorVersion = strings.TrimSpace(targetSoperatorVersion)
+	if targetSoperatorVersion == "" {
+		return nil, fmt.Errorf("target Soperator version is required")
+	}
+	normalizedVersion, err := framework.NormalizeSoperatorVersion(targetSoperatorVersion)
+	if err != nil {
+		return nil, fmt.Errorf("target Soperator version: %w", err)
+	}
+	return newWorld(strings.TrimSpace(kubectlContext), slurmClusterName, normalizedVersion), nil
 }
 
 func (w *world) logf(format string, args ...any) {

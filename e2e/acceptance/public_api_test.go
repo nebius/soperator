@@ -28,6 +28,12 @@ func TestPublicRunnerAPIIsImportable(t *testing.T) {
 	assert.NotNil(t, runner)
 }
 
+func TestPublicRuntimeAPIIsImportable(t *testing.T) {
+	runtime, err := acceptance.NewRuntime("dev-context", "soperator", "5.0.0")
+	require.NoError(t, err)
+	assert.NotNil(t, runtime)
+}
+
 func TestPublicRunnerAPIAcceptsCallerOwnedStaticSuites(t *testing.T) {
 	productFeatures := acceptance.FeatureSource{
 		FS: fstest.MapFS{

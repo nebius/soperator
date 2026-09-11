@@ -44,6 +44,34 @@ func TestSubmitBatchRunsAsUserWithCustomOutputDir(t *testing.T) {
 	assert.Contains(t, runtime.jailCommand, "-e "+ShellQuote(outputDir+"/%x-%j.err"))
 }
 
+func TestSubmitBatchUsesScenarioArtifactDir(t *testing.T) {
+	runtime := &submitBatchRuntime{}
+	ctx := context.WithValue(t.Context(), scenarioArtifactsCtxKey{}, ScenarioArtifactPaths{
+		JailDir: "/opt/soperator-outputs/shared/acceptance/scenarios/suite/scenario",
+	})
+
+	job, err := NewSlurmClient(runtime).SubmitBatch(ctx, SbatchOptions{
+		JobName: "smoke",
+		Wrap:    "true",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "/opt/soperator-outputs/shared/acceptance/scenarios/suite/scenario/smoke-123.out", job.StdoutPath)
+	assert.Contains(t, runtime.jailCommand, "scenarios/suite/scenario")
+}
+
+func TestSubmitBatchFallsBackOutsideScenario(t *testing.T) {
+	runtime := &submitBatchRuntime{}
+
+	job, err := NewSlurmClient(runtime).SubmitBatch(t.Context(), SbatchOptions{
+		JobName: "smoke",
+		Wrap:    "true",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, AcceptanceJobOutputDir+"/smoke-123.out", job.StdoutPath)
+}
+
 func TestParseSacctJob(t *testing.T) {
 	dump := `
 123.batch|COMPLETED|0:0||

@@ -1,14 +1,15 @@
 package cli
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseOptionsDefaults(t *testing.T) {
-	opts, err := parseOptions([]string{"--kubectl-context", "dev-context"})
+func TestParseRunOptionsDefaults(t *testing.T) {
+	opts, err := parseRunOptions([]string{"--kubectl-context", "dev-context", "--output-dir", "artifacts"})
 	require.NoError(t, err)
 
 	assert.Equal(t, "dev-context", opts.KubectlContext)
@@ -17,11 +18,11 @@ func TestParseOptionsDefaults(t *testing.T) {
 	assert.False(t, opts.RunEssentialTests)
 	assert.Empty(t, opts.SoperatorVersion)
 	assert.Empty(t, opts.ScenarioPaths)
-	assert.Empty(t, opts.ReportDir)
+	assert.Equal(t, "artifacts", opts.OutputDir)
 }
 
-func TestParseOptionsExplicitValues(t *testing.T) {
-	opts, err := parseOptions([]string{
+func TestParseRunOptionsExplicitValues(t *testing.T) {
+	opts, err := parseRunOptions([]string{
 		"--kubectl-context", "dev-context",
 		"--slurm-cluster-name", "custom",
 		"--soperator-version", "4.1.5-reb85d0e5",
@@ -29,50 +30,62 @@ func TestParseOptionsExplicitValues(t *testing.T) {
 		"--run-essential=true",
 		"--scenario", "features/internal_ssh.feature:3",
 		"--scenario=features/observability.feature:3",
-		"--report-dir", "reports",
+		"--output-dir", "reports",
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, "dev-context", opts.KubectlContext)
 	assert.Equal(t, "custom", opts.SlurmClusterName)
-	assert.Equal(t, "4.1.5-reb85d0e5", opts.SoperatorVersion)
 	assert.True(t, opts.RunUnstableTests)
 	assert.True(t, opts.RunEssentialTests)
 	assert.Equal(t, []string{"features/internal_ssh.feature:3", "features/observability.feature:3"}, opts.ScenarioPaths)
-	assert.Equal(t, "reports", opts.ReportDir)
+	assert.Equal(t, "reports", opts.OutputDir)
+}
+
+func TestParseCollectOptionsProjectIsOptional(t *testing.T) {
+	opts, err := parseCollectOptions([]string{"--kubectl-context", "dev-context", "--output-dir", "snapshot"})
+	require.NoError(t, err)
+
+	assert.Equal(t, "soperator", opts.SlurmClusterName)
+	assert.Empty(t, opts.NebiusProjectID)
+	assert.Equal(t, "snapshot", opts.OutputDir)
 }
 
 func TestSuiteFromOptionsSelectsEssentialScenarios(t *testing.T) {
-	suite := suiteFromOptions(options{RunEssentialTests: true}, "5.0.0")
-
+	suite := suiteFromOptions(runOptions{RunEssentialTests: true}, "5.0.0")
 	assert.Equal(t, "@essential", suite.Tags)
 	assert.True(t, suite.ExcludeUnstable)
 }
 
 func TestSuiteFromOptionsCanIncludeUnstableEssentialScenarios(t *testing.T) {
-	suite := suiteFromOptions(options{
-		RunEssentialTests: true,
-		RunUnstableTests:  true,
-	}, "5.0.0")
-
+	suite := suiteFromOptions(runOptions{RunEssentialTests: true, RunUnstableTests: true}, "5.0.0")
 	assert.Equal(t, "@essential", suite.Tags)
 	assert.False(t, suite.ExcludeUnstable)
 }
 
-func TestParseOptionsRequiresKubectlContext(t *testing.T) {
-	_, err := parseOptions(nil)
+func TestParseRunOptionsRequiresCommonOptions(t *testing.T) {
+	_, err := parseRunOptions(nil)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "--kubectl-context is required")
-}
 
-func TestParseOptionsRejectsExtraArgs(t *testing.T) {
-	_, err := parseOptions([]string{"--kubectl-context", "dev-context", "extra"})
+	_, err = parseRunOptions([]string{"--kubectl-context", "dev-context"})
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "unexpected acceptance arguments")
+	assert.ErrorContains(t, err, "--output-dir is required")
 }
 
-func TestParseOptionsRejectsEmptyScenario(t *testing.T) {
-	_, err := parseOptions([]string{"--kubectl-context", "dev-context", "--scenario", " "})
+func TestParseRunOptionsRejectsExtraArgs(t *testing.T) {
+	_, err := parseRunOptions([]string{"--kubectl-context", "dev-context", "--output-dir", "out", "extra"})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "unexpected run arguments")
+}
+
+func TestParseRunOptionsRejectsEmptyScenario(t *testing.T) {
+	_, err := parseRunOptions([]string{"--kubectl-context", "dev-context", "--output-dir", "out", "--scenario", " "})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "--scenario value cannot be empty")
+}
+
+func TestRunRequiresExplicitSubcommand(t *testing.T) {
+	err := Run(context.Background(), nil)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "subcommand is required")
 }
