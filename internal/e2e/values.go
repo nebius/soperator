@@ -63,6 +63,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 
 	tfVars["filesystem_jail"] = map[string]interface{}{
 		"spec": map[string]interface{}{
+			"type":                 "NETWORK_SSD",
 			"size_gibibytes":       2048,
 			"block_size_kibibytes": 4,
 		},
@@ -73,6 +74,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"name":       "data",
 			"mount_path": "/data",
 			"spec": map[string]interface{}{
+				"type":                 "NETWORK_SSD",
 				"size_gibibytes":       2048,
 				"block_size_kibibytes": 4,
 			},
