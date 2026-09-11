@@ -144,7 +144,7 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 	})
 }
 
-func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
+func TestRenderNodeSetStatefulSet_SlurmdGPUConfiguration(t *testing.T) {
 	tests := []struct {
 		name                       string
 		clusterWithGPU             bool
@@ -225,6 +225,56 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 
 			assertEnvValue(t, result.Spec.Template.Spec.Containers[0].Env, "SLURM_CLUSTER_WITH_GPU", tt.expectedClusterWithGPUFlag)
 			assertEnvValue(t, result.Spec.Template.Spec.Containers[0].Env, "NODESET_GPU_ENABLED", tt.expectedNodeSetGPUFlag)
+
+			if tt.nodeSetGPUEnabled {
+				assert.Contains(t, result.Spec.Template.Spec.Volumes, corev1.Volume{
+					Name: "host-run",
+					VolumeSource: corev1.VolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{
+							Path: "/run",
+							Type: ptr.To(corev1.HostPathDirectory),
+						},
+					},
+				})
+			} else {
+				assertNoHostPathVolume(t, result.Spec.Template.Spec.Volumes, "host-run")
+			}
+
+			var waiterCount int
+			for i, container := range result.Spec.Template.Spec.InitContainers {
+				assertNoVolumeMount(t, container.VolumeMounts, "persistenced-required")
+				if container.Name != "wait-for-nvidia-persistenced" {
+					assertNoVolumeMount(t, container.VolumeMounts, "host-run")
+					continue
+				}
+				waiterCount++
+				assert.Equal(t, nodeSet.ContainerSlurmd.Image, container.Image)
+				assert.Equal(t, nodeSet.ContainerSlurmd.ImagePullPolicy, container.ImagePullPolicy)
+				assert.Nil(t, container.RestartPolicy, "the waiter must exit before the next init container starts")
+				assert.Empty(t, container.Resources, "waiting for the host socket does not require GPU allocation")
+				assert.Equal(t, []string{"/bin/sh", "-ec"}, container.Command)
+				if assert.Len(t, container.Args, 1) {
+					assert.Contains(t, container.Args[0], "until [ -S /host-run/nvidia-persistenced/socket ]; do")
+				}
+				assert.Equal(t, []corev1.VolumeMount{{
+					Name:      "host-run",
+					MountPath: "/host-run",
+					ReadOnly:  true,
+				}}, container.VolumeMounts)
+				if assert.Less(t, i+1, len(result.Spec.Template.Spec.InitContainers)) {
+					assert.Equal(t, consts.ContainerNameWorkerInit, result.Spec.Template.Spec.InitContainers[i+1].Name)
+				}
+			}
+			if tt.nodeSetGPUEnabled {
+				assert.Equal(t, 1, waiterCount)
+			} else {
+				assert.Zero(t, waiterCount)
+			}
+			assertNoHostPathVolume(t, result.Spec.Template.Spec.Volumes, "persistenced-required")
+			for _, container := range result.Spec.Template.Spec.Containers {
+				assertNoVolumeMount(t, container.VolumeMounts, "host-run")
+				assertNoVolumeMount(t, container.VolumeMounts, "persistenced-required")
+			}
 		})
 	}
 }

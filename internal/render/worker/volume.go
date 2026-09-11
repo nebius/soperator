@@ -44,7 +44,7 @@ func renderVolumesAndClaimTemplateSpecsForNodeSet(
 		}
 	}
 	if nodeSet.GPU.Enabled {
-		volumes = append(volumes, renderVolumeNvidia())
+		volumes = append(volumes, renderVolumeNvidia(), renderVolumeHostRun())
 		volumes = append(volumes, common.RenderVolumesNvidiaIMEX()...)
 	}
 
@@ -163,6 +163,26 @@ func renderVolumeMountNvidia() corev1.VolumeMount {
 		Name:             consts.VolumeNameNvidia,
 		MountPath:        consts.VolumeMountPathNvidia,
 		MountPropagation: ptr.To(corev1.MountPropagationHostToContainer),
+	}
+}
+
+func renderVolumeHostRun() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameHostRun,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: consts.VolumeHostPathRun,
+				Type: ptr.To(corev1.HostPathDirectory),
+			},
+		},
+	}
+}
+
+func renderVolumeMountHostRun() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameHostRun,
+		MountPath: consts.VolumeMountPathHostRun,
+		ReadOnly:  true,
 	}
 }
 
