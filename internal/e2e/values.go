@@ -118,6 +118,9 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 				},
 			},
 		}
+		for key, value := range ns.TerraformOverrides {
+			entry[key] = value
+		}
 		nodesetWorkers = append(nodesetWorkers, entry)
 	}
 	tfVars["slurm_nodeset_workers"] = nodesetWorkers

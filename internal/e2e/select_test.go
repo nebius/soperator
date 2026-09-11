@@ -125,6 +125,26 @@ func TestFilterFeasible_PassesReservedDemandToOracle(t *testing.T) {
 	assert.Equal(t, uint64(16), seen[affinityKey{Platform: "gpu-b200-sxm", Fabric: "us-central1-b"}])
 }
 
+func TestFilterFeasible_PassesClaimedGB300DemandToOracle(t *testing.T) {
+	var seen map[affinityKey]uint64
+	oracle := func(_ Profile, reserved map[affinityKey]uint64) (bool, error) {
+		seen = reserved
+		return true, nil
+	}
+
+	cfg := testConfig()
+	gb300 := gpuProfile("project-gb300", "eu-north1", "gpu-gb300", "gb300-fabric", 2)
+	gb300.NodeSets[0].Preset = "4gpu-112vcpu-800gb"
+	gb300.Labels = []string{autoSelectLabel}
+	cfg.Profiles["MAN_GB300"] = gb300
+	claims := []RunClaim{{RunID: 2, ProfileName: "MAN_GB300", ProjectID: "project-gb300"}}
+
+	feasible, err := filterFeasible(cfg, cfg.Candidates(autoSelectLabel), claims, oracle)
+	require.NoError(t, err)
+	assert.NotContains(t, feasible, "MAN_GB300")
+	assert.Equal(t, uint64(8), seen[affinityKey{Platform: "gpu-gb300", Fabric: "gb300-fabric"}])
+}
+
 func TestFilterFeasible_OracleError(t *testing.T) {
 	boom := errors.New("capacity api down")
 	cfg := testConfig()
