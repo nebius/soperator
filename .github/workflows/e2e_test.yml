@@ -665,11 +665,8 @@ jobs:
         if: always()
         timeout-minutes: 30
         env:
-          # Opt in to terraform DEBUG logging only for the destroy flow.
-          # bin/e2e destroy reads this and calls tf.SetLogPath() on the
-          # terraform-exec handle — otherwise terraform-exec strips TF_LOG from
-          # the subprocess env. Init/Apply steps don't set this, so they stay
-          # clean. See internal/e2e/destroy.go.
+          # Keep Terraform core diagnostics while excluding provider DEBUG logs,
+          # which may contain raw credentials such as short-lived IAM tokens.
           TF_DESTROY_LOG_PATH: ${{ runner.temp }}/tf-destroy.log
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
