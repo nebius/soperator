@@ -46,12 +46,66 @@ on:
         required: false
         default: "false"
         type: string
+      pr_number:
+        description: "PR to update with the E2E result"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
   actions: write
 
 jobs:
+  report-pr-start:
+    name: Report E2E start to PR
+    if: inputs.pr_number != ''
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      comment_id: ${{ steps.comment.outputs.comment_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Create or update PR comment
+        id: comment
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          SOPERATOR_BRANCH: ${{ github.ref_name }}
+          TERRAFORM_BRANCH: ${{ inputs.terraform_repo_ref || github.ref_name }}
+          SOPERATOR_E2E_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
+          REQUESTED_PROFILE: ${{ inputs.profile }}
+          RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
+          RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
+        run: |
+          marker="<!-- soperator-e2e-run:${GITHUB_RUN_ID} -->"
+          python3 .github/scripts/e2e_pr_comment.py start > /tmp/e2e-pr-comment.md
+
+          comment_id=$(gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" \
+            | jq -r --arg marker "$marker" \
+              '[.[][] | select(.body | contains($marker))][0].id // empty')
+
+          payload=$(jq --null-input --rawfile body /tmp/e2e-pr-comment.md '{body: $body}')
+          if [[ -n "$comment_id" ]]; then
+            response=$(gh api --method PATCH \
+              "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" \
+              --input - <<<"$payload")
+          else
+            response=$(gh api --method POST \
+              "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+              --input - <<<"$payload")
+          fi
+
+          echo "comment_id=$(jq -r '.id' <<<"$response")" >> "$GITHUB_OUTPUT"
+
   resolve-profile:
     runs-on: ubuntu-latest
     environment: e2e
@@ -145,6 +199,10 @@ jobs:
   e2e-test:
     needs: resolve-profile
     name: e2e-test (${{ needs.resolve-profile.outputs.profile_name }})
+    outputs:
+      acceptance_outcome: ${{ steps.acceptance.outcome }}
+      acceptance_report_available: ${{ steps.acceptance_summary.outputs.report_available }}
+      acceptance_summary: ${{ steps.acceptance_summary.outputs.comment }}
     concurrency:
       # Per-project mutex: runs targeting the same Nebius project are serialized,
       # different projects can run concurrently. Queued runs wait, never cancel in-progress ones.
@@ -504,6 +562,7 @@ jobs:
           pkill -9 -f terraform-provider || true
 
       - name: Acceptance Tests
+        id: acceptance
         timeout-minutes: 120
         shell: bash
         run: |
@@ -523,15 +582,25 @@ jobs:
           bin/acceptance "${args[@]}"
 
       - name: Acceptance Summary
+        id: acceptance_summary
         if: always()
         shell: bash
         run: |
           json="e2e-reports/acceptance/soperator.cucumber.json"
           if [[ ! -f "$json" ]]; then
             echo "no cucumber report at $json"
+            echo "report_available=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           python3 .github/scripts/acceptance_summary.py "$json" >> "$GITHUB_STEP_SUMMARY"
+          comment=$(python3 .github/scripts/acceptance_summary.py \
+            "$json" --format comment)
+          {
+            echo 'report_available=true'
+            echo 'comment<<EOF'
+            echo "$comment"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Upload Acceptance Reports
         if: always()
@@ -876,6 +945,68 @@ jobs:
               echo "Terraform repo not checked out."
             fi
           } >> $GITHUB_STEP_SUMMARY
+
+  report-pr-result:
+    name: Report E2E result to PR
+    needs: [report-pr-start, resolve-profile, e2e-test]
+    if: always() && inputs.pr_number != ''
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Update PR comment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          COMMENT_ID: ${{ needs.report-pr-start.outputs.comment_id }}
+          SOPERATOR_BRANCH: ${{ github.ref_name }}
+          TERRAFORM_BRANCH: ${{ inputs.terraform_repo_ref || github.ref_name }}
+          SOPERATOR_E2E_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
+          REQUESTED_PROFILE: ${{ inputs.profile }}
+          RESOLVED_PROFILE: ${{ needs.resolve-profile.outputs.profile_name }}
+          RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
+          RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
+          RESOLVE_RESULT: ${{ needs.resolve-profile.result }}
+          E2E_RESULT: ${{ needs.e2e-test.result }}
+          ACCEPTANCE_OUTCOME: ${{ needs.e2e-test.outputs.acceptance_outcome }}
+          ACCEPTANCE_REPORT_AVAILABLE: ${{ needs.e2e-test.outputs.acceptance_report_available }}
+          ACCEPTANCE_SUMMARY: ${{ needs.e2e-test.outputs.acceptance_summary }}
+        run: |
+          gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" \
+            | jq '{jobs: [.[].jobs[]]}' > /tmp/e2e-jobs.json
+          printf '%s\n' "$ACCEPTANCE_SUMMARY" > /tmp/acceptance-comment.md
+          python3 .github/scripts/e2e_pr_comment.py final \
+            --jobs /tmp/e2e-jobs.json \
+            --acceptance-summary /tmp/acceptance-comment.md \
+            > /tmp/e2e-pr-comment.md
+
+          comment_id="$COMMENT_ID"
+          if [[ -z "$comment_id" ]]; then
+            marker="<!-- soperator-e2e-run:${GITHUB_RUN_ID} -->"
+            comment_id=$(gh api --paginate --slurp \
+              "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" \
+              | jq -r --arg marker "$marker" \
+                '[.[][] | select(.body | contains($marker))][0].id // empty')
+          fi
+
+          payload=$(jq --null-input --rawfile body /tmp/e2e-pr-comment.md '{body: $body}')
+          if [[ -n "$comment_id" ]]; then
+            gh api --method PATCH \
+              "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" \
+              --input - <<<"$payload"
+          else
+            gh api --method POST \
+              "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+              --input - <<<"$payload"
+          fi
 
   notify-failure:
     name: Notify Slack on E2E failure

@@ -128,7 +128,6 @@ jobs:
             echo "e2e_command=/$e2e_command"
             echo "terraform_ref=$terraform_ref"
             echo "run_essential_tests=$run_essential_tests"
-            echo "build_url=$build_url"
           } >> "$GITHUB_OUTPUT"
 
       - name: Dispatch E2E
@@ -139,7 +138,6 @@ jobs:
           E2E_COMMAND: ${{ steps.request.outputs.e2e_command }}
           TERRAFORM_REF: ${{ steps.request.outputs.terraform_ref }}
           RUN_ESSENTIAL_TESTS: ${{ steps.request.outputs.run_essential_tests }}
-          BUILD_URL: ${{ steps.request.outputs.build_url }}
         run: |
           current_head_sha=$(gh api \
             "repos/$REPOSITORY/pulls/$PR_NUMBER" \
@@ -164,20 +162,9 @@ jobs:
             -f profile=@auto-select \
             -f run_unstable_tests=false \
             "${essential_input[@]}" \
-            -f is_scheduled=false; then
+            -f is_scheduled=false \
+            -f "pr_number=$PR_NUMBER"; then
             message="Could not dispatch E2E for \`$HEAD_REF\`. See the command workflow logs for details."
             gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "$message"
             exit 1
           fi
-
-          workflow_url="$GITHUB_SERVER_URL/$REPOSITORY/actions/workflows/e2e_test.yml"
-          message=$(printf '%s\n\n%s\n%s\n%s\n%s\n%s\n%s\n\n%s' \
-            'E2E was dispatched with:' \
-            "- Soperator branch: \`$HEAD_REF\`" \
-            "- Terraform branch: \`$TERRAFORM_REF\`" \
-            "- Soperator E2E branch: \`$HEAD_REF\`" \
-            '- Profile: `@auto-select`' \
-            '- Unstable tests: `false`' \
-            "- Essential tests only: \`$RUN_ESSENTIAL_TESTS\`" \
-            "[Build All]($BUILD_URL) · [E2E runs]($workflow_url)")
-          gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "$message"
