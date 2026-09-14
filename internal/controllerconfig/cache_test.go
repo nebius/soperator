@@ -17,7 +17,7 @@ func TestTrimNodeForCache(t *testing.T) {
 		},
 		Spec: corev1.NodeSpec{Unschedulable: true},
 		Status: corev1.NodeStatus{
-			Images:     []corev1.ContainerImage{{Names: []string{"cr.eu-north1.nebius.cloud/soperator:1.0.0"}}},
+			Images:     []corev1.ContainerImage{{Names: []string{"cr.nebius.cloud/soperator:1.0.0"}}},
 			Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}},
 		},
 	}

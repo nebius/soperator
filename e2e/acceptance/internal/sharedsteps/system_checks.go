@@ -23,7 +23,7 @@ const (
 	systemEphemeralRecoverTimeout    = 5 * time.Minute
 	systemEphemeralReason            = "[user_problem] pod_ephemeral_storage"
 	// Small mirrored image used only to enter the host namespace with kubectl debug.
-	systemKubeletDebugImage          = "cr.eu-north1.nebius.cloud/soperator/ubuntu:noble"
+	systemKubeletDebugImage          = "cr.nebius.cloud/soperator/ubuntu:noble"
 	systemKubeletNodeRecreateTimeout = 30 * time.Minute
 	systemKubeletWorkerReadyTimeout  = 10 * time.Minute
 	systemKubeletSlurmRecoverTimeout = 5 * time.Minute

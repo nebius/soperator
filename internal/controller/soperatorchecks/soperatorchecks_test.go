@@ -61,7 +61,7 @@ func nodeWithImages(conditions ...corev1.NodeCondition) *corev1.Node {
 		Status: corev1.NodeStatus{
 			Conditions: conditions,
 			Images: []corev1.ContainerImage{
-				{Names: []string{"cr.eu-north1.nebius.cloud/soperator:1.0.0"}, SizeBytes: 1024},
+				{Names: []string{"cr.nebius.cloud/soperator:1.0.0"}, SizeBytes: 1024},
 			},
 		},
 	}

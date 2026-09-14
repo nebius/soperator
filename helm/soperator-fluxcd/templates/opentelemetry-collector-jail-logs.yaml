@@ -93,7 +93,7 @@ spec:
 
     image:
       pullPolicy: IfNotPresent
-      repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
+      repository: cr.nebius.cloud/observability/nebius-o11y-agent
       tag: 2.0.10
 
     # One collector per worker node: each instance reads (and deletes) only the log files
@@ -182,7 +182,7 @@ spec:
     {{- if $jailEnableFileStorage }}
     initContainers:
       - name: init-fs
-        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        image: cr.nebius.cloud/soperator/busybox:latest
         volumeMounts:
           - name: varlibotelcol
             mountPath: /var/lib/otelcol-jail

@@ -2,7 +2,7 @@
 
 ARG SLURM_VERSION
 
-FROM cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/golang:1.26 AS go-base
+FROM cr.nebius.cloud/soperator-proxy-docker-io/library/golang:1.26 AS go-base
 
 WORKDIR /build
 
@@ -31,7 +31,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     go build -v -o power-manager ./cmd/powermanager
 
 # https://github.com/nebius/ml-containers/pull/102
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260908103131 AS controller_slurmctld
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260908103131 AS controller_slurmctld
 
 COPY ansible/sssd.yml /opt/ansible/sssd.yml
 COPY ansible/roles/sssd /opt/ansible/roles/sssd

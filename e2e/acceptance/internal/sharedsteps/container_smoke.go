@@ -15,8 +15,8 @@ const (
 	// Cluster-supported GPU diagnostic image; includes nvidia-smi for container GPU visibility.
 	// https://github.com/nebius/ml-containers/pull/102
 	gpuSmokeImageRef    = "ml-containers/training_diag:13.0.3-ubuntu24.04-20260909072848"
-	gpuSmokeDockerImage = "cr.eu-north1.nebius.cloud/" + gpuSmokeImageRef
-	gpuSmokeEnrootImage = "docker://cr.eu-north1.nebius.cloud#" + gpuSmokeImageRef
+	gpuSmokeDockerImage = "cr.nebius.cloud/" + gpuSmokeImageRef
+	gpuSmokeEnrootImage = "docker://cr.nebius.cloud#" + gpuSmokeImageRef
 )
 
 func waitForJobSucceeded(ctx context.Context, exec framework.Exec, slurm *framework.SlurmClient, job framework.SbatchJob, timeout time.Duration) error {

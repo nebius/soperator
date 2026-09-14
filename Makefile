@@ -48,7 +48,7 @@ VERSION		= $(VERSION_BASE)
 IMAGE_VERSION			= $(VERSION)-slurm$(SLURM_VERSION)
 GO_CONST_VERSION_FILE	= internal/consts/version.go
 GITHUB_REPO				= ghcr.io/nebius/soperator
-NEBIUS_REPO				= cr.eu-north1.nebius.cloud/soperator
+NEBIUS_REPO				= cr.nebius.cloud/soperator
 IMAGE_REPO				= $(NEBIUS_REPO)
 
 # For version sync test
@@ -521,16 +521,16 @@ deploy-flux: install-flux kustomize ## Deploy soperator via Flux CD to kind clus
 	@echo "Step 2: Determining OCI registry based on version..."
 	@if echo "$(OPERATOR_IMAGE_TAG)" | grep -q -- "-"; then \
 		echo "Unstable version detected: $(OPERATOR_IMAGE_TAG)"; \
-		OCI_REPO="oci://cr.eu-north1.nebius.cloud/soperator-unstable"; \
+		OCI_REPO="oci://cr.nebius.cloud/soperator-unstable"; \
 	else \
 		echo "Stable version detected: $(OPERATOR_IMAGE_TAG)"; \
-		OCI_REPO="oci://cr.eu-north1.nebius.cloud/soperator"; \
+		OCI_REPO="oci://cr.nebius.cloud/soperator"; \
 	fi; \
 	echo "Using OCI repository: $$OCI_REPO"; \
 	echo ""; \
 	echo "Step 3: Deploying Flux configuration for local environment..."; \
 	$(KUSTOMIZE) build fluxcd/environment/local | \
-		sed "s|url: oci://cr.eu-north1.nebius.cloud/soperator.*|url: $$OCI_REPO|g" | \
+		sed "s|url: oci://cr.nebius.cloud/soperator.*|url: $$OCI_REPO|g" | \
 		$(KUBECTL_CTX) apply -f -; \
 	echo ""; \
 	echo "Step 4: Patching soperator-fluxcd-values ConfigMap with OCI repository..."; \

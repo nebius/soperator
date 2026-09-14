@@ -14,7 +14,7 @@ import (
 
 const (
 	// Small mirrored image; Docker lifecycle only needs sh/sleep and storage population.
-	dockerLifecycleImage   = "cr.eu-north1.nebius.cloud/soperator/busybox"
+	dockerLifecycleImage   = "cr.nebius.cloud/soperator/busybox"
 	dockerLifecycleCommand = "echo ready; sleep 3600"
 
 	dockerLocalStorageRoot = "/mnt/image-storage/docker"
