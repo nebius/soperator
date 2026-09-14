@@ -54,6 +54,8 @@ def parameters(context, include_resolved_profile=False):
             ("Essential tests only", context["RUN_ESSENTIAL_TESTS"]),
         ]
     )
+    if context.get("SCENARIOS", "").strip():
+        values.append(("Scenarios", context["SCENARIOS"]))
     return "\n".join(f"- {name}: {inline_code(value)}" for name, value in values)
 
 

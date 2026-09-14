@@ -46,6 +46,11 @@ on:
         required: false
         default: "false"
         type: string
+      scenarios:
+        description: "Acceptance features/scenarios, e.g. features/internal_ssh.feature:3, features/observability.feature. Separate with commas, semicolons, or whitespace (empty = all compatible)."
+        required: false
+        default: ""
+        type: string
       pr_number:
         description: "PR to update with the E2E result"
         required: false
@@ -84,6 +89,7 @@ jobs:
           REQUESTED_PROFILE: ${{ inputs.profile }}
           RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
           RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
+          SCENARIOS: ${{ inputs.scenarios }}
         run: |
           marker="<!-- soperator-e2e-run:${GITHUB_RUN_ID} -->"
           python3 .github/scripts/e2e_pr_comment.py start > /tmp/e2e-pr-comment.md
@@ -182,6 +188,7 @@ jobs:
           PROFILE_YAML: ${{ steps.resolve.outputs.profile_yaml }}
           TERRAFORM_REPO_REF: ${{ github.event.inputs.terraform_repo_ref || github.ref_name }}
           SOPERATOR_E2E_REPO_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
+          SCENARIOS: ${{ inputs.scenarios }}
         run: |
           {
             echo "### Run Parameters"
@@ -189,6 +196,11 @@ jobs:
             echo "- Branch: \`${{ github.ref_name }}\`"
             echo "- Terraform branch: \`$TERRAFORM_REPO_REF\`"
             echo "- Soperator E2E repo branch: \`$SOPERATOR_E2E_REPO_BRANCH\`"
+            if [[ -n "$SCENARIOS" ]]; then
+              echo "- Scenarios: \`$SCENARIOS\`"
+            else
+              echo "- Scenarios: not specified (all to be run)"
+            fi
             echo "- Profile: \`$PROFILE_NAME\`"
             echo ""
             echo '```yaml'
@@ -223,6 +235,7 @@ jobs:
       E2E_PROFILE_YAML: ${{ needs.resolve-profile.outputs.profile_yaml }}
       RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
       RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
+      SCENARIOS: ${{ inputs.scenarios }}
       SLURM_CLUSTER_NAME: "soperator"
       E2E_ARTIFACTS_DIR: "${{ github.workspace }}/e2e-artifacts"
 
@@ -638,6 +651,11 @@ jobs:
           if [[ "$RUN_ESSENTIAL_TESTS" == "true" ]]; then
             args+=(--run-essential)
           fi
+          while read -r -a scenario_paths; do
+            for scenario in "${scenario_paths[@]}"; do
+              args+=(--scenario "$scenario")
+            done
+          done <<< "${SCENARIOS//[[:space:],;]/ }"
           bin/acceptance "${args[@]}" 2>&1 | tee "$E2E_ARTIFACTS_DIR/acceptance/acceptance.log"
 
       - name: Acceptance Summary
@@ -860,6 +878,7 @@ jobs:
           RESOLVED_PROFILE: ${{ needs.resolve-profile.outputs.profile_name }}
           RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
           RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
+          SCENARIOS: ${{ inputs.scenarios }}
           RESOLVE_RESULT: ${{ needs.resolve-profile.result }}
           E2E_RESULT: ${{ needs.e2e-test.result }}
           ACCEPTANCE_OUTCOME: ${{ needs.e2e-test.outputs.acceptance_outcome }}

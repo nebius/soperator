@@ -80,8 +80,30 @@ bin/acceptance run \
   --scenario features/internal_ssh.feature:3
 ```
 
-The `--scenario` flag is for local/manual investigation only. The GitHub
-Actions e2e workflow does not pass it.
+In the GitHub Actions **E2E test soperator** workflow, use the optional
+`scenarios` field to select the same feature paths or exact scenario lines.
+Separate multiple selectors with commas, semicolons, or whitespace, for example
+`features/internal_ssh.feature:3, features/observability.feature:3`.
+Separators can be mixed; repeated separators and surrounding whitespace are
+ignored. Feature paths must not contain these separators.
+Each selector is passed as a separate `--scenario` argument. Leave the field
+empty to run all compatible scenarios subject to the tag filters below.
+Paths refer to features in the selected **E2E repo branch**.
+
+On a PR, use `/e2e [terraform-branch] --scenarios="<selectors>"` or
+`/e2e-essential [terraform-branch] --scenarios="<selectors>"`. Use the same
+separators as the workflow input. Double quotes are optional for lists without
+whitespace; use double quotes when the list contains spaces:
+
+```text
+/e2e --scenarios="features/internal_ssh.feature:3, features/observability.feature"
+/e2e my-terraform-branch --scenarios=features/internal_ssh.feature:3
+```
+
+The Terraform branch defaults to `main`. Omit `--scenarios` or pass an empty
+list to keep the default scenario selection. The same tag filters apply.
+The PR branch must contain a workflow declaring the `scenarios` input, even
+when the list is empty.
 
 `--run-essential` composes with the other selectors. By default, unstable
 essential scenarios are still excluded; pass `--run-unstable` to include them.
