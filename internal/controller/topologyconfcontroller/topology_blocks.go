@@ -78,8 +78,10 @@ func BuildTopologyBlocks(
 			continue
 		}
 
-		blockName, ok := labels["tier-0"]
-		if !ok {
+		// An empty label counts as absent, the way labelsToPath treats it: a block named "" is
+		// not a block, and no worker would ever register into it.
+		blockName := labels[tierZeroKey]
+		if blockName == "" {
 			// Pods fall back to the "unknown" block via stage 1.
 			logger.Error(nil, "missing tier-0 label for the block topology", "node", node)
 			continue

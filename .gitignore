@@ -12,3 +12,5 @@ version.txt
 /version/
 
 .ansible
+__pycache__/
+*.py[cod]

@@ -1,0 +1,16 @@
+- topology: default
+  cluster_default: true
+  tree:
+    switches:
+        - switch: leaf1
+          children: su1
+        - switch: leaf2
+          nodes: worker-3
+        - switch: root
+          children: leaf2,spine0,spine1
+        - switch: spine0
+          children: leaf1
+        - switch: spine1
+          children: leaf1
+        - switch: su1
+          nodes: worker-[0-2]

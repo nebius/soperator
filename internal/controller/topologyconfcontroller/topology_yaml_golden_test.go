@@ -2,6 +2,7 @@ package topologyconfcontroller
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,6 +14,77 @@ import (
 	"nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 )
+
+func TestBuildMultiTopologyYAML_MixedTierZero(t *testing.T) {
+	cluster := clusterWithTopologies(slurmv1.NamedTopology{
+		Name:           "default",
+		ClusterDefault: ptr.To(true),
+		Topo:           slurmv1.TopologyPlugin{Type: consts.SlurmTopologyTypeTree},
+		NodeSetRefs:    []string{consts.SlurmTopologyNodeSetRefAll},
+	})
+	for _, fixture := range []string{"mixed_tier_zero", "mixed_tier_depth", "mixed_tier_parents"} {
+		t.Run(fixture, func(t *testing.T) {
+			// A partially labelled fleet: only k8s-a carries tier-0, so only its leaf1 gets a
+			// parent above it. leaf2 comes from k8s-d, which has no tier-0 at all, and therefore
+			// stays a top switch and hangs off the fabric root - the operator has nothing telling
+			// it which spine that node belongs to. Label every node with tier-0 and the root ends
+			// up with the single spine0 child instead.
+			labels := nodeLabelsCM(map[string]string{
+				"k8s-a": `{"tier-0":"spine0","tier-1":"leaf1"}`,
+				"k8s-b": `{"tier-1":"leaf1"}`,
+				"k8s-c": `{"tier-0":"","tier-1":"leaf1"}`,
+				"k8s-d": `{"tier-1":"leaf2"}`,
+			})
+			if fixture != "mixed_tier_zero" {
+				labels.Data["k8s-a"] = `{"tier-0":"spine0","tier-1":"leaf1","tier-2":"su1"}`
+			}
+			if fixture == "mixed_tier_parents" {
+				labels.Data["k8s-b"] = `{"tier-0":"spine1","tier-1":"leaf1","tier-2":"su1"}`
+				labels.Data["k8s-c"] = `{"tier-0":"","tier-1":"leaf1","tier-2":"su1"}`
+			}
+			r := &WorkerTopologyReconciler{}
+			actual, err := r.buildMultiTopologyYAML(context.Background(), cluster,
+				[]v1alpha1.NodeSet{gpuNodeSet("worker", 4, "")}, labels,
+				map[string][]string{
+					"k8s-a": {"worker-0"},
+					"k8s-b": {"worker-1"},
+					"k8s-c": {"worker-2"},
+					"k8s-d": {"worker-3"},
+				})
+			require.NoError(t, err)
+			expected, err := os.ReadFile("testdata/" + fixture + ".yaml")
+			require.NoError(t, err)
+			assert.Equal(t, string(expected), actual)
+		})
+	}
+}
+
+// TestBuildMultiTopologyYAML_DigitTailParent pins the rendering of a tier-1 switch whose name ends
+// in an overflowing decimal run and that carries both a tier-0 child switch and a direct worker.
+// Every name in the file is terminated, the synthetic leaf included, and worker_init.py reads this
+// same fixture so the two sides cannot drift.
+func TestBuildMultiTopologyYAML_DigitTailParent(t *testing.T) {
+	cluster := clusterWithTopologies(slurmv1.NamedTopology{
+		Name:           "default",
+		ClusterDefault: ptr.To(true),
+		Topo:           slurmv1.TopologyPlugin{Type: consts.SlurmTopologyTypeTree},
+		NodeSetRefs:    []string{consts.SlurmTopologyNodeSetRefAll},
+	})
+	labels := nodeLabelsCM(map[string]string{
+		"k8s-a": `{"tier-0":"spine0","tier-1":"sw1234567890123456789","tier-2":"su1"}`,
+		"k8s-b": `{"tier-0":"spine0","tier-1":"sw1234567890123456789"}`,
+	})
+
+	r := &WorkerTopologyReconciler{}
+	actual, err := r.buildMultiTopologyYAML(context.Background(), cluster,
+		[]v1alpha1.NodeSet{gpuNodeSet("worker", 2, "")}, labels,
+		map[string][]string{"k8s-a": {"worker-0"}, "k8s-b": {"worker-1"}})
+	require.NoError(t, err)
+
+	expected, err := os.ReadFile("testdata/digit_tail_parent.yaml")
+	require.NoError(t, err)
+	assert.Equal(t, string(expected), actual)
+}
 
 // nodeLabelsCM builds the topology-node-labels ConfigMap the way NodeTopologyReconciler writes it:
 // one JSON-encoded label set per Kubernetes node.
@@ -65,7 +137,7 @@ func TestBuildMultiTopologyYAML_Golden(t *testing.T) {
 			}),
 			nodeSets: []v1alpha1.NodeSet{gpuNodeSet("h100", 4, "")},
 			nodeLabels: map[string]string{
-				"k8s-a": `{"tier-1":"leaf1","tier-2":"spine1"}`,
+				"k8s-a": `{"tier-1":"spine1","tier-2":"leaf1"}`,
 			},
 			gpuPods: map[string][]string{"k8s-a": {"h100-0", "h100-1"}},
 			expected: `- topology: default
@@ -80,6 +152,43 @@ func TestBuildMultiTopologyYAML_Golden(t *testing.T) {
           children: leaf1
         - switch: unknown
           nodes: h100-[2-3]
+`,
+		},
+		{
+			// tier-0 is the widest domain: it hangs off the fabric root and the lower tiers
+			// descend from it, so the nodes stay on the deepest switch they are labelled with.
+			name: "tree topology roots the path at the tier-0 switch",
+			cluster: clusterWithTopologies(slurmv1.NamedTopology{
+				Name:           "default",
+				ClusterDefault: ptr.To(true),
+				Topo:           slurmv1.TopologyPlugin{Type: consts.SlurmTopologyTypeTree},
+				NodeSetRefs:    []string{consts.SlurmTopologyNodeSetRefAll},
+			}),
+			nodeSets: []v1alpha1.NodeSet{gpuNodeSet("gb200", 4, "")},
+			nodeLabels: map[string]string{
+				"k8s-a": `{"tier-0":"spine0","tier-1":"pod1","tier-2":"su1"}`,
+				"k8s-b": `{"tier-0":"spine0","tier-1":"pod1","tier-2":"su2"}`,
+			},
+			gpuPods: map[string][]string{
+				"k8s-a": {"gb200-0", "gb200-1"},
+				"k8s-b": {"gb200-2"},
+			},
+			expected: `- topology: default
+  cluster_default: true
+  tree:
+    switches:
+        - switch: pod1
+          children: su1,su2
+        - switch: root
+          children: spine0,unknown
+        - switch: spine0
+          children: pod1
+        - switch: su1
+          nodes: gb200-[0-1]
+        - switch: su2
+          nodes: gb200-2
+        - switch: unknown
+          nodes: gb200-3
 `,
 		},
 		{
@@ -120,10 +229,12 @@ func TestBuildMultiTopologyYAML_Golden(t *testing.T) {
   cluster_default: false
   tree:
     switches:
+        - switch: block7
+          children: leaf3
         - switch: leaf3
           nodes: h100-[0-3]
         - switch: root
-          children: leaf3
+          children: block7
 - topology: block-nvl72
   cluster_default: false
   block:
@@ -163,10 +274,12 @@ func TestBuildMultiTopologyYAML_Golden(t *testing.T) {
   cluster_default: true
   tree:
     switches:
+        - switch: block1
+          children: leaf1
         - switch: leaf1
           nodes: h100-[0-1]
         - switch: root
-          children: leaf1
+          children: block1
 `,
 		},
 		{

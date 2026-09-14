@@ -48,6 +48,11 @@ func (g TopologyGraph) AddEdge(parent, child string) {
 // legacy single-root behavior: root switch "root" with a child switch "unknown".
 const defaultFabric = "root"
 
+// tierZeroKey is the label naming the widest network domain a node belongs to: the unit a block
+// topology groups by, and the switch closest to the root of a tree topology when the node carries
+// it.
+const tierZeroKey = "tier-0"
+
 // fabricOf returns the fabric a Slurm node belongs to (from its NodeSet's spec.topology.fabric),
 // defaulting to defaultFabric when the node has no explicit fabric.
 func fabricOf(fabricByNode map[string]string, node string) string {
@@ -158,11 +163,10 @@ func BuildTopologyGraph(
 			continue
 		}
 
-		topSwitch := pathToRoot[len(pathToRoot)-1]
 		for _, worker := range workers {
 			graph.AddEdge(pathToRoot[0], worker)
 			placed[worker] = struct{}{}
-			addTopSwitch(fabricOf(fabricByNode, worker), topSwitch)
+			addTopSwitch(fabricOf(fabricByNode, worker), pathToRoot[len(pathToRoot)-1])
 		}
 		for i := range len(pathToRoot) - 1 {
 			graph.AddEdge(pathToRoot[i+1], pathToRoot[i])
@@ -181,8 +185,56 @@ func BuildTopologyGraph(
 	}
 
 	graph.attachFabricRoots(topSwitchesByFabric)
+	graph.attachDirectNodeLeaves()
 
 	return graph
+}
+
+// attachDirectNodeLeaves moves workers off switches that also have child switches. Slurm ignores
+// children when a switch has a node list, so direct workers need a separate leaf in that case.
+func (g TopologyGraph) attachDirectNodeLeaves() {
+	var parents []string
+	occupied := make(map[string]struct{})
+	for parent, children := range g.children {
+		parents = append(parents, parent)
+		occupied[slurmSafeSwitchName(parent)] = struct{}{}
+		for child := range children {
+			occupied[slurmSafeSwitchName(child)] = struct{}{}
+		}
+	}
+	slices.Sort(parents)
+
+	for _, parent := range parents {
+		var workers []string
+		hasSwitches := false
+		for child := range g.children[parent] {
+			if len(g.children[child]) > 0 {
+				hasSwitches = true
+			} else {
+				workers = append(workers, child)
+			}
+		}
+		if !hasSwitches || len(workers) == 0 {
+			continue
+		}
+
+		base := slurmSafeSwitchName(parent)
+		suffix := ".nodes"
+		var leaf string
+		for attempt := 0; ; attempt++ {
+			leaf = base[:min(len(base), maxSwitchNameLength-len(suffix))] + suffix
+			if _, exists := occupied[leaf]; !exists {
+				break
+			}
+			suffix = ".nodes" + strconv.Itoa(attempt+1)
+		}
+		occupied[leaf] = struct{}{}
+		g.AddEdge(parent, leaf)
+		for _, worker := range workers {
+			delete(g.children[parent], worker)
+			g.AddEdge(leaf, worker)
+		}
+	}
 }
 
 // attachFabricRoots connects each fabric's top switches to a root switch named after the fabric,
@@ -206,35 +258,60 @@ func (g TopologyGraph) attachFabricRoots(topSwitchesByFabric map[string]map[stri
 	}
 }
 
-// labelsToPath converts labels to a path to the root of the topology tree.
-// E.g.:
+// labelsToPath converts labels to a path from the node to the root of the topology tree.
+//
+// Tiers are numbered from the root down: "tier-0", when the node carries it, is the switch closest
+// to the fabric root, "tier-1" sits below it, and so on. The node itself hangs off the highest tier
+// it is labelled with, so the deeper the label set, the deeper the node sits.
 //
 //	labels = map[string]string{"tier-1": "switch1", "tier-2": "switch2", "tier-3": "switch3"}
-//	returns ["switch1", "switch2", "switch3"] (from lowest to highest tier)
+//	returns ["switch3", "switch2", "switch1"] (from the node up to the root)
 //
-// The labels must be in the format "tier-N" where N is a positive integer starting from 1.
-// If any label is missing (or empty), it returns an error.
-// Non-tier keys (e.g. "tier-0", used for defining a block) are ignored: only contiguous "tier-N"
-// labels starting from 1 form the IB topology path.
+//	labels = map[string]string{"tier-0": "spine1", "tier-1": "switch1"}
+//	returns ["switch1", "spine1"]
+//
+// tier-0 is optional: without it the chain simply starts at tier-1, which then becomes the switch
+// closest to the root. A node carrying tier-0 alone hangs off it directly.
+//
+// The tiers above 0 must be in the format "tier-N" where N is a positive integer starting from 1,
+// and must form a contiguous chain: if any of them is missing (or empty), it returns an error.
 func labelsToPath(labels map[string]string) ([]string, error) {
 	numOfTiers := 0
 	for key := range labels {
-		if key != "tier-0" && strings.HasPrefix(key, "tier-") {
+		if key != tierZeroKey && strings.HasPrefix(key, "tier-") {
 			numOfTiers++
 		}
 	}
-	if numOfTiers == 0 {
+
+	tierZero := labels[tierZeroKey]
+	if numOfTiers == 0 && tierZero == "" {
 		return nil, fmt.Errorf("no labels found for node")
 	}
 
-	pathToRoot := make([]string, 0, numOfTiers)
-	for i := range numOfTiers {
-		key := "tier-" + strconv.Itoa(i+1)
+	pathToRoot := make([]string, 0, numOfTiers+1)
+	onPath := make(map[string]struct{}, numOfTiers+1)
+	// A fabric with fewer real levels than the node has labels names the same switch at several
+	// tiers. Keeping the repeat would make that switch its own ancestor: adjacent repeats give a
+	// self-edge, distant ones a cycle, and either way nothing on that path reaches the fabric
+	// root. A name already on the path is therefore skipped rather than linked again.
+	appendTier := func(name string) {
+		if _, ok := onPath[name]; ok {
+			return
+		}
+		onPath[name] = struct{}{}
+		pathToRoot = append(pathToRoot, name)
+	}
+
+	for i := numOfTiers; i >= 1; i-- {
+		key := "tier-" + strconv.Itoa(i)
 		curTierLabel := labels[key]
 		if curTierLabel == "" {
 			return nil, fmt.Errorf("missing label %q", key)
 		}
-		pathToRoot = append(pathToRoot, curTierLabel)
+		appendTier(curTierLabel)
+	}
+	if tierZero != "" {
+		appendTier(tierZero)
 	}
 	return pathToRoot, nil
 }

@@ -304,13 +304,33 @@ prefix defaults to `topology.nebius.com` and is configurable through the operato
 `TOPOLOGY_LABEL_PREFIX`). `NodeTopologyReconciler` collects them into the `topology-node-labels`
 ConfigMap, and the plugin type decides which labels a topology reads:
 
-- `block` groups nodes by `tier-0`, which is the NVL domain of the rack on GBX00 hardware;
-- `tree` walks the contiguous `tier-1`..`tier-N` chain, highest tier closest to the root. `tier-0`
-  names a block rather than a switch and is left out of the tree.
+- `block` groups nodes by `tier-0`;
+- `tree` reads the tiers as a hierarchy numbered from the root down. `tier-0`, when the node
+  carries it, is the switch closest to the fabric root; `tier-1` sits below it, `tier-2` below
+  `tier-1`, and so on, with the node itself hanging off the highest tier it is labelled with:
+
+  ```
+  <fabric> -> tier-0 -> tier-1 -> tier-2 -> ... -> worker
+  ```
+
+  `tier-0` is optional. Without it the chain simply starts at `tier-1`, which then becomes the
+  switch closest to the root. A node labelled with `tier-0` alone hangs off it directly. The
+  `tier-1`..`tier-N` part must be contiguous: a gap or an empty tier leaves the node under the
+  fabric's `unknown` switch rather than being closed up. A value repeated across two adjacent
+  tiers collapses into one switch, since a switch cannot be its own parent.
+
+If a switch has both workers attached directly and child switches (for example, its nodes are
+labelled to different depths), the operator moves the direct workers to a synthetic leaf such as
+`leaf1.nodes`. This keeps each switch's children either switches or workers, as Slurm requires.
 
 Workers join their topology as part of slurmd registration, and the unit they pick is the one the
-rendered config places them in: the `tier-1` switch for a tree, the `tier-0` block for a block
-topology. A node covered by several topologies joins all of them at once:
+rendered config places them in: the deepest switch of their tier chain for a tree (or its
+synthetic leaf), the `tier-0` block for a block topology. Worker initialization prefers the path
+the rendered config gives it whenever both agree on the switch holding the node, since the
+operator sees every node's labels and therefore the parents this node may not know about. When
+the rendered path ends on a different switch it is stale and the label-derived path wins, so a
+config still listing the worker under `unknown` or an old switch does not override its current
+placement. A node covered by several topologies joins all of them at once:
 
 ```
 slurmd --conf "topology=ib-gpu:nvl0,eth-cpu:root:leaf01"
@@ -499,6 +519,8 @@ arrive.
 | A topology is missing from the file | Its `nodeSetRefs` match no existing NodeSet | Check the NodeSet names; look for the "Topology matches no NodeSet" log line |
 | `Topology=` missing from a partition line | `topologyRef` names a topology the config does not declare | Look for the `WARNING: Partition ...` comment in `slurm.conf` |
 | All nodes sit under `unknown` | Node topology labels are missing | Check the `topology.nebius.com/tier-*` labels on the Kubernetes nodes and the `topology-node-labels` ConfigMap |
+| One node sits under `unknown` while its neighbours have switches | Its `tier-1`..`tier-N` chain has a gap or an empty tier, so the whole path is refused rather than closed up | Check every `tier-*` label on that node, including malformed ones such as `tier-abc`: each of them counts as a tier and makes the chain one longer |
 | A block topology keeps its nodes in `unknown` while the tree looks right | The nodes carry no `tier-0` label, or it was added after the labels were last collected | `tier-0` is what a block groups by. Compare the node's labels with the `topology-node-labels` ConfigMap: the ConfigMap is materialized from the `topology-soperator` ResourceDistribution, so deleting it only restores the same content |
+| A tree topology has one more switch level than expected | The nodes carry `tier-0`, which a tree renders as the switch closest to the root | Expected: `tier-0` sits between the fabric root and `tier-1`. Drop the `tier-0` label only if the nodes really must hang off `tier-1` directly |
 | A topology declared over CPU NodeSets is missing from the file | CPU-only NodeSets belong to the generated `cpu` topology, so it covers nothing | Bind the partition to `cpu` instead |
 | Workers hang in init | The topology file has not been delivered, or does not yet list the worker | The init container waits for the hostname to appear in the file; check the ConfigMap and the `JailedConfig` |

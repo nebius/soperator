@@ -59,12 +59,12 @@ func NewNodeTopologyReconciler(
 
 // NodeTopologyReconciler watches Kubernetes nodes via the API server.
 //
-// Upon detecting a node with a `topology.nebius.com/tier-1` label,
-// it records the node’s tier information in the `node-topoly-labels` ConfigMap in a
+// Upon detecting a node with a `topology.nebius.com/tier-0` or `topology.nebius.com/tier-1`
+// label, it records the node’s tier information in the `node-topoly-labels` ConfigMap in a
 // `nodeName: [tier-x: switchName, ...]` format.
-// For the Blackwell architecture (GBX00 racks) `topology.nebius.com/tier-1` label
-// is considered as NVL domain of the rack. Remaining `tier-*` labels are considered as
-// IB topology.
+// The labels are collected verbatim; how they are read is up to the topology plugin. A tree
+// treats them as a hierarchy numbered from the root down (tier-0 nearest the fabric root), while
+// a block groups nodes by `tier-0`.
 //
 // **Example (not considered as a real block topology):**
 //
@@ -75,9 +75,9 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
-//	  topology.nebius.com/tier-0: nvl0
+//	  topology.nebius.com/tier-0: spine00
 //	  topology.nebius.com/tier-1: leaf00
-//	  topology.nebius.com/tier-2: spine00
+//	  topology.nebius.com/tier-2: su00
 //	name: nodeA
 //
 // ---
@@ -86,9 +86,9 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
-//	  topology.nebius.com/tier-0: nvl0
+//	  topology.nebius.com/tier-0: spine00
 //	  topology.nebius.com/tier-1: leaf00
-//	  topology.nebius.com/tier-2: spine00
+//	  topology.nebius.com/tier-2: su00
 //	name: nodeB
 //
 // ---
@@ -97,9 +97,9 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
-//	  topology.nebius.com/tier-0: nvl1
+//	  topology.nebius.com/tier-0: spine00
 //	  topology.nebius.com/tier-1: leaf01
-//	  topology.nebius.com/tier-2: spine01
+//	  topology.nebius.com/tier-2: su01
 //	name: nodeC
 //
 // ---
@@ -108,17 +108,21 @@ func NewNodeTopologyReconciler(
 // metadata:
 //
 //	labels:
-//	  topology.nebius.com/tier-0: nvl2
-//	  topology.nebius.com/tier-1: leaf02
-//	  topology.nebius.com/tier-2: spine01
+//	  topology.nebius.com/tier-0: spine00
+//	  topology.nebius.com/tier-1: leaf01
+//	  topology.nebius.com/tier-2: su02
 //	name: nodeD
 //
 // The resulting ResourceDistribution would distribute a ConfigMap containing:
 //
-// nodeA: [tier-0: nvl0, tier-1: leaf00, tier-2: spine00]
-// nodeB: [tier-0: nvl0, tier-1: leaf00, tier-2: spine00]
-// nodeC: [tier-0: nvl1, tier-1: leaf01, tier-2: spine01]
-// nodeD: [tier-0: nvl2, tier-1: leaf02, tier-2: spine01]
+// nodeA: [tier-0: spine00, tier-1: leaf00, tier-2: su00]
+// nodeB: [tier-0: spine00, tier-1: leaf00, tier-2: su00]
+// nodeC: [tier-0: spine00, tier-1: leaf01, tier-2: su01]
+// nodeD: [tier-0: spine00, tier-1: leaf01, tier-2: su02]
+//
+// A tree topology reads that as spine00 under the fabric root, leaf00 and leaf01 below it, and
+// the nodes on su00/su01/su02. Each switch has exactly one parent, which is what Slurm needs:
+// sharing a tier only widens a branch, it never gives a switch a second parent.
 func (r *NodeTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
 	logger.Info("Starting reconciliation", "node", req.Name)

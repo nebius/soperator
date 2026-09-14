@@ -111,6 +111,27 @@ func TestBuildTopologyBlocks_RenderMergesWorkerNodes(t *testing.T) {
 	}, lines)
 }
 
+// An empty tier-0 label must not become a block named "": the block would hold nodes no worker
+// ever registers into, since both labelsToPath and the worker treat the empty label as absent.
+func TestBuildTopologyBlocks_EmptyTierZeroIsNotABlock(t *testing.T) {
+	labelsByNode := map[string]tc.NodeTopologyLabels{
+		"node1": {"tier-0": "", "tier-1": "leaf1"},
+		"node2": {"tier-0": "block-a"},
+	}
+	gpuPodsByNode := map[string][]string{
+		"node1": {"worker-0"},
+		"node2": {"worker-1"},
+	}
+
+	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode,
+		[]string{"worker-0", "worker-1"}, nil)
+
+	require.Equal(t, []string{
+		"BlockName=block-a Nodes=worker-1",
+		"BlockName=unknown Nodes=worker-0",
+	}, renderedBlockLines(blocks))
+}
+
 // Regression (SCHED-1971): a block name (external tier-0 label) ending in an overflowing decimal
 // run must be terminated so Slurm's hostlist parser does not rewrite it; the worker list stays
 // verbatim.

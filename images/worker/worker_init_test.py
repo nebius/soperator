@@ -88,16 +88,16 @@ class TestFormatSlurmTopology(unittest.TestCase):
         result = worker_init.format_slurm_topology("my-topo:leaf-switch")
         self.assertEqual(result, "topology=my-topo:root:leaf-switch")
 
-    def test_tier_zero_alone_yields_no_tree_unit(self):
-        """tier-0 names a block, not a switch, so a tree topology has nowhere to put the node."""
+    def test_tier_zero_alone_is_the_tree_unit(self):
+        """tier-0 alone is the switch the operator hangs the node off, right under the fabric."""
         result = worker_init.format_slurm_topology("tier-0=switch1")
-        self.assertEqual(result, "")
+        self.assertEqual(result, "topology=default:root:switch1")
 
     def test_tier_format_two_tiers(self):
-        """Two tier format builds full hierarchy: spine first, leaf last."""
+        """Two tier format builds full hierarchy: tier-1 first, the deepest tier last."""
         result = worker_init.format_slurm_topology("tier-1=leaf01,tier-2=spine01")
-        # tier-2 (spine, closer to root) first, tier-1 (leaf) last
-        self.assertEqual(result, "topology=default:root:spine01:leaf01")
+        # tier-1 (closer to the root) first, tier-2 (the switch holding the node) last
+        self.assertEqual(result, "topology=default:root:leaf01:spine01")
 
     def test_tier_format_three_tiers(self):
         """Three tier format builds full hierarchy from top switch to leaf."""
@@ -105,12 +105,12 @@ class TestFormatSlurmTopology(unittest.TestCase):
             "tier-1=leaf01,tier-2=spine01,tier-3=fabric01"
         )
         # tier-3 first, tier-2 second, tier-1 (leaf) last
-        self.assertEqual(result, "topology=default:root:fabric01:spine01:leaf01")
+        self.assertEqual(result, "topology=default:root:leaf01:spine01:fabric01")
 
     def test_tier_format_with_spaces(self):
         """Tier format with spaces is handled correctly."""
         result = worker_init.format_slurm_topology("tier-1 = leaf01 , tier-2 = spine01")
-        self.assertEqual(result, "topology=default:root:spine01:leaf01")
+        self.assertEqual(result, "topology=default:root:leaf01:spine01")
 
     def test_tier_format_unordered(self):
         """Tier format with unordered tiers builds correct hierarchy."""
@@ -118,7 +118,7 @@ class TestFormatSlurmTopology(unittest.TestCase):
             "tier-2=spine01,tier-1=leaf01,tier-3=fabric01"
         )
         # Must be sorted: tier-3, tier-2, tier-1 regardless of input order
-        self.assertEqual(result, "topology=default:root:fabric01:spine01:leaf01")
+        self.assertEqual(result, "topology=default:root:leaf01:spine01:fabric01")
 
     def test_json_format_two_tiers(self):
         """JSON format with two tiers builds full hierarchy: spine first, leaf last."""
@@ -128,7 +128,7 @@ class TestFormatSlurmTopology(unittest.TestCase):
         # tier-2 (spine) first, tier-1 (leaf) last
         self.assertEqual(
             result,
-            "topology=default:root:5df641bb92d51e0dd5d97037fc7e2971:4dcbe855beb5ce19f484ba1a8960929d",
+            "topology=default:root:4dcbe855beb5ce19f484ba1a8960929d:5df641bb92d51e0dd5d97037fc7e2971",
         )
 
     def test_json_format_single_tier(self):
@@ -142,25 +142,32 @@ class TestFormatSlurmTopology(unittest.TestCase):
             '{"tier-1":"leaf01","tier-2":"spine01","tier-3":"fabric01"}'
         )
         # tier-3 first, tier-2 second, tier-1 (leaf) last
-        self.assertEqual(result, "topology=default:root:fabric01:spine01:leaf01")
+        self.assertEqual(result, "topology=default:root:leaf01:spine01:fabric01")
 
     def test_json_format_with_whitespace(self):
         """JSON format with whitespace is handled correctly."""
         result = worker_init.format_slurm_topology(
             '  {"tier-1": "leaf01", "tier-2": "spine01"}  '
         )
-        self.assertEqual(result, "topology=default:root:spine01:leaf01")
+        self.assertEqual(result, "topology=default:root:leaf01:spine01")
 
-    def test_json_format_ignores_tier_zero_in_tree_mode(self):
-        """tier-0 names a block, so the tree path stops at tier-1.
+    def test_json_format_appends_tier_zero_in_tree_mode(self):
+        """tier-0 opens the path, right under the fabric and above tier-1.
 
-        The operator leaves tier-0 out of the tree it writes into the topology config, so
-        including it here would put the node one switch below where the config places it.
+        The operator renders tier-0 as the switch closest to the root, so leaving it out here
+        would register the node under a parent the config does not give it.
         """
         result = worker_init.format_slurm_topology(
-            '{"tier-0":"nvl0","tier-1":"leaf01"}'
+            '{"tier-0":"spine0","tier-1":"leaf01"}'
         )
-        self.assertEqual(result, "topology=default:root:leaf01")
+        self.assertEqual(result, "topology=default:root:spine0:leaf01")
+
+    def test_json_format_without_tier_zero_starts_at_tier_one(self):
+        """Without tier-0 the chain simply starts at tier-1, which sits nearest the root."""
+        result = worker_init.format_slurm_topology(
+            '{"tier-1":"leaf01","tier-2":"spine01"}'
+        )
+        self.assertEqual(result, "topology=default:root:leaf01:spine01")
 
     def test_json_format_block_topology_uses_tier_zero(self):
         """JSON format in block mode uses tier-0 as the block name."""
@@ -185,7 +192,7 @@ class TestFormatSlurmTopology(unittest.TestCase):
             worker_init.TOPOLOGY_PLUGIN_TREE,
             "fab-a",
         )
-        self.assertEqual(result, "topology=default:fab-a:spine01:leaf01")
+        self.assertEqual(result, "topology=default:fab-a:leaf01:spine01")
 
     def test_fabric_key_value_and_bare_forms(self):
         """The fabric also applies to key/value and bare-name inputs."""
@@ -232,6 +239,16 @@ class TestFormatSlurmTopology(unittest.TestCase):
         )
         self.assertEqual(result, "topology=default:block1")
 
+    def test_block_name_is_terminated_like_the_operator(self):
+        """RenderBlocks terminates an overflowing block name, so registration must match it."""
+        result = worker_init.format_slurm_topology(
+            '{"tier-0":"6f84b74219aa22869602735141708147"}',
+            worker_init.TOPOLOGY_PLUGIN_BLOCK,
+        )
+        self.assertEqual(
+            result, "topology=default:6f84b74219aa22869602735141708147_"
+        )
+
     def test_block_topology_requires_tier_zero_for_structured_data(self):
         """Structured block data without tier-0 is rejected."""
         result = worker_init.format_slurm_topology(
@@ -243,6 +260,76 @@ class TestFormatSlurmTopology(unittest.TestCase):
 
 class TestFormatTierTopology(unittest.TestCase):
     """Tests for _format_tier_topology internal function."""
+
+    def test_safe_switch_names_match_operator(self):
+        """The terminator rule must be byte-identical to the operator's slurmSafeSwitchName."""
+        path = (
+            Path(__file__).resolve().parents[2]
+            / "internal/controller/topologyconfcontroller/testdata/safe_switch_names.json"
+        )
+        cases = json.loads(path.read_text())
+        self.assertTrue(cases)
+        for case in cases:
+            with self.subTest(case=case):
+                self.assertEqual(
+                    worker_init._slurm_safe_switch_name(case["name"]), case["safe"]
+                )
+
+    def test_switch_names_are_terminated_like_the_operator(self):
+        """A tier whose name overflows Slurm's decimal parser is terminated on the path too."""
+        result = worker_init._format_tier_topology(
+            {"tier-1": "sw1234567890123456789", "tier-2": "spine1"}
+        )
+        self.assertEqual(result, "topology=default:root:sw1234567890123456789_:spine1")
+
+    def test_broken_tier_chain_registers_on_unknown(self):
+        """An empty tier in the chain sends the node to "unknown", where the operator puts it."""
+        result = worker_init._format_tier_topology(
+            {"tier-0": "spine0", "tier-1": "", "tier-2": "su1"}
+        )
+        self.assertEqual(result, "topology=default:root:unknown")
+
+    def test_missing_tier_in_chain_registers_on_unknown(self):
+        """A tier missing from the chain is refused, exactly as labelsToPath refuses it."""
+        result = worker_init._format_tier_topology({"tier-0": "spine0", "tier-2": "su1"})
+        self.assertEqual(result, "topology=default:root:unknown")
+
+    def test_broken_tier_chain_honours_the_fabric_unknown(self):
+        """A named fabric has its own catch-all switch, and the worker must use that one."""
+        result = worker_init._format_tier_topology(
+            {"tier-0": "spine0", "tier-1": "", "tier-2": "su1"}, "fab-a"
+        )
+        self.assertEqual(result, "topology=default:fab-a:fab-a.unknown")
+
+    def test_tier_value_repeated_at_a_distant_tier_collapses(self):
+        """A repeat two tiers apart is dropped too, and the deepest occurrence is the one kept.
+
+        The operator resolves such labels the same way, so the node registers on the switch the
+        rendered config hangs it off rather than on the switch that sits above it there.
+        """
+        result = worker_init._format_tier_topology(
+            {"tier-1": "sw-a", "tier-2": "sw-b", "tier-3": "sw-a"}
+        )
+        self.assertEqual(result, "topology=default:root:sw-b:sw-a")
+
+    def test_tier_zero_repeating_its_tier_one_collapses(self):
+        """A value repeated across two tiers collapses, as it does in the operator."""
+        result = worker_init._format_tier_topology(
+            {"tier-0": "spine0", "tier-1": "spine0", "tier-2": "su1"}
+        )
+        self.assertEqual(result, "topology=default:root:spine0:su1")
+
+    def test_broken_tier_chain_is_not_shortened_to_its_tier_zero(self):
+        """A broken chain must not be served by dropping the tiers below tier-0.
+
+        The operator refuses the whole path and leaves the node under "unknown"; registering on
+        tier-0 instead would put it on a switch that holds other, correctly labelled nodes.
+        """
+        broken = worker_init._format_tier_topology(
+            {"tier-0": "spine0", "tier-1": "", "tier-2": "su1"}
+        )
+        self.assertEqual(broken, "topology=default:root:unknown")
+        self.assertNotEqual(broken, worker_init._format_tier_topology({"tier-0": "spine0"}))
 
     def test_empty_dict(self):
         """Empty dictionary returns empty string."""
@@ -264,28 +351,52 @@ class TestFormatTierTopology(unittest.TestCase):
         result = worker_init._format_tier_topology(
             {"tier-1": "leaf01", "tier-2": "spine01"}
         )
-        self.assertEqual(result, "topology=default:root:spine01:leaf01")
+        self.assertEqual(result, "topology=default:root:leaf01:spine01")
 
-    def test_tier_zero_excluded_from_tree(self):
-        """tier-0 is the NVL/block domain and is not part of the switch tree."""
+    def test_tier_zero_opens_the_path(self):
+        """tier-0 is the widest domain, so it comes first, right under the fabric."""
         result = worker_init._format_tier_topology(
-            {"tier-0": "nvl0", "tier-1": "leaf01", "tier-2": "spine01"}
+            {"tier-0": "spine0", "tier-1": "leaf01", "tier-2": "su01"}
         )
-        self.assertEqual(result, "topology=default:root:spine01:leaf01")
+        self.assertEqual(result, "topology=default:root:spine0:leaf01:su01")
+
+    def test_tier_zero_alone_is_a_single_level_path(self):
+        """A node labelled with tier-0 only hangs off that switch, right under the fabric."""
+        result = worker_init._format_tier_topology({"tier-0": "spine0"})
+        self.assertEqual(result, "topology=default:root:spine0")
+
+    def test_tier_zero_alone_honours_the_fabric(self):
+        """The fabric stays the top of the path when tier-0 is the only label."""
+        result = worker_init._format_tier_topology({"tier-0": "spine0"}, "fab-a")
+        self.assertEqual(result, "topology=default:fab-a:spine0")
+
+    def test_empty_tier_zero_leaves_the_path_untouched(self):
+        """An empty tier-0 is the same as no tier-0, matching what the operator renders."""
+        result = worker_init._format_tier_topology(
+            {"tier-0": "", "tier-1": "leaf01", "tier-2": "spine01"}
+        )
+        self.assertEqual(result, "topology=default:root:leaf01:spine01")
+
+    def test_unordered_tier_keys_with_tier_zero(self):
+        """Tier keys in any order produce the same path, with tier-0 first."""
+        result = worker_init._format_tier_topology(
+            {"tier-2": "su01", "tier-0": "spine0", "tier-1": "leaf01"}
+        )
+        self.assertEqual(result, "topology=default:root:spine0:leaf01:su01")
 
     def test_three_tiers_builds_hierarchy(self):
         """Three tiers builds full path from fabric to leaf."""
         result = worker_init._format_tier_topology(
             {"tier-1": "leaf01", "tier-2": "spine01", "tier-3": "fabric01"}
         )
-        self.assertEqual(result, "topology=default:root:fabric01:spine01:leaf01")
+        self.assertEqual(result, "topology=default:root:leaf01:spine01:fabric01")
 
     def test_unordered_tier_keys(self):
         """Tier keys in any order produce the same sorted hierarchy."""
         result = worker_init._format_tier_topology(
             {"tier-3": "fabric01", "tier-1": "leaf01", "tier-2": "spine01"}
         )
-        self.assertEqual(result, "topology=default:root:fabric01:spine01:leaf01")
+        self.assertEqual(result, "topology=default:root:leaf01:spine01:fabric01")
 
     def test_non_tier_keys_ignored(self):
         """Non-tier keys are ignored, tier keys used."""
@@ -299,12 +410,17 @@ class TestFormatTierTopology(unittest.TestCase):
         result = worker_init._format_tier_topology({"switch": "sw1", "rack": "r1"})
         self.assertEqual(result, "topology=default:root:sw1")
 
-    def test_invalid_tier_format_ignored(self):
-        """Invalid tier format keys are ignored."""
+    def test_invalid_tier_key_registers_on_unknown(self):
+        """A "tier-" key that is not a number counts as a tier for the operator too.
+
+        labelsToPath counts every "tier-" key except tier-0 and then demands tier-1..tier-N, so a
+        malformed key leaves the chain one short and the node ends up under "unknown". The worker
+        follows it there instead of registering on a switch the config never defines.
+        """
         result = worker_init._format_tier_topology(
             {"tier-abc": "invalid", "tier-1": "leaf01"}
         )
-        self.assertEqual(result, "topology=default:root:leaf01")
+        self.assertEqual(result, "topology=default:root:unknown")
 
     def test_tier_with_hash_value(self):
         """Tier with hash value (real ConfigMap data) builds full hierarchy."""
@@ -317,7 +433,7 @@ class TestFormatTierTopology(unittest.TestCase):
         # tier-2 (spine) first, tier-1 (leaf) last
         self.assertEqual(
             result,
-            "topology=default:root:5df641bb92d51e0dd5d97037fc7e2971:4dcbe855beb5ce19f484ba1a8960929d",
+            "topology=default:root:4dcbe855beb5ce19f484ba1a8960929d:5df641bb92d51e0dd5d97037fc7e2971",
         )
 
 
@@ -958,6 +1074,210 @@ class TestTopologyIntegration(unittest.TestCase):
 
         shutil.rmtree(self.temp_dir)
 
+    @mock.patch("worker_init.write_slurmd_topology")
+    def test_stale_tree_placement_does_not_override_current_labels(self, mock_write):
+        labels = '{"tier-0":"spine0","tier-1":"leaf01","tier-2":"su01"}'
+        (Path(self.configmap_dir) / "gpu-node").write_text(labels)
+        config_path = Path(self.configmap_dir) / "topology.yaml"
+        env = {
+            "HOSTNAME": "worker-0",
+            "K8S_NODE_NAME": "gpu-node",
+            "TOPOLOGY_CONFIGMAP_PATH": self.configmap_dir,
+            "NODESET_GPU_ENABLED": "true",
+            "SLURM_TOPOLOGY_FABRIC": "root",
+        }
+        for stale_switch in ("unknown", "old-leaf"):
+            with self.subTest(stale_switch=stale_switch):
+                config_path.write_text(
+                    "- topology: default\n  tree:\n    switches:\n"
+                    f"        - switch: {stale_switch}\n          nodes: worker-0\n"
+                    f"        - switch: root\n          children: {stale_switch}\n"
+                )
+                with mock.patch.dict(os.environ, env), mock.patch(
+                    "worker_init.wait_for_topology_file", return_value=config_path
+                ):
+                    worker_init.wait_for_topology()
+                mock_write.assert_called_with(
+                    "topology=default:root:spine0:leaf01:su01"
+                )
+
+    def test_rendered_path_is_adopted_when_it_only_adds_parents(self):
+        """A node that names no tier-0 takes the parent the operator gives its switch."""
+        self.assertEqual(
+            worker_init.build_bound_topology(
+                '{"tier-1":"leaf1"}', [("default", "tree")], "root",
+                {"default": "root:spine0:leaf1"},
+            ),
+            "topology=default:root:spine0:leaf1",
+        )
+
+    def test_rendered_path_is_not_adopted_when_it_contradicts_the_labels(self):
+        """A node that names its own tier-0 keeps it, even where the config picked another parent.
+
+        Inconsistent labels can leave one switch reachable through several parents; the resolver
+        then picks one deterministically, and it may be another node's. This node's own labels
+        decide instead.
+        """
+        self.assertEqual(
+            worker_init.build_bound_topology(
+                '{"tier-0":"spine1","tier-1":"leaf1"}', [("default", "tree")], "root",
+                {"default": "root:spine0:leaf1"},
+            ),
+            "topology=default:root:spine1:leaf1",
+        )
+
+    def test_stale_synthetic_leaf_is_not_reused_after_labels_change(self):
+        self.assertEqual(
+            worker_init.build_bound_topology(
+                '{"tier-1":"new-leaf"}', [("default", "tree")], "root",
+                {"default": "root:old-leaf:old-leaf.nodes"},
+            ),
+            "topology=default:root:new-leaf",
+        )
+
+    def test_removed_tier_zero_is_not_reused_as_a_synthetic_leaf(self):
+        self.assertEqual(
+            worker_init.build_bound_topology(
+                '{"tier-1":"leaf1"}', [("default", "tree")], "root",
+                {"default": "root:leaf1:nvl0"},
+            ),
+            "topology=default:root:leaf1",
+        )
+
+    @mock.patch("worker_init.write_slurmd_topology")
+    def test_mixed_tier_zero_registration_matches_operator_fixture(self, mock_write):
+        config_path = (
+            Path(__file__).resolve().parents[2]
+            / "internal/controller/topologyconfcontroller/testdata/mixed_tier_zero.yaml"
+        )
+        # A node without tier-0 still follows the operator's chain, so it does not claim leaf1
+        # as a child of the root while the config hangs it off spine0.
+        cases = [
+            ("worker-0", '{"tier-0":"spine0","tier-1":"leaf1"}', "spine0:leaf1"),
+            ("worker-1", '{"tier-1":"leaf1"}', "spine0:leaf1"),
+            ("worker-2", '{"tier-0":"","tier-1":"leaf1"}', "spine0:leaf1"),
+            ("worker-3", '{"tier-1":"leaf2"}', "leaf2"),
+        ]
+        for hostname, labels, expected in cases:
+            with self.subTest(hostname=hostname):
+                (Path(self.configmap_dir) / "gpu-node").write_text(labels)
+                env = {
+                    "HOSTNAME": hostname,
+                    "K8S_NODE_NAME": "gpu-node",
+                    "TOPOLOGY_CONFIGMAP_PATH": self.configmap_dir,
+                    "NODESET_GPU_ENABLED": "true",
+                    "SLURM_TOPOLOGY_FABRIC": "root",
+                }
+                with mock.patch.dict(os.environ, env), mock.patch(
+                    "worker_init.wait_for_topology_file", return_value=config_path
+                ):
+                    worker_init.wait_for_topology()
+                mock_write.assert_called_with(f"topology=default:root:{expected}")
+
+    def test_synthetic_registration_with_different_upper_paths(self):
+        """The rendered chain is adopted only where it extends what the labels already say.
+
+        In mixed_tier_parents leaf1 is reachable through two spines, so the resolver picks one of
+        them deterministically. A node that names its own tier-0 keeps it instead of inheriting
+        the other node's spine; a node that names none takes the rendered chain whole.
+        """
+        fixtures = (
+            Path(__file__).resolve().parents[2]
+            / "internal/controller/topologyconfcontroller/testdata"
+        )
+        cases = [
+            (
+                "mixed_tier_depth",
+                "worker-1",
+                '{"tier-1":"leaf1"}',
+                "root:spine0:leaf1:leaf1.nodes",
+                "root:spine0:leaf1:leaf1.nodes",
+            ),
+            (
+                "mixed_tier_parents",
+                "worker-1",
+                '{"tier-0":"spine1","tier-1":"leaf1","tier-2":"su1"}',
+                "root:spine0:leaf1:su1",
+                "root:spine1:leaf1:su1",
+            ),
+            (
+                "mixed_tier_parents",
+                "worker-2",
+                '{"tier-0":"","tier-1":"leaf1","tier-2":"su1"}',
+                "root:spine0:leaf1:su1",
+                "root:spine0:leaf1:su1",
+            ),
+        ]
+        for fixture, hostname, labels, rendered, registered in cases:
+            content = (fixtures / f"{fixture}.yaml").read_text()
+            header, *switches = content.split("        - switch: ")
+            reordered = header + "".join(
+                "        - switch: " + switch for switch in reversed(switches)
+            )
+            for config in (content, reordered):
+                with self.subTest(fixture=fixture, hostname=hostname, reordered=config == reordered):
+                    path = Path(self.configmap_dir) / "topology.yaml"
+                    path.write_text(config)
+                    paths = worker_init.parse_tree_topology_paths(path, hostname, "root")
+                    self.assertEqual(paths, {"default": rendered})
+                    self.assertEqual(
+                        worker_init.build_bound_topology(
+                            labels, worker_init.parse_topology_bindings(path, hostname),
+                            "root", paths,
+                        ),
+                        f"topology=default:{registered}",
+                    )
+
+    def test_digit_tail_parent_registration_matches_operator_fixture(self):
+        """A parent the operator terminates must be terminated on the worker side too.
+
+        The fixture is the operator's own output for these labels. Without the terminator the
+        synthetic-leaf match fails and the worker registers onto the raw label -- a name the config
+        does not contain, one level above the leaf that actually holds it.
+        """
+        fixture = (
+            Path(__file__).resolve().parents[2]
+            / "internal/controller/topologyconfcontroller/testdata/digit_tail_parent.yaml"
+        )
+        path = Path(self.configmap_dir) / "topology.yaml"
+        path.write_text(fixture.read_text())
+
+        cases = [
+            (
+                "worker-0",
+                '{"tier-0":"spine0","tier-1":"sw1234567890123456789","tier-2":"su1"}',
+                "root:spine0:sw1234567890123456789_:su1",
+            ),
+            (
+                "worker-1",
+                '{"tier-0":"spine0","tier-1":"sw1234567890123456789"}',
+                "root:spine0:sw1234567890123456789_"
+                ":sw1234567890123456789_.nodes",
+            ),
+        ]
+        for hostname, labels, expected in cases:
+            with self.subTest(hostname=hostname):
+                paths = worker_init.parse_tree_topology_paths(path, hostname, "root")
+                self.assertEqual(paths, {"default": expected})
+                self.assertEqual(
+                    worker_init.build_bound_topology(
+                        labels,
+                        worker_init.parse_topology_bindings(path, hostname),
+                        "root",
+                        paths,
+                    ),
+                    f"topology=default:{expected}",
+                )
+
+    def test_synthetic_leaf_from_another_fabric_is_not_reused(self):
+        self.assertEqual(
+            worker_init.build_bound_topology(
+                '{"tier-1":"leaf1"}', [("default", "tree")], "fab-a",
+                {"default": "fab-b:leaf1:leaf1.nodes"},
+            ),
+            "topology=default:fab-a:leaf1",
+        )
+
     def test_full_flow_read_and_format(self):
         """Test read topology then format builds full hierarchy."""
         node_name = "gpu-node-001"
@@ -974,7 +1294,7 @@ class TestTopologyIntegration(unittest.TestCase):
 
         # Format topology - spine first, leaf last
         formatted = worker_init.format_slurm_topology(result)
-        self.assertEqual(formatted, "topology=default:root:spine01:leaf01")
+        self.assertEqual(formatted, "topology=default:root:leaf01:spine01")
 
     def test_full_flow_json_input(self):
         """Test read JSON topology then format builds full hierarchy."""
@@ -989,7 +1309,7 @@ class TestTopologyIntegration(unittest.TestCase):
         self.assertEqual(result, topology)
 
         formatted = worker_init.format_slurm_topology(result)
-        self.assertEqual(formatted, "topology=default:root:spine01:leaf01")
+        self.assertEqual(formatted, "topology=default:root:leaf01:spine01")
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_config")
     @mock.patch("worker_init.write_slurmd_topology")
@@ -1028,6 +1348,90 @@ class TestTopologyIntegration(unittest.TestCase):
         mock_wait_hostname.assert_called_once_with("worker-0", 180, 5, config_path)
         mock_write.assert_called_once_with("topology=block-nvl72:block1")
 
+    @mock.patch("worker_init.wait_for_hostname_in_topology_config")
+    @mock.patch("worker_init.write_slurmd_topology")
+    def test_wait_for_topology_tree_json_applies_tier_zero(
+        self, mock_write, mock_wait_hostname):
+        """A tree topology registers the node on its tier-0 switch, the one holding it.
+
+        The config below is the shape the operator renders for these labels, so the registered
+        path must end on the switch whose node list contains this worker.
+        """
+        node_name = "gpu-node-004"
+        topology = '{"tier-0":"spine0","tier-1":"leaf01","tier-2":"su01"}'
+
+        node_file = os.path.join(self.configmap_dir, node_name)
+        with open(node_file, "w") as f:
+            f.write(topology)
+
+        config_path = Path(self.configmap_dir) / "topology.yaml"
+        config_path.write_text(
+            "- topology: tree-ib\n"
+            "  tree:\n"
+            "    switches:\n"
+            "        - switch: leaf01\n"
+            "          children: su01\n"
+            "        - switch: root\n"
+            "          children: spine0\n"
+            "        - switch: spine0\n"
+            "          children: leaf01\n"
+            "        - switch: su01\n"
+            "          nodes: worker-0\n"
+        )
+
+        env = {
+            "HOSTNAME": "worker-0",
+            "K8S_NODE_NAME": node_name,
+            "TOPOLOGY_CONFIGMAP_PATH": self.configmap_dir,
+            "NODESET_GPU_ENABLED": "true",
+        }
+        with mock.patch.dict(os.environ, env), mock.patch(
+            "worker_init.wait_for_topology_file", return_value=config_path
+        ):
+            worker_init.wait_for_topology()
+
+        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5, config_path)
+        mock_write.assert_called_once_with("topology=tree-ib:root:spine0:leaf01:su01")
+
+    @mock.patch("worker_init.wait_for_hostname_in_topology_config")
+    @mock.patch("worker_init.write_slurmd_topology")
+    def test_wait_for_topology_tree_json_without_tier_zero(
+        self, mock_write, mock_wait_hostname):
+        """Without tier-0 the node still registers on its tier-1 switch, as it did before."""
+        node_name = "gpu-node-005"
+        topology = '{"tier-1":"leaf01","tier-2":"su01"}'
+
+        node_file = os.path.join(self.configmap_dir, node_name)
+        with open(node_file, "w") as f:
+            f.write(topology)
+
+        config_path = Path(self.configmap_dir) / "topology.yaml"
+        config_path.write_text(
+            "- topology: tree-ib\n"
+            "  tree:\n"
+            "    switches:\n"
+            "        - switch: leaf01\n"
+            "          children: su01\n"
+            "        - switch: root\n"
+            "          children: leaf01\n"
+            "        - switch: su01\n"
+            "          nodes: worker-0\n"
+        )
+
+        env = {
+            "HOSTNAME": "worker-0",
+            "K8S_NODE_NAME": node_name,
+            "TOPOLOGY_CONFIGMAP_PATH": self.configmap_dir,
+            "NODESET_GPU_ENABLED": "true",
+        }
+        with mock.patch.dict(os.environ, env), mock.patch(
+            "worker_init.wait_for_topology_file", return_value=config_path
+        ):
+            worker_init.wait_for_topology()
+
+        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5, config_path)
+        mock_write.assert_called_once_with("topology=tree-ib:root:leaf01:su01")
+
 
 class TestEdgeCases(unittest.TestCase):
     """Tests for edge cases and error handling."""
@@ -1042,20 +1446,24 @@ class TestEdgeCases(unittest.TestCase):
         result = worker_init.format_slurm_topology("default:sw001:rack42")
         self.assertEqual(result, "topology=default:sw001:rack42")
 
-    def test_tier_with_high_numbers(self):
-        """Tier format with high tier numbers builds full hierarchy sorted correctly."""
+    def test_non_contiguous_tiers_register_on_unknown(self):
+        """A gapped tier chain lands on "unknown", which is where the operator puts the node.
+
+        labelsToPath refuses the whole path rather than closing the gap, so the node never gets a
+        switch of its own in the rendered config; registering the gapped path would name switches
+        the config does not contain.
+        """
         result = worker_init.format_slurm_topology(
             "tier-1=leaf01,tier-5=fabric01,tier-10=supernet01"
         )
-        # tier-10 first, tier-5 second, tier-1 (leaf) last
-        self.assertEqual(result, "topology=default:root:supernet01:fabric01:leaf01")
+        self.assertEqual(result, "topology=default:root:unknown")
 
     def test_mixed_tier_and_non_tier_keys(self):
         """Mixed tier and non-tier keys: non-tier keys are ignored."""
         result = worker_init.format_slurm_topology(
             "tier-1=leaf01,other=value,tier-2=spine01"
         )
-        self.assertEqual(result, "topology=default:root:spine01:leaf01")
+        self.assertEqual(result, "topology=default:root:leaf01:spine01")
 
     def test_only_non_tier_keys(self):
         """Only non-tier keys uses first value."""
@@ -1113,29 +1521,58 @@ class TestMainArgparse(unittest.TestCase):
 class TestTopologyMatchesOperatorConfig(unittest.TestCase):
     """The unit a worker registers into must be the one the operator wrote into the config.
 
-    The operator's tree builder drops tier-0 (it names a block, not a switch) and places the node
-    directly under its tier-1 switch. A worker that included tier-0 would register one switch
-    deeper, on a switch the topology config never defines.
+    Tiers descend from the root: tier-0, when the node carries it, hangs off the fabric and the
+    node itself hangs off the highest tier it is labelled with. Without tier-0 the chain simply
+    starts at tier-1.
     """
 
-    LABELS = '{"tier-0":"nvl0","tier-1":"leaf01","tier-2":"spine01"}'
+    LABELS = '{"tier-0":"spine0","tier-1":"leaf01","tier-2":"su01"}'
+    LABELS_WITHOUT_TIER_ZERO = '{"tier-1":"leaf01","tier-2":"su01"}'
+    TIER_ZERO_ONLY = '{"tier-0":"spine0"}'
 
     def test_tree_registration_matches_the_switch_holding_the_node(self):
-        # Operator renders: SwitchName=leaf01 Nodes=<node>, under spine01, under root.
+        # Operator renders: SwitchName=su01 Nodes=<node>, under leaf01, under spine0, under root.
         self.assertEqual(
             worker_init.format_slurm_topology(
                 self.LABELS, worker_init.TOPOLOGY_PLUGIN_TREE, "root"
             ),
-            "topology=default:root:spine01:leaf01",
+            "topology=default:root:spine0:leaf01:su01",
+        )
+
+    def test_tree_registration_without_tier_zero_starts_at_tier_one(self):
+        # Operator renders: SwitchName=su01 Nodes=<node>, under leaf01, under root.
+        self.assertEqual(
+            worker_init.format_slurm_topology(
+                self.LABELS_WITHOUT_TIER_ZERO, worker_init.TOPOLOGY_PLUGIN_TREE, "root"
+            ),
+            "topology=default:root:leaf01:su01",
+        )
+
+    def test_tree_registration_with_tier_zero_alone(self):
+        # Operator renders: SwitchName=spine0 Nodes=<node>, under root.
+        self.assertEqual(
+            worker_init.format_slurm_topology(
+                self.TIER_ZERO_ONLY, worker_init.TOPOLOGY_PLUGIN_TREE, "root"
+            ),
+            "topology=default:root:spine0",
+        )
+
+    def test_tree_registration_under_a_named_fabric(self):
+        # Operator renders the fabric, not "root", as the top of the path.
+        self.assertEqual(
+            worker_init.format_slurm_topology(
+                self.LABELS, worker_init.TOPOLOGY_PLUGIN_TREE, "fab-a"
+            ),
+            "topology=default:fab-a:spine0:leaf01:su01",
         )
 
     def test_block_registration_matches_the_block_holding_the_node(self):
-        # Operator renders: BlockName=nvl0 Nodes=<node>.
+        # Operator renders: BlockName=spine0 Nodes=<node>: the block plugin still groups by tier-0.
         self.assertEqual(
             worker_init.format_slurm_topology(
                 self.LABELS, worker_init.TOPOLOGY_PLUGIN_BLOCK, "root"
             ),
-            "topology=default:nvl0",
+            "topology=default:spine0",
         )
 
 
@@ -1199,6 +1636,52 @@ class TestParseTopologyBindings(unittest.TestCase):
             worker_init.parse_topology_bindings(Path("/nonexistent/topology.yaml"), "h100-0"),
             [],
         )
+
+    def test_rendered_paths_are_scoped_to_each_tree_and_fabric(self):
+        config = (
+            Path(__file__).resolve().parents[2]
+            / "internal/controller/topologyconfcontroller/testdata/mixed_tier_depth.yaml"
+        ).read_text()
+        config = config.replace("switch: root", "switch: fab-a")
+        config += config.replace("topology: default", "topology: second").replace(
+            "leaf1.nodes", "leaf1.nodes1"
+        )
+        config += (
+            "- topology: block-nvl72\n  block:\n    blocks:\n"
+            "        - block: block0\n          nodes: worker-[0-3]\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "topology.yaml"
+            path.write_text(config)
+            paths = worker_init.parse_tree_topology_paths(path, "worker-1", "fab-a")
+            self.assertEqual(paths, {
+                "default": "fab-a:spine0:leaf1:leaf1.nodes",
+                "second": "fab-a:spine0:leaf1:leaf1.nodes1",
+            })
+            self.assertEqual(
+                worker_init.build_bound_topology(
+                    '{"block":"block0","tier-1":"leaf1"}',
+                    worker_init.parse_topology_bindings(path, "worker-1"),
+                    "fab-a",
+                    paths,
+                ),
+                "topology=default:fab-a:spine0:leaf1:leaf1.nodes,"
+                "second:fab-a:spine0:leaf1:leaf1.nodes1,block-nvl72:block0",
+            )
+
+    def test_cyclic_tree_does_not_hang_path_resolution(self):
+        config = (
+            "- topology: tree-ib\n  tree:\n    switches:\n"
+            "        - switch: leaf\n          nodes: worker-0\n"
+            "        - switch: a\n          children: leaf,b\n"
+            "        - switch: b\n          children: a\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "topology.yaml"
+            path.write_text(config)
+            self.assertEqual(
+                worker_init.parse_tree_topology_paths(path, "worker-0", "root"), {}
+            )
 
 
 class TestCpuOnlyWorkerInMultiTopology(unittest.TestCase):

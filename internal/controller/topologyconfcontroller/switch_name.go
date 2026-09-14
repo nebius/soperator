@@ -1,5 +1,8 @@
 package topologyconfcontroller
 
+// maxSwitchNameLength is Slurm's limit for switch names in topology.yaml.
+const maxSwitchNameLength = 64
+
 // maxSafeTrailingDigits is the longest trailing decimal-digit run a switch or block name may end
 // with before Slurm's hostlist parser risks overflowing it. Slurm decomposes every name into a
 // prefix plus a trailing contiguous decimal run and stores that run as a uint64. UINT64_MAX

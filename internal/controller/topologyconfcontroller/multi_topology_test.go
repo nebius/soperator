@@ -142,7 +142,14 @@ func TestBuildTopologyEntry(t *testing.T) {
 
 		require.NotNil(t, entry.Tree)
 		assert.Nil(t, entry.Block)
-		assert.NotEmpty(t, entry.Tree.Switches)
+		// Both plugins read tier-0, but differently: the block plugin groups by it, the tree makes
+		// it the switch closest to the root and descends to tier-1 below it.
+		assert.Equal(t, []switchYAML{
+			{Switch: "block1", Children: "leaf1"},
+			{Switch: "leaf1", Nodes: "h100-0"},
+			{Switch: "root", Children: "block1,unknown"},
+			{Switch: "unknown", Nodes: "h100-1"},
+		}, entry.Tree.Switches)
 	})
 
 	t.Run("unsupported type is rejected", func(t *testing.T) {

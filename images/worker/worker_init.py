@@ -488,11 +488,14 @@ def format_slurm_topology(
     Format topology string for Slurm --conf option.
 
     Input formats for topology/tree:
-      - JSON: '{"tier-1":"switch1","tier-2":"rack1"}' -> "topology=default:root:rack1:switch1"
-        (builds full switch hierarchy: highest tier first, leaf last)
+      - JSON: '{"tier-1":"switch1","tier-2":"rack1"}' -> "topology=default:root:switch1:rack1"
+        (builds full switch hierarchy: tier-1 nearest the root, the highest tier holds the node)
       - "default:switch1" -> "topology=default:root:switch1"
       - "default:sw_root:s1:s2" -> "topology=default:sw_root:s1:s2" (intermediate switches already present)
-      - "tier-0=block1,tier-1=rack1" -> "topology=default:root:rack1" (tier-0 names a block)
+      - "tier-0=spine1,tier-1=rack1" -> "topology=default:root:spine1:rack1"
+        (tier-0, when present, is the switch closest to the root)
+      - "tier-1=,tier-2=rack1" -> "topology=default:root:unknown" (a gapped chain is refused,
+        exactly as the operator refuses it, so the node registers where the operator placed it)
       - "switch1" -> "topology=default:root:switch1"
 
     Input formats for topology/block:
@@ -502,10 +505,10 @@ def format_slurm_topology(
       - "block1" -> "topology=default:block1"
 
     Slurm dynamic topology format: topology=<name>:<switch_near_root>:...<leaf_switch>
-    Tiers are sorted descending so that the highest tier (closest to root/spine) comes
-    first in the path and the lowest tier (leaf) comes last.
+    Tiers are sorted ascending: tier-0 (when present) comes first, right under the fabric, and
+    the highest tier the node is labelled with comes last, as the switch holding it.
 
-    Example with K8s labels tier-1=leaf, tier-2=spine:
+    Example with K8s labels tier-0=spine, tier-1=leaf:
       topology=default:root:spine:leaf
 
     Returns the formatted Slurm Topology string.
@@ -592,7 +595,33 @@ def _format_block_topology(
         logger.warning("Failed to find tier-0 block name in topology data: %s", parts)
         return ""
 
-    return f"topology={topology_name}:{block_name}"
+    # RenderBlocks terminates block names the same way switch names are terminated, so the raw
+    # label would name a block the config does not declare.
+    return f"topology={topology_name}:{_slurm_safe_switch_name(block_name)}"
+
+
+# Slurm's limit for switch names in topology.yaml. Mirrors maxSwitchNameLength in the operator's
+# switch_name.go.
+MAX_SWITCH_NAME_LENGTH: int = 64
+
+# Longest trailing decimal run a switch name may end with before Slurm's hostlist parser risks
+# overflowing it. Mirrors maxSafeTrailingDigits in the operator's switch_name.go.
+MAX_SAFE_TRAILING_DIGITS: int = 18
+
+DIGITS: str = "0123456789"
+
+
+def _slurm_safe_switch_name(name: str) -> str:
+    """Match the operator's slurmSafeSwitchName.
+
+    Slurm parses the trailing decimal run of a name numerically and saturates it once it exceeds
+    uint64, rewriting the name. The operator terminates such names with "_" everywhere it writes
+    them, so a worker registering with the raw label would name a switch the config does not have.
+    """
+    trailing: int = len(name) - len(name.rstrip(DIGITS))
+    if trailing <= MAX_SAFE_TRAILING_DIGITS:
+        return name
+    return name + "_"
 
 
 def _format_tier_topology(
@@ -605,49 +634,72 @@ def _format_tier_topology(
 
     Args:
         parts: Dictionary with tier keys like {"tier-1": "switch1", "tier-2": "rack1"}
+               and, optionally, "tier-0" naming the widest domain the node belongs to.
         fabric: IB fabric / top-of-tree switch name (the operator's per-fabric root).
 
     Returns:
         Formatted Slurm Topology string with the full switch hierarchy.
-        Tiers are ordered from highest number (spine/root-side) down to lowest (leaf),
-        so that slurmctld can build the correct switch tree dynamically.
+        Tiers are ordered from lowest number (root-side) to highest, so the node registers on
+        the deepest switch it is labelled with, the one the rendered config lists it under.
 
     See: https://slurm.schedmd.com/topology.html#dynamic_topo
          Format: Topology=<name>:<switch_near_root>:...:<leaf_switch>
 
     Example:
       - {"tier-1": "leaf00"} -> "topology=default:root:leaf00"
-      - {"tier-1": "leaf00", "tier-2": "spine00"} -> "topology=default:root:spine00:leaf00"
-      - {"tier-0": "block1", "tier-1": "rack1"} -> "topology=default:root:rack1"
+      - {"tier-1": "spine00", "tier-2": "leaf00"} -> "topology=default:root:spine00:leaf00"
+      - {"tier-0": "spine1", "tier-1": "rack1"} -> "topology=default:root:spine1:rack1"
+      - {"tier-0": "spine1"} -> "topology=default:root:spine1"
+      - {"tier-1": "", "tier-2": "rack1"} -> "topology=default:root:unknown"
     """
     if not parts:
         return ""
 
-    # Find all tier keys and their numbers. tier-0 is skipped: it names a block, not a switch,
-    # and the operator leaves it out of the tree it writes into the topology config. Including it
-    # here would register the node one switch below where the config places it.
-    tier_keys: list[tuple[int, str]] = []
-    for k in parts.keys():
-        if k.startswith("tier-") and k != "tier-0":
-            try:
-                tier_num: int = int(k.split("-")[1])
-                tier_keys.append((tier_num, k))
-            except (ValueError, IndexError):
-                continue
-
     fabric = (fabric or "root").strip()
+    root: str = _slurm_safe_switch_name(fabric)
 
-    if tier_keys:
-        # Sort descending: highest tier first (spine/root-side), lowest last (leaf)
-        tier_keys.sort(key=lambda x: x[0], reverse=True)
-        switches: list[str] = [parts[k] for _, k in tier_keys]
-        return f"topology={topology_name}:{fabric}:{':'.join(switches)}"
+    # The tier chain is walked exactly like labelsToPath in the operator: tiers are numbered from
+    # the root down, so tier-0 -- when the node carries it -- opens the path right under the fabric
+    # and the node hangs off the highest tier it is labelled with. "tier-1".."tier-N" must be
+    # contiguous and non-empty; a gap is not repaired by dropping it, since the operator refuses the
+    # whole path and leaves the node on its fabric's catch-all switch, and a repaired path would
+    # name a switch the rendered config does not contain.
+    num_tiers: int = sum(1 for k in parts if k.startswith("tier-") and k != "tier-0")
+    tier_zero: str = parts.get("tier-0", "")
 
-    # tier-0 names a block, not a switch, and the operator leaves it out of the tree; taking it
-    # here would place the node one switch below where the config puts it.
-    switch_values: list[str] = [v for k, v in parts.items() if k != "tier-0"]
+    if num_tiers or tier_zero:
+        # Walked from the deepest tier up to tier-0, exactly as labelsToPath walks it: a name
+        # already on the path is skipped, so a fabric with fewer levels than the label set cannot
+        # make a switch its own ancestor. Keeping the deepest occurrence keeps the node on the
+        # switch the operator hangs it off.
+        path: list[str] = []
+
+        def add(name: str) -> None:
+            safe: str = _slurm_safe_switch_name(name)
+            if safe not in path:
+                path.append(safe)
+
+        for tier in range(num_tiers, 0, -1):
+            value: str = parts.get(f"tier-{tier}", "")
+            if not value:
+                unknown: str = unknown_switch_name(fabric)
+                logger.warning(
+                    "Topology labels %s lack tier-%d, registering on %s where the operator "
+                    "places nodes with an incomplete tier chain",
+                    parts, tier, unknown,
+                )
+                return f"topology={topology_name}:{root}:{_slurm_safe_switch_name(unknown)}"
+            add(value)
+        if tier_zero:
+            add(tier_zero)
+
+        # The path is built node-first; Slurm wants it root-first.
+        switches: list[str] = list(reversed(path))
+        return f"topology={topology_name}:{root}:{':'.join(switches)}"
+
+    switch_values: list[str] = [v for v in parts.values() if v]
     if switch_values:
-        return f"topology={topology_name}:{fabric}:{switch_values[0]}"
+        return f"topology={topology_name}:{root}:{_slurm_safe_switch_name(switch_values[0])}"
 
     return ""
 
@@ -756,6 +808,72 @@ def parse_topology_bindings(path: Path, hostname: str) -> list[tuple[str, str]]:
     return bindings
 
 
+def parse_tree_topology_paths(
+    path: Path, hostname: str, fabric: str
+) -> dict[str, str]:
+    """Resolve rendered root-to-leaf paths, including synthetic leaves for direct workers."""
+    try:
+        content = Path(path).read_text()
+    except (IOError, OSError) as e:
+        logger.warning("Failed to read topology config %s: %s", path, e)
+        return {}
+
+    trees: dict[str, dict[str, dict[str, str]]] = {}
+    name = ""
+    kind = ""
+    switch = ""
+    for raw_line in content.splitlines():
+        line = raw_line.split("#", 1)[0].rstrip()
+        topology_match = re.match(r"^-\s*topology:\s*(\S+)", line)
+        if topology_match:
+            name = topology_match.group(1)
+            kind = ""
+            switch = ""
+            continue
+        kind_match = re.match(r"^\s{2}(tree|block|flat):", line)
+        if kind_match:
+            kind = kind_match.group(1)
+            continue
+        if not name or kind != TOPOLOGY_TYPE_TREE:
+            continue
+        switch_match = re.match(r"\s*-\s*switch:\s*(\S+)", line)
+        if switch_match:
+            switch = switch_match.group(1)
+            trees.setdefault(name, {})[switch] = {}
+            continue
+        field_match = re.match(r"\s+(children|nodes):\s*(\S+)", line)
+        if switch and field_match:
+            trees[name][switch][field_match.group(1)] = field_match.group(2)
+
+    paths: dict[str, str] = {}
+    for name, switches in trees.items():
+        pending = [
+            [switch]
+            for switch, fields in sorted(switches.items(), reverse=True)
+            if fields.get("nodes") == "ALL"
+            or _slurm_hostlist_contains(fields.get("nodes", ""), hostname)
+        ]
+        visited: set[str] = set()
+        while pending:
+            reverse_path = pending.pop()
+            current = reverse_path[-1]
+            if current in visited:
+                continue
+            visited.add(current)
+            parents = [
+                parent
+                for parent, fields in switches.items()
+                if _slurm_hostlist_contains(fields.get("children", ""), current)
+            ]
+            if current == fabric or (not parents and fabric not in switches):
+                paths[name] = ":".join(reversed(reverse_path))
+                break
+            # The stack visits names in ascending order, regardless of YAML switch order.
+            pending.extend(reverse_path + [parent] for parent in sorted(parents, reverse=True))
+
+    return paths
+
+
 def config_has_non_flat_topology(path: Path) -> bool:
     """Return True when topology.yaml declares at least one tree or block topology."""
     try:
@@ -776,8 +894,44 @@ def _topology_spec(formatted: str) -> str:
     return formatted.split("=", 1)[1] if formatted.startswith("topology=") else formatted
 
 
+def _rendered_path_extends_labels(
+    rendered_path: list[str], label_path: list[str]
+) -> bool:
+    """Report whether the rendered path is this node's own path with parents it does not know.
+
+    It is, when every switch the labels name appears at the end of the rendered path in the same
+    order: the operator sees every node's labels, so the tiers it adds above are ones this node is
+    simply not labelled with. Its last element may also be the synthetic leaf the operator adds
+    when one switch holds nodes and child switches at once.
+
+    A rendered path that disagrees with the labels is not adopted. It is either stale -- the node
+    moved and the config still lists the old switch -- or it belongs to another node's chain,
+    which happens when inconsistent labels leave a switch reachable through several parents. In
+    both cases this node keeps the path its own labels describe.
+    """
+    tail: list[str] = rendered_path
+    suffix: re.Match[str] | None = re.search(
+        r"\.nodes(?:[1-9][0-9]*)?$", rendered_path[-1]
+    )
+    if suffix:
+        if len(rendered_path) < 2 or rendered_path[-1] != (
+            rendered_path[-2][: MAX_SWITCH_NAME_LENGTH - len(suffix.group())]
+            + suffix.group()
+        ):
+            return False
+        tail = rendered_path[:-1]
+
+    # Both paths start with the fabric, compared by the caller; only the switches are matched.
+    switches: list[str] = tail[1:]
+    labelled: list[str] = label_path[1:]
+    return len(switches) >= len(labelled) and switches[len(switches) - len(labelled):] == labelled
+
+
 def build_bound_topology(
-    raw_topology: str, bindings: list[tuple[str, str]], fabric: str
+    raw_topology: str,
+    bindings: list[tuple[str, str]],
+    fabric: str,
+    tree_paths: dict[str, str] | None = None,
 ) -> str:
     """Build the Topology= value registering this node into every topology that covers it.
 
@@ -792,6 +946,13 @@ def build_bound_topology(
             TOPOLOGY_PLUGIN_BLOCK if kind == TOPOLOGY_TYPE_BLOCK else TOPOLOGY_PLUGIN_TREE
         )
         formatted: str = format_slurm_topology(raw_topology, plugin, fabric, name)
+        if kind == TOPOLOGY_TYPE_TREE and formatted and tree_paths and name in tree_paths:
+            label_path: list[str] = _topology_spec(formatted).split(":")[1:]
+            rendered_path: list[str] = tree_paths[name].split(":")
+            if rendered_path[0] == label_path[0] and _rendered_path_extends_labels(
+                rendered_path, label_path
+            ):
+                formatted = f"topology={name}:{tree_paths[name]}"
         if formatted:
             specs.append(_topology_spec(formatted))
 
@@ -899,7 +1060,9 @@ def wait_for_topology() -> None:
         )
         time.sleep(poll_interval)
 
-    topology: str = build_bound_topology(raw_topology, bindings, get_topology_fabric())
+    fabric = get_topology_fabric()
+    tree_paths = parse_tree_topology_paths(config_path, hostname, fabric)
+    topology: str = build_bound_topology(raw_topology, bindings, fabric, tree_paths)
     if not topology:
         # No topology places this worker: they are all flat, or none of them covers its NodeSet.
         # It can still run jobs, just without placement optimization, so this is not fatal.
