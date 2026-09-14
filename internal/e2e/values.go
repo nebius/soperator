@@ -59,7 +59,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
 	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
 	tfVars["production"] = false
-	tfVars["company_name"] = "e2e-test"
+	tfVars["company_name"] = e2eCompanyName
 
 	tfVars["filestore_jail"] = map[string]interface{}{
 		"spec": map[string]interface{}{

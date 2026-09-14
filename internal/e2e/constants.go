@@ -1,3 +1,6 @@
 package e2e
 
-const k8sClusterName = "soperator-e2e-test"
+const (
+	e2eCompanyName = "e2e-test"
+	k8sClusterName = "soperator-" + e2eCompanyName
+)
