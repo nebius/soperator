@@ -12,7 +12,7 @@ RUN go mod download
 COPY cmd/soperator-docker-proxy cmd/soperator-docker-proxy
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux \
-    go build -v -o soperator-docker-proxy ./cmd/soperator-docker-proxy
+    go build -trimpath -ldflags='-s -w' -o soperator-docker-proxy ./cmd/soperator-docker-proxy
 
 # https://github.com/nebius/ml-containers/pull/102
 FROM cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260908101311 AS worker_pam_builder
@@ -177,6 +177,7 @@ COPY images/worker/worker_init.py /opt/bin/slurm/
 
 # Copy supervisord entrypoint script
 COPY images/worker/supervisord_entrypoint.sh /opt/bin/slurm/
+COPY images/worker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY images/common/scripts/docker_proxy_entrypoint.sh /opt/bin/slurm/
 COPY images/worker/dockerd_entrypoint.sh /opt/bin/slurm/
 COPY --from=docker_proxy_builder /build/soperator-docker-proxy /usr/bin/soperator-docker-proxy

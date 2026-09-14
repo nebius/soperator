@@ -28,10 +28,11 @@ type NodeSetInfo struct {
 }
 
 type SlurmClusterInfo struct {
-	Name              string
-	Namespace         string
-	AccountingEnabled bool
-	CustomSlurmConfig *string
+	Name               string
+	Namespace          string
+	AccountingEnabled  bool
+	LoginDockerEnabled bool
+	CustomSlurmConfig  *string
 }
 
 type WorkerPodInfo struct {
@@ -57,10 +58,11 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 		return SlurmClusterInfo{}, fmt.Errorf("get SlurmCluster %s/%s: %w", SoperatorNamespace, name, err)
 	}
 	return SlurmClusterInfo{
-		Name:              cluster.Metadata.Name,
-		Namespace:         cluster.Metadata.Namespace,
-		AccountingEnabled: cluster.Spec.SlurmNodes.Accounting.Enabled,
-		CustomSlurmConfig: cluster.Spec.CustomSlurmConfig,
+		Name:               cluster.Metadata.Name,
+		Namespace:          cluster.Metadata.Namespace,
+		AccountingEnabled:  cluster.Spec.SlurmNodes.Accounting.Enabled,
+		LoginDockerEnabled: cluster.Spec.SlurmNodes.Login.Docker.Enabled,
+		CustomSlurmConfig:  cluster.Spec.CustomSlurmConfig,
 	}, nil
 }
 

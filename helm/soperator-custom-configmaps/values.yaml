@@ -7,11 +7,6 @@ enroot:
   useDedicatedImageStorage: true
 
 configMaps:
-  supervisord:
-    enabled: true
-    name: custom-supervisord-config
-    files:
-      - supervisord.conf
   motd:
     enabled: true
     name: motd-nebius-o11y

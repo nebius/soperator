@@ -119,9 +119,11 @@ func renderContainerNodeSetSlurmd(
 		renderVolumeMountSoperatorOutputs(),
 		renderVolumeMountSharedMemory(),
 		renderVolumeMountSysctl(),
-		renderVolumeMountSupervisordConfigMap(),
-		renderVolumeMountSshdConfigs(),
 	}
+	if nodeSet.SupervisorDConfigMapName != "" {
+		volumeMounts = append(volumeMounts, renderVolumeMountSupervisordConfigMap())
+	}
+	volumeMounts = append(volumeMounts, renderVolumeMountSshdConfigs())
 	if nodeSet.ContainerSSSD != nil {
 		volumeMounts = append(volumeMounts,
 			common.RenderVolumeMountSSSDSocket(),

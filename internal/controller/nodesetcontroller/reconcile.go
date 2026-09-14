@@ -353,14 +353,6 @@ func (r NodeSetReconciler) executeReconciliation(
 					return fmt.Errorf("building cluster values: %w", err)
 				}
 
-				if nodeSetValues.SupervisorDConfigMapDefault {
-					desired := worker.RenderDefaultConfigMapSupervisord(clusterValues)
-					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile default supervisord ConfigMap")
-						return fmt.Errorf("reconciling default worker supervisord ConfigMap: %w", err)
-					}
-				}
-
 				if nodeSetValues.SSHDConfigMapDefault {
 					desired := worker.RenderConfigMapSSHDConfigs(clusterValues, consts.ComponentTypeWorker)
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {

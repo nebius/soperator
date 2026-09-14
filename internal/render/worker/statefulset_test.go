@@ -802,6 +802,99 @@ func TestRenderNodeSetStatefulSet_DockerEnabled(t *testing.T) {
 	}
 }
 
+func TestRenderNodeSetStatefulSet_SupervisordConfig(t *testing.T) {
+	createNodeSet := func(configMapName string) *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image:           "test-image",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory:           resource.MustParse("1Gi"),
+						corev1.ResourceCPU:              resource.MustParse("100m"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{Image: "munge-image"},
+			},
+			VolumeSpool: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+			},
+			VolumeJail: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+			},
+			StatefulSet: values.StatefulSet{
+				Replicas: 1,
+			},
+			SupervisorDConfigMapName: configMapName,
+			SSHDConfigMapName:        "sshd-config",
+			GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+		}
+	}
+
+	for _, tt := range []struct {
+		name          string
+		configMapName string
+		wantMount     bool
+	}{
+		{
+			name:      "bundled configuration",
+			wantMount: false,
+		},
+		{
+			name:          "custom ConfigMap override",
+			configMapName: "custom-supervisord",
+			wantMount:     true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := worker.RenderNodeSetStatefulSet(
+				createNodeSet(tt.configMapName),
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				false,
+				false,
+			)
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			slurmd := result.Spec.Template.Spec.Containers[0]
+			if tt.wantMount {
+				assertVolumeMount(
+					t,
+					slurmd.VolumeMounts,
+					consts.VolumeNameSupervisordConfigMap,
+					consts.VolumeMountPathSupervisordConfig,
+				)
+
+				for i := range result.Spec.Template.Spec.Volumes {
+					volume := &result.Spec.Template.Spec.Volumes[i]
+					if volume.Name == consts.VolumeNameSupervisordConfigMap {
+						if assert.NotNil(t, volume.ConfigMap) {
+							assert.Equal(t, tt.configMapName, volume.ConfigMap.Name)
+						}
+						return
+					}
+				}
+				t.Fatalf("volume %s not found", consts.VolumeNameSupervisordConfigMap)
+			}
+
+			assertNoVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameSupervisordConfigMap)
+			for i := range result.Spec.Template.Spec.Volumes {
+				assert.NotEqual(t, consts.VolumeNameSupervisordConfigMap, result.Spec.Template.Spec.Volumes[i].Name)
+			}
+		})
+	}
+}
+
 func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 	createNodeSet := func() *values.SlurmNodeSet {
 		return &values.SlurmNodeSet{

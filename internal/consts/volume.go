@@ -28,10 +28,8 @@ const (
 	userIsolation          = "user-isolation"
 	userIsolationConfFile  = userIsolation + ".conf"
 
-	sysctl              = "sysctl"
-	sysctlConfFile      = sysctl + ".conf"
-	supervisord         = "supervisord"
-	supervisordConfFile = supervisord + ".conf"
+	sysctl         = "sysctl"
+	sysctlConfFile = sysctl + ".conf"
 
 	slurmdbdSSLCACertificate = "slurmdbd-ssl-ca-cert"
 	slurmdbdSSLClientKey     = "slurmdbd-ssl-client-key"

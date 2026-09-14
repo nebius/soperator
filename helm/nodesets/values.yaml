@@ -266,7 +266,7 @@ nodesets:
     sssdConfSecretRefName: ""
     sssdLdapCAConfigMapRefName: ""
     # Name of the custom SupervisorD config ConfigMap
-    # Optional, defaults to empty string (use default SupervisorD config)
+    # Optional, defaults to empty string (use the SupervisorD config bundled with the worker image)
     configMapRefSupervisord: ""
     # Name of the custom SSHD config ConfigMap
     # Optional, defaults to empty string (use default SSHD config)

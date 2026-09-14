@@ -159,7 +159,7 @@ func TestRenderStatefulSet_PriorityClass(t *testing.T) {
 
 func TestRenderStatefulSetDocker(t *testing.T) {
 	t.Run("disabled preserves the existing pod shape", func(t *testing.T) {
-		podSpec, err := renderTestLogin(newTestLogin(false, false), false)
+		podSpec, err := renderTestLogin(newTestLogin(false, false))
 		if err != nil {
 			t.Fatalf("RenderStatefulSet() error = %v", err)
 		}
@@ -175,7 +175,7 @@ func TestRenderStatefulSetDocker(t *testing.T) {
 	})
 
 	t.Run("enabled requires image storage", func(t *testing.T) {
-		_, err := renderTestLogin(newTestLogin(true, false), false)
+		_, err := renderTestLogin(newTestLogin(true, false))
 		if err == nil {
 			t.Fatal("RenderStatefulSet() error = nil, want missing image-storage error")
 		}
@@ -184,7 +184,7 @@ func TestRenderStatefulSetDocker(t *testing.T) {
 	t.Run("enabled requires user isolation", func(t *testing.T) {
 		login := newTestLogin(true, true)
 		login.UserIsolation = nil
-		_, err := renderTestLogin(login, false)
+		_, err := renderTestLogin(login)
 		if err == nil {
 			t.Fatal("RenderStatefulSet() error = nil, want missing user-isolation error")
 		}
@@ -193,7 +193,7 @@ func TestRenderStatefulSetDocker(t *testing.T) {
 	t.Run("reserved Docker environment is rejected", func(t *testing.T) {
 		login := newTestLogin(false, false)
 		login.ContainerSshd.CustomEnv = []corev1.EnvVar{{Name: consts.EnvDockerEnabled, Value: "true"}}
-		_, err := renderTestLogin(login, false)
+		_, err := renderTestLogin(login)
 		if err == nil {
 			t.Fatal("RenderStatefulSet() error = nil, want reserved environment error")
 		}
@@ -202,14 +202,14 @@ func TestRenderStatefulSetDocker(t *testing.T) {
 	t.Run("enabled rejects read-only image storage", func(t *testing.T) {
 		login := newTestLogin(true, true)
 		login.JailSubMounts[0].ReadOnly = true
-		_, err := renderTestLogin(login, false)
+		_, err := renderTestLogin(login)
 		if err == nil {
 			t.Fatal("RenderStatefulSet() error = nil, want read-only image-storage error")
 		}
 	})
 
 	t.Run("enabled keeps one container and mounts storage directly", func(t *testing.T) {
-		podSpec, err := renderTestLogin(newTestLogin(true, true), false)
+		podSpec, err := renderTestLogin(newTestLogin(true, true))
 		if err != nil {
 			t.Fatalf("RenderStatefulSet() error = %v", err)
 		}
@@ -265,12 +265,12 @@ func newTestLogin(dockerEnabled, withStorage bool) *values.SlurmLogin {
 	return login
 }
 
-func renderTestLogin(login *values.SlurmLogin, compileIntoContainer bool) (corev1.PodSpec, error) {
+func renderTestLogin(login *values.SlurmLogin) (corev1.PodSpec, error) {
 	desiredReplicas := login.StatefulSet.Replicas
 	result, err := RenderStatefulSet(
 		"test-namespace",
 		"test-cluster",
-		compileIntoContainer,
+		false,
 		[]slurmv1.K8sNodeFilter{{Name: "test-filter"}},
 		&slurmv1.Secrets{},
 		[]slurmv1.VolumeSource{{

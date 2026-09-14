@@ -273,7 +273,7 @@ type NodeSetSpec struct {
 	// When Docker is enabled, the custom config must start both dockerd_entrypoint.sh and
 	// docker_proxy_entrypoint.sh in worker mode.
 	//
-	// If omitted, the default name and values of config will be used.
+	// If omitted, the configuration bundled with the worker image will be used.
 	//
 	// +kubebuilder:validation:Optional
 	ConfigMapRefSupervisord string `json:"configMapRefSupervisord,omitempty"`

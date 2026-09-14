@@ -9,21 +9,6 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-func TestGenerateDefaultSupervisordConfig_StartsSSHDDirectly(t *testing.T) {
-	rendered := generateDefaultSupervisordConfig().Render()
-
-	assert.Contains(t, rendered, "command=/usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config")
-	assert.NotContains(t, rendered, "sshd_pam_jail_entrypoint.sh")
-}
-
-func TestGenerateDefaultSupervisordConfig_StartsDockerThroughGuardedLaunchers(t *testing.T) {
-	rendered := generateDefaultSupervisordConfig().Render()
-
-	assert.Contains(t, rendered, "command=/opt/bin/slurm/dockerd_entrypoint.sh chroot /mnt/jail /usr/bin/dockerd")
-	assert.Contains(t, rendered, "command=/opt/bin/slurm/docker_proxy_entrypoint.sh worker")
-	assert.NotContains(t, rendered, "docker_proxy_nginx_entrypoint.sh")
-}
-
 func TestGenerateSshdConfig_AuthorizedKeysCommandDependsOnSSSD(t *testing.T) {
 	login := &values.SlurmLogin{
 		ContainerSshd: values.Container{

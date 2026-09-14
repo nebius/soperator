@@ -32,8 +32,7 @@ type SlurmNodeSet struct {
 	CustomInitContainers      []corev1.Container
 	AppArmorProfileUseDefault bool
 
-	SupervisorDConfigMapDefault bool
-	SupervisorDConfigMapName    string
+	SupervisorDConfigMapName string
 
 	SSHDConfigMapDefault    bool
 	SSHDConfigMapName       string
@@ -166,20 +165,7 @@ func BuildSlurmNodeSetFrom(
 	}
 	// endregion Submounts
 
-	// region SupervisorDConfig
-	{
-		var (
-			supervisordConfigMapName = nsSpec.ConfigMapRefSupervisord
-			supervisordConfigDefault = false
-		)
-		if nsSpec.ConfigMapRefSupervisord == "" {
-			supervisordConfigDefault = true
-			supervisordConfigMapName = naming.BuildConfigMapSupervisordName(clusterName)
-		}
-		res.SupervisorDConfigMapName = supervisordConfigMapName
-		res.SupervisorDConfigMapDefault = supervisordConfigDefault
-	}
-	// endregion SupervisorDConfig
+	res.SupervisorDConfigMapName = nsSpec.ConfigMapRefSupervisord
 
 	// region SSHDConfig
 	{
