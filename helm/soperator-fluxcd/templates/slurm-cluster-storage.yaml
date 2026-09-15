@@ -21,9 +21,6 @@ spec:
   dependsOn:
   - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   - name: {{ include "soperator-fluxcd.fullname" . }}-storageclasses
-  {{- if .Values.soperator.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
-  {{- end }}
   install:
     {{- toYaml .Values.slurmCluster.slurmClusterStorage.install | nindent 4 }}
   upgrade:
