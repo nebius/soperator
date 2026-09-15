@@ -36,8 +36,7 @@ func emptyBackupsBucket(ctx context.Context, bucketName string) error {
 		return fmt.Errorf("find aws CLI: %w", err)
 	}
 
-	if err := exec.CommandContext(ctx, "aws", "s3api", "head-bucket", "--bucket", bucketName).Run(); err != nil {
-		log.Printf("Backups bucket %s does not exist or is not accessible, skipping object cleanup", bucketName)
+	if !backupsBucketAccessible(ctx, bucketName) {
 		return nil
 	}
 
@@ -48,4 +47,12 @@ func emptyBackupsBucket(ctx context.Context, bucketName string) error {
 	}
 	log.Printf("Backups bucket %s emptied", bucketName)
 	return nil
+}
+
+func backupsBucketAccessible(ctx context.Context, bucketName string) bool {
+	if err := exec.CommandContext(ctx, "aws", "s3api", "head-bucket", "--bucket", bucketName).Run(); err != nil {
+		log.Printf("Backups bucket %s does not exist or is not accessible, skipping object cleanup", bucketName)
+		return false
+	}
+	return true
 }
