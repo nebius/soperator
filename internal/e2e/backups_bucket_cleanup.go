@@ -22,21 +22,30 @@ const backupsBucketName = k8sClusterName + "-backups"
 // The AWS CLI is pre-configured by the calling workflow step with the bucket's
 // region and nebius storage endpoint, so we just shell out.
 func bestEffortEmptyBackupsBucket(ctx context.Context) {
+	if err := emptyBackupsBucket(ctx, backupsBucketName); err != nil {
+		log.Printf("Best-effort empty of bucket %s failed: %v", backupsBucketName, err)
+	}
+}
+
+func prepareBackupsBucketDelete(ctx context.Context, resource cloudResource) error {
+	return emptyBackupsBucket(ctx, resource.Metadata.Name)
+}
+
+func emptyBackupsBucket(ctx context.Context, bucketName string) error {
 	if _, err := exec.LookPath("aws"); err != nil {
-		log.Printf("aws CLI not found, skipping pre-init backups bucket cleanup: %v", err)
-		return
+		return fmt.Errorf("find aws CLI: %w", err)
 	}
 
-	if err := exec.CommandContext(ctx, "aws", "s3api", "head-bucket", "--bucket", backupsBucketName).Run(); err != nil {
-		log.Printf("Backups bucket %s does not exist or is not accessible, skipping pre-init cleanup", backupsBucketName)
-		return
+	if err := exec.CommandContext(ctx, "aws", "s3api", "head-bucket", "--bucket", bucketName).Run(); err != nil {
+		log.Printf("Backups bucket %s does not exist or is not accessible, skipping object cleanup", bucketName)
+		return nil
 	}
 
-	log.Printf("Emptying backups bucket %s before init-time destroy", backupsBucketName)
-	out, err := exec.CommandContext(ctx, "aws", "s3", "rm", fmt.Sprintf("s3://%s/", backupsBucketName), "--recursive").CombinedOutput()
+	log.Printf("Emptying backups bucket %s", bucketName)
+	out, err := exec.CommandContext(ctx, "aws", "s3", "rm", fmt.Sprintf("s3://%s/", bucketName), "--recursive").CombinedOutput()
 	if err != nil {
-		log.Printf("Best-effort empty of bucket %s failed: %v\nOutput: %s", backupsBucketName, err, string(out))
-		return
+		return fmt.Errorf("empty backups bucket %s: %w\nOutput: %s", bucketName, err, string(out))
 	}
-	log.Printf("Backups bucket %s emptied", backupsBucketName)
+	log.Printf("Backups bucket %s emptied", bucketName)
+	return nil
 }

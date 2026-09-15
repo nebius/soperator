@@ -38,6 +38,16 @@ func TestCleanupOrphanedCloudResourcesDeletesKnownKindsInDependencyOrder(t *test
 	t.Parallel()
 
 	const projectID = "project-man-h100"
+	var prepared []string
+	kinds := append([]orphanResourceKind(nil), orphanResourceKinds...)
+	for i := range kinds {
+		if kinds[i].prepareDelete != nil {
+			kinds[i].prepareDelete = func(_ context.Context, resource cloudResource) error {
+				prepared = append(prepared, resource.Metadata.Name)
+				return nil
+			}
+		}
+	}
 	script := []scriptedNebiusCommand{
 		{
 			args:   "mk8s cluster list --parent-id project-man-h100 --all --format json",
@@ -45,6 +55,12 @@ func TestCleanupOrphanedCloudResourcesDeletesKnownKindsInDependencyOrder(t *test
 		},
 		{args: "mk8s cluster delete --id mk8s-1 --async --no-progress"},
 		{args: "mk8s cluster list --parent-id project-man-h100 --all --format json", output: resourceListJSON()},
+		{
+			args:   "compute nvl-instance-group list --parent-id project-man-h100 --all --format json",
+			output: resourceListJSON(resource("nvl-1", k8sClusterName+"-worker-rack0")),
+		},
+		{args: "compute nvl-instance-group delete --id nvl-1 --async --no-progress"},
+		{args: "compute nvl-instance-group list --parent-id project-man-h100 --all --format json", output: resourceListJSON()},
 		{
 			args:   "compute gpu-cluster list --parent-id project-man-h100 --all --format json",
 			output: resourceListJSON(resource("gpu-1", k8sClusterName+"-fabric-4")),
@@ -67,18 +83,31 @@ func TestCleanupOrphanedCloudResourcesDeletesKnownKindsInDependencyOrder(t *test
 		},
 		{args: "vpc allocation delete --id allocation-1 --async --no-progress"},
 		{args: "vpc allocation list --parent-id project-man-h100 --all --format json", output: resourceListJSON()},
+		{
+			args:   "storage bucket list --parent-id project-man-h100 --all --format json",
+			output: resourceListJSON(resource("bucket-1", backupsBucketName)),
+		},
+		{args: "storage bucket delete --id bucket-1 --ttl 0s --async --no-progress"},
+		{args: "storage bucket list --parent-id project-man-h100 --all --format json", output: resourceListJSON()},
+		{
+			args:   "iam service-account list --parent-id project-man-h100 --all --format json",
+			output: resourceListJSON(resource("sa-1", k8sClusterName+"-backup-sa")),
+		},
+		{args: "iam service-account delete --id sa-1 --async --no-progress"},
+		{args: "iam service-account list --parent-id project-man-h100 --all --format json", output: resourceListJSON()},
 	}
 	runner := newScriptedNebiusRunner(t, script)
 
 	err := cleanupOrphanedCloudResourcesWith(
 		context.Background(),
 		projectID,
-		orphanResourceKinds,
+		kinds,
 		runner,
 		func(context.Context) error { return nil },
 	)
 
 	require.NoError(t, err)
+	assert.Equal(t, []string{backupsBucketName}, prepared)
 }
 
 func TestCleanupOrphanedCloudResourcesRejectsEmptyProjectID(t *testing.T) {
@@ -154,6 +183,48 @@ func TestCleanupOrphanedCloudResourcesRetriesDeleteFailure(t *testing.T) {
 	)
 
 	require.NoError(t, err)
+}
+
+func TestCleanupOrphanedCloudResourcesRetriesPrepareFailure(t *testing.T) {
+	t.Parallel()
+
+	prepareCalls := 0
+	kind := orphanResourceKind{
+		name:        "storage bucket",
+		commandPath: []string{"storage", "bucket"},
+		deleteArgs:  []string{"--ttl", "0s"},
+		prepareDelete: func(context.Context, cloudResource) error {
+			prepareCalls++
+			if prepareCalls == 1 {
+				return errors.New("bucket is still receiving objects")
+			}
+			return nil
+		},
+	}
+	script := []scriptedNebiusCommand{
+		{
+			args:   "storage bucket list --parent-id project-man-h200 --all --format json",
+			output: resourceListJSON(resource("bucket-1", backupsBucketName)),
+		},
+		{
+			args:   "storage bucket list --parent-id project-man-h200 --all --format json",
+			output: resourceListJSON(resource("bucket-1", backupsBucketName)),
+		},
+		{args: "storage bucket delete --id bucket-1 --ttl 0s --async --no-progress"},
+		{args: "storage bucket list --parent-id project-man-h200 --all --format json", output: resourceListJSON()},
+	}
+	runner := newScriptedNebiusRunner(t, script)
+
+	err := cleanupOrphanedCloudResourcesWith(
+		context.Background(),
+		"project-man-h200",
+		[]orphanResourceKind{kind},
+		runner,
+		func(context.Context) error { return nil },
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, 2, prepareCalls)
 }
 
 func TestCleanupOrphanedCloudResourcesFailsWhenResourceRemains(t *testing.T) {

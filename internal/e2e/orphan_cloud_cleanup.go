@@ -14,15 +14,25 @@ import (
 const orphanCleanupPollInterval = 15 * time.Second
 
 type orphanResourceKind struct {
-	name        string
-	commandPath []string
+	name          string
+	commandPath   []string
+	deleteArgs    []string
+	prepareDelete func(context.Context, cloudResource) error
 }
 
 var orphanResourceKinds = []orphanResourceKind{
 	{name: "MK8s cluster", commandPath: []string{"mk8s", "cluster"}},
+	{name: "NVLink instance group", commandPath: []string{"compute", "nvl-instance-group"}},
 	{name: "GPU cluster", commandPath: []string{"compute", "gpu-cluster"}},
 	{name: "filesystem", commandPath: []string{"compute", "filesystem"}},
 	{name: "VPC allocation", commandPath: []string{"vpc", "allocation"}},
+	{
+		name:          "storage bucket",
+		commandPath:   []string{"storage", "bucket"},
+		deleteArgs:    []string{"--ttl", "0s"},
+		prepareDelete: prepareBackupsBucketDelete,
+	},
+	{name: "service account", commandPath: []string{"iam", "service-account"}},
 }
 
 type cloudResource struct {
@@ -85,6 +95,19 @@ func cleanupOrphanedResourceKind(
 		}
 
 		for _, resource := range resources {
+			if kind.prepareDelete != nil {
+				if err := kind.prepareDelete(ctx, resource); err != nil {
+					log.Printf(
+						"Prepare orphaned %s %s (%s) for deletion failed, will retry: %v",
+						kind.name,
+						resource.Metadata.Name,
+						resource.Metadata.ID,
+						err,
+					)
+					continue
+				}
+			}
+
 			log.Printf(
 				"Deleting orphaned %s: name=%s id=%s project=%s",
 				kind.name,
@@ -96,9 +119,9 @@ func cleanupOrphanedResourceKind(
 			args = append(args,
 				"delete",
 				"--id", resource.Metadata.ID,
-				"--async",
-				"--no-progress",
 			)
+			args = append(args, kind.deleteArgs...)
+			args = append(args, "--async", "--no-progress")
 			if output, err := run(ctx, args...); err != nil {
 				log.Printf(
 					"Delete orphaned %s %s (%s) failed, will retry: %v\nOutput: %s",
