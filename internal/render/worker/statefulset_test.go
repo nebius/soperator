@@ -1066,7 +1066,8 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 					"UpdateStrategy.RollingUpdate.MaxUnavailable should mirror StatefulSet.MaxUnavailable")
 			}
 
-			assert.Equal(t, "false", result.Labels[consts.LabelSoperatorRollingUpdateEnabled])
+			assert.Equal(t, appsv1.RollingUpdateStatefulSetStrategyType, result.Spec.UpdateStrategy.Type)
+			assert.Equal(t, consts.LabelWorkerValue, result.Labels[consts.LabelWorkerKey])
 		})
 	}
 
@@ -1085,7 +1086,7 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 		assert.Equal(t, appsv1.OnDeleteStatefulSetStrategyType, result.Spec.UpdateStrategy.Type)
 		assert.Nil(t, result.Spec.UpdateStrategy.RollingUpdate)
 		assert.Equal(t, kruisev1b1.OnPVCDeleteVolumeClaimUpdateStrategyType, result.Spec.VolumeClaimUpdateStrategy.Type)
-		assert.Equal(t, consts.LabelSoperatorRollingUpdateValue, result.Labels[consts.LabelSoperatorRollingUpdateEnabled])
+		assert.Equal(t, consts.LabelWorkerValue, result.Labels[consts.LabelWorkerKey])
 		assert.Equal(t, intstr.FromString("20%"), *result.Spec.ScaleStrategy.MaxUnavailable)
 	})
 

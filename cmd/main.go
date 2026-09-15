@@ -140,10 +140,11 @@ func main() {
 		soperatorNamespace   string
 		controllersFlag      string
 
-		cacheSyncTimeout time.Duration
-		maxConcurrency   int
-		restConfigQPS    float64
-		restConfigBurst  int
+		cacheSyncTimeout          time.Duration
+		maxConcurrency            int
+		restConfigQPS             float64
+		restConfigBurst           int
+		requeueAfterRollingUpdate time.Duration
 	)
 
 	var watchNsCacheByName map[string]cache.Config
@@ -171,6 +172,7 @@ func main() {
 	flag.StringVar(&logFormat, "log-format", "json", "Log format: plain or json")
 	flag.StringVar(&logLevel, "log-level", "info", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
+	flag.DurationVar(&requeueAfterRollingUpdate, "requeue-after-rolling-update", time.Minute, "The interval between rolling update reconciliations for each worker NodeSet")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.StringVar(&controllersFlag, "controllers", "", "A comma-separated list of controllers to enable or disable. Use '*' for all, and '-name' to disable. Overrides SLURM_OPERATOR_CONTROLLERS if set.")
 	flag.Float64Var(&restConfigQPS, "rest-config-qps", 30, "Kubernetes API requests per second shared by manager clients")
@@ -347,6 +349,7 @@ func main() {
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(updatecontroller.RollingUpdateControllerName),
 			slurmAPIClients,
+			requeueAfterRollingUpdate,
 		).
 			SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create controller", "controller", updatecontroller.RollingUpdateControllerName)

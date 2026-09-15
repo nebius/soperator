@@ -26,6 +26,7 @@ import (
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -60,7 +61,7 @@ const (
 	workerUpdateActionWait
 	workerUpdateActionTrackInFlight
 	workerUpdateActionUndrain
-	workerUpdateActionDelete
+	workerUpdateActionCompleteHandoff
 )
 
 type workerUpdateDecision struct {
@@ -71,125 +72,93 @@ type workerUpdateDecision struct {
 	managedRebootInProgress bool
 }
 
+type workerReplacement struct {
+	pod             corev1.Pod
+	operationID     string
+	k8sNodeCordoned bool
+}
+
+type workerHandoffProgress struct {
+	pending                  []workerReplacement
+	readyPodsConsumingBudget int
+}
+
 type RollingUpdateReconciler struct {
 	*reconciler.Reconciler
 
 	slurmAPIClients *slurmapi.ClientSet
+	requeueAfter    time.Duration
 }
 
 func NewRollingUpdateReconciler(
 	client client.Client, scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
+	requeueAfter time.Duration,
 ) *RollingUpdateReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	return &RollingUpdateReconciler{
 		Reconciler:      r,
 		slurmAPIClients: slurmAPIClients,
+		requeueAfter:    requeueAfter,
 	}
 }
 
-// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets/finalizers,verbs=update
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.0/pkg/reconcile
+// Reconcile advances the periodic rollout loop for one NodeSet's worker StatefulSet.
 func (r *RollingUpdateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithName("rolling-update-reconciler")
-	logger.Info("reconciling statefulset", "namespace", req.Namespace, "name", req.Name)
+	logger := log.FromContext(ctx).WithName("rolling-update-reconciler").
+		WithValues("namespace", req.Namespace, "name", req.Name)
+	result := ctrl.Result{RequeueAfter: r.requeueAfter}
 
+	// Returning an error would replace the configured interval with retry backoff.
 	sts := &kruisev1b1.StatefulSet{}
-	err := r.Get(ctx, req.NamespacedName, sts)
-	if err != nil {
-		if client.IgnoreNotFound(err) == nil {
-			logger.Info("statefulset not found, might be deleted", "namespace", req.Namespace, "name", req.Name)
+	if err := r.Get(ctx, req.NamespacedName, sts); err != nil {
+		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, err
+		logger.Error(err, "Get worker StatefulSet")
+		return result, nil
 	}
-
-	if !rollingUpdateEnabled(sts) {
-		logger.Info("rolling update is disabled", "namespace", req.Namespace, "name", req.Name)
+	if !rollingUpdateEnabled(sts) || sts.DeletionTimestamp != nil {
 		return ctrl.Result{}, nil
 	}
-
-	labels := sts.GetLabels()
-	clusterName, ok := labels[consts.LabelInstanceKey]
-	if !ok || clusterName == "" {
-		return ctrl.Result{}, fmt.Errorf("missing cluster name label %s on statefulset %s/%s", consts.LabelInstanceKey, sts.Namespace, sts.Name)
+	if err := r.reconcileWorkerStatefulSet(ctx, sts); err != nil {
+		logger.Error(err, "Reconcile worker StatefulSet")
 	}
+	return result, nil
+}
 
-	replicas := defaultSTSReplicasCount
-	if sts.Spec.Replicas != nil {
-		replicas = *sts.Spec.Replicas
+func (r *RollingUpdateReconciler) reconcileWorkerStatefulSet(ctx context.Context, sts *kruisev1b1.StatefulSet) error {
+	clusterName := sts.Labels[consts.LabelInstanceKey]
+	if clusterName == "" {
+		return fmt.Errorf("read cluster name label %s on statefulset %s/%s", consts.LabelInstanceKey, sts.Namespace, sts.Name)
 	}
 
 	podList, err := r.getPodList(ctx, sts)
 	if err != nil {
-		return ctrl.Result{}, err
+		return err
 	}
-
-	if sts.Status.UpdatedReplicas == replicas {
-		undrainedNodes, err := r.cleanupStaleRollingUpdateDrains(ctx, clusterName, sts, podList)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if undrainedNodes > 0 {
-			return ctrl.Result{RequeueAfter: time.Second}, nil
-		}
-
-		logger.Info("statefulset is up to date", "namespace", req.Namespace, "name", req.Name)
-		return ctrl.Result{}, nil
+	k8sNodeCordonStates, err := r.getK8sNodeCordonStates(ctx, podList)
+	if err != nil {
+		return err
 	}
-
-	outdatedPodList := filterOutdatedPods(podList, sts.Status.UpdateRevision)
-
-	operationID := sts.Status.UpdateRevision
-	if operationID == "" {
-		return ctrl.Result{}, fmt.Errorf("missing update revision on statefulset %s/%s", sts.Namespace, sts.Name)
+	replacements := planWorkerPodReplacements(sts, podList, k8sNodeCordonStates)
+	if len(replacements) == 0 {
+		return r.cleanupStaleRollingUpdateDrains(ctx, clusterName, sts, podList)
 	}
-
-	if err := r.processRollingUpdate(ctx, clusterName, operationID, sts, outdatedPodList); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{RequeueAfter: time.Minute}, nil
-}
-
-func filterOutdatedPods(podList []corev1.Pod, updateRevision string) []corev1.Pod {
-	var res []corev1.Pod
-
+	// StatefulSet status can lag behind pod events, particularly just after eviction.
+	readyReplicas := int32(0)
 	for _, pod := range podList {
-		podControllerRevisionHash := pod.Labels["controller-revision-hash"]
-		if podControllerRevisionHash == updateRevision {
-			continue
-		}
-
-		res = append(res, pod)
-	}
-
-	return res
-}
-
-func indexSlurmNodesForPods(slurmNodes []slurmapi.Node, pods []corev1.Pod) map[string]slurmapi.Node {
-	podNames := make(map[string]struct{}, len(pods))
-	for _, pod := range pods {
-		podNames[pod.Name] = struct{}{}
-	}
-
-	nodesByName := make(map[string]slurmapi.Node, len(pods))
-	for _, node := range slurmNodes {
-		if _, found := podNames[node.Name]; found {
-			nodesByName[node.Name] = node
+		if pod.DeletionTimestamp == nil && podReady(&pod) {
+			readyReplicas++
 		}
 	}
-
-	return nodesByName
+	sts.Status.ReadyReplicas = min(sts.Status.ReadyReplicas, readyReplicas)
+	return r.processWorkerReplacements(ctx, clusterName, sts, replacements)
 }
 
 func (r *RollingUpdateReconciler) getPodList(
@@ -209,179 +178,246 @@ func (r *RollingUpdateReconciler) getPodList(
 		return nil, fmt.Errorf("failed to list pods: %w", err)
 	}
 
-	return podList.Items, nil
+	var pods []corev1.Pod
+	for _, pod := range podList.Items {
+		if metav1.IsControlledBy(&pod, sts) {
+			pods = append(pods, pod)
+		}
+	}
+	return pods, nil
 }
 
-func (r *RollingUpdateReconciler) processRollingUpdate(
+func planWorkerPodReplacements(
+	sts *kruisev1b1.StatefulSet, pods []corev1.Pod, k8sNodeCordonStates map[string]bool,
+) []workerReplacement {
+	var replacements []workerReplacement
+	for _, pod := range pods {
+		if !metav1.IsControlledBy(&pod, sts) {
+			continue
+		}
+		k8sNodeCordoned := k8sNodeCordonStates[pod.Spec.NodeName]
+		operationID := pod.Labels[consts.LabelSoperatorWorkerOperationID]
+		phase := pod.Labels[consts.LabelSoperatorWorkerOperationPhase]
+		hasActiveHandoff := operationID != "" &&
+			(phase == consts.LabelSoperatorWorkerOperationPhaseStopping || phase == consts.LabelSoperatorWorkerOperationPhaseReady)
+		needsRevisionUpdate := sts.Status.UpdateRevision != "" && pod.Labels["controller-revision-hash"] != sts.Status.UpdateRevision
+		if !k8sNodeCordoned && !needsRevisionUpdate && !hasActiveHandoff {
+			continue
+		}
+
+		// The worker acknowledges the exact operation ID it received from Slurm.
+		// Preserve it across cordon changes and newer StatefulSet revisions.
+		if !hasActiveHandoff {
+			operationID = sts.Status.UpdateRevision
+			if k8sNodeCordoned {
+				operationID = "node-rollout-" + string(pod.UID)
+			}
+		}
+		replacements = append(replacements, workerReplacement{
+			pod:             pod,
+			operationID:     operationID,
+			k8sNodeCordoned: k8sNodeCordoned,
+		})
+	}
+	return replacements
+}
+
+func (r *RollingUpdateReconciler) processWorkerReplacements(
 	ctx context.Context,
 	clusterName string,
-	operationID string,
 	sts *kruisev1b1.StatefulSet,
-	outdatedPods []corev1.Pod,
+	replacements []workerReplacement,
 ) error {
-	logger := log.FromContext(ctx).WithName("rolling-update-reconciler")
-
-	if len(outdatedPods) == 0 {
-		logger.Info("no outdated pods found", "namespace", sts.Namespace, "name", sts.Name)
+	if len(replacements) == 0 {
 		return nil
 	}
+	ctx = log.IntoContext(ctx, log.FromContext(ctx).WithName("rolling-update-reconciler").
+		WithValues("namespace", sts.Namespace, "name", sts.Name))
 
-	sort.Slice(outdatedPods, func(i, j int) bool {
-		return outdatedPods[i].Name < outdatedPods[j].Name
-	})
-
-	podsToStop := make([]corev1.Pod, 0, len(outdatedPods))
-	deletedPods := 0
-	for _, pod := range outdatedPods {
-		if workerOperationPhase(&pod, operationID) != consts.LabelSoperatorWorkerOperationPhaseReady {
-			podsToStop = append(podsToStop, pod)
-			continue
-		}
-
-		if err := r.Delete(ctx, &pod); client.IgnoreNotFound(err) != nil {
-			return fmt.Errorf("delete pod %s/%s with completed worker handoff: %w", pod.Namespace, pod.Name, err)
-		}
-		deletedPods++
-	}
-	if deletedPods > 0 {
-		logger.Info("deleted outdated pods with completed worker handoffs", "count", deletedPods, "operationID", operationID)
-		return nil
-	}
-
-	for _, pod := range podsToStop {
-		if !containerCrashLoopBackOff(pod.Status.InitContainerStatuses, consts.ContainerNameWorkerInit) {
-			continue
-		}
-
-		if err := r.Delete(ctx, &pod); client.IgnoreNotFound(err) != nil {
-			return fmt.Errorf("delete outdated pod %s/%s with crash-looping worker init: %w", pod.Namespace, pod.Name, err)
-		}
-		logger.Info(
-			"deleted outdated pod with crash-looping worker init",
-			"namespace", pod.Namespace,
-			"pod", pod.Name,
-		)
-		return nil
-	}
-
-	slurmClient, ok := r.slurmAPIClients.GetClient(types.NamespacedName{
-		Namespace: sts.Namespace,
-		Name:      clusterName,
-	})
-	if !ok {
-		logger.Info("no slurm api client", "namespace", sts.Namespace, "clusterName", clusterName)
-		return fmt.Errorf("no slurm api client for %s/%s", sts.Namespace, clusterName)
-	}
-	slurmNodes, err := slurmClient.ListNodes(ctx)
+	prioritizeCordonedWorkers(replacements)
+	progress, err := r.reconcileWorkerPodHandoffs(ctx, replacements)
 	if err != nil {
 		return err
 	}
-	slurmNodesByName := indexSlurmNodesForPods(slurmNodes, podsToStop)
-
-	type rebootCandidate struct {
-		pod       corev1.Pod
-		slurmNode slurmapi.Node
+	if len(progress.pending) == 0 {
+		return nil
 	}
 
-	candidates := make([]rebootCandidate, 0, len(podsToStop))
+	slurmClient, ok := r.slurmAPIClients.GetClient(types.NamespacedName{Namespace: sts.Namespace, Name: clusterName})
+	if !ok {
+		return fmt.Errorf("no slurm api client for %s/%s", sts.Namespace, clusterName)
+	}
+	candidates, readyPodsConsumingBudget, err := r.reconcileSlurmWorkerHandoffs(ctx, slurmClient, progress.pending)
+	if err != nil {
+		return err
+	}
+	readyPodsConsumingBudget += progress.readyPodsConsumingBudget
+	availableSlots := availableWorkerHandoffSlots(ctx, sts, readyPodsConsumingBudget)
+	return r.startWorkerHandoffsWithinBudget(ctx, slurmClient, candidates, availableSlots)
+}
+
+func prioritizeCordonedWorkers(replacements []workerReplacement) {
+	sort.Slice(replacements, func(i, j int) bool {
+		if replacements[i].k8sNodeCordoned != replacements[j].k8sNodeCordoned {
+			return replacements[i].k8sNodeCordoned
+		}
+		return replacements[i].pod.Name < replacements[j].pod.Name
+	})
+}
+
+func (r *RollingUpdateReconciler) reconcileWorkerPodHandoffs(
+	ctx context.Context, replacements []workerReplacement,
+) (workerHandoffProgress, error) {
+	var progress workerHandoffProgress
+	for _, replacement := range replacements {
+		pod := replacement.pod
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
+		handoffReady := workerOperationPhase(&pod, replacement.operationID) == consts.LabelSoperatorWorkerOperationPhaseReady
+		if replacement.k8sNodeCordoned && handoffReady {
+			// A released worker still consumes capacity until its replacement is Ready.
+			if podReady(&pod) {
+				progress.readyPodsConsumingBudget++
+			}
+			continue
+		}
+		if handoffReady || containerCrashLoopBackOff(pod.Status.InitContainerStatuses, consts.ContainerNameWorkerInit) {
+			if err := r.finishWorkerHandoff(ctx, replacement); err != nil {
+				return workerHandoffProgress{}, err
+			}
+			// Account for this handoff against the readiness snapshot taken before deletion or release.
+			// Unready pods are already included in unavailableReplicas.
+			if podReady(&pod) {
+				progress.readyPodsConsumingBudget++
+			}
+			continue
+		}
+		progress.pending = append(progress.pending, replacement)
+	}
+	return progress, nil
+}
+
+func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
+	ctx context.Context, slurmClient slurmapi.Client, replacements []workerReplacement,
+) ([]workerReplacement, int, error) {
+	logger := log.FromContext(ctx)
+	slurmNodesByName, err := getSlurmNodesForReplacements(ctx, slurmClient, replacements)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var candidates []workerReplacement
 	var undrainedNodes []string
 	readyPodsConsumingBudget := 0
-	for _, pod := range podsToStop {
+	for _, replacement := range replacements {
+		pod := replacement.pod
 		slurmNode, found := slurmNodesByName[pod.Name]
 		if !found {
-			return fmt.Errorf("slurm node %s is missing from list nodes response", pod.Name)
+			return nil, 0, fmt.Errorf("slurm node %s is missing from list nodes response", pod.Name)
 		}
 
-		decision := decideWorkerUpdateAction(&pod, &slurmNode, operationID)
+		decision := decideWorkerUpdateAction(&pod, &slurmNode, replacement.operationID)
 		switch decision.action {
 		case workerUpdateActionUndrain:
 			if err := slurmClient.UndrainNode(ctx, slurmNode.Name); err != nil {
-				return fmt.Errorf("undrain stale rolling update node %s: %w", slurmNode.Name, err)
+				return nil, 0, fmt.Errorf("undrain stale rolling update node %s: %w", slurmNode.Name, err)
 			}
 			undrainedNodes = append(undrainedNodes, slurmNode.Name)
-			if podReady(&pod) {
-				readyPodsConsumingBudget++
-			}
-		case workerUpdateActionDelete:
-			if err := r.Delete(ctx, &pod); client.IgnoreNotFound(err) != nil {
-				return fmt.Errorf("delete safely offline outdated pod %s/%s: %w", pod.Namespace, pod.Name, err)
+		case workerUpdateActionCompleteHandoff:
+			if err := r.finishWorkerHandoff(ctx, replacement); err != nil {
+				return nil, 0, err
 			}
 			logger.Info(
-				"deleted safely offline outdated pod with no allocations",
-				"namespace", pod.Namespace,
+				"Completed update of safely offline worker with no allocations",
 				"pod", pod.Name,
 				"slurmNode", slurmNode.Name,
 				"slurmdCrashLooping", decision.slurmdCrashLooping,
 				"rebootHandoffInProgress", decision.rebootHandoffInProgress,
 				"managedRebootInProgress", decision.managedRebootInProgress,
-				"operationID", operationID,
+				"operationID", replacement.operationID,
 				"operationPhase", decision.operationPhase,
 			)
-			if podReady(&pod) {
-				readyPodsConsumingBudget++
-			}
 		case workerUpdateActionWait:
 			logger.Info(
-				"waiting to replace outdated pod with crash-looping slurmd",
-				"namespace", pod.Namespace,
+				"Waiting to replace worker with crash-looping slurmd",
 				"pod", pod.Name,
 				"slurmNode", slurmNode.Name,
 				"reason", "node is not safely offline with zero known allocations",
 			)
+			continue
 		case workerUpdateActionTrackInFlight:
-			if podReady(&pod) {
-				readyPodsConsumingBudget++
-			}
 		case workerUpdateActionScheduleReboot:
-			candidates = append(candidates, rebootCandidate{pod: pod, slurmNode: slurmNode})
+			candidates = append(candidates, replacement)
+			continue
+		}
+		if podReady(&pod) {
+			readyPodsConsumingBudget++
 		}
 	}
 	if len(undrainedNodes) > 0 {
-		logger.Info("undrained stale rolling update nodes before reboot", "nodes", undrainedNodes)
+		logger.Info("Undrained stale rolling update nodes before reboot", "nodes", undrainedNodes)
 	}
+	return candidates, readyPodsConsumingBudget, nil
+}
 
+func getSlurmNodesForReplacements(
+	ctx context.Context, slurmClient slurmapi.Client, replacements []workerReplacement,
+) (map[string]slurmapi.Node, error) {
+	slurmNodes, err := slurmClient.ListNodes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	podNames := make(map[string]struct{}, len(replacements))
+	for _, replacement := range replacements {
+		podNames[replacement.pod.Name] = struct{}{}
+	}
+	nodesByName := make(map[string]slurmapi.Node, len(replacements))
+	for _, node := range slurmNodes {
+		if _, found := podNames[node.Name]; found {
+			nodesByName[node.Name] = node
+		}
+	}
+	return nodesByName, nil
+}
+
+func availableWorkerHandoffSlots(ctx context.Context, sts *kruisev1b1.StatefulSet, readyPodsConsumingBudget int) int {
 	budget := rebootBudget(sts)
 	unavailable := unavailableReplicas(sts)
-	availableSlots := budget - unavailable - readyPodsConsumingBudget
-	if availableSlots <= 0 {
-		logger.Info(
-			"rolling update budget is exhausted",
+	availableSlots := max(0, budget-unavailable-readyPodsConsumingBudget)
+	if availableSlots == 0 {
+		log.FromContext(ctx).Info(
+			"Rolling update budget is exhausted",
 			"budget", budget,
 			"unavailable", unavailable,
 			"readyPodsConsumingBudget", readyPodsConsumingBudget,
 		)
-		return nil
 	}
+	return availableSlots
+}
 
-	slurmNodesToReboot := make([]string, 0, availableSlots)
+func (r *RollingUpdateReconciler) startWorkerHandoffsWithinBudget(
+	ctx context.Context, slurmClient slurmapi.Client, candidates []workerReplacement, availableSlots int,
+) error {
+	logger := log.FromContext(ctx)
+	var slurmNodesToReboot []string
 	for _, candidate := range candidates {
-		if len(slurmNodesToReboot) >= availableSlots {
-			break
-		}
-
 		pod := candidate.pod
-		if workerOperationPhase(&pod, operationID) != consts.LabelSoperatorWorkerOperationPhaseStopping {
-			patchBase := pod.DeepCopy()
-			if pod.Labels == nil {
-				pod.Labels = map[string]string{}
+		// Unready workers on draining nodes already consume the unavailable budget.
+		// Their handoff must remain possible even when that budget is exhausted.
+		if podReady(&pod) || !candidate.k8sNodeCordoned {
+			if availableSlots == 0 {
+				continue
 			}
-			pod.Labels[consts.LabelSoperatorWorkerOperationID] = operationID
-			pod.Labels[consts.LabelSoperatorWorkerOperationPhase] =
-				consts.LabelSoperatorWorkerOperationPhaseStopping
-			if err := r.Patch(
-				ctx,
-				&pod,
-				client.StrategicMergeFrom(patchBase, client.MergeFromWithOptimisticLock{}),
-			); err != nil {
-				return fmt.Errorf("start worker operation %s on pod %s/%s: %w", operationID, pod.Namespace, pod.Name, err)
-			}
+			availableSlots--
 		}
-
-		slurmNodesToReboot = append(slurmNodesToReboot, candidate.slurmNode.Name)
+		if err := r.markWorkerOperationStopping(ctx, &pod, candidate.operationID); err != nil {
+			return err
+		}
+		slurmNodesToReboot = append(slurmNodesToReboot, pod.Name)
 	}
-
 	if len(slurmNodesToReboot) == 0 {
-		logger.Info("all outdated pods already have reboot requested", "namespace", sts.Namespace, "name", sts.Name)
+		logger.Info("No additional worker handoffs can be scheduled")
 		return nil
 	}
 
@@ -393,9 +429,55 @@ func (r *RollingUpdateReconciler) processRollingUpdate(
 	}); err != nil {
 		return fmt.Errorf("schedule slurm reboot through rest api: %w", err)
 	}
+	logger.Info("Scheduled Slurm reboot through REST API", "nodes", slurmNodesToReboot)
+	return nil
+}
 
-	logger.Info("scheduled slurm reboot through rest api", "nodes", slurmNodesToReboot)
+func (r *RollingUpdateReconciler) markWorkerOperationStopping(ctx context.Context, pod *corev1.Pod, operationID string) error {
+	if workerOperationPhase(pod, operationID) == consts.LabelSoperatorWorkerOperationPhaseStopping {
+		return nil
+	}
+	patchBase := pod.DeepCopy()
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
+	}
+	pod.Labels[consts.LabelSoperatorWorkerOperationID] = operationID
+	pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseStopping
+	if err := r.Patch(ctx, pod, client.StrategicMergeFrom(patchBase, client.MergeFromWithOptimisticLock{})); err != nil {
+		return fmt.Errorf("start worker operation %s on pod %s/%s: %w", operationID, pod.Namespace, pod.Name, err)
+	}
+	return nil
+}
 
+func (r *RollingUpdateReconciler) finishWorkerHandoff(ctx context.Context, replacement workerReplacement) error {
+	if replacement.k8sNodeCordoned {
+		return r.markWorkerOperationReady(ctx, &replacement.pod, replacement.operationID)
+	}
+	return r.deleteWorkerPod(ctx, &replacement.pod)
+}
+
+func (r *RollingUpdateReconciler) deleteWorkerPod(ctx context.Context, pod *corev1.Pod) error {
+	// UID preconditions prevent a delayed reconcile from deleting a replacement pod.
+	if err := r.Delete(ctx, pod, client.Preconditions{UID: &pod.UID}); client.IgnoreNotFound(err) != nil {
+		return fmt.Errorf("delete worker pod %s/%s after handoff: %w", pod.Namespace, pod.Name, err)
+	}
+	return nil
+}
+
+func (r *RollingUpdateReconciler) markWorkerOperationReady(ctx context.Context, pod *corev1.Pod, operationID string) error {
+	if operationID == "" {
+		return fmt.Errorf("mark worker pod %s/%s ready: operation ID is empty", pod.Namespace, pod.Name)
+	}
+	base := pod.DeepCopy()
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
+	}
+	pod.Labels[consts.LabelSoperatorWorkerOperationID] = operationID
+	pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseReady
+	if err := r.Patch(ctx, pod, client.StrategicMergeFrom(base, client.MergeFromWithOptimisticLock{})); err != nil {
+		return fmt.Errorf("mark worker operation ready on pod %s/%s: %w", pod.Namespace, pod.Name, err)
+	}
+	log.FromContext(ctx).Info("Marked worker operation ready for eviction", "pod", pod.Name, "node", pod.Spec.NodeName, "operationID", operationID)
 	return nil
 }
 
@@ -404,7 +486,7 @@ func (r *RollingUpdateReconciler) cleanupStaleRollingUpdateDrains(
 	clusterName string,
 	sts *kruisev1b1.StatefulSet,
 	pods []corev1.Pod,
-) (int, error) {
+) error {
 	logger := log.FromContext(ctx).WithName("rolling-update-reconciler")
 	eligibleNodeNames := make(map[string]struct{}, len(pods))
 	for _, pod := range pods {
@@ -413,7 +495,7 @@ func (r *RollingUpdateReconciler) cleanupStaleRollingUpdateDrains(
 		}
 	}
 	if len(eligibleNodeNames) == 0 {
-		return 0, nil
+		return nil
 	}
 
 	slurmClient, ok := r.slurmAPIClients.GetClient(types.NamespacedName{
@@ -421,11 +503,11 @@ func (r *RollingUpdateReconciler) cleanupStaleRollingUpdateDrains(
 		Name:      clusterName,
 	})
 	if !ok {
-		return 0, fmt.Errorf("no slurm api client for %s/%s", sts.Namespace, clusterName)
+		return fmt.Errorf("no slurm api client for %s/%s", sts.Namespace, clusterName)
 	}
 	slurmNodes, err := slurmClient.ListNodes(ctx)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	var undrainedNodes []string
@@ -437,15 +519,15 @@ func (r *RollingUpdateReconciler) cleanupStaleRollingUpdateDrains(
 			continue
 		}
 		if err := slurmClient.UndrainNode(ctx, slurmNode.Name); err != nil {
-			return 0, fmt.Errorf("undrain stale rolling update node %s: %w", slurmNode.Name, err)
+			return fmt.Errorf("undrain stale rolling update node %s: %w", slurmNode.Name, err)
 		}
 		undrainedNodes = append(undrainedNodes, slurmNode.Name)
 	}
 
 	if len(undrainedNodes) > 0 {
-		logger.Info("undrained stale rolling update nodes after update", "nodes", undrainedNodes)
+		logger.Info("Undrained stale rolling update nodes after update", "nodes", undrainedNodes)
 	}
-	return len(undrainedNodes), nil
+	return nil
 }
 
 func rebootBudget(sts *kruisev1b1.StatefulSet) int {
@@ -533,7 +615,7 @@ func decideWorkerUpdateAction(
 		decision.managedRebootInProgress) && safeToDeleteOfflineSlurmNode(node):
 		// Supervisord can keep the Pod Ready while repeatedly restarting slurmd.
 		// Slurm state is the source of truth for safely completing an in-flight handoff.
-		decision.action = workerUpdateActionDelete
+		decision.action = workerUpdateActionCompleteHandoff
 	case decision.slurmdCrashLooping:
 		decision.action = workerUpdateActionWait
 	case rebootInProgress:
@@ -586,22 +668,36 @@ func (r *RollingUpdateReconciler) SetupWithManager(
 	maxConcurrency int,
 	cacheSyncTimeout time.Duration,
 ) error {
+	if r.requeueAfter <= 0 {
+		return fmt.Errorf("configure a positive rolling update requeue interval, got %s", r.requeueAfter)
+	}
 
-	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
-		For(&kruisev1b1.StatefulSet{}, builder.WithPredicates(predicate.Funcs{
-			CreateFunc: func(tce event.TypedCreateEvent[client.Object]) bool {
-				return rollingUpdateEnabled(tce.Object)
-			},
-			UpdateFunc: func(tue event.TypedUpdateEvent[client.Object]) bool {
-				return rollingUpdateEnabled(tue.ObjectNew)
-			},
-			DeleteFunc:  func(tde event.TypedDeleteEvent[client.Object]) bool { return false },
-			GenericFunc: func(tge event.TypedGenericEvent[client.Object]) bool { return false },
-		})).
+	// Keep these caches synchronized without enqueueing requests on resource events.
+	for _, obj := range []client.Object{&corev1.Pod{}, &corev1.Node{}} {
+		if _, err := mgr.GetCache().GetInformer(context.Background(), obj); err != nil {
+			return fmt.Errorf("initialize rolling update cache for %T: %w", obj, err)
+		}
+	}
+
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&kruisev1b1.StatefulSet{}, builder.WithPredicates(rollingUpdateLoopStartPredicate())).
 		Named(RollingUpdateControllerName).
-		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout))
+		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
+		Complete(r)
+}
 
-	return controllerBuilder.Complete(r)
+func rollingUpdateLoopStartPredicate() predicate.Funcs {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return rollingUpdateEnabled(e.Object)
+		},
+		// Start a loop when coordination is enabled on an existing NodeSet.
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return !rollingUpdateEnabled(e.ObjectOld) && rollingUpdateEnabled(e.ObjectNew)
+		},
+		DeleteFunc:  func(event.DeleteEvent) bool { return false },
+		GenericFunc: func(event.GenericEvent) bool { return false },
+	}
 }
 
 func rollingUpdateEnabled(obj client.Object) bool {
@@ -610,5 +706,5 @@ func rollingUpdateEnabled(obj client.Object) bool {
 		return false
 	}
 	return sts.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType &&
-		sts.GetLabels()[consts.LabelSoperatorRollingUpdateEnabled] == consts.LabelSoperatorRollingUpdateValue
+		sts.GetLabels()[consts.LabelWorkerKey] == consts.LabelWorkerValue
 }

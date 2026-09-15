@@ -76,6 +76,12 @@ If it completes with a non-zero exit code, the node is drained as well.
 When a node is drained Slurm allows already executing jobs to finish, but excludes the node from scheduling other jobs.
 
 
+### Slurm-aware Worker and Node Rollout
+
+NodeSets using `updateStrategy: slurmAwareRollingUpdate` coordinate worker replacement and Kubernetes node drain
+with Slurm so running jobs can finish. See [Worker and node rollout](worker-node-rollout.md) for configuration and behavior.
+
+
 ### Easy Scaling
 This solution allows Slurm to reuse the unique Kubernetes' ability to scale automatically depending on the current
 needs. You can simply change a single value in the YAML manifest, and watch the cluster changes in size.

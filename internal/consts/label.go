@@ -43,9 +43,6 @@ const (
 
 	AnnotationConfigHash = K8sGroupNameSoperator + "/config-hash"
 
-	LabelSoperatorRollingUpdateEnabled = K8sGroupNameSoperator + "/rolling-update-enabled"
-	LabelSoperatorRollingUpdateValue   = "true"
-
 	LabelSoperatorWorkerOperationID            = K8sGroupNameSoperator + "/worker-operation-id"
 	LabelSoperatorWorkerOperationPhase         = K8sGroupNameSoperator + "/worker-operation-phase"
 	LabelSoperatorWorkerOperationPhaseStopping = "stopping"
