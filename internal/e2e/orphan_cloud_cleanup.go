@@ -22,7 +22,6 @@ type orphanResourceKind struct {
 
 var orphanResourceKinds = []orphanResourceKind{
 	{name: "MK8s cluster", commandPath: []string{"mk8s", "cluster"}},
-	{name: "NVLink instance group", commandPath: []string{"compute", "nvl-instance-group"}},
 	{name: "GPU cluster", commandPath: []string{"compute", "gpu-cluster"}},
 	{name: "filesystem", commandPath: []string{"compute", "filesystem"}},
 	{name: "VPC allocation", commandPath: []string{"vpc", "allocation"}},

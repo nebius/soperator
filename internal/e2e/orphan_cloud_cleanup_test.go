@@ -56,12 +56,6 @@ func TestCleanupOrphanedCloudResourcesDeletesKnownKindsInDependencyOrder(t *test
 		{args: "mk8s cluster delete --id mk8s-1 --async --no-progress"},
 		{args: "mk8s cluster list --parent-id project-man-h100 --all --format json", output: resourceListJSON()},
 		{
-			args:   "compute nvl-instance-group list --parent-id project-man-h100 --all --format json",
-			output: resourceListJSON(resource("nvl-1", k8sClusterName+"-worker-rack0")),
-		},
-		{args: "compute nvl-instance-group delete --id nvl-1 --async --no-progress"},
-		{args: "compute nvl-instance-group list --parent-id project-man-h100 --all --format json", output: resourceListJSON()},
-		{
 			args:   "compute gpu-cluster list --parent-id project-man-h100 --all --format json",
 			output: resourceListJSON(resource("gpu-1", k8sClusterName+"-fabric-4")),
 		},
