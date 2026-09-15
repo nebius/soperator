@@ -8,7 +8,10 @@ import (
 	"github.com/hashicorp/terraform-exec/tfexec"
 )
 
-const terraformApplyTimeout = 90 * time.Minute
+const (
+	terraformApplyTimeout = 90 * time.Minute
+	terraformStopTimeout  = time.Minute
+)
 
 func Apply(ctx context.Context, cfg Config) error {
 	ctx, cancel := context.WithTimeout(ctx, terraformApplyTimeout)
@@ -19,6 +22,10 @@ func Apply(ctx context.Context, cfg Config) error {
 		return err
 	}
 	defer cleanup()
+
+	if err := tf.SetWaitDelay(terraformStopTimeout); err != nil {
+		return fmt.Errorf("set Terraform graceful shutdown timeout: %w", err)
+	}
 
 	if err := tf.Apply(ctx, tfexec.VarFile(varFilePath)); err != nil {
 		return fmt.Errorf("terraform apply: %w", err)
