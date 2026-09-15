@@ -24,9 +24,6 @@ helmRepository:
   prometheusOperator:
     url: https://prometheus-community.github.io/helm-charts
     type: default
-  securityProfilesOperator:
-    url: oci://cr.nebius.cloud/soperator
-    type: oci
   victoriaMetrics:
     url: https://victoriametrics.github.io/helm-charts/
     type: default
@@ -720,70 +717,6 @@ observability:
         # Nebius O11y agent fork option; not part of upstream filelogreceiver.
         # Files are deleted only after they have not been modified for at least this duration.
         minAge: 15m
-securityProfilesOperator:
-  enabled: true
-  interval: 5m
-  timeout: 30m
-  version: 0.8.5-soperator
-  releaseName: security-profiles-operator
-  namespace: security-profiles-operator-system
-  install:
-    crds: CreateReplace
-    remediation:
-      retries: 6
-  upgrade:
-    crds: CreateReplace
-    remediation:
-      retries: 6
-      remediateLastFailure: true
-  values:
-    daemon:
-      # SPO also applies these tolerations to its webhook. Exclude the NFS nodeset.
-      tolerations:
-        - key: slurm.nebius.ai/nodeset
-          operator: Equal
-          value: controller
-          effect: NoSchedule
-        - key: slurm.nebius.ai/nodeset
-          operator: Equal
-          value: login
-          effect: NoSchedule
-        - key: slurm.nebius.ai/nodeset
-          operator: Equal
-          value: accounting
-          effect: NoSchedule
-        - key: nvidia.com/gpu
-          operator: Exists
-          effect: NoSchedule
-      resources:
-        limits:
-          memory: 128Mi
-        requests:
-          cpu: 100m
-          memory: 128Mi
-    # The operator's own webhook Deployment is created by the operator rather than by its chart,
-    # so its placement cannot be set from here.
-    nodeSelector:
-      slurm.nebius.ai/nodeset: system
-    affinity:
-      podAntiAffinity:
-        preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              topologyKey: kubernetes.io/hostname
-              labelSelector:
-                matchLabels:
-                  app: security-profiles-operator
-    resources:
-      limits:
-        cpu: 500m
-        memory: 3Gi
-      requests:
-        cpu: 500m
-        memory: 3Gi
-  overrideValues: null
-  driftDetection:
-    mode: warn
 slurmCluster:
   enabled: true
   interval: 5m

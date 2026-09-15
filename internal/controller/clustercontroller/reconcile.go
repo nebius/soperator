@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
@@ -74,7 +73,6 @@ import (
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=mariadbs,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=k8s.mariadb.com,resources=grants,verbs=get;list;watch;update;patch;delete;create
-//+kubebuilder:rbac:groups=security-profiles-operator.x-k8s.io,resources=apparmorprofiles,verbs=get;list;watch;update;patch;delete;create
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs/finalizers,verbs=update
@@ -100,7 +98,6 @@ type SlurmClusterReconciler struct {
 	Deployment              *reconciler.DeploymentReconciler
 	MariaDb                 *reconciler.MariaDbReconciler
 	MariaDbGrant            *reconciler.MariaDbGrantReconciler
-	AppArmorProfile         *reconciler.AppArmorProfileReconciler
 }
 
 func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *SlurmClusterReconciler {
@@ -124,7 +121,6 @@ func NewSlurmClusterReconciler(client client.Client, scheme *runtime.Scheme, rec
 		Deployment:              reconciler.NewDeploymentReconciler(r),
 		MariaDb:                 reconciler.NewMariaDbReconciler(r),
 		MariaDbGrant:            reconciler.NewMariaDbGrantReconciler(r),
-		AppArmorProfile:         reconciler.NewAppArmorProfileReconciler(r),
 	}
 }
 
@@ -868,13 +864,6 @@ func (r *SlurmClusterReconciler) createResourceChecks(saPredicate predicate.Func
 			Objects: []client.Object{
 				&mariadbv1alpha1.MariaDB{},
 				&mariadbv1alpha1.Grant{},
-			},
-			Predicate: predicate.GenerationChangedPredicate{},
-		},
-		{
-			Check: check.IsAppArmorOperatorCRDInstalled,
-			Objects: []client.Object{
-				&apparmor.AppArmorProfile{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
 		},

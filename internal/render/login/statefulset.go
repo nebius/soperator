@@ -51,7 +51,7 @@ func RenderStatefulSet(
 
 	sshAppArmorProfile := login.ContainerSshd.AppArmorProfile
 	if login.UseDefaultAppArmorProfile {
-		sshAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
+		sshAppArmorProfile = "localhost/" + common.DefaultAppArmorProfileName
 	}
 
 	initContainers := append(

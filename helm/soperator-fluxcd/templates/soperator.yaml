@@ -63,9 +63,6 @@ spec:
           .Values.mariadbOperator.enabled
         }}
         env:
-          {{- if .Values.securityProfilesOperator.enabled }}
-          isApparmorCrdInstalled: true
-          {{- end }}
           {{- if .Values.mariadbOperator.enabled }}
           isMariadbCrdInstalled: true
           {{- end }}

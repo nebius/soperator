@@ -115,7 +115,8 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	SConfigController SConfigController `json:"sConfigController,omitempty"`
 
-	// Generate and set default AppArmor profile for the login nodes. The Security Profiles Operator must be installed.
+	// Use the soperator-default AppArmor profile for login and worker containers.
+	// Node provisioning must load this profile before the containers start.
 	//
 	// +kubebuilder:default=false
 	UseDefaultAppArmorProfile bool `json:"useDefaultAppArmorProfile,omitempty"`

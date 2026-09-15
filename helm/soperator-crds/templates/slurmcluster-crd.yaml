@@ -50706,8 +50706,9 @@ spec:
                 type: object
               useDefaultAppArmorProfile:
                 default: false
-                description: Generate and set default AppArmor profile for the login
-                  nodes. The Security Profiles Operator must be installed.
+                description: |-
+                  Use the soperator-default AppArmor profile for login and worker containers.
+                  Node provisioning must load this profile before the containers start.
                 type: boolean
               volumeSources:
                 description: VolumeSources define the sources for the volumes
