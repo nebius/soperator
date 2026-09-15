@@ -585,7 +585,7 @@ jobs:
 
       - name: Terraform Apply
         id: terraform_apply
-        timeout-minutes: 90
+        timeout-minutes: 100
         shell: bash
         run: |
           cd ${{ env.PATH_TO_INSTALLATION }}
