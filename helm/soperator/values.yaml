@@ -27,7 +27,7 @@ controllerManager:
       slurmOperatorWatchNamespaces: '*'
       topologyLabelPrefix: "topology.nebius.com"
     image:
-      repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
+      repository: cr.nebius.cloud/soperator/slurm-operator
       tag: 5.0.0
     imagePullPolicy: Always
     imagePullSecrets: []
@@ -61,7 +61,7 @@ serviceMonitor:
 nodeExporter:
   enabled: false
   image:
-    repository: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter
+    repository: cr.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter
     tag: v1.10.2
     pullPolicy: IfNotPresent
   port: 9100

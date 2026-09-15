@@ -277,7 +277,7 @@ tests:
           path: spec.values.tolerations
       - equal:
           path: spec.values.image.repository
-          value: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
+          value: cr.nebius.cloud/observability/nebius-o11y-agent
       - equal:
           path: spec.values.configMap.existingName
           value: opentelemetry-collector-nccl-profiles-agent

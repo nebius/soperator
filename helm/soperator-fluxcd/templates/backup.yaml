@@ -53,7 +53,7 @@ spec:
     {{- end }}
     k8up:
       backupImage:
-        repository: cr.eu-north1.nebius.cloud/soperator-proxy-ghcr-io/k8up-io/k8up
+        repository: cr.nebius.cloud/soperator-proxy-ghcr-io/k8up-io/k8up
         tag: v2.13.1
       skipWithoutAnnotation: true
     {{- if .Values.observability.prometheusOperator.enabled }}

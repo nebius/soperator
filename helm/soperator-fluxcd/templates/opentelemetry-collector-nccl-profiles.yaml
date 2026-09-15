@@ -258,7 +258,7 @@ spec:
 
     image:
       pullPolicy: IfNotPresent
-      repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
+      repository: cr.nebius.cloud/observability/nebius-o11y-agent
       tag: {{ $values.nebiusO11yAgentVersion | default "2.0.10" }}
 
     {{- if eq $mode "shared" }}
@@ -337,7 +337,7 @@ spec:
 
     initContainers:
       - name: wait-jail-populated
-        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        image: cr.nebius.cloud/soperator/busybox:latest
         volumeMounts:
           - name: jail
             mountPath: /mnt/jail
@@ -356,7 +356,7 @@ spec:
             done
 
       - name: init-nccl-profiles-dump-dir
-        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        image: cr.nebius.cloud/soperator/busybox:latest
         volumeMounts:
           - name: jail
             mountPath: /mnt/jail
@@ -380,7 +380,7 @@ spec:
 
       {{- if $enableFileStorage }}
       - name: init-fs
-        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        image: cr.nebius.cloud/soperator/busybox:latest
         volumeMounts:
           - name: varlibotelcol
             mountPath: /var/lib/otelcol-nccl-profiles

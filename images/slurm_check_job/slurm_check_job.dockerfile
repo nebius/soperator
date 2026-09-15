@@ -3,7 +3,7 @@
 ARG SLURM_VERSION
 
 # https://github.com/nebius/ml-containers/pull/102
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260908103131 AS slurm_check_job
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260908103131 AS slurm_check_job
 
 # Install slurm сhroot plugin
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/

@@ -14,7 +14,7 @@ import (
 
 const (
 	// Mirrored Ubuntu has /bin/bash required by the Slurm task prolog under Pyxis.
-	enrootLifecycleImage   = "docker://cr.eu-north1.nebius.cloud#soperator/ubuntu:noble"
+	enrootLifecycleImage   = "docker://cr.nebius.cloud#soperator/ubuntu:noble"
 	enrootLifecycleCommand = "echo ready; sleep 3600"
 
 	enrootSquashRoot = "/var/cache/enroot-container-images"

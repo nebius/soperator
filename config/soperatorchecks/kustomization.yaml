@@ -3,7 +3,7 @@ resources:
   - ../rbac/soperatorchecks/role.yaml
 images:
   - name: controller
-    newName: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
+    newName: cr.nebius.cloud/soperator/soperatorchecks
     newTag: 5.0.0
 patches:
   # Serve protected metrics from the manager using controller-runtime authn/authz.

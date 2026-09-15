@@ -85,7 +85,7 @@ spec:
 
     image:
       pullPolicy: IfNotPresent
-      repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
+      repository: cr.nebius.cloud/observability/nebius-o11y-agent
       tag: 2.0.10
 
     mode: daemonset
@@ -208,7 +208,7 @@ spec:
     {{- if or $logsEnableFileStorage .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
     initContainers:
       - name: init-fs
-        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        image: cr.nebius.cloud/soperator/busybox:latest
         volumeMounts:
           {{- if $logsEnableFileStorage }}
           - name: varlibotelcol
