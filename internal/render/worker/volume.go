@@ -31,9 +31,11 @@ func renderVolumesAndClaimTemplateSpecsForNodeSet(
 		renderVolumeSoperatorOutputs(),
 		renderVolumeSharedMemory(nodeSet.SharedMemorySize),
 		renderVolumeSysctl(nodeSet.ParentalCluster.Name),
-		renderSupervisordConfigMap(nodeSet.SupervisorDConfigMapName),
-		renderVolumeSshdConfigs(nodeSet.SSHDConfigMapName),
 	}
+	if nodeSet.SupervisorDConfigMapName != "" {
+		volumes = append(volumes, renderSupervisordConfigMap(nodeSet.SupervisorDConfigMapName))
+	}
+	volumes = append(volumes, renderVolumeSshdConfigs(nodeSet.SSHDConfigMapName))
 	if nodeSet.ContainerSSSD != nil {
 		volumes = append(volumes,
 			common.RenderVolumeSSSDSocket(),

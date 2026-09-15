@@ -32,8 +32,7 @@ type SlurmNodeSet struct {
 	CustomInitContainers      []corev1.Container
 	AppArmorProfileUseDefault bool
 
-	SupervisorDConfigMapDefault bool
-	SupervisorDConfigMapName    string
+	SupervisorDConfigMapName string
 
 	SSHDConfigMapDefault    bool
 	SSHDConfigMapName       string
@@ -43,8 +42,7 @@ type SlurmNodeSet struct {
 
 	GPU *slurmv1alpha1.GPUSpec
 
-	// DockerEnabled defines whether Docker components (dockerd, docker-proxy sidecar,
-	// docker CLI in jail) are enabled for the NodeSet workers.
+	// DockerEnabled defines whether dockerd, its supervised proxy, and the Docker CLI are enabled for the NodeSet workers.
 	DockerEnabled bool
 
 	StatefulSet     StatefulSet
@@ -167,20 +165,7 @@ func BuildSlurmNodeSetFrom(
 	}
 	// endregion Submounts
 
-	// region SupervisorDConfig
-	{
-		var (
-			supervisordConfigMapName = nsSpec.ConfigMapRefSupervisord
-			supervisordConfigDefault = false
-		)
-		if nsSpec.ConfigMapRefSupervisord == "" {
-			supervisordConfigDefault = true
-			supervisordConfigMapName = naming.BuildConfigMapSupervisordName(clusterName)
-		}
-		res.SupervisorDConfigMapName = supervisordConfigMapName
-		res.SupervisorDConfigMapDefault = supervisordConfigDefault
-	}
-	// endregion SupervisorDConfig
+	res.SupervisorDConfigMapName = nsSpec.ConfigMapRefSupervisord
 
 	// region SSHDConfig
 	{

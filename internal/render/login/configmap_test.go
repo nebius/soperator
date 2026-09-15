@@ -53,6 +53,7 @@ func TestGenerateUserIsolationConfig_Disabled(t *testing.T) {
 
 	// Not configured at all.
 	rendered := generateUserIsolationConfig(cluster).Render()
+	assert.Contains(t, rendered, "SOPERATOR_DOCKER_ENABLED=false")
 	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_ENABLED=false")
 	assert.NotContains(t, rendered, "SOPERATOR_USER_ISOLATION_MEMORY_HIGH")
 	assert.NotContains(t, rendered, "SOPERATOR_USER_ISOLATION_MEMORY_MAX")
@@ -74,6 +75,7 @@ func TestGenerateUserIsolationConfig_Enabled(t *testing.T) {
 	memoryMax := resource.MustParse("3Gi")
 	cluster := &values.SlurmCluster{
 		NodeLogin: values.SlurmLogin{
+			DockerEnabled: true,
 			UserIsolation: &slurmv1.LoginUserIsolation{
 				Enabled:    ptr.To(true),
 				MemoryHigh: &memoryHigh,
@@ -84,6 +86,7 @@ func TestGenerateUserIsolationConfig_Enabled(t *testing.T) {
 	}
 
 	rendered := generateUserIsolationConfig(cluster).Render()
+	assert.Contains(t, rendered, "SOPERATOR_DOCKER_ENABLED=true")
 	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_ENABLED=true")
 	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_MEMORY_HIGH=2147483648")
 	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_MEMORY_MAX=3221225472")

@@ -1,5 +1,9 @@
 package consts
 
-// EnvDockerEnabled tells worker entrypoint scripts whether Docker components
-// (dockerd, docker CLI in jail) should be available on the node.
-const EnvDockerEnabled = "SOPERATOR_DOCKER_ENABLED"
+const (
+	// EnvDockerEnabled tells node entrypoint scripts whether Docker components should be available.
+	EnvDockerEnabled = "SOPERATOR_DOCKER_ENABLED"
+
+	// ImageStorageMountPath is the volume root shared by container runtimes.
+	ImageStorageMountPath = "/mnt/image-storage"
+)

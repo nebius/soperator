@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -54,14 +55,51 @@ var _ admission.Validator[*slurmv1.SlurmCluster] = &SlurmClusterCustomValidator{
 func (v *SlurmClusterCustomValidator) ValidateCreate(_ context.Context, slurmCluster *slurmv1.SlurmCluster) (admission.Warnings, error) {
 	slurmClusterLog.Info("Validation for SlurmCluster upon creation", "name", slurmCluster.GetName())
 
-	return nil, validateLoginUserIsolation(slurmCluster)
+	return nil, validateSlurmCluster(slurmCluster)
 }
 
 // ValidateUpdate implements admission.Validator so a webhook will be registered for the type SlurmCluster.
 func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, _, newSlurmCluster *slurmv1.SlurmCluster) (admission.Warnings, error) {
 	slurmClusterLog.Info("Validation for SlurmCluster upon update", "name", newSlurmCluster.GetName())
 
-	return nil, validateLoginUserIsolation(newSlurmCluster)
+	return nil, validateSlurmCluster(newSlurmCluster)
+}
+
+func validateSlurmCluster(cluster *slurmv1.SlurmCluster) error {
+	if err := validateLoginUserIsolation(cluster); err != nil {
+		return err
+	}
+	return validateLoginDocker(cluster)
+}
+
+func validateLoginDocker(cluster *slurmv1.SlurmCluster) error {
+	login := &cluster.Spec.SlurmNodes.Login
+	for _, env := range login.Sshd.CustomEnv {
+		if env.Name == consts.EnvDockerEnabled {
+			return fmt.Errorf(
+				"remove environment variable %q from login.sshd.customEnv because it is managed by Soperator",
+				consts.EnvDockerEnabled,
+			)
+		}
+	}
+	if login.Docker == nil || !ptr.Deref(login.Docker.Enabled, false) {
+		return nil
+	}
+	if login.UserIsolation == nil || !ptr.Deref(login.UserIsolation.Enabled, false) {
+		return fmt.Errorf("configure login.userIsolation.enabled=true when login Docker is enabled")
+	}
+
+	for _, mount := range login.Volumes.JailSubMounts {
+		if mount.MountPath != consts.ImageStorageMountPath {
+			continue
+		}
+		if mount.ReadOnly {
+			return fmt.Errorf("configure login Docker image storage at %s as writable", consts.ImageStorageMountPath)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("configure a writable login jail sub-mount at %s when login Docker is enabled", consts.ImageStorageMountPath)
 }
 
 // validateLoginUserIsolation checks the effective per-user memory limits.

@@ -79,9 +79,9 @@ effective_sshd_config_dir=$(mktemp -d /run/soperator-ssh-configs.XXXXXX)
     "${source_sshd_config_dir}" \
     "${effective_sshd_config_dir}"
 
-# Supervisor configuration is independently reconciled and can temporarily
-# retain the legacy SSHD command during upgrades. Keep its configured path
-# pointed at the startup snapshot prepared for the PAM jail.
+# A custom Supervisor configuration can retain the legacy SSHD command during
+# upgrades. Keep its configured path pointed at the startup snapshot prepared
+# for the PAM jail.
 mount --bind "${effective_sshd_config_dir}" "${source_sshd_config_dir}"
 /usr/sbin/sshd -t -f "${source_sshd_config_dir}/sshd_config"
 

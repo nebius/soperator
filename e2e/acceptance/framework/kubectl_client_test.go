@@ -18,7 +18,10 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 			"metadata": {"name": "soperator", "namespace": "soperator"},
 			"spec": {
 				"customSlurmConfig": "JobRequeue=0",
-				"slurmNodes": {"accounting": {"enabled": true}}
+				"slurmNodes": {
+					"accounting": {"enabled": true},
+					"login": {"docker": {"enabled": true}}
+				}
 			}
 		}`,
 	}}
@@ -26,10 +29,11 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 	cluster, err := NewKubectlClient(exec).SlurmCluster(t.Context(), "soperator")
 	require.NoError(t, err)
 	assert.Equal(t, SlurmClusterInfo{
-		Name:              "soperator",
-		Namespace:         "soperator",
-		AccountingEnabled: true,
-		CustomSlurmConfig: &customConfig,
+		Name:               "soperator",
+		Namespace:          "soperator",
+		AccountingEnabled:  true,
+		LoginDockerEnabled: true,
+		CustomSlurmConfig:  &customConfig,
 	}, cluster)
 }
 

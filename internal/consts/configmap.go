@@ -12,7 +12,6 @@ const (
 	ConfigMapNameSecurityLimits    = securityLimits
 	ConfigMapNameUserIsolation     = userIsolation
 	ConfigMapNameSysctl            = sysctl
-	ConfigMapNameSupervisord       = supervisord
 
 	ConfigMapKeySlurmConfig         = "slurm.conf"
 	ConfigMapKeySlurmBaseConfig     = "slurm_base.conf.noedit"
@@ -31,7 +30,6 @@ const (
 	ConfigMapKeySecurityLimits          = securityLimitsConfFile
 	ConfigMapKeyUserIsolation           = userIsolationConfFile
 	ConfigMapKeySysctl                  = sysctlConfFile
-	ConfigMapKeySupervisord             = supervisordConfFile
 	ConfigMapKeySoperatorcheckSbatch    = "sbatch.sh"
 
 	// AnnotationTopologyStructure records the topology structure the JailedConfig was last rendered

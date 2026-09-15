@@ -1142,6 +1142,12 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Optional
 	Autoscaling *LoginAutoscaling `json:"autoscaling,omitempty"`
+
+	// Docker defines Docker support for SSH sessions on login nodes.
+	// A writable jail sub-mount at /mnt/image-storage and login user isolation are required when enabled.
+	//
+	// +kubebuilder:validation:Optional
+	Docker *LoginDocker `json:"docker,omitempty"`
 }
 
 // LoginAutoscaling defines CPU-based horizontal scaling for login pods.
@@ -1172,6 +1178,15 @@ type LoginAutoscaling struct {
 	// +kubebuilder:validation:Maximum=100
 	// +kubebuilder:default=70
 	TargetCPUUtilizationPercentage int32 `json:"targetCPUUtilizationPercentage,omitempty"`
+}
+
+// LoginDocker defines Docker support for SSH sessions on login nodes.
+type LoginDocker struct {
+	// Enabled starts a rootful Docker daemon and routes container workloads into per-user cgroups.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // LoginUserIsolation defines per-user cgroup v2 limits applied to each SSH session on login nodes.

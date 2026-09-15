@@ -6,7 +6,6 @@ This Helm chart deploys custom ConfigMaps for the Soperator deployment.
 
 The chart contains configuration files that are deployed as Kubernetes ConfigMaps:
 
-- **supervisord.conf** - Supervisord configuration for managing slurmd, sshd, and dockerd processes
 - **daemon.json** - Docker daemon configuration with NVIDIA runtime support
 - **enroot.conf** - Enroot container configuration paths
 - **95-nebius-o11y** - MOTD (Message of the Day) script for Nebius observability
@@ -33,15 +32,10 @@ namespace: soperator
 
 # Enable/disable individual ConfigMaps
 configMaps:
-  supervisord:
-    enabled: true
   motd:
     enabled: true
   imageStorage:
     enabled: true
-
-docker:
-  enabled: true
 
 enroot:
   useDedicatedImageStorage: true
@@ -52,19 +46,15 @@ enroot:
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `namespace` | Namespace where ConfigMaps will be created | `soperator` |
-| `configMaps.supervisord.enabled` | Enable supervisord ConfigMap | `true` |
-| `configMaps.supervisord.name` | Name of supervisord ConfigMap | `custom-supervisord-config` |
 | `configMaps.motd.enabled` | Enable MOTD ConfigMap | `true` |
 | `configMaps.motd.name` | Name of MOTD ConfigMap | `motd-nebius-o11y` |
 | `configMaps.imageStorage.enabled` | Enable image storage ConfigMap | `true` |
 | `configMaps.imageStorage.name` | Name of image storage ConfigMap | `image-storage` |
-| `docker.enabled` | Start the Docker daemon on worker nodes; disable on clusters deployed without image-storage disks | `true` |
 | `enroot.useDedicatedImageStorage` | Store Enroot cache/data/runtime under `/mnt/image-storage/enroot`; when false, cache uses shared `/var/cache/enroot/user-$(id -u)` and data/runtime use Enroot defaults | `true` |
 
 ## Deployed ConfigMaps
 
 This chart creates the following ConfigMaps:
 
-1. **custom-supervisord-config** - Contains supervisord.conf
-2. **motd-nebius-o11y** - Contains 95-nebius-o11y script
-3. **image-storage** - Contains daemon.json and enroot.conf
+1. **motd-nebius-o11y** - Contains 95-nebius-o11y script
+2. **image-storage** - Contains daemon.json and enroot.conf

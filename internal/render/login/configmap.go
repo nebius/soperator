@@ -119,6 +119,7 @@ func generateUserIsolationConfig(cluster *values.SlurmCluster) renderutils.Confi
 	res := &renderutils.PropertiesConfig{}
 	res.AddComment(" Managed by soperator. Consumed by sshd_entrypoint.sh and the PAM session hook.")
 	res.AddComment(" Memory values are in bytes (cgroup v2 memory.high / memory.max).")
+	res.AddProperty(consts.EnvDockerEnabled, cluster.NodeLogin.DockerEnabled)
 
 	isolation := cluster.NodeLogin.UserIsolation
 	if isolation == nil || !ptr.Deref(isolation.Enabled, false) {

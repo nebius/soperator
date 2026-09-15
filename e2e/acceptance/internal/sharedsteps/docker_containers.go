@@ -24,28 +24,59 @@ const (
 	dockerJobCancelTimeout     = 3 * time.Minute
 	dockerContainerStopTimeout = 3 * time.Minute
 	dockerGPUSmokeTimeout      = 10 * time.Minute
+	dockerSSHSmokeTimeout      = 10 * time.Minute
+
+	dockerSSHUserName   = "dockeruser"
+	dockerSSHKeyName    = "soperator_e2e_docker_ssh"
+	dockerSSHKeyComment = "soperator-e2e-docker-ssh"
+	dockerWorkerSSHOK   = "WORKER_SSH_DOCKER_OK"
+
+	dockerSlurmStepdScope     = "slurmstepd.scope"
+	dockerSLUIDLength         = 14
+	dockerSLUIDBase32Alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 )
 
 type DockerContainers struct {
+	info     *framework.ClusterInfo
 	runtime  framework.Runtime
 	slurm    *framework.SlurmClient
+	kubectl  *framework.KubectlClient
 	selector *framework.WorkerSelector
 	workers  []framework.WorkerInfo
 	job      framework.SbatchJob
 
 	containerNamePrefix string
 	connectionWorker    framework.WorkerInfo
+
+	loginSSHContainerName string
+	dockerSSHIdentitySet  bool
+	loginSSHOutput        string
+	workerSSHOutput       string
 }
 
-func NewDockerContainers(runtime framework.Runtime, slurm *framework.SlurmClient, selector *framework.WorkerSelector) *DockerContainers {
+func NewDockerContainers(
+	info *framework.ClusterInfo,
+	runtime framework.Runtime,
+	slurm *framework.SlurmClient,
+	kubectl *framework.KubectlClient,
+	selector *framework.WorkerSelector,
+) *DockerContainers {
 	return &DockerContainers{
+		info:     info,
 		runtime:  runtime,
 		slurm:    slurm,
+		kubectl:  kubectl,
 		selector: selector,
 	}
 }
 
 func (s *DockerContainers) RegisterSteps(sc *godog.ScenarioContext) {
+	sc.Step(`^login Docker is enabled$`, s.loginDockerIsEnabled)
+	sc.Step(`^a Docker SSH test user exists$`, s.aDockerSSHTestUserExists)
+	sc.Step(`^the user runs Docker lifecycle commands over SSH on the login node$`, s.theUserRunsDockerLifecycleCommandsOverSSHOnTheLoginNode)
+	sc.Step(`^Docker uses the login proxy, image storage, and the user's cgroup$`, s.dockerUsesTheLoginProxyImageStorageAndTheUsersCgroup)
+	sc.Step(`^the user runs a Docker container over SSH on a worker node$`, s.theUserRunsADockerContainerOverSSHOnAWorkerNode)
+	sc.Step(`^the Docker container succeeds over worker SSH$`, s.theDockerContainerSucceedsOverWorkerSSH)
 	sc.Step(`^a long-running Docker container job is submitted on two workers$`, s.aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers)
 	sc.Step(`^the Docker container job is running$`, s.theDockerContainerJobIsRunning)
 	sc.Step(`^Docker image and runtime storage is populated on a worker$`, s.dockerImageAndRuntimeStorageIsPopulatedOnAWorker)
@@ -58,6 +89,26 @@ func (s *DockerContainers) RegisterSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *DockerContainers) CleanupAndReset(ctx context.Context) {
+	if s.loginSSHContainerName != "" {
+		cleanupCommand := fmt.Sprintf(
+			"docker rm -f %s >/dev/null 2>&1 || true",
+			framework.ShellQuote(s.loginSSHContainerName),
+		)
+		if _, cleanupErr := s.runtime.Jail().Run(ctx, cleanupCommand); cleanupErr != nil {
+			s.runtime.Logf("cleanup: remove login Docker container: %v", cleanupErr)
+		}
+	}
+	if s.dockerSSHIdentitySet {
+		if cleanupErr := removeSSHTestIdentity(
+			ctx,
+			s.runtime,
+			dockerSSHUserName,
+			dockerSSHKeyName,
+			dockerSSHKeyComment,
+		); cleanupErr != nil {
+			s.runtime.Logf("cleanup: remove Docker SSH identity: %v", cleanupErr)
+		}
+	}
 	if cleanupErr := s.requestCurrentJobCancellation(ctx); cleanupErr != nil {
 		s.runtime.Logf("cleanup: cancel Docker job: %v", cleanupErr)
 	}
@@ -70,6 +121,178 @@ func (s *DockerContainers) CleanupAndReset(ctx context.Context) {
 	s.job = framework.SbatchJob{}
 	s.containerNamePrefix = ""
 	s.connectionWorker = framework.WorkerInfo{}
+	s.loginSSHContainerName = ""
+	s.dockerSSHIdentitySet = false
+	s.loginSSHOutput = ""
+	s.workerSSHOutput = ""
+}
+
+func (s *DockerContainers) loginDockerIsEnabled(ctx context.Context) error {
+	cluster, err := s.kubectl.SlurmCluster(ctx, s.info.SlurmClusterName)
+	if err != nil {
+		return err
+	}
+	if !cluster.LoginDockerEnabled {
+		s.runtime.Logf("login Docker is disabled, skipping scenario")
+		return godog.ErrSkip
+	}
+
+	return nil
+}
+
+func (s *DockerContainers) aDockerSSHTestUserExists(ctx context.Context) error {
+	if err := ensureSSHTestUser(ctx, s.runtime, dockerSSHUserName); err != nil {
+		return err
+	}
+
+	s.dockerSSHIdentitySet = true
+	return ensureSSHTestIdentity(
+		ctx,
+		s.runtime,
+		dockerSSHUserName,
+		dockerSSHKeyName,
+		dockerSSHKeyComment,
+	)
+}
+
+func (s *DockerContainers) theUserRunsDockerLifecycleCommandsOverSSHOnTheLoginNode(ctx context.Context) error {
+	s.loginSSHContainerName = fmt.Sprintf("soperator-e2e-login-docker-%d", time.Now().UnixNano())
+	remoteCommand := fmt.Sprintf(`
+set -euo pipefail
+name=%s
+image=%s
+cleanup() {
+    docker rm -f "${name}" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+echo "DOCKER_ROOT=$(docker info --format '{{.DockerRootDir}}')"
+if docker -H unix:///run/soperator-dockerd.sock version >/dev/null 2>&1; then
+    echo "private Docker socket is accessible" >&2
+    exit 1
+fi
+
+uid=$(id -u)
+echo "EXPECTED_SESSION_CGROUP=/users/user-${uid}/sessions"
+echo "SESSION_CGROUP=$(sed -n 's/^0:://p' /proc/self/cgroup)"
+
+docker run -d \
+    --name "${name}" \
+    --cgroup-parent=/escape \
+    "${image}" sleep 300 >/dev/null
+container_pid=$(docker inspect --format '{{.State.Pid}}' "${name}")
+echo "EXPECTED_USER_CGROUP=/users/user-${uid}/docker/"
+echo "CONTAINER_CGROUP=$(sed -n 's/^0:://p' "/proc/${container_pid}/cgroup")"
+
+docker exec "${name}" true
+`, framework.ShellQuote(s.loginSSHContainerName), framework.ShellQuote(dockerLifecycleImage))
+
+	output, err := s.runLoginDockerSSHCommand(ctx, remoteCommand)
+	if err != nil {
+		return fmt.Errorf("run Docker lifecycle over login SSH: %w", err)
+	}
+	s.loginSSHOutput = output
+	return nil
+}
+
+func (s *DockerContainers) dockerUsesTheLoginProxyImageStorageAndTheUsersCgroup() error {
+	if got := dockerSSHOutputValue(s.loginSSHOutput, "DOCKER_ROOT"); got != dockerLocalStorageRoot {
+		return fmt.Errorf(
+			"login Docker root = %q, want %q; output: %s",
+			got,
+			dockerLocalStorageRoot,
+			strings.TrimSpace(s.loginSSHOutput),
+		)
+	}
+
+	expectedSessionCgroup := dockerSSHOutputValue(s.loginSSHOutput, "EXPECTED_SESSION_CGROUP")
+	sessionCgroup := dockerSSHOutputValue(s.loginSSHOutput, "SESSION_CGROUP")
+	if expectedSessionCgroup == "" || !strings.HasSuffix(sessionCgroup, expectedSessionCgroup) {
+		return fmt.Errorf(
+			"login Docker SSH session cgroup %q does not end with %q; output: %s",
+			sessionCgroup,
+			expectedSessionCgroup,
+			strings.TrimSpace(s.loginSSHOutput),
+		)
+	}
+
+	expectedCgroup := dockerSSHOutputValue(s.loginSSHOutput, "EXPECTED_USER_CGROUP")
+	containerCgroup := dockerSSHOutputValue(s.loginSSHOutput, "CONTAINER_CGROUP")
+	if expectedCgroup == "" || !strings.Contains(containerCgroup, expectedCgroup) {
+		return fmt.Errorf(
+			"login Docker container cgroup %q does not contain per-user parent %q; output: %s",
+			containerCgroup,
+			expectedCgroup,
+			strings.TrimSpace(s.loginSSHOutput),
+		)
+	}
+
+	return nil
+}
+
+func (s *DockerContainers) runLoginDockerSSHCommand(ctx context.Context, remoteCommand string) (string, error) {
+	return runSSHCommand(
+		ctx,
+		s.runtime,
+		dockerSSHUserName,
+		dockerSSHKeyName,
+		"localhost",
+		dockerSSHSmokeTimeout,
+		remoteCommand,
+	)
+}
+
+func (s *DockerContainers) theUserRunsADockerContainerOverSSHOnAWorkerNode(ctx context.Context) error {
+	workers, err := s.selector.PickWorkers(ctx, 1)
+	if err != nil {
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
+	}
+	worker := workers[0]
+	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, dockerSSHUserName, worker); err != nil {
+		return err
+	}
+
+	remoteCommand := fmt.Sprintf(
+		"docker run --rm %s echo %s",
+		framework.ShellQuote(dockerLifecycleImage),
+		framework.ShellQuote(dockerWorkerSSHOK),
+	)
+	output, err := runSSHCommand(
+		ctx,
+		s.runtime,
+		dockerSSHUserName,
+		dockerSSHKeyName,
+		worker.Name,
+		dockerSSHSmokeTimeout,
+		remoteCommand,
+	)
+	if err != nil {
+		return fmt.Errorf("run Docker container over SSH on worker %s: %w", worker.Name, err)
+	}
+	s.workerSSHOutput = output
+	return nil
+}
+
+func (s *DockerContainers) theDockerContainerSucceedsOverWorkerSSH() error {
+	if !strings.Contains(s.workerSSHOutput, dockerWorkerSSHOK) {
+		return fmt.Errorf(
+			"Docker worker SSH output does not contain %q: %s",
+			dockerWorkerSSHOK,
+			strings.TrimSpace(s.workerSSHOutput),
+		)
+	}
+
+	return nil
+}
+
+func dockerSSHOutputValue(output, key string) string {
+	prefix := key + "="
+	for line := range strings.SplitSeq(output, "\n") {
+		if value, ok := strings.CutPrefix(strings.TrimSpace(line), prefix); ok {
+			return value
+		}
+	}
+	return ""
 }
 
 func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers(ctx context.Context) error {
@@ -146,6 +369,18 @@ func (s *DockerContainers) dockerImageAndRuntimeStorageIsPopulatedOnAWorker(ctx 
 				}
 				if !graphDriverPathsUnder(paths, dockerLocalStorageRoot) {
 					return false, fmt.Errorf("expected Docker graph-driver paths under %s, got:\n%s", dockerLocalStorageRoot, paths)
+				}
+
+				cgroupParent, err := s.dockerContainerCgroupParent(waitCtx, s.connectionWorker, containerID)
+				if err != nil {
+					return false, err
+				}
+				if !dockerCgroupParentBelongsToJob(cgroupParent, s.job.ID) {
+					return false, fmt.Errorf(
+						"expected Docker cgroup parent for Slurm job %s, got %q",
+						s.job.ID,
+						cgroupParent,
+					)
 				}
 				return true, nil
 			}
@@ -319,6 +554,15 @@ func (s *DockerContainers) dockerContainerGraphDriverPaths(ctx context.Context, 
 	return strings.TrimSpace(out), nil
 }
 
+func (s *DockerContainers) dockerContainerCgroupParent(ctx context.Context, worker framework.WorkerInfo, containerID string) (string, error) {
+	out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx,
+		fmt.Sprintf("sudo docker inspect --format '{{.HostConfig.CgroupParent}}' %s", framework.ShellQuote(containerID)))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
 func (s *DockerContainers) dockerContainerIDsByNamePrefixAll(ctx context.Context, worker framework.WorkerInfo) (map[string]struct{}, error) {
 	if s.containerNamePrefix == "" {
 		return nil, fmt.Errorf("Docker container name prefix is empty")
@@ -384,6 +628,64 @@ func graphDriverPathsUnder(output, root string) bool {
 		}
 	}
 	return foundPath
+}
+
+func dockerCgroupParentBelongsToJob(value, jobID string) bool {
+	cleaned := path.Clean(strings.TrimSpace(value))
+	if cleaned == "." || !strings.HasPrefix(cleaned, "/") || strings.TrimSpace(jobID) == "" {
+		return false
+	}
+
+	components := strings.Split(strings.TrimPrefix(cleaned, "/"), "/")
+	if len(components) < 3 || components[len(components)-1] != "user" {
+		return false
+	}
+
+	stepIndex := len(components) - 2
+	jobIndex := stepIndex - 1
+	if !isDockerSlurmStepComponent(components[stepIndex]) {
+		return false
+	}
+	if components[jobIndex] == "job_"+jobID {
+		return true
+	}
+
+	// Slurm 26.05 uses an opaque SLUID instead of job_<id>. The caller binds the
+	// container to jobID through its name prefix, so validate the strict SLUID
+	// hierarchy here.
+	return jobIndex > 0 && components[jobIndex-1] == dockerSlurmStepdScope && isDockerSLUID(components[jobIndex])
+}
+
+func isDockerSLUID(value string) bool {
+	if len(value) != dockerSLUIDLength || value[0] != 's' {
+		return false
+	}
+	for _, character := range value[1:] {
+		if !strings.ContainsRune(dockerSLUIDBase32Alphabet, character) {
+			return false
+		}
+	}
+	return true
+}
+
+func isDockerSlurmStepComponent(value string) bool {
+	if hasDockerNumericSuffix(value, "step_") {
+		return true
+	}
+	return value == "step_batch" || value == "step_extern" || value == "step_interactive"
+}
+
+func hasDockerNumericSuffix(value, prefix string) bool {
+	suffix, ok := strings.CutPrefix(value, prefix)
+	if !ok || suffix == "" {
+		return false
+	}
+	for _, character := range suffix {
+		if character < '0' || character > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func pathIsUnder(value, root string) bool {
