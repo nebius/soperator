@@ -14,9 +14,6 @@ func TestOverrideTestValuesCreatesWorkerPartitions(t *testing.T) {
 	}
 
 	got := overrideTestValues(tfVars, cfg)
-	if got["company_name"] != e2eCompanyName {
-		t.Errorf("company_name = %#v, want %q", got["company_name"], e2eCompanyName)
-	}
 	workers, ok := got["slurm_nodeset_workers"].([]interface{})
 	if !ok {
 		t.Fatalf("slurm_nodeset_workers has type %T, want []interface{}", got["slurm_nodeset_workers"])

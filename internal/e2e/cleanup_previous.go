@@ -12,30 +12,18 @@ import (
 )
 
 // RunCleanupPrevious destroys whatever infrastructure a previous e2e run left in
-// the shared remote state, then removes known e2e resources that never reached
-// the state, before the current run inits and applies.
+// the shared remote state, before the current run inits and applies.
 //
 // Stage A destroys with the saved terraform bundle — the exact code that created the leftover state
 // — which is immune to provider/schema drift between branches.
 // If no bundle exists, or its destroy fails, Stage B falls back to a destroy with the current checkout.
 func RunCleanupPrevious(ctx context.Context, cfg Config) error {
-	if err := cleanupPreviousTerraformState(ctx, cfg); err != nil {
-		return err
-	}
-	deleteBundle(ctx)
-
-	if err := cleanupOrphanedCloudResources(ctx, cfg.Profile.NebiusProjectID); err != nil {
-		return fmt.Errorf("clean up orphaned e2e resources: %w", err)
-	}
-	return nil
-}
-
-func cleanupPreviousTerraformState(ctx context.Context, cfg Config) error {
 	if bundleExists(ctx) {
 		if err := cleanupFromBundle(ctx, cfg); err != nil {
 			log.Printf("Saved-bundle destroy failed: %v", err)
 			log.Printf("Falling back to current checkout")
 		} else {
+			deleteBundle(ctx)
 			return nil
 		}
 	} else {
@@ -52,6 +40,7 @@ func cleanupPreviousTerraformState(ctx context.Context, cfg Config) error {
 	if err := stripHelmThenDestroy(ctx, tf, varFilePath); err != nil {
 		return fmt.Errorf("current-checkout cleanup destroy: %w", err)
 	}
+	deleteBundle(ctx)
 	return nil
 }
 
