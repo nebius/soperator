@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	clocktesting "k8s.io/utils/clock/testing"
@@ -154,6 +155,48 @@ func TestWorkerCleanupFollowsHandoffThroughPodReplacement(t *testing.T) {
 	reconcileWorkerCleanupTick(t, r, sts)
 	clock.Step(testRollingUpdateInterval)
 	reconcileWorkerCleanupTick(t, r, sts)
+	slurmClient.AssertExpectations(t)
+}
+
+func TestWorkerCleanupContinuesDuringNodeRollout(t *testing.T) {
+	ctx := t.Context()
+	slurmClient := &slurmapifake.MockClient{}
+	r, sts, drainingPod, _ := testK8sNodeRolloutReconciler(t, slurmClient)
+	sts.Spec.Replicas = ptr.To(int32(2))
+	sts.Status.ReadyReplicas = 2
+	require.NoError(t, r.Update(ctx, sts))
+	recoveredPod := drainingPod.DeepCopy()
+	recoveredPod.Name = "worker-1"
+	recoveredPod.UID = "recovered-worker-uid"
+	recoveredPod.ResourceVersion = ""
+	recoveredPod.Spec.NodeName = "replacement-node"
+	require.NoError(t, r.Create(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: recoveredPod.Spec.NodeName}}))
+	require.NoError(t, r.Create(ctx, recoveredPod))
+	nodes := []slurmapi.Node{
+		{Name: drainingPod.Name, States: nodeStates(api.V0044NodeStateIDLE)},
+		staleRollingUpdateNode(recoveredPod.Name),
+	}
+	slurmClient.On("ListNodes", mock.Anything).Return(nodes, nil).Once()
+	slurmClient.On("UndrainNodes", mock.Anything, []string{recoveredPod.Name}).Return(assert.AnError).Once()
+	slurmClient.On("RebootNodes", mock.Anything, slurmapi.RebootNodesRequest{
+		NodeList: drainingPod.Name, ASAP: true, Reason: defaultRebootReason, PowerAction: consts.SlurmPowerActionWorkerHandoff,
+	}).Return(nil).Once()
+	reconcileWorkerCleanupTick(t, r, sts)
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(drainingPod), drainingPod))
+	require.Equal(t, consts.LabelSoperatorWorkerOperationPhaseStopping, drainingPod.Labels[consts.LabelSoperatorWorkerOperationPhase])
+
+	// Even if every handoff now awaits eviction, retry cleanup without undraining the released worker.
+	drainingPod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseReady
+	require.NoError(t, r.Update(ctx, drainingPod))
+	nodes[0] = staleRollingUpdateNode(drainingPod.Name)
+	slurmClient.On("ListNodes", mock.Anything).Return(nodes, nil).Once()
+	slurmClient.On("UndrainNodes", mock.Anything, []string{recoveredPod.Name}).Return(nil).Once()
+	reconcileWorkerCleanupTick(t, r, sts)
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(drainingPod), drainingPod))
+	assert.Nil(t, drainingPod.DeletionTimestamp)
+	assert.Equal(t, consts.LabelSoperatorWorkerOperationPhaseReady, drainingPod.Labels[consts.LabelSoperatorWorkerOperationPhase])
+	slurmClient.AssertNumberOfCalls(t, "ListNodes", 2)
+	slurmClient.AssertNumberOfCalls(t, "RebootNodes", 1)
 	slurmClient.AssertExpectations(t)
 }
 

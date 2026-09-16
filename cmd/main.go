@@ -319,6 +319,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(nodeSetNameLower+"-controller"),
+			controllersSet.Enabled("rollingupdate"),
 		).
 			SetupWithManager(mgr, nodeSetNameLower, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create controller", "controller", nodeSetName)

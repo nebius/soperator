@@ -257,7 +257,7 @@ func TestProcessRollingUpdateDeletesCrashLoopingWorkerInit(t *testing.T) {
 	}
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, nil)
-	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}}, nil)
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &pod)
 }
@@ -270,7 +270,7 @@ func TestProcessRollingUpdateDeletesPodWithCompletedWorkerHandoff(t *testing.T) 
 	}
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, nil)
-	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}}, nil)
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &pod)
 }
@@ -294,7 +294,7 @@ func TestProcessRollingUpdateDeletesSafelyOfflineCrashLoopingSlurmd(t *testing.T
 	}}, nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}}, nil)
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &pod)
 	slurmClient.AssertExpectations(t)
@@ -323,7 +323,7 @@ func TestProcessRollingUpdateDeletesSafelyOfflineRebootHandoff(t *testing.T) {
 	}}, nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}}, nil)
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &pod)
 	slurmClient.AssertExpectations(t)
@@ -383,7 +383,7 @@ func TestProcessRollingUpdateContinuesWithinBudgetAfterSafeDelete(t *testing.T) 
 		&candidatePod,
 		&waitingPod,
 	)
-	err := reconciler.processWorkerReplacements(context.Background(), "cluster", sts, []workerReplacement{{pod: deletingPod, operationID: "new-revision"}, {pod: candidatePod, operationID: "new-revision"}, {pod: waitingPod, operationID: "new-revision"}})
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", sts, []workerReplacement{{pod: deletingPod, operationID: "new-revision"}, {pod: candidatePod, operationID: "new-revision"}, {pod: waitingPod, operationID: "new-revision"}}, nil)
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &deletingPod)
 
@@ -506,7 +506,7 @@ func TestProcessRollingUpdateRefillsBudgetWhileHandoffsComplete(t *testing.T) {
 				}).Return(nil).Once()
 			}
 			r, kubeClient := testRollingUpdateReconcilerWithPods(t, slurmClient, pods...)
-			require.NoError(t, r.processWorkerReplacements(ctx, "cluster", sts, replacements))
+			require.NoError(t, r.processWorkerReplacements(ctx, "cluster", sts, replacements, nil))
 
 			finishingPod := pods[tt.readyReplacements]
 			if tt.k8sNodeCordoned {
@@ -552,7 +552,7 @@ func TestProcessRollingUpdateKeepsSafelyOfflineUnmanagedRebootWithoutHandoff(t *
 	}}, nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}}, nil)
 	require.NoError(t, err)
 
 	got := &corev1.Pod{}
@@ -580,7 +580,7 @@ func TestProcessRollingUpdateDeletesSafelyOfflineManagedRebootWithoutHandoff(t *
 	}}, nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}}, nil)
 	require.NoError(t, err)
 	assertPodDeleted(t, kubeClient, &pod)
 	slurmClient.AssertExpectations(t)
@@ -601,7 +601,7 @@ func TestProcessRollingUpdateKeepsCrashLoopingSlurmdWithAllocations(t *testing.T
 	}}, nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}}, nil)
 	require.NoError(t, err)
 
 	got := &corev1.Pod{}
@@ -631,7 +631,7 @@ func TestProcessRollingUpdateStartsRevisionScopedWorkerOperation(t *testing.T) {
 	}).Return(nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processWorkerReplacements(context.Background(), "cluster", sts, []workerReplacement{{pod: pod, operationID: "new-revision"}})
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", sts, []workerReplacement{{pod: pod, operationID: "new-revision"}}, nil)
 	require.NoError(t, err)
 
 	got := &corev1.Pod{}
@@ -655,7 +655,7 @@ func TestProcessRollingUpdateUndrainsStaleDrainBeforeReboot(t *testing.T) {
 	slurmClient.On("UndrainNodes", mock.Anything, []string{pod.Name}).Return(nil).Once()
 
 	reconciler, kubeClient := testRollingUpdateReconciler(t, &pod, slurmClient)
-	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}})
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", testStatefulSet(), []workerReplacement{{pod: pod, operationID: "new-revision"}}, nil)
 	require.NoError(t, err)
 
 	got := &corev1.Pod{}
@@ -703,7 +703,7 @@ func TestProcessRollingUpdateContinuesWithinBudgetAfterUndrain(t *testing.T) {
 		&undrainedPod,
 		&candidatePod,
 	)
-	err := reconciler.processWorkerReplacements(context.Background(), "cluster", sts, []workerReplacement{{pod: undrainedPod, operationID: "new-revision"}, {pod: candidatePod, operationID: "new-revision"}})
+	err := reconciler.processWorkerReplacements(context.Background(), "cluster", sts, []workerReplacement{{pod: undrainedPod, operationID: "new-revision"}, {pod: candidatePod, operationID: "new-revision"}}, nil)
 	require.NoError(t, err)
 	slurmClient.AssertExpectations(t)
 }

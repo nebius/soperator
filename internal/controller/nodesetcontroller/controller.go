@@ -66,6 +66,8 @@ import (
 type NodeSetReconciler struct {
 	*reconciler.Reconciler
 
+	rollingUpdateEnabled bool
+
 	AdvancedStatefulSet *reconciler.AdvancedStatefulSetReconciler
 	Service             *reconciler.ServiceReconciler
 	ServiceAccount      *reconciler.ServiceAccountReconciler
@@ -76,18 +78,21 @@ type NodeSetReconciler struct {
 	RoleBinding         *reconciler.RoleBindingReconciler
 }
 
-func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *NodeSetReconciler {
+func NewNodeSetReconciler(
+	client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder, rollingUpdateEnabled bool,
+) *NodeSetReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	return &NodeSetReconciler{
-		Reconciler:          r,
-		AdvancedStatefulSet: reconciler.NewAdvancedStatefulSetReconciler(r),
-		Service:             reconciler.NewServiceReconciler(r),
-		ServiceAccount:      reconciler.NewServiceAccountReconciler(r),
-		Secret:              reconciler.NewSecretReconciler(r),
-		ConfigMap:           reconciler.NewConfigMapReconciler(r),
-		NodeSetPowerState:   reconciler.NewNodeSetPowerStateReconciler(r),
-		Role:                reconciler.NewRoleReconciler(r),
-		RoleBinding:         reconciler.NewRoleBindingReconciler(r),
+		Reconciler:           r,
+		rollingUpdateEnabled: rollingUpdateEnabled,
+		AdvancedStatefulSet:  reconciler.NewAdvancedStatefulSetReconciler(r),
+		Service:              reconciler.NewServiceReconciler(r),
+		ServiceAccount:       reconciler.NewServiceAccountReconciler(r),
+		Secret:               reconciler.NewSecretReconciler(r),
+		ConfigMap:            reconciler.NewConfigMapReconciler(r),
+		NodeSetPowerState:    reconciler.NewNodeSetPowerStateReconciler(r),
+		Role:                 reconciler.NewRoleReconciler(r),
+		RoleBinding:          reconciler.NewRoleBindingReconciler(r),
 	}
 }
 

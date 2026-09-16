@@ -10,7 +10,8 @@ nodesets:
     maxUnavailable: 1
 ```
 
-The NodeSet controller creates a `policy/v1` PodDisruptionBudget (PDB) before reconciling its worker StatefulSet.
+When the `rollingupdate` controller is enabled, the NodeSet controller creates a `policy/v1` PodDisruptionBudget (PDB)
+before reconciling its worker StatefulSet.
 The PDB has the same namespace and name as the StatefulSet, uses `maxUnavailable: 0`, and selects this NodeSet's
 workers unless they carry `slurm.nebius.ai/worker-operation-phase: ready`. Existing workers and replacement pods
 are protected without needing a new label in the pod template. Running but unready workers use `IfHealthyBudget`
@@ -111,6 +112,9 @@ batch while successfully prepared workers proceed. Its reserved budget slot rema
 because the pod may have become unavailable since the snapshot. Errors are reported after attempting the reboot
 batch, and failed workers are reconsidered on the next periodic pass without immediate patch retries.
 
+Cleanup of recovered workers continues while other workers are still rolling out or waiting for eviction. It uses
+an up-to-date, Ready pod outside the replacement set and shares the same Slurm node list as active handoffs.
+
 Stale rolling-update drains are cleared with one batch Slurm `UNDRAIN` request per pass. A batch error is logged
 without stopping independent handoffs; workers selected for undrain keep their budget slots for the current pass.
 The request may have applied partially, so the next pass reads Slurm state again and selects only drains that still
@@ -139,6 +143,9 @@ This handles voluntary eviction through the Kubernetes Eviction API. Direct pod 
 may continue to block eviction after Soperator releases its protection.
 
 Switching a NodeSet back to `rollingUpdate` removes its Soperator-owned PDB and disables this coordination.
+Disabling the `rollingupdate` controller (for example, `--controllers=*,-rollingupdate`) also removes these PDBs
+and prevents their creation, provided the NodeSet controller remains enabled. Re-enabling `rollingupdate` recreates
+them for NodeSets using `slurmAwareRollingUpdate`. PDBs owned by other resources are left untouched.
 The PDB is also garbage-collected with its NodeSet.
 
 ## Inspect progress

@@ -1,8 +1,6 @@
 package updatecontroller
 
 import (
-	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -10,7 +8,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/slurmapi"
@@ -117,32 +114,26 @@ func (s *workerCleanupState) observeSlurmNodes(nodes []slurmapi.Node, now time.T
 	s.checkRequired = false
 }
 
-func (r *RollingUpdateReconciler) reconcileWorkerCleanup(
-	ctx context.Context,
-	clusterName string,
-	sts *kruisev1b1.StatefulSet,
-	pods []corev1.Pod,
-	cleanup *workerCleanupState,
-) error {
-	if len(pods) == 0 || !cleanup.needsCheck(r.clock.Now(), r.idleSlurmAuditInterval) {
-		return nil
+func workerPodsWithoutReplacements(pods []corev1.Pod, replacements []workerReplacement) []corev1.Pod {
+	if len(replacements) == 0 {
+		return pods
 	}
-	ctx = log.IntoContext(ctx, log.FromContext(ctx).WithName("rolling-update-reconciler"))
-	slurmClient, ok := r.slurmAPIClients.GetClient(types.NamespacedName{
-		Namespace: sts.Namespace,
-		Name:      clusterName,
-	})
-	if !ok {
-		return fmt.Errorf("no slurm api client for %s/%s", sts.Namespace, clusterName)
+	replacing := make(map[string]struct{}, len(replacements))
+	for _, replacement := range replacements {
+		replacing[replacement.pod.Name] = struct{}{}
 	}
-	slurmNodes, err := slurmClient.ListNodes(ctx)
-	if err != nil {
-		return err
+	var cleanupPods []corev1.Pod
+	for _, pod := range pods {
+		if _, found := replacing[pod.Name]; !found {
+			cleanupPods = append(cleanupPods, pod)
+		}
 	}
-	// Observe before UNDRAIN: even a successful batch is confirmed by the next
-	// read. DOWN+DRAIN, ongoing reboots and unready workers stay pending too.
-	cleanup.observeSlurmNodes(slurmNodes, r.clock.Now())
+	return cleanupPods
+}
 
+func staleWorkerCleanupDrains(
+	sts *kruisev1b1.StatefulSet, pods []corev1.Pod, slurmNodes []slurmapi.Node,
+) []string {
 	eligibleNodeNames := make(map[string]struct{}, len(pods))
 	for _, pod := range pods {
 		if pod.DeletionTimestamp == nil &&
@@ -159,6 +150,5 @@ func (r *RollingUpdateReconciler) reconcileWorkerCleanup(
 			nodesToUndrain = append(nodesToUndrain, slurmNode.Name)
 		}
 	}
-	undrainStaleRollingUpdateNodes(ctx, slurmClient, nodesToUndrain)
-	return nil
+	return nodesToUndrain
 }

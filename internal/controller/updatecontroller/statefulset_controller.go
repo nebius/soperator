@@ -156,13 +156,7 @@ func (r *RollingUpdateReconciler) reconcileWorkerStatefulSet(ctx context.Context
 	if err != nil {
 		return err
 	}
-	cleanup := r.workerCleanup.forStatefulSet(sts)
-	cleanup.observePods(podList)
 	replacements := planWorkerPodReplacements(sts, podList, k8sNodeCordonStates)
-	if len(replacements) == 0 {
-		return r.reconcileWorkerCleanup(ctx, clusterName, sts, podList, cleanup)
-	}
-	cleanup.trackReplacements(replacements)
 	// StatefulSet status can lag behind pod events, particularly just after eviction.
 	readyReplicas := int32(0)
 	for _, pod := range podList {
@@ -171,7 +165,7 @@ func (r *RollingUpdateReconciler) reconcileWorkerStatefulSet(ctx context.Context
 		}
 	}
 	sts.Status.ReadyReplicas = min(sts.Status.ReadyReplicas, readyReplicas)
-	return r.processWorkerReplacements(ctx, clusterName, sts, replacements)
+	return r.processWorkerReplacements(ctx, clusterName, sts, replacements, podList)
 }
 
 func (r *RollingUpdateReconciler) getPodList(
@@ -240,19 +234,21 @@ func (r *RollingUpdateReconciler) processWorkerReplacements(
 	clusterName string,
 	sts *kruisev1b1.StatefulSet,
 	replacements []workerReplacement,
+	pods []corev1.Pod,
 ) error {
-	if len(replacements) == 0 {
-		return nil
-	}
 	ctx = log.IntoContext(ctx, log.FromContext(ctx).WithName("rolling-update-reconciler").
 		WithValues("namespace", sts.Namespace, "name", sts.Name))
+	cleanup := r.workerCleanup.forStatefulSet(sts)
+	cleanup.observePods(pods)
+	cleanupPods := workerPodsWithoutReplacements(pods, replacements)
 
 	prioritizeCordonedWorkers(replacements)
 	progress, err := r.reconcileWorkerPodHandoffs(ctx, replacements)
 	if err != nil {
 		return err
 	}
-	if len(progress.pending) == 0 {
+	if len(progress.pending) == 0 &&
+		(len(cleanupPods) == 0 || !cleanup.needsCheck(r.clock.Now(), r.idleSlurmAuditInterval)) {
 		return nil
 	}
 
@@ -260,8 +256,20 @@ func (r *RollingUpdateReconciler) processWorkerReplacements(
 	if !ok {
 		return fmt.Errorf("no slurm api client for %s/%s", sts.Namespace, clusterName)
 	}
-	candidates, readyPodsConsumingBudget, err := r.reconcileSlurmWorkerHandoffs(ctx, slurmClient, progress.pending)
+	slurmNodes, err := slurmClient.ListNodes(ctx)
 	if err != nil {
+		return err
+	}
+	// Observe before UNDRAIN or reboot: the next read must confirm their effects.
+	cleanup.observeSlurmNodes(slurmNodes, r.clock.Now())
+	if len(replacements) > 0 {
+		cleanup.trackReplacements(replacements)
+	}
+	nodesToUndrain := staleWorkerCleanupDrains(sts, cleanupPods, slurmNodes)
+	candidates, readyPodsConsumingBudget, err := r.reconcileSlurmWorkerHandoffs(
+		ctx, slurmClient, slurmNodes, progress.pending, nodesToUndrain,
+	)
+	if err != nil || len(progress.pending) == 0 {
 		return err
 	}
 	readyPodsConsumingBudget += progress.readyPodsConsumingBudget
@@ -315,16 +323,13 @@ func (r *RollingUpdateReconciler) reconcileWorkerPodHandoffs(
 }
 
 func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
-	ctx context.Context, slurmClient slurmapi.Client, replacements []workerReplacement,
+	ctx context.Context, slurmClient slurmapi.Client, slurmNodes []slurmapi.Node,
+	replacements []workerReplacement, nodesToUndrain []string,
 ) ([]workerReplacement, int, error) {
 	logger := log.FromContext(ctx)
-	slurmNodesByName, err := getSlurmNodesForReplacements(ctx, slurmClient, replacements)
-	if err != nil {
-		return nil, 0, err
-	}
+	slurmNodesByName := slurmNodesForReplacements(slurmNodes, replacements)
 
 	var candidates []workerReplacement
-	var nodesToUndrain []string
 	var missingSlurmNodes []string
 	readyPodsConsumingBudget := 0
 	for _, replacement := range replacements {
@@ -381,13 +386,9 @@ func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
 	return candidates, readyPodsConsumingBudget, nil
 }
 
-func getSlurmNodesForReplacements(
-	ctx context.Context, slurmClient slurmapi.Client, replacements []workerReplacement,
-) (map[string]slurmapi.Node, error) {
-	slurmNodes, err := slurmClient.ListNodes(ctx)
-	if err != nil {
-		return nil, err
-	}
+func slurmNodesForReplacements(
+	slurmNodes []slurmapi.Node, replacements []workerReplacement,
+) map[string]slurmapi.Node {
 	podNames := make(map[string]struct{}, len(replacements))
 	for _, replacement := range replacements {
 		podNames[replacement.pod.Name] = struct{}{}
@@ -398,7 +399,7 @@ func getSlurmNodesForReplacements(
 			nodesByName[node.Name] = node
 		}
 	}
-	return nodesByName, nil
+	return nodesByName
 }
 
 func availableWorkerHandoffSlots(ctx context.Context, sts *kruisev1b1.StatefulSet, readyPodsConsumingBudget int) int {

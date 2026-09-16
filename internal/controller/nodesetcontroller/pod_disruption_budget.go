@@ -23,7 +23,7 @@ func (r *NodeSetReconciler) reconcilePodDisruptionBudget(
 	existing := &policyv1.PodDisruptionBudget{ObjectMeta: metav1.ObjectMeta{
 		Name: desired.Name, Namespace: desired.Namespace,
 	}}
-	if nodeSet.UpdateStrategy != consts.UpdateStrategySlurmAwareRollingUpdate {
+	if !r.rollingUpdateEnabled || nodeSet.UpdateStrategy != consts.UpdateStrategySlurmAwareRollingUpdate {
 		if err := r.Get(ctx, client.ObjectKeyFromObject(existing), existing); err != nil {
 			return client.IgnoreNotFound(err)
 		}
