@@ -18,6 +18,7 @@ package updatecontroller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -61,7 +62,7 @@ const (
 	workerUpdateActionWait
 	workerUpdateActionTrackInFlight
 	workerUpdateActionUndrain
-	workerUpdateActionCompleteHandoff
+	workerUpdateActionDeleteOfflinePod
 )
 
 type workerUpdateDecision struct {
@@ -282,11 +283,14 @@ func (r *RollingUpdateReconciler) reconcileWorkerPodHandoffs(
 			}
 			continue
 		}
-		if handoffReady || containerCrashLoopBackOff(pod.Status.InitContainerStatuses, consts.ContainerNameWorkerInit) {
-			if err := r.finishWorkerHandoff(ctx, replacement); err != nil {
+		// A crash-loop snapshot cannot release a cordoned worker for later eviction:
+		// it may recover and accept jobs before the drainer removes it.
+		if handoffReady || (!replacement.k8sNodeCordoned &&
+			containerCrashLoopBackOff(pod.Status.InitContainerStatuses, consts.ContainerNameWorkerInit)) {
+			if err := r.deleteWorkerPod(ctx, &pod); err != nil {
 				return workerHandoffProgress{}, err
 			}
-			// Account for this handoff against the readiness snapshot taken before deletion or release.
+			// Account for this handoff against the readiness snapshot taken before deletion.
 			// Unready pods are already included in unavailableReplicas.
 			if podReady(&pod) {
 				progress.readyPodsConsumingBudget++
@@ -308,24 +312,27 @@ func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
 	}
 
 	var candidates []workerReplacement
-	var undrainedNodes []string
+	var nodesToUndrain []string
+	var missingSlurmNodes []string
 	readyPodsConsumingBudget := 0
 	for _, replacement := range replacements {
 		pod := replacement.pod
 		slurmNode, found := slurmNodesByName[pod.Name]
 		if !found {
-			return nil, 0, fmt.Errorf("slurm node %s is missing from list nodes response", pod.Name)
+			missingSlurmNodes = append(missingSlurmNodes, pod.Name)
+			// Unknown Slurm state consumes a slot even when Kubernetes reports Ready.
+			if podReady(&pod) {
+				readyPodsConsumingBudget++
+			}
+			continue
 		}
 
-		decision := decideWorkerUpdateAction(&pod, &slurmNode, replacement.operationID)
+		decision := decideWorkerUpdateAction(replacement, &slurmNode)
 		switch decision.action {
 		case workerUpdateActionUndrain:
-			if err := slurmClient.UndrainNode(ctx, slurmNode.Name); err != nil {
-				return nil, 0, fmt.Errorf("undrain stale rolling update node %s: %w", slurmNode.Name, err)
-			}
-			undrainedNodes = append(undrainedNodes, slurmNode.Name)
-		case workerUpdateActionCompleteHandoff:
-			if err := r.finishWorkerHandoff(ctx, replacement); err != nil {
+			nodesToUndrain = append(nodesToUndrain, slurmNode.Name)
+		case workerUpdateActionDeleteOfflinePod:
+			if err := r.deleteWorkerPod(ctx, &pod); err != nil {
 				return nil, 0, err
 			}
 			logger.Info(
@@ -355,9 +362,10 @@ func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
 			readyPodsConsumingBudget++
 		}
 	}
-	if len(undrainedNodes) > 0 {
-		logger.Info("Undrained stale rolling update nodes before reboot", "nodes", undrainedNodes)
+	if len(missingSlurmNodes) > 0 {
+		logger.Info("Waiting for workers missing from Slurm node list", "nodes", missingSlurmNodes)
 	}
+	undrainStaleRollingUpdateNodes(ctx, slurmClient, nodesToUndrain)
 	return candidates, readyPodsConsumingBudget, nil
 }
 
@@ -401,6 +409,7 @@ func (r *RollingUpdateReconciler) startWorkerHandoffsWithinBudget(
 ) error {
 	logger := log.FromContext(ctx)
 	var slurmNodesToReboot []string
+	var handoffErrors []error
 	for _, candidate := range candidates {
 		pod := candidate.pod
 		// Unready workers on draining nodes already consume the unavailable budget.
@@ -412,13 +421,15 @@ func (r *RollingUpdateReconciler) startWorkerHandoffsWithinBudget(
 			availableSlots--
 		}
 		if err := r.markWorkerOperationStopping(ctx, &pod, candidate.operationID); err != nil {
-			return err
+			// Keep the reserved slot: the pod may have become unavailable since the snapshot.
+			handoffErrors = append(handoffErrors, err)
+			continue
 		}
 		slurmNodesToReboot = append(slurmNodesToReboot, pod.Name)
 	}
 	if len(slurmNodesToReboot) == 0 {
 		logger.Info("No additional worker handoffs can be scheduled")
-		return nil
+		return errors.Join(handoffErrors...)
 	}
 
 	if err := slurmClient.RebootNodes(ctx, slurmapi.RebootNodesRequest{
@@ -427,10 +438,11 @@ func (r *RollingUpdateReconciler) startWorkerHandoffsWithinBudget(
 		Reason:      defaultRebootReason,
 		PowerAction: consts.SlurmPowerActionWorkerHandoff,
 	}); err != nil {
-		return fmt.Errorf("schedule slurm reboot through rest api: %w", err)
+		handoffErrors = append(handoffErrors, fmt.Errorf("schedule slurm reboot through rest api: %w", err))
+		return errors.Join(handoffErrors...)
 	}
 	logger.Info("Scheduled Slurm reboot through REST API", "nodes", slurmNodesToReboot)
-	return nil
+	return errors.Join(handoffErrors...)
 }
 
 func (r *RollingUpdateReconciler) markWorkerOperationStopping(ctx context.Context, pod *corev1.Pod, operationID string) error {
@@ -449,35 +461,11 @@ func (r *RollingUpdateReconciler) markWorkerOperationStopping(ctx context.Contex
 	return nil
 }
 
-func (r *RollingUpdateReconciler) finishWorkerHandoff(ctx context.Context, replacement workerReplacement) error {
-	if replacement.k8sNodeCordoned {
-		return r.markWorkerOperationReady(ctx, &replacement.pod, replacement.operationID)
-	}
-	return r.deleteWorkerPod(ctx, &replacement.pod)
-}
-
 func (r *RollingUpdateReconciler) deleteWorkerPod(ctx context.Context, pod *corev1.Pod) error {
 	// UID preconditions prevent a delayed reconcile from deleting a replacement pod.
 	if err := r.Delete(ctx, pod, client.Preconditions{UID: &pod.UID}); client.IgnoreNotFound(err) != nil {
 		return fmt.Errorf("delete worker pod %s/%s after handoff: %w", pod.Namespace, pod.Name, err)
 	}
-	return nil
-}
-
-func (r *RollingUpdateReconciler) markWorkerOperationReady(ctx context.Context, pod *corev1.Pod, operationID string) error {
-	if operationID == "" {
-		return fmt.Errorf("mark worker pod %s/%s ready: operation ID is empty", pod.Namespace, pod.Name)
-	}
-	base := pod.DeepCopy()
-	if pod.Labels == nil {
-		pod.Labels = make(map[string]string)
-	}
-	pod.Labels[consts.LabelSoperatorWorkerOperationID] = operationID
-	pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseReady
-	if err := r.Patch(ctx, pod, client.StrategicMergeFrom(base, client.MergeFromWithOptimisticLock{})); err != nil {
-		return fmt.Errorf("mark worker operation ready on pod %s/%s: %w", pod.Namespace, pod.Name, err)
-	}
-	log.FromContext(ctx).Info("Marked worker operation ready for eviction", "pod", pod.Name, "node", pod.Spec.NodeName, "operationID", operationID)
 	return nil
 }
 
@@ -487,7 +475,7 @@ func (r *RollingUpdateReconciler) cleanupStaleRollingUpdateDrains(
 	sts *kruisev1b1.StatefulSet,
 	pods []corev1.Pod,
 ) error {
-	logger := log.FromContext(ctx).WithName("rolling-update-reconciler")
+	ctx = log.IntoContext(ctx, log.FromContext(ctx).WithName("rolling-update-reconciler"))
 	eligibleNodeNames := make(map[string]struct{}, len(pods))
 	for _, pod := range pods {
 		if pod.Labels["controller-revision-hash"] == sts.Status.UpdateRevision && podReady(&pod) {
@@ -510,7 +498,7 @@ func (r *RollingUpdateReconciler) cleanupStaleRollingUpdateDrains(
 		return err
 	}
 
-	var undrainedNodes []string
+	var nodesToUndrain []string
 	for _, slurmNode := range slurmNodes {
 		if _, ok := eligibleNodeNames[slurmNode.Name]; !ok {
 			continue
@@ -518,16 +506,25 @@ func (r *RollingUpdateReconciler) cleanupStaleRollingUpdateDrains(
 		if !staleRollingUpdateDrain(&slurmNode) {
 			continue
 		}
-		if err := slurmClient.UndrainNode(ctx, slurmNode.Name); err != nil {
-			return fmt.Errorf("undrain stale rolling update node %s: %w", slurmNode.Name, err)
-		}
-		undrainedNodes = append(undrainedNodes, slurmNode.Name)
+		nodesToUndrain = append(nodesToUndrain, slurmNode.Name)
 	}
 
-	if len(undrainedNodes) > 0 {
-		logger.Info("Undrained stale rolling update nodes after update", "nodes", undrainedNodes)
-	}
+	undrainStaleRollingUpdateNodes(ctx, slurmClient, nodesToUndrain)
 	return nil
+}
+
+func undrainStaleRollingUpdateNodes(ctx context.Context, slurmClient slurmapi.Client, nodeNames []string) {
+	if len(nodeNames) == 0 {
+		return
+	}
+	logger := log.FromContext(ctx)
+	if err := slurmClient.UndrainNodes(ctx, nodeNames); err != nil {
+		// A batch may apply partially. Re-select stale drains on the next pass
+		// while allowing independent handoffs to proceed with their remaining budget.
+		logger.Error(err, "Undrain stale rolling update nodes", "nodes", nodeNames)
+		return
+	}
+	logger.Info("Undrained stale rolling update nodes", "nodes", nodeNames)
 }
 
 func rebootBudget(sts *kruisev1b1.StatefulSet) int {
@@ -593,14 +590,11 @@ func workerOperationPhase(pod *corev1.Pod, operationID string) string {
 	return pod.Labels[consts.LabelSoperatorWorkerOperationPhase]
 }
 
-func decideWorkerUpdateAction(
-	pod *corev1.Pod,
-	node *slurmapi.Node,
-	operationID string,
-) workerUpdateDecision {
+func decideWorkerUpdateAction(replacement workerReplacement, node *slurmapi.Node) workerUpdateDecision {
+	pod := &replacement.pod
 	rebootInProgress := node.IsRebootIssuedState() || node.IsRebootRequestedState()
 	decision := workerUpdateDecision{
-		operationPhase:          workerOperationPhase(pod, operationID),
+		operationPhase:          workerOperationPhase(pod, replacement.operationID),
 		slurmdCrashLooping:      containerCrashLoopBackOff(pod.Status.ContainerStatuses, consts.ContainerNameSlurmd),
 		managedRebootInProgress: rebootInProgress && hasRollingUpdateReason(node),
 	}
@@ -610,13 +604,13 @@ func decideWorkerUpdateAction(
 	switch {
 	case staleRollingUpdateDrain(node):
 		decision.action = workerUpdateActionUndrain
-	case (decision.slurmdCrashLooping ||
+	case !replacement.k8sNodeCordoned && (decision.slurmdCrashLooping ||
 		decision.rebootHandoffInProgress ||
 		decision.managedRebootInProgress) && safeToDeleteOfflineSlurmNode(node):
 		// Supervisord can keep the Pod Ready while repeatedly restarting slurmd.
 		// Slurm state is the source of truth for safely completing an in-flight handoff.
-		decision.action = workerUpdateActionCompleteHandoff
-	case decision.slurmdCrashLooping:
+		decision.action = workerUpdateActionDeleteOfflinePod
+	case !replacement.k8sNodeCordoned && decision.slurmdCrashLooping:
 		decision.action = workerUpdateActionWait
 	case rebootInProgress:
 		decision.action = workerUpdateActionTrackInFlight
@@ -646,8 +640,8 @@ func staleRollingUpdateDrain(node *slurmapi.Node) bool {
 	return hasRollingUpdateReason(node)
 }
 
-// safeToDeleteOfflineSlurmNode requires both zero known allocations and
-// an offline Slurm state, so deleting the Pod cannot race with new scheduling.
+// safeToDeleteOfflineSlurmNode identifies an offline worker with zero known allocations
+// for immediate recovery deletion. This snapshot must not authorize deferred eviction.
 func safeToDeleteOfflineSlurmNode(node *slurmapi.Node) bool {
 	allocatedCPUs, cpusKnown := node.CPUAllocated()
 	if !cpusKnown || allocatedCPUs != 0 {

@@ -27,9 +27,23 @@ flag through the operator arguments (`controllerManager.manager.args` in the `so
 the same when there is no work, after an undrain, and after errors. Errors are logged and do not stop the loop. Deleting
 the StatefulSet or disabling coordination stops its loop; enabling coordination again restarts it.
 
+The rolling update controller uses a two-minute timeout for each Slurm HTTP request, including retries and reading
+the response body. A timed-out request ends the current pass, and the NodeSet is retried after the same configured
+reconciliation interval. Other components retain their existing Slurm client timeout settings.
+
 Pod and Node watches keep the shared cache up to date without enqueueing reconciliations. Updates to an already enabled
 StatefulSet also do not enqueue extra reconciliations. Cordon changes and worker acknowledgements are observed on the
 next periodic pass. Different NodeSets can be processed concurrently according to `--max-concurrent-reconciles`.
+
+## Worker lifecycle
+
+Both a worker template update and a Kubernetes node cordon use the same handoff. The worker StatefulSet uses
+`OnDelete`, so replacing an outdated worker waits for this coordination. Recovery paths for failed containers
+are described below.
+
+`worker-operation-phase=ready` acknowledges that the old worker can be removed. It is separate from the Kubernetes
+`PodReady` condition of its replacement. The node rollout tool owns eviction on cordoned nodes; Soperator waits for it.
+If the node is uncordoned before eviction, Soperator deletes the acknowledged pod on a subsequent pass.
 
 ## Node drain
 
@@ -42,18 +56,59 @@ next periodic pass. Different NodeSets can be processed concurrently according t
 4. The node rollout tool retries eviction and can now remove the worker. Its StatefulSet creates a replacement
    pod on an eligible node. The replacement is protected by the PDB again.
 
-Worker image updates and node rollout share the NodeSet's `maxUnavailable` budget. Cordoned workers take priority
-when choosing new operations. A worker released from the PDB still occupies its slot until eviction and replacement.
-Already unready workers on cordoned nodes can finish their handoff without consuming another slot.
-
 An operation already in progress keeps its ID when the node is cordoned or the worker template changes. If cordon
 is removed after handoff starts, Soperator finishes the operation and replaces the stopped pod itself. An operator
 restart reconstructs this state from the pod labels and Slurm state.
 
-If worker initialization is crash-looping, there is no running slurmd to hand off and eviction is allowed. The existing
-recovery path for a failed slurmd also allows completion when Slurm reports a safely offline worker with zero known
-CPU and memory allocations and no completing jobs. On a cordoned node, these recovery paths set the operation ID
-and `phase=ready` together. Missing allocation data or a Slurm API error keeps protection.
+On a cordoned node, a crash-looping init container or an offline slurmd does not bypass the handoff. The controller
+requests the normal Slurm `reboot ASAP` operation and keeps PDB protection until the worker itself acknowledges
+`phase=ready`. A snapshot with zero allocations does not establish readiness for a later eviction: the worker could
+recover and accept jobs in the meantime. The same acknowledgement is required for an offline worker whose reboot
+is already in progress.
+
+If a failure prevents the worker from ever executing the handoff, node drain waits for recovery or manual intervention.
+Direct `kubectl delete pod` remains available as an explicit bypass. On uncordoned nodes, the existing immediate-deletion
+recovery paths remain: crash-looping worker initialization, or an eligible offline slurmd with zero known CPU and memory
+allocations and no completing jobs.
+
+## One reconciliation pass and the shared budget
+
+Worker image updates and node rollout share the NodeSet's `maxUnavailable` budget. This is separate from the PDB's
+`maxUnavailable: 0`: the controller limits concurrent handoffs, while the PDB gates eviction of individual workers.
+
+Completing a handoff does not end the pass while other workers still need processing. A pod deleted in this pass still
+consumes a slot: if it was `PodReady=True` in the snapshot, it is counted explicitly; otherwise it is already included in
+unavailable replicas. Terminating pods are also counted as unavailable, without an extra charge.
+Pods still handing off, or already released for eviction, continue consuming budget even if Kubernetes reports them
+as Ready. Already unready workers on cordoned nodes can start a handoff even when there are no free slots.
+
+If a worker awaiting handoff is missing from a successful Slurm node list response, the controller leaves it protected
+and retries on the next periodic pass. It conservatively consumes one budget slot even if Kubernetes reports it Ready;
+unready pods are already counted in unavailable replicas. Other workers continue within the remaining budget. With
+`maxUnavailable: 1`, one missing Slurm node can therefore prevent new handoffs until it reappears. An error fetching the
+Slurm node list still stops Slurm processing for the current pass.
+
+If preparing a worker operation fails, including a pod version conflict, that worker is excluded from the reboot
+batch while successfully prepared workers proceed. Its reserved budget slot remains occupied for the current pass
+because the pod may have become unavailable since the snapshot. Errors are reported after attempting the reboot
+batch, and failed workers are reconsidered on the next periodic pass without immediate patch retries.
+
+Stale rolling-update drains are cleared with one batch Slurm `UNDRAIN` request per pass. A batch error is logged
+without stopping independent handoffs; workers selected for undrain keep their budget slots for the current pass.
+The request may have applied partially, so the next pass reads Slurm state again and selects only drains that still
+match the cleanup criteria, including the rolling-update reason.
+
+Slots become reusable as replacements become Ready and the cache and StatefulSet status reflect that progress.
+There is no barrier between batches. For example, with 100 workers in one NodeSet and `maxUnavailable: 50`:
+
+| Observed progress | Slots occupied before new handoffs | New handoffs allowed in this pass |
+| --- | --- | --- |
+| The first 50 workers are handing off or waiting for replacement | 50 | 0 |
+| 10 replacements are Ready; 39 old workers are still handing off; one old pod is deleted in this pass | 40 | 10 |
+| Those 10 new handoffs have started; the earlier 40 replacements are still pending | 50 | 0 |
+
+The deleted pod in the middle row remains one of the 40 occupied slots. The controller can nevertheless start 10 new
+handoffs immediately, using the slots freed by the replacements that are already Ready.
 
 ## Requirements and scope
 

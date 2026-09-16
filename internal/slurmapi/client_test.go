@@ -2,10 +2,12 @@ package slurmapi
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,4 +50,75 @@ func TestClient_GetDiag_LargeScheduleCycleSum(t *testing.T) {
 	require.NotNil(t, diag.Statistics.RpcsByUser)
 	require.Len(t, *diag.Statistics.RpcsByUser, 1)
 	assert.Equal(t, int64(7_384_185_912), (*diag.Statistics.RpcsByUser)[0].TotalTime)
+}
+
+func TestClient_RequestTimeout(t *testing.T) {
+	operations := []struct {
+		name string
+		call func(context.Context, Client) error
+	}{
+		{name: "list nodes", call: func(ctx context.Context, c Client) error {
+			_, err := c.ListNodes(ctx)
+			return err
+		}},
+		{name: "reboot nodes", call: func(ctx context.Context, c Client) error {
+			return c.RebootNodes(ctx, RebootNodesRequest{NodeList: "worker-0"})
+		}},
+		{name: "undrain nodes", call: func(ctx context.Context, c Client) error {
+			return c.UndrainNodes(ctx, []string{"worker-0", "worker-10"})
+		}},
+	}
+	responses := []struct {
+		name       string
+		status     int
+		retryAfter string
+	}{
+		{name: "stalled headers"},
+		{name: "stalled success body", status: http.StatusOK},
+		{name: "stalled error body", status: http.StatusServiceUnavailable},
+		{name: "retry backoff", status: http.StatusServiceUnavailable, retryAfter: "3600"},
+	}
+	for _, operation := range operations {
+		for _, response := range responses {
+			t.Run(operation.name+"/"+response.name, func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, _ = io.Copy(io.Discard, r.Body)
+					if response.retryAfter != "" {
+						w.Header().Set("Retry-After", response.retryAfter)
+						w.WriteHeader(response.status)
+						return
+					}
+					if response.status != 0 {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(response.status)
+						_, _ = w.Write([]byte("{"))
+						w.(http.Flusher).Flush()
+					}
+					select {
+					case <-r.Context().Done():
+					case <-ctx.Done():
+					}
+				}))
+				t.Cleanup(server.Close)
+				t.Cleanup(cancel)
+
+				httpClient := DefaultHTTPClient()
+				httpClient.Timeout = 100 * time.Millisecond
+				c, err := NewClient(server.URL, nil, httpClient)
+				require.NoError(t, err)
+
+				err = operation.call(ctx, c)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.NoError(t, ctx.Err(), "request must stop before the caller's deadline")
+			})
+		}
+	}
+}
+
+func TestClient_DefaultHasNoRequestTimeout(t *testing.T) {
+	require.Zero(t, DefaultHTTPClient().Timeout)
+	c, err := NewClient("http://slurmrestd", nil, nil)
+	require.NoError(t, err)
+	require.Zero(t, c.(*client).httpClient.Timeout)
 }

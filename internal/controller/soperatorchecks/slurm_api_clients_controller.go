@@ -3,6 +3,7 @@ package soperatorchecks
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +33,7 @@ type SlurmAPIClientsController struct {
 	*reconciler.Reconciler
 
 	slurmAPIClients *slurmapi.ClientSet
+	httpClient      *http.Client
 }
 
 func NewSlurmAPIClientsController(
@@ -39,12 +41,14 @@ func NewSlurmAPIClientsController(
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
+	httpClient *http.Client,
 ) *SlurmAPIClientsController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
 	return &SlurmAPIClientsController{
 		Reconciler:      r,
 		slurmAPIClients: slurmAPIClients,
+		httpClient:      httpClient,
 	}
 }
 
@@ -78,7 +82,7 @@ func (c *SlurmAPIClientsController) Reconcile(ctx context.Context, req ctrl.Requ
 
 	jwtToken := jwt.NewToken(c.Client).For(req.NamespacedName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
 	slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, req.Name), req.Namespace)
-	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
+	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, c.httpClient)
 	if err != nil {
 		logger.Error(err, "failed to create slurm api client")
 		return ctrl.Result{}, err

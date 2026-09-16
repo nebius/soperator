@@ -335,11 +335,15 @@ func main() {
 	slurmAPIClients := slurmapi.NewClientSet(context.Background())
 
 	if controllersSet.Enabled("rollingupdate") {
+		slurmHTTPClient := slurmapi.DefaultHTTPClient()
+		// Bound each rolling-update request, including retries and reading the response body.
+		slurmHTTPClient.Timeout = 2 * time.Minute
 		if err = soperatorchecks.NewSlurmAPIClientsController(
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.SlurmAPIClientsControllerName),
 			slurmAPIClients,
+			slurmHTTPClient,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create slurm api clients controller", "controller", soperatorchecks.SlurmAPIClientsControllerName)
 		}
