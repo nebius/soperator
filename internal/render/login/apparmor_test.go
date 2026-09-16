@@ -12,19 +12,17 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-func TestDefaultAppArmorProfile(t *testing.T) {
+func TestAppArmorProfile(t *testing.T) {
 	tests := []struct {
-		name       string
-		useDefault bool
-		custom     string
-		expected   *corev1.AppArmorProfile
+		name     string
+		custom   string
+		expected *corev1.AppArmorProfile
 	}{
-		{"default", true, "", &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeLocalhost, LocalhostProfile: ptr.To("soperator-default")}},
-		{"default takes precedence", true, "localhost/custom", &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeLocalhost, LocalhostProfile: ptr.To("soperator-default")}},
-		{"custom", false, "localhost/custom", &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeLocalhost, LocalhostProfile: ptr.To("custom")}},
-		{"raw custom", false, "custom", &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeLocalhost, LocalhostProfile: ptr.To("custom")}},
-		{"unconfined", false, "unconfined", &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeUnconfined}},
-		{"empty", false, "", nil},
+		{"provisioned", "soperator-default", &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeLocalhost, LocalhostProfile: ptr.To("soperator-default")}},
+		{"prefixed custom", "localhost/custom", &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeLocalhost, LocalhostProfile: ptr.To("custom")}},
+		{"raw custom", "custom", &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeLocalhost, LocalhostProfile: ptr.To("custom")}},
+		{"unconfined", "unconfined", &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeUnconfined}},
+		{"empty", "", nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -37,11 +35,10 @@ func TestDefaultAppArmorProfile(t *testing.T) {
 				},
 			}}
 			login := &values.SlurmLogin{
-				SlurmNode:                 slurmv1.SlurmNode{K8sNodeFilterName: "test"},
-				ContainerSshd:             container,
-				ContainerMunge:            container,
-				UseDefaultAppArmorProfile: tt.useDefault,
-				VolumeJail:                slurmv1.NodeVolume{VolumeSourceName: ptr.To("jail")},
+				SlurmNode:      slurmv1.SlurmNode{K8sNodeFilterName: "test"},
+				ContainerSshd:  container,
+				ContainerMunge: container,
+				VolumeJail:     slurmv1.NodeVolume{VolumeSourceName: ptr.To("jail")},
 			}
 			filters := []slurmv1.K8sNodeFilter{{Name: "test"}}
 			volumes := []slurmv1.VolumeSource{{Name: "jail", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}}

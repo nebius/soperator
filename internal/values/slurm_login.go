@@ -37,11 +37,10 @@ type SlurmLogin struct {
 	Autoscaling   *slurmv1.LoginAutoscaling
 	DockerEnabled bool
 
-	UseDefaultAppArmorProfile bool
-	Maintenance               *consts.MaintenanceMode
+	Maintenance *consts.MaintenanceMode
 }
 
-func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.MaintenanceMode, login *slurmv1.SlurmNodeLogin, useDefaultAppArmorProfile bool) SlurmLogin {
+func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.MaintenanceMode, login *slurmv1.SlurmNodeLogin) SlurmLogin {
 	svc := buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeLogin, clusterName))
 	svc.Type = login.SshdServiceType
 	svc.Annotations = login.SshdServiceAnnotations
@@ -81,18 +80,17 @@ func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.Mai
 			naming.BuildStatefulSetName(consts.ComponentTypeLogin, namePrefix),
 			login.SlurmNode.Size,
 		),
-		SSHDConfigMapName:         sshdConfigMapName,
-		IsSSHDConfigMapDefault:    isSSHDConfigDefault,
-		SSSDConfSecretName:        sssdConfSecretName,
-		SSSDLdapCAConfigMapName:   login.SSSDLdapCAConfigMapRefName,
-		IsSSSDSecretDefault:       isSSSDSecretDefault,
-		SSHRootPublicKeys:         login.SshRootPublicKeys,
-		VolumeJail:                *login.Volumes.Jail.DeepCopy(),
-		UseDefaultAppArmorProfile: useDefaultAppArmorProfile,
-		Maintenance:               maintenance,
-		UserIsolation:             login.UserIsolation.DeepCopy(),
-		Autoscaling:               login.Autoscaling.DeepCopy(),
-		DockerEnabled:             login.Docker != nil && ptr.Deref(login.Docker.Enabled, false),
+		SSHDConfigMapName:       sshdConfigMapName,
+		IsSSHDConfigMapDefault:  isSSHDConfigDefault,
+		SSSDConfSecretName:      sssdConfSecretName,
+		SSSDLdapCAConfigMapName: login.SSSDLdapCAConfigMapRefName,
+		IsSSSDSecretDefault:     isSSSDSecretDefault,
+		SSHRootPublicKeys:       login.SshRootPublicKeys,
+		VolumeJail:              *login.Volumes.Jail.DeepCopy(),
+		Maintenance:             maintenance,
+		UserIsolation:           login.UserIsolation.DeepCopy(),
+		Autoscaling:             login.Autoscaling.DeepCopy(),
+		DockerEnabled:           login.Docker != nil && ptr.Deref(login.Docker.Enabled, false),
 	}
 	if login.Sssd != nil {
 		containerSSSD := buildContainerFrom(

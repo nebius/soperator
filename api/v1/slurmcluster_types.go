@@ -115,12 +115,6 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	SConfigController SConfigController `json:"sConfigController,omitempty"`
 
-	// Use the soperator-default AppArmor profile for login and worker containers.
-	// Node provisioning must load this profile before the containers start.
-	//
-	// +kubebuilder:default=false
-	UseDefaultAppArmorProfile bool `json:"useDefaultAppArmorProfile,omitempty"`
-
 	// HealthCheckConfig defines Slurm health check configuration.
 	//
 	// +kubebuilder:validation:Optional
@@ -1466,8 +1460,8 @@ type NodeContainer struct {
 
 	// AppArmorProfile defines the AppArmor profile for the Slurm containers
 	//
-	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="unconfined"
+	// +kubebuilder:validation:Optional
 	AppArmorProfile string `json:"appArmorProfile,omitempty"`
 
 	// procMount denotes the type of proc mount to use for the containers.

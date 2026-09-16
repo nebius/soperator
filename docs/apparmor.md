@@ -1,20 +1,22 @@
 # AppArmor
 
-Soperator uses the node-local `soperator-default` profile for login sshd and
-worker slurmd containers when `useDefaultAppArmorProfile` is enabled. Provisioning
-must load the profile on every node where these containers may run.
+Soperator selects AppArmor profiles for login sshd and worker slurmd containers.
+Provisioning must load named profiles on every node where these containers may run.
 
 ## Configuration
 
-`useDefaultAppArmorProfile` defaults to `false` in the Helm chart and SlurmCluster
-CR. The [Nebius Terraform recipe](https://github.com/nebius/nebius-solution-library/tree/main/soperator)
-defaults `use_default_apparmor_profile` to `true`, enabling both profile loading
-and its selection in workloads.
+Profiles are configured per container:
 
-To select a custom profile, disable `useDefaultAppArmorProfile` and set
-`SlurmCluster.spec.slurmNodes.login.sshd.appArmorProfile` or
-`NodeSet.spec.slurmd.security.appArmorProfile` to `localhost/<profile-name>`.
-The custom profile must also be loaded on the nodes.
+- Login: `SlurmCluster.spec.slurmNodes.login.sshd.appArmorProfile`
+- Workers: `NodeSet.spec.slurmd.security.appArmorProfile`
+
+Both default to `unconfined` in the CRDs and Helm charts. A profile name or
+`localhost/<profile-name>` selects a profile already loaded on the node.
+
+The [Nebius Terraform recipe](https://github.com/nebius/nebius-solutions-library/tree/main/soperator)
+loads `soperator-default` and sets these two fields to that name when
+`use_default_apparmor_profile` is `true` (the recipe default). When disabled,
+it sets both fields to `unconfined`. Other containers keep their own profiles.
 
 ## Node requirements
 

@@ -23098,12 +23098,6 @@ spec:
                     - name
                     x-kubernetes-list-type: map
                 type: object
-              useDefaultAppArmorProfile:
-                default: false
-                description: |-
-                  Use the soperator-default AppArmor profile for login and worker containers.
-                  Node provisioning must load this profile before the containers start.
-                type: boolean
               volumeSources:
                 description: VolumeSources define the sources for the volumes
                 items:

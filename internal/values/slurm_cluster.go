@@ -39,8 +39,6 @@ type SlurmCluster struct {
 	PlugStackConfig    slurmv1.PlugStackConfig
 	SConfigController  SConfigController
 	NodeSets           []slurmav1alpha1.NodeSet
-
-	UseDefaultAppArmorProfile bool
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD.
@@ -65,7 +63,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster, n
 		NodeController:         buildSlurmControllerFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Controller),
 		NodeAccounting:         buildAccountingFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Accounting),
 		NodeRest:               buildRestFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Rest),
-		NodeLogin:              buildSlurmLoginFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login, cluster.Spec.UseDefaultAppArmorProfile),
+		NodeLogin:              buildSlurmLoginFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login),
 		SlurmExporter:          buildSlurmExporterFrom(namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
 		SlurmConfig:            buildSlurmConfigFrom(&cluster.Spec.SlurmConfig),
 		Topology:               cluster.Spec.Topology,
@@ -85,7 +83,6 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster, n
 			cluster.Spec.SConfigController.ServiceAccountName,
 			namePrefix,
 		),
-		UseDefaultAppArmorProfile: cluster.Spec.UseDefaultAppArmorProfile,
 	}
 
 	if err := res.Validate(ctx); err != nil {

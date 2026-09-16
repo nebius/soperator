@@ -41,7 +41,6 @@ spec:
     - state: CYCLE
   maintenance: {{ default "none" .Values.maintenance | quote  }}
   crVersion: {{ .Chart.Version }}
-  useDefaultAppArmorProfile: {{ .Values.useDefaultAppArmorProfile }}
   partitionConfiguration:
     configType: {{ (default "default" .Values.partitionConfiguration.configType) }}
     {{- if and .Values.partitionConfiguration.rawConfig (eq .Values.partitionConfiguration.configType "custom") }}

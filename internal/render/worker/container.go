@@ -195,14 +195,6 @@ func renderContainerNodeSetSlurmd(
 
 	realMemoryBytes := common.RenderRealMemorySlurmd(resources) * 1024 * 1024
 
-	appArmorProfile := nodeSet.ContainerSlurmd.AppArmorProfile
-	if nodeSet.AppArmorProfileUseDefault {
-		appArmorProfile = "localhost/" + common.DefaultAppArmorProfileName
-	}
-	if appArmorProfile == "" {
-		appArmorProfile = consts.AppArmorProfileUnconfined
-	}
-
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
 		Image:           nodeSet.ContainerSlurmd.Image,
@@ -247,7 +239,7 @@ func renderContainerNodeSetSlurmd(
 				v := nodeSet.ContainerSlurmd.ProcMount
 				return &v
 			}(),
-			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
+			AppArmorProfile: common.ParseAppArmorProfile(nodeSet.ContainerSlurmd.AppArmorProfile),
 		},
 		Resources:                resources,
 		LivenessProbe:            nodeSet.ContainerSlurmd.LivenessProbe,

@@ -1,8 +1,6 @@
 clusterName: "slurm1"
 # Additional annotations for the cluster
 annotations: {}
-# Use soperator-default, which must already be loaded on nodes by provisioning.
-useDefaultAppArmorProfile: false
 # Maintenance defines the maintenance window for the cluster.
 # It can have the following values:
 # - none: No maintenance is performed. The cluster operates normally.

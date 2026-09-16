@@ -7,9 +7,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// DefaultAppArmorProfileName must match the profile loaded by node provisioning.
-const DefaultAppArmorProfileName = "soperator-default"
-
 // ParseAppArmorProfile converts AppArmor profile string to corev1.AppArmorProfile
 // It supports formats like "unconfined", "localhost/profile-name", or just "profile-name"
 func ParseAppArmorProfile(profileStr string) *corev1.AppArmorProfile {

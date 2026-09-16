@@ -247,12 +247,3 @@ tests:
       - equal:
           path: spec.sConfigController.reconfigureWaitTimeout
           value: "1m"
-
-  # Test useDefaultAppArmorProfile default value
-  - it: should set useDefaultAppArmorProfile default value
-    set:
-      clusterName: test-cluster
-    asserts:
-      - equal:
-          path: spec.useDefaultAppArmorProfile
-          value: false

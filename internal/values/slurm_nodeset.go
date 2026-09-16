@@ -26,11 +26,10 @@ type SlurmNodeSet struct {
 	Annotations      map[string]string
 	ImagePullSecrets []corev1.LocalObjectReference
 
-	ContainerSlurmd           Container
-	ContainerMunge            Container
-	ContainerSSSD             *Container
-	CustomInitContainers      []corev1.Container
-	AppArmorProfileUseDefault bool
+	ContainerSlurmd      Container
+	ContainerMunge       Container
+	ContainerSSSD        *Container
+	CustomInitContainers []corev1.Container
 
 	SupervisorDConfigMapName string
 
@@ -77,7 +76,6 @@ func BuildSlurmNodeSetFrom(
 	nodeSet *slurmv1alpha1.NodeSet,
 	clusterName string,
 	maintenance *consts.MaintenanceMode,
-	useDefaultAppArmorProfile bool,
 ) SlurmNodeSet {
 	nsSpec := &nodeSet.Spec
 	res := SlurmNodeSet{
@@ -121,8 +119,7 @@ func BuildSlurmNodeSetFrom(
 			},
 			consts.ContainerNameMunge,
 		),
-		CustomInitContainers:      slices.Clone(nsSpec.CustomInitContainers),
-		AppArmorProfileUseDefault: useDefaultAppArmorProfile,
+		CustomInitContainers: slices.Clone(nsSpec.CustomInitContainers),
 		//
 		GPU: nsSpec.GPU.DeepCopy(),
 		//
