@@ -15,6 +15,11 @@ on:
         required: false
         default: ""
         type: string
+      soperator_build_branch:
+        description: "Soperator build branch (defaults to selected workflow branch)"
+        required: false
+        default: ""
+        type: string
       soperator_e2e_repo_branch:
         description: "E2E repo branch"
         required: false
@@ -84,6 +89,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
           SOPERATOR_BRANCH: ${{ github.ref_name }}
+          SOPERATOR_BUILD_BRANCH: ${{ inputs.soperator_build_branch || github.ref_name }}
           TERRAFORM_BRANCH: ${{ inputs.terraform_repo_ref || github.ref_name }}
           SOPERATOR_E2E_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
           REQUESTED_PROFILE: ${{ inputs.profile }}
@@ -187,6 +193,7 @@ jobs:
           PROFILE_NAME: ${{ steps.resolve.outputs.profile_name }}
           PROFILE_YAML: ${{ steps.resolve.outputs.profile_yaml }}
           TERRAFORM_REPO_REF: ${{ github.event.inputs.terraform_repo_ref || github.ref_name }}
+          SOPERATOR_BUILD_BRANCH: ${{ inputs.soperator_build_branch || github.ref_name }}
           SOPERATOR_E2E_REPO_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
           SCENARIOS: ${{ inputs.scenarios }}
         run: |
@@ -194,6 +201,7 @@ jobs:
             echo "### Run Parameters"
             echo ""
             echo "- Branch: \`${{ github.ref_name }}\`"
+            echo "- Soperator build branch: \`$SOPERATOR_BUILD_BRANCH\`"
             echo "- Terraform branch: \`$TERRAFORM_REPO_REF\`"
             echo "- Soperator E2E repo branch: \`$SOPERATOR_E2E_REPO_BRANCH\`"
             if [[ -n "$SCENARIOS" ]]; then
@@ -228,6 +236,7 @@ jobs:
       PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/soperator/installations/example"
       TERRAFORM_REPO: "nebius/nebius-solutions-library"
       TERRAFORM_REPO_REF: "${{ github.event.inputs.terraform_repo_ref || github.ref_name }}"
+      SOPERATOR_BUILD_BRANCH: "${{ inputs.soperator_build_branch || github.ref_name }}"
       SOPERATOR_E2E_REPO: "${{ github.repository }}"
       SOPERATOR_E2E_REPO_BRANCH: "${{ inputs.soperator_e2e_repo_branch || 'main' }}"
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
@@ -358,19 +367,25 @@ jobs:
           which python
           python --version
 
-      - name: Find latest valid build run on current branch
+      - name: Find latest valid build run on target branch
         id: find_build
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
-          TARGET_BRANCH: ${{ github.ref_name }}
+          TARGET_BRANCH: ${{ env.SOPERATOR_BUILD_BRANCH }}
         run: |
           readonly CANDIDATE_LIMIT=15
           readonly EMPTY_RESPONSE_RETRY_LIMIT=3
           readonly RETRY_BACKOFF_SECONDS=5
 
           echo "Looking for a valid successful build run on branch: $TARGET_BRANCH"
+
+          target_ref="refs/remotes/origin/$TARGET_BRANCH"
+          if ! target_sha=$(git show-ref --verify --hash "$target_ref"); then
+            echo "::error::Soperator build branch not found: $TARGET_BRANCH"
+            exit 1
+          fi
 
           selected_run=""
           artifact_expires_at=""
@@ -449,7 +464,7 @@ jobs:
             fi
 
             break
-          done < <(git rev-list --first-parent --max-count="$CANDIDATE_LIMIT" "$GITHUB_SHA")
+          done < <(git rev-list --first-parent --max-count="$CANDIDATE_LIMIT" "$target_sha")
 
           if [[ -z "$selected_run" ]]; then
             echo "::error::No valid successful build with a non-expired version artifact found among the latest $CANDIDATE_LIMIT commits on branch $TARGET_BRANCH"
@@ -507,6 +522,7 @@ jobs:
             --arg nebius_project_id "$NEBIUS_PROJECT_ID" \
             --arg nebius_region "$NEBIUS_REGION" \
             --arg soperator_version "$SOPERATOR_VERSION" \
+            --arg soperator_build_branch "$SOPERATOR_BUILD_BRANCH" \
             --arg terraform_ref "$TERRAFORM_REPO_REF" \
             --arg acceptance_ref "$SOPERATOR_E2E_REPO_BRANCH" \
             '{
@@ -520,6 +536,7 @@ jobs:
               nebius_project_id: $nebius_project_id,
               nebius_region: $nebius_region,
               soperator_version: $soperator_version,
+              soperator_build_branch: $soperator_build_branch,
               terraform_ref: $terraform_ref,
               acceptance_ref: $acceptance_ref
             }' > "$E2E_ARTIFACTS_DIR/metadata/run.json"
@@ -872,6 +889,7 @@ jobs:
           PR_NUMBER: ${{ inputs.pr_number }}
           COMMENT_ID: ${{ needs.report-pr-start.outputs.comment_id }}
           SOPERATOR_BRANCH: ${{ github.ref_name }}
+          SOPERATOR_BUILD_BRANCH: ${{ inputs.soperator_build_branch || github.ref_name }}
           TERRAFORM_BRANCH: ${{ inputs.terraform_repo_ref || github.ref_name }}
           SOPERATOR_E2E_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
           REQUESTED_PROFILE: ${{ inputs.profile }}
@@ -917,14 +935,14 @@ jobs:
   notify-failure:
     name: Notify Slack on E2E failure
     needs: [resolve-profile, e2e-test]
-    # Only fire when the run targeted the default terraform branch (empty input
-    # falls back to github.ref_name in e2e-test) and default Soperator E2E
-    # branch. Custom branches are usually experiments and shouldn't page e2e
-    # owners on failure.
+    # Only fire when the run targeted the default build, terraform, and
+    # Soperator E2E branches. Custom branches are usually experiments and
+    # shouldn't page e2e owners on failure.
     if: |
       always() &&
       (needs.resolve-profile.result == 'failure' || needs.e2e-test.result == 'failure') &&
       (github.ref_name == 'main' || startsWith(github.ref_name, 'soperator-release-')) &&
+      (inputs.soperator_build_branch == '' || inputs.soperator_build_branch == github.ref_name) &&
       (inputs.terraform_repo_ref == '' || inputs.terraform_repo_ref == github.ref_name) &&
       (inputs.soperator_e2e_repo_branch == '' || inputs.soperator_e2e_repo_branch == 'main')
     runs-on: ubuntu-latest
