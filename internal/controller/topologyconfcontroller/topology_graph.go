@@ -209,27 +209,36 @@ func (g TopologyGraph) attachFabricRoots(topSwitchesByFabric map[string]map[stri
 // labelsToPath converts labels to a path to the root of the topology tree.
 // E.g.:
 //
-//	labels = map[string]string{"tier-1": "switch1", "tier-2": "switch2", "tier-3": "switch3"}
-//	returns ["switch1", "switch2", "switch3"] (from lowest to highest tier)
+//	labels = map[string]string{"tier-0": "nvl0", "tier-1": "leaf1", "tier-2": "spine1"}
+//	returns ["nvl0", "leaf1", "spine1"] (from lowest to highest tier)
 //
-// The labels must be in the format "tier-N" where N is a positive integer starting from 1.
-// If any label is missing (or empty), it returns an error.
-// Non-tier keys (e.g. "tier-0", used for defining a block) are ignored: only contiguous "tier-N"
-// labels starting from 1 form the IB topology path.
+// All present tier-N labels are ordered numerically, with the lowest tier closest to the worker.
+// Tier numbers must be non-negative integers; gaps are allowed. Non-tier keys are ignored.
+// An empty label value or an invalid tier number returns an error.
 func labelsToPath(labels map[string]string) ([]string, error) {
-	numOfTiers := 0
+	var tiers []int
 	for key := range labels {
-		if key != "tier-0" && strings.HasPrefix(key, "tier-") {
-			numOfTiers++
+		suffix, ok := strings.CutPrefix(key, "tier-")
+		if !ok {
+			continue
 		}
+		tier, err := strconv.Atoi(suffix)
+		if err != nil {
+			return nil, fmt.Errorf("parse tier number from label %q: %w", key, err)
+		}
+		if tier < 0 || suffix != strconv.Itoa(tier) {
+			return nil, fmt.Errorf("parse tier number from label %q: expected a non-negative integer without leading zeros", key)
+		}
+		tiers = append(tiers, tier)
 	}
-	if numOfTiers == 0 {
+	if len(tiers) == 0 {
 		return nil, fmt.Errorf("no labels found for node")
 	}
+	slices.Sort(tiers)
 
-	pathToRoot := make([]string, 0, numOfTiers)
-	for i := range numOfTiers {
-		key := "tier-" + strconv.Itoa(i+1)
+	pathToRoot := make([]string, 0, len(tiers))
+	for _, tier := range tiers {
+		key := "tier-" + strconv.Itoa(tier)
 		curTierLabel := labels[key]
 		if curTierLabel == "" {
 			return nil, fmt.Errorf("missing label %q", key)
