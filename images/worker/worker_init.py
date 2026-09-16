@@ -492,7 +492,7 @@ def format_slurm_topology(
         (builds full switch hierarchy: highest tier first, leaf last)
       - "default:switch1" -> "topology=default:root:switch1"
       - "default:sw_root:s1:s2" -> "topology=default:sw_root:s1:s2" (intermediate switches already present)
-      - "tier-0=block1,tier-1=rack1" -> "topology=default:root:rack1" (tier-0 names a block)
+      - "tier-0=nvl1,tier-1=rack1" -> "topology=default:root:rack1:nvl1" (tier-0 is the lowest switch)
       - "switch1" -> "topology=default:root:switch1"
 
     Input formats for topology/block:
@@ -618,17 +618,17 @@ def _format_tier_topology(
     Example:
       - {"tier-1": "leaf00"} -> "topology=default:root:leaf00"
       - {"tier-1": "leaf00", "tier-2": "spine00"} -> "topology=default:root:spine00:leaf00"
-      - {"tier-0": "block1", "tier-1": "rack1"} -> "topology=default:root:rack1"
+      - {"tier-0": "nvl1", "tier-1": "rack1"} -> "topology=default:root:rack1:nvl1"
     """
     if not parts:
         return ""
 
-    # Find all tier keys and their numbers. tier-0 is skipped: it names a block, not a switch,
-    # and the operator leaves it out of the tree it writes into the topology config. Including it
-    # here would register the node one switch below where the config places it.
+    # Find all tier keys and their numbers. tier-0 is included: the operator renders it as the
+    # switch closest to the node, so skipping it would register the node one switch above where the
+    # config places it.
     tier_keys: list[tuple[int, str]] = []
     for k in parts.keys():
-        if k.startswith("tier-") and k != "tier-0":
+        if k.startswith("tier-"):
             try:
                 tier_num: int = int(k.split("-")[1])
                 tier_keys.append((tier_num, k))
@@ -643,9 +643,7 @@ def _format_tier_topology(
         switches: list[str] = [parts[k] for _, k in tier_keys]
         return f"topology={topology_name}:{fabric}:{':'.join(switches)}"
 
-    # tier-0 names a block, not a switch, and the operator leaves it out of the tree; taking it
-    # here would place the node one switch below where the config puts it.
-    switch_values: list[str] = [v for k, v in parts.items() if k != "tier-0"]
+    switch_values: list[str] = list(parts.values())
     if switch_values:
         return f"topology={topology_name}:{fabric}:{switch_values[0]}"
 
