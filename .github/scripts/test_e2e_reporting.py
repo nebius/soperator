@@ -173,7 +173,7 @@ class E2EPRCommentTest(unittest.TestCase):
         result = render_start(context())
 
         self.assertIn("### ⏳ E2E running", result)
-        self.assertIn("- Soperator branch: `feature`", result)
+        self.assertIn("- Soperator workflow branch: `feature`", result)
         self.assertIn(
             "- Soperator build branch: `soperator-release-4.1`",
             result,

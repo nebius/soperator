@@ -40,7 +40,8 @@ def marker(context):
 
 def parameters(context, include_resolved_profile=False):
     values = [
-        ("Soperator branch", context["SOPERATOR_BRANCH"]),
+        # Keep reading SOPERATOR_BRANCH for compatibility with existing callers.
+        ("Soperator workflow branch", context["SOPERATOR_BRANCH"]),
         ("Soperator build branch", context["SOPERATOR_BUILD_BRANCH"]),
         ("Terraform branch", context["TERRAFORM_BRANCH"]),
         ("Soperator E2E branch", context["SOPERATOR_E2E_BRANCH"]),

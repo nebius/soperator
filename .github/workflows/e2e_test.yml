@@ -200,7 +200,7 @@ jobs:
           {
             echo "### Run Parameters"
             echo ""
-            echo "- Branch: \`${{ github.ref_name }}\`"
+            echo "- Soperator workflow branch: \`${{ github.ref_name }}\`"
             echo "- Soperator build branch: \`$SOPERATOR_BUILD_BRANCH\`"
             echo "- Terraform branch: \`$TERRAFORM_REPO_REF\`"
             echo "- Soperator E2E repo branch: \`$SOPERATOR_E2E_REPO_BRANCH\`"
