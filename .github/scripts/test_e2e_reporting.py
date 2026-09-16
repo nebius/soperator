@@ -33,6 +33,7 @@ def context(**overrides):
         "GITHUB_RUN_ID": "12345",
         "GITHUB_RUN_ATTEMPT": "1",
         "SOPERATOR_BRANCH": "feature",
+        "SOPERATOR_BUILD_BRANCH": "soperator-release-4.1",
         "TERRAFORM_BRANCH": "main",
         "SOPERATOR_E2E_BRANCH": "feature",
         "REQUESTED_PROFILE": "@auto-select",
@@ -172,7 +173,11 @@ class E2EPRCommentTest(unittest.TestCase):
         result = render_start(context())
 
         self.assertIn("### ⏳ E2E running", result)
-        self.assertIn("- Soperator branch: `feature`", result)
+        self.assertIn("- Soperator workflow branch: `feature`", result)
+        self.assertIn(
+            "- Soperator build branch: `soperator-release-4.1`",
+            result,
+        )
         self.assertIn("- Essential tests only: `true`", result)
         self.assertIn(
             "[Workflow run](https://github.com/nebius/soperator/actions/runs/12345)",
