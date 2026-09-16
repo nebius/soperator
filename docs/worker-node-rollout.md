@@ -31,6 +31,24 @@ The rolling update controller uses a two-minute timeout for each Slurm HTTP requ
 the response body. A timed-out request ends the current pass, and the NodeSet is retried after the same configured
 reconciliation interval. Other components retain their existing Slurm client timeout settings.
 
+Idle NodeSets check Slurm on the first pass and then at `--rolling-update-idle-slurm-audit-interval` (default `15m`).
+Set this positive duration through `controllerManager.manager.args`, for example
+`--rolling-update-idle-slurm-audit-interval=30m`. The audit runs on the next regular reconciliation after the interval
+expires; values shorter than the reconciliation interval cause an audit on every pass. The Kubernetes cache is still
+checked on every pass, so cordon and revision changes start rollout without waiting for that audit. Changes to worker
+pod UID, readiness, termination or membership also trigger a Slurm check on the next pass. Unrelated pod status updates do not trigger extra Slurm reads.
+
+Pending cleanup is checked at the normal reconciliation interval. This includes rolling-update drains that are not
+ready for UNDRAIN yet, such as `DOWN+DRAIN`, ongoing reboots, and drains on unready pods. A missing Slurm node keeps
+cleanup unresolved. Successful UNDRAIN is confirmed by a subsequent read; errors and partially applied batches keep
+unresolved workers pending without stopping other handoffs. Drains with another reason are not cleared.
+
+Cleanup tracking is held in memory and rebuilt from current pods and Slurm after an operator restart, re-enabling
+coordination, or recreating the StatefulSet. A removed pod stops being tracked; a new pod with the same name triggers
+another check even if it is already Ready. The periodic idle audit catches changes that occur only in Slurm. Failed
+checks retry at the normal reconciliation interval. Active rollout and pending cleanup still use full Slurm node lists
+per NodeSet; this optimization reduces idle requests but does not share Slurm snapshots across NodeSets.
+
 Pod and Node watches keep the shared cache up to date without enqueueing reconciliations. Updates to an already enabled
 StatefulSet also do not enqueue extra reconciliations. Cordon changes and worker acknowledgements are observed on the
 next periodic pass. Different NodeSets can be processed concurrently according to `--max-concurrent-reconciles`.

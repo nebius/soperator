@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -87,8 +88,11 @@ type workerHandoffProgress struct {
 type RollingUpdateReconciler struct {
 	*reconciler.Reconciler
 
-	slurmAPIClients *slurmapi.ClientSet
-	requeueAfter    time.Duration
+	slurmAPIClients        *slurmapi.ClientSet
+	requeueAfter           time.Duration
+	idleSlurmAuditInterval time.Duration
+	clock                  clock.PassiveClock
+	workerCleanup          workerCleanupTracker
 }
 
 func NewRollingUpdateReconciler(
@@ -96,12 +100,15 @@ func NewRollingUpdateReconciler(
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
 	requeueAfter time.Duration,
+	idleSlurmAuditInterval time.Duration,
 ) *RollingUpdateReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	return &RollingUpdateReconciler{
-		Reconciler:      r,
-		slurmAPIClients: slurmAPIClients,
-		requeueAfter:    requeueAfter,
+		Reconciler:             r,
+		slurmAPIClients:        slurmAPIClients,
+		requeueAfter:           requeueAfter,
+		idleSlurmAuditInterval: idleSlurmAuditInterval,
+		clock:                  clock.RealClock{},
 	}
 }
 
@@ -119,12 +126,14 @@ func (r *RollingUpdateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	sts := &kruisev1b1.StatefulSet{}
 	if err := r.Get(ctx, req.NamespacedName, sts); err != nil {
 		if apierrors.IsNotFound(err) {
+			r.workerCleanup.forget(req.NamespacedName)
 			return ctrl.Result{}, nil
 		}
 		logger.Error(err, "Get worker StatefulSet")
 		return result, nil
 	}
 	if !rollingUpdateEnabled(sts) || sts.DeletionTimestamp != nil {
+		r.workerCleanup.forget(req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 	if err := r.reconcileWorkerStatefulSet(ctx, sts); err != nil {
@@ -147,10 +156,13 @@ func (r *RollingUpdateReconciler) reconcileWorkerStatefulSet(ctx context.Context
 	if err != nil {
 		return err
 	}
+	cleanup := r.workerCleanup.forStatefulSet(sts)
+	cleanup.observePods(podList)
 	replacements := planWorkerPodReplacements(sts, podList, k8sNodeCordonStates)
 	if len(replacements) == 0 {
-		return r.cleanupStaleRollingUpdateDrains(ctx, clusterName, sts, podList)
+		return r.reconcileWorkerCleanup(ctx, clusterName, sts, podList, cleanup)
 	}
+	cleanup.trackReplacements(replacements)
 	// StatefulSet status can lag behind pod events, particularly just after eviction.
 	readyReplicas := int32(0)
 	for _, pod := range podList {
@@ -469,50 +481,6 @@ func (r *RollingUpdateReconciler) deleteWorkerPod(ctx context.Context, pod *core
 	return nil
 }
 
-func (r *RollingUpdateReconciler) cleanupStaleRollingUpdateDrains(
-	ctx context.Context,
-	clusterName string,
-	sts *kruisev1b1.StatefulSet,
-	pods []corev1.Pod,
-) error {
-	ctx = log.IntoContext(ctx, log.FromContext(ctx).WithName("rolling-update-reconciler"))
-	eligibleNodeNames := make(map[string]struct{}, len(pods))
-	for _, pod := range pods {
-		if pod.Labels["controller-revision-hash"] == sts.Status.UpdateRevision && podReady(&pod) {
-			eligibleNodeNames[pod.Name] = struct{}{}
-		}
-	}
-	if len(eligibleNodeNames) == 0 {
-		return nil
-	}
-
-	slurmClient, ok := r.slurmAPIClients.GetClient(types.NamespacedName{
-		Namespace: sts.Namespace,
-		Name:      clusterName,
-	})
-	if !ok {
-		return fmt.Errorf("no slurm api client for %s/%s", sts.Namespace, clusterName)
-	}
-	slurmNodes, err := slurmClient.ListNodes(ctx)
-	if err != nil {
-		return err
-	}
-
-	var nodesToUndrain []string
-	for _, slurmNode := range slurmNodes {
-		if _, ok := eligibleNodeNames[slurmNode.Name]; !ok {
-			continue
-		}
-		if !staleRollingUpdateDrain(&slurmNode) {
-			continue
-		}
-		nodesToUndrain = append(nodesToUndrain, slurmNode.Name)
-	}
-
-	undrainStaleRollingUpdateNodes(ctx, slurmClient, nodesToUndrain)
-	return nil
-}
-
 func undrainStaleRollingUpdateNodes(ctx context.Context, slurmClient slurmapi.Client, nodeNames []string) {
 	if len(nodeNames) == 0 {
 		return
@@ -664,6 +632,10 @@ func (r *RollingUpdateReconciler) SetupWithManager(
 ) error {
 	if r.requeueAfter <= 0 {
 		return fmt.Errorf("configure a positive rolling update requeue interval, got %s", r.requeueAfter)
+	}
+
+	if r.idleSlurmAuditInterval <= 0 {
+		return fmt.Errorf("configure a positive rolling update idle Slurm audit interval, got %s", r.idleSlurmAuditInterval)
 	}
 
 	// Keep these caches synchronized without enqueueing requests on resource events.

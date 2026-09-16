@@ -38,7 +38,10 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-const testRollingUpdateInterval = 3 * time.Minute
+const (
+	testRollingUpdateInterval  = 3 * time.Minute
+	testIdleSlurmAuditInterval = 15 * time.Minute
+)
 
 func TestContainerCrashLoopBackOff(t *testing.T) {
 	statuses := []corev1.ContainerStatus{
@@ -745,6 +748,7 @@ func TestReconcileUndrainsStaleDrainAfterUpdate(t *testing.T) {
 		record.NewFakeRecorder(1),
 		slurmClients,
 		testRollingUpdateInterval,
+		testIdleSlurmAuditInterval,
 	)
 
 	result, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)})
@@ -832,6 +836,7 @@ func testRollingUpdateReconcilerWithPods(
 		record.NewFakeRecorder(1),
 		slurmClients,
 		testRollingUpdateInterval,
+		testIdleSlurmAuditInterval,
 	), kubeClient
 }
 
@@ -873,7 +878,7 @@ func testK8sNodeRolloutReconciler(t *testing.T, slurmClient slurmapi.Client) (*R
 	if slurmClient != nil {
 		clients.AddClient(types.NamespacedName{Namespace: sts.Namespace, Name: "cluster"}, slurmClient)
 	}
-	return NewRollingUpdateReconciler(kubeClient, scheme, record.NewFakeRecorder(10), clients, testRollingUpdateInterval), sts, &pod, node
+	return NewRollingUpdateReconciler(kubeClient, scheme, record.NewFakeRecorder(10), clients, testRollingUpdateInterval, testIdleSlurmAuditInterval), sts, &pod, node
 }
 
 func TestReconcilePollsForK8sNodeCordonWithoutPendingReplacements(t *testing.T) {

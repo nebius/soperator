@@ -135,6 +135,11 @@ func TestReconcileBatchUndrainReselectsNodesAfterPartialFailure(t *testing.T) {
 	result, err = r.Reconcile(ctx, req)
 	require.NoError(t, err)
 	assert.Equal(t, testRollingUpdateInterval, result.RequeueAfter)
+
+	// Confirmed cleanup returns to idle polling, even after a partially applied batch.
+	result, err = r.Reconcile(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, testRollingUpdateInterval, result.RequeueAfter)
 	slurmClient.AssertNumberOfCalls(t, "UndrainNodes", 2)
 	slurmClient.AssertNotCalled(t, "RebootNodes", mock.Anything, mock.Anything)
 	slurmClient.AssertExpectations(t)
