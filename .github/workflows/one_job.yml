@@ -526,7 +526,7 @@ jobs:
             fromJSON(
               (github.base_ref == 'soperator-release-4.0' || github.base_ref == 'soperator-release-4.1')
               && '["12.9.0", "13.0.2"]'
-              || '["12.9.0", "13.0.3"]'
+              || '["13.0.3"]'
             )
           }}
         include:
@@ -743,7 +743,7 @@ jobs:
             fromJSON(
               (github.base_ref == 'soperator-release-4.0' || github.base_ref == 'soperator-release-4.1')
               && '["12.9.0", "13.0.2"]'
-              || '["12.9.0", "13.0.3"]'
+              || '["13.0.3"]'
             )
           }}
 
