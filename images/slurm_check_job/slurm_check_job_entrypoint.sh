@@ -37,9 +37,10 @@ echo "Create directory for slurm job outputs"
 echo "Set HOME to soperatorchecks' home directory"
 export HOME=~soperatorchecks
 
-# Auto-detect GPU requirement from the sbatch script's #SBATCH directives and
-# export it, so per-node submission in slurm_submit_jobs.sh targets GPU nodes only.
-if grep -qE '#SBATCH\s+.*(--gpus-per-node|--gpus\b|--gres=gpu|-G\s)' /opt/bin/sbatch.sh; then
+# The 4.1 chart requests GPUs through SBATCH_GPUS_PER_NODE; custom checks may
+# request them in the script instead. Pass either requirement to node selection.
+if [[ -n "${SBATCH_GPUS_PER_NODE:-}" && "${SBATCH_GPUS_PER_NODE}" != "0" ]] ||
+    grep -qE '#SBATCH\s+.*(--gpus-per-node|--gpus\b|--gres=gpu|-G\s)' /opt/bin/sbatch.sh; then
     export ACTIVE_CHECK_REQUIRES_GPU=true
 fi
 
