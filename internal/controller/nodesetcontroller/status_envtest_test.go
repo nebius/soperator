@@ -97,7 +97,7 @@ func TestSetUpConditionsWithAPIServer(t *testing.T) {
 					return c.SubResource(subresource).Patch(ctx, obj, patch, opts...)
 				},
 			})
-			r := NewNodeSetReconciler(countingClient, scheme, record.NewFakeRecorder(10))
+			r := NewNodeSetReconciler(countingClient, scheme, record.NewFakeRecorder(10), true)
 			require.NoError(t, r.setUpConditions(ctx, nodeSet))
 			require.NoError(t, k8sClient.Get(ctx, key, nodeSet))
 			assert.Equal(t, wantReplicas, nodeSet.Status.Replicas)

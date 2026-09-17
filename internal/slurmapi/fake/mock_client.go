@@ -6895,17 +6895,17 @@ func (_c *MockClient_SlurmdbV0044PostWckeysWithResponse_Call) RunAndReturn(run f
 	return _c
 }
 
-// UndrainNode provides a mock function with given fields: ctx, nodeName
-func (_m *MockClient) UndrainNode(ctx context.Context, nodeName string) error {
-	ret := _m.Called(ctx, nodeName)
+// UndrainNodes provides a mock function with given fields: ctx, nodeNames
+func (_m *MockClient) UndrainNodes(ctx context.Context, nodeNames []string) error {
+	ret := _m.Called(ctx, nodeNames)
 
 	if len(ret) == 0 {
-		panic("no return value specified for UndrainNode")
+		panic("no return value specified for UndrainNodes")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, nodeName)
+	if rf, ok := ret.Get(0).(func(context.Context, []string) error); ok {
+		r0 = rf(ctx, nodeNames)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -6913,31 +6913,31 @@ func (_m *MockClient) UndrainNode(ctx context.Context, nodeName string) error {
 	return r0
 }
 
-// MockClient_UndrainNode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UndrainNode'
-type MockClient_UndrainNode_Call struct {
+// MockClient_UndrainNodes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UndrainNodes'
+type MockClient_UndrainNodes_Call struct {
 	*mock.Call
 }
 
-// UndrainNode is a helper method to define mock.On call
+// UndrainNodes is a helper method to define mock.On call
 //   - ctx context.Context
-//   - nodeName string
-func (_e *MockClient_Expecter) UndrainNode(ctx interface{}, nodeName interface{}) *MockClient_UndrainNode_Call {
-	return &MockClient_UndrainNode_Call{Call: _e.mock.On("UndrainNode", ctx, nodeName)}
+//   - nodeNames []string
+func (_e *MockClient_Expecter) UndrainNodes(ctx interface{}, nodeNames interface{}) *MockClient_UndrainNodes_Call {
+	return &MockClient_UndrainNodes_Call{Call: _e.mock.On("UndrainNodes", ctx, nodeNames)}
 }
 
-func (_c *MockClient_UndrainNode_Call) Run(run func(ctx context.Context, nodeName string)) *MockClient_UndrainNode_Call {
+func (_c *MockClient_UndrainNodes_Call) Run(run func(ctx context.Context, nodeNames []string)) *MockClient_UndrainNodes_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].([]string))
 	})
 	return _c
 }
 
-func (_c *MockClient_UndrainNode_Call) Return(_a0 error) *MockClient_UndrainNode_Call {
+func (_c *MockClient_UndrainNodes_Call) Return(_a0 error) *MockClient_UndrainNodes_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockClient_UndrainNode_Call) RunAndReturn(run func(context.Context, string) error) *MockClient_UndrainNode_Call {
+func (_c *MockClient_UndrainNodes_Call) RunAndReturn(run func(context.Context, []string) error) *MockClient_UndrainNodes_Call {
 	_c.Call.Return(run)
 	return _c
 }
