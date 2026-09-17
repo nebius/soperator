@@ -7,14 +7,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/check"
-	"nebius.ai/slurm-operator/internal/naming"
-	"nebius.ai/slurm-operator/internal/utils/sliceutils"
-
-	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/common"
+	"nebius.ai/slurm-operator/internal/utils/sliceutils"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -197,14 +195,6 @@ func renderContainerNodeSetSlurmd(
 
 	realMemoryBytes := common.RenderRealMemorySlurmd(resources) * 1024 * 1024
 
-	appArmorProfile := nodeSet.ContainerSlurmd.AppArmorProfile
-	if nodeSet.AppArmorProfileUseDefault {
-		appArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(nodeSet.ParentalCluster.Name, nodeSet.ParentalCluster.Namespace))
-	}
-	if appArmorProfile == "" {
-		appArmorProfile = consts.AppArmorProfileUnconfined
-	}
-
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
 		Image:           nodeSet.ContainerSlurmd.Image,
@@ -249,7 +239,7 @@ func renderContainerNodeSetSlurmd(
 				v := nodeSet.ContainerSlurmd.ProcMount
 				return &v
 			}(),
-			AppArmorProfile: common.ParseAppArmorProfile(appArmorProfile),
+			AppArmorProfile: common.ParseAppArmorProfile(nodeSet.ContainerSlurmd.AppArmorProfile),
 		},
 		Resources:                resources,
 		LivenessProbe:            nodeSet.ContainerSlurmd.LivenessProbe,

@@ -3,7 +3,6 @@ templates:
   - templates/cert-manager.yaml
   - templates/mariadb-operator.yaml
   - templates/backup.yaml
-  - templates/security-profiles-operator.yaml
   - templates/csi-driver-nfs.yaml
   - templates/kruise.yaml
   - templates/soperator.yaml
@@ -78,18 +77,6 @@ tests:
           path: spec.values.nodeSelector["slurm.nebius.ai/nodeset"]
           value: system
 
-  - it: should pin the security profiles operator but leave its DaemonSet alone
-    template: templates/security-profiles-operator.yaml
-    asserts:
-      - equal:
-          path: spec.values.nodeSelector["slurm.nebius.ai/nodeset"]
-          value: system
-      - equal:
-          path: spec.values.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchLabels.app
-          value: security-profiles-operator
-      - notExists:
-          path: spec.values.daemon.nodeSelector
-
   - it: should pin only the csi-driver-nfs controller, never the node plugin
     template: templates/csi-driver-nfs.yaml
     asserts:
@@ -98,37 +85,6 @@ tests:
           value: system
       - notExists:
           path: spec.values.node
-
-  - it: should tolerate Slurm and GPU nodes without tolerating NFS nodes
-    template: templates/security-profiles-operator.yaml
-    asserts:
-      - equal:
-          path: spec.values.daemon.tolerations
-          value:
-            - key: slurm.nebius.ai/nodeset
-              operator: Equal
-              value: controller
-              effect: NoSchedule
-            - key: slurm.nebius.ai/nodeset
-              operator: Equal
-              value: login
-              effect: NoSchedule
-            - key: slurm.nebius.ai/nodeset
-              operator: Equal
-              value: accounting
-              effect: NoSchedule
-            - key: nvidia.com/gpu
-              operator: Exists
-              effect: NoSchedule
-
-  - it: should allow clearing SPO tolerations
-    template: templates/security-profiles-operator.yaml
-    set:
-      securityProfilesOperator.values.daemon.tolerations: []
-    asserts:
-      - equal:
-          path: spec.values.daemon.tolerations
-          value: []
 
   - it: should pin the kruise manager without an anti-affinity term
     template: templates/kruise.yaml

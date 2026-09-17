@@ -157,6 +157,7 @@ open-source, cloud-agnostic version of Soperator. It covers:
 - Network topology, including describing several fabrics as named topologies.
 - Current limitations.
 - Guidance for deploying Soperator on any cloud or on-premises.
+- [AppArmor configuration and provisioning](docs/apparmor.md).
 - Local development with Kind.
 - The release process for both the `soperator` and `nebius-solutions-library` repositories.
 - Metrics collection and processing.

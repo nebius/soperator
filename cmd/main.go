@@ -27,13 +27,15 @@ import (
 	"strings"
 	"time"
 
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
+	kruisev1alpha1 "github.com/openkruise/kruise-api/apps/v1alpha1"
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"go.uber.org/zap/zapcore"
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	_ "k8s.io/client-go/plugin/pkg/client/auth" // Register Kubernetes client auth plugins.
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -41,12 +43,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-
-	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
-	kruisev1alpha1 "github.com/openkruise/kruise-api/apps/v1alpha1"
-	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
-	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
@@ -81,9 +77,6 @@ func init() {
 	}
 	if check.IsMariaDbCRDInstalled() {
 		utilruntime.Must(mariadbv1alpha1.AddToScheme(scheme))
-	}
-	if check.IsAppArmorCRDInstalled() {
-		utilruntime.Must(apparmor.AddToScheme(scheme))
 	}
 	utilruntime.Must(kruisev1alpha1.AddToScheme(scheme))
 	utilruntime.Must(kruisev1b1.AddToScheme(scheme))

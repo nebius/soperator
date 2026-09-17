@@ -49,11 +49,6 @@ func RenderStatefulSet(
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
 	}
 
-	sshAppArmorProfile := login.ContainerSshd.AppArmorProfile
-	if login.UseDefaultAppArmorProfile {
-		sshAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
-	}
-
 	initContainers := append(
 		login.CustomInitContainers,
 		common.RenderContainerMunge(&login.ContainerMunge),
@@ -118,7 +113,7 @@ func RenderStatefulSet(
 							login.UserIsolation,
 							login.DockerEnabled,
 							dockerImageStorageMount,
-							sshAppArmorProfile,
+							login.ContainerSshd.AppArmorProfile,
 						),
 					},
 					Volumes:   volumes,

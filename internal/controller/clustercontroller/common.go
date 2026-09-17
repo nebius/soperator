@@ -11,7 +11,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -150,33 +149,6 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					}
 					stepLogger.V(1).Info("Reconciled")
 
-					return nil
-				},
-			},
-			utils.MultiStepExecutionStep{
-				Name: "AppArmor profiles",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
-					if !check.IsAppArmorCRDInstalled() {
-						stepLogger.V(1).Info("AppArmor CRD is not installed, skipping AppArmor profile reconciliation")
-						return nil
-					}
-					if !clusterValues.UseDefaultAppArmorProfile {
-						stepLogger.V(1).Info("Default AppArmor profile is not set, skipping AppArmor profile reconciliation")
-						return nil
-					}
-
-					desired := common.RenderAppArmorProfile(
-						clusterValues,
-					)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-					stepLogger.V(1).Info("Rendered")
-
-					if err := r.AppArmorProfile.Reconcile(stepCtx, cluster, desired); err != nil {
-						return fmt.Errorf("reconciling AppArmor profiles: %w", err)
-					}
-					stepLogger.V(1).Info("Reconciled")
 					return nil
 				},
 			},

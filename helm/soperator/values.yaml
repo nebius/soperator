@@ -22,7 +22,6 @@ controllerManager:
       enableWebhooks: "true"
       isMariadbCrdInstalled: "false"
       isOpentelemetryCollectorCrdInstalled: "false"
-      isApparmorCrdInstalled: "false"
       isPrometheusCrdInstalled: "false"
       slurmOperatorWatchNamespaces: '*'
       topologyLabelPrefix: "topology.nebius.com"

@@ -31,7 +31,6 @@ These tests verify the following kubebuilder default values:
 
 ### SlurmClusterSpec
 - `maintenance: "none"`
-- `useDefaultAppArmorProfile: false`
 
 ### SlurmConfig
 - `defMemPerNode: 1048576`
