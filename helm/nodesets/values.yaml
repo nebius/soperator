@@ -121,8 +121,9 @@ nodesets:
         - "cuda"
       # Whether Slurm automatically resumes the nodes.
       # Set to false to render AutoResume=Off in the NodeName configuration.
-      # Optional, defaults to true
-      autoResume: true
+      # When true, the setting is omitted and Slurm uses its default AutoResume=On behavior.
+      # Optional, defaults to false
+      autoResume: false
       # Static string to be added to the Node's configuration
       # Optional
       static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=1"
