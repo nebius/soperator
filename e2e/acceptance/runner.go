@@ -262,7 +262,7 @@ func (r *Runner) initializeSuiteScenario(
 	teamCityReporter *reports.TeamCityReporter,
 ) {
 	if teamCityReporter != nil {
-		registerTeamCityStartHook(sc, teamCityReporter, suite.Name)
+		registerTeamCityStateHook(sc, teamCityReporter, suite.Name)
 	}
 	registerScenarioArtifacts(sc, suite.Name, runtime, artifactsManager)
 	registerTimingHooks(sc)
