@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: mount-jail-submount-filestore
-          image: cr.nebius.cloud/soperator/busybox
+          image: cr.eu-north1.nebius.cloud/soperator/busybox
           command:
             - /bin/sh
             - -c

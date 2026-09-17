@@ -353,14 +353,14 @@ spec:
       name: varlibotelcol
     image:
       pullPolicy: IfNotPresent
-      repository: cr.nebius.cloud/observability/nebius-o11y-agent
+      repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
       tag: 2.0.10
     initContainers:
     - command:
       - sh
       - -c
       - 'chown -R 10001: /var/lib/otelcol-jail'
-      image: cr.nebius.cloud/soperator/busybox:latest
+      image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
       name: init-fs
       securityContext:
         runAsGroup: 0
@@ -379,7 +379,7 @@ spec:
           echo "Waiting for /mnt/jail/opt/soperator-outputs to be created by a worker or login pod"
           sleep 5
         done
-      image: cr.nebius.cloud/soperator/busybox:latest
+      image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
       name: wait-soperator-outputs
       volumeMounts:
       - mountPath: /mnt/jail

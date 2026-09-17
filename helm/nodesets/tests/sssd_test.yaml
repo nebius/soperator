@@ -57,12 +57,12 @@ tests:
           sssdLdapCAConfigMapRefName: "worker-ldap-ca"
       images:
         sssd:
-          repository: "cr.nebius.cloud/soperator/sssd"
+          repository: "cr.eu-north1.nebius.cloud/soperator/sssd"
           tag: "2.9.4-1-63"
     asserts:
       - equal:
           path: spec.sssd.image.repository
-          value: cr.nebius.cloud/soperator/sssd
+          value: cr.eu-north1.nebius.cloud/soperator/sssd
       - equal:
           path: spec.sssd.image.tag
           value: 2.9.4-1-63

@@ -4,9 +4,9 @@
 //
 // Environment Variables:
 //   - UNSTABLE: Controls whether to use unstable (development) or stable (release) versions.
-//   - "true" (default): Uses unstable versions from cr.nebius.cloud/soperator-unstable
+//   - "true" (default): Uses unstable versions from cr.eu-north1.nebius.cloud/soperator-unstable
 //     with git commit hash suffix (e.g., 1.22.3-e0c75283)
-//   - "false": Uses stable versions from cr.nebius.cloud/soperator
+//   - "false": Uses stable versions from cr.eu-north1.nebius.cloud/soperator
 //     without git commit hash (e.g., 1.22.3)
 //
 // Examples:

@@ -1,7 +1,7 @@
 helmRepository:
   interval: 15m
   soperator:
-    url: oci://cr.nebius.cloud/soperator
+    url: oci://cr.eu-north1.nebius.cloud/soperator
     type: oci
   kruise:
     url: https://openkruise.github.io/charts/
@@ -25,7 +25,7 @@ helmRepository:
     url: https://prometheus-community.github.io/helm-charts
     type: default
   securityProfilesOperator:
-    url: oci://cr.nebius.cloud/soperator
+    url: oci://cr.eu-north1.nebius.cloud/e00xdc03sb7gpqfd0a
     type: oci
   victoriaMetrics:
     url: https://victoriametrics.github.io/helm-charts/
@@ -34,7 +34,7 @@ helmRepository:
     url: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
     type: default
   nfsServer:
-    url: oci://cr.nebius.cloud/soperator
+    url: oci://cr.eu-north1.nebius.cloud/soperator
     type: oci
 ns:
   enabled: true
@@ -75,7 +75,7 @@ backup:
   values:
     cleanup:
       pullPolicy: IfNotPresent
-      registry: cr.nebius.cloud/soperator-proxy-docker-io
+      registry: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io
       repository: alpine/k8s
       tag: 1.34.0
   overrideValues: null
@@ -280,7 +280,7 @@ observability:
         # Namespaces to maintain the Secret in. Empty means the vmStack namespace.
         namespaces: []
         image:
-          repository: cr.nebius.cloud/soperator-proxy-docker-io/alpine/curl
+          repository: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/alpine/curl
           tag: "8.19.0"
           pullPolicy: IfNotPresent
         imdsBaseUrl: http://169.254.169.254
@@ -566,7 +566,7 @@ soperator:
       manager:
         replicas: 2
         image:
-          repository: cr.nebius.cloud/soperator/kruise-manager
+          repository: cr.eu-north1.nebius.cloud/soperator/kruise-manager
           tag: v1.8.3
         resources:
           limits:
@@ -577,7 +577,7 @@ soperator:
             memory: 2Gi
       helmHooks:
         image:
-          repository: cr.nebius.cloud/soperator/kruise-helm-hook
+          repository: cr.eu-north1.nebius.cloud/soperator/kruise-helm-hook
           tag: v0.1.0
       featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true,ResourceDistributionGate=true"
     driftDetection:

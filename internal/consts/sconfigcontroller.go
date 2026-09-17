@@ -1,6 +1,6 @@
 package consts
 
 const (
-	InitContainerImageSconfigController = "cr.nebius.cloud/soperator/busybox"
+	InitContainerImageSconfigController = "cr.eu-north1.nebius.cloud/soperator/busybox"
 	DefaultPathEtcSlurm                 = "/mnt/jail/etc/slurm"
 )

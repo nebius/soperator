@@ -26,7 +26,7 @@ tests:
               effect: NoSchedule
           slurmd:
             image:
-              repository: "cr.nebius.cloud/soperator/worker_slurmd"
+              repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
               tag: "1.22.1-noble-slurm25.05.4"
             resources:
               cpu: "4"
@@ -42,7 +42,7 @@ tests:
               jailSubMounts: []
           munge:
             image:
-              repository: "cr.nebius.cloud/soperator/munge"
+              repository: "cr.eu-north1.nebius.cloud/soperator/munge"
               tag: "1.22.1-noble-slurm25.05.4"
             resources:
               cpu: "100m"
@@ -62,7 +62,7 @@ tests:
                           - "cpu-node-group-id"
           slurmd:
             image:
-              repository: "cr.nebius.cloud/soperator/worker_slurmd"
+              repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
               tag: "1.22.1-noble-slurm25.05.4"
             resources:
               cpu: "2"
@@ -77,7 +77,7 @@ tests:
               jailSubMounts: []
           munge:
             image:
-              repository: "cr.nebius.cloud/soperator/munge"
+              repository: "cr.eu-north1.nebius.cloud/soperator/munge"
               tag: "1.22.1-noble-slurm25.05.4"
             resources:
               cpu: "50m"
@@ -180,7 +180,7 @@ tests:
           replicas: 3
           slurmd:
             image:
-              repository: "cr.nebius.cloud/soperator/worker_slurmd"
+              repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
               tag: "1.22.1-noble-slurm25.05.4"
             port: 6818
             resources:
@@ -197,7 +197,7 @@ tests:
               jailSubMounts: []
           munge:
             image:
-              repository: "cr.nebius.cloud/soperator/munge"
+              repository: "cr.eu-north1.nebius.cloud/soperator/munge"
               tag: "1.22.1-noble-slurm25.05.4"
             resources:
               cpu: "100m"
@@ -206,7 +206,7 @@ tests:
     asserts:
       - equal:
           path: spec.slurmd.image.repository
-          value: "cr.nebius.cloud/soperator/worker_slurmd"
+          value: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
       - equal:
           path: spec.slurmd.image.tag
           value: "1.22.1-noble-slurm25.05.4"

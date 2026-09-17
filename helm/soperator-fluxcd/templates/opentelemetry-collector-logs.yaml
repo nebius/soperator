@@ -415,7 +415,7 @@ spec:
       name: varlibdockercontainers
     image:
       pullPolicy: IfNotPresent
-      repository: cr.nebius.cloud/observability/nebius-o11y-agent
+      repository: cr.eu-north1.nebius.cloud/observability/nebius-o11y-agent
       tag: 2.0.10
     initContainers:
     - command:
@@ -426,7 +426,7 @@ spec:
       {{- else }}
       - 'chown -R 10001: /var/lib/otelcol'
       {{- end }}
-      image: cr.nebius.cloud/soperator/busybox:latest
+      image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
       name: init-fs
       securityContext:
         runAsGroup: 0

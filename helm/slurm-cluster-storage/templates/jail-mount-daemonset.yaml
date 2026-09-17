@@ -20,9 +20,9 @@ spec:
       containers:
         - name: {{ cat "mount-jail" (include "slurm-cluster-storage.volume.jail.type" .) | include "mashedkebab" }}
 {{- if eq (include "slurm-cluster-storage.volume.jail.type" .) "filestore" }}
-          image: cr.nebius.cloud/soperator/busybox
+          image: cr.eu-north1.nebius.cloud/soperator/busybox
 {{- else }}
-          image: cr.nebius.cloud/ml-containers/neubuntu:noble-20260324150527
+          image: cr.eu-north1.nebius.cloud/ml-containers/neubuntu:noble-20260324150527
 {{- end }}
           command:
             - /bin/sh

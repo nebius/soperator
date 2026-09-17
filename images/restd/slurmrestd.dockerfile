@@ -3,7 +3,7 @@
 ARG SLURM_VERSION
 
 # https://github.com/nebius/ml-containers/pull/79
-FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS slurmrestd
+FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS slurmrestd
 
 # Expose the port used for accessing slurmrestd
 EXPOSE 6820

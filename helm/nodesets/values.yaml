@@ -24,13 +24,13 @@ priorityClasses:
 # Default container images used by NodeSets
 images:
   munge:
-    repository: "cr.nebius.cloud/soperator/munge"
+    repository: "cr.eu-north1.nebius.cloud/soperator/munge"
     tag: "4.1.8-slurm25.11.3"
   sssd:
-    repository: "cr.nebius.cloud/soperator/sssd"
+    repository: "cr.eu-north1.nebius.cloud/soperator/sssd"
     tag: "2.9.4-1-63"
   slurmd:
-    repository: "cr.nebius.cloud/soperator/worker_slurmd"
+    repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
     tag: "4.1.8-slurm25.11.3"
 # NodeSets configuration
 # Each NodeSet defines a group of worker nodes with specific characteristics
@@ -97,7 +97,7 @@ nodesets:
       # Each particular NodeSet's containers can have images other than default ones
       # Optional
       image:
-        repository: "cr.nebius.cloud/soperator/worker_slurmd"
+        repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
         tag: "4.1.8-slurm25.11.3"
         pullPolicy: "IfNotPresent"
       customEnv:
@@ -186,7 +186,7 @@ nodesets:
       # Each particular NodeSet's containers can have images other than default ones
       # Optional
       image:
-        repository: "cr.nebius.cloud/soperator/munge"
+        repository: "cr.eu-north1.nebius.cloud/soperator/munge"
         # Optional
         tag: "4.1.8-slurm25.11.3"
         pullPolicy: "IfNotPresent"
@@ -262,7 +262,7 @@ nodesets:
     # Optional, defaults to empty list
     customInitContainers:
       - name: say-hi
-        image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox
+        image: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/library/busybox
         command: ["echo", "Hi!"]
   - name: worker-cpu
     replicas: 6

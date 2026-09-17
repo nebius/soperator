@@ -42,7 +42,7 @@ controllerManager:
       slurmOperatorWatchNamespaces: '*'
       topologyLabelPrefix: "topology.nebius.com"
     image:
-      repository: cr.nebius.cloud/soperator/slurm-operator
+      repository: cr.eu-north1.nebius.cloud/soperator/slurm-operator
       tag: 4.1.8
     imagePullPolicy: Always
     resources:

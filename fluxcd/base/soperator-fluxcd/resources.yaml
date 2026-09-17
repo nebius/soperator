@@ -6,7 +6,7 @@ metadata:
 spec:
   type: "oci"
   interval: 24h
-  url: oci://cr.nebius.cloud/soperator
+  url: oci://cr.eu-north1.nebius.cloud/soperator
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease

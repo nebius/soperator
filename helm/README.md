@@ -275,7 +275,7 @@ kubectl create configmap soperator-fluxcd-values \
 
 # Bootstrap with Helm chart
 helm install soperator-bootstrap \
-  oci://cr.nebius.cloud/soperator/soperator-fluxcd-bootstrap \
+  oci://cr.eu-north1.nebius.cloud/soperator/soperator-fluxcd-bootstrap \
   --version 1.23.0 \
   --namespace flux-system
 ```

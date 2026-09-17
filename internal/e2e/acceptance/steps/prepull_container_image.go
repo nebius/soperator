@@ -16,7 +16,7 @@ var containerImageRegex = regexp.MustCompile(`--container-image=(\S+)`)
 
 // PrepullContainerImagePyxis returns the Pyxis-format image declared in the
 // prepull-container-image ActiveCheck's sbatch script
-// (e.g. "cr.nebius.cloud#ml-containers/training_diag:<tag>").
+// (e.g. "cr.eu-north1.nebius.cloud#ml-containers/training_diag:<tag>").
 func PrepullContainerImagePyxis(ctx context.Context, exec framework.Exec) (string, error) {
 	var checks slurmv1alpha1.ActiveCheckList
 	if err := kubectlJSON(ctx, exec, &checks, "get", "activechecks", "-A", "-o", "json"); err != nil {
