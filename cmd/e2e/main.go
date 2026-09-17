@@ -16,6 +16,7 @@ import (
 	"nebius.ai/slurm-operator/internal/e2e"
 )
 
+// SCHED-2516: temporary PR to verify main workflow compatibility with release 4.1.
 func main() {
 	log.SetFlags(0)
 
