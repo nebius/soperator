@@ -3,7 +3,7 @@ resources:
   - ../rbac/soperatorchecks/role.yaml
 images:
   - name: controller
-    newName: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
+    newName: cr.nebius.cloud/soperator/soperatorchecks
     newTag: 4.1.8
 patches:
   # Protect the /metrics endpoint by putting it behind auth.

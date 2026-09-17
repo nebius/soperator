@@ -3,7 +3,7 @@
 ARG SLURM_VERSION
 
 # https://github.com/nebius/ml-containers/pull/79
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS worker_slurmd
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS worker_slurmd
 
 ARG MELLANOX_REPO_URL=https://linux.mellanox.com/public/repo/doca/3.1.0
 

@@ -159,7 +159,7 @@ If you are currently using the Kustomize-based bootstrap, migrate to the Helm ch
 3. **Install the bootstrap Helm chart**:
    ```bash
    helm install soperator-bootstrap \
-     oci://cr.eu-north1.nebius.cloud/soperator/soperator-fluxcd-bootstrap \
+     oci://cr.nebius.cloud/soperator/soperator-fluxcd-bootstrap \
      --version <version> \
      --namespace flux-system
    ```

@@ -288,7 +288,7 @@ tests:
         slurmd: "test-image"
         sshd: "test-image"
         munge: "test-image"
-        sssd: "cr.eu-north1.nebius.cloud/soperator/sssd:2.9.4-1-63"
+        sssd: "cr.nebius.cloud/soperator/sssd:2.9.4-1-63"
         populateJail: "test-image"
         slurmdbd: "test-image"
         soperatorExporter: "test-image"
@@ -297,7 +297,7 @@ tests:
     asserts:
       - equal:
           path: spec.slurmNodes.controller.sssd.image
-          value: cr.eu-north1.nebius.cloud/soperator/sssd:2.9.4-1-63
+          value: cr.nebius.cloud/soperator/sssd:2.9.4-1-63
       - equal:
           path: spec.slurmNodes.controller.sssdConfSecretRefName
           value: sssd-conf
@@ -309,7 +309,7 @@ tests:
           value: 2
       - equal:
           path: spec.slurmNodes.login.sssd.image
-          value: cr.eu-north1.nebius.cloud/soperator/sssd:2.9.4-1-63
+          value: cr.nebius.cloud/soperator/sssd:2.9.4-1-63
       - equal:
           path: spec.slurmNodes.login.sssd.imagePullPolicy
           value: IfNotPresent
