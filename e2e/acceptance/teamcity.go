@@ -29,14 +29,13 @@ type teamCityScenarioState struct {
 
 type teamCityScenarioStateKey struct{}
 
-func registerTeamCityStartHook(sc *godog.ScenarioContext, reporter *reports.TeamCityReporter, suiteName string) {
+func registerTeamCityStateHook(sc *godog.ScenarioContext, reporter *reports.TeamCityReporter, suiteName string) {
 	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
 		state := &teamCityScenarioState{
 			name:      fmt.Sprintf("%s: %s: %s", suiteName, scenario.Uri, scenario.Name),
 			flowID:    suiteName + "/" + scenario.Id,
 			startedAt: reporter.Now(),
 		}
-		reporter.TestStarted(state.name, state.flowID)
 		return context.WithValue(ctx, teamCityScenarioStateKey{}, state), nil
 	})
 }
@@ -71,11 +70,14 @@ func registerTeamCityResultHooks(sc *godog.ScenarioContext, reporter *reports.Te
 			}
 		}
 
-		switch state.result {
-		case teamCityScenarioFailed:
-			reporter.TestFailed(state.name, state.message, state.flowID)
-		case teamCityScenarioSkipped:
+		if state.result == teamCityScenarioSkipped {
 			reporter.TestIgnored(state.name, state.message, state.flowID)
+			return ctx, nil
+		}
+
+		reporter.TestStarted(state.name, state.flowID)
+		if state.result == teamCityScenarioFailed {
+			reporter.TestFailed(state.name, state.message, state.flowID)
 		}
 		reporter.TestFinished(state.name, state.flowID, reporter.Now().Sub(state.startedAt))
 		return ctx, nil

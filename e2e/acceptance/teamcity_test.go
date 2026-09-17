@@ -36,7 +36,7 @@ func TestTeamCityHooksReportParallelScenarioResults(t *testing.T) {
 	suite := godog.TestSuite{
 		Name: "reporting",
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
-			registerTeamCityStartHook(sc, reporter, "reporting")
+			registerTeamCityStateHook(sc, reporter, "reporting")
 			registerSkipHook(sc)
 			sc.Step(`^the step passes$`, func() error { return nil })
 			sc.Step(`^the step fails$`, func() error { return errors.New("controlled failure") })
@@ -54,8 +54,8 @@ func TestTeamCityHooksReportParallelScenarioResults(t *testing.T) {
 
 	assert.Equal(t, 1, suite.Run())
 	report := output.String()
-	assert.Equal(t, 3, strings.Count(report, "##teamcity[testStarted"))
-	assert.Equal(t, 3, strings.Count(report, "##teamcity[testFinished"))
+	assert.Equal(t, 2, strings.Count(report, "##teamcity[testStarted"))
+	assert.Equal(t, 2, strings.Count(report, "##teamcity[testFinished"))
 	assert.Equal(t, 1, strings.Count(report, "##teamcity[testFailed"))
 	assert.Equal(t, 1, strings.Count(report, "##teamcity[testIgnored"))
 	assert.Contains(t, report, "name='reporting: features/teamcity.feature: passes'")
@@ -65,8 +65,9 @@ func TestTeamCityHooksReportParallelScenarioResults(t *testing.T) {
 	assert.Contains(t, report, "message='scenario skipped at step: the step passes'")
 
 	durations := regexp.MustCompile(`##teamcity\[testFinished [^\n]+ duration='[0-9]+'`).FindAllString(report, -1)
-	assert.Len(t, durations, 3)
+	assert.Len(t, durations, 2)
 	assert.NotContains(t, report, "testIgnored name='reporting: features/teamcity.feature: fails'")
+	assert.NotContains(t, report, "testFinished name='reporting: features/teamcity.feature: skips'")
 }
 
 func TestRecordTeamCityStepResultDoesNotReplaceFailureWithSkip(t *testing.T) {
