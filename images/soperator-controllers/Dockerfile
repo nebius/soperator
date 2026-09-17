@@ -1,6 +1,6 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-FROM cr.nebius.cloud/soperator-proxy-docker-io/library/golang:1.26 AS soperator-go-base
+FROM cr.nebius.cloud/soperator-proxy-docker-io/library/golang:1.27.1 AS soperator-go-base
 
 WORKDIR /build
 
