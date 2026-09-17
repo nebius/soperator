@@ -45,7 +45,7 @@ make kind-delete KIND_CLUSTER_NAME=test-cluster
 make kind-create
 
 # Build operator image
-docker build -t cr.eu-north1.nebius.cloud/soperator/slurm-operator:dev .
+docker build -t cr.nebius.cloud/soperator/slurm-operator:dev .
 
 # Load image into kind
 make kind-load-images

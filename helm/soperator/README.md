@@ -32,10 +32,10 @@ To install the Soperator Helm chart, follow these steps:
 
 For the stable version:
 ```bash
-helm install soperator oci://cr.eu-north1.nebius.cloud/soperator/helm-soperator --namespace soperator-system --create-namespace
+helm install soperator oci://cr.nebius.cloud/soperator/helm-soperator --namespace soperator-system --create-namespace
 ```
 
 For the dev version:
 ```bash
-helm install soperator oci://cr.eu-north1.nebius.cloud/soperator-unstable/helm-soperator --namespace soperator-system --create-namespace
+helm install soperator oci://cr.nebius.cloud/soperator-unstable/helm-soperator --namespace soperator-system --create-namespace
 ```

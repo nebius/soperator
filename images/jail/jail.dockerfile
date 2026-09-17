@@ -3,7 +3,7 @@
 ARG CUDA_VERSION
 ARG SLURM_VERSION
 # https://github.com/nebius/ml-containers/pull/93
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260714103620 AS jail
+FROM cr.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260714103620 AS jail
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
@@ -109,7 +109,7 @@ COPY VERSION /etc/soperator-jail-version
 RUN ldconfig
 
 #######################################################################################################################
-FROM cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/restic/restic:0.18.0 AS untaped
+FROM cr.nebius.cloud/soperator-proxy-docker-io/restic/restic:0.18.0 AS untaped
 
 COPY --from=jail / /jail
 
@@ -121,7 +121,7 @@ RUN restic init --insecure-no-password --repo /jail_restic && \
         --host soperator
 
 #######################################################################################################################
-FROM cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/restic/restic:0.18.0 AS populate_jail
+FROM cr.nebius.cloud/soperator-proxy-docker-io/restic/restic:0.18.0 AS populate_jail
 
 COPY --from=untaped /jail_restic /jail_restic
 

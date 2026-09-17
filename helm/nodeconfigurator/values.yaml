@@ -3,7 +3,7 @@ customContainer:
   enabled: false
   env: []
   image:
-    repository: "cr.eu-north1.nebius.cloud/soperator/busybox"
+    repository: "cr.nebius.cloud/soperator/busybox"
     tag: "latest"
     pullPolicy: IfNotPresent
   command:
@@ -27,7 +27,7 @@ rebooter:
   logFormat: "json"
   env: []
   image:
-    repository: "cr.eu-north1.nebius.cloud/soperator/rebooter"
+    repository: "cr.nebius.cloud/soperator/rebooter"
     tag: "4.1.8"
     pullPolicy: IfNotPresent
   nodeSelector: {}
@@ -40,7 +40,7 @@ rebooter:
   serviceAccountName: ""
 initContainers:
   - name: node-sysctl-params
-    image: "cr.eu-north1.nebius.cloud/soperator/busybox"
+    image: "cr.nebius.cloud/soperator/busybox"
     securityContext:
       privileged: true
       runAsUser: 0
