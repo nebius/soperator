@@ -520,7 +520,7 @@ func (c *MetricsCollector) refreshJobs(ctx context.Context, sequence uint64) (er
 	return nil
 }
 
-func (c *MetricsCollector) getDiag(ctx context.Context) (*api.V0044OpenapiDiagResp, error) {
+func (c *MetricsCollector) getDiag(ctx context.Context) (*slurmapi.Diag, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 
 	diagStart := time.Now()
@@ -738,7 +738,7 @@ func (c *MetricsCollector) slurmJobMetrics(
 		for _, job := range slurmJobs {
 			userID := ""
 			if job.UserID != nil {
-				userID = strconv.Itoa(int(*job.UserID))
+				userID = strconv.FormatInt(*job.UserID, 10)
 			}
 
 			var finishedTime string
@@ -875,7 +875,7 @@ func jobAllocatedResources(logger logr.Logger, job slurmapi.Job) (cpu float64, c
 	return cpu, cpuOK, mem, memOK
 }
 
-func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0044OpenapiDiagResp) iter.Seq[prometheus.Metric] {
+func (c *MetricsCollector) slurmRPCMetrics(diag *slurmapi.Diag) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
 		if diag == nil {
 			return
@@ -910,7 +910,7 @@ func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0044OpenapiDiagResp) iter.
 		if stats.RpcsByUser != nil {
 			for _, userRpc := range *stats.RpcsByUser {
 				user := userRpc.User
-				userID := strconv.Itoa(int(userRpc.UserId))
+				userID := strconv.FormatUint(uint64(userRpc.UserId), 10)
 
 				if userRpc.Count > 0 {
 					if !yield(prometheus.MustNewConstMetric(c.rpcUserCallsTotal, prometheus.CounterValue, float64(userRpc.Count), user, userID)) {
