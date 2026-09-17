@@ -1,7 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/pull/102
-FROM cr.nebius.cloud/ml-containers/neubuntu:noble-20260908101311 AS k8s_check_job
+# https://github.com/nebius/ml-containers/pull/104
+FROM cr.nebius.cloud/ml-containers/neubuntu:noble-20260916135615 AS k8s_check_job
 
 # Install common packages
 RUN apt update && \

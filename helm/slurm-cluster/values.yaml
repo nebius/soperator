@@ -12,7 +12,7 @@ useDefaultAppArmorProfile: false
 # - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
 maintenance: "none"
 # CUDA version used for populate-jail image selection.
-cudaVersion: 12.9.0
+cudaVersion: 13.0.2
 # Default image pull policy used for all Slurm cluster images.
 # Can be overridden per component below (e.g. slurmNodes.controller.slurmctld.imagePullPolicy).
 imagePullPolicy: "IfNotPresent"
