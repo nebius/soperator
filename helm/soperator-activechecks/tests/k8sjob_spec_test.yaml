@@ -149,46 +149,6 @@ tests:
           path: spec.k8sJobSpec.jobContainer.appArmorProfile
           value: unconfined
 
-  - it: should resolve NCCL tests version from map for CUDA 12.9.0
-    documentSelector:
-      path: metadata.name
-      value: test-cluster-test-nccl-map-lookup
-    set:
-      slurmClusterRefName: test-cluster
-      cudaVersion: "12.9.0"
-      ncclTestsVersion: ""
-      ncclTestsVersions:
-        "12.9.0": "2.16.4"
-        "13.0.3": "2.20.0"
-      images:
-        k8sJob: "test-image:latest"
-        sansible: "sansible-image:latest"
-      jobContainer:
-        volumeMounts:
-          - mountPath: /mnt/jail
-            name: jail
-        volumes:
-          - name: jail
-            persistentVolumeClaim:
-              claimName: jail-pvc
-      checks:
-        test-nccl-map-lookup:
-          enabled: true
-          checkType: k8sJob
-          k8sJobSpec:
-            jobContainer:
-              workingDir: /opt/ansible
-              image: "{{ .Values.images.sansible }}"
-              command: ["echo", "test"]
-    asserts:
-      - isKind:
-          of: ActiveCheck
-      - contains:
-          path: spec.k8sJobSpec.jobContainer.env
-          content:
-            name: NCCL_TESTS_VERSION
-            value: "2.16.4"
-
   - it: should resolve NCCL tests version from map for CUDA 13.0.3
     documentSelector:
       path: metadata.name
@@ -198,7 +158,6 @@ tests:
       cudaVersion: "13.0.3"
       ncclTestsVersion: ""
       ncclTestsVersions:
-        "12.9.0": "2.16.4"
         "13.0.3": "2.20.0"
       images:
         k8sJob: "test-image:latest"
@@ -235,10 +194,10 @@ tests:
       value: test-cluster-test-nccl-flat-override
     set:
       slurmClusterRefName: test-cluster
-      cudaVersion: "12.9.0"
+      cudaVersion: "13.0.3"
       ncclTestsVersion: "2.99.0"
       ncclTestsVersions:
-        "12.9.0": "2.16.4"
+        "13.0.3": "2.20.0"
       images:
         k8sJob: "test-image:latest"
         sansible: "sansible-image:latest"
@@ -340,7 +299,7 @@ tests:
       cudaVersion: "99.0.0"
       ncclTestsVersion: ""
       ncclTestsVersions:
-        "12.9.0": "2.16.4"
+        "13.0.3": "2.20.0"
       images:
         k8sJob: "test-image:latest"
         sansible: "sansible-image:latest"
