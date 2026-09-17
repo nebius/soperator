@@ -47,5 +47,6 @@ func FeaturePaths() []string {
 		"features/topology.feature",
 		"features/topology_tree.feature",
 		"features/topology_legacy.feature",
+		"features/teamcity_reporting_canary.feature",
 	}
 }
