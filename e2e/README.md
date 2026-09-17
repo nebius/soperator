@@ -63,7 +63,9 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
   file, or the single scenario at an exact `Scenario:` line, for example
   `features/internal_ssh.feature:3`. May be repeated.
 - `--output-dir`: required. The runner writes Cucumber and JUnit reports plus
-  per-scenario artifacts into this directory.
+  per-scenario artifacts into this directory. Under TeamCity, scenarios are
+  also reported directly through native test service messages and JUnit files
+  are placed in the `junit/` subdirectory to avoid duplicate test imports.
 
 CPU/GPU scenarios are selected by tags like other scenarios. Steps that need a
 specific worker kind query live Slurm and NodeSet state at scenario time. They
@@ -184,7 +186,9 @@ filters, and filters scenarios by `@soperator_version_...`. Custom runners can
 add their own suites. Each suite is a separate Godog suite with its own feature
 source, tag expression, step registrars, version axes, and report files. Suite
 names are required, must be unique, and must match `^[A-Za-z0-9._-]+$`; reports
-are written as `<suite>.cucumber.json` and `<suite>.junit.xml`.
+are written as `<suite>.cucumber.json` and `<suite>.junit.xml`. Under TeamCity,
+JUnit reports are written as `junit/<suite>.junit.xml`; native test messages are
+the source of the build's test counts, statuses, and durations.
 
 Step registrars receive static `framework.ClusterInfo` and the shared
 `framework.Runtime` interface:
@@ -303,7 +307,8 @@ through additional `StepRegistrar` values.
   implementations and scenario cleanup/reset.
 - `acceptance/internal/kubeobjects`: Kubernetes object shapes used by shared
   framework helpers and steps.
-- `acceptance/internal/reports`: Godog report format construction.
+- `acceptance/internal/reports`: Godog report format construction and native
+  TeamCity service-message output.
 - `cmd/acceptance`: standalone runner for an already deployed cluster.
 
 ## Synchronization

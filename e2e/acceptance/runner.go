@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -222,11 +223,15 @@ func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runt
 		jail = runtime.Jail()
 	}
 	artifactsManager := framework.NewArtifactsManager(r.outputDir, jail)
+	var teamCityReporter *reports.TeamCityReporter
+	if reports.TeamCityEnabled() {
+		teamCityReporter = reports.NewTeamCityReporter(os.Stdout)
+	}
 	tags := r.suiteTagFilter(suite)
 	godogSuite := godog.TestSuite{
 		Name: suite.Name,
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
-			r.initializeSuiteScenario(sc, info, runtime, suite, artifactsManager)
+			r.initializeSuiteScenario(sc, info, runtime, suite, artifactsManager, teamCityReporter)
 		},
 		Options: &godog.Options{
 			Format:         format,
@@ -254,12 +259,19 @@ func (r *Runner) initializeSuiteScenario(
 	runtime framework.Runtime,
 	suite SuiteConfig,
 	artifactsManager *framework.ArtifactsManager,
+	teamCityReporter *reports.TeamCityReporter,
 ) {
+	if teamCityReporter != nil {
+		registerTeamCityStartHook(sc, teamCityReporter, suite.Name)
+	}
 	registerScenarioArtifacts(sc, suite.Name, runtime, artifactsManager)
 	registerTimingHooks(sc)
 	registerSkipHook(sc)
 	for _, register := range suite.StepRegistrars {
 		register(sc, info, runtime)
+	}
+	if teamCityReporter != nil {
+		registerTeamCityResultHooks(sc, teamCityReporter)
 	}
 }
 
