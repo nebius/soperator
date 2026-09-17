@@ -158,25 +158,36 @@ jobs:
           go-version-file: "go.mod"
           cache: false
 
+      - name: Read golangci-lint version from checkout
+        id: golangci-version
+        shell: bash
+        run: |
+          version=$(awk '$1 == "GOLANGCI_LINT_VERSION" && $2 == "?=" {print $3}' Makefile)
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected exactly one golangci-lint version in Makefile" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       # These steps are not a matrix to avoid allocating 3 jobs on runners for something this small
       - name: golangci-lint on linux/amd64
         uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
         with:
-          version: v2.12.2 # version of golangci-lint, should be in sync with Makefile.
+          version: ${{ steps.golangci-version.outputs.version }}
         env:
           GOARCH: amd64
           GOOS: linux
       - name: golangci-lint on linux/arm64
         uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
         with:
-          version: v2.12.2 # version of golangci-lint, should be in sync with Makefile.
+          version: ${{ steps.golangci-version.outputs.version }}
         env:
           GOARCH: arm64
           GOOS: linux
       - name: golangci-lint on darwin/arm64
         uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
         with:
-          version: v2.12.2 # version of golangci-lint, should be in sync with Makefile.
+          version: ${{ steps.golangci-version.outputs.version }}
         env:
           GOARCH: arm64
           GOOS: darwin
@@ -230,11 +241,23 @@ jobs:
         shell: bash
         run: go -C e2e vet ./...
 
+      - name: Read golangci-lint version from checkout
+        if: steps.layout.outputs.standalone == 'true'
+        id: golangci-version
+        shell: bash
+        run: |
+          version=$(awk '$1 == "GOLANGCI_LINT_VERSION" && $2 == "?=" {print $3}' Makefile)
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected exactly one golangci-lint version in Makefile" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: golangci-lint E2E module
         if: steps.layout.outputs.standalone == 'true'
         uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7
         with:
-          version: v2.12.2 # version of golangci-lint, should be in sync with Makefile.
+          version: ${{ steps.golangci-version.outputs.version }}
           working-directory: e2e
 
       - name: Build E2E commands
