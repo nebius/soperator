@@ -88,9 +88,17 @@ func NewRunner(config RunnerConfig) (*Runner, error) {
 
 // Run executes the configured acceptance suite.
 func (r *Runner) Run(ctx context.Context) error {
+	cluster, err := framework.NewKubectlClient(r.runtime).SlurmCluster(ctx, r.slurmClusterName)
+	if err != nil {
+		return fmt.Errorf("read workload name prefix: %w", err)
+	}
+	if runtime, ok := r.runtime.(*world); ok {
+		runtime.workloadNamePrefix = cluster.WorkloadNamePrefix
+	}
 	info := &framework.ClusterInfo{
 		SlurmClusterName:       r.slurmClusterName,
 		TargetSoperatorVersion: r.targetSoperatorVersion,
+		WorkloadNamePrefix:     cluster.WorkloadNamePrefix,
 	}
 
 	return r.runConfiguredSuites(ctx, info, r.runtime, r.suites)

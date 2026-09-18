@@ -18,6 +18,7 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 			"metadata": {"name": "soperator", "namespace": "soperator"},
 			"spec": {
 				"customSlurmConfig": "JobRequeue=0",
+				"workloadNamePrefix": "disabled",
 				"slurmNodes": {
 					"accounting": {"enabled": true},
 					"login": {"docker": {"enabled": true}}
@@ -34,6 +35,7 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 		AccountingEnabled:  true,
 		LoginDockerEnabled: true,
 		CustomSlurmConfig:  &customConfig,
+		WorkloadNamePrefix: "disabled",
 	}, cluster)
 }
 

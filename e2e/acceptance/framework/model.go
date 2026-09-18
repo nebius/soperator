@@ -1,7 +1,5 @@
 package framework
 
-import "strings"
-
 type WorkerInfo struct {
 	Name        string
 	NodeSetName string
@@ -18,14 +16,15 @@ func (w WorkerInfo) IsUsable() bool {
 type ClusterInfo struct {
 	SlurmClusterName       string
 	TargetSoperatorVersion string
+	WorkloadNamePrefix     string
 }
 
 func (s *ClusterInfo) PodName(podName string) string {
-	return SoperatorPodName(s.SlurmClusterName, s.TargetSoperatorVersion, podName)
+	return SoperatorPodName(s.SlurmClusterName, s.TargetSoperatorVersion, s.WorkloadNamePrefix, podName)
 }
 
-func SoperatorPodName(slurmClusterName, soperatorVersion, podName string) string {
-	if strings.HasPrefix(podName, "login-") || SoperatorVersionBeforeFive(soperatorVersion) {
+func SoperatorPodName(slurmClusterName, soperatorVersion, workloadNamePrefix, podName string) string {
+	if workloadNamePrefix == "disabled" || (workloadNamePrefix == "" && SoperatorVersionBeforeFive(soperatorVersion)) {
 		return podName
 	}
 

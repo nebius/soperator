@@ -27,20 +27,20 @@ func TestSoperatorVersionBeforeFive(t *testing.T) {
 }
 
 func TestSoperatorPodNameUsesLegacyUnprefixedNamesBeforeFive(t *testing.T) {
-	assert.Equal(t, "controller-0", SoperatorPodName("custom", "4.1.5", "controller-0"))
-}
-
-func TestSoperatorPodNameKeepsLoginNamesUnprefixed(t *testing.T) {
-	assert.Equal(t, "login-0", SoperatorPodName("soperator", "4.0.2", "login-0"))
-	assert.Equal(t, "login-0", SoperatorPodName("soperator", "5.0.0", "login-0"))
-	assert.Equal(t, "login-0", SoperatorPodName("soperator", "", "login-0"))
+	assert.Equal(t, "login-0", SoperatorPodName("soperator", "4.0.2", "", "login-0"))
+	assert.Equal(t, "controller-0", SoperatorPodName("custom", "4.1.5", "", "controller-0"))
 }
 
 func TestSoperatorPodNameUsesClusterPrefixedNamesForFiveAndLater(t *testing.T) {
-	assert.Equal(t, "custom-controller-0", SoperatorPodName("custom", "5.1.0", "controller-0"))
+	assert.Equal(t, "soperator-login-0", SoperatorPodName("soperator", "5.0.0", "enabled", "login-0"))
+	assert.Equal(t, "custom-controller-0", SoperatorPodName("custom", "5.1.0", "enabled", "controller-0"))
 }
 
 func TestSoperatorPodNameKeepsExistingFallbackForUnknownVersion(t *testing.T) {
-	assert.Equal(t, "soperator-controller-0", SoperatorPodName("soperator", "", "controller-0"))
-	assert.Equal(t, "controller-0", SoperatorPodName("", "5.0.0", "controller-0"))
+	assert.Equal(t, "soperator-login-0", SoperatorPodName("soperator", "", "", "login-0"))
+	assert.Equal(t, "login-0", SoperatorPodName("", "5.0.0", "", "login-0"))
+}
+
+func TestSoperatorPodNameUsesExplicitlyDisabledPrefix(t *testing.T) {
+	assert.Equal(t, "login-0", SoperatorPodName("soperator", "5.0.0", "disabled", "login-0"))
 }

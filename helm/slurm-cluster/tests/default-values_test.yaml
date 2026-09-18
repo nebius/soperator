@@ -11,6 +11,23 @@ tests:
           path: spec.maintenance
           value: none
 
+  - it: should enable workload name prefixes by default
+    set:
+      clusterName: test-cluster
+    asserts:
+      - equal:
+          path: spec.workloadNamePrefix
+          value: enabled
+
+  - it: should allow workload name prefixes to be disabled
+    set:
+      clusterName: test-cluster
+      workloadNamePrefix: disabled
+    asserts:
+      - equal:
+          path: spec.workloadNamePrefix
+          value: disabled
+
   # Test slurmConfig default values
   - it: should set slurmConfig default values
     set:

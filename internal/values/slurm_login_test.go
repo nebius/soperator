@@ -24,7 +24,7 @@ func TestBuildSlurmLoginFrom_SSSD(t *testing.T) {
 			Volumes: slurmv1.SlurmNodeLoginVolumes{Jail: slurmv1.NodeVolume{}},
 		}
 
-		result := buildSlurmLoginFrom("test-cluster", nil, login)
+		result := buildSlurmLoginFrom("test-cluster", "", nil, login)
 
 		if assert.NotNil(t, result.ContainerSSSD) {
 			assert.Equal(t, "sssd-image", result.ContainerSSSD.Image)
@@ -45,7 +45,7 @@ func TestBuildSlurmLoginFrom_SSSD(t *testing.T) {
 			Volumes: slurmv1.SlurmNodeLoginVolumes{Jail: slurmv1.NodeVolume{}},
 		}
 
-		result := buildSlurmLoginFrom("test-cluster", nil, login)
+		result := buildSlurmLoginFrom("test-cluster", "", nil, login)
 
 		assert.False(t, result.IsSSSDSecretDefault)
 		assert.Equal(t, "custom-sssd-secret", result.SSSDConfSecretName)
@@ -58,7 +58,7 @@ func TestBuildSlurmLoginFrom_SSSD(t *testing.T) {
 			Volumes: slurmv1.SlurmNodeLoginVolumes{Jail: slurmv1.NodeVolume{}},
 		}
 
-		result := buildSlurmLoginFrom("test-cluster", nil, login)
+		result := buildSlurmLoginFrom("test-cluster", "", nil, login)
 
 		assert.Nil(t, result.ContainerSSSD)
 		assert.Equal(t, naming.BuildSecretSSSDConfName("test-cluster"), result.SSSDConfSecretName)
@@ -87,7 +87,7 @@ func TestBuildSlurmLoginFrom_Docker(t *testing.T) {
 				Docker:  test.docker,
 			}
 
-			result := buildSlurmLoginFrom("test-cluster", nil, login)
+			result := buildSlurmLoginFrom("test-cluster", "", nil, login)
 
 			assert.Equal(t, test.enabled, result.DockerEnabled)
 		})
@@ -101,21 +101,23 @@ func TestBuildSlurmLoginFrom_PreservesSSSHDConfigDefault(t *testing.T) {
 		Volumes: slurmv1.SlurmNodeLoginVolumes{Jail: slurmv1.NodeVolume{}},
 	}
 
-	result := buildSlurmLoginFrom("test-cluster", nil, login)
+	result := buildSlurmLoginFrom("test-cluster", "", nil, login)
 
 	assert.Equal(t, naming.BuildConfigMapSSHDConfigsNameLogin("test-cluster"), result.SSHDConfigMapName)
 	assert.True(t, result.IsSSHDConfigMapDefault)
 	assert.Equal(t, corev1.ServiceTypeClusterIP, result.HeadlessService.Type)
 }
 
-func TestBuildSlurmLoginFromUsesUnprefixedStatefulSetName(t *testing.T) {
+func TestBuildSlurmLoginFromUsesConfiguredStatefulSetNamePrefix(t *testing.T) {
 	login := &slurmv1.SlurmNodeLogin{
 		Sshd:    slurmv1.NodeContainer{Image: "sshd-image"},
 		Munge:   slurmv1.NodeContainer{Image: "munge-image"},
 		Volumes: slurmv1.SlurmNodeLoginVolumes{Jail: slurmv1.NodeVolume{}},
 	}
 
-	result := buildSlurmLoginFrom("test-cluster", nil, login)
+	prefixed := buildSlurmLoginFrom("test-cluster", "test-cluster", nil, login)
+	unprefixed := buildSlurmLoginFrom("test-cluster", "", nil, login)
 
-	assert.Equal(t, consts.ComponentTypeLogin.String(), result.StatefulSet.Name)
+	assert.Equal(t, "test-cluster-login", prefixed.StatefulSet.Name)
+	assert.Equal(t, consts.ComponentTypeLogin.String(), unprefixed.StatefulSet.Name)
 }
