@@ -31,7 +31,7 @@ RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
     /out
 
 # https://github.com/nebius/ml-containers/pull/102
-FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260908103131 AS worker_slurmd
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260918141513 AS worker_slurmd
 
 # Install useful packages
 RUN apt-get update && \
