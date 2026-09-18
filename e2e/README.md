@@ -188,8 +188,9 @@ source, tag expression, step registrars, version axes, and report files. Suite
 names are required, must be unique, and must match `^[A-Za-z0-9._-]+$`; reports
 are written as `<suite>.cucumber.json` and `<suite>.junit.xml`. Under TeamCity,
 JUnit reports are written as `junit/<suite>.junit.xml`; native test messages are
-the source of the build's test counts, statuses, and executed-test durations.
-Ignored scenarios are reported without an elapsed time.
+the source of the build's test counts, statuses, and durations. TeamCity
+messages are emitted after each scenario completes, including the measured
+duration for passed, failed, and skipped scenarios.
 
 Step registrars receive static `framework.ClusterInfo` and the shared
 `framework.Runtime` interface:

@@ -70,14 +70,12 @@ func registerTeamCityResultHooks(sc *godog.ScenarioContext, reporter *reports.Te
 			}
 		}
 
-		if state.result == teamCityScenarioSkipped {
-			reporter.TestIgnored(state.name, state.message, state.flowID)
-			return ctx, nil
-		}
-
 		reporter.TestStarted(state.name, state.flowID)
-		if state.result == teamCityScenarioFailed {
+		switch state.result {
+		case teamCityScenarioFailed:
 			reporter.TestFailed(state.name, state.message, state.flowID)
+		case teamCityScenarioSkipped:
+			reporter.TestIgnored(state.name, state.message, state.flowID)
 		}
 		reporter.TestFinished(state.name, state.flowID, reporter.Now().Sub(state.startedAt))
 		return ctx, nil
