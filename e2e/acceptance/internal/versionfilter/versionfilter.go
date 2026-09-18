@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	semver "github.com/Masterminds/semver/v3"
-	gherkin "github.com/cucumber/gherkin/go/v26"
-	messages "github.com/cucumber/messages/go/v21"
+	gherkin "github.com/cucumber/gherkin/go/v42"
+	messages "github.com/cucumber/messages/go/v34"
 )
 
 var (
