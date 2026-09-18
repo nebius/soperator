@@ -1,4 +1,8 @@
 clusterName: "slurm1"
+# Controls whether workload resource names are prefixed with clusterName.
+# Supported values: enabled, disabled.
+# Use disabled only when the namespace contains a single SlurmCluster.
+workloadNamePrefix: "enabled"
 # Additional annotations for the cluster
 annotations: {}
 # Maintenance defines the maintenance window for the cluster.

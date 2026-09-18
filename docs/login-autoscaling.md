@@ -132,10 +132,10 @@ kubectl -n soperator top pods -l app.kubernetes.io/instance=soperator,app.kubern
 Replace the namespace, cluster label, and workload name for your installation.
 The HPA has the same name as the login StatefulSet.
 
-Existing clusters may retain legacy unprefixed workload names: `login` for the
-StatefulSet and HPA, and `login-0`, `login-1`, etc. for pods. For these clusters,
-replace `soperator-login` with `login` in the commands above; the label selectors
-remain unchanged for a cluster named `soperator`.
+When `workloadNamePrefix` is set to `disabled`, the workload names are unprefixed:
+`login` for the StatefulSet and HPA, and `login-0`, `login-1`, etc. for pods. In
+that mode, replace `soperator-login` with `login` in the commands above; the label
+selectors remain unchanged for a cluster named `soperator`.
 
 If the HPA reports unknown CPU utilization, inspect its conditions and events and
 check that resource metrics and SSHD CPU requests are available. If additional pods

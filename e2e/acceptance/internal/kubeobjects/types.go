@@ -52,6 +52,7 @@ type SlurmClusterSpec struct {
 	PartitionConfiguration PartitionConfiguration `json:"partitionConfiguration"`
 	SlurmNodes             SlurmClusterNodes      `json:"slurmNodes"`
 	CustomSlurmConfig      *string                `json:"customSlurmConfig"`
+	WorkloadNamePrefix     string                 `json:"workloadNamePrefix"`
 }
 
 type SlurmClusterNodes struct {

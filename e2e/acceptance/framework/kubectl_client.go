@@ -33,6 +33,7 @@ type SlurmClusterInfo struct {
 	AccountingEnabled  bool
 	LoginDockerEnabled bool
 	CustomSlurmConfig  *string
+	WorkloadNamePrefix string
 }
 
 type WorkerPodInfo struct {
@@ -63,6 +64,7 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 		AccountingEnabled:  cluster.Spec.SlurmNodes.Accounting.Enabled,
 		LoginDockerEnabled: cluster.Spec.SlurmNodes.Login.Docker.Enabled,
 		CustomSlurmConfig:  cluster.Spec.CustomSlurmConfig,
+		WorkloadNamePrefix: cluster.Spec.WorkloadNamePrefix,
 	}, nil
 }
 

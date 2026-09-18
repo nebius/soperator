@@ -345,11 +345,7 @@ func (r NodeSetReconciler) executeReconciliation(
 				stepLogger := log.FromContext(stepCtx)
 				stepLogger.V(1).Info("Reconciling")
 
-				namePrefix, err := resourcegetter.ResolveWorkloadNamePrefix(stepCtx, r.Client, cluster.Namespace, cluster.Name)
-				if err != nil {
-					stepLogger.Error(err, "Failed to resolve workload name prefix")
-					return fmt.Errorf("resolving workload name prefix: %w", err)
-				}
+				namePrefix := resourcegetter.ResolveWorkloadNamePrefix(cluster.Name, cluster.Spec.WorkloadNamePrefix)
 				clusterValues, err := values.BuildSlurmClusterFrom(stepCtx, cluster, namePrefix)
 				if err != nil {
 					stepLogger.Error(err, "Failed to build cluster values")

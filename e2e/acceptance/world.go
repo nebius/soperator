@@ -20,9 +20,10 @@ const (
 type world struct {
 	logPrefix string
 
-	kubectlContext   string
-	slurmClusterName string
-	soperatorVersion string
+	kubectlContext     string
+	slurmClusterName   string
+	soperatorVersion   string
+	workloadNamePrefix string
 }
 
 // NewLocalArgsScope creates a local process scope without requiring a Kubernetes runtime.
@@ -51,13 +52,13 @@ func (w *world) Local() framework.ArgsScope {
 
 func (w *world) Controller() framework.CommandScope {
 	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
-		return w.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, framework.SoperatorPodName(w.slurmClusterName, w.soperatorVersion, "controller-0"), "--", "bash", "-lc", command)
+		return w.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, framework.SoperatorPodName(w.slurmClusterName, w.soperatorVersion, w.workloadNamePrefix, "controller-0"), "--", "bash", "-lc", command)
 	})
 }
 
 func (w *world) Jail() framework.CommandScope {
 	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
-		return w.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, framework.SoperatorPodName(w.slurmClusterName, w.soperatorVersion, "login-0"), "--", "chroot", "/mnt/jail", "bash", "-lc", command)
+		return w.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, framework.SoperatorPodName(w.slurmClusterName, w.soperatorVersion, w.workloadNamePrefix, "login-0"), "--", "chroot", "/mnt/jail", "bash", "-lc", command)
 	})
 }
 
