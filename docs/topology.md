@@ -305,12 +305,13 @@ prefix defaults to `topology.nebius.com` and is configurable through the operato
 ConfigMap, and the plugin type decides which labels a topology reads:
 
 - `block` groups nodes by `tier-0`, which is the NVL domain of the rack on GBX00 hardware;
-- `tree` walks the contiguous `tier-1`..`tier-N` chain, highest tier closest to the root. `tier-0`
-  names a block rather than a switch and is left out of the tree.
+- `tree` uses all present `tier-N` labels in numeric order, highest tier closest to the root.
+  When present, `tier-0` is the leaf switch directly above the workers. Missing tier numbers are
+  skipped; no hardware-specific configuration is needed.
 
 Workers join their topology as part of slurmd registration, and the unit they pick is the one the
-rendered config places them in: the `tier-1` switch for a tree, the `tier-0` block for a block
-topology. A node covered by several topologies joins all of them at once:
+rendered config places them in: the lowest available tier's switch for a tree, the `tier-0` block
+for a block topology. A node covered by several topologies joins all of them at once:
 
 ```
 slurmd --conf "topology=ib-gpu:nvl0,eth-cpu:root:leaf01"

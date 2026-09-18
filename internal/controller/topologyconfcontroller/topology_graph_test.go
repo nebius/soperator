@@ -43,10 +43,10 @@ func TestRenderTopologyConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "With root node and tier-0 label - combined tier1 and higher tiers",
+			name: "Tier-0 switches are closest to workers",
 			labelsByNode: map[string]tc.NodeTopologyLabels{
 				"node1": {"tier-0": "block0", "tier-1": "switch1", "tier-2": "spine1"},
-				"node2": {"tier-0": "block0", "tier-1": "switch2", "tier-2": "spine2"},
+				"node2": {"tier-0": "block1", "tier-1": "switch2", "tier-2": "spine2"},
 				"node3": {"tier-0": "block0", "tier-1": "switch1", "tier-2": "spine3"},
 			},
 			gpuPodsByNode: map[string][]string{
@@ -60,9 +60,53 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"SwitchName=spine1 Switches=switch1",
 				"SwitchName=spine2 Switches=switch2",
 				"SwitchName=spine3 Switches=switch1",
-				"SwitchName=switch1 Nodes=pod1,pod2,pod4",
-				"SwitchName=switch2 Nodes=pod3",
+				"SwitchName=switch1 Switches=block0",
+				"SwitchName=switch2 Switches=block1",
+				"SwitchName=block0 Nodes=pod1,pod2,pod4",
+				"SwitchName=block1 Nodes=pod3",
 				"SwitchName=unknown Nodes=pod5,pod6",
+			},
+		},
+		{
+			name: "Tier-0 alone forms a leaf switch",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-0": "nvl0"},
+			},
+			gpuPodsByNode: map[string][]string{"node1": {"worker-0", "worker-1"}},
+			allNodeNames:  []string{"worker-0", "worker-1"},
+			expected: []string{
+				"SwitchName=root Switches=nvl0",
+				"SwitchName=nvl0 Nodes=worker-[0-1]",
+			},
+		},
+		{
+			name: "Present tiers are sorted numerically across gaps",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-10": "core", "tier-0": "nvl", "tier-2": "spine", "other": "ignored"},
+			},
+			gpuPodsByNode: map[string][]string{"node1": {"worker-0"}},
+			allNodeNames:  []string{"worker-0"},
+			expected: []string{
+				"SwitchName=root Switches=core",
+				"SwitchName=core Switches=spine",
+				"SwitchName=spine Switches=nvl",
+				"SwitchName=nvl Nodes=worker-0",
+			},
+		},
+		{
+			name: "Nodes with and without tier-0 share a topology",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-0": "nvl0", "tier-1": "leaf1", "tier-2": "spine"},
+				"node2": {"tier-1": "leaf2", "tier-2": "spine"},
+			},
+			gpuPodsByNode: map[string][]string{"node1": {"worker-0"}, "node2": {"worker-1"}},
+			allNodeNames:  []string{"worker-0", "worker-1"},
+			expected: []string{
+				"SwitchName=root Switches=spine",
+				"SwitchName=spine Switches=leaf1,leaf2",
+				"SwitchName=leaf1 Switches=nvl0",
+				"SwitchName=nvl0 Nodes=worker-0",
+				"SwitchName=leaf2 Nodes=worker-1",
 			},
 		},
 		{
@@ -215,13 +259,14 @@ func TestRenderTopologyConfig(t *testing.T) {
 			},
 			allNodeNames: []string{"node1", "node2", "node3", "node4"},
 			expected: []string{
-				"SwitchName=root Switches=spine1,switch3,unknown",
+				"SwitchName=root Switches=spine1,spine2,switch3",
 				"SwitchName=leaf1 Switches=switch1,switch2",
+				"SwitchName=leaf2 Nodes=node4",
 				"SwitchName=spine1 Switches=leaf1",
+				"SwitchName=spine2 Switches=leaf2",
 				"SwitchName=switch1 Nodes=node1",
 				"SwitchName=switch2 Nodes=node2",
 				"SwitchName=switch3 Nodes=node3",
-				"SwitchName=unknown Nodes=node4",
 			},
 		},
 		{
@@ -278,15 +323,37 @@ func TestRenderTopologyConfig(t *testing.T) {
 			labelsByNode: map[string]tc.NodeTopologyLabels{
 				"node1": {"tier-1": "", "tier-2": "leaf1"},
 				"node2": {"tier-1": "switch1", "tier-2": ""},
+				"node3": {"tier-0": "", "tier-1": "switch2"},
 			},
 			gpuPodsByNode: map[string][]string{
 				"node1": {"node1"},
 				"node2": {"node2"},
+				"node3": {"node3"},
 			},
-			allNodeNames: []string{"node1", "node2"},
+			allNodeNames: []string{"node1", "node2", "node3"},
 			expected: []string{
 				"SwitchName=root Switches=unknown",
-				"SwitchName=unknown Nodes=node1,node2",
+				"SwitchName=unknown Nodes=node1,node2,node3",
+			},
+		},
+		{
+			name: "Malformed tier numbers keep workers under unknown",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "leaf1", "tier-bad": "invalid"},
+				"node2": {"tier--1": "invalid"},
+				"node3": {"tier-999999999999999999999999999999": "invalid"},
+				"node4": {"tier-01": "invalid"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"worker-0"},
+				"node2": {"worker-1"},
+				"node3": {"worker-2"},
+				"node4": {"worker-3"},
+			},
+			allNodeNames: []string{"worker-0", "worker-1", "worker-2", "worker-3"},
+			expected: []string{
+				"SwitchName=root Switches=unknown",
+				"SwitchName=unknown Nodes=worker-[0-3]",
 			},
 		},
 		{

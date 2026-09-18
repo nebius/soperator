@@ -120,8 +120,10 @@ func TestBuildMultiTopologyYAML_Golden(t *testing.T) {
   cluster_default: false
   tree:
     switches:
-        - switch: leaf3
+        - switch: block7
           nodes: h100-[0-3]
+        - switch: leaf3
+          children: block7
         - switch: root
           children: leaf3
 - topology: block-nvl72
@@ -163,8 +165,10 @@ func TestBuildMultiTopologyYAML_Golden(t *testing.T) {
   cluster_default: true
   tree:
     switches:
-        - switch: leaf1
+        - switch: block1
           nodes: h100-[0-1]
+        - switch: leaf1
+          children: block1
         - switch: root
           children: leaf1
 `,
