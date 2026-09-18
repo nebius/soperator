@@ -9,6 +9,8 @@ import (
 )
 
 func TestFormat(t *testing.T) {
+	t.Setenv("TEAMCITY_VERSION", "")
+
 	format, err := Format("", "soperator")
 	require.NoError(t, err)
 	assert.Equal(t, "pretty", format)
@@ -21,4 +23,18 @@ func TestFormat(t *testing.T) {
 			",junit:"+filepath.Join(dir, "soperator.junit.xml"),
 		format,
 	)
+}
+
+func TestFormatUsesNestedJUnitArtifactInTeamCity(t *testing.T) {
+	t.Setenv("TEAMCITY_VERSION", "2026.1")
+
+	dir := t.TempDir()
+	format, err := Format(dir, "managed")
+	require.NoError(t, err)
+	assert.Equal(t,
+		"pretty,cucumber:"+filepath.Join(dir, "managed.cucumber.json")+
+			",junit:"+filepath.Join(dir, "junit", "managed.junit.xml"),
+		format,
+	)
+	assert.DirExists(t, filepath.Join(dir, "junit"))
 }
