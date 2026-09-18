@@ -132,16 +132,16 @@ There are four deployment paths, all based on the same codebase.
 
 ## 🧪 Requirements & supported versions
 
-| Component | Version |
-|---|---|
-| Linux (node images) | Ubuntu 24.04 |
-| Slurm | 25.11.3 |
-| CUDA | 12.8-13.0 |
-| NCCL | ≥2.28  |
-| Kubernetes | ≥ 1.32 |
-| Helm | ≥ 3.14 |
-| NVIDIA GPU Operator | latest stable |
-| CNI | Cilium (kube-proxy replacement) recommended |
+| Component | Version                                           |
+|---|---------------------------------------------------|
+| Linux (node images) | Ubuntu 24.04                                      |
+| Slurm | 26.05.3-nebius-2 (Nebius fork build with patches) |
+| CUDA | >13.0                                             |
+| NCCL | ≥2.28                                             |
+| Kubernetes | ≥ 1.35                                            |
+| Helm | ≥ 3.14                                            |
+| NVIDIA GPU Operator | latest stable                                     |
+| CNI | Cilium (kube-proxy replacement) recommended       |
 
 Some pre-installed software versions are pinned to the images Soperator ships. See [`docs/limitations.md`](docs/limitations.md) for current caveats, including the single-partition and GPU-only or CPU-only cluster constraints.
 
