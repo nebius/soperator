@@ -1,4 +1,12 @@
 Feature: System checks
+  @soperator_version_>=5.0.0
+  Scenario: Restarting a worker keeps shared Slurm libraries visible
+    Given a healthy worker pod is selected
+    And the shared libslurm symlinks are continuously monitored from login
+    When the selected worker pod is restarted
+    Then the restarted worker pod is ready
+    And the shared libslurm symlinks remained continuously readable
+
   @soperator_version_>=4.0.0
   Scenario: Worker pod ephemeral storage pressure drains and recovers a Slurm node
     Given a healthy worker pod is selected

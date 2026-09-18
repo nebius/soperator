@@ -27,7 +27,15 @@ const (
 	systemKubeletNodeRecreateTimeout = 30 * time.Minute
 	systemKubeletWorkerReadyTimeout  = 10 * time.Minute
 	systemKubeletSlurmRecoverTimeout = 5 * time.Minute
+	systemWorkerRestartTimeout       = 2 * time.Minute
+	libslurmProbeStartTimeout        = 10 * time.Second
+	libslurmProbeStopTimeout         = 5 * time.Second
 )
+
+type libslurmProbeResult struct {
+	output string
+	err    error
+}
 
 type SystemChecks struct {
 	runtime  framework.Runtime
@@ -44,6 +52,14 @@ type SystemChecks struct {
 	kubeletK8sNodeUID    string
 	kubeletWorkerPodUID  string
 	kubeletDebugPodName  string
+
+	restartedWorkerPodUID string
+	libslurmProbeCancel   context.CancelFunc
+	libslurmProbeResults  <-chan libslurmProbeResult
+	libslurmProbeFinished *libslurmProbeResult
+	libslurmProbeReady    string
+	libslurmProbeFailure  string
+	libslurmProbePID      string
 }
 
 type workerEphemeralInfo struct {
@@ -86,9 +102,15 @@ func (s *SystemChecks) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the selected worker pod is recreated and ready$`, s.theSelectedWorkerPodIsRecreatedAndReady)
 	sc.Step(`^the selected Slurm worker is present after kubelet replacement$`, s.theSelectedSlurmWorkerIsPresentAfterKubeletReplacement)
 	sc.Step(`^the selected Slurm worker is usable after kubelet replacement$`, s.theSelectedSlurmWorkerIsUsableAfterKubeletReplacement)
+	sc.Step(`^the shared libslurm symlinks are continuously monitored from login$`, s.theSharedLibslurmSymlinksAreContinuouslyMonitoredFromLogin)
+	sc.Step(`^the selected worker pod is restarted$`, s.theSelectedWorkerPodIsRestarted)
+	sc.Step(`^the restarted worker pod is ready$`, s.theRestartedWorkerPodIsReady)
+	sc.Step(`^the shared libslurm symlinks remained continuously readable$`, s.theSharedLibslurmSymlinksRemainedContinuouslyReadable)
 }
 
 func (s *SystemChecks) CleanupAndReset(ctx context.Context) {
+	s.stopLibslurmProbe(ctx)
+	s.removeLibslurmProbeFiles(ctx)
 	if s.kubeletDebugPodName != "" {
 		if _, err := s.runtime.Kubectl().Run(ctx, "delete", "pod", "-n", framework.SoperatorNamespace, s.kubeletDebugPodName, "--ignore-not-found"); err != nil {
 			s.runtime.Logf("cleanup: delete kubelet debug pod %s: %v", s.kubeletDebugPodName, err)
@@ -113,6 +135,8 @@ func (s *SystemChecks) CleanupAndReset(ctx context.Context) {
 	s.kubeletK8sNodeUID = ""
 	s.kubeletWorkerPodUID = ""
 	s.kubeletDebugPodName = ""
+	s.restartedWorkerPodUID = ""
+	s.resetLibslurmProbe()
 }
 
 func (s *SystemChecks) aHealthyWorkerPodIsSelected(ctx context.Context) error {
@@ -340,6 +364,246 @@ func (s *SystemChecks) theSelectedSlurmWorkerIsUsableAfterKubeletReplacement(ctx
 	return nil
 }
 
+func (s *SystemChecks) theSharedLibslurmSymlinksAreContinuouslyMonitoredFromLogin(ctx context.Context) error {
+	if s.workerPod.Name == "" || s.workerPod.UID == "" {
+		return fmt.Errorf("worker pod is not selected")
+	}
+
+	linkCommand := `python3 -c 'import glob, os, re
+libdir = "/usr/lib/" + os.uname().machine + "-linux-gnu"
+
+versioned = [path for path in glob.glob(libdir + "/libslurm.so.*") if re.fullmatch(r"libslurm\.so\.\d+", os.path.basename(path)) and os.path.islink(path)]
+links = versioned + [libdir + "/libslurm.so"]
+if len(versioned) != 1 or not os.path.islink(links[1]):
+    raise SystemExit("expected versioned and unversioned libslurm symlinks, found: " + repr(links))
+print(*links, sep="\n")'`
+	output, err := s.runtime.Jail().Run(ctx, linkCommand)
+	if err != nil {
+		return fmt.Errorf("locate libslurm symlinks in login jail: %w", err)
+	}
+	links := strings.Fields(output)
+	if len(links) != 2 {
+		return fmt.Errorf("expected two libslurm symlink paths, got %q", strings.TrimSpace(output))
+	}
+
+	suffix := string(s.workerPod.UID)
+	s.libslurmProbeReady = "/tmp/soperator-acceptance-libslurm-" + suffix + ".ready"
+	s.libslurmProbeFailure = "/tmp/soperator-acceptance-libslurm-" + suffix + ".failure"
+	s.libslurmProbePID = "/tmp/soperator-acceptance-libslurm-" + suffix + ".pid"
+	s.removeLibslurmProbeFiles(ctx)
+
+	probeSource := `import os, sys, time
+paths = sys.argv[1:3]
+ready_path, failure_path, pid_path = sys.argv[3:]
+with open(pid_path, "w", encoding="utf-8") as pid_file:
+    pid_file.write(str(os.getpid()))
+started = time.monotonic()
+iterations = 0
+try:
+    for path in paths:
+        descriptor = os.open(path, os.O_RDONLY)
+        os.read(descriptor, 1)
+        os.close(descriptor)
+    with open(ready_path, "w", encoding="utf-8"):
+        pass
+    while True:
+        for path in paths:
+            try:
+                descriptor = os.open(path, os.O_RDONLY)
+                os.read(descriptor, 1)
+                os.close(descriptor)
+            except OSError as error:
+                with open(failure_path, "w", encoding="utf-8") as failure_file:
+                    failure_file.write(f"path={path} iteration={iterations} elapsed={time.monotonic() - started:.6f}s errno={error.errno}: {error}\n")
+                    failure_file.flush()
+                    os.fsync(failure_file.fileno())
+                raise
+        iterations += 1
+        time.sleep(0.001)
+finally:
+    try:
+        os.unlink(ready_path)
+    except FileNotFoundError:
+        pass`
+	command := fmt.Sprintf(
+		"python3 -c %s %s %s %s %s %s",
+		framework.ShellQuote(probeSource),
+		framework.ShellQuote(links[0]),
+		framework.ShellQuote(links[1]),
+		framework.ShellQuote(s.libslurmProbeReady),
+		framework.ShellQuote(s.libslurmProbeFailure),
+		framework.ShellQuote(s.libslurmProbePID),
+	)
+	probeCtx, cancel := context.WithCancel(ctx)
+	results := make(chan libslurmProbeResult, 1)
+	s.libslurmProbeCancel = cancel
+	s.libslurmProbeResults = results
+	go func() {
+		probeOutput, probeErr := s.runtime.Jail().Run(probeCtx, command)
+		results <- libslurmProbeResult{output: probeOutput, err: probeErr}
+	}()
+
+	if err := s.runtime.WaitFor(ctx, "libslurm probe to start", libslurmProbeStartTimeout, 200*time.Millisecond, func(waitCtx context.Context) (bool, error) {
+		select {
+		case result := <-s.libslurmProbeResults:
+			s.libslurmProbeFinished = &result
+			return false, libslurmProbeExitError("libslurm probe exited before startup", result)
+		default:
+		}
+		_, markerErr := s.runtime.Jail().Run(waitCtx, fmt.Sprintf("test -f %s", framework.ShellQuote(s.libslurmProbeReady)))
+		return markerErr == nil, nil
+	}); err != nil {
+		s.stopLibslurmProbe(ctx)
+		return err
+	}
+
+	s.runtime.Logf("system checks: monitoring %s while worker pod %s restarts", strings.Join(links, ", "), s.workerPod.Name)
+	return nil
+}
+
+func (s *SystemChecks) theSelectedWorkerPodIsRestarted(ctx context.Context) error {
+	if s.workerPod.Name == "" || s.workerPod.UID == "" {
+		return fmt.Errorf("worker pod is not selected")
+	}
+	if err := s.ensureLibslurmProbeRunning(); err != nil {
+		return err
+	}
+
+	s.restartedWorkerPodUID = string(s.workerPod.UID)
+	if _, err := s.runtime.Kubectl().Run(ctx,
+		"delete", "pod", s.workerPod.Name,
+		"-n", framework.SoperatorNamespace,
+		"--wait=false",
+	); err != nil {
+		return fmt.Errorf("restart worker pod %s: %w", s.workerPod.Name, err)
+	}
+	return nil
+}
+
+func (s *SystemChecks) theRestartedWorkerPodIsReady(ctx context.Context) error {
+	if s.workerPod.Name == "" || s.restartedWorkerPodUID == "" {
+		return fmt.Errorf("worker pod restart was not started")
+	}
+
+	waitCtx, cancel := context.WithTimeout(ctx, systemWorkerRestartTimeout)
+	defer cancel()
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	var lastErr error
+	for {
+		if err := s.ensureLibslurmProbeRunning(); err != nil {
+			return err
+		}
+		pod, found, err := s.workerPodByNameOnce(waitCtx, s.workerPod.Name)
+		if err != nil {
+			lastErr = err
+		} else if found && string(pod.UID) != s.restartedWorkerPodUID && pod.Status.Phase == corev1.PodRunning && kubeobjects.PodReady(pod) {
+			return nil
+		}
+
+		select {
+		case <-waitCtx.Done():
+			if lastErr != nil {
+				return fmt.Errorf("wait for worker pod %s restarted and ready: %w", s.workerPod.Name, lastErr)
+			}
+			return fmt.Errorf("wait for worker pod %s restarted and ready: timed out after %s", s.workerPod.Name, systemWorkerRestartTimeout)
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s *SystemChecks) theSharedLibslurmSymlinksRemainedContinuouslyReadable(ctx context.Context) error {
+	probeErr := s.ensureLibslurmProbeRunning()
+	s.stopLibslurmProbe(ctx)
+
+	failure, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("cat %s 2>/dev/null || true", framework.ShellQuote(s.libslurmProbeFailure)))
+	if err != nil {
+		return fmt.Errorf("read libslurm probe result: %w", err)
+	}
+	s.removeLibslurmProbeFiles(ctx)
+	if failure = strings.TrimSpace(failure); failure != "" {
+		return fmt.Errorf("shared libslurm symlink became unavailable: %s", failure)
+	}
+	if probeErr != nil {
+		return probeErr
+	}
+	return nil
+}
+
+func (s *SystemChecks) ensureLibslurmProbeRunning() error {
+	if s.libslurmProbeFinished != nil {
+		return libslurmProbeExitError("libslurm probe exited unexpectedly", *s.libslurmProbeFinished)
+	}
+	if s.libslurmProbeResults == nil {
+		return fmt.Errorf("libslurm probe is not running")
+	}
+	select {
+	case result := <-s.libslurmProbeResults:
+		s.libslurmProbeFinished = &result
+		return libslurmProbeExitError("libslurm probe exited unexpectedly", result)
+	default:
+		return nil
+	}
+}
+
+func libslurmProbeExitError(message string, result libslurmProbeResult) error {
+	output := strings.TrimSpace(result.output)
+	if result.err == nil {
+		if output == "" {
+			return fmt.Errorf("%s without an error", message)
+		}
+		return fmt.Errorf("%s without an error: %s", message, output)
+	}
+	if output == "" {
+		return fmt.Errorf("%s: %w", message, result.err)
+	}
+	return fmt.Errorf("%s: %w: %s", message, result.err, output)
+}
+
+func (s *SystemChecks) stopLibslurmProbe(ctx context.Context) {
+	if s.libslurmProbePID != "" && s.runtime != nil {
+		_, _ = s.runtime.Jail().Run(ctx, fmt.Sprintf("test ! -f %[1]s || kill \"$(cat %[1]s)\" >/dev/null 2>&1 || true", framework.ShellQuote(s.libslurmProbePID)))
+	}
+	if s.libslurmProbeCancel != nil {
+		s.libslurmProbeCancel()
+	}
+	if s.libslurmProbeResults != nil && s.libslurmProbeFinished == nil {
+		select {
+		case result := <-s.libslurmProbeResults:
+			s.libslurmProbeFinished = &result
+		case <-time.After(libslurmProbeStopTimeout):
+			if s.runtime != nil {
+				s.runtime.Logf("cleanup: timed out waiting for libslurm probe to stop")
+			}
+		}
+	}
+}
+
+func (s *SystemChecks) removeLibslurmProbeFiles(ctx context.Context) {
+	var paths []string
+	for _, path := range []string{s.libslurmProbeReady, s.libslurmProbeFailure, s.libslurmProbePID} {
+		if path != "" {
+			paths = append(paths, framework.ShellQuote(path))
+		}
+	}
+	if len(paths) == 0 || s.runtime == nil {
+		return
+	}
+	if _, err := s.runtime.Jail().Run(ctx, "rm -f "+strings.Join(paths, " ")); err != nil {
+		s.runtime.Logf("cleanup: remove libslurm probe files: %v", err)
+	}
+}
+
+func (s *SystemChecks) resetLibslurmProbe() {
+	s.libslurmProbeCancel = nil
+	s.libslurmProbeResults = nil
+	s.libslurmProbeFinished = nil
+	s.libslurmProbeReady = ""
+	s.libslurmProbeFailure = ""
+	s.libslurmProbePID = ""
+}
+
 func (s *SystemChecks) ephemeralInfo(ctx context.Context, pod corev1.Pod) (workerEphemeralInfo, error) {
 	limitBytes := podEphemeralLimitBytes(pod)
 	if limitBytes == 0 {
@@ -378,6 +642,22 @@ func (s *SystemChecks) workerPodByName(ctx context.Context, name string) (corev1
 		return corev1.Pod{}, fmt.Errorf("get worker pod %s: %w", name, err)
 	}
 	return pod, nil
+}
+
+func (s *SystemChecks) workerPodByNameOnce(ctx context.Context, name string) (corev1.Pod, bool, error) {
+	output, err := s.runtime.Kubectl().Run(ctx, "get", "pod", "-n", framework.SoperatorNamespace, name, "-o", "json")
+	if err != nil {
+		if isKubectlNotFound(err) {
+			return corev1.Pod{}, false, nil
+		}
+		return corev1.Pod{}, false, fmt.Errorf("get worker pod %s: %w", name, err)
+	}
+
+	var pod corev1.Pod
+	if err := json.Unmarshal([]byte(output), &pod); err != nil {
+		return corev1.Pod{}, false, fmt.Errorf("decode worker pod %s: %w", name, err)
+	}
+	return pod, true, nil
 }
 
 func (s *SystemChecks) k8sNodeByName(ctx context.Context, name string) (corev1.Node, error) {
