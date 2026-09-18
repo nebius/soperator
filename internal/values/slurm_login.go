@@ -40,7 +40,7 @@ type SlurmLogin struct {
 	Maintenance *consts.MaintenanceMode
 }
 
-func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.MaintenanceMode, login *slurmv1.SlurmNodeLogin) SlurmLogin {
+func buildSlurmLoginFrom(clusterName string, maintenance *consts.MaintenanceMode, login *slurmv1.SlurmNodeLogin) SlurmLogin {
 	svc := buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeLogin, clusterName))
 	svc.Type = login.SshdServiceType
 	svc.Annotations = login.SshdServiceAnnotations
@@ -77,7 +77,7 @@ func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.Mai
 		Service:              svc,
 		HeadlessService:      headlessSvc,
 		StatefulSet: buildStatefulSetFrom(
-			naming.BuildStatefulSetName(consts.ComponentTypeLogin, namePrefix),
+			naming.BuildStatefulSetName(consts.ComponentTypeLogin, ""),
 			login.SlurmNode.Size,
 		),
 		SSHDConfigMapName:       sshdConfigMapName,

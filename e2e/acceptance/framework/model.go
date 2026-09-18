@@ -1,5 +1,7 @@
 package framework
 
+import "strings"
+
 type WorkerInfo struct {
 	Name        string
 	NodeSetName string
@@ -23,7 +25,7 @@ func (s *ClusterInfo) PodName(podName string) string {
 }
 
 func SoperatorPodName(slurmClusterName, soperatorVersion, podName string) string {
-	if SoperatorVersionBeforeFive(soperatorVersion) {
+	if strings.HasPrefix(podName, "login-") || SoperatorVersionBeforeFive(soperatorVersion) {
 		return podName
 	}
 

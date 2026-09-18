@@ -118,24 +118,19 @@ recreates the HPA.
 
 ## Check status
 
-For a cluster named `soperator` in namespace `soperator`, using the default workload
-name prefix:
+For a cluster named `soperator` in namespace `soperator`:
 
 ```bash
-kubectl -n soperator get hpa soperator-login
-kubectl -n soperator describe hpa soperator-login
-kubectl -n soperator get statefulsets.apps.kruise.io soperator-login
+kubectl -n soperator get hpa login
+kubectl -n soperator describe hpa login
+kubectl -n soperator get statefulsets.apps.kruise.io login
 kubectl -n soperator get pods -l app.kubernetes.io/instance=soperator,app.kubernetes.io/component=login -o wide
 kubectl -n soperator top pods -l app.kubernetes.io/instance=soperator,app.kubernetes.io/component=login --containers
 ```
 
-Replace the namespace, cluster label, and workload name for your installation.
+Replace the namespace and cluster label for your installation.
 The HPA has the same name as the login StatefulSet.
-
-Existing clusters may retain legacy unprefixed workload names: `login` for the
-StatefulSet and HPA, and `login-0`, `login-1`, etc. for pods. For these clusters,
-replace `soperator-login` with `login` in the commands above; the label selectors
-remain unchanged for a cluster named `soperator`.
+Login StatefulSets and pods retain the unprefixed names `login` and `login-N`.
 
 If the HPA reports unknown CPU utilization, inspect its conditions and events and
 check that resource metrics and SSHD CPU requests are available. If additional pods

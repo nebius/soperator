@@ -42,8 +42,9 @@ type SlurmCluster struct {
 }
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD.
-// namePrefix is the prefix to use for workload resource names (StatefulSet, DaemonSet, Deployment).
-// Pass cluster.Name for new clusters, or "" to preserve legacy unprefixed names on existing clusters.
+// namePrefix is the prefix to use for workload resource names (StatefulSet, DaemonSet, Deployment),
+// except for login resources, which retain their legacy unprefixed names.
+// Pass cluster.Name for new clusters, or "" to preserve unprefixed names on existing clusters.
 func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster, namePrefix string) (*SlurmCluster, error) {
 	logger := log.FromContext(ctx)
 	logger.V(1).Info(fmt.Sprintf("%+v", cluster.Spec.SConfigController))
@@ -63,7 +64,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster, n
 		NodeController:         buildSlurmControllerFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Controller),
 		NodeAccounting:         buildAccountingFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Accounting),
 		NodeRest:               buildRestFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Rest),
-		NodeLogin:              buildSlurmLoginFrom(cluster.Name, namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login),
+		NodeLogin:              buildSlurmLoginFrom(cluster.Name, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Login),
 		SlurmExporter:          buildSlurmExporterFrom(namePrefix, cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
 		SlurmConfig:            buildSlurmConfigFrom(&cluster.Spec.SlurmConfig),
 		Topology:               cluster.Spec.Topology,

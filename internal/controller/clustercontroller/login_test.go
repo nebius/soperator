@@ -158,7 +158,7 @@ func newLoginTestReconciler(t *testing.T) (*SlurmClusterReconciler, *slurmv1.Slu
 		NodeLogin: values.SlurmLogin{
 			SlurmNode: slurmv1.SlurmNode{K8sNodeFilterName: "login"},
 			StatefulSet: values.StatefulSet{
-				Name: naming.BuildStatefulSetName(consts.ComponentTypeLogin, clusterName), Replicas: 3,
+				Name: consts.ComponentTypeLogin.String(), Replicas: 3,
 			},
 			Service:         values.Service{Name: "login-svc"},
 			HeadlessService: values.Service{Name: "login-headless-svc"},

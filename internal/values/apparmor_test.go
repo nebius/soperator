@@ -19,7 +19,7 @@ func TestAppArmorProfilesPreserved(t *testing.T) {
 					Sssd: &slurmv1.NodeContainer{AppArmorProfile: profile},
 				},
 			}
-			loginValues := buildSlurmLoginFrom("cluster", "", nil, login)
+			loginValues := buildSlurmLoginFrom("cluster", nil, login)
 			require.Equal(t, profile, loginValues.ContainerSshd.AppArmorProfile)
 			require.Equal(t, profile, loginValues.ContainerMunge.AppArmorProfile)
 			require.Equal(t, profile, loginValues.ContainerSSSD.AppArmorProfile)
