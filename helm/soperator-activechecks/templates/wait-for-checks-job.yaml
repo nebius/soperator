@@ -16,7 +16,7 @@ spec:
       {{- end }}
       containers:
         - name: wait-for-active-checks
-          image: cr.nebius.cloud/soperator-proxy-docker-io/alpine/k8s:1.31.11
+          image: cr.nebius.cloud/soperator-proxy-docker-io/alpine/k8s:1.36.4
           imagePullPolicy: {{ default "IfNotPresent" .Values.waitForChecks.imagePullPolicy | quote }}
           command:
             - /bin/sh

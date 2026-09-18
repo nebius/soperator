@@ -213,31 +213,31 @@ func TestMetricsCollector_Describe(t *testing.T) {
 	}
 
 	// Base metrics
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", constLabels: {}, variableLabels: {node_name,instance_id,nodeset_name,state_base,state_is_drain,state_is_maintenance,state_is_reserved,state_is_completing,state_is_fail,state_is_planned,state_is_not_responding,state_is_invalid,state_is_cloud,state_is_power_down,state_is_power_drain,state_is_powered_down,state_is_powering_down,state_is_powering_up,state_is_power_up,is_unavailable,reservation_name,address,reason,comment}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_total", help: "Total CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_allocated", help: "CPUs allocated on the node", constLabels: {}, variableLabels: {node_name}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_idle", help: "Idle CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_effective", help: "Effective CPUs on the node", constLabels: {}, variableLabels: {node_name}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_total_bytes", help: "Total memory on the node in bytes", constLabels: {}, variableLabels: {node_name}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_allocated_bytes", help: "Allocated memory on the node in bytes", constLabels: {}, variableLabels: {node_name}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_free_bytes", help: "Free memory on the node in bytes", constLabels: {}, variableLabels: {node_name}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_effective_bytes", help: "Effective memory on the node in bytes", constLabels: {}, variableLabels: {node_name}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_partition", help: "Slurm node partition mapping", constLabels: {}, variableLabels: {node_name,partition}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_nvlink_instance_group", help: "Mapping between Slurm nodes and NVLink instance groups", constLabels: {}, variableLabels: {node_name,instance_id,nvlink_instance_group,nodeset_name}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,user_mail,user_id,standard_error,standard_output,array_job_id,array_task_id,submit_time,start_time,end_time,finished_time}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", constLabels: {}, variableLabels: {job_id,node_name,nvlink_instance_group,nodeset_name}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_job_duration_seconds", help: "Slurm job duration in seconds", constLabels: {}, variableLabels: {job_id}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_job_cpus", help: "CPUs allocated to a Slurm job", constLabels: {}, variableLabels: {job_id}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_job_memory_bytes", help: "Memory allocated to a Slurm job in bytes", constLabels: {}, variableLabels: {job_id}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_info", help: "Slurm node info", unit: "", constLabels: {}, variableLabels: {node_name,instance_id,nodeset_name,state_base,state_is_drain,state_is_maintenance,state_is_reserved,state_is_completing,state_is_fail,state_is_planned,state_is_not_responding,state_is_invalid,state_is_cloud,state_is_power_down,state_is_power_drain,state_is_powered_down,state_is_powering_down,state_is_powering_up,state_is_power_up,is_unavailable,reservation_name,address,reason,comment}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_total", help: "Total CPUs on the node", unit: "", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_allocated", help: "CPUs allocated on the node", unit: "", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_idle", help: "Idle CPUs on the node", unit: "", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_cpus_effective", help: "Effective CPUs on the node", unit: "", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_total_bytes", help: "Total memory on the node in bytes", unit: "", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_allocated_bytes", help: "Allocated memory on the node in bytes", unit: "", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_free_bytes", help: "Free memory on the node in bytes", unit: "", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_memory_effective_bytes", help: "Effective memory on the node in bytes", unit: "", constLabels: {}, variableLabels: {node_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_partition", help: "Slurm node partition mapping", unit: "", constLabels: {}, variableLabels: {node_name,partition}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_nvlink_instance_group", help: "Mapping between Slurm nodes and NVLink instance groups", unit: "", constLabels: {}, variableLabels: {node_name,instance_id,nvlink_instance_group,nodeset_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_job_info", help: "Slurm job detail information", unit: "", constLabels: {}, variableLabels: {job_id,job_state,job_state_reason,slurm_partition,job_name,user_name,user_mail,user_id,standard_error,standard_output,array_job_id,array_task_id,submit_time,start_time,end_time,finished_time}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_node_job", help: "Slurm job node information", unit: "", constLabels: {}, variableLabels: {job_id,node_name,nvlink_instance_group,nodeset_name}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_job_duration_seconds", help: "Slurm job duration in seconds", unit: "", constLabels: {}, variableLabels: {job_id}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_job_cpus", help: "CPUs allocated to a Slurm job", unit: "", constLabels: {}, variableLabels: {job_id}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_job_memory_bytes", help: "Memory allocated to a Slurm job in bytes", unit: "", constLabels: {}, variableLabels: {job_id}}`)
 
 	// RPC metrics
-	assert.Contains(t, found, `Desc{fqName: "slurm_controller_rpc_calls_total", help: "Total count of RPC calls by message type", constLabels: {}, variableLabels: {message_type}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_controller_rpc_duration_seconds_total", help: "Total time spent processing RPCs by message type", constLabels: {}, variableLabels: {message_type}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_controller_rpc_user_calls_total", help: "Total count of RPC calls by user", constLabels: {}, variableLabels: {user,user_id}}`)
-	assert.Contains(t, found, `Desc{fqName: "slurm_controller_rpc_user_duration_seconds_total", help: "Total time spent on user RPCs", constLabels: {}, variableLabels: {user,user_id}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_controller_rpc_calls_total", help: "Total count of RPC calls by message type", unit: "", constLabels: {}, variableLabels: {message_type}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_controller_rpc_duration_seconds_total", help: "Total time spent processing RPCs by message type", unit: "", constLabels: {}, variableLabels: {message_type}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_controller_rpc_user_calls_total", help: "Total count of RPC calls by user", unit: "", constLabels: {}, variableLabels: {user,user_id}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_controller_rpc_user_duration_seconds_total", help: "Total time spent on user RPCs", unit: "", constLabels: {}, variableLabels: {user,user_id}}`)
 
 	// Controller metrics
-	assert.Contains(t, found, `Desc{fqName: "slurm_controller_server_thread_count", help: "Number of server threads", constLabels: {}, variableLabels: {}}`)
+	assert.Contains(t, found, `Desc{fqName: "slurm_controller_server_thread_count", help: "Number of server threads", unit: "", constLabels: {}, variableLabels: {}}`)
 }
 
 func TestMetricsCollector_NodeTopologyMetrics(t *testing.T) {
