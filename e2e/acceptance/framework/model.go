@@ -18,18 +18,6 @@ type ClusterInfo struct {
 	TargetSoperatorVersion string
 }
 
-func (s *ClusterInfo) PodName(podName string) string {
-	return SoperatorPodName(s.SlurmClusterName, s.TargetSoperatorVersion, podName)
-}
-
-func SoperatorPodName(slurmClusterName, soperatorVersion, podName string) string {
-	if SoperatorVersionBeforeFive(soperatorVersion) {
-		return podName
-	}
-
-	return ClusterPrefixedName(slurmClusterName, podName)
-}
-
 func WorkerNames(workers []WorkerInfo) []string {
 	names := make([]string, 0, len(workers))
 	for _, worker := range workers {

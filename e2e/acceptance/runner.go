@@ -72,10 +72,7 @@ func NewRunner(config RunnerConfig) (*Runner, error) {
 	if len(suites) == 0 {
 		return nil, fmt.Errorf("at least one suite is required")
 	}
-	runtime, err := NewRuntime(kubectlContext, slurmClusterName, normalizedTargetVersion)
-	if err != nil {
-		return nil, err
-	}
+	runtime := NewRuntime(kubectlContext, slurmClusterName)
 
 	return &Runner{
 		suites:                 suites,
@@ -331,30 +328,21 @@ func registerTimingHooks(sc *godog.ScenarioContext) {
 	})
 }
 
-func newWorld(kubectlContext, slurmClusterName, soperatorVersion string) *world {
+func newWorld(kubectlContext, slurmClusterName string) *world {
 	return &world{
 		logPrefix:        "acceptance",
 		kubectlContext:   kubectlContext,
 		slurmClusterName: slurmClusterName,
-		soperatorVersion: soperatorVersion,
 	}
 }
 
 // NewRuntime constructs the shared acceptance runtime.
-func NewRuntime(kubectlContext, slurmClusterName, targetSoperatorVersion string) (framework.Runtime, error) {
+func NewRuntime(kubectlContext, slurmClusterName string) framework.Runtime {
 	slurmClusterName = strings.TrimSpace(slurmClusterName)
 	if slurmClusterName == "" {
 		slurmClusterName = defaultSlurmClusterName
 	}
-	targetSoperatorVersion = strings.TrimSpace(targetSoperatorVersion)
-	if targetSoperatorVersion == "" {
-		return nil, fmt.Errorf("target Soperator version is required")
-	}
-	normalizedVersion, err := framework.NormalizeSoperatorVersion(targetSoperatorVersion)
-	if err != nil {
-		return nil, fmt.Errorf("target Soperator version: %w", err)
-	}
-	return newWorld(strings.TrimSpace(kubectlContext), slurmClusterName, normalizedVersion), nil
+	return newWorld(strings.TrimSpace(kubectlContext), slurmClusterName)
 }
 
 func (w *world) logf(format string, args ...any) {

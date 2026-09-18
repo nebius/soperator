@@ -645,7 +645,6 @@ jobs:
           bin/acceptance collect-artifacts \
             --kubectl-context "$kubectl_context" \
             --slurm-cluster-name "$SLURM_CLUSTER_NAME" \
-            --soperator-version "$SOPERATOR_VERSION" \
             --nebius-project-id "$NEBIUS_PROJECT_ID" \
             --output-dir "$E2E_ARTIFACTS_DIR/snapshots/before-acceptance"
 
@@ -705,7 +704,6 @@ jobs:
           bin/acceptance collect-artifacts \
             --kubectl-context "$kubectl_context" \
             --slurm-cluster-name "$SLURM_CLUSTER_NAME" \
-            --soperator-version "$SOPERATOR_VERSION" \
             --nebius-project-id "$NEBIUS_PROJECT_ID" \
             --output-dir "$E2E_ARTIFACTS_DIR/snapshots/before-destroy"
 

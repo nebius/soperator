@@ -115,10 +115,7 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return DefaultRequeueResult, nil
 	}
 
-	namePrefix, err := resourcegetter.ResolveWorkloadNamePrefix(ctx, r.Client, req.Namespace, slurmCluster.Name)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("resolve workload name prefix: %w", err)
-	}
+	namePrefix := resourcegetter.ResolvePodNamePrefix(slurmCluster.Name, slurmCluster.Spec.PodNamePrefix)
 	topoConfigName := resourcegetter.BuildPrefixedName(namePrefix, consts.ConfigMapNameTopologyConfig)
 
 	logger.V(1).Info("Fetching nodeSetList for SlurmCluster")
