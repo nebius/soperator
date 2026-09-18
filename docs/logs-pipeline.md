@@ -150,8 +150,10 @@ The logging system automatically extracts metadata from filenames and creates th
 observability:
   # Cloud delivery
   publicEndpointEnabled: true  # Enable/disable cloud export
-  projectId: "your-nebius-project-id"
-  region: "eu-north1"
+  logsProjectId: "your-nebius-project-id"
+  region: "your-region-id"
+  opentelemetry:
+    publicEndpoint: ""  # Derive the public logging endpoint from region
   
   # Storage
   vmLogs:
@@ -160,6 +162,22 @@ observability:
         enabled: true
         size: 30Gi  # Adjust based on log volume
 ```
+
+Public logging for system logs, jail logs and Kubernetes events uses
+`dns:///write.logging.<observability.region>.nebius.cloud.:443` when
+`observability.opentelemetry.publicEndpoint` is empty or null. For the example
+above, this resolves to `dns:///write.logging.eu-west2.nebius.cloud.:443`.
+
+The default region remains `eu-north1`. Set `observability.region` to your
+cluster's region to route public logging and metrics there. An explicit
+`observability.opentelemetry.publicEndpoint` always takes precedence, including
+an existing MAN endpoint. To adopt regional routing on an existing installation,
+clear that endpoint override and set the intended region in its values.
+
+Disabling `observability.publicEndpointEnabled` removes the public exporter;
+local VictoriaLogs delivery is unchanged. Updating collector configuration may
+roll out collector pods; this change does not establish interruption-free
+telemetry migration.
 
 ## Log Retention
 

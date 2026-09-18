@@ -1,0 +1,77 @@
+suite: public logging endpoint routing
+templates:
+  - templates/opentelemetry-collector-logs.yaml
+  - templates/opentelemetry-collector-events.yaml
+  - templates/opentelemetry-collector-jail-logs.yaml
+tests:
+  - it: preserves the default MAN logging endpoint
+    asserts:
+      - equal:
+          path: spec.values.config.exporters.otlp.endpoint
+          value: dns:///write.logging.eu-north1.nebius.cloud.:443
+
+  - it: follows the configured region without an endpoint override
+    set:
+      observability.region: eu-west2
+    asserts:
+      - equal:
+          path: spec.values.config.exporters.otlp.endpoint
+          value: dns:///write.logging.eu-west2.nebius.cloud.:443
+
+  - it: follows the configured BIC region when the endpoint is empty
+    set:
+      observability.region: eu-west2
+      observability.opentelemetry.publicEndpoint: ""
+    asserts:
+      - equal:
+          path: spec.values.config.exporters.otlp.endpoint
+          value: dns:///write.logging.eu-west2.nebius.cloud.:443
+
+  - it: follows another region when the endpoint is null
+    set:
+      observability.region: me-west1
+      observability.opentelemetry.publicEndpoint: null
+    asserts:
+      - equal:
+          path: spec.values.config.exporters.otlp.endpoint
+          value: dns:///write.logging.me-west1.nebius.cloud.:443
+
+  - it: preserves a custom endpoint regardless of region
+    set:
+      observability.region: eu-west2
+      observability.opentelemetry.publicEndpoint: dns:///custom-logging.example.com:443
+    asserts:
+      - equal:
+          path: spec.values.config.exporters.otlp.endpoint
+          value: dns:///custom-logging.example.com:443
+
+  - it: preserves an explicit MAN endpoint for a non-MAN region
+    set:
+      observability.region: eu-west2
+      observability.opentelemetry.publicEndpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
+    asserts:
+      - equal:
+          path: spec.values.config.exporters.otlp.endpoint
+          value: dns:///write.logging.eu-north1.nebius.cloud.:443
+
+  - it: omits the public exporter when public delivery is disabled
+    set:
+      observability.publicEndpointEnabled: false
+      observability.region: eu-west2
+    asserts:
+      - notExists:
+          path: spec.values.config.exporters.otlp
+
+  - it: does not render collectors when observability is disabled
+    set:
+      observability.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render collectors when opentelemetry is disabled
+    set:
+      observability.opentelemetry.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

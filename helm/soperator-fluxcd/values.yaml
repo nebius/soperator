@@ -152,7 +152,8 @@ observability:
   region: eu-north1
   opentelemetry:
     enabled: true
-    publicEndpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
+    # Empty uses the public logging endpoint for observability.region.
+    publicEndpoint: ""
     namespace: logs-system
     extraHeaders: {}
     metrics:
