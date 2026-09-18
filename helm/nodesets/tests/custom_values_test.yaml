@@ -35,7 +35,7 @@ tests:
           gpu:
             enabled: false
           nodeConfig:
-            autoResume: false
+            autoResume: true
             features:
               - "custom"
     asserts:
@@ -55,7 +55,7 @@ tests:
           value: "slurmAwareRollingUpdate"
       - equal:
           path: spec.nodeConfig.autoResume
-          value: false
+          value: true
       - equal:
           path: spec.slurmd.image.repository
           value: "custom/slurm"

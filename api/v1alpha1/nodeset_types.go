@@ -541,10 +541,11 @@ type NodeConfig struct {
 
 	// AutoResume controls whether Slurm automatically resumes the nodes.
 	// Set to false to render AutoResume=Off in the NodeName configuration.
-	// Defaults to true.
+	// When true, the setting is omitted and Slurm uses its default AutoResume=On behavior.
+	// Defaults to false.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	AutoResume *bool `json:"autoResume,omitempty"`
 
 	// Static provides a possibility to define extra values per Node (e.g. CPU topology).

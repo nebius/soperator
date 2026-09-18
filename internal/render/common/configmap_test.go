@@ -642,7 +642,7 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "Single nodeset with 1 replica",
+			name: "Single nodeset with AutoResume enabled",
 			cluster: &values.SlurmCluster{
 				NamespacedName: types.NamespacedName{
 					Namespace: "soperator",
@@ -663,17 +663,46 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 							},
 							NodeConfig: slurmv1alpha1.NodeConfig{
 								Features:   []string{"a", "b"},
-								AutoResume: ptr.To(false),
+								AutoResume: ptr.To(true),
 								Static:     "Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1 Feature=c,d",
 							},
 						},
 					},
 				},
 			},
-			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 AutoResume=Off Feature=a,b Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=a,b Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
-			name: "Single nodeset with multiple replicas",
+			name: "Single nodeset with AutoResume disabled",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeA",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 1,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								AutoResume: ptr.To(false),
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 AutoResume=Off",
+		},
+		{
+			name: "Single nodeset with multiple replicas and AutoResume unspecified",
 			cluster: &values.SlurmCluster{
 				NamespacedName: types.NamespacedName{
 					Namespace: "soperator",

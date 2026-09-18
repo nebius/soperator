@@ -18249,11 +18249,12 @@ spec:
                   set for Node in `slurm.conf`.
                 properties:
                   autoResume:
-                    default: true
+                    default: false
                     description: |-
                       AutoResume controls whether Slurm automatically resumes the nodes.
                       Set to false to render AutoResume=Off in the NodeName configuration.
-                      Defaults to true.
+                      When true, the setting is omitted and Slurm uses its default AutoResume=On behavior.
+                      Defaults to false.
                     type: boolean
                   dynamic:
                     default: ""
