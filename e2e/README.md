@@ -190,7 +190,8 @@ are written as `<suite>.cucumber.json` and `<suite>.junit.xml`. Under TeamCity,
 JUnit reports are written as `junit/<suite>.junit.xml`; native test messages are
 the source of the build's test counts, statuses, and durations. TeamCity
 messages are emitted after each scenario completes, including the measured
-duration for passed, failed, and skipped scenarios.
+duration from the same scenario start time used by the acceptance log for
+passed, failed, and skipped scenarios.
 
 Step registrars receive static `framework.ClusterInfo` and the shared
 `framework.Runtime` interface:

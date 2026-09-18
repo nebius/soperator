@@ -17,25 +17,14 @@ type teamCityAttribute struct {
 // TeamCityReporter writes native TeamCity test service messages.
 type TeamCityReporter struct {
 	out io.Writer
-	now func() time.Time
 	mu  sync.Mutex
 }
 
 // NewTeamCityReporter creates a native TeamCity test reporter.
 func NewTeamCityReporter(out io.Writer) *TeamCityReporter {
-	return newTeamCityReporter(out, time.Now)
-}
-
-func newTeamCityReporter(out io.Writer, now func() time.Time) *TeamCityReporter {
 	return &TeamCityReporter{
 		out: out,
-		now: now,
 	}
-}
-
-// Now returns the reporter clock's current time.
-func (r *TeamCityReporter) Now() time.Time {
-	return r.now()
 }
 
 // TestStarted reports a running test.

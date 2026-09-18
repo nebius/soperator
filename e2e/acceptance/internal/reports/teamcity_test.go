@@ -11,10 +11,8 @@ import (
 
 func TestTeamCityReporterMessages(t *testing.T) {
 	var output bytes.Buffer
-	now := time.Date(2026, time.September, 17, 12, 0, 0, 0, time.UTC)
-	reporter := newTeamCityReporter(&output, func() time.Time { return now })
+	reporter := NewTeamCityReporter(&output)
 
-	assert.Equal(t, now, reporter.Now())
 	reporter.TestStarted("suite: feature: scenario", "suite/id")
 	reporter.TestFailed("suite: feature: scenario", "expected 'value'\nactual [other] | value", "suite/id")
 	reporter.TestIgnored("suite: feature: skipped", "scenario skipped", "suite/skipped")

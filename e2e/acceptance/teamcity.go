@@ -20,21 +20,19 @@ const (
 )
 
 type teamCityScenarioState struct {
-	name      string
-	flowID    string
-	startedAt time.Time
-	result    teamCityScenarioResult
-	message   string
+	name    string
+	flowID  string
+	result  teamCityScenarioResult
+	message string
 }
 
 type teamCityScenarioStateKey struct{}
 
-func registerTeamCityStateHook(sc *godog.ScenarioContext, reporter *reports.TeamCityReporter, suiteName string) {
+func registerTeamCityStateHook(sc *godog.ScenarioContext, suiteName string) {
 	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
 		state := &teamCityScenarioState{
-			name:      fmt.Sprintf("%s: %s: %s", suiteName, scenario.Uri, scenario.Name),
-			flowID:    suiteName + "/" + scenario.Id,
-			startedAt: reporter.Now(),
+			name:   fmt.Sprintf("%s: %s: %s", suiteName, scenario.Uri, scenario.Name),
+			flowID: suiteName + "/" + scenario.Id,
 		}
 		return context.WithValue(ctx, teamCityScenarioStateKey{}, state), nil
 	})
@@ -77,7 +75,11 @@ func registerTeamCityResultHooks(sc *godog.ScenarioContext, reporter *reports.Te
 		case teamCityScenarioSkipped:
 			reporter.TestIgnored(state.name, state.message, state.flowID)
 		}
-		reporter.TestFinished(state.name, state.flowID, reporter.Now().Sub(state.startedAt))
+		duration := time.Duration(0)
+		if startedAt, ok := ctx.Value(scenarioStartTimeKey).(time.Time); ok && !startedAt.IsZero() {
+			duration = time.Since(startedAt)
+		}
+		reporter.TestFinished(state.name, state.flowID, duration)
 		return ctx, nil
 	})
 }

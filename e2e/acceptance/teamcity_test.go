@@ -36,7 +36,8 @@ func TestTeamCityHooksReportParallelScenarioResults(t *testing.T) {
 	suite := godog.TestSuite{
 		Name: "reporting",
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
-			registerTeamCityStateHook(sc, reporter, "reporting")
+			registerTeamCityStateHook(sc, "reporting")
+			registerTimingHooks(sc)
 			registerSkipHook(sc)
 			sc.Step(`^the step passes$`, func() error { return nil })
 			sc.Step(`^the step fails$`, func() error { return errors.New("controlled failure") })
