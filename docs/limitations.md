@@ -31,7 +31,7 @@ equipped with different GPU models, use different container images, have differe
 ### Software versions
 Our list of supported software versions is pretty short right now:
 - Linux distribution: Ubuntu [24.04](https://releases.ubuntu.com/noble/).
-- Slurm: version [26.05.3-nebius-2](https://github.com/nebius/slurm).
+- Slurm: version [26.05.4-nebius-1](https://github.com/nebius/slurm).
 - CUDA: version [13.0.3](https://developer.nvidia.com/cuda-13-0-3-download-archive).
 - Kubernetes: >= [1.35](https://kubernetes.io/blog/2025/12/31/kubernetes-v1-35-structured-zpages/).
 - Versions of some preinstalled software packages can't be changed.

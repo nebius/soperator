@@ -26,13 +26,13 @@ priorityClasses:
 images:
   munge:
     repository: "cr.nebius.cloud/soperator/munge"
-    tag: "5.0.0-slurm26.05.3-nebius-2"
+    tag: "5.0.0-slurm26.05.4-nebius-1"
   sssd:
     repository: "cr.nebius.cloud/soperator/sssd"
     tag: "2.9.4-1-63"
   slurmd:
     repository: "cr.nebius.cloud/soperator/worker_slurmd"
-    tag: "5.0.0-slurm26.05.3-nebius-2"
+    tag: "5.0.0-slurm26.05.4-nebius-1"
   nodeExporter:
     repository: "cr.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter"
     tag: "v1.10.2"
@@ -140,7 +140,7 @@ nodesets:
       # Optional
       image:
         repository: "cr.nebius.cloud/soperator/worker_slurmd"
-        tag: "5.0.0-slurm26.05.3-nebius-2"
+        tag: "5.0.0-slurm26.05.4-nebius-1"
         # pullPolicy: "IfNotPresent"
         # imagePullSecrets: []
       customEnv:
@@ -231,7 +231,7 @@ nodesets:
       image:
         repository: "cr.nebius.cloud/soperator/munge"
         # Optional
-        tag: "5.0.0-slurm26.05.3-nebius-2"
+        tag: "5.0.0-slurm26.05.4-nebius-1"
         # pullPolicy: "IfNotPresent"
         # imagePullSecrets: []
       # Munge container resources
