@@ -23,6 +23,23 @@ tests:
           path: metadata.name
           value: RELEASE-NAME-soperator
 ---
+suite: test security profiles operator dependencies
+templates:
+  - templates/security-profiles-operator.yaml
+tests:
+  - it: should depend on the namespace HelmRelease
+    set:
+      securityProfilesOperator.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HelmRelease
+      - contains:
+          path: spec.dependsOn
+          content:
+            name: RELEASE-NAME-ns
+---
 suite: test soperatorchecks dependencies
 templates:
   - templates/soperatorchecks.yaml
