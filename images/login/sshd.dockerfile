@@ -33,6 +33,8 @@ RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
 # https://github.com/nebius/ml-containers/pull/102
 FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260918141513 AS login_sshd
 
+ARG SLURM_VERSION
+
 # Install OpenSSH server, Docker, and process supervision. Docker remains
 # inactive unless it is enabled in the SlurmCluster login configuration.
 # Create root .ssh directory
@@ -83,6 +85,7 @@ COPY ansible/spank_nccl_inspector_preconf.yml /opt/ansible/spank_nccl_inspector_
 COPY ansible/roles/spank_nccl_inspector_preconf /opt/ansible/roles/spank_nccl_inspector_preconf
 RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local \
+      -e "slurm_version=${SLURM_VERSION}" \
       -e spank_nccl_inspector_preconf_dump_dir_create=false \
       spank_nccl_inspector_preconf.yml
 

@@ -1,10 +1,18 @@
 ---
 
+- name: Assert Slurm version is set
+  ansible.builtin.assert:
+    that:
+      - slurm_version is defined
+      - slurm_version | length > 0
+    fail_msg: Set slurm_version to match the installed Slurm version.
+  tags:
+    - spank-nccl-inspector-preconf
+
 - name: Ensure NCCL Inspector PreConf SPANK plugin is installed
   ansible.builtin.apt:
     name:
-      - spank-nccl-inspector-preconf
-    state: present
+      - "spank-nccl-inspector-preconf={{ slurm_version }}-{{ spank_nccl_inspector_preconf_deb_release }}"
     update_cache: true
   tags:
     - spank-nccl-inspector-preconf
