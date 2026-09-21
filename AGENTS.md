@@ -43,7 +43,7 @@ In GitHub Workflows:
 - Use `shell: bash` for shell steps since it adds pipefail for better error handling.
 - For actions, prefer SHA pinning with version comment, e.g., `user/action@sha256hash # v1.2.3`
 - Do not use booleans for input variables, use strings instead: bools require complicated expressions
-- `one_job.yml` runs on `pull_request_target`, so the definition from main serves PRs into every branch. When changing it, keep its jobs working against the current release branches' checkouts too — their repo layout may differ from main's. The current release branches are listed in `e2e_release_branches` in `.github/branch-config.yaml` on main.
+- `one_job.yml` runs on `pull_request_target`, so the definition from main serves PRs into every branch. When changing it, keep its jobs working against the current release branches' checkouts too — their repo layout may differ from main's. The scheduled release branches are listed in `scheduler.e2e_release_branches` in the `E2E_CONFIG` variable of the GitHub `e2e` environment; `main` is always scheduled automatically.
 
 In Documentation:
 - Do not overuse *bold*
