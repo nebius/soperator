@@ -35,8 +35,27 @@ jobs:
             exit 1
           fi
 
-          readarray -t RELEASE_BRANCHES < <(yq -r '.e2e_release_branches[]' .github/branch-config.yaml)
-          BRANCHES=("main" "${RELEASE_BRANCHES[@]}")
+          # Parse before readarray so invalid configuration stops the step.
+          RELEASE_BRANCH_NAMES=$(yq -o=json '.' <<<"$E2E_CONFIG" | jq -r '
+            .scheduler.e2e_release_branches
+            | if . == null then [] else . end
+            | if type == "array" and all(.[]; type == "string" and length > 0)
+              then .
+              else error("scheduler.e2e_release_branches must be an array of non-empty strings")
+              end
+            | if all(.[]; startswith("soperator-release-") and (test("\\s") | not))
+              then .
+              else error("scheduler.e2e_release_branches entries must start with soperator-release- and contain no whitespace; main is included automatically")
+              end
+            | if length == (unique | length)
+              then .[]
+              else error("scheduler.e2e_release_branches must not contain duplicates")
+              end')
+          BRANCHES=("main")
+          if [[ -n "$RELEASE_BRANCH_NAMES" ]]; then
+            readarray -t RELEASE_BRANCHES <<<"$RELEASE_BRANCH_NAMES"
+            BRANCHES+=("${RELEASE_BRANCHES[@]}")
+          fi
           BRANCH_COUNT=${#BRANCHES[@]}
 
           echo "Branches: ${BRANCHES[*]}"
