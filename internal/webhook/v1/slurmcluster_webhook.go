@@ -19,6 +19,8 @@ package v1
 import (
 	"context"
 	"fmt"
+	"strings"
+	"unicode"
 
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -69,7 +71,100 @@ func validateSlurmCluster(cluster *slurmv1.SlurmCluster) error {
 	if err := validateLoginUserIsolation(cluster); err != nil {
 		return err
 	}
-	return validateLoginDocker(cluster)
+	if err := validateLoginDocker(cluster); err != nil {
+		return err
+	}
+	return validatePAMSlurmAdopt(cluster)
+}
+
+func validatePAMSlurmAdopt(cluster *slurmv1.SlurmCluster) error {
+	config := cluster.Spec.PAMSlurmAdopt
+	if config == nil {
+		return nil
+	}
+
+	if err := validatePAMListfileIdentities("exemptUsers", config.ExemptUsers); err != nil {
+		return err
+	}
+	if err := validatePAMListfileIdentities("exemptGroups", config.ExemptGroups); err != nil {
+		return err
+	}
+	if !ptr.Deref(config.Enabled, false) || cluster.Spec.CustomSlurmConfig == nil {
+		return nil
+	}
+
+	return validatePAMSlurmAdoptOverrides(*cluster.Spec.CustomSlurmConfig)
+}
+
+func validatePAMListfileIdentities(field string, identities []string) error {
+	seen := make(map[string]struct{}, len(identities))
+	for index, identity := range identities {
+		if identity == "" || strings.TrimSpace(identity) != identity || strings.IndexFunc(identity, unicode.IsControl) >= 0 {
+			return fmt.Errorf(
+				"configure pamSlurmAdopt.%s[%d] as a non-empty identity without surrounding whitespace or control characters",
+				field,
+				index,
+			)
+		}
+		if _, exists := seen[identity]; exists {
+			return fmt.Errorf("remove duplicate identity %q from pamSlurmAdopt.%s", identity, field)
+		}
+		seen[identity] = struct{}{}
+	}
+	return nil
+}
+
+func validatePAMSlurmAdoptOverrides(customConfig string) error {
+	requiredParameters := []struct {
+		key   string
+		value string
+	}{
+		{key: "prologflags", value: "contain"},
+		{key: "launchparameters", value: "ulimit_pam_adopt"},
+	}
+	effectiveValues := make(map[string]string, len(requiredParameters))
+	for line := range strings.Lines(customConfig) {
+		line, _, _ = strings.Cut(line, "#")
+		key, value, found := strings.Cut(line, "=")
+		if !found {
+			continue
+		}
+		key = strings.ToLower(strings.TrimSpace(key))
+		for _, parameter := range requiredParameters {
+			if key == parameter.key {
+				effectiveValues[key] = strings.TrimSpace(value)
+				break
+			}
+		}
+	}
+
+	for _, parameter := range requiredParameters {
+		value, overridden := effectiveValues[parameter.key]
+		if overridden && !containsSlurmConfigParameter(value, parameter.value) {
+			return fmt.Errorf(
+				"include %q in customSlurmConfig %s when pamSlurmAdopt is enabled",
+				parameter.value,
+				canonicalSlurmConfigKey(parameter.key),
+			)
+		}
+	}
+	return nil
+}
+
+func containsSlurmConfigParameter(value, expected string) bool {
+	for parameter := range strings.SplitSeq(value, ",") {
+		if strings.EqualFold(strings.TrimSpace(parameter), expected) {
+			return true
+		}
+	}
+	return false
+}
+
+func canonicalSlurmConfigKey(key string) string {
+	if key == "prologflags" {
+		return "PrologFlags"
+	}
+	return "LaunchParameters"
 }
 
 func validateLoginDocker(cluster *slurmv1.SlurmCluster) error {

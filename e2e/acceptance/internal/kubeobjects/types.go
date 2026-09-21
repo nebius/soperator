@@ -52,6 +52,7 @@ type SlurmClusterSpec struct {
 	PartitionConfiguration PartitionConfiguration `json:"partitionConfiguration"`
 	SlurmNodes             SlurmClusterNodes      `json:"slurmNodes"`
 	CustomSlurmConfig      *string                `json:"customSlurmConfig"`
+	PAMSlurmAdopt          json.RawMessage        `json:"pamSlurmAdopt"`
 }
 
 type SlurmClusterNodes struct {

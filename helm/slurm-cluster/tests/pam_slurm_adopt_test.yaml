@@ -1,0 +1,50 @@
+suite: test pam_slurm_adopt rendering
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should render pam_slurm_adopt disabled by default
+    asserts:
+      - equal:
+          path: spec.pamSlurmAdopt.enabled
+          value: false
+      - equal:
+          path: spec.pamSlurmAdopt.actionUnknown
+          value: newest
+      - equal:
+          path: spec.pamSlurmAdopt.exemptUsers
+          value: []
+      - equal:
+          path: spec.pamSlurmAdopt.exemptGroups
+          value: []
+
+  - it: should render enabled pam_slurm_adopt configuration
+    set:
+      pamSlurmAdopt:
+        enabled: true
+        actionUnknown: deny
+        exemptUsers:
+          - service-account
+        exemptGroups:
+          - cluster-admins
+    asserts:
+      - equal:
+          path: spec.pamSlurmAdopt.enabled
+          value: true
+      - equal:
+          path: spec.pamSlurmAdopt.actionUnknown
+          value: deny
+      - equal:
+          path: spec.pamSlurmAdopt.exemptUsers
+          value:
+            - service-account
+      - equal:
+          path: spec.pamSlurmAdopt.exemptGroups
+          value:
+            - cluster-admins
+
+  - it: should omit pam_slurm_adopt when the values block is removed
+    set:
+      pamSlurmAdopt: null
+    asserts:
+      - notExists:
+          path: spec.pamSlurmAdopt

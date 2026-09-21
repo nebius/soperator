@@ -122,6 +122,9 @@ func renderContainerNodeSetSlurmd(
 		volumeMounts = append(volumeMounts, renderVolumeMountSupervisordConfigMap())
 	}
 	volumeMounts = append(volumeMounts, renderVolumeMountSshdConfigs())
+	if nodeSet.PAMSlurmAdopt.Enabled {
+		volumeMounts = append(volumeMounts, renderVolumeMountsPAMSlurmAdopt()...)
+	}
 	if nodeSet.ContainerSSSD != nil {
 		volumeMounts = append(volumeMounts,
 			common.RenderVolumeMountSSSDSocket(),
@@ -188,12 +191,34 @@ func renderContainerNodeSetSlurmd(
 
 	for _, env := range nodeSet.ContainerSlurmd.CustomEnv {
 		switch env.Name {
-		case consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes:
+		case consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes, consts.EnvPAMSlurmAdoptEnabled:
 			return corev1.Container{}, fmt.Errorf("environment variable %q is managed by Soperator", env.Name)
 		}
 	}
 
 	realMemoryBytes := common.RenderRealMemorySlurmd(resources) * 1024 * 1024
+
+	env := append(
+		append(
+			renderNodeSetSlurmdEnv(
+				cgroupVersion,
+				clusterWithGPU,
+				nodeSet.GPU.Enabled,
+				nodeSet.GPU.Nvidia.GDRCopyEnabled,
+				nodeSet.DockerEnabled,
+				nodeSet.NodeExtra,
+				realMemoryBytes,
+			),
+			renderSlurmdTopologyEnv(topologyEnabled)...,
+		),
+		nodeSet.ContainerSlurmd.CustomEnv...,
+	)
+	if nodeSet.PAMSlurmAdopt.Enabled {
+		env = append(env, corev1.EnvVar{
+			Name:  consts.EnvPAMSlurmAdoptEnabled,
+			Value: "true",
+		})
+	}
 
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
@@ -201,21 +226,7 @@ func renderContainerNodeSetSlurmd(
 		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
 		Command:         nodeSet.ContainerSlurmd.Command,
 		Args:            nodeSet.ContainerSlurmd.Args,
-		Env: append(
-			append(
-				renderNodeSetSlurmdEnv(
-					cgroupVersion,
-					clusterWithGPU,
-					nodeSet.GPU.Enabled,
-					nodeSet.GPU.Nvidia.GDRCopyEnabled,
-					nodeSet.DockerEnabled,
-					nodeSet.NodeExtra,
-					realMemoryBytes,
-				),
-				renderSlurmdTopologyEnv(topologyEnabled)...,
-			),
-			nodeSet.ContainerSlurmd.CustomEnv...,
-		),
+		Env:             env,
 		Ports: []corev1.ContainerPort{{
 			Name:          nodeSet.ContainerSlurmd.Name,
 			ContainerPort: nodeSet.ContainerSlurmd.Port,
@@ -261,6 +272,29 @@ func renderVolumeMountRuntime() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameRuntime,
 		MountPath: consts.VolumeMountPathRuntime,
+	}
+}
+
+func renderVolumeMountsPAMSlurmAdopt() []corev1.VolumeMount {
+	return []corev1.VolumeMount{
+		{
+			Name:      consts.VolumeNamePAMSlurmAdopt,
+			MountPath: consts.VolumeMountPathPAMSlurmAdopt,
+			SubPath:   consts.VolumeMountSubPathPAMSlurmAdopt,
+			ReadOnly:  true,
+		},
+		{
+			Name:      consts.VolumeNamePAMSlurmAdopt,
+			MountPath: consts.VolumeMountPathPAMSlurmAdoptUsers,
+			SubPath:   consts.VolumeMountSubPathPAMSlurmAdoptUsers,
+			ReadOnly:  true,
+		},
+		{
+			Name:      consts.VolumeNamePAMSlurmAdopt,
+			MountPath: consts.VolumeMountPathPAMSlurmAdoptGroups,
+			SubPath:   consts.VolumeMountSubPathPAMSlurmAdoptGroups,
+			ReadOnly:  true,
+		},
 	}
 }
 

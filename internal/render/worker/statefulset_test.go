@@ -802,6 +802,97 @@ func TestRenderNodeSetStatefulSet_DockerEnabled(t *testing.T) {
 	}
 }
 
+func TestRenderNodeSetStatefulSet_PAMSlurmAdopt(t *testing.T) {
+	createNodeSet := func(enabled bool) *values.SlurmNodeSet {
+		return &values.SlurmNodeSet{
+			Name: "test-nodeset",
+			ParentalCluster: client.ObjectKey{
+				Namespace: "test-namespace",
+				Name:      "test-cluster",
+			},
+			ContainerSlurmd: values.Container{
+				NodeContainer: slurmv1.NodeContainer{
+					Image: "test-image",
+					Resources: corev1.ResourceList{
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+						corev1.ResourceCPU:    resource.MustParse("1"),
+					},
+				},
+			},
+			ContainerMunge: values.Container{
+				NodeContainer: slurmv1.NodeContainer{Image: "munge-image"},
+			},
+			VolumeSpool: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+			},
+			VolumeJail: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+			},
+			StatefulSet:       values.StatefulSet{Replicas: 1},
+			SSHDConfigMapName: "sshd-config",
+			GPU:               &slurmv1alpha1.GPUSpec{},
+			PAMSlurmAdopt: values.PAMSlurmAdopt{
+				Enabled: enabled,
+			},
+		}
+	}
+
+	for _, enabled := range []bool{false, true} {
+		t.Run(strconv.FormatBool(enabled), func(t *testing.T) {
+			result, err := worker.RenderNodeSetStatefulSet(
+				createNodeSet(enabled),
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				false,
+				false,
+			)
+			assert.NoError(t, err)
+
+			var adoptVolume *corev1.Volume
+			for index := range result.Spec.Template.Spec.Volumes {
+				volume := &result.Spec.Template.Spec.Volumes[index]
+				if volume.Name == consts.VolumeNamePAMSlurmAdopt {
+					adoptVolume = volume
+					break
+				}
+			}
+
+			slurmd := result.Spec.Template.Spec.Containers[0]
+			var adoptMounts []corev1.VolumeMount
+			for _, mount := range slurmd.VolumeMounts {
+				if mount.Name == consts.VolumeNamePAMSlurmAdopt {
+					adoptMounts = append(adoptMounts, mount)
+				}
+			}
+
+			if !enabled {
+				assert.Nil(t, adoptVolume)
+				assert.Empty(t, adoptMounts)
+				for _, env := range slurmd.Env {
+					assert.NotEqual(t, consts.EnvPAMSlurmAdoptEnabled, env.Name)
+				}
+				return
+			}
+
+			if assert.NotNil(t, adoptVolume) && assert.NotNil(t, adoptVolume.ConfigMap) {
+				assert.Equal(t, "test-cluster-pam-slurm-adopt", adoptVolume.ConfigMap.Name)
+			}
+			if assert.Len(t, adoptMounts, 3) {
+				assert.Equal(t, consts.VolumeMountPathPAMSlurmAdopt, adoptMounts[0].MountPath)
+				assert.Equal(t, consts.VolumeMountSubPathPAMSlurmAdopt, adoptMounts[0].SubPath)
+				assert.True(t, adoptMounts[0].ReadOnly)
+				assert.Equal(t, consts.VolumeMountPathPAMSlurmAdoptUsers, adoptMounts[1].MountPath)
+				assert.Equal(t, consts.VolumeMountSubPathPAMSlurmAdoptUsers, adoptMounts[1].SubPath)
+				assert.True(t, adoptMounts[1].ReadOnly)
+				assert.Equal(t, consts.VolumeMountPathPAMSlurmAdoptGroups, adoptMounts[2].MountPath)
+				assert.Equal(t, consts.VolumeMountSubPathPAMSlurmAdoptGroups, adoptMounts[2].SubPath)
+				assert.True(t, adoptMounts[2].ReadOnly)
+			}
+			assertEnvValue(t, slurmd.Env, consts.EnvPAMSlurmAdoptEnabled, "true")
+		})
+	}
+}
+
 func TestRenderNodeSetStatefulSet_SupervisordConfig(t *testing.T) {
 	createNodeSet := func(configMapName string) *values.SlurmNodeSet {
 		return &values.SlurmNodeSet{
@@ -948,7 +1039,11 @@ func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 		t.Fatal("slurmd container not found")
 	})
 
-	for _, envName := range []string{consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes} {
+	for _, envName := range []string{
+		consts.EnvDockerEnabled,
+		consts.EnvNodeRealMemoryBytes,
+		consts.EnvPAMSlurmAdoptEnabled,
+	} {
 		t.Run("rejects a custom override of "+envName, func(t *testing.T) {
 			nodeSet := createNodeSet()
 			nodeSet.ContainerSlurmd.CustomEnv = []corev1.EnvVar{{

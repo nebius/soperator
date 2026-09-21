@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -13,11 +14,13 @@ import (
 
 func TestKubectlClientSlurmCluster(t *testing.T) {
 	customConfig := "JobRequeue=0"
+	pamSlurmAdopt := json.RawMessage(`{"enabled":true,"actionUnknown":"newest"}`)
 	exec := &kubectlClientTestExec{kubectl: map[string]string{
 		"get\x00slurmcluster\x00soperator\x00-n\x00soperator\x00-o\x00json": `{
 			"metadata": {"name": "soperator", "namespace": "soperator"},
 			"spec": {
 				"customSlurmConfig": "JobRequeue=0",
+				"pamSlurmAdopt": {"enabled": true, "actionUnknown": "newest"},
 				"slurmNodes": {
 					"accounting": {"enabled": true},
 					"login": {"docker": {"enabled": true}}
@@ -28,13 +31,12 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 
 	cluster, err := NewKubectlClient(exec).SlurmCluster(t.Context(), "soperator")
 	require.NoError(t, err)
-	assert.Equal(t, SlurmClusterInfo{
-		Name:               "soperator",
-		Namespace:          "soperator",
-		AccountingEnabled:  true,
-		LoginDockerEnabled: true,
-		CustomSlurmConfig:  &customConfig,
-	}, cluster)
+	assert.Equal(t, "soperator", cluster.Name)
+	assert.Equal(t, "soperator", cluster.Namespace)
+	assert.True(t, cluster.AccountingEnabled)
+	assert.True(t, cluster.LoginDockerEnabled)
+	assert.Equal(t, &customConfig, cluster.CustomSlurmConfig)
+	assert.JSONEq(t, string(pamSlurmAdopt), string(cluster.PAMSlurmAdopt))
 }
 
 func TestKubectlClientSlurmClusterRejectsEmptyName(t *testing.T) {
@@ -72,6 +74,43 @@ func TestKubectlClientPatchSlurmClusterCustomConfig(t *testing.T) {
 func TestKubectlClientPatchSlurmClusterCustomConfigRejectsEmptyName(t *testing.T) {
 	err := NewKubectlClient(&kubectlClientTestExec{}).PatchSlurmClusterCustomConfig(t.Context(), " ", nil)
 	assert.ErrorContains(t, err, "name is empty")
+}
+
+func TestKubectlClientPatchSlurmClusterPAMSlurmAdopt(t *testing.T) {
+	for name, test := range map[string]struct {
+		value json.RawMessage
+		patch string
+	}{
+		"set": {
+			value: json.RawMessage(`{"enabled":true,"actionUnknown":"newest"}`),
+			patch: `{"spec":{"pamSlurmAdopt":{"enabled":true,"actionUnknown":"newest"}}}`,
+		},
+		"remove": {
+			patch: `{"spec":{"pamSlurmAdopt":null}}`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			exec := &kubectlClientTestExec{kubectl: map[string]string{
+				strings.Join([]string{
+					"patch", "slurmcluster", "soperator", "-n", "soperator",
+					"--type=merge", "-p", test.patch,
+				}, "\x00"): "",
+			}}
+
+			err := NewKubectlClient(exec).PatchSlurmClusterPAMSlurmAdopt(t.Context(), "soperator", test.value)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestKubectlClientPatchSlurmClusterPAMSlurmAdoptRejectsInvalidInput(t *testing.T) {
+	client := NewKubectlClient(&kubectlClientTestExec{})
+
+	err := client.PatchSlurmClusterPAMSlurmAdopt(t.Context(), " ", nil)
+	assert.ErrorContains(t, err, "name is empty")
+
+	err = client.PatchSlurmClusterPAMSlurmAdopt(t.Context(), "soperator", json.RawMessage(`{`))
+	assert.ErrorContains(t, err, "invalid JSON")
 }
 
 func ptrTo[T any](value T) *T {
@@ -145,7 +184,11 @@ func TestKubectlClientWorkerPods(t *testing.T) {
 			"items": [
 				{
 					"metadata": {"name": "kube-worker-a"},
-					"spec": {"hostname": "worker-a", "nodeName": "node-a"},
+					"spec": {
+						"hostname": "worker-a",
+						"nodeName": "node-a",
+						"containers": [{"name": "slurmd", "env": [{"name": "SOPERATOR_PAM_SLURM_ADOPT_ENABLED", "value": "true"}]}]
+					},
 					"status": {"conditions": [{"type": "Ready", "status": "True"}]}
 				},
 				{
@@ -160,8 +203,19 @@ func TestKubectlClientWorkerPods(t *testing.T) {
 	pods, err := NewKubectlClient(exec).WorkerPods(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, []WorkerPodInfo{
-		{SlurmNodeName: "worker-a", PodName: "kube-worker-a", KubernetesNodeName: "node-a", Ready: true},
-		{SlurmNodeName: "worker-b", PodName: "kube-worker-b", KubernetesNodeName: "node-b"},
+		{
+			SlurmNodeName:      "worker-a",
+			PodName:            "kube-worker-a",
+			KubernetesNodeName: "node-a",
+			Ready:              true,
+			SlurmdEnvironment:  map[string]string{"SOPERATOR_PAM_SLURM_ADOPT_ENABLED": "true"},
+		},
+		{
+			SlurmNodeName:      "worker-b",
+			PodName:            "kube-worker-b",
+			KubernetesNodeName: "node-b",
+			SlurmdEnvironment:  map[string]string{},
+		},
 	}, pods)
 }
 
@@ -238,6 +292,25 @@ func TestKubectlClientWorkerContainerEnvironmentVariableRejectsValueFrom(t *test
 	)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "valueFrom is not supported")
+}
+
+func TestKubectlClientWorkerContainerEnvironmentVariableOptional(t *testing.T) {
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00pod\x00worker-0\x00-n\x00soperator\x00-o\x00json": `{
+			"metadata": {"name": "worker-0"},
+			"spec": {"containers": [{"name": "slurmd", "env": []}]}
+		}`,
+	}}
+
+	value, found, err := NewKubectlClient(exec).WorkerContainerEnvironmentVariableOptional(
+		t.Context(),
+		WorkerPodInfo{PodName: "worker-0"},
+		"slurmd",
+		"SOPERATOR_PAM_SLURM_ADOPT_ENABLED",
+	)
+	require.NoError(t, err)
+	assert.False(t, found)
+	assert.Empty(t, value)
 }
 
 type kubectlClientTestExec struct {

@@ -221,6 +221,11 @@ slurmConfig:
 topology: null
 customSlurmConfig: ""
 customCgroupConfig: ""
+pamSlurmAdopt:
+  enabled: false
+  actionUnknown: newest
+  exemptUsers: []
+  exemptGroups: []
 mpiConfig:
   pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"
 plugStackConfig:

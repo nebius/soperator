@@ -33,6 +33,7 @@ type SlurmClusterInfo struct {
 	AccountingEnabled  bool
 	LoginDockerEnabled bool
 	CustomSlurmConfig  *string
+	PAMSlurmAdopt      json.RawMessage
 }
 
 type WorkerPodInfo struct {
@@ -40,6 +41,7 @@ type WorkerPodInfo struct {
 	PodName            string
 	KubernetesNodeName string
 	Ready              bool
+	SlurmdEnvironment  map[string]string
 }
 
 func NewKubectlClient(exec Exec) *KubectlClient {
@@ -63,6 +65,7 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 		AccountingEnabled:  cluster.Spec.SlurmNodes.Accounting.Enabled,
 		LoginDockerEnabled: cluster.Spec.SlurmNodes.Login.Docker.Enabled,
 		CustomSlurmConfig:  cluster.Spec.CustomSlurmConfig,
+		PAMSlurmAdopt:      append(json.RawMessage(nil), cluster.Spec.PAMSlurmAdopt...),
 	}, nil
 }
 
@@ -87,6 +90,34 @@ func (c *KubectlClient) PatchSlurmClusterCustomConfig(ctx context.Context, name 
 		"--type=merge", "-p", string(patch),
 	); err != nil {
 		return fmt.Errorf("patch SlurmCluster %s/%s custom config: %w", SoperatorNamespace, name, err)
+	}
+	return nil
+}
+
+func (c *KubectlClient) PatchSlurmClusterPAMSlurmAdopt(ctx context.Context, name string, value json.RawMessage) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("SlurmCluster name is empty")
+	}
+	if value != nil && !json.Valid(value) {
+		return fmt.Errorf("validate SlurmCluster PAM Slurm adopt patch: invalid JSON")
+	}
+
+	patch, err := json.Marshal(map[string]any{
+		"spec": map[string]any{
+			"pamSlurmAdopt": value,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("marshal SlurmCluster PAM Slurm adopt patch: %w", err)
+	}
+
+	if _, err := c.exec.Kubectl().RunWithDefaultRetry(ctx,
+		"patch", "slurmcluster", name,
+		"-n", SoperatorNamespace,
+		"--type=merge", "-p", string(patch),
+	); err != nil {
+		return fmt.Errorf("patch SlurmCluster %s/%s PAM Slurm adopt config: %w", SoperatorNamespace, name, err)
 	}
 	return nil
 }
@@ -150,12 +181,25 @@ func (c *KubectlClient) WorkerPods(ctx context.Context) ([]WorkerPodInfo, error)
 			return nil, fmt.Errorf("worker pods %s and %s both declare spec.hostname=%s", existing, pod.Name, slurmNodeName)
 		}
 		seen[slurmNodeName] = pod.Name
+		slurmdEnvironment := make(map[string]string)
+		for _, container := range pod.Spec.Containers {
+			if container.Name != "slurmd" {
+				continue
+			}
+			for _, variable := range container.Env {
+				if variable.ValueFrom == nil {
+					slurmdEnvironment[variable.Name] = variable.Value
+				}
+			}
+			break
+		}
 
 		out = append(out, WorkerPodInfo{
 			SlurmNodeName:      slurmNodeName,
 			PodName:            pod.Name,
 			KubernetesNodeName: pod.Spec.NodeName,
 			Ready:              kubeobjects.PodReady(pod),
+			SlurmdEnvironment:  slurmdEnvironment,
 		})
 	}
 
@@ -189,23 +233,44 @@ func (c *KubectlClient) WorkerContainerEnvironmentVariable(
 	containerName,
 	variableName string,
 ) (string, error) {
+	value, found, err := c.WorkerContainerEnvironmentVariableOptional(ctx, pod, containerName, variableName)
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return "", fmt.Errorf(
+			"find environment variable %s in container %s of worker pod %s",
+			strings.TrimSpace(variableName),
+			strings.TrimSpace(containerName),
+			strings.TrimSpace(pod.PodName),
+		)
+	}
+	return value, nil
+}
+
+func (c *KubectlClient) WorkerContainerEnvironmentVariableOptional(
+	ctx context.Context,
+	pod WorkerPodInfo,
+	containerName,
+	variableName string,
+) (string, bool, error) {
 	podName := strings.TrimSpace(pod.PodName)
 	if podName == "" {
-		return "", fmt.Errorf("worker pod name is empty")
+		return "", false, fmt.Errorf("worker pod name is empty")
 	}
 	containerName = strings.TrimSpace(containerName)
 	if containerName == "" {
-		return "", fmt.Errorf("container name is empty")
+		return "", false, fmt.Errorf("container name is empty")
 	}
 	variableName = strings.TrimSpace(variableName)
 	if variableName == "" {
-		return "", fmt.Errorf("environment variable name is empty")
+		return "", false, fmt.Errorf("environment variable name is empty")
 	}
 
 	var workerPod corev1.Pod
 	if err := c.GetJSON(ctx, &workerPod,
 		"get", "pod", podName, "-n", SoperatorNamespace, "-o", "json"); err != nil {
-		return "", fmt.Errorf("get worker pod %s/%s: %w", SoperatorNamespace, podName, err)
+		return "", false, fmt.Errorf("get worker pod %s/%s: %w", SoperatorNamespace, podName, err)
 	}
 
 	for _, container := range workerPod.Spec.Containers {
@@ -217,22 +282,17 @@ func (c *KubectlClient) WorkerContainerEnvironmentVariable(
 				continue
 			}
 			if variable.ValueFrom != nil {
-				return "", fmt.Errorf(
+				return "", false, fmt.Errorf(
 					"resolve environment variable %s from container %s in worker pod %s: valueFrom is not supported",
 					variableName,
 					containerName,
 					podName,
 				)
 			}
-			return variable.Value, nil
+			return variable.Value, true, nil
 		}
-		return "", fmt.Errorf(
-			"find environment variable %s in container %s of worker pod %s",
-			variableName,
-			containerName,
-			podName,
-		)
+		return "", false, nil
 	}
 
-	return "", fmt.Errorf("find container %s in worker pod %s", containerName, podName)
+	return "", false, fmt.Errorf("find container %s in worker pod %s", containerName, podName)
 }

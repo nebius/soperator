@@ -329,6 +329,37 @@ func TestRenderSlurmConfigMapRebootPrograms(t *testing.T) {
 		"PowerAction=soperator-worker-handoff Location=slurmd Program=/opt/bin/slurm/worker_handoff.py")
 }
 
+func TestRenderSlurmConfigMapPAMSlurmAdoptLaunchParameters(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		enabled  bool
+		expected string
+	}{
+		{
+			name:     "disabled",
+			expected: "LaunchParameters=use_interactive_step",
+		},
+		{
+			name:     "enabled",
+			enabled:  true,
+			expected: "LaunchParameters=use_interactive_step,ulimit_pam_adopt",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{
+				PAMSlurmAdopt: values.PAMSlurmAdopt{Enabled: tt.enabled},
+			})
+
+			slurmConfig := result.Data[consts.ConfigMapKeySlurmBaseConfig]
+			assert.Contains(t, slurmConfig, tt.expected)
+			assert.Contains(t, slurmConfig, "PrologFlags=contain")
+			if !tt.enabled {
+				assert.NotContains(t, slurmConfig, "ulimit_pam_adopt")
+			}
+		})
+	}
+}
+
 func TestRenderConfigMapSlurmConfigs_FileNamesAndWarnings(t *testing.T) {
 	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{})
 

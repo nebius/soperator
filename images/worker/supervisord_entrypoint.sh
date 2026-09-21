@@ -84,6 +84,7 @@ effective_sshd_config_dir=$(mktemp -d /run/soperator-ssh-configs.XXXXXX)
 # for the PAM jail.
 mount --bind "${effective_sshd_config_dir}" "${source_sshd_config_dir}"
 /usr/sbin/sshd -t -f "${source_sshd_config_dir}/sshd_config"
+/opt/bin/slurm/verify_pam_slurm_adopt.sh "${source_sshd_config_dir}/sshd_config"
 
 # TODO: Since 1.29 kubernetes supports native sidecar containers. We can remove it in feature releases
 echo "Waiting until munge is started"

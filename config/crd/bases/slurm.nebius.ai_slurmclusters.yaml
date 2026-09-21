@@ -1141,6 +1141,40 @@ spec:
                       Defaults to "OMPI_MCA_btl_tcp_if_include=eth0" to avoid "lo" and "docker" interfaces to be selected by OpenMPI.
                     type: string
                 type: object
+              pamSlurmAdopt:
+                description: |-
+                  PAMSlurmAdopt controls whether SSH sessions on worker nodes must belong to a running Slurm job.
+                  Eligible sessions are adopted into the job's external step and inherit its cgroup constraints.
+                properties:
+                  actionUnknown:
+                    default: newest
+                    description: |-
+                      ActionUnknown controls behavior when a user owns multiple jobs on the worker and Slurm cannot
+                      identify which job originated the SSH connection.
+                    enum:
+                    - newest
+                    - deny
+                    type: string
+                  enabled:
+                    default: false
+                    description: Enabled requires non-root SSH users to own a running
+                      job on the target worker.
+                    type: boolean
+                  exemptGroups:
+                    description: |-
+                      ExemptGroups lists groups whose members may SSH to workers without a running job. Their sessions
+                      are not adopted into a job cgroup.
+                    items:
+                      type: string
+                    type: array
+                  exemptUsers:
+                    description: |-
+                      ExemptUsers lists non-root users that may SSH to workers without a running job. Their sessions
+                      are not adopted into a job cgroup.
+                    items:
+                      type: string
+                    type: array
+                type: object
               partitionConfiguration:
                 description: |-
                   PartitionConfiguration define partition configuration of slurm worker nodes

@@ -43,6 +43,7 @@ type SlurmNodeSet struct {
 
 	// DockerEnabled defines whether dockerd, its supervised proxy, and the Docker CLI are enabled for the NodeSet workers.
 	DockerEnabled bool
+	PAMSlurmAdopt PAMSlurmAdopt
 
 	StatefulSet     StatefulSet
 	UpdateStrategy  consts.UpdateStrategy
@@ -76,6 +77,7 @@ func BuildSlurmNodeSetFrom(
 	nodeSet *slurmv1alpha1.NodeSet,
 	clusterName string,
 	maintenance *consts.MaintenanceMode,
+	pamSlurmAdopt *slurmv1.PAMSlurmAdopt,
 ) SlurmNodeSet {
 	nsSpec := &nodeSet.Spec
 	res := SlurmNodeSet{
@@ -124,6 +126,7 @@ func BuildSlurmNodeSetFrom(
 		GPU: nsSpec.GPU.DeepCopy(),
 		//
 		DockerEnabled: nsSpec.Docker.Enabled == nil || *nsSpec.Docker.Enabled,
+		PAMSlurmAdopt: buildPAMSlurmAdoptFrom(pamSlurmAdopt),
 		//
 		StatefulSet: buildStatefulSetWithMaxUnavailableFrom(
 			naming.BuildNodeSetStatefulSetName(nodeSet.Name),

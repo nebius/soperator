@@ -33,6 +33,8 @@ RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
 # https://github.com/nebius/ml-containers/pull/102
 FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260918141513 AS worker_slurmd
 
+ARG SLURM_DEB_VERSION
+
 # Install useful packages
 RUN apt-get update && \
     apt -y install \
@@ -41,7 +43,8 @@ RUN apt-get update && \
         kmod \
         libncurses5-dev \
         supervisor \
-        openssh-server && \
+        openssh-server \
+        slurm-smd-libpam-slurm-adopt=${SLURM_DEB_VERSION} && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -96,7 +99,6 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
     chmod 644 /etc/enroot/enroot.conf.d/custom-dirs.conf
 
 # Install slurm pyxis plugin
-ARG SLURM_DEB_VERSION
 ARG PYXIS_VERSION=0.24.0
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${SLURM_DEB_VERSION}-${PYXIS_VERSION}-1 && \
@@ -125,6 +127,7 @@ COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
 # Copy script for preparing an SSHD configuration compatible with the PAM jail
 COPY images/common/scripts/prepare_sshd_pam_jail_config.sh /opt/bin/slurm/
+COPY images/worker/verify_pam_slurm_adopt.sh /opt/bin/slurm/
 
 # Copy scripts for rebooting K8s nodes and handing off worker operations
 COPY images/common/scripts/reboot.sh /opt/bin/slurm/
@@ -133,6 +136,7 @@ COPY images/common/scripts/worker_handoff.py /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh && \
     chmod +x /opt/bin/slurm/prepare_sshd_pam_jail_config.sh && \
+    chmod +x /opt/bin/slurm/verify_pam_slurm_adopt.sh && \
     chmod +x /opt/bin/slurm/reboot.sh && \
     chmod +x /opt/bin/slurm/worker_handoff.py
 
@@ -158,7 +162,10 @@ RUN rm -rf /etc/update-motd.d
 # Keep pam_soperator_jail last: it pivots the per-session sshd process into the
 # jail, so any PAM session modules after it would also run inside the jail.
 COPY --from=worker_pam_builder /out/ /
-RUN echo "session required pam_soperator_jail.so /mnt/jail" >> /etc/pam.d/sshd
+RUN touch /etc/pam.d/soperator-pam-slurm-adopt && \
+    chmod 0644 /etc/pam.d/soperator-pam-slurm-adopt && \
+    echo "@include soperator-pam-slurm-adopt" >> /etc/pam.d/sshd && \
+    echo "session required pam_soperator_jail.so /mnt/jail" >> /etc/pam.d/sshd
 
 # Expose the port used for accessing slurmd
 EXPOSE 6818

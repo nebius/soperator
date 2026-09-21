@@ -104,6 +104,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		nodeSet,
 		cluster.Name,
 		cluster.Spec.Maintenance,
+		cluster.Spec.PAMSlurmAdopt,
 	)
 
 	nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(ctx, r.Client, client.ObjectKeyFromObject(cluster))
@@ -361,6 +362,14 @@ func (r NodeSetReconciler) executeReconciliation(
 					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
 						stepLogger.Error(err, "Failed to reconcile default sshd ConfigMap")
 						return fmt.Errorf("reconciling default worker sshd ConfigMap: %w", err)
+					}
+				}
+
+				if clusterValues.PAMSlurmAdopt.Enabled {
+					desired := worker.RenderConfigMapPAMSlurmAdopt(clusterValues)
+					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+						stepLogger.Error(err, "Failed to reconcile pam_slurm_adopt ConfigMap")
+						return fmt.Errorf("reconciling worker pam_slurm_adopt ConfigMap: %w", err)
 					}
 				}
 
@@ -711,6 +720,21 @@ func (r NodeSetReconciler) getWorkersStatefulSetDependencies(
 			return []metav1.Object{}, err
 		}
 		res = append(res, sshdConfigMap)
+	}
+
+	if nodeSet.PAMSlurmAdopt.Enabled {
+		pamSlurmAdoptConfigMap := &corev1.ConfigMap{}
+		if err := r.Get(
+			ctx,
+			types.NamespacedName{
+				Namespace: nodeSet.ParentalCluster.Namespace,
+				Name:      naming.BuildConfigMapPAMSlurmAdoptName(nodeSet.ParentalCluster.Name),
+			},
+			pamSlurmAdoptConfigMap,
+		); err != nil {
+			return []metav1.Object{}, err
+		}
+		res = append(res, pamSlurmAdoptConfigMap)
 	}
 
 	return res, nil
