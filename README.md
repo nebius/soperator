@@ -135,7 +135,7 @@ There are four deployment paths, all based on the same codebase.
 | Component | Version                                           |
 |---|---------------------------------------------------|
 | Linux (node images) | Ubuntu 24.04                                      |
-| Slurm | 26.05.3-nebius-2 (Nebius fork build with patches) |
+| Slurm | 26.05.4-nebius-1 (Nebius fork build with patches) |
 | CUDA | >13.0                                             |
 | NCCL | ≥2.28                                             |
 | Kubernetes | ≥ 1.35                                            |
