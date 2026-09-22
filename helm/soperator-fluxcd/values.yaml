@@ -356,10 +356,10 @@ observability:
             minAge: 4h
           resources:
             requests:
-              memory: 200Mi
+              memory: 512Mi
               cpu: 100m
             limits:
-              memory: 200Mi
+              memory: 512Mi
         nodeLogs:
           enabled: true
           resources:
