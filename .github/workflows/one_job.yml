@@ -68,7 +68,7 @@ jobs:
       - uses: dorny/paths-filter@v4
         id: filter
         with:
-          predicate-quantifier: 'every'
+          predicate-quantifier: "every"
           filters: |
             has_code_changes:
               - '**'
@@ -285,7 +285,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ linux/amd64, linux/arm64 ]
+        platform: [linux/amd64, linux/arm64]
         include:
           - platform: linux/amd64
             runner: ubuntu-24.04
@@ -356,7 +356,7 @@ jobs:
 
           echo "Updating CRDs & auto-generated code (included in test step) & run tests"
           make test-coverage UNSTABLE="${UNSTABLE}"
-          
+
           echo "go base for cache - ${OPERATOR_IMAGE_TAG}"
           make docker-build-and-push \
             PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
@@ -403,7 +403,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ linux/amd64, linux/arm64 ]
+        platform: [linux/amd64, linux/arm64]
         include:
           - platform: linux/amd64
             runner: ubuntu-24.04
@@ -471,7 +471,7 @@ jobs:
           echo "Building for platform: ${{ matrix.platform }}"
 
           make sync-version UNSTABLE=${UNSTABLE}
-          
+
           echo "munge - ${IMAGE_VERSION}"
           make docker-build-and-push \
             PLATFORM="${{ matrix.platform }}" ARCH="${{ matrix.arch }}" DOCKER_BUILD_ARGS="${DOCKER_BUILD_ARGS}" \
@@ -531,7 +531,6 @@ jobs:
             UNSTABLE="${UNSTABLE}" IMAGE_NAME=nfs-server DOCKERFILE=nfs-server/nfs.dockerfile \
             IMAGE_VERSION=${NFS_VERSION}
 
-
   build-jail-images:
     needs:
       - changes
@@ -542,7 +541,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ linux/amd64, linux/arm64 ]
+        platform: [linux/amd64, linux/arm64]
         # pull_request_target uses this definition from main for release-branch PRs.
         cuda_version: >-
           ${{

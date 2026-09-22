@@ -50,10 +50,10 @@ RUN cd /opt/ansible && \
       spank_nccl_inspector_preconf.yml
 
 # Install kubectl
+ARG KUBECTL_VERSION=v1.36.4
 RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
-    KUBECTL_VERSION="$(curl -Ls https://dl.k8s.io/release/stable.txt)" && \
     echo "Downloading kubectl from https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
-    curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
+    curl -fsSLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
     rm kubectl
 
