@@ -37,6 +37,38 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 	}, cluster)
 }
 
+func TestKubectlClientReadyWorkloadPodName(t *testing.T) {
+	selector := "app.kubernetes.io/instance=soperator,app.kubernetes.io/component=login"
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00pods\x00-n\x00soperator\x00-l\x00" + selector + "\x00-o\x00json": `{
+			"items": [
+				{"metadata": {"name": "soperator-login-1"}, "status": {"phase": "Running", "conditions": [{"type": "Ready", "status": "True"}]}},
+				{"metadata": {"name": "soperator-login-0"}, "status": {"phase": "Running", "conditions": [{"type": "Ready", "status": "True"}]}},
+				{"metadata": {"name": "login-0"}, "status": {"phase": "Pending", "conditions": [{"type": "Ready", "status": "False"}]}}
+			]
+		}`,
+	}}
+
+	podName, err := NewKubectlClient(exec).ReadyWorkloadPodName(t.Context(), "soperator", "login")
+	require.NoError(t, err)
+	assert.Equal(t, "soperator-login-0", podName)
+}
+
+func TestKubectlClientReadyWorkloadPodNameSupportsUnprefixedPods(t *testing.T) {
+	selector := "app.kubernetes.io/instance=soperator,app.kubernetes.io/component=controller"
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00pods\x00-n\x00soperator\x00-l\x00" + selector + "\x00-o\x00json": `{
+			"items": [
+				{"metadata": {"name": "controller-0"}, "status": {"phase": "Running", "conditions": [{"type": "Ready", "status": "True"}]}}
+			]
+		}`,
+	}}
+
+	podName, err := NewKubectlClient(exec).ReadyWorkloadPodName(t.Context(), "soperator", "controller")
+	require.NoError(t, err)
+	assert.Equal(t, "controller-0", podName)
+}
+
 func TestKubectlClientSlurmClusterRejectsEmptyName(t *testing.T) {
 	_, err := NewKubectlClient(&kubectlClientTestExec{}).SlurmCluster(t.Context(), " ")
 	assert.ErrorContains(t, err, "name is empty")

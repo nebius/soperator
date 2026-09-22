@@ -29,8 +29,7 @@ func TestPublicRunnerAPIIsImportable(t *testing.T) {
 }
 
 func TestPublicRuntimeAPIIsImportable(t *testing.T) {
-	runtime, err := acceptance.NewRuntime("dev-context", "soperator", "5.0.0")
-	require.NoError(t, err)
+	runtime := acceptance.NewRuntime("dev-context", "soperator")
 	assert.NotNil(t, runtime)
 }
 

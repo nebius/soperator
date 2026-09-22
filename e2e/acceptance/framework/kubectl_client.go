@@ -66,6 +66,41 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 	}, nil
 }
 
+func (c *KubectlClient) ReadyWorkloadPodName(ctx context.Context, clusterName, component string) (string, error) {
+	clusterName = strings.TrimSpace(clusterName)
+	if clusterName == "" {
+		return "", fmt.Errorf("SlurmCluster name is empty")
+	}
+	component = strings.TrimSpace(component)
+	if component == "" {
+		return "", fmt.Errorf("workload component is empty")
+	}
+
+	selector := fmt.Sprintf(
+		"app.kubernetes.io/instance=%s,app.kubernetes.io/component=%s",
+		clusterName,
+		component,
+	)
+	var pods corev1.PodList
+	if err := c.GetJSON(ctx, &pods,
+		"get", "pods", "-n", SoperatorNamespace, "-l", selector, "-o", "json"); err != nil {
+		return "", fmt.Errorf("list %s pods for SlurmCluster %s: %w", component, clusterName, err)
+	}
+
+	var readyPods []string
+	for _, pod := range pods.Items {
+		if pod.DeletionTimestamp == nil && pod.Status.Phase == corev1.PodRunning && kubeobjects.PodReady(pod) {
+			readyPods = append(readyPods, pod.Name)
+		}
+	}
+	if len(readyPods) == 0 {
+		return "", fmt.Errorf("no Ready %s pods found for SlurmCluster %s", component, clusterName)
+	}
+
+	sort.Strings(readyPods)
+	return readyPods[0], nil
+}
+
 func (c *KubectlClient) PatchSlurmClusterCustomConfig(ctx context.Context, name string, value *string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {

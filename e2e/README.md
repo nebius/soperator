@@ -124,7 +124,6 @@ Collect a reusable cluster snapshot before or after acceptance:
 bin/acceptance collect-artifacts \
   --kubectl-context <dev-context> \
   --slurm-cluster-name soperator \
-  --soperator-version 5.0.0 \
   --output-dir e2e-artifacts/snapshots/before-destroy
 ```
 

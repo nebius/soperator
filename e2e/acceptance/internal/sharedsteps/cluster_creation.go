@@ -405,8 +405,12 @@ func (s *ClusterCreation) checkJailUserHome(ctx context.Context, user string) er
 }
 
 func (s *ClusterCreation) checkWelcomeOutput(ctx context.Context) error {
+	podName, err := s.kubectl.ReadyWorkloadPodName(ctx, s.info.SlurmClusterName, "login")
+	if err != nil {
+		return fmt.Errorf("find Ready login pod: %w", err)
+	}
 	output, err := s.runtime.Kubectl().RunWithDefaultRetry(ctx,
-		"exec", "-n", framework.SoperatorNamespace, s.info.PodName("login-0"), "--", "sh", "-lc",
+		"exec", "-n", framework.SoperatorNamespace, podName, "--", "sh", "-lc",
 		"/etc/update-motd.d/00-welcome && /etc/update-motd.d/20-slurm-stats")
 	if err != nil {
 		return fmt.Errorf("render welcome output: %w", err)
