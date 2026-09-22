@@ -606,7 +606,7 @@ jobs:
       - name: Free Disk Space on runner
         uses: jlumbroso/free-disk-space@v2.0.0
         with:
-          tool-cache: true
+          preinstalled-runtimes: true
           android: true
           dotnet: true
           haskell: true
