@@ -1,0 +1,1925 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "dashboard",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [
+        "soperator"
+      ],
+      "targetBlank": false,
+      "title": "Soperator dashboards",
+      "tooltip": "Open related cluster and worker dashboards",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Rollout overview",
+      "type": "row",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 2,
+      "title": "Active rollouts",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "description": "NodeSets with an active rollout or worker replacement. Cordoned worker handoff and drain cleanup keep the rollout active even when no pods have an outdated revision. Duplicate scrape targets are reduced by max over the full NodeSet identity.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "blue",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_active{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"}))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 3,
+      "title": "Outdated worker pods",
+      "type": "stat",
+      "gridPos": {
+        "x": 4,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "description": "Worker pods that still need the target revision. This count can decrease when pods are deleted, before replacements become Ready. Zero backlog does not imply completion; also inspect Active rollouts and wait reasons.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "blue",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_outdated_pods{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"}))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 4,
+      "title": "Waiting NodeSets",
+      "type": "stat",
+      "gridPos": {
+        "x": 9,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "description": "NodeSets reporting at least one controller blocker, including errors observed while inactive. A NodeSet is counted once. A blocker can prevent new actions while existing worker replacements continue; inspect the stage counts above the table.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"}))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 5,
+      "title": "NodeSets with errors",
+      "type": "stat",
+      "gridPos": {
+        "x": 14,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "description": "NodeSets reporting a reconcile error, unavailable Slurm dependency, or missing Slurm node, including errors observed while inactive. Each NodeSet counts once. This is current state, not an error counter.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=~\"reconcile_error|slurm_unavailable|slurm_node_missing\"}))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 6,
+      "title": "Longest observed time without progress",
+      "type": "stat",
+      "gridPos": {
+        "x": 19,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "description": "Time since rollout start or progress observed by the current operator process, for active rollouts with a known timestamp. This clock is held in memory and resets on operator restart; it does not include waiting before the current observation lifetime. Inactive rollouts and missing or zero timestamps have no age. Check Active rollouts and scrape health. Amber/red at 10/30 minutes are visual guides, not rollout timeouts.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 600
+              },
+              {
+                "color": "red",
+                "value": 1800
+              }
+            ]
+          },
+          "unit": "s",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max(clamp_min(time() - (max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_last_progress_timestamp_seconds{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"}) > 0), 0) and on (cluster, resource_namespace, slurm_cluster, nodeset) (max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_active{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"}) > 0))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 18,
+      "title": "Workers by rollout stage",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 12
+      },
+      "description": "Actual worker counts by mutually exclusive lifecycle stage, aggregated across the selected NodeSets after deduplicating scrape targets. Several stages can be present concurrently. Each stage is shown as a separate line with points. The sum of the series counts each observed Pod once, including terminating Pods, plus desired worker slots with no Pod; for a complete observation this sum is max(desired workers, observed Pods). Waiting for a replacement pod is a synthetic slot count. State not confirmed indicates an unavailable or unfinished observation. This chart shows work in progress; the separate controller-blocker timeline shows only the dominant reason another action cannot proceed. Restoring Slurm scheduling means confirming removal of rollout-related drain or reboot state, not filesystem cleanup. Use the legend to isolate stages or hide Ready and Queued when focusing on the smaller in-progress stages.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Workers / pending slots",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "always",
+            "spanNulls": false,
+            "stacking": {
+              "group": "workers",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ready"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Ready at target revision"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "waiting_for_slot"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Queued for an update slot"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FADE2A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "waiting_for_jobs"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Finishing running jobs"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF9830"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "waiting_for_slurm"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Waiting for Slurm handoff"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6ED0E0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "stopping_worker"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Waiting for worker shutdown"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#B877D9"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "waiting_for_eviction"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Waiting for external eviction"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8F3BB8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "deleting_pod"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Deleting old pod"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "starting_pod"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Starting new pod"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "waiting_for_pod"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Waiting for a replacement pod"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8AB8FF"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "restoring_slurm"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Restoring Slurm scheduling"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2DABAB"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "missing_slurm_node"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Worker missing in Slurm"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E02F44"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "blocked"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Replacement blocked"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#C4162A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "unknown"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "State not confirmed"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8E8E8E"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum by (stage) (max by (cluster, resource_namespace, slurm_cluster, nodeset, stage) (soperator_rollout_workers{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"}))",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{stage}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc",
+          "hideZeros": false
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Rollout progress by NodeSet",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 24,
+        "h": 9
+      },
+      "description": "One row per physical cluster / resource namespace / SlurmCluster / NodeSet. Duplicate scrape targets are collapsed before joining on that complete identity. Controller blocker is one dominant reason the next action is waiting; it does not describe all workers. Use Workers by rollout stage to see queued and in-flight workers together. Outdated pods are revision backlog, not Ready capacity. Age is available only for active rollouts with a known timestamp, and covers the current operator process lifetime; it resets on restart.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Active"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "No",
+                        "color": "green"
+                      },
+                      "1": {
+                        "text": "Yes",
+                        "color": "blue"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Controller blocker"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "No blocker",
+                        "color": "green"
+                      },
+                      "1": {
+                        "text": "New pods not Ready",
+                        "color": "orange"
+                      },
+                      "2": {
+                        "text": "Restoring Slurm scheduling/registration",
+                        "color": "blue"
+                      },
+                      "3": {
+                        "text": "Waiting for Slurm to release worker",
+                        "color": "blue"
+                      },
+                      "4": {
+                        "text": "Waiting for worker shutdown",
+                        "color": "purple"
+                      },
+                      "5": {
+                        "text": "Queued: update limit reached",
+                        "color": "yellow"
+                      },
+                      "6": {
+                        "text": "Waiting for external eviction",
+                        "color": "yellow"
+                      },
+                      "7": {
+                        "text": "Waiting for safe replacement",
+                        "color": "orange"
+                      },
+                      "8": {
+                        "text": "Worker missing in Slurm",
+                        "color": "red"
+                      },
+                      "9": {
+                        "text": "Slurm API unavailable",
+                        "color": "red"
+                      },
+                      "10": {
+                        "text": "Kubernetes/reconcile error",
+                        "color": "red"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "No progress age"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 600
+                    },
+                    {
+                      "color": "red",
+                      "value": 1800
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (rollout) (label_join((max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_active{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"})), \"rollout\", \"/\", \"cluster\", \"resource_namespace\", \"slurm_cluster\", \"nodeset\"))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "A",
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (rollout) (label_join((max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_outdated_pods{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"})), \"rollout\", \"/\", \"cluster\", \"resource_namespace\", \"slurm_cluster\", \"nodeset\"))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "B",
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (rollout) (label_join((max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_available_slots{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"})), \"rollout\", \"/\", \"cluster\", \"resource_namespace\", \"slurm_cluster\", \"nodeset\"))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "C",
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (rollout) (label_join((max by (cluster, resource_namespace, slurm_cluster, nodeset) ((1 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"pods_not_ready\"})) or (2 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"cleanup_pending\"})) or (3 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"reboot_pending\"})) or (4 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"handoff_pending\"})) or (5 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"budget_exhausted\"})) or (6 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"eviction_pending\"})) or (7 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"safety_pending\"})) or (8 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"slurm_node_missing\"})) or (9 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"slurm_unavailable\"})) or (10 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"reconcile_error\"})))), \"rollout\", \"/\", \"cluster\", \"resource_namespace\", \"slurm_cluster\", \"nodeset\"))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "D",
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (rollout) (label_join((clamp_min(time() - (max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_last_progress_timestamp_seconds{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"}) > 0), 0) and on (cluster, resource_namespace, slurm_cluster, nodeset) (max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_active{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"}) > 0)), \"rollout\", \"/\", \"cluster\", \"resource_namespace\", \"slurm_cluster\", \"nodeset\"))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "E",
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "rollout",
+            "mode": "outerTabular"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "rollout",
+                "Value #A",
+                "Value #B",
+                "Value #C",
+                "Value #D",
+                "Value #E"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "rollout": 0,
+              "Value #A": 1,
+              "Value #B": 2,
+              "Value #C": 3,
+              "Value #D": 4,
+              "Value #E": 5
+            },
+            "renameByName": {
+              "rollout": "Cluster / namespace / SlurmCluster / NodeSet",
+              "Value #A": "Active",
+              "Value #B": "Outdated pods",
+              "Value #C": "Available slots",
+              "Value #D": "Controller blocker",
+              "Value #E": "No progress age"
+            }
+          }
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "No progress age",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false,
+          "enablePagination": true
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Controller blocker by NodeSet",
+      "type": "state-timeline",
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 5
+      },
+      "description": "Secondary view: one dominant blocker per NodeSet, not a worker lifecycle stage. Queued: update limit reached means the controller cannot start more replacements while other workers may still be doing useful work; see Workers by rollout stage. Restoring Slurm scheduling/registration means confirming rollout-related Slurm state or worker registration, including removal of stale DRAIN when applicable; it is not filesystem cleanup. When scrape targets disagree, the highest controller priority wins. Observed zero is No blocker; missing telemetry stays a gap.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "No blocker",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "New pods not Ready",
+                  "color": "orange"
+                },
+                "2": {
+                  "text": "Restoring Slurm scheduling/registration",
+                  "color": "blue"
+                },
+                "3": {
+                  "text": "Waiting for Slurm to release worker",
+                  "color": "blue"
+                },
+                "4": {
+                  "text": "Waiting for worker shutdown",
+                  "color": "purple"
+                },
+                "5": {
+                  "text": "Queued: update limit reached",
+                  "color": "yellow"
+                },
+                "6": {
+                  "text": "Waiting for external eviction",
+                  "color": "yellow"
+                },
+                "7": {
+                  "text": "Waiting for safe replacement",
+                  "color": "orange"
+                },
+                "8": {
+                  "text": "Worker missing in Slurm",
+                  "color": "red"
+                },
+                "9": {
+                  "text": "Slurm API unavailable",
+                  "color": "red"
+                },
+                "10": {
+                  "text": "Kubernetes/reconcile error",
+                  "color": "red"
+                }
+              }
+            }
+          ],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 85,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (cluster, resource_namespace, slurm_cluster, nodeset) ((1 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"pods_not_ready\"})) or (2 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"cleanup_pending\"})) or (3 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"reboot_pending\"})) or (4 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"handoff_pending\"})) or (5 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"budget_exhausted\"})) or (6 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"eviction_pending\"})) or (7 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"safety_pending\"})) or (8 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"slurm_node_missing\"})) or (9 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"slurm_unavailable\"})) or (10 * max by (cluster, resource_namespace, slurm_cluster, nodeset, reason) (soperator_rollout_waiting{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\", reason=\"reconcile_error\"})))",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{cluster}} / {{resource_namespace}} / {{slurm_cluster}} / {{nodeset}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "alignValue": "left",
+        "mergeValues": true,
+        "rowHeight": 0.85,
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Outdated pods over time",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Revision backlog per NodeSet, deduplicated by logical identity. Falling backlog shows replacement progress, but does not guarantee the replacements are Ready.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_outdated_pods{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"})",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{cluster}} / {{resource_namespace}} / {{slurm_cluster}} / {{nodeset}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Available rollout slots",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 31,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Additional workers the controller can start replacing under the concurrent update limit. Zero means no new replacement can start, even while other workers progress through jobs, shutdown, deletion or startup. Use Workers by rollout stage to see that in-flight work.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (cluster, resource_namespace, slurm_cluster, nodeset) (soperator_rollout_available_slots{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", nodeset=~\"${nodeset:regex}\"})",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{cluster}} / {{resource_namespace}} / {{slurm_cluster}} / {{nodeset}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Controller runtime \u00b7 process scope",
+      "type": "row",
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 12,
+          "title": "Returned reconcile errors / second",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 0,
+            "y": 40,
+            "w": 8,
+            "h": 7
+          },
+          "description": "Rolling-update controller process metrics. Only the physical cluster filter applies; namespace, SlurmCluster and NodeSet filters do not. Separate series identify job/instance; missing series remain No data. The current rolling-update controller logs operational errors and returns nil to retain its configured polling interval; this runtime counter can remain zero during those failures. Use NodeSets with errors and the wait reason table for rollout failures.",
+          "pluginVersion": "11.5.1",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "No data",
+              "mappings": [],
+              "min": 0,
+              "color": {
+                "mode": "palette-classic"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "ops",
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "stepAfter",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "max by (cluster, job, instance) (rate(controller_runtime_reconcile_errors_total{cluster=~\"$cluster\", controller=\"rollingupdate\"}[$__rate_interval]))",
+              "instant": false,
+              "range": true,
+              "legendFormat": "{{cluster}} / {{job}} / {{instance}}",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 13,
+          "title": "Reconcile duration \u00b7 p95",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 8,
+            "y": 40,
+            "w": 8,
+            "h": 7
+          },
+          "description": "Rolling-update controller process metrics. Only the physical cluster filter applies; namespace, SlurmCluster and NodeSet filters do not. Separate series identify job/instance; missing series remain No data. Includes successful, waiting and failed reconciles; it is not end-to-end rollout duration.",
+          "pluginVersion": "11.5.1",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "No data",
+              "mappings": [],
+              "min": 0,
+              "color": {
+                "mode": "palette-classic"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "s",
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "stepAfter",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "histogram_quantile(0.95, max by (cluster, job, instance, le) (rate(controller_runtime_reconcile_time_seconds_bucket{cluster=~\"$cluster\", controller=\"rollingupdate\"}[$__rate_interval])))",
+              "instant": false,
+              "range": true,
+              "legendFormat": "{{cluster}} / {{job}} / {{instance}}",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 14,
+          "title": "Workqueue depth",
+          "type": "timeseries",
+          "gridPos": {
+            "x": 16,
+            "y": 40,
+            "w": 8,
+            "h": 7
+          },
+          "description": "Rolling-update controller process metrics. Only the physical cluster filter applies; namespace, SlurmCluster and NodeSet filters do not. Separate series identify job/instance; missing series remain No data.",
+          "pluginVersion": "11.5.1",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "No data",
+              "mappings": [],
+              "min": 0,
+              "color": {
+                "mode": "palette-classic"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "short",
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "stepAfter",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "max by (cluster, job, instance) (workqueue_depth{cluster=~\"$cluster\", name=\"rollingupdate\"})",
+              "instant": false,
+              "range": true,
+              "legendFormat": "{{cluster}} / {{job}} / {{instance}}",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "legend": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "title": "Definitions and troubleshooting",
+      "type": "row",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 17,
+          "title": "Worker stages and controller blockers",
+          "type": "text",
+          "gridPos": {
+            "x": 0,
+            "y": 41,
+            "w": 24,
+            "h": 30
+          },
+          "description": "",
+          "pluginVersion": "11.5.1",
+          "options": {
+            "mode": "markdown",
+            "content": "The separate lines with points show **what workers are doing**. Each observed Pod appears in one stage; missing desired Pod slots have their own stage. Each line shows a stage count, not a percentage; summing the series gives the total observed workers and missing desired Pod slots. Use the legend to isolate stages or hide Ready/Queued to focus on in-progress workers. A NodeSet can have workers in several stages at once. The table and timeline instead show one **controller blocker**: why the next action cannot proceed.\n\n**Worker stages**\n\n| Stage | Meaning |\n| --- | --- |\n| Ready at target revision | Pod is Ready at the target revision, with no known replacement handoff or Slurm restoration pending. |\n| Queued for an update slot | Replacement has not started because the concurrent update limit is full. |\n| Finishing running jobs | Slurm acknowledged the request; allocated CPU/memory or job completion work is still present. |\n| Waiting for Slurm handoff | Slurm acknowledged the request; no running-job evidence was observed, and shutdown has not been issued. |\n| Waiting for worker shutdown | Slurm issued the reboot; the worker has not yet acknowledged that it can be replaced. |\n| Waiting for external eviction | A cordoned worker has finished its handoff; the external drainer must evict its Pod. |\n| Deleting old pod | Pod deletion was accepted or the Pod is terminating. It remains counted once until it disappears. |\n| Starting new pod | The target-revision Pod exists but is not Ready yet. |\n| Waiting for a replacement pod | A desired worker slot has no Pod yet. This is a missing slot, not an existing worker. |\n| Restoring Slurm scheduling | Rollout-related drain or reboot state remains; the controller is restoring scheduling and confirming the updated Slurm state. |\n| Worker missing in Slurm | A successful Slurm listing did not contain this worker. |\n| Replacement blocked | Replacement is not yet safe, or a worker action failed. Inspect the controller blocker and operator logs. |\n| State not confirmed | The controller could not confirm the worker state, or has not visited it in this observation. |\n\n**Controller blockers**\n\n| Blocker | Meaning |\n| --- | --- |\n| New pods not Ready | Replacement Pods are present or expected, but the desired Ready state has not been observed. |\n| Restoring Slurm scheduling/registration | The controller is confirming rollout-related Slurm state or worker registration, including removal of stale DRAIN when applicable. This does not mean filesystem cleanup. |\n| Waiting for Slurm to release worker | A requested Slurm handoff has not advanced to worker shutdown. Check the stage chart to distinguish running jobs from other Slurm waits. |\n| Waiting for worker shutdown | Slurm has issued the reboot, but worker shutdown acknowledgement is still pending. |\n| Queued: update limit reached | The concurrent update limit is full, so more workers cannot start. Other workers can still be finishing jobs, shutting down, or starting. |\n| Waiting for external eviction | A cordoned worker is ready for replacement, but an external drainer must evict its Pod. |\n| Waiting for safe replacement | The controller has not confirmed the worker is safely offline with no allocated resources. |\n| Worker missing in Slurm | A successful Slurm listing did not contain a worker needed for the next action. |\n| Slurm API unavailable | The Slurm dependency could not be queried or an API action failed. |\n| Kubernetes/reconcile error | A Kubernetes operation or another reconcile step failed; inspect the operator logs. |\n\n**Progress and missing data:** progress age is stored in memory and resets with the operator process. It covers the current observation lifetime, not earlier waiting. Missing metrics stay No data; check the operator scrape, datasource and filters. Unknown worker stages are not counted as Ready. Zero outdated pods does not imply completion.\n\n**Scope and debugging:** worker metrics follow the selected physical cluster, resource namespace, SlurmCluster and NodeSet. Use the operator logs for the affected namespace and worker StatefulSet to investigate a blocker. Controller-runtime panels apply only to the physical cluster and process. Fixed polling returns nil after logging operational failures, so its generic returned-error counter may stay zero; use NodeSets with errors and Controller blocker for those failures. For manual imports, `var-datasource=<UID>` selects another datasource; optional `var-cluster=<physical-cluster>` narrows the hidden cluster scope."
+          }
+        }
+      ]
+    }
+  ],
+  "preload": false,
+  "refresh": "30s",
+  "schemaVersion": 40,
+  "tags": [
+    "nebius",
+    "soperator",
+    "operator",
+    "rollouts"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "VictoriaMetrics",
+          "value": "VictoriaMetrics"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "label": "Datasource",
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "type": "datasource"
+      },
+      {
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "filters": [],
+        "hide": 2,
+        "label": "O11y",
+        "name": "o11y",
+        "type": "adhoc"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(soperator_rollout_active, cluster)",
+        "hide": 2,
+        "includeAll": true,
+        "label": "Physical cluster",
+        "multi": true,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "query": "label_values(soperator_rollout_active, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery",
+          "qryType": 1
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query",
+        "description": "Infrastructure cluster from the optional external cluster label, distinct from a SlurmCluster CR. O11y can set this hidden variable; a local datasource without the label uses All. For manual scope selection, set var-cluster in the dashboard URL."
+      },
+      {
+        "name": "resource_namespace",
+        "label": "Resource namespace",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(soperator_rollout_active{cluster=~\"$cluster\"}, resource_namespace)",
+        "query": {
+          "query": "label_values(soperator_rollout_active{cluster=~\"$cluster\"}, resource_namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery",
+          "qryType": 1
+        },
+        "description": "Namespace of the managed NodeSet, not the operator metrics Pod namespace.",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "allowCustomValue": false,
+        "options": [],
+        "refresh": 2,
+        "sort": 1,
+        "regex": ""
+      },
+      {
+        "name": "slurm_cluster",
+        "label": "SlurmCluster",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(soperator_rollout_active{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\"}, slurm_cluster)",
+        "query": {
+          "query": "label_values(soperator_rollout_active{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\"}, slurm_cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery",
+          "qryType": 1
+        },
+        "description": "Logical SlurmCluster CR used by rollout telemetry. This filter does not apply to controller process metrics.",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "allowCustomValue": false,
+        "options": [],
+        "refresh": 2,
+        "sort": 1,
+        "regex": ""
+      },
+      {
+        "name": "nodeset",
+        "label": "NodeSet",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(soperator_rollout_active{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\"}, nodeset)",
+        "query": {
+          "query": "label_values(soperator_rollout_active{cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\"}, nodeset)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery",
+          "qryType": 1
+        },
+        "description": "NodeSets in the selected physical cluster, resource namespace and SlurmCluster.",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "allowCustomValue": false,
+        "options": [],
+        "refresh": 2,
+        "sort": 1,
+        "regex": ""
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h"
+    ]
+  },
+  "timezone": "browser",
+  "title": "Soperator / Rollouts",
+  "uid": "soperator_operator_rollouts",
+  "version": 1,
+  "weekStart": ""
+}
