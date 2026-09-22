@@ -1,146 +1,36 @@
-name: "Create GitHub release with automatic changelog"
+# Prepared locally; not installed or dispatched. Requires final requester approval.
+name: Restore original 4.1.8 artifacts and metadata
 
 on:
-  workflow_dispatch:  # Manual trigger via GitHub UI
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type restore-4.1.8 after the approved MAN restoration completes
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: restore-original-4.1.8
+  cancel-in-progress: false
 
 jobs:
-  # First, build the stable release
-  build:
-    name: Build stable release
-    uses: ./.github/workflows/one_job.yml
-    with:
-      unstable: 'false'
-    secrets: inherit
-
-  tag:
-    name: Push new tag
-    needs: build  # Wait for build to complete successfully
-
-    permissions:
-      contents: write
-
-    runs-on: ubuntu-latest
+  restore:
+    if: github.repository == 'nebius/soperator' && github.ref == 'refs/heads/users/yozel/restore-4.1.8-metadata' && inputs.confirmation == 'restore-4.1.8'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
-      - name: Checkout repository
+      - name: Check out approved recovery branch
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
-
-      - name: Get previous tag from current branch
-        id: get-previous-tag
-        run: |
-          # Get the latest release tag (semantic version) that's reachable from the current commit
-          # Match tags like: 1.2.3 (without 'v' prefix)
-          # Exclude current version to support hotfix re-runs
-          CURRENT_VERSION="$(cat VERSION)"
-          PREV_TAG=$(git tag --merged HEAD^ | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${CURRENT_VERSION}$" | sort -V | tail -1)
-          if [ -z "$PREV_TAG" ]; then
-            echo "Error: No previous release tag found in current branch history"
-            echo "This is unexpected - there should be previous releases in the history"
-            exit 1
-          fi
-          echo "tag=${PREV_TAG}" >> "${GITHUB_OUTPUT}"
-          echo "Found previous tag: ${PREV_TAG}"
-
-      - name: Get version
-        id: get-version
-        run: |
-          VERSION="$(cat VERSION)"
-          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
-
-      - name: Push new tag (force update if exists)
-        run: |
-          VERSION="${{ steps.get-version.outputs.version }}"
-          git tag -f "${VERSION}"
-          git push -f origin "${VERSION}"
-
-    outputs:
-      previous-tag: ${{ steps.get-previous-tag.outputs.tag }}
-      new-tag: ${{ steps.get-version.outputs.version }}
-
-  release:
-    name: Create release
-    needs: tag
-
-    permissions:
-      pull-requests: read
-      contents: write
-
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          fetch-depth: 0
-
-      - name: Generate changelog
-        id: changelog
-        uses: mikepenz/release-changelog-builder-action@a34a8009a9588bb86b02a873cf592440e96a5da8 # v5
-        with:
-          mode: "PR"
-          fromTag: ${{ needs.tag.outputs.previous-tag }}
-          toTag: ${{ needs.tag.outputs.new-tag }}
-          configurationJson: |
-            {
-              "template": "#{{CHANGELOG}}\n\nContributors:\n#{{CONTRIBUTORS}}",
-              "categories": [
-                {
-                    "key": "features",
-                    "title": "## 🚀 Features",
-                    "labels": ["feat", "feature"]
-                },
-                {
-                    "key": "tests",
-                    "title": "## 🧪 Tests",
-                    "labels": ["test"]
-                },
-                {
-                    "key": "fixes",
-                    "title": "## 🐛 Fixes",
-                    "labels": ["fix", "bug"]
-                },
-                {
-                    "key": "dependencies",
-                    "title": "## 📦 Dependencies",
-                    "labels": ["dependencies", "deps"]
-                },
-                {
-                    "key": "docs",
-                    "title": "## 📔Docs",
-                    "labels": ["doc", "docs", "documentation"]
-                },
-                {
-                    "key": "other",
-                    "title": "## Other",
-                    "labels": []
-                }
-              ],
-              "ignore_labels": [
-                  "ignore-for-release"
-              ],
-              "label_extractor": [
-                {
-                  "pattern": "^(other|docs|doc|dependencies|deps|feat|feature|fix|bug|test|.*)",
-                  "target": "$1"
-                }
-              ]
-            }
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create GitHub Release with changelog
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
+          token: ${{ github.token }}
+      - name: Restore exact GHCR manifests and Git metadata
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ needs.tag.outputs.new-tag }}
-          name: ${{ needs.tag.outputs.new-tag }}
-          draft: false
-          prerelease: false
-          body: |
-            Changes made since version `${{ steps.changelog.outputs.fromTag }}` prior to version `${{ steps.changelog.outputs.toTag }}`:
-
-            ${{ steps.changelog.outputs.changelog }}
-
-            | 📁 **Categorized PRs** | 📂 **Uncategorized PRs** | 📥 **Commits** | ➕ **Lines added** | ➖ **Lines deleted** |
-            | :---: | :---: | :---: | :---: | :---: |
-            | ${{ steps.changelog.outputs.categorized_prs }} | ${{ steps.changelog.outputs.uncategorized_prs }} | ${{ steps.changelog.outputs.commits }} | ${{ steps.changelog.outputs.additions }} | ${{ steps.changelog.outputs.deletions }} |
+          GH_TOKEN: ${{ github.token }}
+          ROLLBACK_CONFIRMATION: ${{ inputs.confirmation }}
+        run: python3 .github/workflows/scripts/recovery_ci.py
