@@ -55,6 +55,9 @@ func cleanupFromBundle(ctx context.Context, cfg Config) error {
 		return err
 	}
 	defer cleanup()
+	if err := overrideTerraformBackendS3Endpoint(workdir, cfg.Profile.TerraformBackendS3Endpoint); err != nil {
+		return err
+	}
 
 	execPath, err := exec.LookPath("terraform")
 	if err != nil {
