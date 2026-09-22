@@ -191,34 +191,12 @@ func renderContainerNodeSetSlurmd(
 
 	for _, env := range nodeSet.ContainerSlurmd.CustomEnv {
 		switch env.Name {
-		case consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes, consts.EnvPAMSlurmAdoptEnabled:
+		case consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes:
 			return corev1.Container{}, fmt.Errorf("environment variable %q is managed by Soperator", env.Name)
 		}
 	}
 
 	realMemoryBytes := common.RenderRealMemorySlurmd(resources) * 1024 * 1024
-
-	env := append(
-		append(
-			renderNodeSetSlurmdEnv(
-				cgroupVersion,
-				clusterWithGPU,
-				nodeSet.GPU.Enabled,
-				nodeSet.GPU.Nvidia.GDRCopyEnabled,
-				nodeSet.DockerEnabled,
-				nodeSet.NodeExtra,
-				realMemoryBytes,
-			),
-			renderSlurmdTopologyEnv(topologyEnabled)...,
-		),
-		nodeSet.ContainerSlurmd.CustomEnv...,
-	)
-	if nodeSet.PAMSlurmAdopt.Enabled {
-		env = append(env, corev1.EnvVar{
-			Name:  consts.EnvPAMSlurmAdoptEnabled,
-			Value: "true",
-		})
-	}
 
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
@@ -226,7 +204,21 @@ func renderContainerNodeSetSlurmd(
 		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
 		Command:         nodeSet.ContainerSlurmd.Command,
 		Args:            nodeSet.ContainerSlurmd.Args,
-		Env:             env,
+		Env: append(
+			append(
+				renderNodeSetSlurmdEnv(
+					cgroupVersion,
+					clusterWithGPU,
+					nodeSet.GPU.Enabled,
+					nodeSet.GPU.Nvidia.GDRCopyEnabled,
+					nodeSet.DockerEnabled,
+					nodeSet.NodeExtra,
+					realMemoryBytes,
+				),
+				renderSlurmdTopologyEnv(topologyEnabled)...,
+			),
+			nodeSet.ContainerSlurmd.CustomEnv...,
+		),
 		Ports: []corev1.ContainerPort{{
 			Name:          nodeSet.ContainerSlurmd.Name,
 			ContainerPort: nodeSet.ContainerSlurmd.Port,

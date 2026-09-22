@@ -222,8 +222,7 @@ topology: null
 customSlurmConfig: ""
 customCgroupConfig: ""
 pamSlurmAdopt:
-  enabled: false
-  actionUnknown: newest
+  enabled: true
   exemptUsers: []
   exemptGroups: []
 mpiConfig:

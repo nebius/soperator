@@ -127,10 +127,7 @@ func generatePAMSlurmAdoptConfig(config values.PAMSlurmAdopt) renderutils.Config
 			consts.VolumeMountPathPAMSlurmAdoptGroups,
 		))
 	}
-	res.AddLine(fmt.Sprintf(
-		"-account required pam_slurm_adopt.so action_no_jobs=deny action_unknown=%s action_adopt_failure=deny action_generic_failure=deny disable_x11=1 join_container=false",
-		config.ActionUnknown,
-	))
+	res.AddLine("-account required pam_slurm_adopt.so action_no_jobs=deny action_unknown=newest action_adopt_failure=deny action_generic_failure=deny disable_x11=1 join_container=false")
 	return res
 }
 

@@ -82,12 +82,6 @@ NodeSets using `updateStrategy: slurmAwareRollingUpdate` coordinate worker repla
 with Slurm so running jobs can finish. See [Worker and node rollout](worker-node-rollout.md) for configuration and behavior.
 
 
-### Worker SSH Job Adoption
-
-Worker SSH can be restricted to users with running jobs and adopted into each job's constrained Slurm cgroup. See
-[Worker SSH adoption with pam_slurm_adopt](pam-slurm-adopt.md) for configuration, exemptions, rollout, and validation.
-
-
 ### Easy Scaling
 This solution allows Slurm to reuse the unique Kubernetes' ability to scale automatically depending on the current
 needs. You can simply change a single value in the YAML manifest, and watch the cluster changes in size.

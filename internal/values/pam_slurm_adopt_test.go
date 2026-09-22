@@ -10,27 +10,24 @@ import (
 )
 
 func TestBuildPAMSlurmAdoptFrom(t *testing.T) {
-	t.Run("defaults disabled configuration", func(t *testing.T) {
+	t.Run("defaults to enabled", func(t *testing.T) {
 		result := buildPAMSlurmAdoptFrom(nil)
 
-		assert.False(t, result.Enabled)
-		assert.Equal(t, slurmv1.PAMSlurmAdoptActionUnknownNewest, result.ActionUnknown)
+		assert.True(t, result.Enabled)
 		assert.Empty(t, result.ExemptUsers)
 		assert.Empty(t, result.ExemptGroups)
 	})
 
-	t.Run("preserves enabled configuration", func(t *testing.T) {
+	t.Run("preserves configuration", func(t *testing.T) {
 		config := &slurmv1.PAMSlurmAdopt{
-			Enabled:       ptr.To(true),
-			ActionUnknown: slurmv1.PAMSlurmAdoptActionUnknownDeny,
-			ExemptUsers:   []string{"service-user"},
-			ExemptGroups:  []string{"cluster-admins"},
+			Enabled:      ptr.To(true),
+			ExemptUsers:  []string{"service-user"},
+			ExemptGroups: []string{"cluster-admins"},
 		}
 
 		result := buildPAMSlurmAdoptFrom(config)
 
 		assert.True(t, result.Enabled)
-		assert.Equal(t, slurmv1.PAMSlurmAdoptActionUnknownDeny, result.ActionUnknown)
 		assert.Equal(t, config.ExemptUsers, result.ExemptUsers)
 		assert.Equal(t, config.ExemptGroups, result.ExemptGroups)
 
@@ -38,5 +35,11 @@ func TestBuildPAMSlurmAdoptFrom(t *testing.T) {
 		config.ExemptGroups[0] = "changed"
 		assert.Equal(t, []string{"service-user"}, result.ExemptUsers)
 		assert.Equal(t, []string{"cluster-admins"}, result.ExemptGroups)
+	})
+
+	t.Run("can be disabled", func(t *testing.T) {
+		result := buildPAMSlurmAdoptFrom(&slurmv1.PAMSlurmAdopt{Enabled: ptr.To(false)})
+
+		assert.False(t, result.Enabled)
 	})
 }

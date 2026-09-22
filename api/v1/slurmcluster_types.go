@@ -127,31 +127,13 @@ type SlurmClusterSpec struct {
 	HealthCheckConfig *HealthCheckConfig `json:"healthCheckConfig,omitempty"`
 }
 
-// PAMSlurmAdoptActionUnknown defines how pam_slurm_adopt handles an ambiguous choice between jobs.
-type PAMSlurmAdoptActionUnknown string
-
-const (
-	// PAMSlurmAdoptActionUnknownNewest adopts the SSH session into the newest eligible job.
-	PAMSlurmAdoptActionUnknownNewest PAMSlurmAdoptActionUnknown = "newest"
-	// PAMSlurmAdoptActionUnknownDeny rejects the SSH session when its job cannot be identified.
-	PAMSlurmAdoptActionUnknownDeny PAMSlurmAdoptActionUnknown = "deny"
-)
-
 // PAMSlurmAdopt defines access and adoption policy for SSH sessions on worker nodes.
 type PAMSlurmAdopt struct {
 	// Enabled requires non-root SSH users to own a running job on the target worker.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
+	// +kubebuilder:default=true
 	Enabled *bool `json:"enabled,omitempty"`
-
-	// ActionUnknown controls behavior when a user owns multiple jobs on the worker and Slurm cannot
-	// identify which job originated the SSH connection.
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Enum=newest;deny
-	// +kubebuilder:default="newest"
-	ActionUnknown PAMSlurmAdoptActionUnknown `json:"actionUnknown,omitempty"`
 
 	// ExemptUsers lists non-root users that may SSH to workers without a running job. Their sessions
 	// are not adopted into a job cgroup.

@@ -127,7 +127,6 @@ COPY images/common/scripts/bind_slurm_common.sh /opt/bin/slurm/
 
 # Copy script for preparing an SSHD configuration compatible with the PAM jail
 COPY images/common/scripts/prepare_sshd_pam_jail_config.sh /opt/bin/slurm/
-COPY images/worker/verify_pam_slurm_adopt.sh /opt/bin/slurm/
 
 # Copy scripts for rebooting K8s nodes and handing off worker operations
 COPY images/common/scripts/reboot.sh /opt/bin/slurm/
@@ -136,7 +135,6 @@ COPY images/common/scripts/worker_handoff.py /opt/bin/slurm/
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh && \
     chmod +x /opt/bin/slurm/prepare_sshd_pam_jail_config.sh && \
-    chmod +x /opt/bin/slurm/verify_pam_slurm_adopt.sh && \
     chmod +x /opt/bin/slurm/reboot.sh && \
     chmod +x /opt/bin/slurm/worker_handoff.py
 
@@ -162,7 +160,12 @@ RUN rm -rf /etc/update-motd.d
 # Keep pam_soperator_jail last: it pivots the per-session sshd process into the
 # jail, so any PAM session modules after it would also run inside the jail.
 COPY --from=worker_pam_builder /out/ /
-RUN touch /etc/pam.d/soperator-pam-slurm-adopt && \
+RUN sed -Ei \
+      's/^[[:space:]]*@include[[:space:]]+common-account[[:space:]]*$/account substack common-account/' \
+      /etc/pam.d/sshd && \
+    grep -Eq '^[[:space:]]*account[[:space:]]+substack[[:space:]]+common-account[[:space:]]*$' \
+      /etc/pam.d/sshd && \
+    touch /etc/pam.d/soperator-pam-slurm-adopt && \
     chmod 0644 /etc/pam.d/soperator-pam-slurm-adopt && \
     echo "@include soperator-pam-slurm-adopt" >> /etc/pam.d/sshd && \
     echo "session required pam_soperator_jail.so /mnt/jail" >> /etc/pam.d/sshd

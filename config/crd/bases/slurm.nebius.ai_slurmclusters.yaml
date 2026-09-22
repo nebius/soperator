@@ -1146,17 +1146,8 @@ spec:
                   PAMSlurmAdopt controls whether SSH sessions on worker nodes must belong to a running Slurm job.
                   Eligible sessions are adopted into the job's external step and inherit its cgroup constraints.
                 properties:
-                  actionUnknown:
-                    default: newest
-                    description: |-
-                      ActionUnknown controls behavior when a user owns multiple jobs on the worker and Slurm cannot
-                      identify which job originated the SSH connection.
-                    enum:
-                    - newest
-                    - deny
-                    type: string
                   enabled:
-                    default: false
+                    default: true
                     description: Enabled requires non-root SSH users to own a running
                       job on the target worker.
                     type: boolean

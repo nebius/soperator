@@ -33,10 +33,9 @@ func TestGenerateSshdConfig_AuthorizedKeysCommandDependsOnSSSD(t *testing.T) {
 func TestRenderConfigMapPAMSlurmAdopt(t *testing.T) {
 	cluster := &values.SlurmCluster{
 		PAMSlurmAdopt: values.PAMSlurmAdopt{
-			Enabled:       true,
-			ActionUnknown: slurmv1.PAMSlurmAdoptActionUnknownDeny,
-			ExemptUsers:   []string{"service-user", `EXAMPLE\domain-user`},
-			ExemptGroups:  []string{"cluster-admins", "platform operators"},
+			Enabled:      true,
+			ExemptUsers:  []string{"service-user", `EXAMPLE\domain-user`},
+			ExemptGroups: []string{"cluster-admins", "platform operators"},
 		},
 	}
 	cluster.Name = "test-cluster"
@@ -52,7 +51,7 @@ func TestRenderConfigMapPAMSlurmAdopt(t *testing.T) {
 	assert.Contains(t, pamConfig,
 		"account sufficient pam_listfile.so item=group sense=allow onerr=fail file=/etc/security/soperator-pam-slurm-adopt-groups")
 	assert.Contains(t, pamConfig, "action_no_jobs=deny")
-	assert.Contains(t, pamConfig, "action_unknown=deny")
+	assert.Contains(t, pamConfig, "action_unknown=newest")
 	assert.Contains(t, pamConfig, "action_adopt_failure=deny")
 	assert.Contains(t, pamConfig, "action_generic_failure=deny")
 	assert.Contains(t, pamConfig, "disable_x11=1")
@@ -66,10 +65,7 @@ func TestRenderConfigMapPAMSlurmAdopt(t *testing.T) {
 
 func TestRenderConfigMapPAMSlurmAdoptWithoutExemptions(t *testing.T) {
 	result := RenderConfigMapPAMSlurmAdopt(&values.SlurmCluster{
-		PAMSlurmAdopt: values.PAMSlurmAdopt{
-			Enabled:       true,
-			ActionUnknown: slurmv1.PAMSlurmAdoptActionUnknownNewest,
-		},
+		PAMSlurmAdopt: values.PAMSlurmAdopt{Enabled: true},
 	})
 
 	assert.NotContains(t, result.Data[consts.ConfigMapKeyPAMSlurmAdopt], "pam_listfile.so")

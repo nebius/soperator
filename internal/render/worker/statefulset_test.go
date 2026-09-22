@@ -868,9 +868,6 @@ func TestRenderNodeSetStatefulSet_PAMSlurmAdopt(t *testing.T) {
 			if !enabled {
 				assert.Nil(t, adoptVolume)
 				assert.Empty(t, adoptMounts)
-				for _, env := range slurmd.Env {
-					assert.NotEqual(t, consts.EnvPAMSlurmAdoptEnabled, env.Name)
-				}
 				return
 			}
 
@@ -888,7 +885,6 @@ func TestRenderNodeSetStatefulSet_PAMSlurmAdopt(t *testing.T) {
 				assert.Equal(t, consts.VolumeMountSubPathPAMSlurmAdoptGroups, adoptMounts[2].SubPath)
 				assert.True(t, adoptMounts[2].ReadOnly)
 			}
-			assertEnvValue(t, slurmd.Env, consts.EnvPAMSlurmAdoptEnabled, "true")
 		})
 	}
 }
@@ -1039,11 +1035,7 @@ func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 		t.Fatal("slurmd container not found")
 	})
 
-	for _, envName := range []string{
-		consts.EnvDockerEnabled,
-		consts.EnvNodeRealMemoryBytes,
-		consts.EnvPAMSlurmAdoptEnabled,
-	} {
+	for _, envName := range []string{consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes} {
 		t.Run("rejects a custom override of "+envName, func(t *testing.T) {
 			nodeSet := createNodeSet()
 			nodeSet.ContainerSlurmd.CustomEnv = []corev1.EnvVar{{
