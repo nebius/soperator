@@ -604,7 +604,7 @@ jobs:
         run: nebius registry configure-helper
 
       - name: Free Disk Space on runner
-        uses: jlumbroso/free-disk-space@v1.3.1
+        uses: jlumbroso/free-disk-space@v2.0.0
         with:
           tool-cache: true
           android: true
