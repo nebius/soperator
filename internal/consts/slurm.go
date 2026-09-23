@@ -11,9 +11,6 @@ const (
 	SlurmUser              = "root"
 	SlurmLogFile           = "/dev/null"
 	SlurmDefaultDebugLevel = "debug"
-
-	// SlurmDefaultResumeTimeout mirrors the CRD default of SlurmConfig.ResumeTimeout, in seconds.
-	SlurmDefaultResumeTimeout = 1800
 )
 
 var (

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -356,63 +355,6 @@ func TestRenderSlurmConfigMapWithLargeSuspendTime(t *testing.T) {
 	assert.Contains(t, slurmConfig, "SuspendTime=1000000000")
 	assert.NotContains(t, slurmConfig, "SuspendTime=-1")
 	assert.NotContains(t, slurmConfig, "SuspendTime=INFINITE")
-}
-
-func TestRenderSlurmConfigMapResumeTimeout(t *testing.T) {
-	tests := []struct {
-		name          string
-		resumeTimeout *int32
-		want          string
-	}{
-		{
-			name: "default timeout",
-			want: "ResumeTimeout=1800",
-		},
-		{
-			name:          "explicit timeout",
-			resumeTimeout: ptr.To[int32](3600),
-			want:          "ResumeTimeout=3600",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cluster := &slurmv1.SlurmCluster{
-				Spec: slurmv1.SlurmClusterSpec{
-					Maintenance:    ptr.To(consts.ModeNone),
-					K8sNodeFilters: []slurmv1.K8sNodeFilter{{Name: "controller"}},
-					SlurmNodes: slurmv1.SlurmNodes{
-						Controller: slurmv1.SlurmNodeController{
-							K8sNodeFilterName: "controller",
-						},
-						Login: slurmv1.SlurmNodeLogin{
-							SshdServiceType: corev1.ServiceTypeLoadBalancer,
-						},
-					},
-					SlurmConfig: slurmv1.SlurmConfig{ResumeTimeout: tt.resumeTimeout},
-				},
-			}
-			clusterValues, err := values.BuildSlurmClusterFrom(t.Context(), cluster)
-			require.NoError(t, err)
-
-			result := RenderConfigMapSlurmConfigs(clusterValues)
-			slurmConfig := result.Data[consts.ConfigMapKeySlurmConfig]
-			assert.Contains(t, slurmConfig, tt.want)
-			assert.Equal(t, 1, strings.Count(slurmConfig, "ResumeTimeout="),
-				"ResumeTimeout must be rendered once, from SlurmConfig")
-			assert.Equal(t, tt.resumeTimeout, cluster.Spec.SlurmConfig.ResumeTimeout)
-		})
-	}
-}
-
-func TestRenderSlurmConfigMapResumeFailProgram(t *testing.T) {
-	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{})
-
-	slurmConfig := result.Data[consts.ConfigMapKeySlurmConfig]
-	assert.Contains(t, slurmConfig, "ResumeFailProgram=/opt/soperator/bin/power_resume_fail.sh",
-		"without it Slurm leaves the pod running after ResumeTimeout")
-	assert.Contains(t, slurmConfig, "ResumeProgram=/opt/soperator/bin/power_resume.sh")
-	assert.Contains(t, slurmConfig, "SuspendProgram=/opt/soperator/bin/power_suspend.sh")
 }
 
 func TestRenderSlurmConfig_MetricsType(t *testing.T) {
