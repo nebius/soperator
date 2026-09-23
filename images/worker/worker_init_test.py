@@ -88,10 +88,10 @@ class TestFormatSlurmTopology(unittest.TestCase):
         result = worker_init.format_slurm_topology("my-topo:leaf-switch")
         self.assertEqual(result, "topology=my-topo:root:leaf-switch")
 
-    def test_tier_zero_alone_yields_no_tree_unit(self):
-        """tier-0 names a block, not a switch, so a tree topology has nowhere to put the node."""
+    def test_tier_zero_alone_is_the_tree_unit(self):
+        """tier-0 alone is the only switch of the node."""
         result = worker_init.format_slurm_topology("tier-0=switch1")
-        self.assertEqual(result, "")
+        self.assertEqual(result, "topology=default:root:switch1")
 
     def test_tier_format_two_tiers(self):
         """Two tier format builds full hierarchy: spine first, leaf last."""
@@ -151,16 +151,16 @@ class TestFormatSlurmTopology(unittest.TestCase):
         )
         self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
-    def test_json_format_ignores_tier_zero_in_tree_mode(self):
-        """tier-0 names a block, so the tree path stops at tier-1.
+    def test_json_format_includes_tier_zero_in_tree_mode(self):
+        """tier-0 is the switch closest to the node, below tier-1.
 
-        The operator leaves tier-0 out of the tree it writes into the topology config, so
-        including it here would put the node one switch below where the config places it.
+        The operator renders tier-0 into the tree, so leaving it out here would put the node one
+        switch above where the config places it.
         """
         result = worker_init.format_slurm_topology(
             '{"tier-0":"nvl0","tier-1":"leaf01"}'
         )
-        self.assertEqual(result, "topology=default:root:leaf01")
+        self.assertEqual(result, "topology=default:root:leaf01:nvl0")
 
     def test_json_format_block_topology_uses_tier_zero(self):
         """JSON format in block mode uses tier-0 as the block name."""
@@ -266,12 +266,12 @@ class TestFormatTierTopology(unittest.TestCase):
         )
         self.assertEqual(result, "topology=default:root:spine01:leaf01")
 
-    def test_tier_zero_excluded_from_tree(self):
-        """tier-0 is the NVL/block domain and is not part of the switch tree."""
+    def test_tier_zero_is_the_lowest_switch(self):
+        """tier-0 is part of the switch tree, below every other tier."""
         result = worker_init._format_tier_topology(
             {"tier-0": "nvl0", "tier-1": "leaf01", "tier-2": "spine01"}
         )
-        self.assertEqual(result, "topology=default:root:spine01:leaf01")
+        self.assertEqual(result, "topology=default:root:spine01:leaf01:nvl0")
 
     def test_three_tiers_builds_hierarchy(self):
         """Three tiers builds full path from fabric to leaf."""
@@ -1113,20 +1113,20 @@ class TestMainArgparse(unittest.TestCase):
 class TestTopologyMatchesOperatorConfig(unittest.TestCase):
     """The unit a worker registers into must be the one the operator wrote into the config.
 
-    The operator's tree builder drops tier-0 (it names a block, not a switch) and places the node
-    directly under its tier-1 switch. A worker that included tier-0 would register one switch
-    deeper, on a switch the topology config never defines.
+    The operator's tree builder renders tier-0 as the switch holding the node, under its tier-1
+    switch. A worker that skipped tier-0 would register one switch higher, on a switch that is not a
+    leaf in the topology config, and slurmctld would reject the registration.
     """
 
     LABELS = '{"tier-0":"nvl0","tier-1":"leaf01","tier-2":"spine01"}'
 
     def test_tree_registration_matches_the_switch_holding_the_node(self):
-        # Operator renders: SwitchName=leaf01 Nodes=<node>, under spine01, under root.
+        # Operator renders: SwitchName=nvl0 Nodes=<node>, under leaf01, under spine01, under root.
         self.assertEqual(
             worker_init.format_slurm_topology(
                 self.LABELS, worker_init.TOPOLOGY_PLUGIN_TREE, "root"
             ),
-            "topology=default:root:spine01:leaf01",
+            "topology=default:root:spine01:leaf01:nvl0",
         )
 
     def test_block_registration_matches_the_block_holding_the_node(self):

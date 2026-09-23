@@ -59,12 +59,10 @@ func NewNodeTopologyReconciler(
 
 // NodeTopologyReconciler watches Kubernetes nodes via the API server.
 //
-// Upon detecting a node with a `topology.nebius.com/tier-1` label,
-// it records the node’s tier information in the `node-topoly-labels` ConfigMap in a
+// Upon detecting a node with a `topology.nebius.com/tier-*` label,
+// it records the node's tier information in the `topology-node-labels` ConfigMap in a
 // `nodeName: [tier-x: switchName, ...]` format.
-// For the Blackwell architecture (GBX00 racks) `topology.nebius.com/tier-1` label
-// is considered as NVL domain of the rack. Remaining `tier-*` labels are considered as
-// IB topology.
+// Tree topologies use all tiers, while block topologies group nodes by tier-0.
 //
 // **Example (not considered as a real block topology):**
 //
@@ -168,13 +166,10 @@ func (r *NodeTopologyReconciler) getNode(ctx context.Context, nodeName string) (
 	return node, nil
 }
 
-// shouldProcessNode checks if the node has the required tier-1 label
+// shouldProcessNode checks if the node has any topology tier label.
 func (r *NodeTopologyReconciler) shouldProcessNode(node *corev1.Node, nodeName string, logger logr.Logger) bool {
-	_, hasTierZero := node.Labels[r.tierZeroLabel()]
-	_, hasTierOne := node.Labels[r.tierOneLabel()]
-
-	if !hasTierZero && !hasTierOne {
-		logger.V(1).Info("Node missing one of tier-0 or tier-1 label, skipping", "node", nodeName)
+	if !r.NodeCarriesTierLabels(node) {
+		logger.V(1).Info("Node has no tier labels, skipping", "node", nodeName)
 		return false
 	}
 	return true
@@ -381,17 +376,16 @@ func (r *NodeTopologyReconciler) initializeResourceDistributionWithAllNodes(ctx 
 	}
 
 	for _, node := range nodeList.Items {
-		if _, hasTierLabel := node.Labels[r.tierOneLabel()]; hasTierLabel {
-			tierData := ExtractTierLabels(node.Labels, r.topologyLabelPrefix)
-			if len(tierData) > 0 {
-				tierDataJSON, err := json.Marshal(tierData)
-				if err != nil {
-					logger.Error(err, "Failed to serialize tier data for node", "node", node.Name)
-					continue
-				}
-				configMapData[node.Name] = string(tierDataJSON)
-			}
+		tierData := ExtractTierLabels(node.Labels, r.topologyLabelPrefix)
+		if len(tierData) == 0 {
+			continue
 		}
+		tierDataJSON, err := json.Marshal(tierData)
+		if err != nil {
+			logger.Error(err, "Failed to serialize tier data for node", "node", node.Name)
+			continue
+		}
+		configMapData[node.Name] = string(tierDataJSON)
 	}
 
 	// Get target namespaces from SlurmClusters
@@ -613,14 +607,6 @@ func (r *NodeTopologyReconciler) Start(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (r *NodeTopologyReconciler) tierZeroLabel() string {
-	return r.topologyLabelPrefix + consts.TierZeroSuffix
-}
-
-func (r *NodeTopologyReconciler) tierOneLabel() string {
-	return r.topologyLabelPrefix + consts.TierOneSuffix
 }
 
 // Legacy methods for backward compatibility with tests
