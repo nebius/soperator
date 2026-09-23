@@ -92,7 +92,7 @@ func gaugeValue(gauge prometheus.Gauge) float64 {
 }
 
 func TestRolloutMetricsReportWaitReasonsAndErrors(t *testing.T) {
-	for _, reason := range rolloutWaitReasons {
+	for _, reason := range rolloutWaitReasonLabelValues {
 		t.Run(reason, func(t *testing.T) {
 			f := newMetricFixture(t)
 			switch reason {
@@ -138,7 +138,7 @@ func TestRolloutMetricsReportWaitReasonsAndErrors(t *testing.T) {
 				f.nodes[0] = staleRollingUpdateNode(f.podKey.Name)
 			}
 			require.Equal(t, testRollingUpdateInterval, f.run(t).RequeueAfter)
-			for _, candidate := range rolloutWaitReasons {
+			for _, candidate := range rolloutWaitReasonLabelValues {
 				expected := 0.0
 				if candidate == reason {
 					expected = 1
@@ -220,12 +220,15 @@ func TestRolloutMetricsResetIdentityAndCleanSeries(t *testing.T) {
 	require.NoError(t, err)
 	for _, family := range families {
 		for _, metric := range family.Metric {
+			labels := make(prometheus.Labels, len(metric.Label))
 			for _, label := range metric.Label {
+				labels[label.GetName()] = label.GetValue()
 				if label.GetName() == "nodeset" {
 					require.Equal(t, "renamed", label.GetValue())
 				}
-				require.Contains(t, []string{"resource_namespace", "slurm_cluster", "nodeset", "reason", "stage"}, label.GetName())
+				require.Contains(t, []string{"controller", "resource_namespace", "slurm_cluster", "nodeset", "reason", "stage"}, label.GetName())
 			}
+			require.Equal(t, "rollingupdate", labels["controller"])
 		}
 	}
 	f.clock.Step(time.Hour)

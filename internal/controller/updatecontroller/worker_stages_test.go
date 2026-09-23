@@ -22,7 +22,7 @@ import (
 
 func requireWorkerCounts(t *testing.T, f *metricFixture, expected map[string]int) {
 	t.Helper()
-	for _, stage := range workerStageNames {
+	for _, stage := range workerStageLabelValues {
 		require.Equal(t, float64(expected[stage]), metricValue(f.r.metrics.workers, stage), stage)
 	}
 }

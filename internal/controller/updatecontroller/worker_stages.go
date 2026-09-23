@@ -26,7 +26,8 @@ const (
 	workerStageCount
 )
 
-var workerStageNames = [workerStageCount]string{
+// Values of the stage label on rollout_workers, indexed by workerStage.
+var workerStageLabelValues = [workerStageCount]string{
 	"ready", "waiting_for_slot", "waiting_for_jobs", "waiting_for_slurm", "stopping_worker",
 	"waiting_for_eviction", "deleting_pod", "starting_pod", "waiting_for_pod", "restoring_slurm",
 	"missing_slurm_node", "blocked", "unknown",
