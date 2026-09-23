@@ -31,6 +31,7 @@ type pamSlurmAdoptSSHResult struct {
 type PAMSlurmAdopt struct {
 	runtime  framework.Runtime
 	slurm    *framework.SlurmClient
+	kubectl  *framework.KubectlClient
 	selector *framework.WorkerSelector
 
 	worker      framework.WorkerInfo
@@ -43,11 +44,13 @@ type PAMSlurmAdopt struct {
 func NewPAMSlurmAdopt(
 	runtime framework.Runtime,
 	slurm *framework.SlurmClient,
+	kubectl *framework.KubectlClient,
 	selector *framework.WorkerSelector,
 ) *PAMSlurmAdopt {
 	return &PAMSlurmAdopt{
 		runtime:  runtime,
 		slurm:    slurm,
+		kubectl:  kubectl,
 		selector: selector,
 	}
 }
@@ -96,7 +99,11 @@ func (s *PAMSlurmAdopt) aTestUserAndGPUWorkerAreReady(ctx context.Context) error
 	}
 	s.worker = workers[0]
 
-	if _, err := s.runtime.Worker(s.worker).RunWithDefaultRetry(
+	workerPod, err := s.kubectl.WorkerPodForSlurmNode(ctx, s.worker.Name)
+	if err != nil {
+		return err
+	}
+	if _, err := s.runtime.WorkerPod(workerPod).RunWithDefaultRetry(
 		ctx,
 		"grep -Eq '^[[:space:]]*-?account[[:space:]]+required[[:space:]]+pam_slurm_adopt\\.so' /etc/pam.d/soperator-pam-slurm-adopt",
 	); err != nil {
@@ -118,6 +125,20 @@ func (s *PAMSlurmAdopt) aTestUserAndGPUWorkerAreReady(ctx context.Context) error
 	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, pamSlurmAdoptUser, s.worker); err != nil {
 		return err
 	}
+	if _, err := runSSHCommand(
+		ctx,
+		s.runtime,
+		pamSlurmAdoptUser,
+		pamSlurmAdoptKeyName,
+		"localhost",
+		30*time.Second,
+		"true",
+	); err != nil {
+		return fmt.Errorf("verify PAM Slurm adopt test identity on login node: %w", err)
+	}
+	if _, err := s.runtime.Worker(s.worker).RunWithDefaultRetry(ctx, "true"); err != nil {
+		return fmt.Errorf("verify root SSH transport to worker %s: %w", s.worker.Name, err)
+	}
 
 	command := fmt.Sprintf(
 		"scancel -u %s >/dev/null 2>&1 || true; rm -f -- %s",
@@ -127,7 +148,7 @@ func (s *PAMSlurmAdopt) aTestUserAndGPUWorkerAreReady(ctx context.Context) error
 	if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
 		return fmt.Errorf("reset PAM Slurm adopt test state: %w", err)
 	}
-	return nil
+	return s.waitForUserJobsGone(ctx)
 }
 
 func (s *PAMSlurmAdopt) sshWithoutAJobIsDenied(ctx context.Context) error {
@@ -142,6 +163,9 @@ func (s *PAMSlurmAdopt) sshWithoutAJobIsDenied(ctx context.Context) error {
 	)
 	if err == nil {
 		return fmt.Errorf("expected SSH without a job to be denied, got output %q", strings.TrimSpace(output))
+	}
+	if sshCommandTimedOut(err) {
+		return fmt.Errorf("SSH without a job timed out instead of being denied: %w", err)
 	}
 	return nil
 }
@@ -228,8 +252,49 @@ func (s *PAMSlurmAdopt) sshSessionIsAdoptedAndEndsWithJob(ctx context.Context) e
 		if result.err == nil {
 			return fmt.Errorf("adopted SSH command exited successfully after job cancellation")
 		}
-		return nil
+		if err := s.waitForUserProcessesGone(ctx); err != nil {
+			return err
+		}
+		return s.sshWithoutAJobIsDenied(ctx)
 	}
+}
+
+func (s *PAMSlurmAdopt) waitForUserJobsGone(ctx context.Context) error {
+	return s.runtime.WaitFor(
+		ctx,
+		"PAM Slurm adopt test user's jobs to leave the queue",
+		pamSlurmAdoptSessionTimeout,
+		framework.DefaultPollInterval,
+		func(waitCtx context.Context) (bool, error) {
+			output, err := s.runtime.Jail().RunWithDefaultRetry(
+				waitCtx,
+				"squeue -h -u "+framework.ShellQuote(pamSlurmAdoptUser),
+			)
+			if err != nil {
+				return false, err
+			}
+			return strings.TrimSpace(output) == "", nil
+		},
+	)
+}
+
+func (s *PAMSlurmAdopt) waitForUserProcessesGone(ctx context.Context) error {
+	command := fmt.Sprintf(
+		"if pgrep -u %s -a; then exit 1; fi",
+		framework.ShellQuote(pamSlurmAdoptUser),
+	)
+	return s.runtime.WaitFor(
+		ctx,
+		fmt.Sprintf("PAM Slurm adopt user processes to leave worker %s", s.worker.Name),
+		pamSlurmAdoptSessionTimeout,
+		framework.DefaultPollInterval,
+		func(waitCtx context.Context) (bool, error) {
+			if _, err := s.runtime.Worker(s.worker).Run(waitCtx, command); err != nil {
+				return false, err
+			}
+			return true, nil
+		},
+	)
 }
 
 func (s *PAMSlurmAdopt) stopSSH(ctx context.Context) {
@@ -256,7 +321,7 @@ func validatePAMSlurmAdoptStatus(output string) (bool, error) {
 			values[strings.TrimSpace(key)] = strings.TrimSpace(value)
 		}
 	}
-	if !strings.Contains(values["cgroup"], "step_extern") {
+	if !isSlurmExternCgroup(values["cgroup"]) {
 		return false, fmt.Errorf("SSH session cgroup %q does not contain step_extern", values["cgroup"])
 	}
 	gpuCount, err := strconv.Atoi(values["gpu_count"])
@@ -267,4 +332,27 @@ func validatePAMSlurmAdoptStatus(output string) (bool, error) {
 		return false, fmt.Errorf("adopted SSH session sees %d GPUs, expected 1", gpuCount)
 	}
 	return true, nil
+}
+
+func isSlurmExternCgroup(value string) bool {
+	for line := range strings.SplitSeq(value, "\n") {
+		fields := strings.SplitN(line, ":", 3)
+		if len(fields) != 3 {
+			continue
+		}
+		for component := range strings.SplitSeq(strings.Trim(fields[2], "/"), "/") {
+			if component == "step_extern" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func sshCommandTimedOut(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "exit status 124") || strings.Contains(message, "exit code 124")
 }

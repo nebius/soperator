@@ -251,6 +251,17 @@ func (s *DockerContainers) theUserRunsADockerContainerOverSSHOnAWorkerNode(ctx c
 	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, dockerSSHUserName, worker); err != nil {
 		return err
 	}
+	job, err := startSSHAccessJob(
+		ctx,
+		s.slurm,
+		dockerSSHUserName,
+		worker,
+		"e2e-docker-worker-ssh-access",
+	)
+	s.job = job
+	if err != nil {
+		return err
+	}
 
 	remoteCommand := fmt.Sprintf(
 		"docker run --rm %s echo %s",

@@ -8,7 +8,37 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
-const sshTestUserPropagationTimeout = time.Minute
+const (
+	sshTestUserPropagationTimeout = time.Minute
+	sshAccessJobTimeout           = 5 * time.Minute
+)
+
+func startSSHAccessJob(
+	ctx context.Context,
+	slurm *framework.SlurmClient,
+	userName string,
+	worker framework.WorkerInfo,
+	jobName string,
+) (framework.SbatchJob, error) {
+	if worker.Name == "" {
+		return framework.SbatchJob{}, fmt.Errorf("start SSH access job: worker name is empty")
+	}
+
+	job, err := slurm.SubmitBatch(ctx, framework.SbatchOptions{
+		JobName:   jobName,
+		Nodes:     1,
+		Nodelist:  []string{worker.Name},
+		Wrap:      "sleep 3600",
+		RunAsUser: userName,
+	})
+	if err != nil {
+		return framework.SbatchJob{}, err
+	}
+	if err := slurm.WaitForJobRunning(ctx, job.ID, sshAccessJobTimeout); err != nil {
+		return job, err
+	}
+	return job, nil
+}
 
 func ensureSSHTestUser(ctx context.Context, runtime framework.Runtime, userName string) error {
 	quotedUserName := framework.ShellQuote(userName)

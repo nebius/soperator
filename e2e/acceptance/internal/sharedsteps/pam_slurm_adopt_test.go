@@ -1,6 +1,7 @@
 package sharedsteps
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,4 +20,14 @@ func TestValidatePAMSlurmAdoptStatus(t *testing.T) {
 
 	_, err = validatePAMSlurmAdoptStatus("cgroup=0::/job_42/step_extern\ngpu_count=2\n")
 	assert.ErrorContains(t, err, "expected 1")
+
+	_, err = validatePAMSlurmAdoptStatus("cgroup=0::/job_42/step_extern_child\ngpu_count=1\n")
+	assert.ErrorContains(t, err, "step_extern")
+}
+
+func TestSSHCommandTimedOut(t *testing.T) {
+	assert.True(t, sshCommandTimedOut(errors.New("command failed: exit status 124")))
+	assert.True(t, sshCommandTimedOut(errors.New("command terminated with exit code 124")))
+	assert.False(t, sshCommandTimedOut(errors.New("command failed: exit status 255")))
+	assert.False(t, sshCommandTimedOut(nil))
 }

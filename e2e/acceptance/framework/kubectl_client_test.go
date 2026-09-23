@@ -42,6 +42,81 @@ func TestKubectlClientSlurmClusterRejectsEmptyName(t *testing.T) {
 	assert.ErrorContains(t, err, "name is empty")
 }
 
+func TestKubectlClientResolveSoperatorPodName(t *testing.T) {
+	tests := map[string]struct {
+		version string
+		pods    map[string]string
+		want    string
+	}{
+		"new naming": {
+			version: "5.0.0",
+			pods: map[string]string{
+				"soperator-login-0": "pod/soperator-login-0\n",
+			},
+			want: "soperator-login-0",
+		},
+		"upgraded legacy naming": {
+			version: "5.0.0",
+			pods: map[string]string{
+				"soperator-login-0": "",
+				"login-0":           "pod/login-0\n",
+			},
+			want: "login-0",
+		},
+		"pre-five naming": {
+			version: "4.1.5",
+			pods: map[string]string{
+				"login-0": "pod/login-0\n",
+			},
+			want: "login-0",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			commands := make(map[string]string, len(tt.pods))
+			for podName, output := range tt.pods {
+				commands[strings.Join([]string{
+					"get", "pod", podName,
+					"-n", SoperatorNamespace,
+					"--ignore-not-found=true",
+					"-o", "name",
+				}, "\x00")] = output
+			}
+			client := NewKubectlClient(&kubectlClientTestExec{kubectl: commands})
+
+			resolved, err := client.ResolveSoperatorPodName(t.Context(), "soperator", tt.version, "login-0")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, resolved)
+
+			resolved, err = client.ResolveSoperatorPodName(t.Context(), "soperator", tt.version, "login-0")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, resolved)
+		})
+	}
+}
+
+func TestKubectlClientResolveSoperatorPodNameReportsCandidates(t *testing.T) {
+	commands := make(map[string]string)
+	for _, podName := range []string{"soperator-login-0", "login-0"} {
+		commands[strings.Join([]string{
+			"get", "pod", podName,
+			"-n", SoperatorNamespace,
+			"--ignore-not-found=true",
+			"-o", "name",
+		}, "\x00")] = ""
+	}
+
+	_, err := NewKubectlClient(&kubectlClientTestExec{kubectl: commands}).ResolveSoperatorPodName(
+		t.Context(),
+		"soperator",
+		"5.0.0",
+		"login-0",
+	)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "tried soperator-login-0, login-0")
+}
+
 func TestKubectlClientPatchSlurmClusterCustomConfig(t *testing.T) {
 	for name, test := range map[string]struct {
 		value *string

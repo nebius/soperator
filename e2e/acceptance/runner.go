@@ -344,12 +344,14 @@ func registerTimingHooks(sc *godog.ScenarioContext) {
 }
 
 func newWorld(kubectlContext, slurmClusterName, soperatorVersion string) *world {
-	return &world{
+	w := &world{
 		logPrefix:        "acceptance",
 		kubectlContext:   kubectlContext,
 		slurmClusterName: slurmClusterName,
 		soperatorVersion: soperatorVersion,
 	}
+	w.kubectl = framework.NewKubectlClient(w)
+	return w
 }
 
 // NewRuntime constructs the shared acceptance runtime.

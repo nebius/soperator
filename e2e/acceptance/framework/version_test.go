@@ -40,3 +40,14 @@ func TestSoperatorPodNameKeepsExistingFallbackForUnknownVersion(t *testing.T) {
 	assert.Equal(t, "soperator-login-0", SoperatorPodName("soperator", "", "login-0"))
 	assert.Equal(t, "login-0", SoperatorPodName("", "5.0.0", "login-0"))
 }
+
+func TestSoperatorPodNameCandidatesPreferVersionConventionAndIncludeUpgradeFallback(t *testing.T) {
+	assert.Equal(t,
+		[]string{"login-0", "soperator-login-0"},
+		SoperatorPodNameCandidates("soperator", "4.1.5", "login-0"),
+	)
+	assert.Equal(t,
+		[]string{"soperator-login-0", "login-0"},
+		SoperatorPodNameCandidates("soperator", "5.0.0", "login-0"),
+	)
+}

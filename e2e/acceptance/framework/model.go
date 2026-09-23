@@ -30,6 +30,29 @@ func SoperatorPodName(slurmClusterName, soperatorVersion, podName string) string
 	return ClusterPrefixedName(slurmClusterName, podName)
 }
 
+func SoperatorPodNameCandidates(slurmClusterName, soperatorVersion, podName string) []string {
+	prefixedName := ClusterPrefixedName(slurmClusterName, podName)
+	preferredName := SoperatorPodName(slurmClusterName, soperatorVersion, podName)
+
+	var candidates []string
+	for _, candidate := range []string{preferredName, podName, prefixedName} {
+		if candidate == "" {
+			continue
+		}
+		found := false
+		for _, existing := range candidates {
+			if existing == candidate {
+				found = true
+				break
+			}
+		}
+		if !found {
+			candidates = append(candidates, candidate)
+		}
+	}
+	return candidates
+}
+
 func WorkerNames(workers []WorkerInfo) []string {
 	names := make([]string, 0, len(workers))
 	for _, worker := range workers {

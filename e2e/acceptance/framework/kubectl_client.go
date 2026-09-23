@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -16,6 +17,9 @@ const SoperatorNamespace = "soperator"
 
 type KubectlClient struct {
 	exec Exec
+
+	podNameMutex sync.Mutex
+	podNames     map[string]string
 }
 
 type NodeSetInfo struct {
@@ -43,7 +47,55 @@ type WorkerPodInfo struct {
 }
 
 func NewKubectlClient(exec Exec) *KubectlClient {
-	return &KubectlClient{exec: exec}
+	return &KubectlClient{
+		exec:     exec,
+		podNames: make(map[string]string),
+	}
+}
+
+func (c *KubectlClient) ResolveSoperatorPodName(
+	ctx context.Context,
+	clusterName,
+	soperatorVersion,
+	podName string,
+) (string, error) {
+	candidates := SoperatorPodNameCandidates(clusterName, soperatorVersion, podName)
+	cacheKey := strings.Join(candidates, "\x00")
+
+	c.podNameMutex.Lock()
+	resolvedName := c.podNames[cacheKey]
+	c.podNameMutex.Unlock()
+	if resolvedName != "" {
+		return resolvedName, nil
+	}
+
+	for _, candidate := range candidates {
+		output, err := c.exec.Kubectl().Run(
+			ctx,
+			"get", "pod", candidate,
+			"-n", SoperatorNamespace,
+			"--ignore-not-found=true",
+			"-o", "name",
+		)
+		if err != nil {
+			return "", fmt.Errorf("look up Soperator pod %s/%s: %w", SoperatorNamespace, candidate, err)
+		}
+		if strings.TrimSpace(output) == "" {
+			continue
+		}
+
+		c.podNameMutex.Lock()
+		c.podNames[cacheKey] = candidate
+		c.podNameMutex.Unlock()
+		return candidate, nil
+	}
+
+	return "", fmt.Errorf(
+		"find Soperator pod %s in namespace %s; tried %s",
+		podName,
+		SoperatorNamespace,
+		strings.Join(candidates, ", "),
+	)
 }
 
 func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClusterInfo, error) {

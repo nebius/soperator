@@ -46,7 +46,7 @@ func TestSharedFeaturesHaveValidVersionTags(t *testing.T) {
 
 func TestSharedFeaturesHaveExpectedEssentialScenarios(t *testing.T) {
 	want := []string{
-		"A regular user can SSH to a worker without extra options",
+		"A regular user with a job can SSH to a worker without extra options",
 		"A maintenance event replaces the selected worker node",
 		"A user job is recorded with its allocated resources",
 		"CPU jobs run expected Prolog and Epilog passive checks",

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 
@@ -14,23 +15,32 @@ const sshUserName = "bob"
 
 type InternalSSH struct {
 	runtime      framework.Runtime
+	slurm        *framework.SlurmClient
 	selector     *framework.WorkerSelector
 	targetWorker framework.WorkerInfo
+	job          framework.SbatchJob
 	sshOutput    string
 }
 
-func NewInternalSSH(runtime framework.Runtime, selector *framework.WorkerSelector) *InternalSSH {
-	return &InternalSSH{runtime: runtime, selector: selector}
+func NewInternalSSH(runtime framework.Runtime, slurm *framework.SlurmClient, selector *framework.WorkerSelector) *InternalSSH {
+	return &InternalSSH{runtime: runtime, slurm: slurm, selector: selector}
 }
 
 func (s *InternalSSH) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a regular user account exists on the login node$`, s.aRegularUserAccountExistsOnTheLoginNode)
+	sc.Step(`^the user has a running job on the worker$`, s.theUserHasARunningJobOnTheWorker)
 	sc.Step(`^the user SSHs from the login node to a worker$`, s.theUserSSHsFromTheLoginNodeToAWorker)
 	sc.Step(`^the connection succeeds without extra SSH options$`, s.theConnectionSucceedsWithoutExtraSSHOptions)
 }
 
 func (s *InternalSSH) CleanupAndReset(ctx context.Context) {
+	if !s.job.IsZero() {
+		if err := s.slurm.CancelJob(ctx, s.job.ID, 2*time.Minute); err != nil {
+			s.runtime.Logf("cleanup: cancel internal SSH access job: %v", err)
+		}
+	}
 	s.targetWorker = framework.WorkerInfo{}
+	s.job = framework.SbatchJob{}
 	s.sshOutput = ""
 }
 
@@ -45,6 +55,18 @@ func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Contex
 		return err
 	}
 	return waitForSSHTestUserOnWorker(ctx, s.runtime, sshUserName, s.targetWorker)
+}
+
+func (s *InternalSSH) theUserHasARunningJobOnTheWorker(ctx context.Context) error {
+	job, err := startSSHAccessJob(
+		ctx,
+		s.slurm,
+		sshUserName,
+		s.targetWorker,
+		"e2e-internal-ssh-access",
+	)
+	s.job = job
+	return err
 }
 
 func (s *InternalSSH) theUserSSHsFromTheLoginNodeToAWorker(ctx context.Context) error {

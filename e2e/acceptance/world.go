@@ -23,6 +23,7 @@ type world struct {
 	kubectlContext   string
 	slurmClusterName string
 	soperatorVersion string
+	kubectl          *framework.KubectlClient
 }
 
 // NewLocalArgsScope creates a local process scope without requiring a Kubernetes runtime.
@@ -51,13 +52,21 @@ func (w *world) Local() framework.ArgsScope {
 
 func (w *world) Controller() framework.CommandScope {
 	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
-		return w.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, framework.SoperatorPodName(w.slurmClusterName, w.soperatorVersion, "controller-0"), "--", "bash", "-lc", command)
+		podName, err := w.kubectl.ResolveSoperatorPodName(ctx, w.slurmClusterName, w.soperatorVersion, "controller-0")
+		if err != nil {
+			return "", err
+		}
+		return w.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, podName, "--", "bash", "-lc", command)
 	})
 }
 
 func (w *world) Jail() framework.CommandScope {
 	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
-		return w.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, framework.SoperatorPodName(w.slurmClusterName, w.soperatorVersion, "login-0"), "--", "chroot", "/mnt/jail", "bash", "-lc", command)
+		podName, err := w.kubectl.ResolveSoperatorPodName(ctx, w.slurmClusterName, w.soperatorVersion, "login-0")
+		if err != nil {
+			return "", err
+		}
+		return w.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, podName, "--", "chroot", "/mnt/jail", "bash", "-lc", command)
 	})
 }
 
