@@ -41,7 +41,7 @@ tests:
           value: 4
       - equal:
           path: spec.slurmConfig.completeWait
-          value: 5
+          value: 0
       - equal:
           path: spec.slurmConfig.prolog
           value: "/opt/slurm_scripts/prolog.sh"
@@ -56,10 +56,10 @@ tests:
           value: ""
       - equal:
           path: spec.slurmConfig.maxJobCount
-          value: 20000
+          value: 100000
       - equal:
           path: spec.slurmConfig.minJobAge
-          value: 1800
+          value: 600
       - equal:
           path: spec.slurmConfig.messageTimeout
           value: 60
@@ -67,7 +67,24 @@ tests:
           path: spec.slurmConfig.topologyParam
           value: "SwitchAsNodeRank"
 
-  # Test mpiConfig default values  
+  - it: should preserve explicit Slurm scheduling and retention values
+    set:
+      clusterName: test-cluster
+      slurmConfig.completeWait: 5
+      slurmConfig.maxJobCount: 20000
+      slurmConfig.minJobAge: 0
+    asserts:
+      - equal:
+          path: spec.slurmConfig.completeWait
+          value: 5
+      - equal:
+          path: spec.slurmConfig.maxJobCount
+          value: 20000
+      - equal:
+          path: spec.slurmConfig.minJobAge
+          value: 0
+
+  # Test mpiConfig default values
   - it: should set mpiConfig default values
     set:
       clusterName: test-cluster

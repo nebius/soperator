@@ -3858,20 +3858,20 @@ spec:
                 type: object
               slurmConfig:
                 default:
-                  completeWait: 5
+                  completeWait: 0
                   defCpuPerGPU: 4
                   defMemPerNode: 0
                   epilog: ""
-                  maxJobCount: 20000
+                  maxJobCount: 100000
                   messageTimeout: 60
-                  minJobAge: 1800
+                  minJobAge: 600
                   prolog: ""
                   taskProlog: ""
                 description: SlurmConfig represents the Slurm configuration in slurm.conf.
                   Not all options are supported.
                 properties:
                   completeWait:
-                    default: 5
+                    default: 0
                     description: The time to wait, in seconds, when any job is in
                       the COMPLETING state before any additional jobs are scheduled.
                     format: int32
@@ -3893,8 +3893,9 @@ spec:
                       ends. Default value is no epilog
                     type: string
                   maxJobCount:
-                    default: 20000
-                    description: Keep N last jobs in controller memory
+                    default: 100000
+                    description: Maximum number of jobs tracked in controller memory,
+                      including unfinished and retained completed jobs.
                     format: int32
                     type: integer
                   messageTimeout:
@@ -3905,9 +3906,9 @@ spec:
                     format: int32
                     type: integer
                   minJobAge:
-                    default: 1800
-                    description: Don't remove jobs from controller memory after some
-                      time
+                    default: 600
+                    description: Minimum time in seconds to retain completed jobs
+                      in controller memory. Zero disables purging.
                     format: int32
                     type: integer
                   prolog:

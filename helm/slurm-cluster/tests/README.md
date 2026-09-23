@@ -35,13 +35,13 @@ These tests verify the following kubebuilder default values:
 ### SlurmConfig
 - `defMemPerNode: 1048576`
 - `defCpuPerGPU: 4`
-- `completeWait: 5`
+- `completeWait: 0`
 - `epilog: ""`
 - `prolog: ""`
 - `taskProlog: ""`
 - `taskPluginParam: ""`
-- `maxJobCount: 20000`
-- `minJobAge: 1800`
+- `maxJobCount: 100000`
+- `minJobAge: 600`
 - `messageTimeout: 60`
 - `topologyParam: "SwitchAsNodeRank"`
 

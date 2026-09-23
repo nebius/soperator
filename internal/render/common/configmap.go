@@ -406,6 +406,11 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 			"conmgr_threads=32",            // number of threads in thread pool used for connections on the listening sockets
 			"validate_nodeaddr_threads=32", // permit concurrent node address validation during startup
 			"enable_stepmgr",               // enable job steps to be managed by a single extern job-associated slurmstepd
+			"rl_enable",                    // enable per-user RPC rate limiting
+			"rl_refill_period=1",           // interval between token refills (s)
+			"rl_refill_rate=20",            // tokens added per refill
+			"rl_bucket_size=60",            // token capacity for RPC bursts
+			"rl_log_freq=30",               // minimum interval between rate-limit logs per user (s)
 		}
 		if cluster.HasEphemeralNodes() {
 			slurmCtldParams = append(slurmCtldParams, []string{
@@ -457,19 +462,22 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("SchedulerType", "sched/backfill")
 	res.AddProperty("SchedulerParameters",
 		strings.Join([]string{
-			"nohold_on_prolog_fail", // allows jobs to be dispatched to another hosts during requeue
-			"extra_constraints",     // enables filtering nodes with the --extra option
-			"pack_serial_at_end",    // reduces resource fragmentation for some workloads with select/cons_tres plugin
-			"salloc_wait_nodes",     // wait until all allocated nodes are ready for use in salloc
-			"sbatch_wait_nodes",     // wait until all allocated nodes are ready for use in sbatch
-			"defer_batch",           // avoid attempting to schedule each batch job individually at job submit time
-			"max_rpc_cnt=100",       // maximum number of threads before deferring job scheduling
+			"nohold_on_prolog_fail",   // allows jobs to be dispatched to another hosts during requeue
+			"extra_constraints",       // enables filtering nodes with the --extra option
+			"pack_serial_at_end",      // reduces resource fragmentation for some workloads with select/cons_tres plugin
+			"salloc_wait_nodes",       // wait until all allocated nodes are ready for use in salloc
+			"sbatch_wait_nodes",       // wait until all allocated nodes are ready for use in sbatch
+			"defer_batch",             // avoid attempting to schedule each batch job individually at job submit time
+			"batch_sched_delay=1",     // minimum interval between batch-triggered scheduling passes (s)
+			"default_queue_depth=500", // maximum jobs considered per event-triggered scheduling pass
+			"sched_interval=30",       // interval between full-queue scheduling passes (s)
 			// sched/backfill
-			"bf_continue",            // resume mid-cycle instead of restarting from the top after releasing the lock
-			"bf_max_time=60",         // maximum time the backfill scheduler can spend before discontinuing (s)
-			"bf_max_job_test=1000",   // maximum number of jobs to attempt scheduling for
-			"bf_max_job_part=300",    // maximum number of jobs per partition to attempt starting with the scheduler
-			"bf_running_job_reserve", // creates backfill reservations for jobs running on whole nodes
+			"bf_continue",              // resume mid-cycle instead of restarting from the top after releasing the lock
+			"bf_max_job_test=1000",     // maximum number of jobs to attempt scheduling for
+			"bf_max_job_part=300",      // maximum number of jobs per partition to attempt starting with the scheduler
+			"bf_yield_interval=500000", // interval between releasing backfill locks (us)
+			"bf_yield_sleep=500000",    // sleep duration while backfill locks are released (us)
+			"bf_running_job_reserve",   // creates backfill reservations for jobs running on whole nodes
 		}, ","),
 	)
 	res.AddProperty("SelectType", "select/cons_tres")
