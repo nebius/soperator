@@ -40,6 +40,7 @@ type WorkerPodInfo struct {
 	PodName            string
 	KubernetesNodeName string
 	Ready              bool
+	HasLocalNVMe       bool
 }
 
 func NewKubectlClient(exec Exec) *KubectlClient {
@@ -191,6 +192,7 @@ func (c *KubectlClient) WorkerPods(ctx context.Context) ([]WorkerPodInfo, error)
 			PodName:            pod.Name,
 			KubernetesNodeName: pod.Spec.NodeName,
 			Ready:              kubeobjects.PodReady(pod),
+			HasLocalNVMe:       podHasVolume(pod, "local-nvme"),
 		})
 	}
 
@@ -198,6 +200,15 @@ func (c *KubectlClient) WorkerPods(ctx context.Context) ([]WorkerPodInfo, error)
 		return out[i].SlurmNodeName < out[j].SlurmNodeName
 	})
 	return out, nil
+}
+
+func podHasVolume(pod corev1.Pod, name string) bool {
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *KubectlClient) WorkerPodForSlurmNode(ctx context.Context, slurmNodeName string) (WorkerPodInfo, error) {

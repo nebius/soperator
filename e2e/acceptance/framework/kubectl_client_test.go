@@ -177,7 +177,7 @@ func TestKubectlClientWorkerPods(t *testing.T) {
 			"items": [
 				{
 					"metadata": {"name": "kube-worker-a"},
-					"spec": {"hostname": "worker-a", "nodeName": "node-a"},
+					"spec": {"hostname": "worker-a", "nodeName": "node-a", "volumes": [{"name": "local-nvme", "emptyDir": {}}]},
 					"status": {"conditions": [{"type": "Ready", "status": "True"}]}
 				},
 				{
@@ -192,7 +192,7 @@ func TestKubectlClientWorkerPods(t *testing.T) {
 	pods, err := NewKubectlClient(exec).WorkerPods(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, []WorkerPodInfo{
-		{SlurmNodeName: "worker-a", PodName: "kube-worker-a", KubernetesNodeName: "node-a", Ready: true},
+		{SlurmNodeName: "worker-a", PodName: "kube-worker-a", KubernetesNodeName: "node-a", Ready: true, HasLocalNVMe: true},
 		{SlurmNodeName: "worker-b", PodName: "kube-worker-b", KubernetesNodeName: "node-b"},
 	}, pods)
 }
