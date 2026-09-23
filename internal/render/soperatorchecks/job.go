@@ -8,13 +8,9 @@ import (
 	"k8s.io/utils/ptr"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/render/common"
 )
 
 func RenderK8sJob(check *slurmv1alpha1.ActiveCheck, cronJob *batchv1.CronJob) *batchv1.Job {
-	labels := common.RenderLabels(consts.ComponentTypeSoperatorChecks, check.Spec.SlurmClusterRefName)
-
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      RenderK8sJobName(check),
@@ -29,7 +25,7 @@ func RenderK8sJob(check *slurmv1alpha1.ActiveCheck, cronJob *batchv1.CronJob) *b
 					BlockOwnerDeletion: ptr.To(true),
 				},
 			},
-			Labels:      labels,
+			Labels:      cronJob.Labels,
 			Annotations: cronJob.Spec.JobTemplate.Annotations,
 		},
 		Spec: *cronJob.Spec.JobTemplate.Spec.DeepCopy(),
