@@ -13,12 +13,31 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
+// PodNamePrefixMode controls whether pod workload names include the SlurmCluster name.
+type PodNamePrefixMode string
+
+const (
+	// PodNamePrefixEnabled prefixes pod workload names with the SlurmCluster name.
+	PodNamePrefixEnabled PodNamePrefixMode = "enabled"
+	// PodNamePrefixDisabled keeps pod workload names unprefixed.
+	PodNamePrefixDisabled PodNamePrefixMode = "disabled"
+)
+
 // SlurmClusterSpec defines the desired state of SlurmCluster
 type SlurmClusterSpec struct {
 	// CRVersion defines the version of the Operator the Custom Resource belongs to
 	//
 	// +kubebuilder:validation:Optional
 	CRVersion string `json:"crVersion,omitempty"` // TODO backward compatibility
+
+	// PodNamePrefix controls whether pod workload names are prefixed with the SlurmCluster name.
+	// It applies to controller, accounting, login, REST, exporter, and sconfigcontroller workloads.
+	// Disable it only when the namespace contains a single SlurmCluster, because unprefixed workload names can collide.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=enabled;disabled
+	// +kubebuilder:default=enabled
+	PodNamePrefix PodNamePrefixMode `json:"podNamePrefix,omitempty"`
 
 	// Maintenance defines the maintenance window for the cluster.
 	// It can have the following values:

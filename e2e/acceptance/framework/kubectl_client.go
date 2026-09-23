@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -17,9 +16,6 @@ const SoperatorNamespace = "soperator"
 
 type KubectlClient struct {
 	exec Exec
-
-	podNameMutex sync.Mutex
-	podNames     map[string]string
 }
 
 type NodeSetInfo struct {
@@ -47,55 +43,7 @@ type WorkerPodInfo struct {
 }
 
 func NewKubectlClient(exec Exec) *KubectlClient {
-	return &KubectlClient{
-		exec:     exec,
-		podNames: make(map[string]string),
-	}
-}
-
-func (c *KubectlClient) ResolveSoperatorPodName(
-	ctx context.Context,
-	clusterName,
-	soperatorVersion,
-	podName string,
-) (string, error) {
-	candidates := SoperatorPodNameCandidates(clusterName, soperatorVersion, podName)
-	cacheKey := strings.Join(candidates, "\x00")
-
-	c.podNameMutex.Lock()
-	resolvedName := c.podNames[cacheKey]
-	c.podNameMutex.Unlock()
-	if resolvedName != "" {
-		return resolvedName, nil
-	}
-
-	for _, candidate := range candidates {
-		output, err := c.exec.Kubectl().Run(
-			ctx,
-			"get", "pod", candidate,
-			"-n", SoperatorNamespace,
-			"--ignore-not-found=true",
-			"-o", "name",
-		)
-		if err != nil {
-			return "", fmt.Errorf("look up Soperator pod %s/%s: %w", SoperatorNamespace, candidate, err)
-		}
-		if strings.TrimSpace(output) == "" {
-			continue
-		}
-
-		c.podNameMutex.Lock()
-		c.podNames[cacheKey] = candidate
-		c.podNameMutex.Unlock()
-		return candidate, nil
-	}
-
-	return "", fmt.Errorf(
-		"find Soperator pod %s in namespace %s; tried %s",
-		podName,
-		SoperatorNamespace,
-		strings.Join(candidates, ", "),
-	)
+	return &KubectlClient{exec: exec}
 }
 
 func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClusterInfo, error) {
@@ -116,6 +64,41 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 		LoginDockerEnabled: cluster.Spec.SlurmNodes.Login.Docker.Enabled,
 		CustomSlurmConfig:  cluster.Spec.CustomSlurmConfig,
 	}, nil
+}
+
+func (c *KubectlClient) ReadyWorkloadPodName(ctx context.Context, clusterName, component string) (string, error) {
+	clusterName = strings.TrimSpace(clusterName)
+	if clusterName == "" {
+		return "", fmt.Errorf("SlurmCluster name is empty")
+	}
+	component = strings.TrimSpace(component)
+	if component == "" {
+		return "", fmt.Errorf("workload component is empty")
+	}
+
+	selector := fmt.Sprintf(
+		"app.kubernetes.io/instance=%s,app.kubernetes.io/component=%s",
+		clusterName,
+		component,
+	)
+	var pods corev1.PodList
+	if err := c.GetJSON(ctx, &pods,
+		"get", "pods", "-n", SoperatorNamespace, "-l", selector, "-o", "json"); err != nil {
+		return "", fmt.Errorf("list %s pods for SlurmCluster %s: %w", component, clusterName, err)
+	}
+
+	var readyPods []string
+	for _, pod := range pods.Items {
+		if pod.DeletionTimestamp == nil && pod.Status.Phase == corev1.PodRunning && kubeobjects.PodReady(pod) {
+			readyPods = append(readyPods, pod.Name)
+		}
+	}
+	if len(readyPods) == 0 {
+		return "", fmt.Errorf("no Ready %s pods found for SlurmCluster %s", component, clusterName)
+	}
+
+	sort.Strings(readyPods)
+	return readyPods[0], nil
 }
 
 func (c *KubectlClient) PatchSlurmClusterCustomConfig(ctx context.Context, name string, value *string) error {

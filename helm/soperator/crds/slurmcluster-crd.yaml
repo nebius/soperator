@@ -29036,6 +29036,16 @@ spec:
                         type: boolean
                     type: object
                 type: object
+              podNamePrefix:
+                default: enabled
+                description: |-
+                  PodNamePrefix controls whether pod workload names are prefixed with the SlurmCluster name.
+                  It applies to controller, accounting, login, REST, exporter, and sconfigcontroller workloads.
+                  Disable it only when the namespace contains a single SlurmCluster, because unprefixed workload names can collide.
+                enum:
+                - enabled
+                - disabled
+                type: string
               populateJail:
                 description: PopulateJail defines the k8s Job that performs initial
                   jail file system population

@@ -28,7 +28,6 @@ type runOptions struct {
 type collectOptions struct {
 	KubectlContext   string
 	SlurmClusterName string
-	SoperatorVersion string
 	NebiusProjectID  string
 	OutputDir        string
 }
@@ -106,14 +105,7 @@ func collectArtifacts(ctx context.Context, args []string) error {
 			artifacts.NewMK8sCollector(acceptance.NewLocalArgsScope(), opts.NebiusProjectID),
 		)
 	}
-	targetVersion, err := resolveTargetSoperatorVersion(ctx, opts.KubectlContext, opts.SoperatorVersion)
-	if err != nil {
-		return err
-	}
-	runtime, err := acceptance.NewRuntime(opts.KubectlContext, opts.SlurmClusterName, targetVersion)
-	if err != nil {
-		return err
-	}
+	runtime := acceptance.NewRuntime(opts.KubectlContext, opts.SlurmClusterName)
 	collectors := artifacts.CommonCollectors(runtime, opts.NebiusProjectID)
 	return artifacts.CollectAll(ctx, opts.OutputDir, collectors...)
 }
@@ -162,7 +154,6 @@ func parseCollectOptions(args []string) (collectOptions, error) {
 	fs.SetOutput(os.Stderr)
 	fs.StringVar(&opts.KubectlContext, "kubectl-context", "", "optional kubectl context; when omitted, only MK8s artifacts are collected")
 	fs.StringVar(&opts.SlurmClusterName, "slurm-cluster-name", opts.SlurmClusterName, "SlurmCluster resource name")
-	fs.StringVar(&opts.SoperatorVersion, "soperator-version", "", "target Soperator version; when omitted, Flux HelmRelease discovery is used")
 	fs.StringVar(&opts.NebiusProjectID, "nebius-project-id", "", "optional Nebius project ID for Managed Kubernetes artifacts")
 	fs.StringVar(&opts.OutputDir, "output-dir", "", "directory for collected artifacts")
 	if err := fs.Parse(args); err != nil {
@@ -173,7 +164,6 @@ func parseCollectOptions(args []string) (collectOptions, error) {
 	}
 	opts.KubectlContext = strings.TrimSpace(opts.KubectlContext)
 	opts.SlurmClusterName = strings.TrimSpace(opts.SlurmClusterName)
-	opts.SoperatorVersion = strings.TrimSpace(opts.SoperatorVersion)
 	opts.NebiusProjectID = strings.TrimSpace(opts.NebiusProjectID)
 	opts.OutputDir = strings.TrimSpace(opts.OutputDir)
 	if opts.OutputDir == "" {

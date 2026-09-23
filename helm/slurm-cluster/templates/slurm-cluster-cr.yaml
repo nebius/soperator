@@ -44,6 +44,7 @@ spec:
     - state: ANY
     - state: CYCLE
   maintenance: {{ default "none" .Values.maintenance | quote  }}
+  podNamePrefix: {{ .Values.podNamePrefix | quote }}
   crVersion: {{ .Chart.Version }}
   partitionConfiguration:
     configType: {{ (default "default" .Values.partitionConfiguration.configType) }}

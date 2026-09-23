@@ -1,5 +1,5 @@
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.28.0
+ENVTEST_K8S_VERSION ?= 1.36.2
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -118,6 +118,8 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
+	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)"; \
+	export KUBEBUILDER_ASSETS; \
 	go test ./...
 
 .PHONY: test-python
@@ -126,6 +128,8 @@ test-python: ## Temporarily retained while removing Python unit tests from CI.
 
 .PHONY: test-coverage
 test-coverage: manifests generate fmt vet envtest ## Run tests and generate test coverage.
+	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)"; \
+	export KUBEBUILDER_ASSETS; \
 	go test ./... -coverprofile cover.out
 
 .PHONY: lint
@@ -503,7 +507,8 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
 .PHONY: deploy-flux
-deploy-flux: install-flux kustomize ## Deploy soperator via Flux CD to kind cluster (for local development)
+# Match the bootstrap chart: Flux waits for each child release independently of the parent.
+deploy-flux: install-flux kustomize yq ## Deploy soperator via Flux CD to kind cluster (for local development)
 	@echo "Step 1: Installing Flux CD..."
 	@echo "Checking cluster connectivity..."
 	@if ! $(KUBECTL_CTX) cluster-info > /dev/null 2>&1; then \
@@ -530,6 +535,7 @@ deploy-flux: install-flux kustomize ## Deploy soperator via Flux CD to kind clus
 	echo ""; \
 	echo "Step 3: Deploying Flux configuration for local environment..."; \
 	$(KUSTOMIZE) build fluxcd/environment/local | \
+		$(YQ) '(select(.kind == "HelmRelease" and .metadata.name == "soperator-fluxcd") | .spec) |= (.install.disableWait = true | .upgrade.disableWait = true)' - | \
 		sed "s|url: oci://cr.nebius.cloud/soperator.*|url: $$OCI_REPO|g" | \
 		$(KUBECTL_CTX) apply -f -; \
 	echo ""; \
@@ -581,22 +587,21 @@ KIND			?= $(LOCALBIN)/kind
 FLUX			?= $(LOCALBIN)/flux
 
 ## Tool Versions
-KUSTOMIZE_VERSION			?= v5.5.0
+KUSTOMIZE_VERSION			?= v5.8.1
 CONTROLLER_TOOLS_VERSION	?= v0.21.0
-ENVTEST_VERSION				?= release-0.24
+ENVTEST_VERSION				?= v0.24.2-0.20260713111223-0f529e22d5c0
 # Read by the GitHub CI workflow.
 GOLANGCI_LINT_VERSION		?= v2.13.2
-HELMIFY_VERSION				?= 0.4.13
-HELM_VERSION				?= v3.18.3
-HELM_UNITTEST_VERSION		?= 0.8.2
-YQ_VERSION					?= 4.44.3
+HELMIFY_VERSION				?= 0.4.20
+HELM_VERSION				?= v3.22.0
+HELM_UNITTEST_VERSION		?= 1.1.2
+YQ_VERSION					?= 4.53.6
 MOCKERY_VERSION				?= 2.53.7
-KIND_VERSION				?= v0.30.0
-FLUX_VERSION				?= 2.7.3
+KIND_VERSION				?= v0.33.0
+FLUX_VERSION				?= 2.9.5
 
 .PHONY: kustomize
-kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
-$(KUSTOMIZE): $(LOCALBIN)
+kustomize: | $(LOCALBIN) ## Download kustomize locally if necessary.
 	@if test -x $(LOCALBIN)/kustomize && ! $(LOCALBIN)/kustomize version | grep -q $(KUSTOMIZE_VERSION); then \
 		echo "$(LOCALBIN)/kustomize version is not expected $(KUSTOMIZE_VERSION). Removing it before installing."; \
 		rm -rf $(LOCALBIN)/kustomize; \
@@ -626,9 +631,9 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
 .PHONY: envtest
-envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
-$(ENVTEST): $(LOCALBIN)
-	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
+envtest: | $(LOCALBIN) ## Download setup-envtest locally if necessary.
+	test -s $(ENVTEST) && go version -m $(ENVTEST) | grep -q $(ENVTEST_VERSION) || \
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 
 .PHONY: golangci-lint
 golangci-lint: | $(LOCALBIN) ## Download golangci-lint locally if necessary.
@@ -639,18 +644,17 @@ golangci-lint: | $(LOCALBIN) ## Download golangci-lint locally if necessary.
 	fi
 
 .PHONY: helmify
-helmify: $(HELMIFY) ## Download helmify locally if necessary.
-$(HELMIFY): $(LOCALBIN)
-	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@v$(HELMIFY_VERSION)
+helmify: | $(LOCALBIN) ## Download helmify locally if necessary.
+	test -s $(HELMIFY) && go version -m $(HELMIFY) | grep -q v$(HELMIFY_VERSION) || \
+	GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@v$(HELMIFY_VERSION)
 
 .PHONY: yq
-yq: $(YQ) ## Download yq locally if necessary.
-$(YQ): $(LOCALBIN)
-	test -s $(LOCALBIN)/yq || GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
+yq: | $(LOCALBIN) ## Download yq locally if necessary.
+	test -s $(YQ) && $(YQ) --version | grep -q v$(YQ_VERSION) || \
+	GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
 
 .PHONY: install-kind
-install-kind: $(KIND) ## Download kind locally if necessary.
-$(KIND): $(LOCALBIN)
+install-kind: | $(LOCALBIN) ## Download kind locally if necessary.
 	@if test -x $(LOCALBIN)/kind && ! $(LOCALBIN)/kind version | grep -q $(KIND_VERSION); then \
 		echo "$(LOCALBIN)/kind version is not expected $(KIND_VERSION). Removing it before installing."; \
 		rm -rf $(LOCALBIN)/kind; \
@@ -666,8 +670,7 @@ $(KIND): $(LOCALBIN)
 	fi
 
 .PHONY: install-flux
-install-flux: $(FLUX) ## Download flux CLI locally if necessary.
-$(FLUX): $(LOCALBIN)
+install-flux: | $(LOCALBIN) ## Download flux CLI locally if necessary.
 	@if test -x $(LOCALBIN)/flux && ! $(LOCALBIN)/flux version --client | grep -q $(FLUX_VERSION); then \
 		echo "$(LOCALBIN)/flux version is not expected $(FLUX_VERSION). Removing it before installing."; \
 		rm -rf $(LOCALBIN)/flux; \
@@ -707,7 +710,7 @@ check-helm:
 
 install-helm:
 	@echo "Installing Helm $(HELM_VERSION)..."
-	@curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+	@curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | DESIRED_VERSION=$(HELM_VERSION) bash
 
 install-unittest:
 	@echo "Installing helm-unittest plugin $(HELM_UNITTEST_VERSION)..."
@@ -717,7 +720,7 @@ install-unittest:
 
 KIND_CLUSTER_NAME	?= soperator-dev
 KIND_NODES			?= 2
-KIND_K8S_VERSION	?= v1.31.0
+KIND_K8S_VERSION	?= v1.36.4
 KIND_CONTEXT		?= kind-$(KIND_CLUSTER_NAME)
 # The soperator-fluxcd chart pins its control-plane workloads to the system nodeset, so every kind
 # node carries the label - otherwise those pods stay Pending and their HelmReleases never go Ready.

@@ -107,3 +107,17 @@ func TestBuildSlurmLoginFrom_PreservesSSSHDConfigDefault(t *testing.T) {
 	assert.True(t, result.IsSSHDConfigMapDefault)
 	assert.Equal(t, corev1.ServiceTypeClusterIP, result.HeadlessService.Type)
 }
+
+func TestBuildSlurmLoginFromUsesConfiguredStatefulSetNamePrefix(t *testing.T) {
+	login := &slurmv1.SlurmNodeLogin{
+		Sshd:    slurmv1.NodeContainer{Image: "sshd-image"},
+		Munge:   slurmv1.NodeContainer{Image: "munge-image"},
+		Volumes: slurmv1.SlurmNodeLoginVolumes{Jail: slurmv1.NodeVolume{}},
+	}
+
+	prefixed := buildSlurmLoginFrom("test-cluster", "test-cluster", nil, login)
+	unprefixed := buildSlurmLoginFrom("test-cluster", "", nil, login)
+
+	assert.Equal(t, "test-cluster-login", prefixed.StatefulSet.Name)
+	assert.Equal(t, consts.ComponentTypeLogin.String(), unprefixed.StatefulSet.Name)
+}

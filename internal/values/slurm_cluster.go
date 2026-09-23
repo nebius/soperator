@@ -44,7 +44,7 @@ type SlurmCluster struct {
 
 // BuildSlurmClusterFrom creates a new instance of SlurmCluster given a SlurmCluster CRD.
 // namePrefix is the prefix to use for workload resource names (StatefulSet, DaemonSet, Deployment).
-// Pass cluster.Name for new clusters, or "" to preserve legacy unprefixed names on existing clusters.
+// Pass cluster.Name to enable workload prefixes, or "" to keep workload names unprefixed.
 func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster, namePrefix string) (*SlurmCluster, error) {
 	logger := log.FromContext(ctx)
 	logger.V(1).Info(fmt.Sprintf("%+v", cluster.Spec.SConfigController))
