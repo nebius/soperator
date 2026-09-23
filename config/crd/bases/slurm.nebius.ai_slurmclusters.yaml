@@ -89,14 +89,17 @@ spec:
               extraAnnotations:
                 additionalProperties:
                   type: string
-                description: ExtraAnnotations are custom K8s annotations added to
-                  every Pod and PVC created for this cluster.
+                description: |-
+                  ExtraAnnotations are custom K8s annotations added to every Pod and PVC created for this cluster,
+                  including the Pods of its ActiveChecks.
                 type: object
               extraLabels:
                 additionalProperties:
                   type: string
-                description: ExtraLabels are custom K8s labels added to every Pod
-                  and PVC created for this cluster.
+                description: |-
+                  ExtraLabels are custom K8s labels added to every Pod and PVC created for this cluster,
+                  including the Pods of its ActiveChecks. A key that collides with a label the operator
+                  relies on (e.g. for a resource's selector) is ignored.
                 type: object
               healthCheckConfig:
                 description: HealthCheckConfig defines Slurm health check configuration.
