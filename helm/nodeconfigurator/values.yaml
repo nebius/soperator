@@ -28,7 +28,7 @@ rebooter:
   env: []
   image:
     repository: "cr.nebius.cloud/soperator/rebooter"
-    tag: "4.1.10"
+    tag: "4.1.11"
     pullPolicy: IfNotPresent
   nodeSelector: {}
   resources: {}
