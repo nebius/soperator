@@ -165,8 +165,18 @@ RUN sed -Ei \
       /etc/pam.d/sshd && \
     grep -Eq '^[[:space:]]*account[[:space:]]+substack[[:space:]]+common-account[[:space:]]*$' \
       /etc/pam.d/sshd && \
-    touch /etc/pam.d/soperator-pam-slurm-adopt && \
-    chmod 0644 /etc/pam.d/soperator-pam-slurm-adopt && \
+    mkdir -p /etc/soperator/pam-slurm-adopt && \
+    touch \
+      /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt \
+      /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt-users \
+      /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt-groups && \
+    chmod 0644 /etc/soperator/pam-slurm-adopt/* && \
+    ln -s /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt \
+      /etc/pam.d/soperator-pam-slurm-adopt && \
+    ln -s /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt-users \
+      /etc/security/soperator-pam-slurm-adopt-users && \
+    ln -s /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt-groups \
+      /etc/security/soperator-pam-slurm-adopt-groups && \
     echo "@include soperator-pam-slurm-adopt" >> /etc/pam.d/sshd && \
     echo "session required pam_soperator_jail.so /mnt/jail" >> /etc/pam.d/sshd
 

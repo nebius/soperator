@@ -68,10 +68,24 @@ func TestRenderConfigMapPAMSlurmAdoptWithoutExemptions(t *testing.T) {
 		PAMSlurmAdopt: values.PAMSlurmAdopt{Enabled: true},
 	})
 
-	assert.NotContains(t, result.Data[consts.ConfigMapKeyPAMSlurmAdopt], "pam_listfile.so")
+	assert.Contains(t, result.Data[consts.ConfigMapKeyPAMSlurmAdopt], "pam_listfile.so item=user")
+	assert.Contains(t, result.Data[consts.ConfigMapKeyPAMSlurmAdopt], "pam_listfile.so item=group")
 	assert.Contains(t, result.Data[consts.ConfigMapKeyPAMSlurmAdopt], "action_unknown=newest")
 	assert.Empty(t, result.Data[consts.ConfigMapKeyPAMSlurmAdoptUsers])
 	assert.Empty(t, result.Data[consts.ConfigMapKeyPAMSlurmAdoptGroups])
+}
+
+func TestRenderConfigMapPAMSlurmAdoptDisabled(t *testing.T) {
+	result := RenderConfigMapPAMSlurmAdopt(&values.SlurmCluster{
+		PAMSlurmAdopt: values.PAMSlurmAdopt{
+			ExemptUsers:  []string{"service-user"},
+			ExemptGroups: []string{"cluster-admins"},
+		},
+	})
+
+	assert.Empty(t, result.Data[consts.ConfigMapKeyPAMSlurmAdopt])
+	assert.Equal(t, "service-user", result.Data[consts.ConfigMapKeyPAMSlurmAdoptUsers])
+	assert.Equal(t, "cluster-admins", result.Data[consts.ConfigMapKeyPAMSlurmAdoptGroups])
 }
 
 func TestGenerateSshdConfig_KeepsChrootFallbackForOldImages(t *testing.T) {

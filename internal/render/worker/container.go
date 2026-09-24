@@ -1,8 +1,6 @@
 package worker
 
 import (
-	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -124,9 +122,9 @@ func renderContainerNodeSetSlurmd(
 		volumeMounts = append(volumeMounts, renderVolumeMountSupervisordConfigMap())
 	}
 	volumeMounts = append(volumeMounts, renderVolumeMountSshdConfigs())
-	if nodeSet.PAMSlurmAdopt.Enabled {
-		volumeMounts = append(volumeMounts, renderVolumeMountsPAMSlurmAdopt()...)
-	}
+	// Mount the whole ConfigMap directory so kubelet can refresh PAM policy and
+	// exemption files without changing the worker pod template.
+	volumeMounts = append(volumeMounts, renderVolumeMountPAMSlurmAdopt())
 	if nodeSet.ContainerSSSD != nil {
 		volumeMounts = append(volumeMounts,
 			common.RenderVolumeMountSSSDSocket(),
@@ -193,7 +191,7 @@ func renderContainerNodeSetSlurmd(
 
 	for _, env := range nodeSet.ContainerSlurmd.CustomEnv {
 		switch env.Name {
-		case consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes, consts.EnvPAMSlurmAdoptConfigHash:
+		case consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes:
 			return corev1.Container{}, fmt.Errorf("environment variable %q is managed by Soperator", env.Name)
 		}
 	}
@@ -211,17 +209,6 @@ func renderContainerNodeSetSlurmd(
 		),
 		renderSlurmdTopologyEnv(topologyEnabled)...,
 	)
-	if nodeSet.PAMSlurmAdopt.Enabled {
-		configHash, hashErr := renderPAMSlurmAdoptConfigHash(nodeSet.PAMSlurmAdopt)
-		if hashErr != nil {
-			return corev1.Container{}, fmt.Errorf("hashing pam_slurm_adopt configuration: %w", hashErr)
-		}
-		// The PAM files use subPath mounts, which only refresh when the container restarts.
-		env = append(env, corev1.EnvVar{
-			Name:  consts.EnvPAMSlurmAdoptConfigHash,
-			Value: configHash,
-		})
-	}
 	env = append(env, nodeSet.ContainerSlurmd.CustomEnv...)
 
 	return corev1.Container{
@@ -264,19 +251,6 @@ func renderContainerNodeSetSlurmd(
 	}, nil
 }
 
-func renderPAMSlurmAdoptConfigHash(config values.PAMSlurmAdopt) (string, error) {
-	contents, err := json.Marshal([]string{
-		generatePAMSlurmAdoptConfig(config).Render(),
-		generatePAMSlurmAdoptIdentityList(config.ExemptUsers).Render(),
-		generatePAMSlurmAdoptIdentityList(config.ExemptGroups).Render(),
-	})
-	if err != nil {
-		return "", fmt.Errorf("marshaling rendered configuration: %w", err)
-	}
-
-	return fmt.Sprintf("%x", sha256.Sum256(contents)), nil
-}
-
 func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameSupervisordConfigMap,
@@ -292,26 +266,11 @@ func renderVolumeMountRuntime() corev1.VolumeMount {
 	}
 }
 
-func renderVolumeMountsPAMSlurmAdopt() []corev1.VolumeMount {
-	return []corev1.VolumeMount{
-		{
-			Name:      consts.VolumeNamePAMSlurmAdopt,
-			MountPath: consts.VolumeMountPathPAMSlurmAdopt,
-			SubPath:   consts.VolumeMountSubPathPAMSlurmAdopt,
-			ReadOnly:  true,
-		},
-		{
-			Name:      consts.VolumeNamePAMSlurmAdopt,
-			MountPath: consts.VolumeMountPathPAMSlurmAdoptUsers,
-			SubPath:   consts.VolumeMountSubPathPAMSlurmAdoptUsers,
-			ReadOnly:  true,
-		},
-		{
-			Name:      consts.VolumeNamePAMSlurmAdopt,
-			MountPath: consts.VolumeMountPathPAMSlurmAdoptGroups,
-			SubPath:   consts.VolumeMountSubPathPAMSlurmAdoptGroups,
-			ReadOnly:  true,
-		},
+func renderVolumeMountPAMSlurmAdopt() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNamePAMSlurmAdopt,
+		MountPath: consts.VolumeMountPathPAMSlurmAdopt,
+		ReadOnly:  true,
 	}
 }
 

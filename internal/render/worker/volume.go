@@ -36,9 +36,7 @@ func renderVolumesAndClaimTemplateSpecsForNodeSet(
 		volumes = append(volumes, renderSupervisordConfigMap(nodeSet.SupervisorDConfigMapName))
 	}
 	volumes = append(volumes, renderVolumeSshdConfigs(nodeSet.SSHDConfigMapName))
-	if nodeSet.PAMSlurmAdopt.Enabled {
-		volumes = append(volumes, renderVolumePAMSlurmAdopt(nodeSet.ParentalCluster.Name))
-	}
+	volumes = append(volumes, renderVolumePAMSlurmAdopt(nodeSet.ParentalCluster.Name))
 	if nodeSet.ContainerSSSD != nil {
 		volumes = append(volumes,
 			common.RenderVolumeSSSDSocket(),

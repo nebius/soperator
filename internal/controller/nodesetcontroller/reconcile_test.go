@@ -31,7 +31,7 @@ func makeNodeSetWithConditions(conditions ...metav1.Condition) *slurmv1alpha1.No
 	}
 }
 
-func TestGetWorkersStatefulSetDependenciesPAMSlurmAdopt(t *testing.T) {
+func TestGetWorkersStatefulSetDependenciesExcludesPAMSlurmAdopt(t *testing.T) {
 	const (
 		namespace   = "test-namespace"
 		clusterName = "test-cluster"
@@ -49,10 +49,6 @@ func TestGetWorkersStatefulSetDependenciesPAMSlurmAdopt(t *testing.T) {
 		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      sshdName,
-		}},
-		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      naming.BuildConfigMapPAMSlurmAdoptName(clusterName),
 		}},
 	}
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
@@ -72,9 +68,7 @@ func TestGetWorkersStatefulSetDependenciesPAMSlurmAdopt(t *testing.T) {
 	nodeSet.PAMSlurmAdopt.Enabled = true
 	dependencies, err = r.getWorkersStatefulSetDependencies(context.Background(), nodeSet, cluster)
 	require.NoError(t, err)
-	if assert.Len(t, dependencies, 3) {
-		assert.Equal(t, naming.BuildConfigMapPAMSlurmAdoptName(clusterName), dependencies[2].GetName())
-	}
+	assert.Len(t, dependencies, 2)
 }
 
 func TestComputePhase(t *testing.T) {

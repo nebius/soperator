@@ -361,12 +361,12 @@ func (r NodeSetReconciler) executeReconciliation(
 					}
 				}
 
-				if clusterValues.PAMSlurmAdopt.Enabled {
-					desired := worker.RenderConfigMapPAMSlurmAdopt(clusterValues)
-					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile pam_slurm_adopt ConfigMap")
-						return fmt.Errorf("reconciling worker pam_slurm_adopt ConfigMap: %w", err)
-					}
+				// Keep the projected files present even while adoption is disabled so policy
+				// changes do not require changing or restarting the worker pods.
+				desired := worker.RenderConfigMapPAMSlurmAdopt(clusterValues)
+				if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile pam_slurm_adopt ConfigMap")
+					return fmt.Errorf("reconciling worker pam_slurm_adopt ConfigMap: %w", err)
 				}
 
 				stepLogger.V(1).Info("Reconciled")
@@ -717,21 +717,8 @@ func (r NodeSetReconciler) getWorkersStatefulSetDependencies(
 		}
 		res = append(res, sshdConfigMap)
 	}
-
-	if nodeSet.PAMSlurmAdopt.Enabled {
-		pamSlurmAdoptConfigMap := &corev1.ConfigMap{}
-		if err := r.Get(
-			ctx,
-			types.NamespacedName{
-				Namespace: nodeSet.ParentalCluster.Namespace,
-				Name:      naming.BuildConfigMapPAMSlurmAdoptName(nodeSet.ParentalCluster.Name),
-			},
-			pamSlurmAdoptConfigMap,
-		); err != nil {
-			return []metav1.Object{}, err
-		}
-		res = append(res, pamSlurmAdoptConfigMap)
-	}
+	// The PAM ConfigMap is intentionally not a versioned dependency. Its directory
+	// mount receives kubelet updates; versioning it would restart workers on edits.
 
 	return res, nil
 }

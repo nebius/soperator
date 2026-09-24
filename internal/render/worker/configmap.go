@@ -115,18 +115,18 @@ func RenderConfigMapPAMSlurmAdopt(cluster *values.SlurmCluster) corev1.ConfigMap
 
 func generatePAMSlurmAdoptConfig(config values.PAMSlurmAdopt) renderutils.ConfigFile {
 	res := &renderutils.MultilineStringConfig{}
-	if len(config.ExemptUsers) > 0 {
-		res.AddLine(fmt.Sprintf(
-			"account sufficient pam_listfile.so item=user sense=allow onerr=fail file=%s",
-			consts.VolumeMountPathPAMSlurmAdoptUsers,
-		))
+	if !config.Enabled {
+		return res
 	}
-	if len(config.ExemptGroups) > 0 {
-		res.AddLine(fmt.Sprintf(
-			"account sufficient pam_listfile.so item=group sense=allow onerr=fail file=%s",
-			consts.VolumeMountPathPAMSlurmAdoptGroups,
-		))
-	}
+
+	res.AddLine(fmt.Sprintf(
+		"account sufficient pam_listfile.so item=user sense=allow onerr=fail file=%s",
+		consts.VolumeMountPathPAMSlurmAdoptUsers,
+	))
+	res.AddLine(fmt.Sprintf(
+		"account sufficient pam_listfile.so item=group sense=allow onerr=fail file=%s",
+		consts.VolumeMountPathPAMSlurmAdoptGroups,
+	))
 	res.AddLine("-account required pam_slurm_adopt.so action_no_jobs=deny action_unknown=newest action_adopt_failure=deny action_generic_failure=deny disable_x11=1 join_container=false")
 	return res
 }
