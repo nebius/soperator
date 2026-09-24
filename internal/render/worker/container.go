@@ -1,6 +1,8 @@
 package worker
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -191,12 +193,36 @@ func renderContainerNodeSetSlurmd(
 
 	for _, env := range nodeSet.ContainerSlurmd.CustomEnv {
 		switch env.Name {
-		case consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes:
+		case consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes, consts.EnvPAMSlurmAdoptConfigHash:
 			return corev1.Container{}, fmt.Errorf("environment variable %q is managed by Soperator", env.Name)
 		}
 	}
 
 	realMemoryBytes := common.RenderRealMemorySlurmd(resources) * 1024 * 1024
+	env := append(
+		renderNodeSetSlurmdEnv(
+			cgroupVersion,
+			clusterWithGPU,
+			nodeSet.GPU.Enabled,
+			nodeSet.GPU.Nvidia.GDRCopyEnabled,
+			nodeSet.DockerEnabled,
+			nodeSet.NodeExtra,
+			realMemoryBytes,
+		),
+		renderSlurmdTopologyEnv(topologyEnabled)...,
+	)
+	if nodeSet.PAMSlurmAdopt.Enabled {
+		configHash, hashErr := renderPAMSlurmAdoptConfigHash(nodeSet.PAMSlurmAdopt)
+		if hashErr != nil {
+			return corev1.Container{}, fmt.Errorf("hashing pam_slurm_adopt configuration: %w", hashErr)
+		}
+		// The PAM files use subPath mounts, which only refresh when the container restarts.
+		env = append(env, corev1.EnvVar{
+			Name:  consts.EnvPAMSlurmAdoptConfigHash,
+			Value: configHash,
+		})
+	}
+	env = append(env, nodeSet.ContainerSlurmd.CustomEnv...)
 
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
@@ -204,21 +230,7 @@ func renderContainerNodeSetSlurmd(
 		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
 		Command:         nodeSet.ContainerSlurmd.Command,
 		Args:            nodeSet.ContainerSlurmd.Args,
-		Env: append(
-			append(
-				renderNodeSetSlurmdEnv(
-					cgroupVersion,
-					clusterWithGPU,
-					nodeSet.GPU.Enabled,
-					nodeSet.GPU.Nvidia.GDRCopyEnabled,
-					nodeSet.DockerEnabled,
-					nodeSet.NodeExtra,
-					realMemoryBytes,
-				),
-				renderSlurmdTopologyEnv(topologyEnabled)...,
-			),
-			nodeSet.ContainerSlurmd.CustomEnv...,
-		),
+		Env: env,
 		Ports: []corev1.ContainerPort{{
 			Name:          nodeSet.ContainerSlurmd.Name,
 			ContainerPort: nodeSet.ContainerSlurmd.Port,
@@ -250,6 +262,19 @@ func renderContainerNodeSetSlurmd(
 		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 	}, nil
+}
+
+func renderPAMSlurmAdoptConfigHash(config values.PAMSlurmAdopt) (string, error) {
+	contents, err := json.Marshal([]string{
+		generatePAMSlurmAdoptConfig(config).Render(),
+		generatePAMSlurmAdoptIdentityList(config.ExemptUsers).Render(),
+		generatePAMSlurmAdoptIdentityList(config.ExemptGroups).Render(),
+	})
+	if err != nil {
+		return "", fmt.Errorf("marshaling rendered configuration: %w", err)
+	}
+
+	return fmt.Sprintf("%x", sha256.Sum256(contents)), nil
 }
 
 func renderVolumeMountSupervisordConfigMap() corev1.VolumeMount {

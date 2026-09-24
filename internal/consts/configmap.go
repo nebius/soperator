@@ -34,6 +34,7 @@ const (
 	ConfigMapKeyPAMSlurmAdopt           = pamSlurmAdoptConfFile
 	ConfigMapKeyPAMSlurmAdoptUsers      = pamSlurmAdoptUsersConfFile
 	ConfigMapKeyPAMSlurmAdoptGroups     = pamSlurmAdoptGroupsConfFile
+	EnvPAMSlurmAdoptConfigHash          = "SOPERATOR_PAM_SLURM_ADOPT_CONFIG_HASH"
 	ConfigMapKeySoperatorcheckSbatch    = "sbatch.sh"
 
 	// AnnotationTopologyStructure records the topology structure the JailedConfig was last rendered

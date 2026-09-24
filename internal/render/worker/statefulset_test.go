@@ -33,6 +33,19 @@ func assertEnvValue(t *testing.T, envs []corev1.EnvVar, name, expectedValue stri
 	t.Fatalf("env var %s not found", name)
 }
 
+func envValue(t *testing.T, envs []corev1.EnvVar, name string) string {
+	t.Helper()
+
+	for _, env := range envs {
+		if env.Name == name {
+			return env.Value
+		}
+	}
+
+	t.Fatalf("env var %s not found", name)
+	return ""
+}
+
 func Test_RenderContainerWorkerInit(t *testing.T) {
 	container := &values.Container{
 		NodeContainer: slurmv1.NodeContainer{
@@ -868,6 +881,9 @@ func TestRenderNodeSetStatefulSet_PAMSlurmAdopt(t *testing.T) {
 			if !enabled {
 				assert.Nil(t, adoptVolume)
 				assert.Empty(t, adoptMounts)
+				for _, env := range slurmd.Env {
+					assert.NotEqual(t, consts.EnvPAMSlurmAdoptConfigHash, env.Name)
+				}
 				return
 			}
 
@@ -885,8 +901,37 @@ func TestRenderNodeSetStatefulSet_PAMSlurmAdopt(t *testing.T) {
 				assert.Equal(t, consts.VolumeMountSubPathPAMSlurmAdoptGroups, adoptMounts[2].SubPath)
 				assert.True(t, adoptMounts[2].ReadOnly)
 			}
+			assert.NotEmpty(t, envValue(t, slurmd.Env, consts.EnvPAMSlurmAdoptConfigHash))
 		})
 	}
+
+	t.Run("changing exemptions changes the pod spec hash", func(t *testing.T) {
+		initial := createNodeSet(true)
+		initial.PAMSlurmAdopt.ExemptUsers = []string{"bob"}
+		updated := createNodeSet(true)
+		updated.PAMSlurmAdopt.ExemptUsers = []string{"bob", "dockeruser"}
+
+		initialStatefulSet, err := worker.RenderNodeSetStatefulSet(
+			initial,
+			&slurmv1.Secrets{},
+			consts.CGroupV2,
+			false,
+			false,
+		)
+		assert.NoError(t, err)
+		updatedStatefulSet, err := worker.RenderNodeSetStatefulSet(
+			updated,
+			&slurmv1.Secrets{},
+			consts.CGroupV2,
+			false,
+			false,
+		)
+		assert.NoError(t, err)
+
+		initialHash := envValue(t, initialStatefulSet.Spec.Template.Spec.Containers[0].Env, consts.EnvPAMSlurmAdoptConfigHash)
+		updatedHash := envValue(t, updatedStatefulSet.Spec.Template.Spec.Containers[0].Env, consts.EnvPAMSlurmAdoptConfigHash)
+		assert.NotEqual(t, initialHash, updatedHash)
+	})
 }
 
 func TestRenderNodeSetStatefulSet_SupervisordConfig(t *testing.T) {
@@ -1035,7 +1080,11 @@ func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 		t.Fatal("slurmd container not found")
 	})
 
-	for _, envName := range []string{consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes} {
+	for _, envName := range []string{
+		consts.EnvDockerEnabled,
+		consts.EnvNodeRealMemoryBytes,
+		consts.EnvPAMSlurmAdoptConfigHash,
+	} {
 		t.Run("rejects a custom override of "+envName, func(t *testing.T) {
 			nodeSet := createNodeSet()
 			nodeSet.ContainerSlurmd.CustomEnv = []corev1.EnvVar{{
