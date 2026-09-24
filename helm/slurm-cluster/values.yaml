@@ -226,7 +226,7 @@ topology: null
 customSlurmConfig: ""
 customCgroupConfig: ""
 pamSlurmAdopt:
-  enabled: true
+  enabled: false
   exemptUsers: []
   exemptGroups: []
 mpiConfig:

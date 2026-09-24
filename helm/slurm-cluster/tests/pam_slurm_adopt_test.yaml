@@ -2,11 +2,11 @@ suite: test pam_slurm_adopt rendering
 templates:
   - templates/slurm-cluster-cr.yaml
 tests:
-  - it: should render pam_slurm_adopt enabled by default
+  - it: should render pam_slurm_adopt disabled by default
     asserts:
       - equal:
           path: spec.pamSlurmAdopt.enabled
-          value: true
+          value: false
       - equal:
           path: spec.pamSlurmAdopt.exemptUsers
           value: []
@@ -17,7 +17,7 @@ tests:
   - it: should render pam_slurm_adopt overrides
     set:
       pamSlurmAdopt:
-        enabled: false
+        enabled: true
         exemptUsers:
           - service-account
         exemptGroups:
@@ -25,7 +25,7 @@ tests:
     asserts:
       - equal:
           path: spec.pamSlurmAdopt.enabled
-          value: false
+          value: true
       - equal:
           path: spec.pamSlurmAdopt.exemptUsers
           value:

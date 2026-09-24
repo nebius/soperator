@@ -151,7 +151,7 @@ type PAMSlurmAdopt struct {
 	// Enabled requires non-root SSH users to own a running job on the target worker.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// ExemptUsers lists non-root users that may SSH to workers without a running job. Their sessions

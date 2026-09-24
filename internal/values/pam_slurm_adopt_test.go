@@ -10,12 +10,18 @@ import (
 )
 
 func TestBuildPAMSlurmAdoptFrom(t *testing.T) {
-	t.Run("defaults to enabled", func(t *testing.T) {
+	t.Run("defaults to disabled", func(t *testing.T) {
 		result := buildPAMSlurmAdoptFrom(nil)
 
-		assert.True(t, result.Enabled)
+		assert.False(t, result.Enabled)
 		assert.Empty(t, result.ExemptUsers)
 		assert.Empty(t, result.ExemptGroups)
+	})
+
+	t.Run("defaults omitted enabled field to disabled", func(t *testing.T) {
+		result := buildPAMSlurmAdoptFrom(&slurmv1.PAMSlurmAdopt{})
+
+		assert.False(t, result.Enabled)
 	})
 
 	t.Run("preserves configuration", func(t *testing.T) {
@@ -37,7 +43,7 @@ func TestBuildPAMSlurmAdoptFrom(t *testing.T) {
 		assert.Equal(t, []string{"cluster-admins"}, result.ExemptGroups)
 	})
 
-	t.Run("can be disabled", func(t *testing.T) {
+	t.Run("preserves explicit disabled configuration", func(t *testing.T) {
 		result := buildPAMSlurmAdoptFrom(&slurmv1.PAMSlurmAdopt{Enabled: ptr.To(false)})
 
 		assert.False(t, result.Enabled)

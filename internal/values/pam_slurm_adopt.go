@@ -16,11 +16,11 @@ type PAMSlurmAdopt struct {
 
 func buildPAMSlurmAdoptFrom(config *slurmv1.PAMSlurmAdopt) PAMSlurmAdopt {
 	if config == nil {
-		return PAMSlurmAdopt{Enabled: true}
+		return PAMSlurmAdopt{Enabled: false}
 	}
 
 	return PAMSlurmAdopt{
-		Enabled:      ptr.Deref(config.Enabled, true),
+		Enabled:      ptr.Deref(config.Enabled, false),
 		ExemptUsers:  slices.Clone(config.ExemptUsers),
 		ExemptGroups: slices.Clone(config.ExemptGroups),
 	}

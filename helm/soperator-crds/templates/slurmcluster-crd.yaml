@@ -28754,7 +28754,7 @@ spec:
                   Eligible sessions are adopted into the job's external step and inherit its cgroup constraints.
                 properties:
                   enabled:
-                    default: true
+                    default: false
                     description: Enabled requires non-root SSH users to own a running
                       job on the target worker.
                     type: boolean
