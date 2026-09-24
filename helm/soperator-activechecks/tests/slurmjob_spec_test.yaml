@@ -28,3 +28,26 @@ tests:
       - matchRegex:
           path: spec.slurmJobSpec.sbatchScript
           pattern: 'Running GPU checks'
+      - matchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: '^#!/bin/bash\n#SBATCH --deadline="now\+8hours"\n#SBATCH --time=50:00\n'
+      - matchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: '(?m)^#SBATCH --licenses=gpu_checks:1$'
+      - notExists:
+          path: spec.slurmJobSpec.maxNumberOfJobs
+
+  - it: should not request licenses for gpu-checks when gpuChecksLicenses is empty
+    documentSelector:
+      path: metadata.name
+      value: soperator-gpu-checks
+    set:
+      slurmJob:
+        gpuChecksLicenses: ""
+    asserts:
+      - notMatchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: '--licenses'
+      - matchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: '^#!/bin/bash\n#SBATCH --deadline="now\+8hours"\n#SBATCH --time=50:00\n#SBATCH --exclusive\n#SBATCH --mem=0\n\nplatform=""\n'

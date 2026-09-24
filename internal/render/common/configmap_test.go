@@ -326,6 +326,7 @@ func TestRenderSlurmSchedulingConfig(t *testing.T) {
 			assert.Equal(t, "0", properties["CompleteWait"])
 			assert.Equal(t, "100000", properties["MaxJobCount"])
 			assert.Equal(t, "600", properties["MinJobAge"])
+			assert.Equal(t, "gpu_checks:200", properties["Licenses"])
 			assert.Equal(t, "sched/backfill", properties["SchedulerType"])
 			assert.ElementsMatch(t, []string{
 				"nohold_on_prolog_fail", "extra_constraints", "pack_serial_at_end",
@@ -342,7 +343,7 @@ func TestRenderSlurmSchedulingConfig(t *testing.T) {
 				controllerParams = append(controllerParams, "cloud_dns", "idle_on_node_suspend")
 			}
 			assert.ElementsMatch(t, controllerParams, strings.Split(properties["SlurmctldParameters"], ","))
-			for _, key := range []string{"CompleteWait", "MaxJobCount", "MinJobAge", "SchedulerParameters", "SlurmctldParameters"} {
+			for _, key := range []string{"CompleteWait", "MaxJobCount", "MinJobAge", "Licenses", "SchedulerParameters", "SlurmctldParameters"} {
 				assert.Equal(t, 1, strings.Count(base, "\n"+key+"="), key)
 			}
 			extra := result.Data[consts.ConfigMapKeySlurmK8sExtraConfig]

@@ -1,8 +1,11 @@
 #!/bin/bash
-#SBATCH --deadline="now+4hours"
+#SBATCH --deadline="now+8hours"
 #SBATCH --time=50:00
 #SBATCH --exclusive
 #SBATCH --mem=0
+{{- with .Values.slurmJob.gpuChecksLicenses }}
+#SBATCH --licenses={{ . }}
+{{- end }}
 
 platform=""
 gpus_on_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | sort | uniq -c)
