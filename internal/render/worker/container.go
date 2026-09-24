@@ -230,7 +230,7 @@ func renderContainerNodeSetSlurmd(
 		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
 		Command:         nodeSet.ContainerSlurmd.Command,
 		Args:            nodeSet.ContainerSlurmd.Args,
-		Env: env,
+		Env:             env,
 		Ports: []corev1.ContainerPort{{
 			Name:          nodeSet.ContainerSlurmd.Name,
 			ContainerPort: nodeSet.ContainerSlurmd.Port,
