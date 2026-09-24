@@ -82,13 +82,21 @@ func (s *EnrootContainers) RegisterSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
+	if cleanupErr := s.cancelCurrentJob(ctx); cleanupErr != nil {
+		s.runtime.Logf("cleanup: cancel enroot job: %v", cleanupErr)
+	}
+	s.workers = nil
+	s.connectionWorker = framework.WorkerInfo{}
+	s.job = framework.SbatchJob{}
+	s.squashPath = ""
+	s.expectedSquashPath = ""
+	s.squashStatBefore = ""
+	s.runtimeNamePrefix = ""
+	s.directSquashFS = nil
 	if s.sshEnrootImagePath != "" {
 		if cleanupErr := s.removeEnrootSSHImage(ctx); cleanupErr != nil {
 			s.runtime.Logf("cleanup: remove imported Enroot SSH image: %v", cleanupErr)
 		}
-	}
-	if cleanupErr := s.cancelCurrentJob(ctx); cleanupErr != nil {
-		s.runtime.Logf("cleanup: cancel enroot job: %v", cleanupErr)
 	}
 	if s.sshIdentitySet {
 		if cleanupErr := removeSSHTestIdentity(
@@ -101,14 +109,6 @@ func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
 			s.runtime.Logf("cleanup: remove Enroot SSH test identity: %v", cleanupErr)
 		}
 	}
-	s.workers = nil
-	s.connectionWorker = framework.WorkerInfo{}
-	s.job = framework.SbatchJob{}
-	s.squashPath = ""
-	s.expectedSquashPath = ""
-	s.squashStatBefore = ""
-	s.runtimeNamePrefix = ""
-	s.directSquashFS = nil
 	s.sshEnrootOutput = ""
 	s.sshEnrootTarget = ""
 	s.sshEnrootHost = ""
@@ -139,17 +139,6 @@ func (s *EnrootContainers) theUserImportsAnEnrootImageOverSSH(ctx context.Contex
 			return framework.SkipIfInsufficientWorkers(s.runtime, err)
 		}
 		if err := waitForSSHTestUserOnWorker(ctx, s.runtime, sshUserName, workers[0]); err != nil {
-			return err
-		}
-		job, err := startSSHAccessJob(
-			ctx,
-			s.slurm,
-			sshUserName,
-			workers[0],
-			"e2e-enroot-worker-ssh-access",
-		)
-		s.job = job
-		if err != nil {
 			return err
 		}
 		host = workers[0].Name
