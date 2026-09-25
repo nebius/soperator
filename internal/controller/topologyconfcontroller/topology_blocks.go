@@ -2,7 +2,6 @@ package topologyconfcontroller
 
 import (
 	"context"
-	"sort"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -25,18 +24,21 @@ func (b TopologyBlocks) AddNode(block, worker string) {
 	b.blocks[block] = append(b.blocks[block], worker)
 }
 
+func (b TopologyBlocks) addBlock(block string) {
+	if _, ok := b.blocks[block]; !ok {
+		b.blocks[block] = nil
+	}
+}
+
 // RenderBlocks flattens the topology into the block entries of a block topology, in the shape
 // topology.yaml expects.
-func (b TopologyBlocks) RenderBlocks() []blockYAML {
+func (b TopologyBlocks) RenderBlocks(pathsByBlock map[string]blockIBPath) []blockYAML {
 	if len(b.blocks) == 0 {
 		return nil
 	}
 
 	blocks := make([]blockYAML, 0, len(b.blocks))
 	for blockName, workers := range b.blocks {
-		if len(workers) == 0 {
-			continue
-		}
 		blocks = append(blocks, blockYAML{
 			// Block names are external tier-0 labels; sanitize them like switch names. The
 			// worker list must stay verbatim to match real Slurm node names.
@@ -44,7 +46,7 @@ func (b TopologyBlocks) RenderBlocks() []blockYAML {
 			Nodes: slurmpattern.Merge(workers),
 		})
 	}
-	sort.Slice(blocks, func(i, j int) bool { return blocks[i].Block < blocks[j].Block })
+	sortBlocksByIBTopology(blocks, pathsByBlock)
 
 	return blocks
 }
@@ -59,7 +61,9 @@ func (b TopologyBlocks) RenderBlocks() []blockYAML {
 //
 // Blocks themselves have no root hierarchy, so real tier-0 blocks are fabric-agnostic. Only the
 // catch-all "unknown" block is split per fabric (via fabricByNode, keyed by Slurm node name) so
-// powered-down nodes from different fabrics don't get lumped into one block.
+// powered-down nodes from different fabrics don't get lumped into one block. It is rendered for
+// every fabric in scope, empty when all its nodes are placed: a single rescheduled worker must not
+// add or remove a block, since that changes the structure fingerprint and requests a reconfigure.
 func BuildTopologyBlocks(
 	ctx context.Context,
 	labelsByNode map[string]NodeTopologyLabels,
@@ -93,10 +97,12 @@ func BuildTopologyBlocks(
 
 	// Stage 1: every node not placed into a real block goes into its fabric's "unknown" block.
 	for _, name := range allNodeNames {
+		unknown := unknownSwitchName(fabricOf(fabricByNode, name))
 		if _, ok := placed[name]; ok {
+			blocks.addBlock(unknown)
 			continue
 		}
-		blocks.AddNode(unknownSwitchName(fabricOf(fabricByNode, name)), name)
+		blocks.AddNode(unknown, name)
 	}
 
 	return blocks

@@ -139,6 +139,9 @@ func main() {
 		restConfigBurst           int
 		requeueAfterRollingUpdate time.Duration
 		idleSlurmAuditInterval    time.Duration
+
+		topologyDeferrableReconfigureInterval time.Duration
+		topologyDeferrableReconfigureBurst    int
 	)
 
 	var watchNsCacheByName map[string]cache.Config
@@ -172,9 +175,15 @@ func main() {
 	flag.StringVar(&controllersFlag, "controllers", "", "A comma-separated list of controllers to enable or disable. Use '*' for all, and '-name' to disable. Overrides SLURM_OPERATOR_CONTROLLERS if set.")
 	flag.Float64Var(&restConfigQPS, "rest-config-qps", 30, "Kubernetes API requests per second shared by manager clients")
 	flag.IntVar(&restConfigBurst, "rest-config-burst", 50, "Kubernetes API request burst shared by manager clients")
+	flag.DurationVar(&topologyDeferrableReconfigureInterval, "topology-deferrable-reconfigure-interval", 11*time.Minute, "The average interval between Slurm reconfigures caused by topology changes that only reorder or remove blocks; 0 disables the limit")
+	flag.IntVar(&topologyDeferrableReconfigureBurst, "topology-deferrable-reconfigure-burst", 2, "The number of Slurm reconfigures caused by topology changes that only reorder or remove blocks allowed back to back")
 	flag.Parse()
 	if float32(restConfigQPS) <= 0 || math.IsNaN(restConfigQPS) || math.IsInf(restConfigQPS, 0) || restConfigQPS > math.MaxFloat32 || restConfigBurst <= 0 {
 		fmt.Fprintln(os.Stderr, "REST config QPS and burst must be positive and finite")
+		os.Exit(1)
+	}
+	if topologyDeferrableReconfigureInterval < 0 || topologyDeferrableReconfigureBurst <= 0 {
+		fmt.Fprintln(os.Stderr, "Topology deferrable reconfigure interval must not be negative and burst must be positive")
 		os.Exit(1)
 	}
 	opts := getZapOpts(logFormat, logLevel)
@@ -376,6 +385,8 @@ func main() {
 			mgr.GetScheme(),
 			soperatorNamespace,
 			mgr.GetEventRecorder(topologyconfcontroller.WorkerTopologyReconcilerName),
+			topologyDeferrableReconfigureInterval,
+			topologyDeferrableReconfigureBurst,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err,
 				"unable to create controller",

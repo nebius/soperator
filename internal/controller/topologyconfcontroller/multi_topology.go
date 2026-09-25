@@ -36,6 +36,7 @@ func (r *WorkerTopologyReconciler) buildMultiTopologyYAML(
 	}
 
 	specs := namedTopologies(slurmCluster)
+	var pathsByBlock map[string]blockIBPath
 	entries := make([]topologyYAMLEntry, 0, len(specs)+1)
 	for _, spec := range specs {
 		nodeSets := topologyrefs.ListedNodeSets(nodeSetList, spec.Topo.Type, spec.NodeSetRefs)
@@ -59,13 +60,17 @@ func (r *WorkerTopologyReconciler) buildMultiTopologyYAML(
 			continue
 		}
 
-		entry, err := buildTopologyEntry(ctx, spec, labelsByNode, gpuPodsByNode, nodeSets)
+		if spec.Topo.Type == consts.SlurmTopologyTypeBlock && pathsByBlock == nil {
+			pathsByBlock = blockIBPaths(labelsByNode)
+		}
+		entry, err := buildTopologyEntry(ctx, spec, labelsByNode, gpuPodsByNode, nodeSets, pathsByBlock)
 		if err != nil {
 			return "", fmt.Errorf("build topology %q: %w", spec.Name, err)
 		}
 		entries = append(entries, entry)
 	}
 
+	r.reportBlockConflicts(ctx, slurmCluster, entries, pathsByBlock)
 	r.markClusterDefault(ctx, slurmCluster, entries)
 	r.reportUnresolvedTopologyRefs(slurmCluster, entries)
 
@@ -84,6 +89,7 @@ func buildTopologyEntry(
 	labelsByNode map[string]NodeTopologyLabels,
 	gpuPodsByNode map[string][]string,
 	nodeSets []v1alpha1.NodeSet,
+	pathsByBlock map[string]blockIBPath,
 ) (topologyYAMLEntry, error) {
 	entry := topologyYAMLEntry{
 		Topology:       spec.Name,
@@ -103,7 +109,7 @@ func buildTopologyEntry(
 		blocks := BuildTopologyBlocks(ctx, labelsByNode, scopedGPUPods, allNodeNames, fabricByNode)
 		entry.Block = &blockTopologyYAML{
 			BlockSizes: spec.Topo.BlockSizes,
-			Blocks:     blocks.RenderBlocks(),
+			Blocks:     blocks.RenderBlocks(pathsByBlock),
 		}
 	case consts.SlurmTopologyTypeTree:
 		graph := BuildTopologyGraph(ctx, labelsByNode, scopedGPUPods, allNodeNames, fabricByNode)
