@@ -2,45 +2,20 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/79
-FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS worker_slurmd
-
-ARG MELLANOX_REPO_URL=https://linux.mellanox.com/public/repo/doca/3.1.0
+# https://github.com/nebius/ml-containers/pull/107
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260925081218 AS worker_slurmd
 
 # Install useful packages
-RUN DPKG_ARCH="$(dpkg --print-architecture)" && \
-    case "$DPKG_ARCH" in \
-      amd64) MLNX_ARCH=x86_64 ;; \
-      arm64) MLNX_ARCH=arm64 ;; \
-      *) echo "Unsupported architecture: $DPKG_ARCH" && exit 1 ;; \
-    esac && \
-    echo "deb ${MELLANOX_REPO_URL}/ubuntu24.04/${MLNX_ARCH} ./" > /etc/apt/sources.list.d/mellanox_doca.list && \
-    wget -qO - https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub | apt-key add - && \
-    apt-get update && \
+RUN apt-get update && \
     apt -y install \
         pciutils \
         iproute2 \
-        infiniband-diags=2507mlnx58-1.2507097 \
         kmod \
         libncurses5-dev \
         supervisor \
         openssh-server && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-
-# Install OpenMPI
-ARG OPENMPI_VERSION=4.1.9a1
-COPY images/common/scripts/install_openmpi.sh /opt/bin/
-RUN chmod +x /opt/bin/install_openmpi.sh && \
-    /opt/bin/install_openmpi.sh && \
-    rm /opt/bin/install_openmpi.sh
-
-RUN arch=$(uname -m) && \
-    if [ "$arch" = "x86_64" ]; then alt_arch="x86_64"; \
-    elif [ "$arch" = "aarch64" ]; then alt_arch="aarch64"; \
-    else echo "Unsupported arch: $arch" && exit 1; fi && \
-    echo "LD_LIBRARY_PATH=/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib:/lib/${alt_arch}-linux-gnu:/usr/lib/${alt_arch}-linux-gnu:/usr/local/cuda/targets/${alt_arch}-linux/lib" >> /etc/environment
-ENV PATH=${PATH}:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # Create dummy library for replacing GPU-specific libraries on CPU workers in GPU clusters
 RUN ALT_ARCH="$(uname -m)" && \
@@ -86,7 +61,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
 
 # Install slurm pyxis plugin
 ARG SLURM_VERSION
-ARG PYXIS_VERSION=0.23.0
+ARG PYXIS_VERSION=0.24.0
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \
