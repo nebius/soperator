@@ -364,7 +364,11 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddComment("")
 	res.AddProperty("CliFilterPlugins", "cli_filter/user_defaults")
 	res.AddComment("")
-	res.AddProperty("LaunchParameters", "use_interactive_step")
+	launchParameters := []string{"use_interactive_step"}
+	if cluster.PAMSlurmAdopt.Enabled {
+		launchParameters = append(launchParameters, "ulimit_pam_adopt")
+	}
+	res.AddProperty("LaunchParameters", strings.Join(launchParameters, ","))
 	res.AddComment("Scrontab")
 	res.AddProperty("ScronParameters", "enable,explicit_scancel")
 	res.AddComment("")

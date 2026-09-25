@@ -18,15 +18,19 @@ const (
 
 	SssdConfig = "sssd.conf"
 
-	sshConfigs             = "ssh-configs"
-	sshConfigsLogin        = "ssh-configs"
-	sshConfigsWorker       = "ssh-configs-worker"
-	sshRootKeys            = "ssh-root-keys"
-	authorizedKeys         = "authorized_keys"
-	securityLimits         = "security-limits"
-	securityLimitsConfFile = "limits.conf"
-	userIsolation          = "user-isolation"
-	userIsolationConfFile  = userIsolation + ".conf"
+	sshConfigs                  = "ssh-configs"
+	sshConfigsLogin             = "ssh-configs"
+	sshConfigsWorker            = "ssh-configs-worker"
+	sshRootKeys                 = "ssh-root-keys"
+	authorizedKeys              = "authorized_keys"
+	securityLimits              = "security-limits"
+	securityLimitsConfFile      = "limits.conf"
+	userIsolation               = "user-isolation"
+	userIsolationConfFile       = userIsolation + ".conf"
+	pamSlurmAdopt               = "pam-slurm-adopt"
+	pamSlurmAdoptConfFile       = "soperator-pam-slurm-adopt"
+	pamSlurmAdoptUsersConfFile  = "soperator-pam-slurm-adopt-users"
+	pamSlurmAdoptGroupsConfFile = "soperator-pam-slurm-adopt-groups"
 
 	sysctl         = "sysctl"
 	sysctlConfFile = sysctl + ".conf"
@@ -63,6 +67,7 @@ const (
 	VolumeNameUserIsolation            = userIsolation
 	VolumeNameSharedMemory             = "dev-shm"
 	VolumeNameSysctl                   = sysctl
+	VolumeNamePAMSlurmAdopt            = pamSlurmAdopt
 	VolumeNameSupervisordConfigMap     = "supervisord-config"
 	VolumeNameRuntime                  = "runtime"
 	VolumeNameInMemorySubmount         = "in-memory"
@@ -96,6 +101,9 @@ const (
 	VolumeMountPathSharedMemory             = "/dev/shm"
 	VolumeMountPathSysctl                   = "/etc/" + sysctlConfFile
 	VolumeMountSubPathSysctl                = sysctlConfFile
+	VolumeMountPathPAMSlurmAdopt            = "/etc/soperator/" + pamSlurmAdopt
+	VolumeMountPathPAMSlurmAdoptUsers       = VolumeMountPathPAMSlurmAdopt + "/..data/" + pamSlurmAdoptUsersConfFile
+	VolumeMountPathPAMSlurmAdoptGroups      = VolumeMountPathPAMSlurmAdopt + "/..data/" + pamSlurmAdoptGroupsConfFile
 	VolumeMountPathSupervisordConfig        = "/etc/supervisor/conf.d/"
 	VolumeMountPathRuntime                  = "/run"
 	VolumeMountPathInMemorySubmount         = VolumeMountPathJailUpper + "/mnt/memory"

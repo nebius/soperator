@@ -36,6 +36,7 @@ func renderVolumesAndClaimTemplateSpecsForNodeSet(
 		volumes = append(volumes, renderSupervisordConfigMap(nodeSet.SupervisorDConfigMapName))
 	}
 	volumes = append(volumes, renderVolumeSshdConfigs(nodeSet.SSHDConfigMapName))
+	volumes = append(volumes, renderVolumePAMSlurmAdopt(nodeSet.ParentalCluster.Name))
 	if nodeSet.ContainerSSSD != nil {
 		volumes = append(volumes,
 			common.RenderVolumeSSSDSocket(),
@@ -287,6 +288,20 @@ func renderVolumeMountSshdConfigs() corev1.VolumeMount {
 		Name:      consts.VolumeNameSSHDConfigsWorker,
 		MountPath: consts.VolumeMountPathSSHConfigs,
 		ReadOnly:  true,
+	}
+}
+
+func renderVolumePAMSlurmAdopt(clusterName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNamePAMSlurmAdopt,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: naming.BuildConfigMapPAMSlurmAdoptName(clusterName),
+				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
+			},
+		},
 	}
 }
 

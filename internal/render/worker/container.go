@@ -122,6 +122,9 @@ func renderContainerNodeSetSlurmd(
 		volumeMounts = append(volumeMounts, renderVolumeMountSupervisordConfigMap())
 	}
 	volumeMounts = append(volumeMounts, renderVolumeMountSshdConfigs())
+	// Mount the whole ConfigMap directory so kubelet can refresh PAM policy and
+	// exemption files without changing the worker pod template.
+	volumeMounts = append(volumeMounts, renderVolumeMountPAMSlurmAdopt())
 	if nodeSet.ContainerSSSD != nil {
 		volumeMounts = append(volumeMounts,
 			common.RenderVolumeMountSSSDSocket(),
@@ -194,6 +197,19 @@ func renderContainerNodeSetSlurmd(
 	}
 
 	realMemoryBytes := common.RenderRealMemorySlurmd(resources) * 1024 * 1024
+	env := append(
+		renderNodeSetSlurmdEnv(
+			cgroupVersion,
+			clusterWithGPU,
+			nodeSet.GPU.Enabled,
+			nodeSet.GPU.Nvidia.GDRCopyEnabled,
+			nodeSet.DockerEnabled,
+			nodeSet.NodeExtra,
+			realMemoryBytes,
+		),
+		renderSlurmdTopologyEnv(topologyEnabled)...,
+	)
+	env = append(env, nodeSet.ContainerSlurmd.CustomEnv...)
 
 	return corev1.Container{
 		Name:            consts.ContainerNameSlurmd,
@@ -201,21 +217,7 @@ func renderContainerNodeSetSlurmd(
 		ImagePullPolicy: nodeSet.ContainerSlurmd.ImagePullPolicy,
 		Command:         nodeSet.ContainerSlurmd.Command,
 		Args:            nodeSet.ContainerSlurmd.Args,
-		Env: append(
-			append(
-				renderNodeSetSlurmdEnv(
-					cgroupVersion,
-					clusterWithGPU,
-					nodeSet.GPU.Enabled,
-					nodeSet.GPU.Nvidia.GDRCopyEnabled,
-					nodeSet.DockerEnabled,
-					nodeSet.NodeExtra,
-					realMemoryBytes,
-				),
-				renderSlurmdTopologyEnv(topologyEnabled)...,
-			),
-			nodeSet.ContainerSlurmd.CustomEnv...,
-		),
+		Env:             env,
 		Ports: []corev1.ContainerPort{{
 			Name:          nodeSet.ContainerSlurmd.Name,
 			ContainerPort: nodeSet.ContainerSlurmd.Port,
@@ -261,6 +263,14 @@ func renderVolumeMountRuntime() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameRuntime,
 		MountPath: consts.VolumeMountPathRuntime,
+	}
+}
+
+func renderVolumeMountPAMSlurmAdopt() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNamePAMSlurmAdopt,
+		MountPath: consts.VolumeMountPathPAMSlurmAdopt,
+		ReadOnly:  true,
 	}
 }
 
