@@ -94,6 +94,7 @@ type client struct {
 
 	server     string
 	httpClient *http.Client
+	rawClient  api.ClientInterface
 
 	tokenIssuer tokenIssuer
 }
@@ -126,6 +127,7 @@ func NewClient(server string, tokenIssuer tokenIssuer, httpClient *http.Client) 
 	}
 
 	apiClient.ClientWithResponsesInterface = c
+	apiClient.rawClient = c.ClientInterface
 
 	return apiClient, nil
 }
@@ -164,20 +166,20 @@ func (c *client) setHeaders(ctx context.Context, req *http.Request) error {
 }
 
 func (c *client) ListNodes(ctx context.Context) ([]Node, error) {
-	getNodesResp, err := c.SlurmV0044GetNodesWithResponse(ctx, &api.SlurmV0044GetNodesParams{})
+	getNodesResp, err := c.rawClient.SlurmV0044GetNodes(ctx, &api.SlurmV0044GetNodesParams{})
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	if getNodesResp.JSON200 == nil {
-		return nil, fmt.Errorf("json200 field is nil")
-	}
-	if getNodesResp.JSON200.Errors != nil && len(*getNodesResp.JSON200.Errors) != 0 {
-		return nil, fmt.Errorf("list nodes responded with errors: %v", *getNodesResp.JSON200.Errors)
+	response, err := decodeResponse[struct {
+		Nodes []nodeInfo `json:"nodes"`
+	}](getNodesResp)
+	if err != nil {
+		return nil, fmt.Errorf("list nodes: %w", err)
 	}
 
-	nodes := make([]Node, 0, len(getNodesResp.JSON200.Nodes))
-	for _, n := range getNodesResp.JSON200.Nodes {
-		node, err := NodeFromAPI(n)
+	nodes := make([]Node, 0, len(response.Nodes))
+	for _, n := range response.Nodes {
+		node, err := NodeFromAPI(n.apiNode())
 		if err != nil {
 			return nil, fmt.Errorf("convert node from api response: %w", err)
 		}
@@ -189,22 +191,22 @@ func (c *client) ListNodes(ctx context.Context) ([]Node, error) {
 }
 
 func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
-	getNodesResp, err := c.SlurmV0044GetNodeWithResponse(ctx, nodeName, &api.SlurmV0044GetNodeParams{})
+	getNodesResp, err := c.rawClient.SlurmV0044GetNode(ctx, nodeName, &api.SlurmV0044GetNodeParams{})
 	if err != nil {
 		return Node{}, fmt.Errorf("get node %s: %w", nodeName, err)
 	}
-	if getNodesResp.JSON200 == nil {
-		return Node{}, fmt.Errorf("json200 field is nil, node name %s", nodeName)
-	}
-	if getNodesResp.JSON200.Errors != nil && len(*getNodesResp.JSON200.Errors) != 0 {
-		return Node{}, fmt.Errorf("get node %s responded with errors: %v", nodeName, *getNodesResp.JSON200.Errors)
+	response, err := decodeResponse[struct {
+		Nodes []nodeInfo `json:"nodes"`
+	}](getNodesResp)
+	if err != nil {
+		return Node{}, fmt.Errorf("get node %s: %w", nodeName, err)
 	}
 
-	if nodeLength := len(getNodesResp.JSON200.Nodes); nodeLength != 1 {
+	if nodeLength := len(response.Nodes); nodeLength != 1 {
 		return Node{}, fmt.Errorf("expected only one node in response for get %s request, got %d", nodeName, nodeLength)
 	}
 
-	node, err := NodeFromAPI(getNodesResp.JSON200.Nodes[0])
+	node, err := NodeFromAPI(response.Nodes[0].apiNode())
 	if err != nil {
 		return Node{}, fmt.Errorf("convert node from api response: %w", err)
 	}
@@ -224,20 +226,18 @@ func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
 // (b) the job has been purged by slurmdbd's `PurgeJobAfter` (default 12 months) — retries will
 // loop forever. Bound retries by elapsed time since submit if a caller can hit case (b).
 func (c *client) GetJobsByIDFromAccounting(ctx context.Context, jobID string) ([]Job, error) {
-	getJobResp, err := c.SlurmdbV0044GetJobWithResponse(ctx, jobID)
+	getJobResp, err := c.rawClient.SlurmdbV0044GetJob(ctx, jobID)
 	if err != nil {
 		return nil, fmt.Errorf("get job %s: %w", jobID, err)
 	}
-	if getJobResp.JSON200 == nil {
-		return nil, fmt.Errorf("get job %s: status=%d %s", jobID, getJobResp.StatusCode(), summarizeSlurmRESTBody(getJobResp.Body))
-	}
-	if getJobResp.JSON200.Errors != nil && len(*getJobResp.JSON200.Errors) != 0 {
-		return nil, fmt.Errorf("get job %s responded with errors: %v", jobID, *getJobResp.JSON200.Errors)
+	apiJobs, err := decodeJobsResponse[accountingJob](getJobResp)
+	if err != nil {
+		return nil, fmt.Errorf("get job %s: %w", jobID, err)
 	}
 
-	jobs := make([]Job, 0, len(getJobResp.JSON200.Jobs))
-	for _, j := range getJobResp.JSON200.Jobs {
-		job, err := JobFromAccountingAPI(j)
+	jobs := make([]Job, 0, len(apiJobs))
+	for _, j := range apiJobs {
+		job, err := jobFromAccountingAPI(j)
 		if err != nil {
 			return nil, fmt.Errorf("convert job from accounting api response: %w", err)
 		}
@@ -266,20 +266,18 @@ func (c *client) ListJobsWithParams(ctx context.Context, params ListJobsParams) 
 }
 
 func (c *client) listControllerJobs(ctx context.Context) ([]Job, error) {
-	getJobsResp, err := c.SlurmV0044GetJobsWithResponse(ctx, &api.SlurmV0044GetJobsParams{})
+	getJobsResp, err := c.rawClient.SlurmV0044GetJobs(ctx, &api.SlurmV0044GetJobsParams{})
 	if err != nil {
 		return nil, fmt.Errorf("list jobs from controller API: %w", err)
 	}
-	if getJobsResp.JSON200 == nil {
-		return nil, fmt.Errorf("list jobs from controller API: status=%d %s", getJobsResp.StatusCode(), summarizeSlurmRESTBody(getJobsResp.Body))
-	}
-	if getJobsResp.JSON200.Errors != nil && len(*getJobsResp.JSON200.Errors) != 0 {
-		return nil, fmt.Errorf("list jobs from controller API responded with errors: %v", *getJobsResp.JSON200.Errors)
+	apiJobs, err := decodeJobsResponse[controllerJob](getJobsResp)
+	if err != nil {
+		return nil, fmt.Errorf("list jobs from controller API: %w", err)
 	}
 
-	jobs := make([]Job, 0, len(getJobsResp.JSON200.Jobs))
-	for _, j := range getJobsResp.JSON200.Jobs {
-		job, err := JobFromAPI(j)
+	jobs := make([]Job, 0, len(apiJobs))
+	for _, j := range apiJobs {
+		job, err := jobFromControllerAPI(j)
 		if err != nil {
 			return nil, fmt.Errorf("convert job from controller api response: %w", err)
 		}
@@ -307,7 +305,7 @@ func (c *client) listAccountingJobs(ctx context.Context, params ListJobsParams) 
 	if params.AccountingCluster != "" {
 		clusterFilter = &params.AccountingCluster
 	}
-	getJobsResp, err := c.SlurmdbV0044GetJobsWithResponse(ctx, &api.SlurmdbV0044GetJobsParams{
+	getJobsResp, err := c.rawClient.SlurmdbV0044GetJobs(ctx, &api.SlurmdbV0044GetJobsParams{
 		Cluster:   clusterFilter,
 		StartTime: &startTime,
 		EndTime:   &endTime,
@@ -325,23 +323,21 @@ func (c *client) listAccountingJobs(ctx context.Context, params ListJobsParams) 
 	if err != nil {
 		return nil, fmt.Errorf("list jobs from accounting API: %w", err)
 	}
-	if getJobsResp.JSON200 == nil {
-		return nil, fmt.Errorf("list jobs from accounting API: status=%d %s", getJobsResp.StatusCode(), summarizeSlurmRESTBody(getJobsResp.Body))
-	}
-	if getJobsResp.JSON200.Errors != nil && len(*getJobsResp.JSON200.Errors) != 0 {
-		return nil, fmt.Errorf("list jobs from accounting API responded with errors: %v", *getJobsResp.JSON200.Errors)
+	apiJobs, err := decodeJobsResponse[accountingJob](getJobsResp)
+	if err != nil {
+		return nil, fmt.Errorf("list jobs from accounting API: %w", err)
 	}
 
 	staleCutoff := now.Add(-stalePendingMaxAge).Unix()
 	var droppedStale int
 
-	jobs := make([]Job, 0, len(getJobsResp.JSON200.Jobs))
-	for _, j := range getJobsResp.JSON200.Jobs {
+	jobs := make([]Job, 0, len(apiJobs))
+	for _, j := range apiJobs {
 		if isStaleAccountingPending(j, staleCutoff) {
 			droppedStale++
 			continue
 		}
-		job, err := JobFromAccountingAPI(j)
+		job, err := jobFromAccountingAPI(j)
 		if err != nil {
 			return nil, fmt.Errorf("convert job from accounting api response: %w", err)
 		}
@@ -359,17 +355,14 @@ func (c *client) listAccountingJobs(ctx context.Context, params ListJobsParams) 
 	return jobs, nil
 }
 
-func (c *client) GetDiag(ctx context.Context) (*api.V0044OpenapiDiagResp, error) {
-	getDiagResp, err := c.SlurmV0044GetDiagWithResponse(ctx)
+func (c *client) GetDiag(ctx context.Context) (*Diag, error) {
+	resp, err := c.rawClient.SlurmV0044GetDiag(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get diag: %w", err)
 	}
-	if getDiagResp.JSON200 == nil {
-		return nil, fmt.Errorf("json200 field is nil")
+	diag, err := decodeResponse[Diag](resp)
+	if err != nil {
+		return nil, fmt.Errorf("get diag: %w", err)
 	}
-	if getDiagResp.JSON200.Errors != nil && len(*getDiagResp.JSON200.Errors) != 0 {
-		return nil, fmt.Errorf("get diag responded with errors: %v", *getDiagResp.JSON200.Errors)
-	}
-
-	return getDiagResp.JSON200, nil
+	return diag, nil
 }
