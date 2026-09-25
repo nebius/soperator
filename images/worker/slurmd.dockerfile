@@ -3,7 +3,7 @@
 ARG SLURM_VERSION
 
 # https://github.com/nebius/ml-containers/pull/107
-FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260924135008 AS worker_slurmd
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260925081218 AS worker_slurmd
 
 # Install useful packages
 RUN apt-get update && \
