@@ -522,6 +522,11 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	}
 	res.AddComment("")
 
+	res.AddComment("LICENSES")
+	res.AddComment("Semaphores for active checks; a Licenses= line in the custom config overrides this one")
+	res.AddProperty("Licenses", consts.SlurmDefaultLicenses)
+	res.AddComment("")
+
 	if cluster.NodeAccounting.Enabled {
 		res.AddComment("ACCOUNTING")
 		res.AddProperty("AccountingStorageType", "accounting_storage/slurmdbd")

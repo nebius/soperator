@@ -49,6 +49,11 @@ images:
 slurmJob:
   # Slurm consumes this as SBATCH_GPUS_PER_NODE for GPU ActiveChecks.
   gpusPerNode: "8"
+  # Slurm licenses every gpu-checks job requests (sbatch --licenses). The operator renders
+  # Licenses=gpu_checks:200 into slurm.conf; that count bounds how many nodes run gpu-checks at once
+  # cluster-wide, which keeps its InfiniBand tests from overloading the fabric. Override the count
+  # with a Licenses= line in the SlurmCluster customSlurmConfig. Empty string disables the request.
+  gpuChecksLicenses: "gpu_checks:1"
 checks:
   gpu-checks:
     enabled: true
@@ -59,10 +64,11 @@ checks:
     schedule: "0 0,12 * * *"
     suspend: false
     runAfterCreation: true
+    # Budget for the submit pod: one sbatch per worker at ~0.3s plus controller latency each.
+    activeDeadlineSeconds: 3600
     slurmJobSpec:
       sbatchScriptFile: "scripts/gpu-checks.sh"
       eachWorkerJobs: true
-      maxNumberOfJobs: 200
       jobContainer:
         extraEnv:
           - name: "SBATCH_GPUS_PER_NODE"
