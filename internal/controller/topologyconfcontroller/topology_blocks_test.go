@@ -35,6 +35,7 @@ func TestBuildTopologyBlocks_GroupsWorkersByTierZero(t *testing.T) {
 		require.Equal(t, map[string][]string{
 			"block-a": {"pod1", "pod2", "pod3"},
 			"block-b": {"pod4"},
+			"unknown": nil,
 		}, result)
 
 		require.Equal(t, map[string][]string{
@@ -60,6 +61,7 @@ func TestBuildTopologyBlocks_GroupsWorkersByTierZero(t *testing.T) {
 		require.Equal(t, map[string][]string{
 			"block-a": {"pod-[1-3]"},
 			"block-b": {"pod-4"},
+			"unknown": nil,
 		}, result)
 
 		require.Equal(t, map[string][]string{
@@ -108,6 +110,7 @@ func TestBuildTopologyBlocks_RenderMergesWorkerNodes(t *testing.T) {
 
 	require.Equal(t, []string{
 		"BlockName=block-a Nodes=worker-[0-2],worker-cpu-[0-1],workerkek1",
+		"BlockName=unknown Nodes=",
 	}, lines)
 }
 
@@ -128,6 +131,7 @@ func TestBuildTopologyBlocks_SanitizesBlockName(t *testing.T) {
 
 	require.Equal(t, []string{
 		"BlockName=6f84b74219aa22869602735141708147_ Nodes=worker-0",
+		"BlockName=unknown Nodes=",
 	}, lines)
 }
 
@@ -170,7 +174,10 @@ func parseBlockLines(t *testing.T, lines []string) map[string][]string {
 		require.True(t, strings.HasPrefix(parts[1], "Nodes="), "unexpected node list")
 
 		blockName := strings.TrimPrefix(parts[0], "BlockName=")
-		nodes := strings.Split(strings.TrimPrefix(parts[1], "Nodes="), ",")
+		var nodes []string
+		if list := strings.TrimPrefix(parts[1], "Nodes="); list != "" {
+			nodes = strings.Split(list, ",")
+		}
 		slices.Sort(nodes)
 		result[blockName] = nodes
 	}
@@ -181,7 +188,7 @@ func parseBlockLines(t *testing.T, lines []string) map[string][]string {
 // assertions readable now that the only rendered format is topology.yaml.
 func renderedBlockLines(blocks tc.TopologyBlocks) []string {
 	var lines []string
-	for _, block := range blocks.RenderBlocks() {
+	for _, block := range blocks.RenderBlocks(nil) {
 		lines = append(lines, fmt.Sprintf("BlockName=%s Nodes=%s", block.Block, block.Nodes))
 	}
 	return lines

@@ -216,6 +216,23 @@ func (g TopologyGraph) attachFabricRoots(topSwitchesByFabric map[string]map[stri
 // Tier numbers must be non-negative integers; gaps are allowed. Non-tier keys are ignored.
 // An empty label value or an invalid tier number returns an error.
 func labelsToPath(labels map[string]string) ([]string, error) {
+	tiers, err := labelsToTiers(labels, 0)
+	if err != nil {
+		return nil, err
+	}
+	path := make([]string, 0, len(tiers))
+	for _, tier := range tiers {
+		path = append(path, tier.name)
+	}
+	return path, nil
+}
+
+type topologyTier struct {
+	tier int
+	name string
+}
+
+func labelsToTiers(labels map[string]string, minimumTier int) ([]topologyTier, error) {
 	var tiers []int
 	for key := range labels {
 		suffix, ok := strings.CutPrefix(key, "tier-")
@@ -229,21 +246,23 @@ func labelsToPath(labels map[string]string) ([]string, error) {
 		if tier < 0 || suffix != strconv.Itoa(tier) {
 			return nil, fmt.Errorf("parse tier number from label %q: expected a non-negative integer without leading zeros", key)
 		}
-		tiers = append(tiers, tier)
+		if tier >= minimumTier {
+			tiers = append(tiers, tier)
+		}
 	}
 	if len(tiers) == 0 {
 		return nil, fmt.Errorf("no labels found for node")
 	}
 	slices.Sort(tiers)
 
-	pathToRoot := make([]string, 0, len(tiers))
+	pathToRoot := make([]topologyTier, 0, len(tiers))
 	for _, tier := range tiers {
 		key := "tier-" + strconv.Itoa(tier)
 		curTierLabel := labels[key]
 		if curTierLabel == "" {
 			return nil, fmt.Errorf("missing label %q", key)
 		}
-		pathToRoot = append(pathToRoot, curTierLabel)
+		pathToRoot = append(pathToRoot, topologyTier{tier: tier, name: curTierLabel})
 	}
 	return pathToRoot, nil
 }

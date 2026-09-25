@@ -126,6 +126,8 @@ func (s *Topology) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the cluster is configured with several named topologies$`, s.clusterIsConfiguredWithNamedTopologies)
 	sc.Step(`^the cluster is configured with a tree topology spanning multiple leaf switches$`, s.clusterIsConfiguredWithTreeTopology)
 	sc.Step(`^the cluster is configured with a block topology whose base size can be changed$`, s.clusterIsConfiguredWithResizableBlockTopology)
+	sc.Step(`^the cluster is configured with a topology spanning multiple blocks$`, s.clusterIsConfiguredWithMultipleBlocks)
+	sc.Step(`^a multi-block job assigns SLURM_PROCID in rendered block order$`, s.blockNodeRanksFollowConfig)
 
 	sc.Step(`^the operator published the topology config$`, s.publishedTopologyConfig)
 	sc.Step(`^the config declares several named topologies$`, s.configDeclaresSeveralTopologies)
@@ -525,11 +527,12 @@ func (s *Topology) partitionsAreBound(ctx context.Context) error {
 
 	var problems []string
 	for _, partition := range s.partitions {
-		if partition.Topology == "" {
-			problems = append(problems, fmt.Sprintf("%s is bound to no topology", partition.Name))
+		if _, ok := topologyForPartition(s.loaded, partition.Topology); ok {
 			continue
 		}
-		if _, ok := topologyByName(s.loaded, partition.Topology); !ok {
+		if partition.Topology == "" {
+			problems = append(problems, fmt.Sprintf("%s is bound to no topology and no cluster default is loaded", partition.Name))
+		} else {
 			problems = append(problems, fmt.Sprintf("%s is bound to unknown topology %s", partition.Name, partition.Topology))
 		}
 	}
@@ -1162,7 +1165,7 @@ func (s *Topology) renderedConfigCarriesBlockSizes(ctx context.Context) error {
 			if err != nil {
 				return false, err
 			}
-			if want := topologyStructure(entries); structure != want {
+			if want := topologyReconfigureStructure(entries); structure != want {
 				return false, fmt.Errorf("the JailedConfig records structure %q, the published config is %q",
 					structure, want)
 			}
@@ -1471,8 +1474,9 @@ type srunRequest struct {
 	Nodes     []string
 	// Switches caps the number of leaf switches the allocation may span. Zero leaves the job
 	// unconstrained.
-	Switches  int
-	Immediate time.Duration
+	Switches        int
+	Immediate       time.Duration
+	ReportNodeRanks bool
 }
 
 func (r srunRequest) command() string {
@@ -1491,8 +1495,14 @@ func (r srunRequest) command() string {
 
 	// The outer timeout is a backstop for an srun that neither runs nor gives up; --immediate is
 	// what normally ends the wait.
-	return fmt.Sprintf("timeout %d srun %s hostname",
-		int(r.Immediate.Seconds())+60, strings.Join(args, " "))
+	command := "hostname"
+	if r.ReportNodeRanks {
+		args = append(args, "--distribution=block")
+		command = "bash -c " + framework.ShellQuote(
+			`printf 'SOPERATOR_NODE_RANK=%s:%s\nSOPERATOR_NODE_ID=%s:%s\n' "$SLURM_PROCID" "$SLURMD_NODENAME" "$SLURM_NODEID" "$SLURMD_NODENAME"`)
+	}
+	return fmt.Sprintf("timeout %d srun %s %s",
+		int(r.Immediate.Seconds())+60, strings.Join(args, " "), command)
 }
 
 func (s *Topology) srun(ctx context.Context, request srunRequest) (string, error) {

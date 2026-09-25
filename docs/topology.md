@@ -139,6 +139,55 @@ PartitionName=main Nodes=ALL Default=YES State=UP
 
 `main` sets no `topologyRef`, so it uses the topology marked `clusterDefault`.
 
+Block topologies retain a flat list of blocks grouped by `tier-0`. Soperator orders these blocks
+by their InfiniBand paths, comparing the highest numbered tier first and continuing down to
+`tier-1`. Each block gets its own path, including when one NodeSet spans several racks. Node lists
+inside blocks keep their existing rendering.
+
+Paths come from Kubernetes node labels, independently of which worker pods are currently scheduled.
+Nodes without usable labels are ignored; paths without `tier-1` still use their known higher tiers.
+Missing ancestors are filled from unambiguous switch relationships on other nodes. Tier numbers
+remain part of the comparison, so names from different tiers are never compared, and a missing tier
+sorts after a known one: a block whose lower tiers are unknown lands after the fully labelled blocks
+under the same switch. Equal paths and blocks without known paths use block-name order; blocks
+without known paths and the catch-all `unknown` block come last.
+
+If nodes within a block disagree, Soperator uses the path most of the block's nodes agree on, then
+the most complete one, then the one of the first Kubernetes node by name. Conflicts are reported as
+one aggregated error log record and one `BlockIBTopologyConflict` warning event per reconcile, with
+the number of blocks and up to five examples. Only new conflicts, or conflicts whose selected path
+changed, are reported; a conflict is reported again after it was resolved and returns, and after an
+operator restart.
+
+When `topo.blockSizes` is not set, Slurm takes the base block size from the node count of the first
+block that has nodes in the file. With IB ordering that block is the first populated one in path
+order, so its size may change with the scheduled workers. Set `blockSizes` explicitly for block
+topologies.
+
+Changes to the ordered list of block names request a Slurm reconfigure after the updated file is
+published. This includes blocks being added or removed, for example when workers are scheduled into
+a new rack or a rack is powered down. Slurm rejects a node registering into a block it has not
+loaded, so a new block needs a re-read. A change that only reorders or removes blocks is rate-limited,
+see [Rate limit for reordered and removed blocks](#rate-limit-for-reordered-and-removed-blocks).
+Changes to node lists inside the same blocks do not request a reconfigure. The catch-all `unknown` block is rendered for every fabric in scope, without nodes
+when all of them are placed, so a single rescheduled worker does not add or remove a block.
+
+Upgrading the operator to a version with block ordering changes the structure fingerprint format
+and usually the block order in the file, so each cluster with a block topology gets one reconfigure
+after the upgrade. A rollback does the same.
+
+The rank scenario in `features/topology_block.feature` checks rank distribution by
+running one task per node across multiple blocks and comparing `SLURM_PROCID` against the rendered
+block order. Slurm's per-job topology ranking controls task ranks; `SLURM_NODEID` identifies the
+node's position in the node list and need not follow block order. The scenario records both values
+for diagnostics. It tries the available block partitions, including those using the cluster-default
+topology. It selects two blocks in the same allocation group and requests `baseBlockSize + 1` idle
+nodes, capped at 64 nodes; a smaller job cannot span two base blocks. The base block size is the
+`BlockSize` slurmctld reports, since without `blockSizes` it was fixed at the last reconfigure. It
+skips when no such pair has enough idle workers. Before selecting workers, it waits for Slurm to
+report the currently published block order, refreshing the ConfigMap while waiting, and then reads
+the idle workers again. Node order within each block is unconstrained.
+
 ## Configuration reference
 
 ### `spec.topology.topologies[]`
@@ -392,11 +441,13 @@ what `topoconf` loaded, the partition bindings, the workers' registrations and a
 every e2e run. It skips itself unless the cluster configures a tree spanning more than one leaf
 switch.
 
-`e2e/acceptance/features/topology_block.feature` is kept out of the default suite because it
-reconfigures the block topology while it runs. Start it by hand:
+`e2e/acceptance/features/topology_block.feature` holds every block topology scenario: task ranks
+following the rendered block order, and scheduling after the base block size changes. Both are
+tagged `@unstable`, so the default suite skips them: they need a cluster with a block topology, and
+the resize scenario reconfigures it while it runs. They run with `--run-unstable`; to run only them:
 
 ```
-go run ./e2e/cmd/acceptance --kubectl-context <ctx> --scenario features/topology_block.feature
+go run ./e2e/cmd/acceptance --kubectl-context <ctx> --run-unstable --scenario features/topology_block.feature
 ```
 
 `e2e/acceptance/features/topology_legacy.feature` checks the single `topology/tree` configuration
@@ -419,24 +470,27 @@ update action, and withdrawn only once a reconfigure has demonstrably run over t
 #### What counts as a structural change
 
 The operator reduces the rendered file to a structure fingerprint, keeping only what slurmctld can
-learn by re-reading it: for each entry, its name, its plugin, its `block_sizes` and its
-`cluster_default` flag. For the example above that is:
+learn by re-reading it: for each entry, its name, its plugin, its `block_sizes`, its
+`cluster_default` flag and a SHA-256 hash of its ordered block names. For example:
 
 ```
-flat=flat:[]:true,tree-ib=tree:[]:false,block-nvl72=block:[18]:false
+flat=flat:[]:true,tree-ib=tree:[]:false,block-nvl72=block:[18]:false:blocks=<hash>
 ```
 
 | Asks for a reconfigure | Does not |
 | --- | --- |
-| a topology added or removed | a node moving between switches or blocks |
-| a topology renamed | a switch or block appearing, disappearing or renamed |
-| `topo.type` changed | `nodeSetRefs` changed |
-| `topo.blockSizes` changed | a NodeSet scaled up or down |
+| a topology added or removed | a node moving between existing switches or blocks |
+| a topology renamed | a tree switch appearing, disappearing or renamed |
+| `topo.type` changed | `nodeSetRefs` changed, unless the block list changes |
+| `topo.blockSizes` changed | a NodeSet scaled up or down, unless the block list changes |
 | `clusterDefault` moved to another topology | |
 | topologies reordered in the spec | |
+| blocks reordered inside a block topology | |
+| a block appearing, disappearing or renamed | |
 
-The right-hand column is deliberate: those are node membership changes, and membership travels
-with the worker's own slurmd registration, not through a cluster-wide re-read.
+The right-hand column applies while the ordered list of block names stays the same. Node membership
+travels with the worker's own slurmd registration. Scaling a NodeSet or changing `nodeSetRefs`
+requests a reconfigure when it adds or empties a block.
 
 #### Two further gates
 
@@ -451,6 +505,36 @@ recorded when the request was raised, rather than on the JailedConfig generation
 in the spec while the structure lives in an annotation, so a second structural change arriving while
 a request is outstanding leaves the generation untouched, and a confirmation earned over the previous
 content would otherwise read as confirming the new one.
+
+#### Rate limit for reordered and removed blocks
+
+Structural changes are not equally urgent. A new block must reach slurmctld at once: a node
+registering into a block slurmctld has not loaded is set to `INVAL` and drained with reason
+`Failed to set topology`. A change that only reorders blocks or removes some of them can wait: a
+stale order only worsens placement, and a removed block stays loaded but harmless. Such changes are
+what powering racks down and up in waves produces, and on a large cluster each one would otherwise
+restart slurmd on every node.
+
+So when the new file differs from the published one only in block order or in blocks that
+disappeared, the operator publishes it through a token bucket per cluster. Without a token, neither
+the ConfigMap nor the `JailedConfig` is touched, and the change is retried on the next
+reconciliation, about once a minute. A rack that comes back before a token is available finds its
+block still loaded and causes no reconfigure at all. Any other change, such as a new block, is
+published at once and carries the deferred order and removals along.
+
+The ConfigMap is held back rather than published without a request because sconfigcontroller
+records any written content in `status.appliedHash`; a request raised later over the same content
+could then never be confirmed.
+
+The bucket is configured with operator flags:
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--topology-deferrable-reconfigure-interval` | `11m` | Average interval between such reconfigures; `0` disables the limit |
+| `--topology-deferrable-reconfigure-burst` | `2` | Number of such reconfigures allowed back to back |
+
+Set them through `controllerManager.manager.args` in the `soperator` Helm chart. The bucket lives in
+operator memory, so a restart or a leader change refills it.
 
 #### Watching it happen
 
