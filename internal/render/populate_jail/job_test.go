@@ -87,3 +87,40 @@ func Test_RenderPopulateJailJob_PriorityClass(t *testing.T) {
 		})
 	}
 }
+
+func Test_RenderPopulateJailJob_CustomLabelsAndAnnotations(t *testing.T) {
+	namespace := "test-namespace"
+	clusterName := "test-cluster"
+
+	nodeFilters := []slurmv1.K8sNodeFilter{{Name: "test-filter"}}
+	volumeSources := []slurmv1.VolumeSource{
+		{
+			Name:         "test-volume-source",
+			VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{}},
+		},
+	}
+
+	populateJail := &values.PopulateJail{
+		PopulateJail: slurmv1.PopulateJail{
+			K8sNodeFilterName: "test-filter",
+		},
+		Labels:      map[string]string{"gcore.com/project-id": "123"},
+		Annotations: map[string]string{"gcore.com/note": "abc"},
+		Name:        "test-populate-jail",
+		ContainerPopulateJail: values.Container{
+			Name: "populate-jail",
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "nginx:latest",
+			},
+		},
+		VolumeJail: slurmv1.NodeVolume{
+			VolumeSourceName: ptr.To("test-volume-source"),
+		},
+	}
+
+	result := populate_jail.RenderPopulateJailJob(namespace, clusterName, nodeFilters, volumeSources, populateJail)
+
+	assert.Equal(t, "123", result.Labels["gcore.com/project-id"])
+	assert.Equal(t, "123", result.Spec.Template.Labels["gcore.com/project-id"])
+	assert.Equal(t, "abc", result.Spec.Template.Annotations["gcore.com/note"])
+}

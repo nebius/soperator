@@ -37,7 +37,7 @@ func TestAppArmorProfilesPreserved(t *testing.T) {
 					},
 				},
 			}
-			nodeSetValues := BuildSlurmNodeSetFrom(nodeSet, "cluster", nil)
+			nodeSetValues := BuildSlurmNodeSetFrom(nodeSet, "cluster", nil, nil, nil)
 			require.Equal(t, profile, nodeSetValues.ContainerSlurmd.AppArmorProfile)
 			require.Equal(t, profile, nodeSetValues.ContainerMunge.AppArmorProfile)
 			require.Equal(t, profile, nodeSetValues.ContainerSSSD.AppArmorProfile)

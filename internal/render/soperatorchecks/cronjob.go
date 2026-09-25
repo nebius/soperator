@@ -11,12 +11,17 @@ import (
 	"nebius.ai/slurm-operator/internal/render/common"
 )
 
-func RenderK8sCronJob(check *slurmv1alpha1.ActiveCheck, foundPodTemplate *corev1.PodTemplate) (batchv1.CronJob, error) {
+func RenderK8sCronJob(
+	check *slurmv1alpha1.ActiveCheck,
+	foundPodTemplate *corev1.PodTemplate,
+	clusterExtraLabels, clusterExtraAnnotations map[string]string,
+) (batchv1.CronJob, error) {
 	labels := common.RenderLabels(consts.ComponentTypeSoperatorChecks, check.Spec.SlurmClusterRefName)
+	common.MergeExtraLabels(labels, clusterExtraLabels)
 
 	var podTemplateSpec corev1.PodTemplateSpec
 
-	basePodTemplateSpec := renderPodTemplateSpec(check, labels)
+	basePodTemplateSpec := renderPodTemplateSpec(check, labels, clusterExtraAnnotations)
 
 	if foundPodTemplate != nil {
 		var err error
