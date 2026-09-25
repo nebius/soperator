@@ -158,13 +158,13 @@ slurmConfig:
   suspendTimeout: 90
   defMemPerNode: 0
   defCpuPerGPU: 4
-  completeWait: 5
+  completeWait: 0
   prolog: /opt/slurm_scripts/prolog.sh
   taskProlog: /opt/slurm_scripts/task_prolog.sh
   epilog: /opt/slurm_scripts/epilog.sh
   taskPluginParam: ""
-  maxJobCount: 20000
-  minJobAge: 1800
+  maxJobCount: 100000
+  minJobAge: 600
   messageTimeout: 60
   topologyParam: "SwitchAsNodeRank"
 # Topology contains topology-related parameters for Slurm.

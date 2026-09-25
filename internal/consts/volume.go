@@ -102,8 +102,8 @@ const (
 	VolumeMountPathSysctl                   = "/etc/" + sysctlConfFile
 	VolumeMountSubPathSysctl                = sysctlConfFile
 	VolumeMountPathPAMSlurmAdopt            = "/etc/soperator/" + pamSlurmAdopt
-	VolumeMountPathPAMSlurmAdoptUsers       = "/etc/security/" + pamSlurmAdoptUsersConfFile
-	VolumeMountPathPAMSlurmAdoptGroups      = "/etc/security/" + pamSlurmAdoptGroupsConfFile
+	VolumeMountPathPAMSlurmAdoptUsers       = VolumeMountPathPAMSlurmAdopt + "/..data/" + pamSlurmAdoptUsersConfFile
+	VolumeMountPathPAMSlurmAdoptGroups      = VolumeMountPathPAMSlurmAdopt + "/..data/" + pamSlurmAdoptGroupsConfFile
 	VolumeMountPathSupervisordConfig        = "/etc/supervisor/conf.d/"
 	VolumeMountPathRuntime                  = "/run"
 	VolumeMountPathInMemorySubmount         = VolumeMountPathJailUpper + "/mnt/memory"

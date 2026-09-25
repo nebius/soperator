@@ -51,9 +51,58 @@ func (s *ClusterCreation) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^main partition smoke job succeeds$`, s.checkMainSmokeJob)
 	sc.Step(`^hidden partition smoke job succeeds$`, s.checkHiddenSmokeJob)
 	sc.Step(`^each discovered nodeset accepts a targeted smoke job$`, s.checkNodeSetSmokeJobs)
+	sc.Step(`^node-local jail submounts have mode 777$`, s.checkNodeLocalJailSubmountPermissions)
 }
 
 func (s *ClusterCreation) CleanupAndReset(ctx context.Context) {}
+
+func (s *ClusterCreation) checkNodeLocalJailSubmountPermissions(ctx context.Context) error {
+	pods, err := s.kubectl.WorkerPods(ctx)
+	if err != nil {
+		return fmt.Errorf("list worker pods: %w", err)
+	}
+	if len(pods) == 0 {
+		return fmt.Errorf("no worker pods found")
+	}
+
+	var problems []string
+	for _, pod := range pods {
+		if !pod.Ready {
+			problems = append(problems, fmt.Sprintf("%s is not Ready", pod.PodName))
+			continue
+		}
+		worker := framework.WorkerInfo{Name: pod.SlurmNodeName}
+		if _, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx, nodeLocalJailSubmountPermissionsCommand(pod.HasLocalNVMe)); err != nil {
+			problems = append(problems, fmt.Sprintf("%s: %v", pod.SlurmNodeName, err))
+		}
+	}
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		return fmt.Errorf("check node-local jail submount permissions: %s", strings.Join(problems, "; "))
+	}
+	return nil
+}
+
+func nodeLocalJailSubmountPermissionsCommand(hasLocalNVMe bool) string {
+	paths := []string{"/scratch"}
+	if hasLocalNVMe {
+		paths = append(paths, "/mnt/local-nvme")
+	}
+
+	return fmt.Sprintf(`set -eu
+check_mode() {
+    path="$1"
+    mode="$(stat -c '%%a' -- "$path")"
+    if [ "$mode" != "777" ]; then
+        echo "$path mode=$mode, expected 777" >&2
+        return 1
+    fi
+}
+
+for path in %s; do
+    check_mode "$path"
+done`, strings.Join(paths, " "))
+}
 
 func (s *ClusterCreation) checkPodsReady(ctx context.Context) error {
 	var pods corev1.PodList

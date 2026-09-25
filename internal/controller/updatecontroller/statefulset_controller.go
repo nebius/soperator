@@ -93,6 +93,7 @@ type RollingUpdateReconciler struct {
 	idleSlurmAuditInterval time.Duration
 	clock                  clock.PassiveClock
 	workerCleanup          workerCleanupTracker
+	metrics                *rolloutMetrics
 }
 
 func NewRollingUpdateReconciler(
@@ -109,6 +110,7 @@ func NewRollingUpdateReconciler(
 		requeueAfter:           requeueAfter,
 		idleSlurmAuditInterval: idleSlurmAuditInterval,
 		clock:                  clock.RealClock{},
+		metrics:                defaultRolloutMetrics,
 	}
 }
 
@@ -127,18 +129,25 @@ func (r *RollingUpdateReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err := r.Get(ctx, req.NamespacedName, sts); err != nil {
 		if apierrors.IsNotFound(err) {
 			r.workerCleanup.forget(req.NamespacedName)
+			r.metrics.forget(req.NamespacedName)
 			return ctrl.Result{}, nil
 		}
 		logger.Error(err, "Get worker StatefulSet")
+		r.metrics.readFailed(req.NamespacedName)
 		return result, nil
 	}
 	if !rollingUpdateEnabled(sts) || sts.DeletionTimestamp != nil {
 		r.workerCleanup.forget(req.NamespacedName)
+		r.metrics.forget(req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
-	if err := r.reconcileWorkerStatefulSet(ctx, sts); err != nil {
+	observation := &rolloutObservation{}
+	ctx = context.WithValue(ctx, rolloutObservationKey{}, observation)
+	err := r.reconcileWorkerStatefulSet(ctx, sts)
+	if err != nil {
 		logger.Error(err, "Reconcile worker StatefulSet")
 	}
+	r.metrics.observe(sts, observation, r.clock.Now(), err != nil)
 	return result, nil
 }
 
@@ -152,11 +161,13 @@ func (r *RollingUpdateReconciler) reconcileWorkerStatefulSet(ctx context.Context
 	if err != nil {
 		return err
 	}
+	observationFromContext(ctx).observeWorkerPods(podList)
 	k8sNodeCordonStates, err := r.getK8sNodeCordonStates(ctx, podList)
 	if err != nil {
 		return err
 	}
 	replacements := planWorkerPodReplacements(sts, podList, k8sNodeCordonStates)
+	observationFromContext(ctx).observePlan(sts, podList, replacements)
 	// StatefulSet status can lag behind pod events, particularly just after eviction.
 	readyReplicas := int32(0)
 	for _, pod := range podList {
@@ -240,12 +251,19 @@ func (r *RollingUpdateReconciler) processWorkerReplacements(
 		WithValues("namespace", sts.Namespace, "name", sts.Name))
 	cleanup := r.workerCleanup.forStatefulSet(sts)
 	cleanup.observePods(pods)
+	observation := observationFromContext(ctx)
+	if observation != nil {
+		defer func() { observation.observeCleanup(cleanup) }()
+	}
 	cleanupPods := workerPodsWithoutReplacements(pods, replacements)
 
 	prioritizeCordonedWorkers(replacements)
 	progress, err := r.reconcileWorkerPodHandoffs(ctx, replacements)
 	if err != nil {
 		return err
+	}
+	if observation != nil {
+		observation.slots = max(0, rebootBudget(sts)-unavailableReplicas(sts)-progress.readyPodsConsumingBudget)
 	}
 	if len(progress.pending) == 0 &&
 		(len(cleanupPods) == 0 || !cleanup.needsCheck(r.clock.Now(), r.idleSlurmAuditInterval)) {
@@ -254,14 +272,17 @@ func (r *RollingUpdateReconciler) processWorkerReplacements(
 
 	slurmClient, ok := r.slurmAPIClients.GetClient(types.NamespacedName{Namespace: sts.Namespace, Name: clusterName})
 	if !ok {
+		observation.waiting(waitSlurm)
 		return fmt.Errorf("no slurm api client for %s/%s", sts.Namespace, clusterName)
 	}
 	slurmNodes, err := slurmClient.ListNodes(ctx)
 	if err != nil {
+		observation.waiting(waitSlurm)
 		return err
 	}
 	// Observe before UNDRAIN or reboot: the next read must confirm their effects.
 	cleanup.observeSlurmNodes(slurmNodes, r.clock.Now())
+	observation.observeWorkerSlurm(slurmNodes)
 	if len(replacements) > 0 {
 		cleanup.trackReplacements(replacements)
 	}
@@ -274,6 +295,9 @@ func (r *RollingUpdateReconciler) processWorkerReplacements(
 	}
 	readyPodsConsumingBudget += progress.readyPodsConsumingBudget
 	availableSlots := availableWorkerHandoffSlots(ctx, sts, readyPodsConsumingBudget)
+	if observation != nil {
+		observation.slots = availableSlots
+	}
 	return r.startWorkerHandoffsWithinBudget(ctx, slurmClient, candidates, availableSlots)
 }
 
@@ -297,6 +321,8 @@ func (r *RollingUpdateReconciler) reconcileWorkerPodHandoffs(
 		}
 		handoffReady := workerOperationPhase(&pod, replacement.operationID) == consts.LabelSoperatorWorkerOperationPhaseReady
 		if replacement.k8sNodeCordoned && handoffReady {
+			observationFromContext(ctx).waiting(waitEviction)
+			observationFromContext(ctx).setWorkerStage(pod.Name, workerWaitingForEviction)
 			// A released worker still consumes capacity until its replacement is Ready.
 			if podReady(&pod) {
 				progress.readyPodsConsumingBudget++
@@ -336,6 +362,8 @@ func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
 		pod := replacement.pod
 		slurmNode, found := slurmNodesByName[pod.Name]
 		if !found {
+			observationFromContext(ctx).waiting(waitMissing)
+			observationFromContext(ctx).setWorkerStage(pod.Name, workerMissingSlurmNode)
 			missingSlurmNodes = append(missingSlurmNodes, pod.Name)
 			// Unknown Slurm state consumes a slot even when Kubernetes reports Ready.
 			if podReady(&pod) {
@@ -345,8 +373,17 @@ func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
 		}
 
 		decision := decideWorkerUpdateAction(replacement, &slurmNode)
+		observationFromContext(ctx).observeWorkerDecision(pod.Name, &slurmNode, decision)
+		if observation := observationFromContext(ctx); observation != nil {
+			if slurmNode.IsRebootIssuedState() {
+				observation.snapshot.Issued++
+			} else if slurmNode.IsRebootRequestedState() {
+				observation.snapshot.Requested++
+			}
+		}
 		switch decision.action {
 		case workerUpdateActionUndrain:
+			observationFromContext(ctx).waiting(waitCleanup)
 			nodesToUndrain = append(nodesToUndrain, slurmNode.Name)
 		case workerUpdateActionDeleteOfflinePod:
 			if err := r.deleteWorkerPod(ctx, &pod); err != nil {
@@ -363,6 +400,7 @@ func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
 				"operationPhase", decision.operationPhase,
 			)
 		case workerUpdateActionWait:
+			observationFromContext(ctx).waiting(waitSafety)
 			logger.Info(
 				"Waiting to replace worker with crash-looping slurmd",
 				"pod", pod.Name,
@@ -371,6 +409,11 @@ func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
 			)
 			continue
 		case workerUpdateActionTrackInFlight:
+			if slurmNode.IsRebootIssuedState() {
+				observationFromContext(ctx).waiting(waitHandoff)
+			} else {
+				observationFromContext(ctx).waiting(waitReboot)
+			}
 		case workerUpdateActionScheduleReboot:
 			candidates = append(candidates, replacement)
 			continue
@@ -429,16 +472,22 @@ func (r *RollingUpdateReconciler) startWorkerHandoffsWithinBudget(
 		// Their handoff must remain possible even when that budget is exhausted.
 		if podReady(&pod) || !candidate.k8sNodeCordoned {
 			if availableSlots == 0 {
+				observationFromContext(ctx).waiting(waitBudget)
+				observationFromContext(ctx).setWorkerStage(pod.Name, workerWaitingForSlot)
 				continue
 			}
 			availableSlots--
 		}
 		if err := r.markWorkerOperationStopping(ctx, &pod, candidate.operationID); err != nil {
+			observationFromContext(ctx).setWorkerStage(pod.Name, workerBlocked)
 			// Keep the reserved slot: the pod may have become unavailable since the snapshot.
 			handoffErrors = append(handoffErrors, err)
 			continue
 		}
 		slurmNodesToReboot = append(slurmNodesToReboot, pod.Name)
+	}
+	if observation := observationFromContext(ctx); observation != nil {
+		observation.slots = availableSlots
 	}
 	if len(slurmNodesToReboot) == 0 {
 		logger.Info("No additional worker handoffs can be scheduled")
@@ -451,10 +500,14 @@ func (r *RollingUpdateReconciler) startWorkerHandoffsWithinBudget(
 		Reason:      defaultRebootReason,
 		PowerAction: consts.SlurmPowerActionWorkerHandoff,
 	}); err != nil {
+		observationFromContext(ctx).waiting(waitSlurm)
+		observationFromContext(ctx).observeWorkerRebootRequest(slurmNodesToReboot, true)
 		handoffErrors = append(handoffErrors, fmt.Errorf("schedule slurm reboot through rest api: %w", err))
 		return errors.Join(handoffErrors...)
 	}
 	logger.Info("Scheduled Slurm reboot through REST API", "nodes", slurmNodesToReboot)
+	observationFromContext(ctx).observeWorkerRebootRequest(slurmNodesToReboot, false)
+	observationFromContext(ctx).waiting(waitReboot)
 	return errors.Join(handoffErrors...)
 }
 
@@ -471,14 +524,20 @@ func (r *RollingUpdateReconciler) markWorkerOperationStopping(ctx context.Contex
 	if err := r.Patch(ctx, pod, client.StrategicMergeFrom(patchBase, client.MergeFromWithOptimisticLock{})); err != nil {
 		return fmt.Errorf("start worker operation %s on pod %s/%s: %w", operationID, pod.Namespace, pod.Name, err)
 	}
+	if observation := observationFromContext(ctx); observation != nil {
+		observation.snapshot.Stopping++
+	}
 	return nil
 }
 
 func (r *RollingUpdateReconciler) deleteWorkerPod(ctx context.Context, pod *corev1.Pod) error {
 	// UID preconditions prevent a delayed reconcile from deleting a replacement pod.
 	if err := r.Delete(ctx, pod, client.Preconditions{UID: &pod.UID}); client.IgnoreNotFound(err) != nil {
+		observationFromContext(ctx).setWorkerStage(pod.Name, workerBlocked)
 		return fmt.Errorf("delete worker pod %s/%s after handoff: %w", pod.Namespace, pod.Name, err)
 	}
+	observationFromContext(ctx).setWorkerStage(pod.Name, workerDeleting)
+	observationFromContext(ctx).waiting(waitPods)
 	return nil
 }
 
@@ -488,12 +547,20 @@ func undrainStaleRollingUpdateNodes(ctx context.Context, slurmClient slurmapi.Cl
 	}
 	logger := log.FromContext(ctx)
 	if err := slurmClient.UndrainNodes(ctx, nodeNames); err != nil {
+		if observation := observationFromContext(ctx); observation != nil {
+			observation.failed = true
+			observation.waiting(waitSlurm)
+			for _, name := range nodeNames {
+				observation.setWorkerStage(name, workerBlocked)
+			}
+		}
 		// A batch may apply partially. Re-select stale drains on the next pass
 		// while allowing independent handoffs to proceed with their remaining budget.
 		logger.Error(err, "Undrain stale rolling update nodes", "nodes", nodeNames)
 		return
 	}
 	logger.Info("Undrained stale rolling update nodes", "nodes", nodeNames)
+	observationFromContext(ctx).waiting(waitCleanup)
 }
 
 func rebootBudget(sts *kruisev1b1.StatefulSet) int {
@@ -658,11 +725,13 @@ func rollingUpdateLoopStartPredicate() predicate.Funcs {
 		CreateFunc: func(e event.CreateEvent) bool {
 			return rollingUpdateEnabled(e.Object)
 		},
-		// Start a loop when coordination is enabled on an existing NodeSet.
+		// Start coordination when enabled; clean metric series when disabled.
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return !rollingUpdateEnabled(e.ObjectOld) && rollingUpdateEnabled(e.ObjectNew)
+			return rollingUpdateEnabled(e.ObjectOld) != rollingUpdateEnabled(e.ObjectNew)
 		},
-		DeleteFunc:  func(event.DeleteEvent) bool { return false },
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return rollingUpdateEnabled(e.Object)
+		},
 		GenericFunc: func(event.GenericEvent) bool { return false },
 	}
 }

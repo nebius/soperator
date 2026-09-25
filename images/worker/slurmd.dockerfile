@@ -33,6 +33,7 @@ RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
 # https://github.com/nebius/ml-containers/pull/102
 FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260918141513 AS worker_slurmd
 
+ARG SLURM_VERSION
 ARG SLURM_DEB_VERSION
 
 # Install useful packages
@@ -81,6 +82,7 @@ COPY ansible/spank_nccl_inspector_preconf.yml /opt/ansible/spank_nccl_inspector_
 COPY ansible/roles/spank_nccl_inspector_preconf /opt/ansible/roles/spank_nccl_inspector_preconf
 RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local \
+      -e "slurm_version=${SLURM_VERSION}" \
       -e spank_nccl_inspector_preconf_dump_dir_create=false \
       spank_nccl_inspector_preconf.yml
 
@@ -173,10 +175,6 @@ RUN sed -Ei \
     chmod 0644 /etc/soperator/pam-slurm-adopt/* && \
     ln -s /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt \
       /etc/pam.d/soperator-pam-slurm-adopt && \
-    ln -s /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt-users \
-      /etc/security/soperator-pam-slurm-adopt-users && \
-    ln -s /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt-groups \
-      /etc/security/soperator-pam-slurm-adopt-groups && \
     echo "@include soperator-pam-slurm-adopt" >> /etc/pam.d/sshd && \
     echo "session required pam_soperator_jail.so /mnt/jail" >> /etc/pam.d/sshd
 

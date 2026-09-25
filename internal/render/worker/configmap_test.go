@@ -47,9 +47,9 @@ func TestRenderConfigMapPAMSlurmAdopt(t *testing.T) {
 	assert.Equal(t, "test-namespace", result.Namespace)
 	pamConfig := result.Data[consts.ConfigMapKeyPAMSlurmAdopt]
 	assert.Contains(t, pamConfig,
-		"account sufficient pam_listfile.so item=user sense=allow onerr=fail file=/etc/security/soperator-pam-slurm-adopt-users")
+		"account sufficient pam_listfile.so item=user sense=allow onerr=fail file=/etc/soperator/pam-slurm-adopt/..data/soperator-pam-slurm-adopt-users")
 	assert.Contains(t, pamConfig,
-		"account sufficient pam_listfile.so item=group sense=allow onerr=fail file=/etc/security/soperator-pam-slurm-adopt-groups")
+		"account sufficient pam_listfile.so item=group sense=allow onerr=fail file=/etc/soperator/pam-slurm-adopt/..data/soperator-pam-slurm-adopt-groups")
 	assert.Contains(t, pamConfig, "action_no_jobs=deny")
 	assert.Contains(t, pamConfig, "action_unknown=newest")
 	assert.Contains(t, pamConfig, "action_adopt_failure=deny")

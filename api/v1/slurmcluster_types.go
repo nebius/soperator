@@ -86,7 +86,7 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 0, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", taskProlog: "", maxJobCount: 20000, minJobAge: 1800, messageTimeout: 60}
+	// +kubebuilder:default={defMemPerNode: 0, defCpuPerGPU: 4, completeWait: 0, epilog: "", prolog: "", taskProlog: "", maxJobCount: 100000, minJobAge: 600, messageTimeout: 60}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
 	// Topology contains topology-related parameters for Slurm.
@@ -182,7 +182,7 @@ type SlurmConfig struct {
 	// The time to wait, in seconds, when any job is in the COMPLETING state before any additional jobs are scheduled.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=5
+	// +kubebuilder:default=0
 	CompleteWait *int32 `json:"completeWait,omitempty"`
 	// Defines specific file to run the epilog when job ends. Default value is no epilog
 	//
@@ -204,15 +204,15 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=""
 	TaskPluginParam *string `json:"taskPluginParam,omitempty"`
-	// Keep N last jobs in controller memory
+	// Maximum number of jobs tracked in controller memory, including unfinished and retained completed jobs.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=20000
+	// +kubebuilder:default=100000
 	MaxJobCount *int32 `json:"maxJobCount,omitempty"`
-	// Don't remove jobs from controller memory after some time
+	// Minimum time in seconds to retain completed jobs in controller memory. Zero disables purging.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=1800
+	// +kubebuilder:default=600
 	MinJobAge *int32 `json:"minJobAge,omitempty"`
 	// MessageTimeout specifies the permitted time for a round-trip communication to complete in seconds.
 	// See https://slurm.schedmd.com/slurm.conf.html#OPT_MessageTimeout.

@@ -119,6 +119,8 @@ func generatePAMSlurmAdoptConfig(config values.PAMSlurmAdopt) renderutils.Config
 		return res
 	}
 
+	// pam_listfile rejects a final-component symlink. ConfigMap keys are symlinks,
+	// but resolving the intermediate ..data link leaves the key as a regular file.
 	res.AddLine(fmt.Sprintf(
 		"account sufficient pam_listfile.so item=user sense=allow onerr=fail file=%s",
 		consts.VolumeMountPathPAMSlurmAdoptUsers,

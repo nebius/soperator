@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -282,6 +283,77 @@ func TestRenderConfigMapSecurityLimits(t *testing.T) {
 			assert.NotNil(t, result)
 			assert.Equal(t, tt.expectedLabel, result.Labels[consts.LabelComponentKey])
 			assert.Equal(t, tt.expectedData, result.Data[consts.ConfigMapKeySecurityLimits])
+		})
+	}
+}
+
+func TestRenderSlurmSchedulingConfig(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		replicas    int32
+		ephemeral   bool
+		connections string
+	}{
+		{"ordinary", 10, false, "1024"},
+		{"large ephemeral", 5000, true, "16384"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			custom := "CompleteWait=7\nSchedulerParameters=defer_batch,bf_continue\nSlurmctldParameters=conmgr_max_connections=" +
+				tt.connections + ",conmgr_threads=32,validate_nodeaddr_threads=32,enable_stepmgr"
+			if tt.ephemeral {
+				custom += ",cloud_dns,idle_on_node_suspend"
+			}
+			cluster := &values.SlurmCluster{
+				SlurmConfig: slurmv1.SlurmConfig{
+					CompleteWait: ptr.To[int32](0),
+					MaxJobCount:  ptr.To[int32](100000),
+					MinJobAge:    ptr.To[int32](600),
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{{Spec: slurmv1alpha1.NodeSetSpec{
+					Replicas: tt.replicas, EphemeralNodes: ptr.To(tt.ephemeral),
+				}}},
+				CustomSlurmConfig: &custom,
+			}
+			result := RenderConfigMapSlurmConfigs(cluster)
+			base := result.Data[consts.ConfigMapKeySlurmBaseConfig]
+			properties := make(map[string]string)
+			for _, line := range strings.Split(base, "\n") {
+				key, value, ok := strings.Cut(line, "=")
+				if ok {
+					properties[key] = value
+				}
+			}
+			assert.Equal(t, "0", properties["CompleteWait"])
+			assert.Equal(t, "100000", properties["MaxJobCount"])
+			assert.Equal(t, "600", properties["MinJobAge"])
+			assert.Equal(t, "sched/backfill", properties["SchedulerType"])
+			assert.ElementsMatch(t, []string{
+				"nohold_on_prolog_fail", "extra_constraints", "pack_serial_at_end",
+				"salloc_wait_nodes", "sbatch_wait_nodes", "defer_batch", "batch_sched_delay=1",
+				"default_queue_depth=500", "sched_interval=30",
+				"bf_continue", "bf_max_job_test=1000", "bf_max_job_part=300", "bf_running_job_reserve",
+				"bf_yield_interval=500000", "bf_yield_sleep=500000",
+			}, strings.Split(properties["SchedulerParameters"], ","))
+			var controllerParams = []string{
+				"conmgr_max_connections=" + tt.connections, "conmgr_threads=32", "validate_nodeaddr_threads=32",
+				"enable_stepmgr", "rl_enable", "rl_refill_period=1", "rl_refill_rate=20", "rl_bucket_size=60", "rl_log_freq=30",
+			}
+			if tt.ephemeral {
+				controllerParams = append(controllerParams, "cloud_dns", "idle_on_node_suspend")
+			}
+			assert.ElementsMatch(t, controllerParams, strings.Split(properties["SlurmctldParameters"], ","))
+			for _, key := range []string{"CompleteWait", "MaxJobCount", "MinJobAge", "SchedulerParameters", "SlurmctldParameters"} {
+				assert.Equal(t, 1, strings.Count(base, "\n"+key+"="), key)
+			}
+			extra := result.Data[consts.ConfigMapKeySlurmK8sExtraConfig]
+			assert.Contains(t, extra, custom)
+			assert.NotContains(t, extra, "rl_enable")
+			entrypoint := result.Data[consts.ConfigMapKeySlurmConfig]
+			baseInclude := "include " + slurmConfigPath(consts.ConfigMapKeySlurmBaseConfig)
+			extraInclude := "include " + slurmConfigPath(consts.ConfigMapKeySlurmK8sExtraConfig)
+			require.Contains(t, entrypoint, baseInclude)
+			require.Contains(t, entrypoint, extraInclude)
+			assert.Less(t, strings.Index(entrypoint, baseInclude), strings.Index(entrypoint, extraInclude))
 		})
 	}
 }

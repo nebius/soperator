@@ -75,7 +75,7 @@ func (r *WorkerTopologyReconciler) buildMultiTopologyYAML(
 // buildTopologyEntry turns one NamedTopology into its topology.yaml entry.
 //
 // The node labels a topology reads follow from its plugin: block topologies group nodes by the
-// "tier-0" label, tree topologies walk the contiguous "tier-1".."tier-N" chain. Both come from the
+// "tier-0" label, tree topologies walk all present "tier-N" labels in numeric order. Both come from the
 // topology-node-labels ConfigMap that NodeTopologyReconciler builds out of the
 // topology.nebius.com/tier-* labels on the Kubernetes nodes.
 func buildTopologyEntry(

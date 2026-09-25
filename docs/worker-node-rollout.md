@@ -161,3 +161,124 @@ kubectl get pods -n <namespace> \
 During `stopping`, check the worker's jobs and reboot state in Slurm. After the operation phase becomes `ready`, check the
 node rollout tool's eviction retries and any other matching PDBs. A merely cordoned node needs an actual drain to
 remove a worker whose operation is `ready`.
+
+## Metrics and dashboard
+
+The operator exposes rollout gauges on its metrics endpoint for worker StatefulSets managed by the rolling update
+controller. They describe both worker revision updates and cordon-driven node replacements. Values are refreshed
+after each reconciliation, so they reflect the last controller observation rather than a live stream of pod changes.
+For idle NodeSets, Slurm information follows the audit interval described above.
+
+The `soperator_rollout_` prefix identifies the application and the measured rollout state. All six metric families
+explicitly attach the fixed label `controller="rollingupdate"`, using the same controller name as controller-runtime.
+Controller-runtime does not add this label to custom metrics automatically; its own controller metrics already have
+it. Workqueue metrics use `name="rollingupdate"`. Resource identity, worker stage and wait reason are also labels.
+The rollout metrics are gauges, so they do not use the counter suffix `_total`; the progress timestamp uses seconds.
+
+Update the operator image and dashboard together, and update any custom queries to use the metric names below and
+`controller="rollingupdate"`. Historical samples with earlier names or without the controller label remain separate
+series and do not match the new dashboard filters.
+
+The [Soperator / Rollouts dashboard](../helm/soperator-monitoring-dashboards/dashboards/operator_rollouts.json)
+shows worker counts by stage, progress and the dominant controller blocker per NodeSet. Its worker-stage panel uses
+separate lines with points; stages can be isolated through the legend. Filter by namespace, SlurmCluster and NodeSet
+to inspect a particular rollout. Prometheus must scrape the operator's metrics endpoint; the `soperator` chart
+provides a ServiceMonitor when `serviceMonitor.enabled` is set.
+
+### Labels and cardinality
+
+All rollout metrics use the same controller and resource labels:
+
+| Label | Meaning |
+| --- | --- |
+| `controller` | Fixed value `rollingupdate`, matching the name registered with controller-runtime. |
+| `resource_namespace` | Namespace of the worker StatefulSet, which can differ from the operator's namespace. |
+| `slurm_cluster` | SlurmCluster name. |
+| `nodeset` | NodeSet name; falls back to the StatefulSet name if NodeSet identity is unavailable. |
+
+`soperator_rollout_waiting` also has a `reason` label, and
+`soperator_rollout_workers` has a `stage` label. Both use fixed vocabularies listed below.
+There are no per-pod, node, UID, revision or error-message labels. Each observed worker StatefulSet (normally one per
+NodeSet) contributes 27 series per scrape target: four single-series gauges, ten wait reasons and thirteen worker
+stages, including zero-valued series.
+This count does not grow with the number of workers; the fixed `controller` value does not multiply it. Prometheus
+may add target labels such as `job`, `instance` and the physical `cluster`; these are separate from the labels above.
+
+### Rollout gauges
+
+| Metric | Meaning |
+| --- | --- |
+| `soperator_rollout_active` | `1` while revision updates, readiness, replacement handoffs or Slurm cleanup remain incomplete; `0` after completion is confirmed. A cordon-driven replacement can be active with no outdated pods. |
+| `soperator_rollout_outdated_pods` | Number of observed pods outside the target revision; zero if that revision is not yet known. Zero does not imply that all replacements are Ready or that Slurm cleanup has finished. |
+| `soperator_rollout_available_handoff_slots` | Remaining budget for starting additional handoffs after this pass's reservations. It is clamped to zero and remains populated when no rollout is active. Observation failures report zero. |
+| `soperator_rollout_last_progress_timestamp_seconds` | Unix timestamp of the start of the current observed rollout or its last observed progress. Interpret it only while `soperator_rollout_active == 1` and the timestamp is greater than zero. |
+| `soperator_rollout_waiting{reason}` | `1` for one dominant controller wait reason; all other reasons are `0`. All reasons are zero after a successful completed observation. This is a blocker indicator, not a worker count. |
+| `soperator_rollout_workers{stage}` | Number of workers in each mutually exclusive rollout stage, plus a separate count of missing desired pod slots. |
+
+Available slots follow the shared `maxUnavailable` budget described above. With an idle, fully Ready NodeSet and
+up-to-date StatefulSet status, this is the full configured budget, capped by the desired replica count. Zero can mean
+that existing handoffs or unavailable replicas consume the budget, that desired replicas are zero, or that an
+observation failed. A lagging StatefulSet Ready count can temporarily keep the value low. Check the worker stages
+and controller blocker alongside it; zero slots does not mean that in-flight replacements have stopped progressing.
+
+Progress includes reductions in outdated or pending workers, increasing readiness, handoff advancement, pod
+replacement and clearing pending cleanup. Repeated polling alone does not advance the timestamp, and readiness
+flapping does not repeatedly count as progress. A changed target revision or desired replica count starts a new
+progress window while rollout is incomplete. Progress tracking is held in memory: operator restarts, StatefulSet
+recreation or resource-label changes reset it. It is not the historical start time or total duration of a rollout.
+
+### Worker stages
+
+Each observed pod is counted once, including terminating pods. `waiting_for_pod` counts desired worker slots without
+a pod: `max(desired replicas - observed pods, 0)`. With a complete observation, summing all stages gives
+`max(desired replicas, observed pods)`. A terminating pod and its missing replacement are not counted twice.
+
+| `stage` | Meaning |
+| --- | --- |
+| `ready` | Pod is Ready at the target revision, with no known replacement handoff or rollout-related Slurm restoration pending. This does not assert general Slurm schedulability. |
+| `waiting_for_slot` | Replacement has not started because the concurrent update budget is exhausted. |
+| `waiting_for_jobs` | Handoff is requested and Slurm reports allocated CPU or memory, or jobs in `COMPLETING`. A reboot flag alone is not evidence of running jobs. |
+| `waiting_for_slurm` | Handoff is requested, no job-allocation/completion evidence was observed, and Slurm has not issued worker shutdown. |
+| `stopping_worker` | Slurm has issued the reboot; the controller is waiting for the worker's handoff acknowledgement. |
+| `waiting_for_eviction` | A cordoned worker has acknowledged its handoff and is waiting for the external node drainer to evict its pod. |
+| `deleting_pod` | Pod deletion was accepted or the pod is terminating. It remains counted until a later observation sees it disappear. |
+| `starting_pod` | A target-revision pod exists but is not Ready yet. |
+| `waiting_for_pod` | A desired worker slot has no pod yet. This is a missing slot, not an existing pod. |
+| `restoring_slurm` | Rollout-related drain or reboot state needs cleanup or confirmation from Slurm. |
+| `missing_slurm_node` | A successful Slurm node listing did not contain the worker. |
+| `blocked` | Replacement is not yet safe, or an action for this worker failed. Check the controller blocker and operator logs. |
+| `unknown` | The worker's state could not be confirmed, for example after an API failure or an interrupted observation. |
+
+On partial failures, already observed worker stages are retained for that pass and unconfirmed workers can be
+`unknown`. If the pod list is unavailable, the last-known or desired worker capacity is reported as `unknown`;
+a failed StatefulSet read uses the last-known capacity. This is not a fresh pod count.
+
+### Controller wait reasons
+
+Several worker stages can coexist, but only one dominant `reason` is exported at a time. Errors and unsafe states
+take precedence over ordinary waits. In particular, `budget_exhausted` can coexist with workers finishing jobs,
+stopping or starting new pods; use the stage counts to see what those workers are doing.
+
+| `reason` | Meaning |
+| --- | --- |
+| `budget_exhausted` | No budget remains to start another queued handoff. |
+| `reboot_pending` | A Slurm handoff has been requested but has not advanced to worker shutdown. |
+| `handoff_pending` | Slurm has issued the reboot; worker shutdown acknowledgement is pending. |
+| `pods_not_ready` | The desired pod revision/readiness state has not yet been confirmed. |
+| `eviction_pending` | A cordoned worker has completed handoff and is waiting for external eviction. |
+| `cleanup_pending` | Rollout-related Slurm state or worker registration still needs confirmation, including removal of stale rollout DRAIN when applicable. This is not filesystem cleanup. |
+| `safety_pending` | The controller cannot safely use the offline-worker recovery path with the observed state and allocations. |
+| `slurm_node_missing` | A worker needed for replacement is absent from a successful Slurm node listing. |
+| `slurm_unavailable` | The Slurm client is unavailable, or a Slurm read/action failed. |
+| `reconcile_error` | A Kubernetes operation or another reconciliation step failed. |
+
+For example, `active=0`, `outdated_pods=0`, no wait reason and positive available slots describe an idle, completed
+NodeSet with spare update budget. If a later API read fails, the previous active/progress values can remain while
+slots become zero and an error reason is set; `active=0` alone is therefore not a health signal.
+
+Series are removed when the controller observes the worker StatefulSet being deleted or coordination being
+disabled; resource-label changes also remove the old series. Missing metrics mean no observation, not successful
+completion. Check the scrape and dashboard filters
+before interpreting missing data. The controller logs operational failures and returns a nil reconcile error to
+preserve its polling interval, so `controller_runtime_reconcile_errors_total` can stay zero during those failures.
+Use `soperator_rollout_waiting` and the operator logs for the affected namespace and StatefulSet.

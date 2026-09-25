@@ -15,3 +15,4 @@ Feature: Cluster creation
     And main partition smoke job succeeds
     And hidden partition smoke job succeeds
     And each discovered nodeset accepts a targeted smoke job
+    And node-local jail submounts have mode 777
