@@ -160,11 +160,30 @@ func TestTopologyStructure(t *testing.T) {
 			Topology: "block-nvl72",
 			Block: &blockTopologyYAML{
 				BlockSizes: []int{18},
-				Blocks:     []blockYAML{{Block: "another-block", Nodes: "h100-[1-3]"}},
+				Blocks:     []blockYAML{{Block: "block1", Nodes: "h100-[1-3]"}},
 			},
 		}}
 
 		assert.Equal(t, structureOf(base...), structureOf(same...))
+	})
+
+	t.Run("block order and block membership changes request reconfiguration", func(t *testing.T) {
+		before := topologyYAMLEntry{Topology: "blocks", Block: &blockTopologyYAML{
+			Blocks: []blockYAML{{Block: "b1", Nodes: "rack-a-0"}, {Block: "b2", Nodes: "rack-b-0"}},
+		}}
+		oldStructure := structureOf(before)
+		for _, blocks := range [][]blockYAML{
+			{before.Block.Blocks[1], before.Block.Blocks[0]},
+			{{Block: "b2", Nodes: "rack-b-0"}, {Block: "unknown", Nodes: "rack-a-0"}},
+			{{Block: "unknown", Nodes: "rack-a-0,rack-b-0"}},
+			{{Block: "b1", Nodes: "rack-a-0"}, {Block: "b2", Nodes: "rack-b-0"}, {Block: "b3", Nodes: "rack-c-0"}},
+		} {
+			after := topologyYAMLEntry{Topology: "blocks", Block: &blockTopologyYAML{Blocks: blocks}}
+			newStructure := structureOf(after)
+			assert.NotEqual(t, oldStructure, newStructure)
+			assert.Equal(t, reconfigure, reconcileReconfigureRequest(logr.Discard(), jailedConfig(oldStructure, nil), newStructure))
+		}
+		assert.Empty(t, reconcileReconfigureRequest(logr.Discard(), jailedConfig(oldStructure, nil), structureOf(before)))
 	})
 
 	t.Run("adding a topology changes it", func(t *testing.T) {
