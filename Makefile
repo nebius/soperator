@@ -600,35 +600,30 @@ MOCKERY_VERSION				?= 2.53.7
 KIND_VERSION				?= v0.33.0
 FLUX_VERSION				?= 2.9.5
 
+# Read the embedded module version: CLI version output can be unset by go install.
+define install-go-tool
+@current_version="$$(go version -m "$(1)" 2>/dev/null | awk '$$1 == "mod" {print $$3}' || true)"; \
+if ! test -x "$(1)" || [ "$$current_version" != "$(3)" ]; then \
+	echo "Installing $(notdir $(1)) $(3) (found: $${current_version:-none})"; \
+	GOBIN=$(LOCALBIN) GO111MODULE=on go install $(2)@$(3); \
+fi
+endef
+
 .PHONY: kustomize
 kustomize: | $(LOCALBIN) ## Download kustomize locally if necessary.
-	@if test -x $(LOCALBIN)/kustomize && ! $(LOCALBIN)/kustomize version | grep -q $(KUSTOMIZE_VERSION); then \
-		echo "$(LOCALBIN)/kustomize version is not expected $(KUSTOMIZE_VERSION). Removing it before installing."; \
-		rm -rf $(LOCALBIN)/kustomize; \
-	fi
-	test -s $(LOCALBIN)/kustomize || GOBIN=$(LOCALBIN) GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
+	$(call install-go-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5,$(KUSTOMIZE_VERSION))
 
 .PHONY: mockery
-mockery:
-	@mkdir -p $(LOCALBIN)
-	@current_version="$$( $(MOCKERY) --version 2>&1 | grep -o 'version=v[0-9.]*' | cut -d= -f2 || true)"; \
-	if [ "$$current_version" != "v$(MOCKERY_VERSION)" ]; then \
-		echo "🛠  Installing mockery v$(MOCKERY_VERSION) (found: $$current_version)"; \
-		rm -f $(MOCKERY); \
-		GOBIN=$(LOCALBIN) GO111MODULE=on go install github.com/vektra/mockery/v2@v$(MOCKERY_VERSION); \
-	else \
-		echo "✅ mockery v$(MOCKERY_VERSION) already installed"; \
-	fi
+mockery: | $(LOCALBIN) ## Download mockery locally if necessary.
+	$(call install-go-tool,$(MOCKERY),github.com/vektra/mockery/v2,v$(MOCKERY_VERSION))
 
 .PHONY: mock
 mock: mockery ## Generate mocks using mockery
 	$(MOCKERY)
 
 .PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
-$(CONTROLLER_GEN): $(LOCALBIN)
-	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+controller-gen: | $(LOCALBIN) ## Download controller-gen locally if necessary.
+	$(call install-go-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
 .PHONY: envtest
 envtest: | $(LOCALBIN) ## Download setup-envtest locally if necessary.
@@ -645,13 +640,11 @@ golangci-lint: | $(LOCALBIN) ## Download golangci-lint locally if necessary.
 
 .PHONY: helmify
 helmify: | $(LOCALBIN) ## Download helmify locally if necessary.
-	test -s $(HELMIFY) && go version -m $(HELMIFY) | grep -q v$(HELMIFY_VERSION) || \
-	GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@v$(HELMIFY_VERSION)
+	$(call install-go-tool,$(HELMIFY),github.com/arttor/helmify/cmd/helmify,v$(HELMIFY_VERSION))
 
 .PHONY: yq
 yq: | $(LOCALBIN) ## Download yq locally if necessary.
-	test -s $(YQ) && $(YQ) --version | grep -q v$(YQ_VERSION) || \
-	GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
+	$(call install-go-tool,$(YQ),github.com/mikefarah/yq/v4,v$(YQ_VERSION))
 
 .PHONY: install-kind
 install-kind: | $(LOCALBIN) ## Download kind locally if necessary.
