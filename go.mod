@@ -34,7 +34,7 @@ require (
 	istio.io/pkg v0.0.0-20260319112335-17f2fd590f47
 	k8s.io/api v0.36.4
 	k8s.io/apiextensions-apiserver v0.36.4
-	k8s.io/apimachinery v0.36.4
+	k8s.io/apimachinery v0.37.0
 	k8s.io/apiserver v0.36.4
 	k8s.io/client-go v0.36.4
 	k8s.io/klog/v2 v2.140.0
@@ -144,8 +144,8 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/component-base v0.36.4 // indirect
-	k8s.io/kube-openapi v0.0.0-20260603220949-865597e52e25 // indirect
-	k8s.io/streaming v0.36.4 // indirect
+	k8s.io/kube-openapi v0.0.0-20260721132016-d427ff9ee9ad // indirect
+	k8s.io/streaming v0.37.0 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.36.0 // indirect
 	sigs.k8s.io/json v0.0.0-20260909141634-11ed52e25bc5 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
