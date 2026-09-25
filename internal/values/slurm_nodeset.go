@@ -19,20 +19,19 @@ type SlurmNodeSet struct {
 	Name            string
 	ParentalCluster client.ObjectKey
 
-	NodeSelector  map[string]string
-	Affinity      *corev1.Affinity
-	Tolerations   []corev1.Toleration
-	PriorityClass string
-	Annotations   map[string]string
+	NodeSelector     map[string]string
+	Affinity         *corev1.Affinity
+	Tolerations      []corev1.Toleration
+	PriorityClass    string
+	Annotations      map[string]string
+	ImagePullSecrets []corev1.LocalObjectReference
 
-	ContainerSlurmd           Container
-	ContainerMunge            Container
-	ContainerSSSD             *Container
-	CustomInitContainers      []corev1.Container
-	AppArmorProfileUseDefault bool
+	ContainerSlurmd      Container
+	ContainerMunge       Container
+	ContainerSSSD        *Container
+	CustomInitContainers []corev1.Container
 
-	SupervisorDConfigMapDefault bool
-	SupervisorDConfigMapName    string
+	SupervisorDConfigMapName string
 
 	SSHDConfigMapDefault    bool
 	SSHDConfigMapName       string
@@ -42,7 +41,11 @@ type SlurmNodeSet struct {
 
 	GPU *slurmv1alpha1.GPUSpec
 
+	// DockerEnabled defines whether dockerd, its supervised proxy, and the Docker CLI are enabled for the NodeSet workers.
+	DockerEnabled bool
+
 	StatefulSet     StatefulSet
+	UpdateStrategy  consts.UpdateStrategy
 	Service         Service
 	ServiceUmbrella Service
 
@@ -53,12 +56,18 @@ type SlurmNodeSet struct {
 	SharedMemorySize                     *resource.Quantity
 	PersistentVolumeClaimRetentionPolicy *kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy
 
-	Maintenance             *consts.MaintenanceMode
-	NodeExtra               string
-	EnableHostUserNamespace bool
+	Maintenance                  *consts.MaintenanceMode
+	NodeExtra                    string
+	EnableHostUserNamespace      bool
+	WorkerInitRandomDelaySeconds int32
 
 	EphemeralNodes               *bool
 	EphemeralTopologyWaitTimeout int32
+
+	// TopologyFabric is the IB fabric / top-of-tree switch name (spec.topology.fabric). It is
+	// passed to worker-init so the dynamic topology path it declares matches the operator's
+	// per-fabric root switch in topology.yaml.
+	TopologyFabric string
 
 	ActiveNodes []int32
 }
@@ -67,7 +76,6 @@ func BuildSlurmNodeSetFrom(
 	nodeSet *slurmv1alpha1.NodeSet,
 	clusterName string,
 	maintenance *consts.MaintenanceMode,
-	useDefaultAppArmorProfile bool,
 ) SlurmNodeSet {
 	nsSpec := &nodeSet.Spec
 	res := SlurmNodeSet{
@@ -77,11 +85,12 @@ func BuildSlurmNodeSetFrom(
 			Name:      clusterName,
 		},
 		//
-		NodeSelector:  maps.Clone(nsSpec.NodeSelector),
-		Affinity:      nsSpec.Affinity.DeepCopy(),
-		Tolerations:   slices.Clone(nsSpec.Tolerations),
-		PriorityClass: nsSpec.PriorityClass,
-		Annotations:   maps.Clone(nsSpec.WorkerAnnotations),
+		NodeSelector:     maps.Clone(nsSpec.NodeSelector),
+		Affinity:         nsSpec.Affinity.DeepCopy(),
+		Tolerations:      slices.Clone(nsSpec.Tolerations),
+		PriorityClass:    nsSpec.PriorityClass,
+		Annotations:      maps.Clone(nsSpec.WorkerAnnotations),
+		ImagePullSecrets: slices.Clone(nsSpec.ImagePullSecrets),
 		//
 		ContainerSlurmd: buildContainerFrom(
 			slurmv1.NodeContainer{
@@ -110,16 +119,18 @@ func BuildSlurmNodeSetFrom(
 			},
 			consts.ContainerNameMunge,
 		),
-		CustomInitContainers:      slices.Clone(nsSpec.CustomInitContainers),
-		AppArmorProfileUseDefault: useDefaultAppArmorProfile,
+		CustomInitContainers: slices.Clone(nsSpec.CustomInitContainers),
 		//
 		GPU: nsSpec.GPU.DeepCopy(),
+		//
+		DockerEnabled: nsSpec.Docker.Enabled == nil || *nsSpec.Docker.Enabled,
 		//
 		StatefulSet: buildStatefulSetWithMaxUnavailableFrom(
 			naming.BuildNodeSetStatefulSetName(nodeSet.Name),
 			nsSpec.Replicas,
 			nsSpec.MaxUnavailable,
 		),
+		UpdateStrategy:  nsSpec.UpdateStrategy,
 		Service:         buildServiceFrom(naming.BuildNodeSetServiceName(clusterName, nodeSet.Name)),
 		ServiceUmbrella: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName)),
 		//
@@ -130,12 +141,14 @@ func BuildSlurmNodeSetFrom(
 			nsSpec.Slurmd.Volumes.PersistentVolumeClaimRetentionPolicy,
 		),
 		//
-		Maintenance:             maintenance,
-		NodeExtra:               nsSpec.NodeConfig.Dynamic,
-		EnableHostUserNamespace: nsSpec.EnableHostUserNamespace,
+		Maintenance:                  maintenance,
+		NodeExtra:                    nsSpec.NodeConfig.Dynamic,
+		EnableHostUserNamespace:      nsSpec.EnableHostUserNamespace,
+		WorkerInitRandomDelaySeconds: nsSpec.WorkerInitRandomDelaySeconds,
 		//
 		EphemeralNodes:               nsSpec.EphemeralNodes,
 		EphemeralTopologyWaitTimeout: nsSpec.EphemeralTopologyWaitTimeout,
+		TopologyFabric:               nsSpec.Topology.Fabric,
 	}
 
 	// region Submounts
@@ -149,20 +162,7 @@ func BuildSlurmNodeSetFrom(
 	}
 	// endregion Submounts
 
-	// region SupervisorDConfig
-	{
-		var (
-			supervisordConfigMapName = nsSpec.ConfigMapRefSupervisord
-			supervisordConfigDefault = false
-		)
-		if nsSpec.ConfigMapRefSupervisord == "" {
-			supervisordConfigDefault = true
-			supervisordConfigMapName = naming.BuildConfigMapSupervisordName(clusterName)
-		}
-		res.SupervisorDConfigMapName = supervisordConfigMapName
-		res.SupervisorDConfigMapDefault = supervisordConfigDefault
-	}
-	// endregion SupervisorDConfig
+	res.SupervisorDConfigMapName = nsSpec.ConfigMapRefSupervisord
 
 	// region SSHDConfig
 	{

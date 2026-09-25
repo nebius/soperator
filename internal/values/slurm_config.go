@@ -19,6 +19,9 @@ func buildSlurmConfigFrom(slurmConfig *slurmv1.SlurmConfig) slurmv1.SlurmConfig 
 		res.ResumeTimeout = ptr.To[int32](consts.SlurmDefaultResumeTimeout)
 	}
 
+	if res.SuspendTimeout == nil {
+		res.SuspendTimeout = ptr.To[int32](consts.SlurmDefaultSuspendTimeout)
+	}
 	return res
 }
 

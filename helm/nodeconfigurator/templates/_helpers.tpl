@@ -42,6 +42,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+Name of the rebooter's priority class. PriorityClass is cluster-scoped, so this defaults to the
+release-derived name to keep two installations in one cluster from colliding.
+*/}}
+{{- define "nodeconfigurator.rebooterPriorityClassName" -}}
+{{- $priorityClass := .Values.rebooter.priorityClass | default dict -}}
+{{- if $priorityClass.name -}}
+{{- $priorityClass.name -}}
+{{- else -}}
+{{- printf "%s-rebooter" (include "nodeconfigurator.name" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "nodeconfigurator.serviceAccountName" -}}

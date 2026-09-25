@@ -1,5 +1,5 @@
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.28.0
+ENVTEST_K8S_VERSION ?= 1.36.2
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -37,7 +37,8 @@ CHART_FLUXCD_BOOTSTRAP_PATH					= $(CHART_PATH)/soperator-fluxcd-bootstrap
 CHART_STORAGECLASSES						= $(CHART_PATH)/storageclasses
 CHART_BACKUP_CONFIG							= $(CHART_PATH)/soperator-backup-config
 
-SLURM_VERSION		= 25.11.3
+SLURM_VERSION		= 26.05.4-nebius-1
+SLURM_DEB_VERSION	= 26.05.4-nebius-1
 NFS_VERSION_BASE	= $(shell cat VERSION_NFS)
 VERSION_BASE		= $(shell cat VERSION)
 
@@ -101,7 +102,7 @@ help: ## Display this help.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) crd webhook paths=$(GENPATH) output:crd:artifacts:config=config/crd/bases
 	$(CONTROLLER_GEN) rbac:roleName=nodeconfigurator-role paths="./internal/rebooter/..." output:artifacts:config=config/rbac/nodeconfigurator/
-	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./internal/controller/clustercontroller/...;  ./internal/controller/topologyconfcontroller/...; ./internal/controller/nodeconfigurator/...; ./internal/controller/nodesetcontroller/..." output:artifacts:config=config/rbac/clustercontroller/
+	$(CONTROLLER_GEN) rbac:roleName=manager-role paths="./internal/controller/clustercontroller/...;  ./internal/controller/topologyconfcontroller/...; ./internal/controller/nodeconfigurator/...; ./internal/controller/nodesetcontroller/...; ./internal/controller/updatecontroller/..." output:artifacts:config=config/rbac/clustercontroller/
 	$(CONTROLLER_GEN) rbac:roleName=soperator-checks-role paths="./internal/controller/soperatorchecks/..." output:artifacts:config=config/rbac/soperatorchecks/
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -117,10 +118,18 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
+	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)"; \
+	export KUBEBUILDER_ASSETS; \
 	go test ./...
+
+.PHONY: test-python
+test-python: ## Temporarily retained while removing Python unit tests from CI.
+	@echo "Python unit tests are disabled in CI."
 
 .PHONY: test-coverage
 test-coverage: manifests generate fmt vet envtest ## Run tests and generate test coverage.
+	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)"; \
+	export KUBEBUILDER_ASSETS; \
 	go test ./... -coverprofile cover.out
 
 .PHONY: lint
@@ -156,6 +165,8 @@ helm: generate manifests kustomize helmify ## Update soperator Helm chart
 		in_metadata && /^  name:/ {print; if (!done) {print "  {{- if .Values.certManager.enabled }}"; print "  annotations:"; print "    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include \"soperator.fullname\" . }}-serving-cert"; print "  {{- end }}"; done=1}; next} \
 		in_metadata && /^  annotations:/ {next} \
 		in_metadata && /^    cert-manager/ {next} \
+		in_metadata && /^  \{\{- if .Values.certManager.enabled \}\}/ {next} \
+		in_metadata && /^  \{\{- end \}\}/ {next} \
 		in_metadata && /^  labels:/ {in_metadata=0} \
 		{print}' \
 		$(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml > $(CHART_OPERATOR_PATH)/templates/mutating-webhook-configuration.yaml.tmp && \
@@ -167,6 +178,8 @@ helm: generate manifests kustomize helmify ## Update soperator Helm chart
 		in_metadata && /^  name:/ {print; if (!done) {print "  {{- if .Values.certManager.enabled }}"; print "  annotations:"; print "    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include \"soperator.fullname\" . }}-serving-cert"; print "  {{- end }}"; done=1}; next} \
 		in_metadata && /^  annotations:/ {next} \
 		in_metadata && /^    cert-manager/ {next} \
+		in_metadata && /^  \{\{- if .Values.certManager.enabled \}\}/ {next} \
+		in_metadata && /^  \{\{- end \}\}/ {next} \
 		in_metadata && /^  labels:/ {in_metadata=0} \
 		{print}' \
 		$(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml > $(CHART_OPERATOR_PATH)/templates/validating-webhook-configuration.yaml.tmp && \
@@ -384,7 +397,7 @@ build: manifests generate fmt vet ## Build manager binary with native toolchain.
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host with native toolchain.
-	IS_PROMETHEUS_CRD_INSTALLED=true IS_MARIADB_CRD_INSTALLED=true ENABLE_WEBHOOKS=false IS_APPARMOR_CRD_INSTALLED=true go run cmd/main.go \
+	IS_PROMETHEUS_CRD_INSTALLED=true IS_MARIADB_CRD_INSTALLED=true ENABLE_WEBHOOKS=false go run cmd/main.go \
 	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system
 
 .PHONY: docker-build-and-push
@@ -417,6 +430,7 @@ endif
 		-t "$(IMAGE_REPO)/$(IMAGE_NAME):$(IMAGE_VERSION)-$(ARCH)" \
 		-f images/$(DOCKERFILE) \
 		--build-arg SLURM_VERSION="$(SLURM_VERSION)" \
+		--build-arg SLURM_DEB_VERSION="$(SLURM_DEB_VERSION)" \
 		--progress=plain \
 		--push \
 		--cache-from=type=registry,ref=$${CACHE_REF} \
@@ -493,7 +507,8 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
 .PHONY: deploy-flux
-deploy-flux: install-flux kustomize ## Deploy soperator via Flux CD to kind cluster (for local development)
+# Match the bootstrap chart: Flux waits for each child release independently of the parent.
+deploy-flux: install-flux kustomize yq ## Deploy soperator via Flux CD to kind cluster (for local development)
 	@echo "Step 1: Installing Flux CD..."
 	@echo "Checking cluster connectivity..."
 	@if ! $(KUBECTL_CTX) cluster-info > /dev/null 2>&1; then \
@@ -520,6 +535,7 @@ deploy-flux: install-flux kustomize ## Deploy soperator via Flux CD to kind clus
 	echo ""; \
 	echo "Step 3: Deploying Flux configuration for local environment..."; \
 	$(KUSTOMIZE) build fluxcd/environment/local | \
+		$(YQ) '(select(.kind == "HelmRelease" and .metadata.name == "soperator-fluxcd") | .spec) |= (.install.disableWait = true | .upgrade.disableWait = true)' - | \
 		sed "s|url: oci://cr.nebius.cloud/soperator.*|url: $$OCI_REPO|g" | \
 		$(KUBECTL_CTX) apply -f -; \
 	echo ""; \
@@ -571,17 +587,18 @@ KIND			?= $(LOCALBIN)/kind
 FLUX			?= $(LOCALBIN)/flux
 
 ## Tool Versions
-KUSTOMIZE_VERSION			?= v5.5.0
-CONTROLLER_TOOLS_VERSION	?= v0.19.0
-ENVTEST_VERSION				?= release-0.17
-GOLANGCI_LINT_VERSION		?= v2.12.2  # Should be in sync with the github CI step.
-HELMIFY_VERSION				?= 0.4.13
-HELM_VERSION				?= v3.18.3
-HELM_UNITTEST_VERSION		?= 0.8.2
-YQ_VERSION					?= 4.44.3
-MOCKERY_VERSION				?= 2.53.5
-KIND_VERSION				?= v0.30.0
-FLUX_VERSION				?= 2.7.3
+KUSTOMIZE_VERSION			?= v5.8.1
+CONTROLLER_TOOLS_VERSION	?= v0.21.0
+ENVTEST_VERSION				?= v0.24.2-0.20260713111223-0f529e22d5c0
+# Read by the GitHub CI workflow.
+GOLANGCI_LINT_VERSION		?= v2.13.2
+HELMIFY_VERSION				?= 0.4.20
+HELM_VERSION				?= v3.22.0
+HELM_UNITTEST_VERSION		?= 1.1.2
+YQ_VERSION					?= 4.53.6
+MOCKERY_VERSION				?= 2.53.7
+KIND_VERSION				?= v0.33.0
+FLUX_VERSION				?= 2.9.5
 
 # Read the embedded module version: CLI version output can be unset by go install.
 define install-go-tool
@@ -609,17 +626,17 @@ controller-gen: | $(LOCALBIN) ## Download controller-gen locally if necessary.
 	$(call install-go-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
 .PHONY: envtest
-envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
-$(ENVTEST): $(LOCALBIN)
-	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.22
+envtest: | $(LOCALBIN) ## Download setup-envtest locally if necessary.
+	test -s $(ENVTEST) && go version -m $(ENVTEST) | grep -q $(ENVTEST_VERSION) || \
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 
 .PHONY: golangci-lint
-golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
-$(GOLANGCI_LINT): $(LOCALBIN)
-	@[ -f $(GOLANGCI_LINT) ] || { \
-	set -e ;\
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell dirname $(GOLANGCI_LINT)) $(GOLANGCI_LINT_VERSION) ;\
-	}
+golangci-lint: | $(LOCALBIN) ## Download golangci-lint locally if necessary.
+	@current_version="$$( $(GOLANGCI_LINT) version 2>/dev/null | awk '{print $$4}' || true)"; \
+	if [ "$$current_version" != "$(patsubst v%,%,$(GOLANGCI_LINT_VERSION))" ]; then \
+		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION) (found: $${current_version:-none})"; \
+		curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(dir $(GOLANGCI_LINT)) $(GOLANGCI_LINT_VERSION); \
+	fi
 
 .PHONY: helmify
 helmify: | $(LOCALBIN) ## Download helmify locally if necessary.
@@ -630,8 +647,7 @@ yq: | $(LOCALBIN) ## Download yq locally if necessary.
 	$(call install-go-tool,$(YQ),github.com/mikefarah/yq/v4,v$(YQ_VERSION))
 
 .PHONY: install-kind
-install-kind: $(KIND) ## Download kind locally if necessary.
-$(KIND): $(LOCALBIN)
+install-kind: | $(LOCALBIN) ## Download kind locally if necessary.
 	@if test -x $(LOCALBIN)/kind && ! $(LOCALBIN)/kind version | grep -q $(KIND_VERSION); then \
 		echo "$(LOCALBIN)/kind version is not expected $(KIND_VERSION). Removing it before installing."; \
 		rm -rf $(LOCALBIN)/kind; \
@@ -647,8 +663,7 @@ $(KIND): $(LOCALBIN)
 	fi
 
 .PHONY: install-flux
-install-flux: $(FLUX) ## Download flux CLI locally if necessary.
-$(FLUX): $(LOCALBIN)
+install-flux: | $(LOCALBIN) ## Download flux CLI locally if necessary.
 	@if test -x $(LOCALBIN)/flux && ! $(LOCALBIN)/flux version --client | grep -q $(FLUX_VERSION); then \
 		echo "$(LOCALBIN)/flux version is not expected $(FLUX_VERSION). Removing it before installing."; \
 		rm -rf $(LOCALBIN)/flux; \
@@ -688,7 +703,7 @@ check-helm:
 
 install-helm:
 	@echo "Installing Helm $(HELM_VERSION)..."
-	@curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+	@curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | DESIRED_VERSION=$(HELM_VERSION) bash
 
 install-unittest:
 	@echo "Installing helm-unittest plugin $(HELM_UNITTEST_VERSION)..."
@@ -698,8 +713,11 @@ install-unittest:
 
 KIND_CLUSTER_NAME	?= soperator-dev
 KIND_NODES			?= 2
-KIND_K8S_VERSION	?= v1.31.0
+KIND_K8S_VERSION	?= v1.36.4
 KIND_CONTEXT		?= kind-$(KIND_CLUSTER_NAME)
+# The soperator-fluxcd chart pins its control-plane workloads to the system nodeset, so every kind
+# node carries the label - otherwise those pods stay Pending and their HelmReleases never go Ready.
+KIND_NODESET_LABEL	?= slurm.nebius.ai/nodeset: system
 KUBECTL_CTX			= $(KUBECTL) --context $(KIND_CONTEXT)
 
 .PHONY: kind-create
@@ -713,8 +731,12 @@ kind-create: install-kind ## Create kind cluster with specified number of nodes
 	@echo "apiVersion: kind.x-k8s.io/v1alpha4" >> /tmp/kind-config.yaml
 	@echo "nodes:" >> /tmp/kind-config.yaml
 	@echo "- role: control-plane" >> /tmp/kind-config.yaml
+	@echo "  labels:" >> /tmp/kind-config.yaml
+	@echo "    $(KIND_NODESET_LABEL)" >> /tmp/kind-config.yaml
 	@for i in $$(seq 1 $$(($(KIND_NODES) - 1))); do \
 		echo "- role: worker" >> /tmp/kind-config.yaml; \
+		echo "  labels:" >> /tmp/kind-config.yaml; \
+		echo "    $(KIND_NODESET_LABEL)" >> /tmp/kind-config.yaml; \
 	done
 	@$(KIND) create cluster --name $(KIND_CLUSTER_NAME) --config /tmp/kind-config.yaml --image kindest/node:$(KIND_K8S_VERSION)
 	@rm /tmp/kind-config.yaml

@@ -42,8 +42,24 @@ else
     export TOPO_SWITCH_TIER2="unknown"
 fi
 
+echo "Export Soperator node metadata"
+/opt/bin/slurm/write_soperator_metadata.sh
+
 echo "Evaluate variables in the Slurm node 'Extra' field"
 evaluated_extra=$(eval echo "$SLURM_NODE_EXTRA")
+
+# The topology is passed to registration instead of being pushed with a separate scontrol update:
+# an update issued before slurmd starts makes slurmctld drop the InstanceId and Extra that
+# registration carries. worker-init resolved it and left it here, so nothing is waited for.
+node_topology=""
+if [ "${SLURM_TOPOLOGY_ENABLED}" = "true" ]; then
+    if [ ! -f "${SLURMD_TOPOLOGY_PATH}" ]; then
+        echo "Error: topology is enabled but ${SLURMD_TOPOLOGY_PATH} is missing; worker-init did not resolve it" >&2
+        exit 1
+    fi
+    node_topology=$(cat "${SLURMD_TOPOLOGY_PATH}")
+    echo "Registering into topology: ${node_topology:-<none>}"
+fi
 
 echo "Start slurmd daemon"
 
@@ -56,6 +72,12 @@ slurmd_args=(
 if [ "${evaluated_extra}" != "" ]; then
   slurmd_args+=(
     --extra "${evaluated_extra}"
+  )
+fi
+
+if [ "${node_topology}" != "" ]; then
+  slurmd_args+=(
+    --conf "${node_topology}"
   )
 fi
 

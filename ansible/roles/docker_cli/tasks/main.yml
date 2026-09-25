@@ -1,0 +1,15 @@
+---
+
+- name: Move real docker binary back
+  ansible.builtin.command: mv /usr/bin/docker.real /usr/bin/docker
+  args:
+    removes: /usr/bin/docker.real
+  tags:
+    - docker-cli
+
+- name: Ensure docker.io (Docker engine and CLI) is installed
+  ansible.builtin.apt:
+    name:
+      - "docker.io={{ docker_cli_version }}"
+  tags:
+    - docker-cli

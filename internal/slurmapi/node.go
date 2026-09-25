@@ -4,14 +4,14 @@ import (
 	"errors"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 )
 
 type Node struct {
 	Name        string
 	ClusterName string
 	InstanceID  string
-	States      map[api.V0041NodeState]struct{}
+	States      map[api.V0044NodeState]struct{}
 	Reason      *NodeReason
 	Partitions  []string
 	Tres        string    // Trackable Resources (e.g., CPUs, GPUs) assigned to the node.
@@ -37,7 +37,7 @@ type NodeReason struct {
 	ChangedAt      time.Time
 }
 
-func validateAPINode(node api.V0041Node) error {
+func validateAPINode(node api.V0044Node) error {
 	var errs []error
 
 	if node.State == nil || len(*node.State) == 0 {
@@ -63,14 +63,14 @@ func validateAPINode(node api.V0041Node) error {
 	return errors.Join(errs...)
 }
 
-func NodeFromAPI(node api.V0041Node) (Node, error) {
+func NodeFromAPI(node api.V0044Node) (Node, error) {
 	if err := validateAPINode(node); err != nil {
 		return Node{}, err
 	}
 
 	var res Node
 
-	nodeStates := make(map[api.V0041NodeState]struct{}, len(*node.State))
+	nodeStates := make(map[api.V0044NodeState]struct{}, len(*node.State))
 	for _, state := range *node.State {
 		nodeStates[state] = struct{}{}
 	}
@@ -114,91 +114,106 @@ func NodeFromAPI(node api.V0041Node) (Node, error) {
 }
 
 func (n *Node) IsIdleDrained() bool {
-	_, drained := n.States[api.V0041NodeStateDRAIN]
-	_, idle := n.States[api.V0041NodeStateIDLE]
+	_, drained := n.States[api.V0044NodeStateDRAIN]
+	_, idle := n.States[api.V0044NodeStateIDLE]
 
 	return drained && idle
 }
 
 func (n *Node) IsDrainState() bool {
-	_, exists := n.States[api.V0041NodeStateDRAIN]
+	_, exists := n.States[api.V0044NodeStateDRAIN]
 	return exists
 }
 
 func (n *Node) IsCompletingState() bool {
-	_, exists := n.States[api.V0041NodeStateCOMPLETING]
+	_, exists := n.States[api.V0044NodeStateCOMPLETING]
 	return exists
 }
 
 func (n *Node) IsMaintenanceState() bool {
-	_, exists := n.States[api.V0041NodeStateMAINTENANCE]
+	_, exists := n.States[api.V0044NodeStateMAINTENANCE]
 	return exists
 }
 
 func (n *Node) IsReservedState() bool {
-	_, exists := n.States[api.V0041NodeStateRESERVED]
+	_, exists := n.States[api.V0044NodeStateRESERVED]
 	return exists
 }
 
 func (n *Node) IsFailState() bool {
-	_, exists := n.States[api.V0041NodeStateFAIL]
+	_, exists := n.States[api.V0044NodeStateFAIL]
+	return exists
+}
+
+func (n *Node) IsIdleState() bool {
+	_, exists := n.States[api.V0044NodeStateIDLE]
 	return exists
 }
 
 func (n *Node) IsPlannedState() bool {
-	_, exists := n.States[api.V0041NodeStatePLANNED]
+	_, exists := n.States[api.V0044NodeStatePLANNED]
 	return exists
 }
 
 func (n *Node) IsDownState() bool {
-	_, exists := n.States[api.V0041NodeStateDOWN]
+	_, exists := n.States[api.V0044NodeStateDOWN]
 	return exists
 }
 
 func (n *Node) IsNotRespondingState() bool {
-	_, exists := n.States[api.V0041NodeStateNOTRESPONDING]
+	_, exists := n.States[api.V0044NodeStateNOTRESPONDING]
 	return exists
 }
 
 func (n *Node) IsInvalidState() bool {
-	_, exists := n.States[api.V0041NodeStateINVALID]
+	_, exists := n.States[api.V0044NodeStateINVALID]
+	return exists
+}
+
+func (n *Node) IsRebootIssuedState() bool {
+	_, exists := n.States[api.V0044NodeStateREBOOTISSUED]
+	return exists
+}
+
+func (n *Node) IsRebootRequestedState() bool {
+	_, exists := n.States[api.V0044NodeStateREBOOTREQUESTED]
 	return exists
 }
 
 // IsCloudState reports whether the node is a cloud node, i.e. one that is
 // provisioned and powered on or off dynamically via Slurm power saving.
 func (n *Node) IsCloudState() bool {
-	_, exists := n.States[api.V0041NodeStateCLOUD]
+	_, exists := n.States[api.V0044NodeStateCLOUD]
 	return exists
 }
 
 func (n *Node) IsPowerDownState() bool {
-	_, exists := n.States[api.V0041NodeStatePOWERDOWN]
+	_, exists := n.States[api.V0044NodeStatePOWERDOWN]
 	return exists
 }
 
 func (n *Node) IsPowerDrainState() bool {
-	_, exists := n.States[api.V0041NodeStatePOWERDRAIN]
+	_, exists := n.States[api.V0044NodeStatePOWERDRAIN]
 	return exists
 }
 
 func (n *Node) IsPoweredDownState() bool {
-	_, exists := n.States[api.V0041NodeStatePOWEREDDOWN]
+	_, exists := n.States[api.V0044NodeStatePOWEREDDOWN]
 	return exists
 }
 
 func (n *Node) IsPoweringDownState() bool {
-	_, exists := n.States[api.V0041NodeStatePOWERINGDOWN]
+	_, exists := n.States[api.V0044NodeStatePOWERINGDOWN]
 	return exists
 }
 
 func (n *Node) IsPoweringUpState() bool {
-	_, exists := n.States[api.V0041NodeStatePOWERINGUP]
+	_, exists := n.States[api.V0044NodeStatePOWERINGUP]
 	return exists
 }
 
 func (n *Node) IsPowerUpState() bool {
-	_, exists := n.States[api.V0041NodeStatePOWERUP]
+	_, exists := n.States[api.V0044NodeStatePOWERUP]
 	return exists
 }
 
@@ -225,14 +240,14 @@ func (n *Node) IsPowerManaged() bool {
 // IDLE+COMPLETING simultaneously (e.g., State=IDLE+COMPLETING+DYNAMIC_NORM+NOT_RESPONDING).
 //
 // More details: https://github.com/SchedMD/slurm/blob/master/slurm/slurm.h#L978-L992
-var baseStates = []api.V0041NodeState{
-	api.V0041NodeStateUNKNOWN,
-	api.V0041NodeStateDOWN,
-	api.V0041NodeStateIDLE,
-	api.V0041NodeStateALLOCATED,
-	api.V0041NodeStateERROR,
-	api.V0041NodeStateMIXED,
-	api.V0041NodeStateFUTURE,
+var baseStates = []api.V0044NodeState{
+	api.V0044NodeStateUNKNOWN,
+	api.V0044NodeStateDOWN,
+	api.V0044NodeStateIDLE,
+	api.V0044NodeStateALLOCATED,
+	api.V0044NodeStateERROR,
+	api.V0044NodeStateMIXED,
+	api.V0044NodeStateFUTURE,
 }
 
 // BaseState returns the base state of the node.
@@ -242,7 +257,7 @@ var baseStates = []api.V0041NodeState{
 // with the base state to form the complete node state.
 //
 // More details: https://github.com/SchedMD/slurm/blob/1cb50f245f05d851f2383e326db2f20a01820a88/slurm/slurm.h#L961
-func (n *Node) BaseState() api.V0041NodeState {
+func (n *Node) BaseState() api.V0044NodeState {
 	for _, baseState := range baseStates {
 		if _, ok := n.States[baseState]; ok {
 			return baseState
@@ -251,7 +266,7 @@ func (n *Node) BaseState() api.V0041NodeState {
 	return ""
 }
 
-func convertUint64Struct(input *api.V0041Uint64NoValStruct) *int64 {
+func convertUint64Struct(input *api.V0044Uint64NoValStruct) *int64 {
 	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
 		return nil
 	}

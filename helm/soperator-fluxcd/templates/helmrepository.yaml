@@ -73,7 +73,7 @@ spec:
   url: {{ .Values.helmRepository.mariadbOperator.url }}
   type: {{ .Values.helmRepository.mariadbOperator.type }}
 {{- end }}
-{{- if and .Values.observability.enabled .Values.observability.opentelemetry.enabled }}
+{{- if and .Values.observability.enabled (or .Values.observability.opentelemetry.enabled .Values.observability.ncclProfiles.enabled) }}
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
@@ -98,19 +98,6 @@ spec:
   interval: {{ .Values.helmRepository.interval }}
   url: {{ .Values.helmRepository.prometheusOperator.url }}
   type: {{ .Values.helmRepository.prometheusOperator.type }}
-{{- end }}
-{{- if .Values.securityProfilesOperator.enabled }}
----
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: {{ include "soperator-fluxcd.fullname" . }}-security-profiles-operator
-  labels:
-    {{- include "soperator-fluxcd.labels" . | nindent 4 }}
-spec:
-  interval: {{ .Values.helmRepository.interval }}
-  url: {{ .Values.helmRepository.securityProfilesOperator.url }}
-  type: {{ .Values.helmRepository.securityProfilesOperator.type }}
 {{- end }}
 {{- if and
     .Values.observability.enabled

@@ -7,13 +7,14 @@ tests:
       clusterName: test-cluster
     asserts:
       - equal:
-          path: spec.slurmNodes.controller.slurmctld.livenessProbe.exec.command
-          value:
-            - scontrol
-            - ping
+          path: spec.slurmNodes.controller.slurmctld.livenessProbe.httpGet.path
+          value: /livez
+      - equal:
+          path: spec.slurmNodes.controller.slurmctld.livenessProbe.httpGet.port
+          value: 6817
       - equal:
           path: spec.slurmNodes.controller.slurmctld.livenessProbe.initialDelaySeconds
-          value: 25
+          value: 10
 
   - it: should merge partial readiness probe overrides for login sshd
     set:

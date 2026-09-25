@@ -27,3 +27,16 @@ func TestGenerateSshdConfig_AuthorizedKeysCommandDependsOnSSSD(t *testing.T) {
 	assert.Contains(t, withSSSD, "AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys")
 	assert.Contains(t, withSSSD, "AuthorizedKeysCommandUser root")
 }
+
+func TestGenerateSshdConfig_KeepsChrootFallbackForOldImages(t *testing.T) {
+	login := &values.SlurmLogin{
+		ContainerSshd: values.Container{
+			NodeContainer: slurmv1.NodeContainer{Port: 22},
+		},
+	}
+
+	rendered := generateSshdConfig(login).Render()
+	assert.Contains(t, rendered, "UsePAM yes")
+	assert.Contains(t, rendered, "# Upgrade fallback for pre-PAM images")
+	assert.Contains(t, rendered, "ChrootDirectory /mnt/jail")
+}

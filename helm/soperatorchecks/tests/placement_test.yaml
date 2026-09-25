@@ -1,0 +1,42 @@
+suite: test checks deployment placement
+release:
+  name: test-soperatorchecks
+  namespace: soperator-system
+templates:
+  - templates/deployment.yaml
+
+tests:
+  - it: should not constrain placement by default
+    asserts:
+      - notExists:
+          path: spec.template.spec.nodeSelector
+      - notExists:
+          path: spec.template.spec.affinity
+      - notExists:
+          path: spec.template.spec.tolerations
+
+  - it: should render nodeSelector, affinity and tolerations when set
+    set:
+      checks.nodeSelector:
+        slurm.nebius.ai/nodeset: system
+      checks.affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    control-plane: soperatorchecks
+      checks.tolerations:
+        - operator: Exists
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.topologyKey
+          value: kubernetes.io/hostname
+      - equal:
+          path: spec.template.spec.tolerations[0].operator
+          value: Exists

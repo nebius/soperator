@@ -1,0 +1,91 @@
+package topologyconfcontroller
+
+import (
+	"fmt"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
+
+// topologyYAMLEntry is one entry of topology.yaml.
+//
+// Field order is significant: Slurm requires "topology" to be the first attribute, which is why
+// this file is marshalled with gopkg.in/yaml.v3 (preserves struct field order) rather than
+// sigs.k8s.io/yaml (round-trips through JSON and sorts keys alphabetically).
+//
+// Exactly one of Tree, Block or Flat is set, and that choice picks the plugin backing the topology.
+// Flat is never selected by the user: the operator generates it for CPU-only NodeSets.
+// https://slurm.schedmd.com/topology.yaml.html
+type topologyYAMLEntry struct {
+	Topology       string             `yaml:"topology"`
+	ClusterDefault bool               `yaml:"cluster_default"`
+	Tree           *treeTopologyYAML  `yaml:"tree,omitempty"`
+	Block          *blockTopologyYAML `yaml:"block,omitempty"`
+	Flat           bool               `yaml:"flat,omitempty"`
+}
+
+type treeTopologyYAML struct {
+	Switches []switchYAML `yaml:"switches"`
+}
+
+// switchYAML is one switch of a tree topology. Children names child switches, Nodes names child
+// worker nodes; a switch carries one or the other, never both.
+type switchYAML struct {
+	Switch   string `yaml:"switch"`
+	Children string `yaml:"children,omitempty"`
+	Nodes    string `yaml:"nodes,omitempty"`
+}
+
+type blockTopologyYAML struct {
+	BlockSizes []int       `yaml:"block_sizes,omitempty"`
+	Blocks     []blockYAML `yaml:"blocks"`
+}
+
+// blockYAML is one block. Nodes is omitted rather than emitted empty when the block has none:
+// Slurm checks the field for presence, so an empty string would be parsed as a node list and
+// rejected as an invalid node name.
+type blockYAML struct {
+	Block string `yaml:"block"`
+	Nodes string `yaml:"nodes,omitempty"`
+}
+
+// renderTopologyYAML marshals the entries into the body of topology.yaml.
+func renderTopologyYAML(entries []topologyYAMLEntry) (string, error) {
+	if len(entries) == 0 {
+		return "", nil
+	}
+	out, err := yaml.Marshal(entries)
+	if err != nil {
+		return "", fmt.Errorf("marshal topology.yaml: %w", err)
+	}
+	return string(out), nil
+}
+
+// topologyStructure fingerprints the rendered settings that slurmctld can only learn by
+// re-reading topology.yaml. Node membership is deliberately omitted because workers push their
+// placement into the running controller with scontrol update.
+func topologyStructure(rendered string) (string, error) {
+	var entries []topologyYAMLEntry
+	if err := yaml.Unmarshal([]byte(rendered), &entries); err != nil {
+		return "", fmt.Errorf("unmarshal topology.yaml structure: %w", err)
+	}
+
+	parts := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		plugin := ""
+		var blockSizes []int
+		switch {
+		case entry.Tree != nil:
+			plugin = "tree"
+		case entry.Block != nil:
+			plugin = "block"
+			blockSizes = entry.Block.BlockSizes
+		case entry.Flat:
+			plugin = "flat"
+		}
+		parts = append(parts, fmt.Sprintf("%s=%s:%v:%t",
+			entry.Topology, plugin, blockSizes, entry.ClusterDefault))
+	}
+
+	return strings.Join(parts, ","), nil
+}

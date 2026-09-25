@@ -51,36 +51,6 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-
-{{/*
-Pyxis format for active check image.
-*/}}
-{{- define "activecheck.image.pyxis" -}}
-{{- include "activecheck.image.resolve" . -}}
-{{- .Values.activeCheckImage -}}
-{{- end -}}
-
-{{/*
-Resolve active check image when not explicitly set.
-*/}}
-{{- define "activecheck.image.resolve" -}}
-{{- if not .Values.activeCheckImage -}}
-{{- $cudaVersion := default "12.9.0" .Values.cudaVersion -}}
-{{- $tag := required "activeCheck image tag for the selected CUDA version must be provided." (index .Values.images.activeCheckImageTags (printf "%v" $cudaVersion)) -}}
-{{- $repo := required "activeCheck image repository must be provided." .Values.images.activeCheckImageRepository -}}
-{{- $_ := set .Values "activeCheckImage" (printf "%s:%s" $repo $tag) -}}
-{{- end -}}
-{{- end -}}
-
-
-{{/*
-Docker format for active check image.
-Converts from format "reg#repo:tag" to format "reg/repo:tag".
-*/}}
-{{- define "activecheck.image.docker" -}}
-{{- include "activecheck.image.pyxis" . | replace "#" "/" -}}
-{{- end -}}
-
 {{/*
 Resolve NCCL tests version from cudaVersion.
 If .Values.ncclTestsVersion is non-empty, use it (flat override).
@@ -122,7 +92,12 @@ Render slurmJobSpec for an ActiveCheck.
 {{- $ctx := .ctx -}}
 {{- $spec := default dict .check.slurmJobSpec -}}
 {{- $jobContainerRaw := default dict $spec.jobContainer -}}
-{{- $baseContainer := dict "appArmorProfile" "unconfined" "image" $ctx.Values.images.slurmJob "env" $ctx.Values.jobContainer.env "volumeMounts" $ctx.Values.jobContainer.volumeMounts "volumes" $ctx.Values.jobContainer.volumes -}}
+{{- $baseContainer := dict "appArmorProfile" "unconfined" "image" $ctx.Values.images.slurmJob -}}
+{{- $_ := set $baseContainer "env" $ctx.Values.jobContainer.env -}}
+{{- $_ := set $baseContainer "volumeMounts" $ctx.Values.jobContainer.volumeMounts -}}
+{{- $_ := set $baseContainer "volumes" $ctx.Values.jobContainer.volumes -}}
+{{- $_ := set $baseContainer "imagePullPolicy" $ctx.Values.jobContainer.imagePullPolicy -}}
+{{- $_ := set $baseContainer "imagePullSecrets" $ctx.Values.jobContainer.imagePullSecrets -}}
 {{- $jobContainer := mustMerge (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") $baseContainer -}}
 {{- $env := default (list) $jobContainer.env -}}
 {{- $workingDir := default "" $jobContainer.workingDir -}}
@@ -145,6 +120,13 @@ jobContainer:
 {{- end }}
   appArmorProfile: {{ $jobContainer.appArmorProfile }}
   image: {{ tpl $jobContainer.image $ctx | quote }}
+{{- with $jobContainer.imagePullPolicy }}
+  imagePullPolicy: {{ . }}
+{{- end }}
+{{- with $jobContainer.imagePullSecrets }}
+  imagePullSecrets:
+{{ toYaml . | indent 4 }}
+{{- end }}
 {{- with $jobContainer.command }}
   command:
 {{ toYaml . | indent 4 }}
@@ -180,6 +162,8 @@ Render k8sJobSpec for an ActiveCheck.
 {{- $useCommonVolumes := default true $spec.useCommonVolumes -}}
 {{- $includeCommonEnv := default false $spec.includeCommonEnv -}}
 {{- $baseContainer := dict "image" $ctx.Values.images.k8sJob -}}
+{{- $_ := set $baseContainer "imagePullPolicy" $ctx.Values.jobContainer.imagePullPolicy -}}
+{{- $_ := set $baseContainer "imagePullSecrets" $ctx.Values.jobContainer.imagePullSecrets -}}
 {{- if $useCommonVolumeMounts }}{{- $_ := set $baseContainer "volumeMounts" $ctx.Values.jobContainer.volumeMounts -}}{{- end }}
 {{- if $includeCommonEnv }}{{- $_ := set $baseContainer "env" $ctx.Values.jobContainer.env -}}{{- end }}
 {{- $jobContainer := mustMerge (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") $baseContainer -}}
@@ -212,6 +196,13 @@ jobContainer:
   image: {{ $image | quote }}
 {{- with $jobContainer.appArmorProfile }}
   appArmorProfile: {{ . }}
+{{- end }}
+{{- with $jobContainer.imagePullPolicy }}
+  imagePullPolicy: {{ . }}
+{{- end }}
+{{- with $jobContainer.imagePullSecrets }}
+  imagePullSecrets:
+{{ toYaml . | indent 4 }}
 {{- end }}
 {{- if $command }}
   command:
@@ -253,6 +244,14 @@ Otherwise: true for Kubernetes >= 1.33 (user namespaces stable, explicitly opt i
   {{- false -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Name for the activecheck-waiter ServiceAccount and its RBAC resources.
+Prefixed with slurmClusterRefName to support multiple releases in the same namespace.
+*/}}
+{{- define "soperator-activechecks.waitForChecksName" -}}
+{{- printf "%s-activecheck-waiter" .Values.slurmClusterRefName | trunc 63 | trimSuffix "-" }}
+{{- end }}
 
 {{/*
 Validate that a check does not enable both commentSlurmNode and drainSlurmNode

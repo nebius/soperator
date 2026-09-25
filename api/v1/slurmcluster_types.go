@@ -3,6 +3,7 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
@@ -12,12 +13,31 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
 
+// PodNamePrefixMode controls whether pod workload names include the SlurmCluster name.
+type PodNamePrefixMode string
+
+const (
+	// PodNamePrefixEnabled prefixes pod workload names with the SlurmCluster name.
+	PodNamePrefixEnabled PodNamePrefixMode = "enabled"
+	// PodNamePrefixDisabled keeps pod workload names unprefixed.
+	PodNamePrefixDisabled PodNamePrefixMode = "disabled"
+)
+
 // SlurmClusterSpec defines the desired state of SlurmCluster
 type SlurmClusterSpec struct {
 	// CRVersion defines the version of the Operator the Custom Resource belongs to
 	//
 	// +kubebuilder:validation:Optional
 	CRVersion string `json:"crVersion,omitempty"` // TODO backward compatibility
+
+	// PodNamePrefix controls whether pod workload names are prefixed with the SlurmCluster name.
+	// It applies to controller, accounting, login, REST, exporter, and sconfigcontroller workloads.
+	// Disable it only when the namespace contains a single SlurmCluster, because unprefixed workload names can collide.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=enabled;disabled
+	// +kubebuilder:default=enabled
+	PodNamePrefix PodNamePrefixMode `json:"podNamePrefix,omitempty"`
 
 	// Maintenance defines the maintenance window for the cluster.
 	// It can have the following values:
@@ -66,7 +86,7 @@ type SlurmClusterSpec struct {
 	// SlurmConfig represents the Slurm configuration in slurm.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={defMemPerNode: 0, defCpuPerGPU: 4, completeWait: 5, epilog: "", prolog: "", maxJobCount: 20000, minJobAge: 28800, messageTimeout: 60}
+	// +kubebuilder:default={defMemPerNode: 0, defCpuPerGPU: 4, completeWait: 0, epilog: "", prolog: "", taskProlog: "", maxJobCount: 100000, minJobAge: 600, messageTimeout: 60}
 	SlurmConfig SlurmConfig `json:"slurmConfig,omitempty"`
 
 	// Topology contains topology-related parameters for Slurm.
@@ -106,18 +126,13 @@ type SlurmClusterSpec struct {
 	// PlugStackConfig represents the Plugin stack configurations in `plugstack.conf`.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ pyxis: { required: true, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" } }
+	// +kubebuilder:default={ pyxis: { required: true, useSquashfuse: false, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }, ncclDebug: { required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/local/nccl_logs" } }
 	PlugStackConfig PlugStackConfig `json:"plugStackConfig,omitempty"`
 
 	// SConfigController defines the desired state of controller that watches after configs
 	//
 	// +kubebuilder:validation:Optional
 	SConfigController SConfigController `json:"sConfigController,omitempty"`
-
-	// Generate and set default AppArmor profile for the login nodes. The Security Profiles Operator must be installed.
-	//
-	// +kubebuilder:default=false
-	UseDefaultAppArmorProfile bool `json:"useDefaultAppArmorProfile,omitempty"`
 
 	// HealthCheckConfig defines Slurm health check configuration.
 	//
@@ -140,7 +155,7 @@ type SlurmConfig struct {
 	// The time to wait, in seconds, when any job is in the COMPLETING state before any additional jobs are scheduled.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=5
+	// +kubebuilder:default=0
 	CompleteWait *int32 `json:"completeWait,omitempty"`
 	// Defines specific file to run the epilog when job ends. Default value is no epilog
 	//
@@ -152,20 +167,25 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=""
 	Prolog *string `json:"prolog,omitempty"`
+	// Defines specific file to run the task prolog when job starts. Default value is no task prolog
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	TaskProlog *string `json:"taskProlog,omitempty"`
 	// Additional parameters for the task plugin
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=""
 	TaskPluginParam *string `json:"taskPluginParam,omitempty"`
-	// Keep N last jobs in controller memory
+	// Maximum number of jobs tracked in controller memory, including unfinished and retained completed jobs.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=20000
+	// +kubebuilder:default=100000
 	MaxJobCount *int32 `json:"maxJobCount,omitempty"`
-	// Don't remove jobs from controller memory after some time
+	// Minimum time in seconds to retain completed jobs in controller memory. Zero disables purging.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=28800
+	// +kubebuilder:default=600
 	MinJobAge *int32 `json:"minJobAge,omitempty"`
 	// MessageTimeout specifies the permitted time for a round-trip communication to complete in seconds.
 	// See https://slurm.schedmd.com/slurm.conf.html#OPT_MessageTimeout.
@@ -173,11 +193,6 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=60
 	MessageTimeout *int32 `json:"messageTimeout,omitempty"`
-	// TopologyPlugin identifies the plugin to determine network topology for optimizations.
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="topology/tree"
-	TopologyPlugin string `json:"topologyPlugin,omitempty"`
 	// TopologyParam is list of comma-separated options identifying network topology options.
 	//
 	// +kubebuilder:validation:Optional
@@ -203,16 +218,88 @@ type SlurmConfig struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=1800
 	ResumeTimeout *int32 `json:"resumeTimeout,omitempty"`
+
+	// SuspendTimeout is the number of seconds allowed for ephemeral nodes to shut down.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=90
+	SuspendTimeout *int32 `json:"suspendTimeout,omitempty"`
 }
 
 // Topology contains topology-related parameters for Slurm.
 type Topology struct {
-	// BlockSize represents a schedulable size of a block for topology/block plugin.
-	// Maps to BlockSizes parameter in topology.conf.
+	// Topologies defines the named network topologies rendered into topology.yaml, letting a
+	// cluster describe heterogeneous fabrics (e.g. InfiniBand GPU NodeSets next to Ethernet-only
+	// CPU ones) separately instead of squeezing them into one flat topology.
+	// See https://slurm.schedmd.com/topology.html#multi_topo.
+	//
+	// A cluster that declares none gets no topology config at all.
+	//
+	// Names must be unique: duplicates would emit the same topology twice and slurmctld rejects the
+	// whole file. The map list type has the API server enforce that.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=18
-	BlockSize *int `json:"blockSize,omitempty"`
+	// +listType=map
+	// +listMapKey=name
+	Topologies []NamedTopology `json:"topologies,omitempty"`
+}
+
+// NamedTopology defines one entry of topology.yaml: a named topology, the plugin that backs it,
+// and the NodeSets whose Slurm nodes it covers.
+type NamedTopology struct {
+	// Name identifies the topology and must be unique across Topologies. It is rendered as the
+	// "topology" attribute of the entry in topology.yaml, and is how anything referring to this
+	// topology names it.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+
+	// ClusterDefault marks the topology used by partitions that don't set TopologyRef, and by
+	// cluster-wide operations not tied to a partition.
+	//
+	// Exactly one topology always ends up as the default: Slurm uses the first entry of
+	// topology.yaml for those operations no matter what, so when no topology requests it the
+	// operator promotes the first one rather than leave the choice to file order. Setting this to
+	// false everywhere therefore does not produce a cluster without a default.
+	//
+	// +kubebuilder:validation:Optional
+	ClusterDefault *bool `json:"clusterDefault,omitempty"`
+
+	// Topo selects the topology plugin and carries its plugin-specific parameters.
+	//
+	// +kubebuilder:validation:Required
+	Topo TopologyPlugin `json:"topo"`
+
+	// NodeSetRefs lists the NodeSets whose Slurm nodes belong to this topology. Each value must
+	// correspond to a NodeSet.Metadata.Name, or be the special value "ALL" covering every NodeSet
+	// of the cluster. Topologies may overlap: Slurm lets a node belong to several topologies at
+	// once, so the same NodeSet can be described as a tree in one and as blocks in another.
+	//
+	// +kubebuilder:validation:Optional
+	NodeSetRefs []string `json:"nodeSetRefs,omitempty"`
+}
+
+// TopologyPlugin is a discriminated union: Type picks the plugin, and the remaining fields
+// apply only to the matching plugin.
+type TopologyPlugin struct {
+	// Type identifies the topology plugin backing this topology.
+	//
+	// "flat" applies no placement optimization and lists no nodes. It is what a cluster with no
+	// fabric to optimize on should use, and the only way to describe such nodes without inventing a
+	// switch hierarchy for them. A partition still has to reach it, through TopologyRef or by the
+	// topology being the ClusterDefault.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=tree;block;flat
+	Type string `json:"type"`
+
+	// BlockSizes is the planning base block size followed by any higher-level block sizes to
+	// enforce. Each successive value must be a power of two larger than the previous one.
+	// Applies only to Type "block"; it maps to the block_sizes attribute of topology.yaml.
+	//
+	// +kubebuilder:validation:Optional
+	BlockSizes []int `json:"blockSizes,omitempty"`
 }
 
 type MPIConfig struct {
@@ -229,14 +316,20 @@ type PlugStackConfig struct {
 	// Pyxis represents the 'Pyxis' SPANK plugin configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ required: true, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }
+	// +kubebuilder:default={ required: true, useSquashfuse: false, importerPath: "/opt/slurm_scripts/pyxis_caching_importer.sh" }
 	Pyxis PluginConfigPyxis `json:"pyxis,omitempty"`
 
 	// NcclDebug represents the 'NCCL Debug' SPANK plugin configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/nccl_logs" }
+	// +kubebuilder:default={ required: false, enabled: false, logLevel: "INFO", outputToFile: true, outputToStdOut: false, outputDirectory: "/opt/soperator-outputs/local/nccl_logs" }
 	NcclDebug PluginConfigNcclDebug `json:"ncclDebug,omitempty"`
+
+	// NcclInspectorPreConf represents the NCCL Inspector Pre-Configuration SPANK plugin configuration.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={ required: false, enabled: false, profilerPlugin: "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so", dumpDir: "/opt/soperator-outputs/shared/nccl_profiles/%j/%s", dumpVerbose: false, dumpThreadIntervalMicroseconds: 1000000 }
+	NcclInspectorPreConf PluginConfigNcclInspectorPreConf `json:"ncclInspectorPreConf,omitempty"`
 
 	// PluginConfigCustom represents a configuration of custom SPANK plugins.
 	//
@@ -253,6 +346,13 @@ type PluginConfigPyxis struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
 	Required *bool `json:"required,omitempty"`
+
+	// UseSquashfuse enables Pyxis to start importer-produced SquashFS images directly through squashfuse.
+	// When disabled, Pyxis still uses ImporterPath for image caching but lets Enroot create the runtime rootfs.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	UseSquashfuse *bool `json:"useSquashfuse,omitempty"`
 
 	// Path to the executable for pyxis importer extension.
 	// File should be available to execute for every user in Slurm.
@@ -320,8 +420,52 @@ type PluginConfigNcclDebug struct {
 	// If the path does not exist, it will be created by the plugin.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="/opt/soperator-outputs/nccl_logs"
+	// +kubebuilder:default="/opt/soperator-outputs/local/nccl_logs"
 	OutputDirectory string `json:"outputDirectory,omitempty"`
+}
+
+// PluginConfigNcclInspectorPreConf represents the NCCL Inspector Pre-Configuration SPANK plugin configuration.
+//
+// See: https://github.com/nebius/slurm-plugins/tree/main/spank/nccl-inspector-preconf
+type PluginConfigNcclInspectorPreConf struct {
+	// Required defines if NCCL Inspector Pre-Configuration is 'required' for SLURM.
+	// Otherwise, 'optional'.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Required *bool `json:"required,omitempty"`
+
+	// Enabled defines whether to enable the plugin.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// ProfilerPlugin defines a file path to NCCL Inspector's SO file.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so"
+	ProfilerPlugin string `json:"profilerPlugin,omitempty"`
+
+	// DumpDir defines a directory path where NCCL profiles will be dumped into.
+	//
+	// If the path does not exist, it will be created by the plugin.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="/opt/soperator-outputs/shared/nccl_profiles/%j/%s"
+	DumpDir string `json:"dumpDir,omitempty"`
+
+	// DumpVerbose defines if the NCCL profile dumps should be verbose.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	DumpVerbose *bool `json:"dumpVerbose,omitempty"`
+
+	// DumpThreadIntervalMicroseconds defines an interval between NCCL Inspector dump thread runs in microseconds.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=1000000
+	DumpThreadIntervalMicroseconds uint64 `json:"dumpThreadIntervalMicroseconds,omitempty"`
 }
 
 // PluginConfigCustom represents a custom SPANK plugin configuration.
@@ -451,6 +595,13 @@ type Partition struct {
 	// +kubebuilder:validation:Optional
 	NodeSetRefs []string `json:"nodeSetRefs,omitempty"`
 
+	// TopologyRef binds the Partition to one of Topology.Topologies by name, rendering
+	// Topology=<name> on the partition line. When empty, the partition uses the topology marked
+	// ClusterDefault. A reference that resolves to no defined topology is dropped.
+	//
+	// +kubebuilder:validation:Optional
+	TopologyRef string `json:"topologyRef,omitempty"`
+
 	// Config allows to provide additional configuration for a Partition regarding https://slurm.schedmd.com/slurm.conf.html#SECTION_PARTITION-CONFIGURATION.
 	//
 	// Example:
@@ -498,6 +649,11 @@ type PopulateJail struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="IfNotPresent"
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// ImagePullSecrets is a list of secret names in the same namespace used for pulling the container's image.
+	//
+	// +kubebuilder:validation:Optional
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
 	// K8sNodeFilterName defines the Kubernetes node filter name associated with the Slurm node.
 	// Must correspond to the name of one of [K8sNodeFilter]
@@ -834,7 +990,7 @@ type AccountingSlurmConf struct {
 	AcctGatherProfileType *string `json:"acctGatherProfileType,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum="jobacct_gather/linux";"jobacct_gather/cgroup";"jobacct_gather/none"
-	// +kubebuilder:default="jobacct_gather/cgroup"
+	// +kubebuilder:default="jobacct_gather/none"
 	JobAcctGatherType *string `json:"jobAcctGatherType,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=0
@@ -933,6 +1089,7 @@ type SlurmNodeControllerVolumes struct {
 }
 
 // SlurmNodeLogin defines the configuration for the Slurm login node
+// +kubebuilder:validation:XValidation:rule="!has(self.autoscaling) || !self.autoscaling.enabled || (has(self.sshd.resources) && 'cpu' in self.sshd.resources && quantity(string(self.sshd.resources['cpu'])).compareTo(quantity('0')) > 0)",message="sshd.resources.cpu must be greater than zero when autoscaling is enabled"
 type SlurmNodeLogin struct {
 	SlurmNode `json:",inline"`
 
@@ -989,6 +1146,102 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Required
 	Volumes SlurmNodeLoginVolumes `json:"volumes"`
+
+	// UserIsolation defines per-user cgroup resource isolation for SSH sessions on login nodes
+	//
+	// +kubebuilder:validation:Optional
+	UserIsolation *LoginUserIsolation `json:"userIsolation,omitempty"`
+
+	// Autoscaling defines CPU-based horizontal scaling for login pods
+	//
+	// +kubebuilder:validation:Optional
+	Autoscaling *LoginAutoscaling `json:"autoscaling,omitempty"`
+
+	// Docker defines Docker support for SSH sessions on login nodes.
+	// A writable jail sub-mount at /mnt/image-storage and login user isolation are required when enabled.
+	//
+	// +kubebuilder:validation:Optional
+	Docker *LoginDocker `json:"docker,omitempty"`
+}
+
+// LoginAutoscaling defines CPU-based horizontal scaling for login pods.
+// When enabled, its replica bounds override the configured login replica count.
+// +kubebuilder:validation:XValidation:rule="!self.enabled || self.maxReplicas >= self.minReplicas",message="maxReplicas must be at least minReplicas when autoscaling is enabled"
+type LoginAutoscaling struct {
+	// Enabled turns on horizontal scaling for login pods
+	//
+	// +kubebuilder:validation:Required
+	Enabled bool `json:"enabled"`
+
+	// MinReplicas is the minimum number of login pods
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=1
+	MinReplicas int32 `json:"minReplicas"`
+
+	// MaxReplicas is the maximum number of login pods
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=1
+	MaxReplicas int32 `json:"maxReplicas"`
+
+	// TargetCPUUtilizationPercentage is the target average SSHD CPU utilization
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	// +kubebuilder:default=70
+	TargetCPUUtilizationPercentage int32 `json:"targetCPUUtilizationPercentage,omitempty"`
+}
+
+// LoginDocker defines Docker support for SSH sessions on login nodes.
+type LoginDocker struct {
+	// Enabled starts a rootful Docker daemon and routes container workloads into per-user cgroups.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// LoginUserIsolation defines per-user cgroup v2 limits applied to each SSH session on login nodes.
+// Each user's session processes are placed into a dedicated child cgroup of the sshd container,
+// so one user cannot exhaust the memory or monopolize the CPU of the whole login node.
+// Requires cgroup v2 on the Kubernetes node.
+// +kubebuilder:validation:XValidation:rule="!has(self.memoryHigh) || !has(self.memoryMax) || quantity(self.memoryHigh).compareTo(quantity(self.memoryMax)) <= 0",message="memoryHigh must not exceed memoryMax"
+// +kubebuilder:validation:XValidation:rule="has(self.memoryHigh) == has(self.memoryMax)",message="memoryHigh and memoryMax must be specified together or both omitted"
+type LoginUserIsolation struct {
+	// Enabled turns on placement of each SSH session into a per-user cgroup
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// MemoryHigh is the per-user memory throttling threshold (cgroup v2 memory.high).
+	// The kernel throttles and reclaims a user's memory above this value before OOM.
+	// Must be lower than the sshd container memory limit.
+	// Must be specified together with memoryMax.
+	// When unset, it is derived as 40% of the sshd container memory limit
+	//
+	// +kubebuilder:validation:Optional
+	MemoryHigh *resource.Quantity `json:"memoryHigh,omitempty"`
+
+	// MemoryMax is the per-user hard memory limit (cgroup v2 memory.max).
+	// The OOM killer is scoped to the user's own cgroup when this limit is hit.
+	// Must be lower than the sshd container memory limit.
+	// Must be specified together with memoryHigh.
+	// When unset, it is derived as 50% of the sshd container memory limit
+	//
+	// +kubebuilder:validation:Optional
+	MemoryMax *resource.Quantity `json:"memoryMax,omitempty"`
+
+	// CPUWeight is the per-user CPU weight (cgroup v2 cpu.weight).
+	// CPU is shared proportionally between users under contention; idle CPU stays fully usable
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=10000
+	// +kubebuilder:default=100
+	CPUWeight int64 `json:"cpuWeight,omitempty"`
 }
 
 // SidecarSSSD defines the shared SSSD sidecar configuration for Slurm node pods.
@@ -1079,6 +1332,40 @@ type SlurmExporter struct {
 	// +kubebuilder:default="30s"
 	CollectionInterval prometheusv1.Duration `json:"collectionInterval,omitempty"`
 
+	// MaxCollectorInflight limits concurrent runs of the same exporter sub-collector.
+	// A value greater than 1 allows overlapping runs for clusters loaded with jobs and nodes to avoid missing metrics,
+	// while 1 keeps the safer default of one in-flight run per collector.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	MaxCollectorInflight int32 `json:"maxCollectorInflight,omitempty"`
+
+	// JobSource selects the Slurm API used for job collection.
+	//
+	// "controller" reads jobs from the Slurm controller API (default, current behavior).
+	// "accounting" reads jobs from the Slurm accounting API (slurmdbd) and is intended for clusters where
+	// the controller endpoint is overloaded.
+	//
+	// Note: the accounting source has known label-fidelity limitations (empty user_id, "None" job_state_reason
+	// for pending jobs, collapsed pending array tasks). See docs/slurm-exporter.md "Known limitations of
+	// the accounting source" for details.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=controller;accounting
+	// +kubebuilder:default="controller"
+	JobSource string `json:"jobSource,omitempty"`
+
+	// AccountingJobsLookback sets the size of the time window queried from the accounting API:
+	// [now − lookback, now + 5 min]. The +5 min skew tolerates clock drift between slurmrestd, slurmctld and slurmdbd.
+	// Long-running jobs that started before the window are still included (sacct overlap semantics).
+	// Only applied when JobSource is "accounting".
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="1h"
+	// +kubebuilder:validation:XValidation:rule="self.matches('[1-9]')",message="accountingJobsLookback must be greater than zero"
+	AccountingJobsLookback prometheusv1.Duration `json:"accountingJobsLookback,omitempty"`
+
 	// ServiceAccountName is the name of the ServiceAccount to use for exporter pods.
 	// +kubebuilder:validation:Optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
@@ -1158,6 +1445,11 @@ type NodeContainer struct {
 	// +kubebuilder:default="IfNotPresent"
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
+	// ImagePullSecrets is a list of secret names in the same namespace used for pulling the container's image.
+	//
+	// +kubebuilder:validation:Optional
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
 	// Port defines the port the container exposes
 	//
 	// +kubebuilder:validation:Optional
@@ -1187,8 +1479,8 @@ type NodeContainer struct {
 
 	// AppArmorProfile defines the AppArmor profile for the Slurm containers
 	//
-	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="unconfined"
+	// +kubebuilder:validation:Optional
 	AppArmorProfile string `json:"appArmorProfile,omitempty"`
 
 	// procMount denotes the type of proc mount to use for the containers.
@@ -1343,6 +1635,7 @@ const (
 	ConditionClusterAccountingAvailable        = "AccountingAvailable"
 	ConditionClusterSConfigControllerAvailable = "SConfigControllerAvailable"
 	ConditionClusterPopulateJailMode           = "PopulateJailMode"
+	ConditionClusterNodeSetRefsResolved        = "NodeSetRefsResolved"
 
 	PhaseClusterPending = "Pending"
 	// PhaseClusterReconciling
@@ -1422,6 +1715,9 @@ func (p *PluginConfigPyxis) SetDefaults() {
 	if p.Required == nil {
 		p.Required = ptr.To(true)
 	}
+	if p.UseSquashfuse == nil {
+		p.UseSquashfuse = ptr.To(false)
+	}
 }
 
 // SetDefaults sets default values for PluginConfigNcclDebug
@@ -1431,9 +1727,31 @@ func (p *PluginConfigNcclDebug) SetDefaults() {
 	}
 }
 
+// SetDefaults sets default values for PluginConfigNcclInspectorPreConf
+func (p *PluginConfigNcclInspectorPreConf) SetDefaults() {
+	if p.Required == nil {
+		p.Required = ptr.To(false)
+	}
+	if p.Enabled == nil {
+		p.Enabled = ptr.To(true)
+	}
+	if p.DumpVerbose == nil {
+		p.DumpVerbose = ptr.To(false)
+	}
+}
+
 // SetDefaults sets default values for SlurmExporter
 func (s *SlurmExporter) SetDefaults() {
 	if s.Enabled == nil {
 		s.Enabled = ptr.To(false)
+	}
+	if s.JobSource == "" {
+		s.JobSource = "controller"
+	}
+	if s.MaxCollectorInflight == 0 {
+		s.MaxCollectorInflight = 1
+	}
+	if s.AccountingJobsLookback == "" {
+		s.AccountingJobsLookback = "1h"
 	}
 }

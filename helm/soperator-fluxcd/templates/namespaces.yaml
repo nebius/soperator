@@ -39,12 +39,6 @@ spec:
         name: {{ .Values.mariadbOperator.namespace | default "mariadb-operator-system" }}
     {{- end }}
 
-    {{- if .Values.securityProfilesOperator.enabled }}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.securityProfilesOperator.namespace | default "security-profiles-operator-system" }}
-    {{- end }}
     {{- if .Values.observability.enabled }}
     {{- if or .Values.observability.vmLogs.enabled .Values.observability.opentelemetry.enabled }}
     {{- /* First, check if at least one component is enabled */}}

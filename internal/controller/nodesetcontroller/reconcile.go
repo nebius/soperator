@@ -68,16 +68,26 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		err     error
 	)
 	{
-		clusterName, hasClusterRef := nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]
-		if !hasClusterRef {
-			err = fmt.Errorf("getting parental cluster ref from annotations")
-			logger.Error(err, "No parent cluster ref found")
-			return ctrl.Result{}, err
+		// Migrate legacy annotation to spec.ClusterName if needed.
+		if nodeSet.Spec.ClusterName == "" {
+			clusterName, hasAnnotation := nodeSet.GetAnnotations()[consts.AnnotationParentalClusterRefName]
+			if !hasAnnotation || clusterName == "" {
+				err = fmt.Errorf("spec.clusterName must be set")
+				logger.Error(err, "No cluster name found")
+				return ctrl.Result{}, err
+			}
+			logger.Info("Migrating cluster name from annotation to spec.clusterName")
+			patch := client.MergeFrom(nodeSet.DeepCopy())
+			nodeSet.Spec.ClusterName = clusterName
+			delete(nodeSet.Annotations, consts.AnnotationParentalClusterRefName)
+			if err = r.Patch(ctx, nodeSet, patch); err != nil {
+				return ctrl.Result{}, fmt.Errorf("migrating cluster name from annotation: %w", err)
+			}
 		}
 		cluster, err = resourcegetter.GetCluster(ctx, r.Client,
 			types.NamespacedName{
 				Namespace: nodeSet.Namespace,
-				Name:      clusterName,
+				Name:      nodeSet.Spec.ClusterName,
 			},
 		)
 		if err != nil {
@@ -94,7 +104,6 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		nodeSet,
 		cluster.Name,
 		cluster.Spec.Maintenance,
-		cluster.Spec.UseDefaultAppArmorProfile,
 	)
 
 	nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(ctx, r.Client, client.ObjectKeyFromObject(cluster))
@@ -105,18 +114,33 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	clusterWithGPU := values.BuildClusterWithGPUFromNodeSets(nodeSets)
 
 	// region Ephemeral nodes power state
-	if nodeSetValues.EphemeralNodes != nil && *nodeSetValues.EphemeralNodes {
-		activeNodes, err := r.reconcileNodeSetPowerState(ctx, nodeSet)
+	var appliedPowerState *slurmv1alpha1.NodeSetPowerState
+	ephemeralNodesEnabled := nodeSetValues.EphemeralNodes != nil && *nodeSetValues.EphemeralNodes
+	if ephemeralNodesEnabled {
+		powerState, err := r.reconcileNodeSetPowerState(ctx, nodeSet)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("reconciling NodeSetPowerState: %w", err)
 		}
-		nodeSetValues.ActiveNodes = activeNodes
-		logger.V(1).Info("Ephemeral nodes power state reconciled", "activeNodes", activeNodes)
+		appliedPowerState = powerState
+		nodeSetValues.ActiveNodes = powerState.Spec.ActiveNodes
+		logger.V(1).Info("Ephemeral nodes power state reconciled", "activeNodes", powerState.Spec.ActiveNodes)
 	}
 	// endregion Ephemeral nodes power state
 
 	if err = r.executeReconciliation(ctx, nodeSet, &nodeSetValues, cluster, clusterWithGPU); err != nil {
 		return ctrl.Result{}, err
+	}
+
+	// Remove any stale NodeSetPowerState after the NodeSet becomes static.
+	// Apply static replicas and clear reserved ordinals before removing the power state.
+	if !ephemeralNodesEnabled {
+		if err = r.deleteNodeSetPowerState(ctx, nodeSet); err != nil {
+			return ctrl.Result{}, fmt.Errorf("deleting NodeSetPowerState: %w", err)
+		}
+	}
+
+	if err = r.updateEphemeralModeAppliedCondition(ctx, nodeSet); err != nil {
+		return ctrl.Result{}, fmt.Errorf("updating ephemeral mode applied condition: %w", err)
 	}
 
 	// region Maintenance condition
@@ -153,6 +177,18 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		return ctrl.Result{}, fmt.Errorf("validating Slurm workers: %w", err)
 	}
 	// endregion Validation
+
+	if appliedPowerState != nil {
+		ready, err := r.reconcilePowerStateReady(ctx, nodeSet, &nodeSetValues, appliedPowerState)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if !ready {
+			res.RequeueAfter = 10 * time.Second
+		}
+	} else if err := r.clearPowerStateReady(ctx, nodeSet); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// region Phase computation
 	// Always update phase after validation so it reflects current conditions,
@@ -208,7 +244,6 @@ func computePhase(nodeSet *slurmv1alpha1.NodeSet) string {
 }
 
 func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv1alpha1.NodeSet) error {
-	patch := client.MergeFrom(nodeSet.DeepCopy())
 	needToUpdate := false
 
 	for _, conditionType := range []string{
@@ -217,6 +252,7 @@ func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv
 		slurmv1alpha1.ConditionNodeSetStatefulSetUpdated,
 		slurmv1alpha1.ConditionNodeSetPodsReady,
 		slurmv1alpha1.ConditionNodeSetStatefulSetTerminated,
+		slurmv1alpha1.ConditionNodeSetEphemeralModeApplied,
 	} {
 		if meta.FindStatusCondition(nodeSet.Status.Conditions, conditionType) != nil {
 			continue
@@ -238,12 +274,36 @@ func (r *NodeSetReconciler) setUpConditions(ctx context.Context, nodeSet *slurmv
 		return nil
 	}
 
-	if err := r.Status().Patch(ctx, nodeSet, patch); err != nil {
-		log.FromContext(ctx).Error(err, "Failed to patch status")
-		return fmt.Errorf("patching %s status: %w", slurmv1alpha1.KindNodeSet, err)
+	// A merge patch omits unchanged zero-valued replicas, but a new NodeSet has no
+	// status.replicas yet and the CRD requires it when initializing status.
+	if err := r.Status().Update(ctx, nodeSet); err != nil {
+		log.FromContext(ctx).Error(err, "Failed to update status")
+		return fmt.Errorf("update %s status: %w", slurmv1alpha1.KindNodeSet, err)
 	}
 
 	return nil
+}
+
+func (r *NodeSetReconciler) updateEphemeralModeAppliedCondition(
+	ctx context.Context,
+	nodeSet *slurmv1alpha1.NodeSet,
+) error {
+	condition := metav1.Condition{
+		Type:               slurmv1alpha1.ConditionNodeSetEphemeralModeApplied,
+		Status:             metav1.ConditionFalse,
+		ObservedGeneration: nodeSet.Generation,
+		Reason:             "StaticModeApplied",
+		Message:            "Static nodes mode is applied",
+	}
+	if nodeSet.Spec.EphemeralNodes != nil && *nodeSet.Spec.EphemeralNodes {
+		condition.Status = metav1.ConditionTrue
+		condition.Reason = "EphemeralModeApplied"
+		condition.Message = "Ephemeral nodes mode is applied"
+	}
+
+	return r.patchStatus(ctx, nodeSet, func(status *slurmv1alpha1.NodeSetStatus) bool {
+		return meta.SetStatusCondition(&status.Conditions, condition)
+	})
 }
 
 // executeReconciliation reconciles all resources necessary for deploying Slurm NodeSet workers
@@ -254,6 +314,10 @@ func (r NodeSetReconciler) executeReconciliation(
 	cluster *slurmv1.SlurmCluster,
 	clusterWithGPU bool,
 ) error {
+	// Install protection before creating workers or enabling Slurm-aware updates.
+	if err := r.reconcilePodDisruptionBudget(ctx, nodeSet, nodeSetValues); err != nil {
+		return err
+	}
 	steps := []utils.MultiStepExecutionStep{
 		{
 			Name: "Security limits ConfigMap",
@@ -281,18 +345,11 @@ func (r NodeSetReconciler) executeReconciliation(
 				stepLogger := log.FromContext(stepCtx)
 				stepLogger.V(1).Info("Reconciling")
 
-				clusterValues, err := values.BuildSlurmClusterFrom(stepCtx, cluster)
+				namePrefix := resourcegetter.ResolvePodNamePrefix(cluster.Name, cluster.Spec.PodNamePrefix)
+				clusterValues, err := values.BuildSlurmClusterFrom(stepCtx, cluster, namePrefix)
 				if err != nil {
 					stepLogger.Error(err, "Failed to build cluster values")
 					return fmt.Errorf("building cluster values: %w", err)
-				}
-
-				if nodeSetValues.SupervisorDConfigMapDefault {
-					desired := worker.RenderDefaultConfigMapSupervisord(clusterValues)
-					if err := r.ConfigMap.Reconcile(stepCtx, cluster, &desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile default supervisord ConfigMap")
-						return fmt.Errorf("reconciling default worker supervisord ConfigMap: %w", err)
-					}
 				}
 
 				if nodeSetValues.SSHDConfigMapDefault {
@@ -304,6 +361,63 @@ func (r NodeSetReconciler) executeReconciliation(
 				}
 
 				stepLogger.V(1).Info("Reconciled")
+				return nil
+			},
+		},
+		{
+			Name: "Slurm NodeSet ServiceAccount",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				desired := worker.RenderServiceAccount(nodeSet.Namespace, cluster.Name, nodeSet.Name)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.ServiceAccount.Reconcile(stepCtx, nodeSet, desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling NodeSet ServiceAccount: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
+			},
+		},
+		{
+			Name: "Slurm NodeSet Role",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				desired := worker.RenderRole(nodeSet.Namespace, cluster.Name, nodeSetValues)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.Role.Reconcile(stepCtx, nodeSet, desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling NodeSet Role: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
+				return nil
+			},
+		},
+		{
+			Name: "Slurm NodeSet RoleBinding",
+			Func: func(stepCtx context.Context) error {
+				stepLogger := log.FromContext(stepCtx)
+				stepLogger.V(1).Info("Reconciling")
+
+				desired := worker.RenderRoleBinding(nodeSet.Namespace, cluster.Name, nodeSet.Name)
+				stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
+				stepLogger.V(1).Info("Rendered")
+
+				if err := r.RoleBinding.Reconcile(stepCtx, nodeSet, desired); err != nil {
+					stepLogger.Error(err, "Failed to reconcile")
+					return fmt.Errorf("reconciling NodeSet RoleBinding: %w", err)
+				}
+				stepLogger.V(1).Info("Reconciled")
+
 				return nil
 			},
 		},
@@ -394,17 +508,17 @@ func (r NodeSetReconciler) executeReconciliation(
 					secrets.SshdKeysName = naming.BuildSecretSSHDKeysName(cluster.Name)
 				}
 
-				topologyPlugin := cluster.Spec.SlurmConfig.TopologyPlugin
-				topologyPluginEnabled := topologyPlugin != ""
+				// The same condition the topology controller renders on: waiting for a topology
+				// config the operator never writes would time out every worker init container.
+				topologyEnabled := cluster.Spec.Topology != nil &&
+					len(cluster.Spec.Topology.Topologies) > 0
 
 				desired, err := worker.RenderNodeSetStatefulSet(
-					cluster.Name,
 					nodeSetValues,
 					&secrets,
 					cluster.Spec.CgroupVersion,
 					clusterWithGPU,
-					topologyPluginEnabled,
-					topologyPlugin,
+					topologyEnabled,
 				)
 				if err != nil {
 					stepLogger.Error(err, "Failed to render")
@@ -603,7 +717,7 @@ func (r NodeSetReconciler) getWorkersStatefulSetDependencies(
 func (r *NodeSetReconciler) reconcileNodeSetPowerState(
 	ctx context.Context,
 	nodeSet *slurmv1alpha1.NodeSet,
-) ([]int32, error) {
+) (*slurmv1alpha1.NodeSetPowerState, error) {
 	logger := log.FromContext(ctx)
 
 	powerStateName := nodeSet.Name
@@ -633,11 +747,7 @@ func (r *NodeSetReconciler) reconcileNodeSetPowerState(
 
 	if apierrors.IsNotFound(err) {
 		logger.V(1).Info("NodeSetPowerState not found, it will be created")
-		activeNodes := make([]int32, nodeSet.Spec.InitialNumberEphemeralNodes)
-		for i := int32(0); i < nodeSet.Spec.InitialNumberEphemeralNodes; i++ {
-			activeNodes[i] = i
-		}
-		desired.Spec.ActiveNodes = activeNodes
+		desired.Spec.ActiveNodes = buildActiveNodesForNewPowerState(nodeSet)
 	}
 
 	if err := r.NodeSetPowerState.Reconcile(ctx, nodeSet, desired); err != nil {
@@ -686,5 +796,37 @@ func (r *NodeSetReconciler) reconcileNodeSetPowerState(
 		"activeNodes", existing.Spec.ActiveNodes,
 	)
 
-	return existing.Spec.ActiveNodes, nil
+	return existing, nil
+}
+
+func (r *NodeSetReconciler) deleteNodeSetPowerState(
+	ctx context.Context,
+	nodeSet *slurmv1alpha1.NodeSet,
+) error {
+	powerState := &slurmv1alpha1.NodeSetPowerState{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nodeSet.Name,
+			Namespace: nodeSet.Namespace,
+		},
+	}
+	return client.IgnoreNotFound(r.Delete(ctx, powerState))
+}
+
+func buildActiveNodesForNewPowerState(nodeSet *slurmv1alpha1.NodeSet) []int32 {
+	activeCount := nodeSet.Spec.InitialNumberEphemeralNodes
+	appliedMode := meta.FindStatusCondition(
+		nodeSet.Status.Conditions,
+		slurmv1alpha1.ConditionNodeSetEphemeralModeApplied,
+	)
+
+	// On a static-to-ephemeral transition, activate all spec replicas instead of applying the initial ephemeral count
+	if appliedMode != nil && appliedMode.Status == metav1.ConditionFalse {
+		activeCount = nodeSet.Spec.Replicas
+	}
+
+	activeNodes := make([]int32, activeCount)
+	for i := int32(0); i < activeCount; i++ {
+		activeNodes[i] = i
+	}
+	return activeNodes
 }

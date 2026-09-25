@@ -8,6 +8,19 @@ set -e # Exit immediately if any command returns a non-zero error code
 
 usage() { echo "usage: ${0} -j <path_to_jail_dir> [-h]" >&2; exit 1; }
 
+ensure_symlink() {
+    local target=$1
+    local link=$2
+
+    # Compare the link payload without following it. A transient failure to open
+    # the target is not a reason to replace an already-correct shared link.
+    if [[ -L "${link}" ]] && [[ "$(readlink -- "${link}")" == "${target}" ]]; then
+        return
+    fi
+
+    ln -sf -- "${target}" "${link}"
+}
+
 while getopts j:h flag
 do
     case "${flag}" in
@@ -42,8 +55,8 @@ pushd "${jaildir}"
 
     MAJOR=$(printf '%s\n' "$LIBSLURM_REAL" | sed -E 's/.*\.so\.([0-9]+).*/\1/')
     pushd "${JAIL_LIBDIR}"
-        ln -sf "${LIBSLURM_REAL}" "libslurm.so.${MAJOR}"
-        ln -sf "${LIBSLURM_REAL}" "libslurm.so"
+        ensure_symlink "${LIBSLURM_REAL}" "libslurm.so.${MAJOR}"
+        ensure_symlink "${LIBSLURM_REAL}" "libslurm.so"
     popd
 
     # slurm-smd-dev

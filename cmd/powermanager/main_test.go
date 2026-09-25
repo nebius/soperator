@@ -17,10 +17,118 @@ limitations under the License.
 package main
 
 import (
+	"context"
+	"fmt"
+	"net"
 	"reflect"
 	"sort"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 )
+
+func TestNodeSetIsEphemeral(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		ephemeral      *bool
+		missingNodeSet bool
+		want           bool
+	}{
+		{name: "ephemeral", ephemeral: ptr.To(true), want: true},
+		{name: "non-ephemeral", ephemeral: ptr.To(false)},
+		{name: "unset defaults to non-ephemeral"},
+		{name: "missing nodeset", missingNodeSet: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			builder := fake.NewClientBuilder().WithScheme(scheme)
+			if !tc.missingNodeSet {
+				nodeSet := &slurmv1alpha1.NodeSet{
+					ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "test"},
+				}
+				nodeSet.Spec.EphemeralNodes = tc.ephemeral
+				builder.WithObjects(nodeSet)
+			}
+
+			got, err := nodeSetIsEphemeral(context.Background(), builder.Build(), "test", "worker")
+			if err != nil {
+				t.Fatalf("nodeSetIsEphemeral returned error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("nodeSetIsEphemeral = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestNodeSetIsEphemeralRetriesTransientErrors(t *testing.T) {
+	for _, transient := range []error{
+		apierrors.NewServiceUnavailable("try again"),
+		apierrors.NewInternalError(fmt.Errorf("try again")),
+		apierrors.NewTooManyRequests("try again", 0),
+		&net.DNSError{IsTimeout: true},
+	} {
+		t.Run(transient.Error(), func(t *testing.T) {
+			nodeSet := &slurmv1alpha1.NodeSet{ObjectMeta: metav1.ObjectMeta{Name: "worker", Namespace: "test"}}
+			nodeSet.Spec.EphemeralNodes = ptr.To(true)
+			calls := 0
+			client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(nodeSet).WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(ctx context.Context, c ctrlclient.WithWatch, key ctrlclient.ObjectKey, obj ctrlclient.Object, opts ...ctrlclient.GetOption) error {
+					calls++
+					if calls == 1 {
+						return fmt.Errorf("read object: %w", transient)
+					}
+					return c.Get(ctx, key, obj, opts...)
+				},
+			}).Build()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			ephemeral, err := nodeSetIsEphemeral(ctx, client, "test", "worker")
+			require.NoError(t, err)
+			require.True(t, ephemeral)
+			require.Equal(t, 2, calls)
+		})
+	}
+}
+
+func TestNodeSetIsEphemeralStopsRetrying(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		err, want error
+	}{
+		{name: "deadline", err: apierrors.NewServiceUnavailable("try again"), want: context.DeadlineExceeded},
+		{name: "forbidden", err: apierrors.NewForbidden(schema.GroupResource{Resource: "nodesets"}, "worker", fmt.Errorf("denied"))},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			client := fake.NewClientBuilder().WithScheme(scheme).WithInterceptorFuncs(interceptor.Funcs{
+				Get: func(context.Context, ctrlclient.WithWatch, ctrlclient.ObjectKey, ctrlclient.Object, ...ctrlclient.GetOption) error {
+					calls++
+					return tt.err
+				},
+			}).Build()
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			defer cancel()
+			ephemeral, err := nodeSetIsEphemeral(ctx, client, "test", "worker")
+			require.False(t, ephemeral)
+			if tt.want != nil {
+				require.ErrorIs(t, err, tt.want)
+			} else {
+				require.ErrorIs(t, err, tt.err)
+			}
+			require.Equal(t, 1, calls)
+		})
+	}
+}
 
 func TestParseNodeList(t *testing.T) {
 	tests := []struct {

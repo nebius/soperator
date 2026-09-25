@@ -20,13 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/values"
 )
 
 // nolint:unused
@@ -35,7 +36,7 @@ var slurmClusterLog = logf.Log.WithName("slurmcluster-resource")
 
 // SetupSlurmClusterWebhookWithManager registers the webhook for SlurmCluster in the manager.
 func SetupSlurmClusterWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&slurmv1.SlurmCluster{}).
+	return ctrl.NewWebhookManagedBy(mgr, &slurmv1.SlurmCluster{}).
 		WithValidator(&SlurmClusterCustomValidator{}).
 		Complete()
 }
@@ -48,31 +49,108 @@ type SlurmClusterCustomValidator struct {
 	// TODO(user): Add more fields as needed for validation
 }
 
-var _ webhook.CustomValidator = &SlurmClusterCustomValidator{}
+var _ admission.Validator[*slurmv1.SlurmCluster] = &SlurmClusterCustomValidator{}
 
-// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type SlurmCluster.
-func (v *SlurmClusterCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	slurmCluster, ok := obj.(*slurmv1.SlurmCluster)
-	if !ok {
-		return nil, fmt.Errorf("expected a SlurmCluster object but got %T", obj)
-	}
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type SlurmCluster.
+func (v *SlurmClusterCustomValidator) ValidateCreate(_ context.Context, slurmCluster *slurmv1.SlurmCluster) (admission.Warnings, error) {
 	slurmClusterLog.Info("Validation for SlurmCluster upon creation", "name", slurmCluster.GetName())
 
-	return nil, nil
+	return nil, validateSlurmCluster(slurmCluster)
 }
 
-// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type SlurmCluster.
-func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
-	slurmCluster, ok := newObj.(*slurmv1.SlurmCluster)
-	if !ok {
-		return nil, fmt.Errorf("expected a SlurmCluster object for the newObj but got %T", newObj)
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type SlurmCluster.
+func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, _, newSlurmCluster *slurmv1.SlurmCluster) (admission.Warnings, error) {
+	slurmClusterLog.Info("Validation for SlurmCluster upon update", "name", newSlurmCluster.GetName())
+
+	return nil, validateSlurmCluster(newSlurmCluster)
+}
+
+func validateSlurmCluster(cluster *slurmv1.SlurmCluster) error {
+	if err := validateLoginUserIsolation(cluster); err != nil {
+		return err
 	}
-	slurmClusterLog.Info("Validation for SlurmCluster upon update", "name", slurmCluster.GetName())
-
-	return nil, nil
+	return validateLoginDocker(cluster)
 }
 
-// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type SlurmCluster.
-func (v *SlurmClusterCustomValidator) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
+func validateLoginDocker(cluster *slurmv1.SlurmCluster) error {
+	login := &cluster.Spec.SlurmNodes.Login
+	for _, env := range login.Sshd.CustomEnv {
+		if env.Name == consts.EnvDockerEnabled {
+			return fmt.Errorf(
+				"remove environment variable %q from login.sshd.customEnv because it is managed by Soperator",
+				consts.EnvDockerEnabled,
+			)
+		}
+	}
+	if login.Docker == nil || !ptr.Deref(login.Docker.Enabled, false) {
+		return nil
+	}
+	if login.UserIsolation == nil || !ptr.Deref(login.UserIsolation.Enabled, false) {
+		return fmt.Errorf("configure login.userIsolation.enabled=true when login Docker is enabled")
+	}
+
+	for _, mount := range login.Volumes.JailSubMounts {
+		if mount.MountPath != consts.ImageStorageMountPath {
+			continue
+		}
+		if mount.ReadOnly {
+			return fmt.Errorf("configure login Docker image storage at %s as writable", consts.ImageStorageMountPath)
+		}
+		return nil
+	}
+
+	return fmt.Errorf("configure a writable login jail sub-mount at %s when login Docker is enabled", consts.ImageStorageMountPath)
+}
+
+// validateLoginUserIsolation checks the effective per-user memory limits.
+func validateLoginUserIsolation(cluster *slurmv1.SlurmCluster) error {
+	isolation := cluster.Spec.SlurmNodes.Login.UserIsolation
+	if isolation == nil || !ptr.Deref(isolation.Enabled, false) {
+		return nil
+	}
+
+	if isolation.MemoryHigh != nil && isolation.MemoryHigh.Sign() <= 0 {
+		return fmt.Errorf(
+			"login.userIsolation.memoryHigh (%s) must be greater than zero",
+			isolation.MemoryHigh.String(),
+		)
+	}
+	if isolation.MemoryMax != nil && isolation.MemoryMax.Sign() <= 0 {
+		return fmt.Errorf(
+			"login.userIsolation.memoryMax (%s) must be greater than zero",
+			isolation.MemoryMax.String(),
+		)
+	}
+
+	containerMemory := cluster.Spec.SlurmNodes.Login.Sshd.Resources.Memory()
+	memoryHigh, memoryMax := values.ResolveLoginUserIsolationMemoryLimits(isolation, containerMemory)
+	if memoryHigh != nil && memoryMax != nil && memoryHigh.Cmp(*memoryMax) > 0 {
+		return fmt.Errorf(
+			"effective login.userIsolation.memoryHigh (%s) must not exceed memoryMax (%s)",
+			memoryHigh.String(), memoryMax.String(),
+		)
+	}
+
+	if containerMemory == nil || containerMemory.Sign() <= 0 {
+		return nil
+	}
+
+	if isolation.MemoryHigh != nil && isolation.MemoryHigh.Cmp(*containerMemory) >= 0 {
+		return fmt.Errorf(
+			"login.userIsolation.memoryHigh (%s) must be lower than the sshd container memory limit (%s)",
+			isolation.MemoryHigh.String(), containerMemory.String(),
+		)
+	}
+	if isolation.MemoryMax != nil && isolation.MemoryMax.Cmp(*containerMemory) >= 0 {
+		return fmt.Errorf(
+			"login.userIsolation.memoryMax (%s) must be lower than the sshd container memory limit (%s)",
+			isolation.MemoryMax.String(), containerMemory.String(),
+		)
+	}
+	return nil
+}
+
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type SlurmCluster.
+func (v *SlurmClusterCustomValidator) ValidateDelete(_ context.Context, _ *slurmv1.SlurmCluster) (admission.Warnings, error) {
 	return nil, nil
 }

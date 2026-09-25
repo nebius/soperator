@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -155,7 +156,7 @@ func TestCollectWorkerPods(t *testing.T) {
 		WithObjects(objects...).
 		Build()
 
-	reconciler := tc.NewWorkerTopologyReconciler(fakeClient, scheme, namespace)
+	reconciler := tc.NewWorkerTopologyReconciler(fakeClient, scheme, namespace, events.NewFakeRecorder(10))
 
 	pods, err := reconciler.CollectWorkerPods(context.Background(), nodeSetList, clusterName, namespace)
 	require.NoError(t, err)

@@ -1,0 +1,18 @@
+suite: test HelmRepository rendering
+templates:
+  - templates/helmrepository.yaml
+tests:
+  - it: should render opentelemetry collector repository for nccl profiles when opentelemetry is disabled
+    set:
+      observability.enabled: true
+      observability.opentelemetry.enabled: false
+      observability.ncclProfiles.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-opentelemetry-collector
+    asserts:
+      - isKind:
+          of: HelmRepository
+      - equal:
+          path: spec.url
+          value: https://open-telemetry.github.io/opentelemetry-helm-charts

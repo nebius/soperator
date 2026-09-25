@@ -146,12 +146,14 @@ func LoadProfile() (Profile, error) {
 	return ParseProfile(raw)
 }
 
-// SchedulerSettings caps how many e2e runs the scheduler workflow starts.
+// SchedulerSettings controls which release branches run e2e and caps concurrent runs.
 // That workflow is plain bash and reads these with yq — go code doesn't use it.
 // They are declared anyway so that a malformed value fails config load.
 type SchedulerSettings struct {
-	RunsPerTick int `json:"runs_per_tick"`
-	MaxInFlight int `json:"max_in_flight"`
+	// Main is always scheduled; an empty list schedules no release branches.
+	E2EReleaseBranches []string `json:"e2e_release_branches"`
+	RunsPerTick        int      `json:"runs_per_tick"`
+	MaxInFlight        int      `json:"max_in_flight"`
 }
 
 // SelectorSettings drives how long SelectProfile waits for a candidate to become free.
@@ -302,6 +304,7 @@ type Config struct {
 	O11yAccessToken    string `split_words:"true" required:"true"`                // O11Y_ACCESS_TOKEN
 	O11ySecretName     string `split_words:"true" default:"o11y-writer-sa-token"` // O11Y_SECRET_NAME
 	O11yNamespace      string `split_words:"true" default:"logs-system"`          // O11Y_NAMESPACE
+	SlurmClusterName   string `split_words:"true" default:"soperator"`            // SLURM_CLUSTER_NAME
 
 	Profile      Profile `ignored:"true"`
 	SSHPublicKey string  `ignored:"true"`

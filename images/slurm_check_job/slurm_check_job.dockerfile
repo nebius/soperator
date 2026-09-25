@@ -2,8 +2,10 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/79
-FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS slurm_check_job
+# https://github.com/nebius/ml-containers/pull/102
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260918141513 AS slurm_check_job
+
+ARG SLURM_VERSION
 
 # Install slurm сhroot plugin
 COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
@@ -26,26 +28,35 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
     chown 0:0 /etc/enroot/enroot.conf.d/custom-dirs.conf && \
     chmod 644 /etc/enroot/enroot.conf.d/custom-dirs.conf
 
-ARG SLURM_VERSION
-ARG PYXIS_VERSION=0.23.0
+ARG SLURM_DEB_VERSION
+ARG PYXIS_VERSION=0.24.0
 # Install slurm pyxis plugin \
 RUN apt-get update && \
-    apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
+    apt -y install nvslurm-plugin-pyxis=${SLURM_DEB_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install NCCL debug plugin
+# Install NCCL Debug SPANK plugin
 COPY images/common/spank-nccl-debug/src /usr/src/soperator/spank/nccld-debug
 COPY images/common/scripts/install_nccld_debug_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_nccld_debug_plugin.sh && \
     /opt/bin/install_nccld_debug_plugin.sh && \
     rm /opt/bin/install_nccld_debug_plugin.sh
 
+# Install NCCL Inspector PreConf SPANK plugin
+COPY ansible/spank_nccl_inspector_preconf.yml /opt/ansible/spank_nccl_inspector_preconf.yml
+COPY ansible/roles/spank_nccl_inspector_preconf /opt/ansible/roles/spank_nccl_inspector_preconf
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local \
+      -e "slurm_version=${SLURM_VERSION}" \
+      -e spank_nccl_inspector_preconf_dump_dir_create=false \
+      spank_nccl_inspector_preconf.yml
+
 # Install kubectl
+ARG KUBECTL_VERSION=v1.36.4
 RUN ARCH="$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')" && \
-    KUBECTL_VERSION="$(curl -Ls https://dl.k8s.io/release/stable.txt)" && \
     echo "Downloading kubectl from https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
-    curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
+    curl -fsSLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" && \
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
     rm kubectl
 
@@ -58,10 +69,13 @@ RUN ARCH="$(uname -m)" && \
     mkdir -p /usr/lib/slurm && \
     ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/chroot.so" /usr/lib/slurm/chroot.so && \
     ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spank_pyxis.so" /usr/lib/slurm/spank_pyxis.so && \
-    ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spanknccldebug.so" /usr/lib/slurm/spanknccldebug.so
+    ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spanknccldebug.so" /usr/lib/slurm/spanknccldebug.so && \
+    ln -s "/usr/lib/${ARCH}-linux-gnu/slurm/spank_nccl_inspector_preconf.so" /usr/lib/slurm/spank_nccl_inspector_preconf.so
 
-# Disable NCCL debug plugin by default for slurm jobs
+# Disable NCCL Debug SPANK plugin by default for Slurm jobs
 ENV SNCCLD_ENABLED="false"
+# Disable NCCL Inspector PreConf SPANK plugin by default for Slurm jobs
+ENV SNCCLIPRECON_ENABLED="false"
 
 # Delete users & home because they will be linked from jail
 RUN rm /etc/passwd* /etc/group* /etc/shadow* /etc/gshadow*

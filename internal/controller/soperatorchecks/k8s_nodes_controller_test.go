@@ -246,7 +246,6 @@ func TestK8SNodesController_Reconcile_NotReadyFlow(t *testing.T) {
 	tests := []struct {
 		name               string
 		node               *corev1.Node
-		expectRequeue      bool
 		expectRequeueAfter bool
 		expectNodeDeletion bool
 	}{
@@ -265,7 +264,6 @@ func TestK8SNodesController_Reconcile_NotReadyFlow(t *testing.T) {
 					},
 				},
 			},
-			expectRequeue:      false,
 			expectRequeueAfter: false,
 			expectNodeDeletion: false,
 		},
@@ -285,7 +283,6 @@ func TestK8SNodesController_Reconcile_NotReadyFlow(t *testing.T) {
 					},
 				},
 			},
-			expectRequeue:      true,
 			expectRequeueAfter: true,
 			expectNodeDeletion: false,
 		},
@@ -305,7 +302,6 @@ func TestK8SNodesController_Reconcile_NotReadyFlow(t *testing.T) {
 					},
 				},
 			},
-			expectRequeue:      false,
 			expectRequeueAfter: false,
 			expectNodeDeletion: true,
 		},
@@ -331,13 +327,9 @@ func TestK8SNodesController_Reconcile_NotReadyFlow(t *testing.T) {
 			result, err := controller.Reconcile(ctx, req)
 			assert.NoError(t, err)
 
-			if tt.expectRequeue && tt.expectRequeueAfter {
-				assert.True(t, result.Requeue || result.RequeueAfter > 0, "Should requeue")
-				if result.RequeueAfter > 0 {
-					assert.Greater(t, result.RequeueAfter, time.Duration(0), "RequeueAfter should be positive")
-				}
+			if tt.expectRequeueAfter {
+				assert.Greater(t, result.RequeueAfter, time.Duration(0), "RequeueAfter should be positive")
 			} else {
-				assert.False(t, result.Requeue, "Should not requeue")
 				assert.Equal(t, time.Duration(0), result.RequeueAfter, "RequeueAfter should be zero")
 			}
 

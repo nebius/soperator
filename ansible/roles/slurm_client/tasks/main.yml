@@ -1,0 +1,39 @@
+---
+
+- name: Assert slurm_version
+  ansible.builtin.assert:
+    that:
+      - slurm_version is defined
+    fail_msg: Missing slurm_version variable.
+  tags:
+    - slurm-client
+
+# /var/spool/slurmd for bind-mounting it from the host. It's needed for sbatch to work
+- name: Create directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  loop:
+    - /var/spool/slurmd
+    - /usr/lib/slurm
+  tags:
+    - slurm-client
+
+- name: Install Slurm client packages
+  vars:
+    slurm_resolved_apt_version: >-
+      {{ slurm_apt_version | default(slurm_version ~ '-1', true) }}
+  ansible.builtin.apt:
+    name: >-
+      {{
+        slurm_client_packages
+        | map('regex_replace', '$', '=' ~ slurm_resolved_apt_version)
+        | list
+      }}
+    state: present
+    update_cache: true
+  tags:
+    - slurm-client

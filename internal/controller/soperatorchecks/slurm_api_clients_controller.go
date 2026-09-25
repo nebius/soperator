@@ -3,23 +3,24 @@ package soperatorchecks
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/controller/reconciler"
-	"nebius.ai/slurm-operator/internal/controllerconfig"
-	"nebius.ai/slurm-operator/internal/jwt"
-	"nebius.ai/slurm-operator/internal/naming"
-	"nebius.ai/slurm-operator/internal/slurmapi"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+
+	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/controller/reconciler"
+	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/jwt"
+	"nebius.ai/slurm-operator/internal/naming"
+	"nebius.ai/slurm-operator/internal/slurmapi"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 )
@@ -31,8 +32,8 @@ var (
 type SlurmAPIClientsController struct {
 	*reconciler.Reconciler
 
-	slurmAPIClients          *slurmapi.ClientSet
-	MaintenanceConditionType corev1.NodeConditionType
+	slurmAPIClients *slurmapi.ClientSet
+	httpClient      *http.Client
 }
 
 func NewSlurmAPIClientsController(
@@ -40,18 +41,14 @@ func NewSlurmAPIClientsController(
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	slurmAPIClients *slurmapi.ClientSet,
-	maintenanceConditionType corev1.NodeConditionType,
+	httpClient *http.Client,
 ) *SlurmAPIClientsController {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
-	if maintenanceConditionType == "" {
-		maintenanceConditionType = consts.DefaultMaintenanceConditionType
-	}
-
 	return &SlurmAPIClientsController{
-		Reconciler:               r,
-		slurmAPIClients:          slurmAPIClients,
-		MaintenanceConditionType: maintenanceConditionType,
+		Reconciler:      r,
+		slurmAPIClients: slurmAPIClients,
+		httpClient:      httpClient,
 	}
 }
 
@@ -85,7 +82,7 @@ func (c *SlurmAPIClientsController) Reconcile(ctx context.Context, req ctrl.Requ
 
 	jwtToken := jwt.NewToken(c.Client).For(req.NamespacedName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
 	slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, req.Name), req.Namespace)
-	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
+	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, c.httpClient)
 	if err != nil {
 		logger.Error(err, "failed to create slurm api client")
 		return ctrl.Result{}, err

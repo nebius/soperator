@@ -1,0 +1,33 @@
+suite: Per-container AppArmor profiles
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should default sshd and munge to unconfined
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.sshd.appArmorProfile
+          value: unconfined
+      - equal:
+          path: spec.slurmNodes.login.munge.appArmorProfile
+          value: unconfined
+      - notExists:
+          path: spec.useDefaultAppArmorProfile
+      - notExists:
+          path: spec.defaultAppArmorProfile
+  - it: should apply the provisioned profile only to sshd
+    set:
+      slurmNodes.login.sshd.appArmorProfile: soperator-default
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.sshd.appArmorProfile
+          value: soperator-default
+      - equal:
+          path: spec.slurmNodes.login.munge.appArmorProfile
+          value: unconfined
+  - it: should pass a custom profile to sshd
+    set:
+      slurmNodes.login.sshd.appArmorProfile: localhost/custom
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.sshd.appArmorProfile
+          value: localhost/custom

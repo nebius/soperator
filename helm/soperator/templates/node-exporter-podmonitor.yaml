@@ -1,0 +1,32 @@
+{{- if and .Values.nodeExporter.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/PodMonitor") }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "soperator.fullname" . }}-manager-node-exporter
+  labels:
+  {{- include "soperator.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      slurm.nebius.ai/pod-node-exporter: "true"
+    {{- include "soperator.selectorLabels" . | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace | quote }}
+  jobLabel: control-plane
+  podMetricsEndpoints:
+  - port: node-exporter
+    path: /metrics
+    scheme: http
+    interval: {{ .Values.nodeExporter.podMonitor.interval }}
+    scrapeTimeout: {{ .Values.nodeExporter.podMonitor.scrapeTimeout }}
+    {{- if .Values.nodeExporter.podMonitor.metricRelabelings }}
+    metricRelabelings:
+      {{- toYaml .Values.nodeExporter.podMonitor.metricRelabelings | nindent 6 }}
+    {{- end }}
+    {{- if .Values.nodeExporter.podMonitor.relabelings }}
+    relabelings:
+      {{- toYaml .Values.nodeExporter.podMonitor.relabelings | nindent 6 }}
+    {{- end }}
+{{- end }}
