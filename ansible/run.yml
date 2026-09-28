@@ -22,24 +22,22 @@
   roles:
     - repos
     - python
-    - common-packages
+    - common_packages
     - cuda
-    - cuda-samples
-    - nccl-tests
+    - cuda_samples
+    - nccl_tests
     - dcgmi
-    - perftest
     - nvtop
-    - docker-cli
-    - openmpi
-    - dcgmi
+    - docker_cli
+    - doca_ofed
     - gdrcopy
-    - nvidia-container-toolkit
-    - soperator-scripts
-    - slurm-divert
-    - slurm-client
-    - slurm-divert # role doubled here, because we need to do that after Slurm version upgrade
+    - nvidia_container_toolkit
+    - soperator_scripts
+    - slurm_divert
+    - slurm_client
+    - slurm_divert # role doubled here, because we need to do that after Slurm version upgrade
     - sssd
     - motd
-    - nc-health-checker
+    - nc_health_checker
   tags:
     - run-all-upgrade
