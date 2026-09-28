@@ -103,6 +103,7 @@ jobs:
 
       - id: set_vars
         name: Setting variables
+        shell: bash
         run: |
           UNSTABLE="${{ inputs.unstable || 'true' }}"
 
@@ -114,6 +115,7 @@ jobs:
 
           make get-version UNSTABLE=${UNSTABLE} >> version.txt
           echo "${UNSTABLE}" >> version.txt
+          make get-nfs-version UNSTABLE=${UNSTABLE} >> version.txt
 
       # This artifact is consumed by e2e_test.yml to determine which version to test.
       - name: Upload version artifact
