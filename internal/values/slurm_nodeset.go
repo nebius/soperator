@@ -24,6 +24,7 @@ type SlurmNodeSet struct {
 	Tolerations      []corev1.Toleration
 	PriorityClass    string
 	Annotations      map[string]string
+	Labels           map[string]string
 	ImagePullSecrets []corev1.LocalObjectReference
 
 	ContainerSlurmd      Container
@@ -76,6 +77,8 @@ func BuildSlurmNodeSetFrom(
 	nodeSet *slurmv1alpha1.NodeSet,
 	clusterName string,
 	maintenance *consts.MaintenanceMode,
+	clusterExtraLabels map[string]string,
+	clusterExtraAnnotations map[string]string,
 ) SlurmNodeSet {
 	nsSpec := &nodeSet.Spec
 	res := SlurmNodeSet{
@@ -89,7 +92,8 @@ func BuildSlurmNodeSetFrom(
 		Affinity:         nsSpec.Affinity.DeepCopy(),
 		Tolerations:      slices.Clone(nsSpec.Tolerations),
 		PriorityClass:    nsSpec.PriorityClass,
-		Annotations:      maps.Clone(nsSpec.WorkerAnnotations),
+		Annotations:      mergeClusterExtra(clusterExtraAnnotations, maps.Clone(nsSpec.WorkerAnnotations)),
+		Labels:           mergeClusterExtra(clusterExtraLabels, maps.Clone(nsSpec.WorkerLabels)),
 		ImagePullSecrets: slices.Clone(nsSpec.ImagePullSecrets),
 		//
 		ContainerSlurmd: buildContainerFrom(

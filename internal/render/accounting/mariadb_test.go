@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -193,4 +194,32 @@ innodb_log_file_size=64M
 innodb_lock_wait_timeout=900
 max_allowed_packet=16M`
 	assert.Equal(t, legacyMyCnf, *mariaDb.Spec.MyCnf)
+}
+
+func Test_RenderMariaDb_CustomLabelsAndAnnotations(t *testing.T) {
+	acc := &values.SlurmAccounting{
+		SlurmNode: slurmv1.SlurmNode{
+			K8sNodeFilterName: "test-filter",
+		},
+		Labels:      map[string]string{"gcore.com/project-id": "123"},
+		Annotations: map[string]string{"gcore.com/note": "abc"},
+		MariaDb: slurmv1.MariaDbOperator{
+			Enabled: true,
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "mariadb:10.5",
+			},
+			Storage: mariadbv1alpha1.Storage{
+				Size: ptr.To(resource.MustParse("1Gi")),
+			},
+		},
+	}
+
+	nodeFilters := []slurmv1.K8sNodeFilter{{Name: "test-filter"}}
+
+	result, err := RenderMariaDb("test-namespace", "test-cluster", acc, nodeFilters)
+	assert.NoError(t, err)
+
+	assert.NotNil(t, result.Spec.PodTemplate.PodMetadata)
+	assert.Equal(t, "123", result.Spec.PodTemplate.PodMetadata.Labels["gcore.com/project-id"])
+	assert.Equal(t, "abc", result.Spec.PodTemplate.PodMetadata.Annotations["gcore.com/note"])
 }

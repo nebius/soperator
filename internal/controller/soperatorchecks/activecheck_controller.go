@@ -210,7 +210,9 @@ func (r *ActiveCheckReconciler) Reconcile(
 							return fmt.Errorf("getting PodTemplate: %w", err)
 						}
 					}
-					desired, err := render.RenderK8sCronJob(check, foundPodTemplate)
+					desired, err := render.RenderK8sCronJob(
+						check, foundPodTemplate, slurmCluster.Spec.ExtraLabels, slurmCluster.Spec.ExtraAnnotations,
+					)
 
 					if err != nil {
 						stepLogger.Error(err, "Failed to render")

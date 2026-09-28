@@ -5,6 +5,9 @@ clusterName: "slurm1"
 podNamePrefix: "enabled"
 # Additional annotations for the cluster
 annotations: {}
+# Custom labels/annotations applied to every Pod and the spool PVC
+extraLabels: {}
+extraAnnotations: {}
 # Maintenance defines the maintenance window for the cluster.
 # It can have the following values:
 # - none: No maintenance is performed. The cluster operates normally.
