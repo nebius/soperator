@@ -75,3 +75,14 @@ tests:
       - equal:
           path: spec.activeDeadlineSeconds
           value: 3600
+
+  - it: should give gpu-checks an hour to submit one job per worker
+    documentSelector:
+      path: metadata.name
+      value: test-cluster-gpu-checks
+    set:
+      slurmClusterRefName: test-cluster
+    asserts:
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 3600

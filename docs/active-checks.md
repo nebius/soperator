@@ -103,7 +103,7 @@ CronJobs create Kubernetes Jobs on schedule, which either run the check directly
 - **`spec.slurmJobSpec.sbatchScriptRefName`** *(string)* — Name of a `ConfigMap` containing an sbatch script at key `sbatch.sh`.
 - **`spec.slurmJobSpec.sbatchScript`** *(string, multiline)* — Inline sbatch script. May contain `#SBATCH` directives and shell logic; can invoke `srun`.
 - **`spec.slurmJobSpec.eachWorkerJobs`** *(bool)* — Run on **each worker** using **separate Slurm jobs**.
-- **`spec.slurmJobSpec.maxNumberOfJobs`** *(int64)* — Maximum number of simultaneous jobs. If less than the number of workers, only a subset runs. `0` = no limit.
+- **`spec.slurmJobSpec.maxNumberOfJobs`** *(int64)* — Upper bound on how many workers get a job per run. If less than the number of workers, a random subset of that size runs. `0` = every worker.
 
 ### Reactions fields (spec)
 
@@ -174,7 +174,31 @@ In both cases, the Active Check Controller creates a CronJob (1:1 with CR) which
 
 #### Slurm job submission modes
 - **Default** — One Slurm batch per run.
-- **eachWorkerJobs** — Run once per worker using separate Slurm jobs. `maxNumberOfJobs` param may be used together with it to limit the number of jobs (if less than the number of workers, only a subset executes).
+- **eachWorkerJobs** — Run once per worker using separate Slurm jobs. `maxNumberOfJobs` may be used together with it to test only a random subset of workers per run; all jobs are still submitted at once. To bound how many jobs run at the same time, use a Slurm license (see below).
+
+#### Bounding concurrency with Slurm licenses
+
+A slurmJob check that must not run on too many nodes at once can request a Slurm local license in its
+sbatch script. Jobs that cannot get a slot stay PENDING with reason `Licenses` and do not occupy their
+node. `gpu-checks` does this because its InfiniBand tests load the fabric:
+
+- `gpu-checks.sh` carries `#SBATCH --licenses=gpu_checks:1` (chart value `slurmJob.gpuChecksLicenses`;
+  an empty value disables the request).
+- The operator renders `Licenses=gpu_checks:200` into `slurm.conf` on every cluster, so at most 200
+  nodes run the check at the same time.
+
+Every worker still gets a job per run, so a run on a large cluster takes about
+`ceil(workers / count) x job duration`. The script sets `--deadline=now+8hours`: a job that cannot
+start within 8 hours minus its 50-minute time limit is removed by Slurm as DEADLINE and the run ends
+as `Error`, so the nodes one run can cover are roughly `count x 7h / job duration` (with 200 slots:
+about 11000 at the 7.5-minute jobs measured on H100, about 4000 at 20-minute jobs). Anything still
+pending when the next scheduled run starts is cancelled by it, and the superseded run ends as
+`Cancelled`. To change the count or add your own licenses, put one `Licenses=` line into the
+SlurmCluster `customSlurmConfig`, for example `Licenses=gpu_checks:100,fluent:30`. It is included after
+the generated config and Slurm keeps only the last `Licenses=` line, so it must still list `gpu_checks`.
+
+Useful commands: `scontrol show lic gpu_checks` shows the slots in use, and
+`squeue --name=<cluster>-gpu-checks -O JobID,State,Reason` shows which jobs wait for one.
 
 #### Slurm partitions (defaults)
 There are two partitions by default:

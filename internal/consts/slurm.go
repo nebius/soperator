@@ -18,6 +18,11 @@ const (
 	// SlurmDefaultSuspendTimeout mirrors the CRD default, in seconds.
 	SlurmDefaultSuspendTimeout = 90
 
+	// SlurmDefaultLicenses is rendered as Licenses= into slurm.conf. Active checks request these
+	// licenses as cluster-wide semaphores: every gpu-checks job takes gpu_checks:1, so the count
+	// bounds how many nodes run that check at once. A Licenses= line in customSlurmConfig overrides it.
+	SlurmDefaultLicenses = "gpu_checks:200"
+
 	SlurmPowerActionWorkerHandoff = "soperator-worker-handoff"
 )
 
