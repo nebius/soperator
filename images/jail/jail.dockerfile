@@ -59,7 +59,7 @@ RUN cd /opt/ansible && \
 
 ## Install Docker CLI
 COPY ansible/docker-cli.yml /opt/ansible/docker-cli.yml
-COPY ansible/roles/docker-cli /opt/ansible/roles/docker-cli
+COPY ansible/roles/docker_cli /opt/ansible/roles/docker_cli
 RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local docker-cli.yml
 
@@ -71,7 +71,7 @@ RUN cd /opt/ansible && \
 
 ## Install nvidia-container-toolkit (for enroot usage)
 COPY ansible/nvidia-container-toolkit.yml /opt/ansible/nvidia-container-toolkit.yml
-COPY ansible/roles/nvidia-container-toolkit /opt/ansible/roles/nvidia-container-toolkit
+COPY ansible/roles/nvidia_container_toolkit /opt/ansible/roles/nvidia_container_toolkit
 RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local nvidia-container-toolkit.yml -t nvidia-container-toolkit
 
@@ -89,13 +89,13 @@ RUN cd /opt/ansible && \
 
 # Copy wrapper scripts and utilities
 COPY ansible/soperator-scripts.yml /opt/ansible/soperator-scripts.yml
-COPY ansible/roles/soperator-scripts /opt/ansible/roles/soperator-scripts
+COPY ansible/roles/soperator_scripts /opt/ansible/roles/soperator_scripts
 RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local soperator-scripts.yml
 
 # Install Nebius health-check library
 COPY ansible/nc-health-checker.yml /opt/ansible/nc-health-checker.yml
-COPY ansible/roles/nc-health-checker /opt/ansible/roles/nc-health-checker
+COPY ansible/roles/nc_health_checker /opt/ansible/roles/nc_health_checker
 RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local nc-health-checker.yml
 

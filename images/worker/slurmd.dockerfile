@@ -69,7 +69,7 @@ RUN apt-get update && \
 
 ## Install nvidia-container-toolkit (for enroot usage)
 COPY ansible/nvidia-container-toolkit.yml /opt/ansible/nvidia-container-toolkit.yml
-COPY ansible/roles/nvidia-container-toolkit /opt/ansible/roles/nvidia-container-toolkit
+COPY ansible/roles/nvidia_container_toolkit /opt/ansible/roles/nvidia_container_toolkit
 RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local nvidia-container-toolkit.yml -t nvidia-container-toolkit
 
