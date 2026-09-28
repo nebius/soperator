@@ -9,6 +9,6 @@
   gather_subset:
     - min
   roles:
-    - nc_health_checker
+    - nc-health-checker
   tags:
     - nc-health-checker

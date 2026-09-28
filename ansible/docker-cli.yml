@@ -7,6 +7,6 @@
     - min
   become: true
   roles:
-    - docker_cli
+    - docker-cli
   tags:
     - docker-cli

@@ -4,6 +4,6 @@
   hosts: localhost
   become: true
   roles:
-    - nvidia_container_toolkit
+    - nvidia-container-toolkit
   tags:
     - nvidia-container-toolkit
