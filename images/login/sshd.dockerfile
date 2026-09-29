@@ -14,8 +14,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux \
     go build -trimpath -ldflags='-s -w' -o soperator-docker-proxy ./cmd/soperator-docker-proxy
 
-# https://github.com/nebius/ml-containers/pull/104
-FROM cr.nebius.cloud/ml-containers/neubuntu:noble-20260916135615 AS login_pam_builder
+# https://github.com/nebius/ml-containers/pull/109
+FROM cr.nebius.cloud/ml-containers/neubuntu:noble-20260929103914 AS login_pam_builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -30,8 +30,8 @@ RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
     /usr/src/pam-soperator-jail/pam_soperator_jail.c \
     /out
 
-# https://github.com/nebius/ml-containers/pull/102
-FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260918141513 AS login_sshd
+# https://github.com/nebius/ml-containers/pull/109
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260929115231 AS login_sshd
 
 ARG SLURM_VERSION
 

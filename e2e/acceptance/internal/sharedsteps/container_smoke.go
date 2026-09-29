@@ -13,8 +13,8 @@ const (
 	containerSmokeSacctTimeout = 2 * time.Minute
 
 	// Cluster-supported GPU diagnostic image; includes nvidia-smi for container GPU visibility.
-	// https://github.com/nebius/ml-containers/pull/104
-	gpuSmokeImageRef    = "ml-containers/training_diag:13.0.3-ubuntu24.04-20260916141105"
+	// https://github.com/nebius/ml-containers/pull/109
+	gpuSmokeImageRef    = "ml-containers/training_diag:13.0.3-ubuntu24.04-20260929123220"
 	gpuSmokeDockerImage = "cr.nebius.cloud/" + gpuSmokeImageRef
 	gpuSmokeEnrootImage = "docker://cr.nebius.cloud#" + gpuSmokeImageRef
 )

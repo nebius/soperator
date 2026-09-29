@@ -2,8 +2,8 @@
 
 ARG CUDA_VERSION
 ARG SLURM_VERSION
-# https://github.com/nebius/ml-containers/pull/104
-FROM cr.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260918141542 AS jail
+# https://github.com/nebius/ml-containers/pull/109
+FROM cr.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20260929123149 AS jail
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
