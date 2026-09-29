@@ -31,10 +31,9 @@ RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
     /out
 
 # https://github.com/nebius/ml-containers/pull/102
-FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260918141513 AS worker_slurmd
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260929080740 AS worker_slurmd
 
 ARG SLURM_VERSION
-ARG SLURM_DEB_VERSION
 
 # Install useful packages
 RUN apt-get update && \
@@ -44,8 +43,7 @@ RUN apt-get update && \
         kmod \
         libncurses5-dev \
         supervisor \
-        openssh-server \
-        slurm-smd-libpam-slurm-adopt=${SLURM_DEB_VERSION} && \
+        openssh-server && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -101,6 +99,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
     chmod 644 /etc/enroot/enroot.conf.d/custom-dirs.conf
 
 # Install slurm pyxis plugin
+ARG SLURM_DEB_VERSION
 ARG PYXIS_VERSION=0.24.0
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${SLURM_DEB_VERSION}-${PYXIS_VERSION}-1 && \
