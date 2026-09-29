@@ -215,6 +215,13 @@ func BuildConfigMapSysctlName(clusterName string) string {
 	}.String()
 }
 
+func BuildConfigMapPAMSlurmAdoptName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      consts.ConfigMapNamePAMSlurmAdopt,
+	}.String()
+}
+
 // endregion Worker
 
 // region PopulateJailJob

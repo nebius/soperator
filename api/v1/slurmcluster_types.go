@@ -117,6 +117,12 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Enum="v1";"v2"
 	CgroupVersion string `json:"cgroupVersion,omitempty"`
 
+	// PAMSlurmAdopt controls whether SSH sessions on worker nodes must belong to a running Slurm job.
+	// Eligible sessions are adopted into the job's external step and inherit its cgroup constraints.
+	//
+	// +kubebuilder:validation:Optional
+	PAMSlurmAdopt *PAMSlurmAdopt `json:"pamSlurmAdopt,omitempty"`
+
 	// MPIConfig represents the PMIx configuration in mpi.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
@@ -138,6 +144,27 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	HealthCheckConfig *HealthCheckConfig `json:"healthCheckConfig,omitempty"`
+}
+
+// PAMSlurmAdopt defines access and adoption policy for SSH sessions on worker nodes.
+type PAMSlurmAdopt struct {
+	// Enabled requires non-root SSH users to own a running job on the target worker.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// ExemptUsers lists non-root users that may SSH to workers without a running job. Their sessions
+	// are not adopted into a job cgroup.
+	//
+	// +kubebuilder:validation:Optional
+	ExemptUsers []string `json:"exemptUsers,omitempty"`
+
+	// ExemptGroups lists groups whose members may SSH to workers without a running job. Their sessions
+	// are not adopted into a job cgroup.
+	//
+	// +kubebuilder:validation:Optional
+	ExemptGroups []string `json:"exemptGroups,omitempty"`
 }
 
 // SlurmConfig represents the Slurm configuration in slurm.conf

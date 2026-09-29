@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,8 +16,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/values"
 )
 
@@ -26,6 +29,46 @@ func makeNodeSetWithConditions(conditions ...metav1.Condition) *slurmv1alpha1.No
 			Conditions: conditions,
 		},
 	}
+}
+
+func TestGetWorkersStatefulSetDependenciesExcludesPAMSlurmAdopt(t *testing.T) {
+	const (
+		namespace   = "test-namespace"
+		clusterName = "test-cluster"
+		sshdName    = "test-sshd"
+	)
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	objects := []client.Object{
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      naming.BuildSecretMungeKeyName(clusterName),
+		}},
+		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      sshdName,
+		}},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()
+	r := NodeSetReconciler{
+		Reconciler: reconciler.NewReconciler(fakeClient, scheme, record.NewFakeRecorder(10)),
+	}
+	cluster := &slurmv1.SlurmCluster{}
+	nodeSet := &values.SlurmNodeSet{
+		ParentalCluster:   client.ObjectKey{Namespace: namespace, Name: clusterName},
+		SSHDConfigMapName: sshdName,
+	}
+
+	dependencies, err := r.getWorkersStatefulSetDependencies(context.Background(), nodeSet, cluster)
+	require.NoError(t, err)
+	assert.Len(t, dependencies, 2)
+
+	nodeSet.PAMSlurmAdopt.Enabled = true
+	dependencies, err = r.getWorkersStatefulSetDependencies(context.Background(), nodeSet, cluster)
+	require.NoError(t, err)
+	assert.Len(t, dependencies, 2)
 }
 
 func TestComputePhase(t *testing.T) {

@@ -31,7 +31,7 @@ RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
     /out
 
 # https://github.com/nebius/ml-containers/pull/102
-FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260918141513 AS worker_slurmd
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260929080740 AS worker_slurmd
 
 ARG SLURM_VERSION
 
@@ -161,7 +161,21 @@ RUN rm -rf /etc/update-motd.d
 # Keep pam_soperator_jail last: it pivots the per-session sshd process into the
 # jail, so any PAM session modules after it would also run inside the jail.
 COPY --from=worker_pam_builder /out/ /
-RUN echo "session required pam_soperator_jail.so /mnt/jail" >> /etc/pam.d/sshd
+RUN sed -Ei \
+      's/^[[:space:]]*@include[[:space:]]+common-account[[:space:]]*$/account substack common-account/' \
+      /etc/pam.d/sshd && \
+    grep -Eq '^[[:space:]]*account[[:space:]]+substack[[:space:]]+common-account[[:space:]]*$' \
+      /etc/pam.d/sshd && \
+    mkdir -p /etc/soperator/pam-slurm-adopt && \
+    touch \
+      /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt \
+      /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt-users \
+      /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt-groups && \
+    chmod 0644 /etc/soperator/pam-slurm-adopt/* && \
+    ln -s /etc/soperator/pam-slurm-adopt/soperator-pam-slurm-adopt \
+      /etc/pam.d/soperator-pam-slurm-adopt && \
+    echo "@include soperator-pam-slurm-adopt" >> /etc/pam.d/sshd && \
+    echo "session required pam_soperator_jail.so /mnt/jail" >> /etc/pam.d/sshd
 
 # Expose the port used for accessing slurmd
 EXPOSE 6818

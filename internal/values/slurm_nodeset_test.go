@@ -39,7 +39,7 @@ func TestBuildSlurmNodeSetFrom_SSSD(t *testing.T) {
 			Image: slurmv1alpha1.Image{Repository: "sssd", Tag: "latest"},
 		}
 
-		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil)
+		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil, nil)
 
 		if assert.NotNil(t, result.ContainerSSSD) {
 			assert.Equal(t, "sssd:latest", result.ContainerSSSD.Image)
@@ -56,7 +56,7 @@ func TestBuildSlurmNodeSetFrom_SSSD(t *testing.T) {
 		}
 		nodeSet.Spec.SSSDConfSecretRefName = "custom-worker-sssd"
 
-		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil)
+		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil, nil)
 
 		assert.False(t, result.IsSSSDSecretDefault)
 		assert.Equal(t, "custom-worker-sssd", result.SSSDConfSecretName)
@@ -65,7 +65,7 @@ func TestBuildSlurmNodeSetFrom_SSSD(t *testing.T) {
 	t.Run("keeps sssd disabled when container is not configured", func(t *testing.T) {
 		nodeSet := makeNodeSet()
 
-		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil)
+		result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil, nil)
 
 		assert.Nil(t, result.ContainerSSSD)
 		assert.Empty(t, result.SSSDConfSecretName)

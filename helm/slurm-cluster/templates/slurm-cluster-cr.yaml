@@ -33,6 +33,10 @@ spec:
   customCgroupConfig: |
 {{- .Values.customCgroupConfig | nindent 4 }}
   {{- end }}
+  {{- with .Values.pamSlurmAdopt }}
+  pamSlurmAdopt:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   healthCheckConfig:
     healthCheckInterval: 120
     healthCheckProgram: /opt/slurm_scripts/hc_program.sh
