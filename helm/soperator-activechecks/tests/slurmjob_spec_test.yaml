@@ -1,0 +1,53 @@
+suite: test slurmJobSpec structure
+templates:
+  - templates/active-checks.yaml
+
+tests:
+  - it: should render gpu-checks active check
+    documentSelector:
+      path: metadata.name
+      value: soperator-gpu-checks
+    asserts:
+      - isKind:
+          of: ActiveCheck
+      - equal:
+          path: spec.checkType
+          value: slurmJob
+      - equal:
+          path: spec.runAfterCreation
+          value: true
+      - equal:
+          path: spec.suspend
+          value: false
+      - contains:
+          path: spec.dependsOn
+          content: soperator-manage-jail-state
+      - matchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: 'health-checker run'
+      - matchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: 'Running GPU checks'
+      - matchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: '^#!/bin/bash\n#SBATCH --deadline="now\+8hours"\n#SBATCH --time=50:00\n'
+      - matchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: '(?m)^#SBATCH --licenses=gpu_checks:1$'
+      - notExists:
+          path: spec.slurmJobSpec.maxNumberOfJobs
+
+  - it: should not request licenses for gpu-checks when gpuChecksLicenses is empty
+    documentSelector:
+      path: metadata.name
+      value: soperator-gpu-checks
+    set:
+      slurmJob:
+        gpuChecksLicenses: ""
+    asserts:
+      - notMatchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: '--licenses'
+      - matchRegex:
+          path: spec.slurmJobSpec.sbatchScript
+          pattern: '^#!/bin/bash\n#SBATCH --deadline="now\+8hours"\n#SBATCH --time=50:00\n#SBATCH --exclusive\n#SBATCH --mem=0\n\nplatform=""\n'

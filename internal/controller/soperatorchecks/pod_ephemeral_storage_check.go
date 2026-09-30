@@ -2,7 +2,6 @@ package soperatorchecks
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -12,33 +11,32 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
-	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/reconciler"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/jwt"
+	"nebius.ai/slurm-operator/internal/kubeletclient"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
-// +kubebuilder:rbac:groups=core,resources=nodes/proxy,verbs=get;watch;list
+// +kubebuilder:rbac:groups=core,resources=nodes/stats,verbs=get
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch;list;watch;get;update
+// +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch;list;watch;get;update
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
 
@@ -78,12 +76,11 @@ type EphemeralStorageInfo struct {
 
 type PodEphemeralStorageCheck struct {
 	*reconciler.Reconciler
-	reconcileTimeout time.Duration
-	clientset        kubernetes.Interface
-	restConfig       *rest.Config
-	usageThreshold   float64
-	resumeThreshold  float64
-	slurmAPIClients  *slurmapi.ClientSet
+	requeueAfter    time.Duration
+	kubelet         *kubeletclient.Client
+	usageThreshold  float64
+	resumeThreshold float64
+	slurmAPIClients *slurmapi.ClientSet
 }
 
 func NewPodEphemeralStorageCheck(
@@ -91,26 +88,26 @@ func NewPodEphemeralStorageCheck(
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
 	restConfig *rest.Config,
-	reconcileTimeout time.Duration,
+	requeueAfter time.Duration,
 	usageThreshold float64,
 	resumeThreshold float64,
 	slurmAPIClients *slurmapi.ClientSet,
+	kubeletConfig kubeletclient.Config,
 ) (*PodEphemeralStorageCheck, error) {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 
-	clientset, err := kubernetes.NewForConfig(restConfig)
+	kubelet, err := kubeletclient.New(restConfig, kubeletConfig)
 	if err != nil {
-		return nil, fmt.Errorf("creating kubernetes clientset: %w", err)
+		return nil, fmt.Errorf("creating kubelet client: %w", err)
 	}
 
 	return &PodEphemeralStorageCheck{
-		Reconciler:       r,
-		reconcileTimeout: reconcileTimeout,
-		clientset:        clientset,
-		restConfig:       restConfig,
-		usageThreshold:   usageThreshold,
-		resumeThreshold:  resumeThreshold,
-		slurmAPIClients:  slurmAPIClients,
+		Reconciler:      r,
+		requeueAfter:    requeueAfter,
+		kubelet:         kubelet,
+		usageThreshold:  usageThreshold,
+		resumeThreshold: resumeThreshold,
+		slurmAPIClients: slurmAPIClients,
 	}, nil
 }
 
@@ -139,9 +136,6 @@ func (r *PodEphemeralStorageCheck) SetupWithManager(mgr ctrl.Manager, maxConcurr
 
 	return ctrl.NewControllerManagedBy(mgr).Named(PodEphemeralStorageCheckName).
 		For(&corev1.Pod{}).
-		Watches(&kruisev1b1.StatefulSet{},
-			handler.EnqueueRequestsFromMapFunc(r.mapKruiseStatefulSetToPods),
-		).
 		WithEventFilter(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
 				pod, ok := e.Object.(*corev1.Pod)
@@ -174,12 +168,16 @@ func (r *PodEphemeralStorageCheck) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, fmt.Errorf("getting pod: %w", err)
 	}
 
+	if !r.isPodRelevant(pod) {
+		return ctrl.Result{}, nil
+	}
+
 	if err := r.ReconcilePodEphemeralStorageCheckForPod(ctx, pod); err != nil {
 		return ctrl.Result{}, fmt.Errorf("reconciling Pod Ephemeral Storage Check: %w", err)
 	}
 
-	logger.Info("Pod Ephemeral Storage Check completed successfully")
-	return ctrl.Result{RequeueAfter: r.reconcileTimeout}, nil
+	logger.V(1).Info("Pod Ephemeral Storage Check completed successfully")
+	return ctrl.Result{RequeueAfter: r.requeueAfter}, nil
 }
 
 func (r *PodEphemeralStorageCheck) isPodRelevant(pod *corev1.Pod) bool {
@@ -204,59 +202,6 @@ func (r *PodEphemeralStorageCheck) isPodRelevant(pod *corev1.Pod) bool {
 	}
 
 	return false
-}
-
-// hasOwnerWithSoperator checks if the object has an owner that belongs to soperator
-func (r *PodEphemeralStorageCheck) hasOwnerWithSoperator(obj client.Object) bool {
-	ownerRefs := obj.GetOwnerReferences()
-	for _, ownerRef := range ownerRefs {
-		if ownerRef.Kind == "SlurmCluster" &&
-			ownerRef.APIVersion == "slurm.nebius.ai/v1" {
-			return true
-		}
-	}
-	return false
-}
-
-// mapKruiseStatefulSetToPods maps kruise StatefulSet changes to pod reconcile requests
-func (r *PodEphemeralStorageCheck) mapKruiseStatefulSetToPods(ctx context.Context, obj client.Object) []reconcile.Request {
-	sts, ok := obj.(*kruisev1b1.StatefulSet)
-	if !ok {
-		return nil
-	}
-	if !r.hasOwnerWithSoperator(sts) {
-		return nil
-	}
-
-	return r.getPodsForStatefulSet(ctx, sts.Namespace, sts.Name)
-}
-
-// getPodsForStatefulSet returns reconcile requests for pods owned by the StatefulSet
-func (r *PodEphemeralStorageCheck) getPodsForStatefulSet(ctx context.Context, namespace, statefulSetName string) []reconcile.Request {
-	var podList corev1.PodList
-	err := r.List(ctx, &podList, client.InNamespace(namespace), client.MatchingLabels{
-		consts.LabelWorkerKey: consts.LabelWorkerValue,
-	})
-	if err != nil {
-		return nil
-	}
-
-	var requests []reconcile.Request
-	for _, pod := range podList.Items {
-		for _, ownerRef := range pod.GetOwnerReferences() {
-			if ownerRef.Kind == "StatefulSet" && ownerRef.Name == statefulSetName {
-				requests = append(requests, reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      pod.Name,
-						Namespace: pod.Namespace,
-					},
-				})
-				break
-			}
-		}
-	}
-
-	return requests
 }
 
 func (r *PodEphemeralStorageCheck) ReconcilePodEphemeralStorageCheckForPod(ctx context.Context, pod *corev1.Pod) error {
@@ -314,15 +259,19 @@ func (r *PodEphemeralStorageCheck) initSlurmClientAndGetNode(
 		Namespace: pod.Namespace,
 	}
 
-	if err := r.InitSlurmAPIClients(slurmClusterNamespacedName, slurmClusterName); err != nil {
+	if err := r.ensureNodeCache(ctx, slurmClusterNamespacedName, slurmClusterName); err != nil {
 		return types.NamespacedName{}, slurmapi.Node{}, fmt.Errorf("initializing Slurm API clients: %w", err)
 	}
 
-	slurmNode, err := r.getSlurmNode(ctx, slurmClusterNamespacedName, pod.Name)
-	if err != nil {
-		return types.NamespacedName{}, slurmapi.Node{}, fmt.Errorf("getting Slurm node: %w for pod %s/%s", err, pod.Namespace, pod.Name)
+	nc, found := r.slurmAPIClients.GetNodeCache(slurmClusterNamespacedName)
+	if !found {
+		return types.NamespacedName{}, slurmapi.Node{}, fmt.Errorf("node cache not found for cluster %v", slurmClusterNamespacedName)
 	}
 
+	slurmNode, found := nc.GetNode(pod.Name)
+	if !found {
+		return types.NamespacedName{}, slurmapi.Node{}, fmt.Errorf("slurm node %s not found in cache for cluster %v", pod.Name, slurmClusterNamespacedName)
+	}
 	return slurmClusterNamespacedName, slurmNode, nil
 }
 
@@ -435,56 +384,20 @@ func (r *PodEphemeralStorageCheck) checkSlurmNodeDrainStatus(ctx context.Context
 	return fmt.Errorf("node needs draining")
 }
 
-func (r *PodEphemeralStorageCheck) findWorkerPods(ctx context.Context, namespace string) ([]corev1.Pod, error) {
-	var podList corev1.PodList
-	err := r.List(ctx, &podList, client.InNamespace(namespace), client.MatchingLabels{
-		consts.LabelWorkerKey: consts.LabelWorkerValue,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("listing worker pods: %w", err)
-	}
-
-	var runningPods []corev1.Pod
-	for _, pod := range podList.Items {
-		if pod.Status.Phase == corev1.PodRunning && pod.Spec.NodeName != "" {
-			runningPods = append(runningPods, pod)
-		}
-	}
-
-	return runningPods, nil
-}
-
-func (r *PodEphemeralStorageCheck) getUniqueNodeNames(pods []corev1.Pod) []string {
-	nodeSet := make(map[string]bool)
-	for _, pod := range pods {
-		if pod.Spec.NodeName != "" {
-			nodeSet[pod.Spec.NodeName] = true
-		}
-	}
-
-	var nodeNames []string
-	for nodeName := range nodeSet {
-		nodeNames = append(nodeNames, nodeName)
-	}
-	return nodeNames
-}
-
 func (r *PodEphemeralStorageCheck) getEphemeralStorageStatsFromNode(ctx context.Context, nodeName string, workerPods []corev1.Pod) ([]EphemeralStorageInfo, error) {
-	result := r.clientset.CoreV1().RESTClient().Get().
-		Resource("nodes").
-		Name(nodeName).
-		SubResource("proxy").
-		Suffix("stats/summary").
-		Do(ctx)
+	node := &corev1.Node{}
+	if err := r.Get(ctx, types.NamespacedName{Name: nodeName}, node); err != nil {
+		return nil, fmt.Errorf("getting node %s: %w", nodeName, err)
+	}
 
-	rawData, err := result.Raw()
+	address, port, err := kubeletclient.AddressForNode(node)
 	if err != nil {
-		return nil, fmt.Errorf("getting kubelet stats from node %s: %w", nodeName, err)
+		return nil, err
 	}
 
 	var stats KubeletStats
-	if err := json.Unmarshal(rawData, &stats); err != nil {
-		return nil, fmt.Errorf("decoding kubelet stats: %w", err)
+	if err := r.kubelet.Get(ctx, address, port, kubeletclient.SummaryPath, &stats); err != nil {
+		return nil, fmt.Errorf("getting kubelet stats from node %s: %w", nodeName, err)
 	}
 
 	workerPodMap := make(map[string]corev1.Pod)
@@ -561,40 +474,39 @@ func (r *PodEphemeralStorageCheck) getSlurmClusterName(ctx context.Context, name
 	return slurmClusterName, nil
 }
 
-// InitSlurmAPIClients initializes Slurm API clients for the given Slurm cluster
-func (r *PodEphemeralStorageCheck) InitSlurmAPIClients(
-	slurmClusterNamespacedName types.NamespacedName, slurmClusterName string) error {
-	if _, found := r.slurmAPIClients.GetClient(slurmClusterNamespacedName); found {
-		return nil // Client already exists, no need to create a new one
-	}
-
-	jwtToken := jwt.NewToken(r.Client).For(slurmClusterNamespacedName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
-	slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, slurmClusterName), slurmClusterNamespacedName.Namespace)
-	slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
-	if err != nil {
-		return fmt.Errorf("creating slurm api client: %w", err)
-	}
-	r.slurmAPIClients.AddClient(slurmClusterNamespacedName, slurmAPIClient)
-	return nil
-}
-
-func (c *PodEphemeralStorageCheck) getSlurmNode(
+// ensureNodeCache creates the Slurm API client and starts the node cache background
+// goroutine for the given cluster if they do not already exist, then blocks until
+// the first successful ListNodes refresh completes.
+func (r *PodEphemeralStorageCheck) ensureNodeCache(
 	ctx context.Context,
-	slurmClusterName types.NamespacedName,
-	slurmNodeName string,
-) (slurmapi.Node, error) {
-
-	slurmAPIClient, found := c.slurmAPIClients.GetClient(slurmClusterName)
-	if !found {
-		return slurmapi.Node{}, fmt.Errorf("slurm cluster %v not found", slurmClusterName)
+	slurmClusterNamespacedName types.NamespacedName,
+	slurmClusterName string,
+) error {
+	// Always wait for readiness, even when cache already exists — a concurrent
+	// reconcile may have just created it and the first refresh is still in flight.
+	if nc, found := r.slurmAPIClients.GetNodeCache(slurmClusterNamespacedName); found {
+		return nc.WaitReady(ctx)
 	}
 
-	node, err := slurmAPIClient.GetNode(ctx, slurmNodeName)
-	if err != nil {
-		return slurmapi.Node{}, fmt.Errorf("get node: %w", err)
+	if _, found := r.slurmAPIClients.GetClient(slurmClusterNamespacedName); !found {
+		jwtToken := jwt.NewToken(r.Client).For(slurmClusterNamespacedName, "root").WithRegistry(jwt.NewTokenRegistry().Build())
+		slurmAPIServer := fmt.Sprintf("http://%s.%s:6820", naming.BuildServiceName(consts.ComponentTypeREST, slurmClusterName), slurmClusterNamespacedName.Namespace)
+		slurmAPIClient, err := slurmapi.NewClient(slurmAPIServer, jwtToken, slurmapi.DefaultHTTPClient())
+		if err != nil {
+			return fmt.Errorf("creating slurm api client: %w", err)
+		}
+		r.slurmAPIClients.AddClient(slurmClusterNamespacedName, slurmAPIClient)
 	}
 
-	return node, nil
+	nc := r.slurmAPIClients.EnsureNodeCache(
+		slurmClusterNamespacedName,
+		r.requeueAfter,
+		log.Log.WithName("NodeCache").WithValues("cluster", slurmClusterNamespacedName),
+	)
+	if nc == nil {
+		return fmt.Errorf("no slurm API client for cluster %v", slurmClusterNamespacedName)
+	}
+	return nc.WaitReady(ctx)
 }
 
 func (r *PodEphemeralStorageCheck) handleLowStorageUsage(ctx context.Context, pod *corev1.Pod) error {
@@ -637,9 +549,9 @@ func (c *PodEphemeralStorageCheck) undrainSlurmNode(
 		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
-	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
-		api.V0041UpdateNodeMsg{
-			State: ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateRESUME}),
+	resp, err := slurmAPIClient.SlurmV0044PostNodeWithResponse(ctx, slurmNodeName,
+		api.V0044UpdateNodeMsg{
+			State: ptr.To([]api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateRESUME}),
 		},
 	)
 	if err != nil {
@@ -680,10 +592,10 @@ func (c *PodEphemeralStorageCheck) drainSlurmNode(
 		return fmt.Errorf("slurm cluster %v not found", slurmClusterName)
 	}
 
-	resp, err := slurmAPIClient.SlurmV0041PostNodeWithResponse(ctx, slurmNodeName,
-		api.V0041UpdateNodeMsg{
+	resp, err := slurmAPIClient.SlurmV0044PostNodeWithResponse(ctx, slurmNodeName,
+		api.V0044UpdateNodeMsg{
 			Reason: ptr.To(string(reason)),
-			State:  ptr.To([]api.V0041UpdateNodeMsgState{api.V0041UpdateNodeMsgStateDRAIN}),
+			State:  ptr.To([]api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateDRAIN}),
 		},
 	)
 	if err != nil {

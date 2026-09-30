@@ -8,14 +8,6 @@ rules:
   - ""
   resources:
   - nodes
-  verbs:
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - nodes/status
   verbs:
   - get
@@ -26,8 +18,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - pods
+  - nodes/proxy
   verbs:
   - get
-  - list
-  - watch

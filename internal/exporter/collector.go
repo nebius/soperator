@@ -6,10 +6,11 @@ import (
 	"iter"
 	"maps"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +22,7 @@ import (
 // MetricsCollector exposes SLURM metrics by implementing prometheus.Collector interface
 type MetricsCollector struct {
 	slurmAPIClient slurmapi.Client
+	jobListParams  slurmapi.ListJobsParams
 
 	nodeInfo                   *prometheus.Desc
 	nodeCPUTotal               *prometheus.Desc
@@ -32,11 +34,14 @@ type MetricsCollector struct {
 	nodeMemoryFreeBytes        *prometheus.Desc
 	nodeMemoryEffectiveBytes   *prometheus.Desc
 	nodePartition              *prometheus.Desc
+	nodeNVLinkInstanceGroup    *prometheus.Desc
 	jobInfo                    *prometheus.Desc
 	jobNode                    *prometheus.Desc
 	jobDuration                *prometheus.Desc
 	jobCPUs                    *prometheus.Desc
 	jobMemoryBytes             *prometheus.Desc
+	nodeTopologySource         NodeTopologySource
+	nodeTopologyTimeout        time.Duration
 	nodeGPUSeconds             *prometheus.CounterVec
 	nodeFails                  *prometheus.CounterVec
 	nodeUnavailabilityDuration *prometheus.HistogramVec
@@ -49,11 +54,14 @@ type MetricsCollector struct {
 	controllerServerThreadCount *prometheus.Desc
 
 	// Atomic pointer to the current state for lock-free reads
-	state atomic.Pointer[metricsCollectorState]
+	stateMu sync.Mutex
+	state   atomic.Pointer[metricsCollectorState]
 
 	// Monitoring contains self-monitoring metrics
 	Monitoring *MonitoringMetrics
 }
+
+const defaultNodeTopologyCollectionTimeout = time.Minute
 
 // durationBuckets defines histogram buckets for duration metrics ranging from 30 seconds to 30 days
 var durationBuckets = []float64{
@@ -76,10 +84,19 @@ var durationBuckets = []float64{
 }
 
 // NewMetricsCollector creates a new MetricsCollector
-func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
+func NewMetricsCollector(slurmAPIClient slurmapi.Client, jobListParams slurmapi.ListJobsParams) *MetricsCollector {
+	return newMetricsCollector(slurmAPIClient, jobListParams, nil)
+}
+
+func newMetricsCollector(
+	slurmAPIClient slurmapi.Client,
+	jobListParams slurmapi.ListJobsParams,
+	nodeTopologySource NodeTopologySource,
+) *MetricsCollector {
 	var nodeInfoLabels = []string{
 		"node_name",
 		"instance_id",
+		"nodeset_name",
 		"state_base",
 		"state_is_drain",
 		"state_is_maintenance",
@@ -121,8 +138,11 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 		"finished_time",
 	}
 	collector := &MetricsCollector{
-		slurmAPIClient: slurmAPIClient,
-		Monitoring:     NewMonitoringMetrics(),
+		slurmAPIClient:      slurmAPIClient,
+		jobListParams:       jobListParams,
+		nodeTopologySource:  nodeTopologySource,
+		nodeTopologyTimeout: defaultNodeTopologyCollectionTimeout,
+		Monitoring:          NewMonitoringMetrics(),
 
 		nodeInfo:                 prometheus.NewDesc("slurm_node_info", "Slurm node info", nodeInfoLabels, nil),
 		nodeCPUTotal:             prometheus.NewDesc("slurm_node_cpus_total", "Total CPUs on the node", []string{"node_name"}, nil),
@@ -134,9 +154,20 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 		nodeMemoryFreeBytes:      prometheus.NewDesc("slurm_node_memory_free_bytes", "Free memory on the node in bytes", []string{"node_name"}, nil),
 		nodeMemoryEffectiveBytes: prometheus.NewDesc("slurm_node_memory_effective_bytes", "Effective memory on the node in bytes", []string{"node_name"}, nil),
 		nodePartition:            prometheus.NewDesc("slurm_node_partition", "Slurm node partition mapping", []string{"node_name", "partition"}, nil),
+		nodeNVLinkInstanceGroup: prometheus.NewDesc(
+			"slurm_node_nvlink_instance_group",
+			"Mapping between Slurm nodes and NVLink instance groups",
+			[]string{"node_name", "instance_id", "nvlink_instance_group", "nodeset_name"},
+			nil,
+		),
 		jobInfo: prometheus.NewDesc(
 			"slurm_job_info", "Slurm job detail information", jobInfoLabels, nil),
-		jobNode:        prometheus.NewDesc("slurm_node_job", "Slurm job node information", []string{"job_id", "node_name"}, nil),
+		jobNode: prometheus.NewDesc(
+			"slurm_node_job",
+			"Slurm job node information",
+			[]string{"job_id", "node_name", "nvlink_instance_group", "nodeset_name"},
+			nil,
+		),
 		jobDuration:    prometheus.NewDesc("slurm_job_duration_seconds", "Slurm job duration in seconds", []string{"job_id"}, nil),
 		jobCPUs:        prometheus.NewDesc("slurm_job_cpus", "CPUs allocated to a Slurm job", []string{"job_id"}, nil),
 		jobMemoryBytes: prometheus.NewDesc("slurm_job_memory_bytes", "Memory allocated to a Slurm job in bytes", []string{"job_id"}, nil),
@@ -171,8 +202,10 @@ func NewMetricsCollector(slurmAPIClient slurmapi.Client) *MetricsCollector {
 	return collector
 }
 
-// isNodeUnavailable checks if a node is in unavailable state
-// Unavailable state: DOWN+* or IDLE+DRAIN+* or NOTRESPONDING or UNKNOWN or ERROR or FAIL or INVALID
+// isNodeUnavailable checks if a node is in unavailable state:
+//
+// DOWN+* or IDLE+DRAIN+* or NOTRESPONDING or UNKNOWN or ERROR or FAIL or INVALID
+//
 // Power-managed nodes (powering up/down or powered down) are part of the normal cloud
 // lifecycle and are never reported as unavailable.
 func isNodeUnavailable(node slurmapi.Node) bool {
@@ -185,13 +218,13 @@ func isNodeUnavailable(node slurmapi.Node) bool {
 	if node.IsNotRespondingState() {
 		return true
 	}
-	if node.BaseState() == api.V0041NodeStateIDLE && node.IsDrainState() {
+	if node.BaseState() == api.V0044NodeStateIDLE && node.IsDrainState() {
 		return true
 	}
-	if node.BaseState() == api.V0041NodeStateUNKNOWN {
+	if node.BaseState() == api.V0044NodeStateUNKNOWN {
 		return true
 	}
-	if node.BaseState() == api.V0041NodeStateERROR {
+	if node.BaseState() == api.V0044NodeStateERROR {
 		return true
 	}
 	if node.IsFailState() {
@@ -209,7 +242,7 @@ func isNodeDraining(node slurmapi.Node) bool {
 		return false
 	}
 	baseState := node.BaseState()
-	return baseState == api.V0041NodeStateALLOCATED || baseState == api.V0041NodeStateMIXED
+	return baseState == api.V0044NodeStateALLOCATED || baseState == api.V0044NodeStateMIXED
 }
 
 func (c *MetricsCollector) updateGPUSecondsMetrics(ctx context.Context, nodes []slurmapi.Node, previousTime time.Time, currentTime time.Time) time.Time {
@@ -309,6 +342,7 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.nodeMemoryFreeBytes
 	ch <- c.nodeMemoryEffectiveBytes
 	ch <- c.nodePartition
+	ch <- c.nodeNVLinkInstanceGroup
 	ch <- c.jobInfo
 	ch <- c.jobNode
 	ch <- c.jobDuration
@@ -326,56 +360,206 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.controllerServerThreadCount
 }
 
-// updateState fetches data from SLURM APIs and atomically updates the collector state
-func (c *MetricsCollector) updateState(ctx context.Context) (err error) {
+func (c *MetricsCollector) listNodes(ctx context.Context) ([]slurmapi.Node, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
-	startTime := time.Now()
 
+	nodesStart := time.Now()
+	nodes, err := c.slurmAPIClient.ListNodes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get nodes from SLURM API: %w", err)
+	}
+	logger.Info("Fetched nodes", "count", len(nodes), "elapsed_seconds", time.Since(nodesStart).Seconds())
+
+	return nodes, nil
+}
+
+// Failed refreshes keep exporting the last successful data for that collector
+// until a later refresh succeeds.
+func (c *MetricsCollector) recordCollectorRun(ctx context.Context, name string, start time.Time, err error) {
+	if err != nil && ctx.Err() == nil {
+		c.Monitoring.RecordCollectorError(name)
+	}
+	c.Monitoring.RecordCollectorDuration(name, time.Since(start).Seconds())
+}
+
+func (c *MetricsCollector) applyNodes(ctx context.Context, nodes []slurmapi.Node, previousState, newState *metricsCollectorState) {
+	newState.nodes = nodes
+	c.updateNodeFailureMetrics(nodes, previousState.nodes)
+	c.updateNodeStateMetrics(nodes, previousState, newState, time.Now())
+	newState.lastGPUSecondsUpdate = c.updateGPUSecondsMetrics(ctx, nodes, previousState.lastGPUSecondsUpdate, time.Now())
+}
+
+func cloneMetricsCollectorState(previousState *metricsCollectorState) *metricsCollectorState {
+	if previousState == nil {
+		previousState = newMetricsCollectorState()
+	}
+	newState := newMetricsCollectorState()
+	newState.lastGPUSecondsUpdate = previousState.lastGPUSecondsUpdate
+	newState.nodes = previousState.nodes
+	newState.nodesCollectionSequence = previousState.nodesCollectionSequence
+	newState.jobs = previousState.jobs
+	newState.jobsCollectionSequence = previousState.jobsCollectionSequence
+	newState.diag = previousState.diag
+	newState.diagCollectionSequence = previousState.diagCollectionSequence
+	newState.nodeTopologies = previousState.nodeTopologies
+	newState.topologyCollectionSequence = previousState.topologyCollectionSequence
+	maps.Copy(newState.nodeUnavailabilityStartTimes, previousState.nodeUnavailabilityStartTimes)
+	maps.Copy(newState.nodeDrainingStartTimes, previousState.nodeDrainingStartTimes)
+	return newState
+}
+
+func (c *MetricsCollector) refreshNodeTopologies(ctx context.Context, sequence uint64) (err error) {
+	start := time.Now()
 	defer func() {
-		duration := time.Since(startTime).Seconds()
-		c.Monitoring.RecordCollection(duration, err)
+		c.recordCollectorRun(ctx, "topology", start, err)
 	}()
+
+	if c.nodeTopologySource == nil {
+		return nil
+	}
+	topologyCtx, cancel := context.WithTimeout(ctx, c.nodeTopologyTimeout)
+	defer cancel()
+	topologies, err := c.nodeTopologySource.ListNodeTopologies(topologyCtx)
+	if err != nil {
+		return fmt.Errorf("get Kubernetes node topology: %w", err)
+	}
+
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 
 	previousState := c.state.Load()
 	if previousState == nil {
 		previousState = newMetricsCollectorState()
 	}
+	if sequence != 0 && sequence <= previousState.topologyCollectionSequence {
+		return nil
+	}
+	newState := cloneMetricsCollectorState(previousState)
+	newState.nodeTopologies = topologies
+	if sequence != 0 {
+		newState.topologyCollectionSequence = sequence
+	}
+	c.state.Store(newState)
+	return nil
+}
 
-	newState := newMetricsCollectorState()
-	// Copy timestamps in case we fail to get nodes/jobs, so they will be preserved in the new state.
-	newState.lastGPUSecondsUpdate = previousState.lastGPUSecondsUpdate
-	maps.Copy(newState.nodeUnavailabilityStartTimes, previousState.nodeUnavailabilityStartTimes)
-	maps.Copy(newState.nodeDrainingStartTimes, previousState.nodeDrainingStartTimes)
-
-	// Always update state with whatever data we successfully collect (even if partial)
+func (c *MetricsCollector) refreshNodes(ctx context.Context, sequence uint64) (err error) {
+	start := time.Now()
 	defer func() {
-		c.state.Store(newState)
+		c.recordCollectorRun(ctx, "nodes", start, err)
 	}()
 
-	nodes, err := c.slurmAPIClient.ListNodes(ctx)
+	nodes, err := c.listNodes(ctx)
 	if err != nil {
-		return fmt.Errorf("get nodes from SLURM API: %w", err)
+		return err
 	}
-	newState.nodes = nodes
 
-	c.updateNodeFailureMetrics(nodes, previousState.nodes)
-	c.updateNodeStateMetrics(nodes, previousState, newState, time.Now())
-	newState.lastGPUSecondsUpdate = c.updateGPUSecondsMetrics(ctx, nodes, previousState.lastGPUSecondsUpdate, time.Now())
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 
-	jobs, err := c.slurmAPIClient.ListJobs(ctx)
+	previousState := c.state.Load()
+	if previousState == nil {
+		previousState = newMetricsCollectorState()
+	}
+	if sequence != 0 && sequence <= previousState.nodesCollectionSequence {
+		return nil
+	}
+	newState := cloneMetricsCollectorState(previousState)
+	c.applyNodes(ctx, nodes, previousState, newState)
+	if sequence != 0 {
+		newState.nodesCollectionSequence = sequence
+	}
+	c.state.Store(newState)
+	return nil
+}
+
+func (c *MetricsCollector) listJobs(ctx context.Context) ([]slurmapi.Job, error) {
+	logger := log.FromContext(ctx).WithName(ControllerName)
+
+	jobsStart := time.Now()
+	jobs, err := c.slurmAPIClient.ListJobsWithParams(ctx, c.jobListParams)
 	if err != nil {
-		return fmt.Errorf("get jobs from SLURM API: %w", err)
+		return nil, fmt.Errorf("get jobs from SLURM API: %w", err)
 	}
+	logger.Info("Fetched jobs",
+		"source", string(c.jobListParams.Source),
+		"count", len(jobs),
+		"elapsed_seconds", time.Since(jobsStart).Seconds(),
+	)
+
+	return jobs, nil
+}
+
+func (c *MetricsCollector) refreshJobs(ctx context.Context, sequence uint64) (err error) {
+	start := time.Now()
+	defer func() {
+		c.recordCollectorRun(ctx, "jobs", start, err)
+	}()
+
+	jobs, err := c.listJobs(ctx)
+	if err != nil {
+		return err
+	}
+
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+
+	previousState := c.state.Load()
+	if previousState == nil {
+		previousState = newMetricsCollectorState()
+	}
+	if sequence != 0 && sequence <= previousState.jobsCollectionSequence {
+		return nil
+	}
+	newState := cloneMetricsCollectorState(previousState)
 	newState.jobs = jobs
+	if sequence != 0 {
+		newState.jobsCollectionSequence = sequence
+	}
+	c.state.Store(newState)
+	return nil
+}
 
+func (c *MetricsCollector) getDiag(ctx context.Context) (*api.V0044OpenapiDiagResp, error) {
+	logger := log.FromContext(ctx).WithName(ControllerName)
+
+	diagStart := time.Now()
 	diag, err := c.slurmAPIClient.GetDiag(ctx)
 	if err != nil {
-		return fmt.Errorf("get diag from SLURM API: %w", err)
+		return nil, fmt.Errorf("get diag from SLURM API: %w", err)
 	}
+	logger.Info("Fetched controller diag", "elapsed_seconds", time.Since(diagStart).Seconds())
+
+	return diag, nil
+}
+
+func (c *MetricsCollector) refreshDiag(ctx context.Context, sequence uint64) (err error) {
+	start := time.Now()
+	defer func() {
+		c.recordCollectorRun(ctx, "diag", start, err)
+	}()
+
+	diag, err := c.getDiag(ctx)
+	if err != nil {
+		return err
+	}
+
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+
+	previousState := c.state.Load()
+	if previousState == nil {
+		previousState = newMetricsCollectorState()
+	}
+	if sequence != 0 && sequence <= previousState.diagCollectionSequence {
+		return nil
+	}
+	newState := cloneMetricsCollectorState(previousState)
 	newState.diag = diag
-
-	logger.Info("Collected metrics", "elapsed_seconds", time.Since(startTime).Seconds())
-
+	if sequence != 0 {
+		newState.diagCollectionSequence = sequence
+	}
+	c.state.Store(newState)
 	return nil
 }
 
@@ -406,7 +590,7 @@ func (c *MetricsCollector) collectImpl(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	for slurmNodeMetric := range c.slurmNodeMetrics(state.nodes) {
+	for slurmNodeMetric := range c.slurmNodeMetrics(state.nodes, state.nodeTopologies) {
 		ch <- slurmNodeMetric
 	}
 
@@ -415,7 +599,7 @@ func (c *MetricsCollector) collectImpl(ch chan<- prometheus.Metric) {
 	c.nodeUnavailabilityDuration.Collect(ch)
 	c.nodeDrainingDuration.Collect(ch)
 
-	for slurmJobMetric := range c.slurmJobMetrics(ctx, state.jobs) {
+	for slurmJobMetric := range c.slurmJobMetrics(ctx, state.jobs, state.nodeTopologies) {
 		ch <- slurmJobMetric
 	}
 
@@ -424,9 +608,26 @@ func (c *MetricsCollector) collectImpl(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq[prometheus.Metric] {
+func (c *MetricsCollector) slurmNodeMetrics(
+	slurmNodes []slurmapi.Node,
+	nodeTopologies map[string]NodeTopology,
+) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
 		for _, node := range slurmNodes {
+			topology := nodeTopologies[node.Name]
+			if topology.NVLinkInstanceGroup != "" {
+				if !yield(prometheus.MustNewConstMetric(
+					c.nodeNVLinkInstanceGroup,
+					prometheus.GaugeValue,
+					1,
+					node.Name,
+					node.InstanceID,
+					topology.NVLinkInstanceGroup,
+					topology.SlurmNodeSetName,
+				)) {
+					return
+				}
+			}
 			var reason string
 			if node.Reason != nil {
 				reason = node.Reason.Reason
@@ -434,6 +635,7 @@ func (c *MetricsCollector) slurmNodeMetrics(slurmNodes []slurmapi.Node) iter.Seq
 			labels := []string{
 				node.Name,
 				node.InstanceID,
+				topology.SlurmNodeSetName,
 				string(node.BaseState()),
 				strconv.FormatBool(node.IsDrainState()),       // Keep "true"/"false" for backward compatibility
 				strconv.FormatBool(node.IsMaintenanceState()), // Keep "true"/"false" for backward compatibility
@@ -526,7 +728,11 @@ func boolToLabelValue(b bool) string {
 	return ""
 }
 
-func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slurmapi.Job) iter.Seq[prometheus.Metric] {
+func (c *MetricsCollector) slurmJobMetrics(
+	ctx context.Context,
+	slurmJobs []slurmapi.Job,
+	nodeTopologies map[string]NodeTopology,
+) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
 		logger := log.FromContext(ctx).WithName(ControllerName)
 		for _, job := range slurmJobs {
@@ -599,7 +805,13 @@ func (c *MetricsCollector) slurmJobMetrics(ctx context.Context, slurmJobs []slur
 				continue
 			}
 			for _, nodeName := range nodeList {
-				jobNodeLabels := []string{job.GetIDString(), nodeName}
+				topology := nodeTopologies[nodeName]
+				jobNodeLabels := []string{
+					job.GetIDString(),
+					nodeName,
+					topology.NVLinkInstanceGroup,
+					topology.SlurmNodeSetName,
+				}
 				if !yield(prometheus.MustNewConstMetric(c.jobNode, prometheus.GaugeValue, 1, jobNodeLabels...)) {
 					return
 				}
@@ -625,24 +837,45 @@ func jobAllocatedResources(logger logr.Logger, job slurmapi.Job) (cpu float64, c
 		}
 	}
 
+	// Fall back to the requested TRES when the allocated TRES doesn't carry the value. This is
+	// what saves the accounting-mode metrics for pending or DEADLINE-without-allocation jobs:
+	// slurmdbd's Required.CPUs is the per-task minimum (defaults to 1), so without this layer
+	// slurm_job_cpus would silently report 1 for jobs that requested 192. Allocated TRES still
+	// wins when present.
+	if (!cpuOK || !memOK) && job.TresRequested != "" {
+		tres, err := slurmapi.ParseTrackableResources(job.TresRequested)
+		if err != nil {
+			logger.Error(err, "Failed to parse job requested resources", "job_id", job.GetIDString(), "tres", job.TresRequested)
+		} else {
+			if !cpuOK && tres.CPUCount > 0 {
+				cpu = float64(tres.CPUCount)
+				cpuOK = true
+			}
+			if !memOK && tres.MemoryBytes > 0 {
+				mem = float64(tres.MemoryBytes)
+				memOK = true
+			}
+		}
+	}
+
 	if !cpuOK && job.CPUs != nil {
 		cpu = float64(*job.CPUs)
 		cpuOK = true
 	}
 
-	if !memOK && job.MemoryPerNode != nil {
-		nodeCount := int32(1)
-		if job.NodeCount != nil {
-			nodeCount = *job.NodeCount
-		}
-		mem = mbToBytes(*job.MemoryPerNode * int64(nodeCount))
+	// Fall back to MemoryPerNode × NodeCount only when the node count is known. If NodeCount is
+	// nil — the typical case for accounting-mode pending multi-node jobs, since slurmdbd doesn't
+	// expose the originally requested node count separately — emit no memory metric. Reporting
+	// MemoryPerNode × 1 would silently undercount queued multi-node jobs; omitting is safer.
+	if !memOK && job.MemoryPerNode != nil && job.NodeCount != nil {
+		mem = mbToBytes(*job.MemoryPerNode * int64(*job.NodeCount))
 		memOK = true
 	}
 
 	return cpu, cpuOK, mem, memOK
 }
 
-func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0041OpenapiDiagResp) iter.Seq[prometheus.Metric] {
+func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0044OpenapiDiagResp) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
 		if diag == nil {
 			return

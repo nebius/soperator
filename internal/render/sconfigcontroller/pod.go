@@ -41,7 +41,7 @@ func BasePodTemplateSpec(
 		}
 	}
 
-	return &corev1.PodTemplateSpec{
+	res := &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: matchLabels,
 			Annotations: map[string]string{
@@ -50,6 +50,7 @@ func BasePodTemplateSpec(
 		},
 		Spec: corev1.PodSpec{
 			HostUsers:         sConfigController.HostUsers,
+			ImagePullSecrets:  sConfigController.Container.ImagePullSecrets,
 			Affinity:          nodeFilter.Affinity,
 			Tolerations:       nodeFilter.Tolerations,
 			NodeSelector:      nodeFilter.NodeSelector,
@@ -72,5 +73,7 @@ func BasePodTemplateSpec(
 			ServiceAccountName: sConfigController.ServiceAccountName,
 			SecurityContext:    securityContext,
 		},
-	}, nil
+	}
+
+	return res, nil
 }

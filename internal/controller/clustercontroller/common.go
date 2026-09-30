@@ -6,11 +6,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -95,7 +95,7 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					}
 					stepLogger.V(1).Info("Reconciled")
 
-					return nil
+					return r.reportNodeSetRefs(stepCtx, cluster, clusterValues)
 				},
 			},
 			utils.MultiStepExecutionStep{
@@ -146,52 +146,6 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 
 					if err := r.Secret.Reconcile(stepCtx, cluster, &desired); err != nil {
 						return fmt.Errorf("reconciling Munge Key Secret: %w", err)
-					}
-					stepLogger.V(1).Info("Reconciled")
-
-					return nil
-				},
-			},
-			utils.MultiStepExecutionStep{
-				Name: "AppArmor profiles",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
-					if !check.IsAppArmorCRDInstalled() {
-						stepLogger.V(1).Info("AppArmor CRD is not installed, skipping AppArmor profile reconciliation")
-						return nil
-					}
-					if !clusterValues.UseDefaultAppArmorProfile {
-						stepLogger.V(1).Info("Default AppArmor profile is not set, skipping AppArmor profile reconciliation")
-						return nil
-					}
-
-					desired := common.RenderAppArmorProfile(
-						clusterValues,
-					)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(desired)...)
-					stepLogger.V(1).Info("Rendered")
-
-					if err := r.AppArmorProfile.Reconcile(stepCtx, cluster, desired); err != nil {
-						return fmt.Errorf("reconciling AppArmor profiles: %w", err)
-					}
-					stepLogger.V(1).Info("Reconciled")
-					return nil
-				},
-			},
-			utils.MultiStepExecutionStep{
-				Name: "Slurm Worker ServiceAccount",
-				Func: func(stepCtx context.Context) error {
-					stepLogger := log.FromContext(stepCtx)
-					stepLogger.V(1).Info("Reconciling")
-
-					desired := worker.RenderServiceAccount(clusterValues.Namespace, clusterValues.Name)
-					stepLogger = stepLogger.WithValues(logfield.ResourceKV(&desired)...)
-					stepLogger.V(1).Info("Rendered")
-
-					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
-						stepLogger.Error(err, "Failed to reconcile")
-						return fmt.Errorf("reconciling worker ServiceAccount: %w", err)
 					}
 					stepLogger.V(1).Info("Reconciled")
 
@@ -270,4 +224,50 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 	}
 	logger.Info("Reconciled common resources")
 	return nil
+}
+
+const (
+	// The API server rejects conditions with a message longer than 32 KiB. Event messages are kept
+	// much shorter to stay readable in `kubectl describe`.
+	nodeSetRefsConditionMessageLimit = 32768
+	nodeSetRefsEventMessageLimit     = 1024
+
+	nodeSetRefsResolvedReason = "AllNodeSetRefsResolved"
+	nodeSetRefsIgnoredReason  = "IgnoredNodeSetRefs"
+)
+
+// reportNodeSetRefs reflects in the cluster status the partition nodeSetRefs that rendering left
+// out of slurm.conf, so that a partition silently losing its nodes is explained to the user.
+func (r SlurmClusterReconciler) reportNodeSetRefs(
+	ctx context.Context,
+	cluster *slurmv1.SlurmCluster,
+	clusterValues *values.SlurmCluster,
+) error {
+	condition := metav1.Condition{
+		Type:    slurmv1.ConditionClusterNodeSetRefsResolved,
+		Status:  metav1.ConditionTrue,
+		Reason:  nodeSetRefsResolvedReason,
+		Message: "All partition nodeSetRefs are rendered into slurm.conf",
+	}
+
+	if resolution := common.ResolveNodeSetRefs(clusterValues); !resolution.IsEmpty() {
+		condition = metav1.Condition{
+			Type:    slurmv1.ConditionClusterNodeSetRefsResolved,
+			Status:  metav1.ConditionFalse,
+			Reason:  nodeSetRefsIgnoredReason,
+			Message: common.FormatIgnoredNodeSetRefs(resolution, nodeSetRefsConditionMessageLimit),
+		}
+
+		log.FromContext(ctx).Info("Ignored partition nodeSetRefs", "Reason", condition.Message)
+		r.Recorder.Event(
+			cluster,
+			corev1.EventTypeWarning,
+			nodeSetRefsIgnoredReason,
+			common.FormatIgnoredNodeSetRefs(resolution, nodeSetRefsEventMessageLimit),
+		)
+	}
+
+	return r.patchStatus(ctx, cluster, func(status *slurmv1.SlurmClusterStatus) bool {
+		return status.SetCondition(condition)
+	})
 }

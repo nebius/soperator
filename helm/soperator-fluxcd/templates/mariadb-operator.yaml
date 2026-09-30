@@ -34,11 +34,31 @@ spec:
   {{- if .Values.mariadbOperator.overrideValues }}
     {{- toYaml .Values.mariadbOperator.overrideValues | nindent 4 }}
   {{- else }}
+  {{- $mariadbOperator := .Values.mariadbOperator.values | default dict }}
+    {{- with $mariadbOperator.nodeSelector }}
+    nodeSelector:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $mariadbOperator.affinity }}
+    affinity:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $mariadbOperator.resources }}
+    resources:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
     webhook:
       cert:
         certManager:
           enabled: true
       enabled: true
+      {{- with $mariadbOperator.webhook }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- with $mariadbOperator.certController }}
+    certController:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
   {{- end }}
   valuesFrom:
   - kind: ConfigMap

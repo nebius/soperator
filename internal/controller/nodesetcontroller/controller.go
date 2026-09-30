@@ -18,16 +18,16 @@ package nodesetcontroller
 
 import (
 	"context"
-	errorsStd "errors"
 	"fmt"
 	"time"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,37 +54,53 @@ import (
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;update;patch;delete;create
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=create;delete;get;list;patch;update;watch
 // +kubebuilder:rbac:groups=core,resources=podtemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 
 // NodeSetReconciler reconciles a NodeSet object
 type NodeSetReconciler struct {
 	*reconciler.Reconciler
 
+	rollingUpdateEnabled bool
+
 	AdvancedStatefulSet *reconciler.AdvancedStatefulSetReconciler
 	Service             *reconciler.ServiceReconciler
+	ServiceAccount      *reconciler.ServiceAccountReconciler
 	Secret              *reconciler.SecretReconciler
 	ConfigMap           *reconciler.ConfigMapReconciler
 	NodeSetPowerState   *reconciler.NodeSetPowerStateReconciler
+	Role                *reconciler.RoleReconciler
+	RoleBinding         *reconciler.RoleBindingReconciler
 }
 
-func NewNodeSetReconciler(client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder) *NodeSetReconciler {
+func NewNodeSetReconciler(
+	client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder, rollingUpdateEnabled bool,
+) *NodeSetReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	return &NodeSetReconciler{
-		Reconciler:          r,
-		AdvancedStatefulSet: reconciler.NewAdvancedStatefulSetReconciler(r),
-		Service:             reconciler.NewServiceReconciler(r),
-		Secret:              reconciler.NewSecretReconciler(r),
-		ConfigMap:           reconciler.NewConfigMapReconciler(r),
-		NodeSetPowerState:   reconciler.NewNodeSetPowerStateReconciler(r),
+		Reconciler:           r,
+		rollingUpdateEnabled: rollingUpdateEnabled,
+		AdvancedStatefulSet:  reconciler.NewAdvancedStatefulSetReconciler(r),
+		Service:              reconciler.NewServiceReconciler(r),
+		ServiceAccount:       reconciler.NewServiceAccountReconciler(r),
+		Secret:               reconciler.NewSecretReconciler(r),
+		ConfigMap:            reconciler.NewConfigMapReconciler(r),
+		NodeSetPowerState:    reconciler.NewNodeSetPowerStateReconciler(r),
+		Role:                 reconciler.NewRoleReconciler(r),
+		RoleBinding:          reconciler.NewRoleBindingReconciler(r),
 	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, name string, maxConcurrency int, cacheSyncTimeout time.Duration) error {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Pod{}, powerPodOwnerIndex, powerPodOwnerKeys); err != nil {
+		return err
+	}
 	if err := r.setupConfigMapIndexer(mgr); err != nil {
 		return err
 	}
@@ -114,7 +130,7 @@ func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, name string, maxC
 	controllerBuilder.Watches(
 		&slurmv1alpha1.NodeSetPowerState{},
 		handler.EnqueueRequestsFromMapFunc(r.findNodeSetForPowerState),
-		builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		builder.WithPredicates(predicate.GenerationChangedPredicate{}),
 	)
 
 	resourceChecks := r.createResourceChecks(controllercommon.CreateServiceAccountPredicate())
@@ -136,7 +152,10 @@ func (r *NodeSetReconciler) createResourceChecks(saPredicate predicate.Funcs) []
 			Objects: []client.Object{
 				&corev1.ConfigMap{},
 				&corev1.Service{},
+				&rbacv1.Role{},
+				&rbacv1.RoleBinding{},
 				&kruisev1b1.StatefulSet{},
+				&policyv1.PodDisruptionBudget{},
 			},
 			Predicate: predicate.GenerationChangedPredicate{},
 		},
@@ -169,7 +188,7 @@ func (r *NodeSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		// Error reading the object - requeue the request.
 		logger.Error(err, "Failed to get resource")
-		return ctrl.Result{Requeue: true}, fmt.Errorf("getting %s: %w", slurmv1alpha1.KindNodeSet, err)
+		return ctrl.Result{}, fmt.Errorf("getting %s: %w", slurmv1alpha1.KindNodeSet, err)
 	}
 
 	// If nodeset is marked for deletion, we have nothing to do
@@ -184,28 +203,7 @@ func (r *NodeSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		err = fmt.Errorf("reconciling %s: %w", slurmv1alpha1.KindNodeSet, err)
 	}
 
-	statusErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		innerNodeSet := &slurmv1alpha1.NodeSet{}
-		innerErr := r.Get(ctx, req.NamespacedName, innerNodeSet)
-		if innerErr != nil {
-			if apierrors.IsNotFound(innerErr) {
-				logger.V(1).Info("Resource not found. Ignoring since object must be deleted")
-				return nil
-			}
-			// Error reading the object - requeue the request.
-			logger.Error(innerErr, "Failed to get resource")
-			return fmt.Errorf("getting %s: %w", slurmv1alpha1.KindNodeSet, innerErr)
-		}
-
-		return r.Status().Update(ctx, innerNodeSet)
-	})
-	if statusErr != nil {
-		logger.Error(statusErr, "Failed to update resource status")
-		result = ctrl.Result{}
-		err = fmt.Errorf("updating %s status: %w", slurmv1alpha1.KindNodeSet, statusErr)
-	}
-
-	return result, errorsStd.Join(err, statusErr)
+	return result, err
 }
 
 // patchStatus patches the status of the NodeSet object using the provided patcher function.

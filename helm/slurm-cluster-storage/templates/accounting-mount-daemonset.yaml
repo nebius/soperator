@@ -5,6 +5,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   name: {{ include "slurm-cluster-storage.volume.accounting.mount" . }}
 spec:
+  {{- with .Values.storage.accounting.updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       slurm: {{ include "slurm-cluster-storage.volume.accounting.mount" . }}

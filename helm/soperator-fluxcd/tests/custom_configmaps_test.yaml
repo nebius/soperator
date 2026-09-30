@@ -122,14 +122,14 @@ tests:
         overrideValues:
           namespace: override-namespace
           configMaps:
-            supervisord:
+            motd:
               enabled: false
     asserts:
       - equal:
           path: spec.values.namespace
           value: override-namespace
       - equal:
-          path: spec.values.configMaps.supervisord.enabled
+          path: spec.values.configMaps.motd.enabled
           value: false
 
   - it: should have correct install and upgrade settings

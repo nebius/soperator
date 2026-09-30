@@ -23,9 +23,6 @@ spec:
 {{- if .Values.slurmCluster.slurmClusterStorage.enabled }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster-storage
 {{- end }}
-{{- if .Values.securityProfilesOperator.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-security-profiles-operator
-{{- end }}
 {{- if .Values.nfsServer.enabled }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-nfs-server
 {{- end }}

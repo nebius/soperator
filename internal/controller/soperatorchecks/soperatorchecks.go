@@ -45,17 +45,16 @@ func setK8SNodeCondition(
 		return err
 	}
 
-	// The field node.Status.Conditions belongs to the status of the Node resource.
-	// In Kubernetes, the status is considered a "system-owned" object and cannot be
-	// modified using a regular Update call.
-	// Instead, changes to the status must be made using the Status().Update method.
+	// node.Status.Conditions belongs to the status subresource, so it is written through
+	// Status(), and by patch rather than update: the node comes from the manager cache, whose
+	// transform drops fields no controller reads, and an update would write that back wholesale.
 	for i, cond := range node.Status.Conditions {
 		if cond.Type == condition.Type {
 
 			if cond.Status == condition.Status && cond.Reason == string(condition.Reason) {
 				logger.Info("Node already has condition, updating LastHeartbeatTime")
-				node.Status.Conditions[i].LastHeartbeatTime = metav1.Now()
 				patch := client.MergeFrom(node.DeepCopy())
+				node.Status.Conditions[i].LastHeartbeatTime = metav1.Now()
 				return c.Status().Patch(ctx, node, patch)
 			}
 
@@ -68,9 +67,13 @@ func setK8SNodeCondition(
 	}
 
 	logger.Info("Adding new condition to node")
+	// Patch rather than update: the node was read from the manager cache, which trims fields the
+	// controllers never read, and a status update would write that truncated status back wholesale.
+	// The optimistic lock keeps a concurrent condition write from being lost to the array replacement.
+	patch := client.MergeFromWithOptions(node.DeepCopy(), client.MergeFromWithOptimisticLock{})
 	node.Status.Conditions = append(node.Status.Conditions, condition)
-	if err := c.Status().Update(ctx, node); err != nil {
-		return fmt.Errorf("failed to update object status: %w", err)
+	if err := c.Status().Patch(ctx, node, patch); err != nil {
+		return fmt.Errorf("patch object status: %w", err)
 	}
 
 	return nil
@@ -116,15 +119,4 @@ func getK8SNode(ctx context.Context, c client.Client, nodeName string) (*corev1.
 		return nil, err
 	}
 	return node, nil
-}
-
-func listK8SNodesWithReader(ctx context.Context, reader client.Reader, limit int64, nextToken string) (corev1.NodeList, error) {
-	nodes := &corev1.NodeList{}
-	if err := reader.List(ctx, nodes, &client.ListOptions{
-		Limit:    limit,
-		Continue: nextToken,
-	}); err != nil {
-		return corev1.NodeList{}, fmt.Errorf("list nodes: %w", err)
-	}
-	return *nodes, nil
 }

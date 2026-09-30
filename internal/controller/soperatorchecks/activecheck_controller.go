@@ -38,7 +38,7 @@ var (
 
 type ActiveCheckReconciler struct {
 	*reconciler.Reconciler
-	reconcileTimeout time.Duration
+	requeueAfter time.Duration
 
 	CronJob   *reconciler.CronJobReconciler
 	ConfigMap *reconciler.ConfigMapReconciler
@@ -48,17 +48,17 @@ func NewActiveCheckController(
 	client client.Client,
 	scheme *runtime.Scheme,
 	recorder record.EventRecorder,
-	reconcileTimeout time.Duration,
+	requeueAfter time.Duration,
 ) *ActiveCheckReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	cronJobReconciler := reconciler.NewCronJobReconciler(r)
 	configMapReconciler := reconciler.NewConfigMapReconciler(r)
 
 	return &ActiveCheckReconciler{
-		Reconciler:       r,
-		reconcileTimeout: reconcileTimeout,
-		CronJob:          cronJobReconciler,
-		ConfigMap:        configMapReconciler,
+		Reconciler:   r,
+		requeueAfter: requeueAfter,
+		CronJob:      cronJobReconciler,
+		ConfigMap:    configMapReconciler,
 	}
 }
 
@@ -159,7 +159,7 @@ func (r *ActiveCheckReconciler) Reconcile(
 	if !dependenciesReady {
 		logger.Info("Not all dependencies are ready, requeueing in 10 seconds.")
 		return ctrl.Result{
-			RequeueAfter: time.Second * 10,
+			RequeueAfter: r.requeueAfter,
 		}, nil
 	}
 
@@ -386,10 +386,12 @@ func (r *ActiveCheckReconciler) dependenciesReady(
 				return false, nil
 			}
 		case "slurmJob": // TODO: const
-			if prerequisiteCheck.Status.SlurmJobsStatus.LastRunStatus != consts.ActiveCheckSlurmRunStatusComplete {
+			slurmRunStatus := prerequisiteCheck.Status.SlurmJobsStatus.LastRunStatus
+			if slurmRunStatus != consts.ActiveCheckSlurmRunStatusComplete &&
+				slurmRunStatus != consts.ActiveCheckSlurmRunStatusSkipped {
 				logger.Info(fmt.Sprintf(
 					"Prerequisite ActiveCheck %s is not ready yet, status %s",
-					prerequisiteCheckName, prerequisiteCheck.Status.SlurmJobsStatus.LastRunStatus,
+					prerequisiteCheckName, slurmRunStatus,
 				))
 				return false, nil
 			}

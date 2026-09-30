@@ -97,93 +97,37 @@ var _ = Describe("Local Kind Cluster with FluxCD", func() {
 			})
 		}
 
-		// soperator-activechecks has a 120m timeout and runs long jobs during installation.
-		// We verify it starts installing successfully and doesn't fail quickly (e.g., due to template errors).
-		It("should have HelmRelease soperator-fluxcd-soperator-activechecks installing or ready", func() {
-			const releaseName = "soperator-fluxcd-soperator-activechecks"
+		It("should have all HelmReleases reconciled successfully", func(ctx SpecContext) {
+			Eventually(ctx, func(g Gomega) {
+				cmd := exec.CommandContext(ctx, "kubectl", "get", "helmreleases", "-n", "flux-system",
+					"-o", "jsonpath={.items[*].metadata.name}")
+				output, err := testenv.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
 
-			// First, wait for the HelmRelease to start installing or be ready
-			Eventually(func() bool {
-				statusCmd := exec.Command("kubectl", "get", "helmrelease", releaseName,
-					"-n", "flux-system",
-					"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-				status, err := testenv.Run(statusCmd)
-				if err != nil {
-					return false
-				}
-				status = strings.TrimSpace(status)
+				releases := strings.Fields(output)
+				g.Expect(releases).To(ContainElements(requiredHelmReleases))
 
-				// Ready=True means already installed
-				if status == "True" {
-					return true
-				}
-
-				msgCmd := exec.Command("kubectl", "get", "helmrelease", releaseName,
-					"-n", "flux-system",
-					"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].message}")
-				msg, err := testenv.Run(msgCmd)
-				if err != nil {
-					return false
-				}
-				msg = strings.TrimSpace(msg)
-
-				// Unknown with "Running 'install' action" message means installing
-				if status == "Unknown" && strings.HasPrefix(msg, "Running 'install' action") {
-					return true
-				}
-
-				return false
-			}, 10*time.Minute, 10*time.Second).Should(BeTrue(),
-				"HelmRelease soperator-fluxcd-soperator-activechecks should be installing or ready")
-
-			// Wait 30 seconds and verify the install hasn't failed (catches quick failures like template errors)
-			time.Sleep(30 * time.Second)
-
-			statusCmd := exec.Command("kubectl", "get", "helmrelease", releaseName,
-				"-n", "flux-system",
-				"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-			status, err := testenv.Run(statusCmd)
-			Expect(err).NotTo(HaveOccurred())
-			status = strings.TrimSpace(status)
-
-			// If status is False, the install failed - get the error message
-			if status == "False" {
-				msgCmd := exec.Command("kubectl", "get", "helmrelease", releaseName,
-					"-n", "flux-system",
-					"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].message}")
-				msg, _ := testenv.Run(msgCmd)
-				Fail(fmt.Sprintf("HelmRelease %s failed: %s", releaseName, strings.TrimSpace(msg)))
-			}
-		})
-
-		It("should have all HelmReleases reconciled successfully", func() {
-			cmd := exec.Command("kubectl", "get", "helmreleases", "-n", "flux-system",
-				"-o", "jsonpath={.items[*].metadata.name}")
-			output, err := testenv.Run(cmd)
-			Expect(err).NotTo(HaveOccurred())
-
-			releases := strings.Fields(output)
-			Expect(len(releases)).To(BeNumerically(">=", len(requiredHelmReleases)))
-
-			for _, release := range releases {
-				// Skip activechecks - checked separately with different criteria
-				if release == "soperator-fluxcd-soperator-activechecks" {
-					continue
-				}
-				statusCmd := exec.Command("kubectl", "get", "helmrelease", release,
-					"-n", "flux-system",
-					"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-				status, err := testenv.Run(statusCmd)
-				Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("get status for HelmRelease %s", release))
-
-				if strings.TrimSpace(status) != "True" {
-					msgCmd := exec.Command("kubectl", "get", "helmrelease", release,
+				for _, release := range releases {
+					// ActiveChecks can run long jobs beyond the integration test timeout.
+					if release == "soperator-fluxcd-soperator-activechecks" {
+						continue
+					}
+					statusCmd := exec.CommandContext(ctx, "kubectl", "get", "helmrelease", release,
 						"-n", "flux-system",
-						"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].message}")
-					msg, _ := testenv.Run(msgCmd)
-					Fail(fmt.Sprintf("HelmRelease %s is not Ready: %s", release, strings.TrimSpace(msg)))
+						"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
+					status, err := testenv.Run(statusCmd)
+					g.Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("get status for HelmRelease %s", release))
+
+					if strings.TrimSpace(status) != "True" {
+						msgCmd := exec.CommandContext(ctx, "kubectl", "get", "helmrelease", release,
+							"-n", "flux-system",
+							"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].message}")
+						msg, _ := testenv.Run(msgCmd)
+						g.Expect(strings.TrimSpace(status)).To(Equal("True"),
+							fmt.Sprintf("HelmRelease %s is not Ready: %s", release, strings.TrimSpace(msg)))
+					}
 				}
-			}
+			}, 5*time.Minute, 5*time.Second).Should(Succeed())
 		})
 	})
 
@@ -266,35 +210,39 @@ var _ = Describe("Local Kind Cluster with FluxCD", func() {
 			}
 		})
 
-		It("should have no failed HelmReleases", func() {
-			cmd := exec.Command("kubectl", "get", "helmreleases", "-n", "flux-system",
-				"-o", "jsonpath={.items[*].metadata.name}")
-			output, err := testenv.Run(cmd)
-			Expect(err).NotTo(HaveOccurred())
+		It("should have no failed HelmReleases", func(ctx SpecContext) {
+			Eventually(ctx, func(g Gomega) {
+				cmd := exec.CommandContext(ctx, "kubectl", "get", "helmreleases", "-n", "flux-system",
+					"-o", "jsonpath={.items[*].metadata.name}")
+				output, err := testenv.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
 
-			releases := strings.Fields(output)
-			var failedReleases []string
+				releases := strings.Fields(output)
+				g.Expect(releases).NotTo(BeEmpty())
+				var failedReleases []string
 
-			for _, release := range releases {
-				// Skip activechecks - checked separately with different criteria
-				if release == "soperator-fluxcd-soperator-activechecks" {
-					continue
-				}
-				statusCmd := exec.Command("kubectl", "get", "helmrelease", release,
-					"-n", "flux-system",
-					"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-				status, err := testenv.Run(statusCmd)
-				if err == nil && strings.TrimSpace(status) == "False" {
-					msgCmd := exec.Command("kubectl", "get", "helmrelease", release,
+				for _, release := range releases {
+					// ActiveChecks can run long jobs beyond the integration test timeout.
+					if release == "soperator-fluxcd-soperator-activechecks" {
+						continue
+					}
+					statusCmd := exec.CommandContext(ctx, "kubectl", "get", "helmrelease", release,
 						"-n", "flux-system",
-						"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].message}")
-					msg, _ := testenv.Run(msgCmd)
-					failedReleases = append(failedReleases, fmt.Sprintf("%s: %s", release, strings.TrimSpace(msg)))
+						"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
+					status, err := testenv.Run(statusCmd)
+					g.Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("get status for HelmRelease %s", release))
+					if strings.TrimSpace(status) != "True" {
+						msgCmd := exec.CommandContext(ctx, "kubectl", "get", "helmrelease", release,
+							"-n", "flux-system",
+							"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].message}")
+						msg, _ := testenv.Run(msgCmd)
+						failedReleases = append(failedReleases, fmt.Sprintf("%s: %s", release, strings.TrimSpace(msg)))
+					}
 				}
-			}
 
-			Expect(failedReleases).To(BeEmpty(),
-				fmt.Sprintf("The following HelmReleases are not Ready:\n%s", strings.Join(failedReleases, "\n")))
+				g.Expect(failedReleases).To(BeEmpty(),
+					fmt.Sprintf("The following HelmReleases are not Ready:\n%s", strings.Join(failedReleases, "\n")))
+			}, 5*time.Minute, 5*time.Second).Should(Succeed())
 		})
 	})
 })

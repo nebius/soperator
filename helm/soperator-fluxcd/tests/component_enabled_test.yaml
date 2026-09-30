@@ -5,6 +5,34 @@ excludeTemplates:
   - templates/helmrepository.yaml
   - templates/notifier.yaml
 tests:
+  - it: should render nccl profiles config when ncclProfiles.enabled=true
+    set:
+      observability.enabled: true
+      observability.vmStack.enabled: true
+      observability.ncclProfiles.enabled: true
+    templates:
+      - templates/opentelemetry-collector-nccl-profiles.yaml
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles-cm
+    asserts:
+      - exists:
+          path: 'spec.values.resources[0].data.relay'
+
+  - it: should render nccl profiles collector when ncclProfiles.enabled=true
+    set:
+      observability.enabled: true
+      observability.vmStack.enabled: true
+      observability.ncclProfiles.enabled: true
+    templates:
+      - templates/opentelemetry-collector-nccl-profiles.yaml
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles
+    asserts:
+      - exists:
+          path: 'spec.values.podMonitor'
+
   - it: should render jail logs component when jailLogs.enabled=true
     set:
       observability.enabled: true

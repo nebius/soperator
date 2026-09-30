@@ -43,6 +43,8 @@ func TestRenderContainerSConfigController(t *testing.T) {
 				"--cluster-name=test-cluster",
 				"--jail-path=/mnt/jail",
 				"--slurmapiserver=http://slurm-api-server",
+				"--metrics-bind-address=:8443",
+				"--metrics-secure=true",
 				"--leader-elect",
 			},
 			expectedImage: "test-image:latest",
@@ -68,6 +70,8 @@ func TestRenderContainerSConfigController(t *testing.T) {
 				"--cluster-name=custom-cluster",
 				"--jail-path=/mnt/jail",
 				"--slurmapiserver=https://custom-slurm-api",
+				"--metrics-bind-address=:8443",
+				"--metrics-secure=true",
 				"--leader-elect",
 			},
 			expectedImage: "custom-image:v1",
@@ -95,6 +99,8 @@ func TestRenderContainerSConfigController(t *testing.T) {
 				"--cluster-name=timeout-cluster",
 				"--jail-path=/mnt/jail",
 				"--slurmapiserver=http://timeout-slurm-api",
+				"--metrics-bind-address=:8443",
+				"--metrics-secure=true",
 				"--leader-elect",
 				"--reconfigure-poll-interval=30s",
 				"--reconfigure-wait-timeout=2m",
@@ -128,6 +134,12 @@ func TestRenderContainerSConfigController(t *testing.T) {
 			}
 			if !equalSlices(result.Args, tt.expectedArgs) {
 				t.Errorf("expected args %v, got %v", tt.expectedArgs, result.Args)
+			}
+			if len(result.Ports) != 1 {
+				t.Fatalf("expected one metrics port, got %d", len(result.Ports))
+			}
+			if result.Ports[0].Name != "https" || result.Ports[0].ContainerPort != 8443 || result.Ports[0].Protocol != corev1.ProtocolTCP {
+				t.Fatalf("unexpected metrics port: %+v", result.Ports[0])
 			}
 		})
 	}

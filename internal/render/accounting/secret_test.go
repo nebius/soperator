@@ -21,8 +21,9 @@ func Test_RenderSecret(t *testing.T) {
 	assert.Equal(t, defaultNamespace, secret.Namespace)
 	assert.Equal(t, common.RenderLabels(consts.ComponentTypeAccounting, defaultNameCluster), secret.Labels)
 
-	_, ok := secret.Data[consts.ConfigMapKeySlurmdbdConfig]
+	data, ok := secret.Data[consts.ConfigMapKeySlurmdbdConfig]
 	assert.True(t, ok)
+	assert.Contains(t, string(data), common.ManagedSlurmConfigWarning())
 }
 
 func Test_RenderSecret_Errors(t *testing.T) {

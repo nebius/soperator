@@ -48,6 +48,18 @@ spec:
   - kustomize:
       patches:
       - target:
+          group: apps
+          version: v1
+          kind: DaemonSet
+          name: kruise-daemon
+        patch: |
+          - op: add
+            path: /spec/updateStrategy
+            value:
+              type: RollingUpdate
+              rollingUpdate:
+                maxUnavailable: 50%
+      - target:
           kind: MutatingWebhookConfiguration
           name: kruise-mutating-webhook-configuration
         patch: |

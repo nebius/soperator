@@ -20,7 +20,7 @@ if [ "$usage" -gt "$THRESHOLD" ]; then
     # Return failure details
     echo "$usage% of node boot disk is used. \
 Clean up volumes from 'ssh $SLURMD_NODENAME /opt/soperator_utils/fs_usage.sh -l', \
-delete leftover containers from 'ssh $SLURMD_NODENAME enroot list' and 'ssh $SLURMD_NODENAME docker ps -a', \
+delete leftover Docker containers from 'ssh $SLURMD_NODENAME docker ps -a', \
 reboot the node using 'scontrol reboot $SLURMD_NODENAME', \
 or stop-start the InstanceId from 'scontrol show node $SLURMD_NODENAME'" >&3
     exit 1
