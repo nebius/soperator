@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	WorkerTopologyReconcilerName = "workerTopologyReconciler"
+	WorkerTopologyReconcilerName = "workertopology"
 	DefaultRequeueResult         = ctrl.Result{
 		RequeueAfter: 1 * time.Minute,
 	}

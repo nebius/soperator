@@ -41,7 +41,7 @@ import (
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
 
 var (
-	PodEphemeralStorageCheckName = "soperatorchecks.pod-ephemeral-storage-check"
+	PodEphemeralStorageCheckName = "soperatorchecks.podephemeralstorage"
 )
 
 // KubeletStatsAPI structures for parsing kubelet /stats/summary endpoint

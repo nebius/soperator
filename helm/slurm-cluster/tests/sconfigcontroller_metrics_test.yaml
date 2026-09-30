@@ -22,6 +22,31 @@ tests:
           path: spec.ports[0].targetPort
           value: https
 
+  - it: should select the sconfigcontroller pods rendered by the operator
+    template: templates/sconfigcontroller-metrics-service.yaml
+    set:
+      clusterName: test-cluster
+    asserts:
+      # Operator-rendered pods carry app.kubernetes.io/name=slurmcluster, so the
+      # Service must match on component and instance instead.
+      - equal:
+          path: spec.selector
+          value:
+            app.kubernetes.io/component: sconfigcontroller
+            app.kubernetes.io/instance: test-cluster
+
+  - it: should label scraped series with the sconfigcontroller component
+    template: templates/sconfigcontroller-servicemonitor.yaml
+    set:
+      clusterName: test-cluster
+    asserts:
+      - equal:
+          path: spec.endpoints[0].relabelings[0]
+          value:
+            action: replace
+            targetLabel: component
+            replacement: sconfigcontroller
+
   - it: should scrape sconfigcontroller metrics over authenticated https
     template: templates/sconfigcontroller-servicemonitor.yaml
     set:

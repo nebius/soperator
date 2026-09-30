@@ -118,12 +118,23 @@ curl http://localhost:8080/metrics
 Note: Port 8080 provides Kubernetes object metrics, while port 8081 provides self-monitoring metrics. VMServiceScrape targets port 8080 for cluster monitoring.
 
 #### 6. Soperator Controller Metrics
-- Purpose: Exports controller runtime metrics
-- Port: 8443 (controller-runtime secure metrics)
-- Metrics: Reconciliation metrics, controller health
-- Deployment: Runs on system nodes with the controller manager
-- Namespace: `soperator-system`
+- Purpose: Exports controller-runtime metrics of every soperator process: `controller_runtime_*` (reconcile
+  rate, results, errors, panics, duration, workers), `workqueue_*` (depth, adds, retries, latency),
+  `leader_election_master_status`, plus Go and process collectors
+- Port: 8443 (controller-runtime secure metrics); the rebooter uses plain http on 8080
 - Access: Protected by controller-runtime authn/authz, requires proper authentication
+- Dashboard: Soperator / Controllers (`helm/soperator-monitoring-dashboards/dashboards/operator_controllers.json`)
+
+Each ServiceMonitor sets a static `component` target label so processes can be told apart even where `job`
+is dropped (the public remote-write to Nebius o11y). The `controller` label is the controller-runtime name;
+workqueue metrics carry the same value in `name`.
+
+| `component` | Chart | Controllers |
+| --- | --- | --- |
+| `soperator` | `helm/soperator` | `cluster`, `nodeset`, `nodeconfigurator`, `rollingupdate`, `nodetopology`, `workertopology`, `soperatorchecks.slurmapiclients` |
+| `soperatorchecks` | `helm/soperatorchecks` | `soperatorchecks.activecheck`, `.activecheckjob`, `.slurmnodes`, `.k8snodes`, `.serviceaccount`, `.slurmapiclients`, `.podephemeralstorage` |
+| `sconfigcontroller` | `helm/slurm-cluster` (one per SlurmCluster) | `jailedconfig` |
+| `rebooter` | `helm/nodeconfigurator` (DaemonSet, one pod per node) | `rebooter` |
 
 Connection Example:
 ```bash
@@ -206,7 +217,8 @@ kubectl port-forward -n monitoring-system svc/metrics-grafana 3000:80
 Pre-configured Dashboards:
 
 - Victoria Metrics K8s Stack: Grafana, Kubelet, Kubernetes system, Node Exporter, VictoriaMetrics health
-- Soperator Custom: Cluster Health & Overview, Slurm Controller, Jobs overview, Workers stats and overview
+- Soperator Custom: Cluster Health & Overview, Slurm Controller, Jobs overview, Workers stats and overview,
+  Soperator / Controllers (reconcile and workqueue metrics per controller), Soperator / Rollouts
 
 Cluster Health & Overview and Slurm Controller each include **Nodes by Categories**
 and **Nodes by State** panels. They share mutually exclusive category definitions
