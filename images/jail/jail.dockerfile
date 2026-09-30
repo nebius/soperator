@@ -107,9 +107,6 @@ RUN cd /opt/ansible && \
 # Remove ansible
 RUN rm -rf /opt/ansible
 
-# Save the initial jail version to a file
-COPY VERSION /etc/soperator-jail-version
-
 # Update linker cache
 RUN ldconfig
 
@@ -132,4 +129,7 @@ COPY --from=untaped /jail_restic /jail_restic
 
 COPY images/jail/populate_jail_entrypoint.sh /opt/bin/
 RUN chmod +x /opt/bin/populate_jail_entrypoint.sh
+
+# Keep release metadata outside the packed filesystem so patch bumps reuse it.
+COPY VERSION /etc/soperator-jail-version
 ENTRYPOINT ["/opt/bin/populate_jail_entrypoint.sh"]

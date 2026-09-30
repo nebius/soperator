@@ -400,6 +400,9 @@ run: manifests generate fmt vet ## Run a controller from your host with native t
 	IS_PROMETHEUS_CRD_INSTALLED=true IS_MARIADB_CRD_INSTALLED=true ENABLE_WEBHOOKS=false go run cmd/main.go \
 	 -log-level=debug -leader-elect=true -operator-namespace=soperator-system
 
+# Reuse cache across patch releases; isolate images, release lines and variants.
+CACHE_VERSION ?= $(shell cut -d. -f1,2 VERSION)-slurm$(SLURM_VERSION)$(if $(CUDA_VERSION),-cuda$(CUDA_VERSION))-cache-$(ARCH)
+
 .PHONY: docker-build-and-push
 docker-build-and-push: ## Build and push docker images
 ifndef IMAGE_NAME
@@ -419,11 +422,7 @@ ifndef ARCH
 endif
 
 	@set -euo pipefail; \
-	if [ -n "$${CACHE_VERSION:-}" ]; then \
-		CACHE_REF="$(IMAGE_REPO)/$(IMAGE_NAME):$${CACHE_VERSION}"; \
-	else \
-		CACHE_REF="$(IMAGE_REPO)/$(IMAGE_NAME):$(shell cat VERSION)-slurm$(SLURM_VERSION)-cache-$(ARCH)"; \
-	fi; \
+	CACHE_REF="$(IMAGE_REPO)/$(IMAGE_NAME):$(CACHE_VERSION)"; \
 	docker buildx build \
 		--platform $(PLATFORM) \
 		--target $(IMAGE_NAME) \

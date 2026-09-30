@@ -17,6 +17,9 @@ populate_jail_rootfs() {
       --json \
       --exclude-xattr system.nfs4_acl
 
+    echo "Record the restored jail version"
+    cp /etc/soperator-jail-version /mnt/jail/etc/soperator-jail-version
+
     echo "Set permissions for jail directory"
     chmod 755 /mnt/jail # Keep the jail root traversable by SSH users
 
