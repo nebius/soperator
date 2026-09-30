@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"regexp"
 	"strconv"
 
@@ -128,12 +127,6 @@ func capacityFor(ctx context.Context, sdk *gosdk.SDK, profile Profile, key affin
 }
 
 func CheckCapacity(ctx context.Context, profile Profile) error {
-	token := os.Getenv("NEBIUS_IAM_TOKEN")
-	if token == "" {
-		log.Print("NEBIUS_IAM_TOKEN is not set, skipping capacity check")
-		return nil
-	}
-
 	demands, skipped := gpuDemands(profile)
 	for _, s := range skipped {
 		log.Printf("Nodeset %q: %s, skipping capacity check", s.name, s.reason)
@@ -144,9 +137,9 @@ func CheckCapacity(ctx context.Context, profile Profile) error {
 		return nil
 	}
 
-	sdk, err := gosdk.New(ctx, gosdk.WithCredentials(gosdk.IAMToken(token)))
+	sdk, err := newNebiusSDK(ctx, profile.NebiusProfile)
 	if err != nil {
-		return fmt.Errorf("create gosdk client: %w", err)
+		return err
 	}
 	defer func() {
 		_ = sdk.Close()
