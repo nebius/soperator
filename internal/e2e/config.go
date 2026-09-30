@@ -299,6 +299,7 @@ func LoadE2EConfig() (E2EConfig, error) {
 type Config struct {
 	SoperatorVersion   string `split_words:"true" required:"true"`                // SOPERATOR_VERSION
 	SoperatorUnstable  bool   `split_words:"true" required:"true"`                // SOPERATOR_UNSTABLE
+	NFSVersion         string `envconfig:"NFS_VERSION" required:"true"`           // NFS_VERSION
 	RunUnstableTests   bool   `split_words:"true" default:"false"`                // RUN_UNSTABLE_TESTS
 	PathToInstallation string `split_words:"true" required:"true"`                // PATH_TO_INSTALLATION
 	O11yAccessToken    string `split_words:"true" required:"true"`                // O11Y_ACCESS_TOKEN
