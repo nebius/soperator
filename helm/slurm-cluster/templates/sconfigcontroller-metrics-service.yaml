@@ -13,5 +13,6 @@ spec:
     protocol: TCP
     targetPort: https
   selector:
-    app.kubernetes.io/name: sconfigcontroller
+    app.kubernetes.io/component: sconfigcontroller
+    app.kubernetes.io/instance: {{ include "slurm-cluster.name" . }}
 {{- end }}

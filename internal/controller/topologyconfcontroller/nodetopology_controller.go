@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	NodeTopologyReconcilerName = "nodeTopologyReconciler"
+	NodeTopologyReconcilerName = "nodetopology"
 )
 
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;
