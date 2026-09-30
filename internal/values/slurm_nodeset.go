@@ -59,6 +59,7 @@ type SlurmNodeSet struct {
 
 	Maintenance                  *consts.MaintenanceMode
 	NodeExtra                    string
+	NodeStatic                   string
 	EnableHostUserNamespace      bool
 	WorkerInitRandomDelaySeconds int32
 
@@ -146,6 +147,7 @@ func BuildSlurmNodeSetFrom(
 		//
 		Maintenance:                  maintenance,
 		NodeExtra:                    nsSpec.NodeConfig.Dynamic,
+		NodeStatic:                   nsSpec.NodeConfig.Static,
 		EnableHostUserNamespace:      nsSpec.EnableHostUserNamespace,
 		WorkerInitRandomDelaySeconds: nsSpec.WorkerInitRandomDelaySeconds,
 		//

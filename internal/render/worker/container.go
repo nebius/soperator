@@ -3,6 +3,7 @@ package worker
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
@@ -190,10 +191,18 @@ func renderContainerNodeSetSlurmd(
 	}
 
 	for _, env := range nodeSet.ContainerSlurmd.CustomEnv {
-		switch env.Name {
-		case consts.EnvDockerEnabled, consts.EnvNodeRealMemoryBytes:
+		if strings.HasPrefix(env.Name, consts.EnvNodePrefix) {
 			return corev1.Container{}, fmt.Errorf("environment variable %q is managed by Soperator", env.Name)
 		}
+		switch env.Name {
+		case consts.EnvDockerEnabled, "NODESET_GPU_ENABLED", "CHECKS_PLATFORM_TAG",
+			"CHECKS_PLATFORM_TAGS", "CHECKS_NODE_REAL_MEM_BYTES":
+			return corev1.Container{}, fmt.Errorf("environment variable %q is managed by Soperator", env.Name)
+		}
+	}
+	metadataEnv, err := renderNodeMetadataEnv(nodeSet.NodeStatic, nodeSet.GPU.Enabled)
+	if err != nil {
+		return corev1.Container{}, fmt.Errorf("render node metadata: %w", err)
 	}
 
 	realMemoryBytes := common.RenderRealMemorySlurmd(resources) * 1024 * 1024
@@ -209,6 +218,7 @@ func renderContainerNodeSetSlurmd(
 		),
 		renderSlurmdTopologyEnv(topologyEnabled)...,
 	)
+	env = append(env, metadataEnv...)
 	env = append(env, nodeSet.ContainerSlurmd.CustomEnv...)
 
 	return corev1.Container{

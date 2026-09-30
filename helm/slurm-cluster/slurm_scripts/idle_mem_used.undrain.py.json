@@ -12,5 +12,5 @@
   "reason_append_details": false,
   "run_in_jail": false,
   "log": "slurm_scripts/$worker.$name.undrain.$context.out",
-  "need_env": ["CHECKS_NODE_REAL_MEM_BYTES"]
+  "need_env": []
 }

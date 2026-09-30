@@ -11,6 +11,8 @@ import typing
 
 SOPERATOR_NODE_METADATA_FILE = "/run/soperator/node_metadata.env"
 SOPERATOR_NODE_REAL_MEMORY_BYTES = "SOPERATOR_NODE_REAL_MEMORY_BYTES"
+SOPERATOR_NODE_PLATFORM_TAG = "SOPERATOR_NODE_PLATFORM_TAG"
+SOPERATOR_NODE_PLATFORM_TAGS = "SOPERATOR_NODE_PLATFORM_TAGS"
 
 # Set up logging
 try:
@@ -43,10 +45,11 @@ class Check(typing.NamedTuple):
 
     # Nodes with what platforms this check should run on.
     # Supported values:
-    # - "any" - run on any platform and skip platform detection
+    # - "any" - run on any platform
     # - "CPU" - run on nodes without GPUs
     # - "<num>xGPU" - run on nodes with <num> GPUs of any model
-    # - "<num>x<gpu_model>" - run on nodes with <num> GPUs of model <gpu_model>
+    # - "<num>x<gpu_model>" - run on nodes with <num> GPUs of model <gpu_model>,
+    #   taken from the Gres type in uppercase, e.g. "H100" for "Gres=gpu:nvidia_h100_80gb_hbm3:8"
     platforms: list[str] = ["any"]
 
     # Whether to skip this check for jobs that don't allocate any GPUs.
@@ -115,21 +118,48 @@ class Check(typing.NamedTuple):
 
     # Whether to export additional environment variables
     # Available variables:
-    # - CHECKS_PLATFORM_TAG - the most precise platform tag
-    # - CHECKS_PLATFORM_TAGS - comma-separated list of all platform tags
     # - CHECKS_NODE_STATE_FLAGS - "+"-separated list of Slurm node state flags
     # - CHECKS_NODE_REASON - (drain/down) reason field of the Slurm node
     # - CHECKS_NODE_COMMENT - comment field of the Slurm node
-    # - CHECKS_NODE_REAL_MEM_BYTES - total allocatable memory in bytes for the Slurm node
-    # Some values are extracted from long-running commands, so they aren't exported by default.
+    # These values require Slurm queries, so they aren't exported by default.
     need_env: list[str] = []
 
 class NodeInfo(typing.NamedTuple):
     state_flags: list[str] = []
     reason: str = ""
     comment: str = ""
-    real_memory_bytes: int = 0
     effective_cpus: int = 0
+
+def read_node_metadata(key: typing.Optional[str] = None) -> typing.Union[dict[str, str], str]:
+    """Read all metadata variables, or return a single variable by key."""
+    metadata = {}
+    with open(SOPERATOR_NODE_METADATA_FILE, encoding="utf-8") as metadata_file:
+        for raw_line in metadata_file:
+            line = raw_line.rstrip("\n")
+            if not line or line.startswith("#"):
+                continue
+            name, separator, value = line.partition("=")
+            if not separator or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) or "\0" in value:
+                raise ValueError(f"invalid metadata entry in {SOPERATOR_NODE_METADATA_FILE}")
+            if name in metadata:
+                raise ValueError(f"duplicate {name} in {SOPERATOR_NODE_METADATA_FILE}")
+            metadata[name] = value
+    return metadata if key is None else metadata[key]
+
+
+# Load node metadata into the process environment.
+try:
+    node_metadata = read_node_metadata()
+    for key in ("NODESET_GPU_ENABLED", SOPERATOR_NODE_PLATFORM_TAG, SOPERATOR_NODE_PLATFORM_TAGS, SOPERATOR_NODE_REAL_MEMORY_BYTES):
+        if key not in node_metadata:
+            raise ValueError(f"missing {key} in {SOPERATOR_NODE_METADATA_FILE}")
+    os.environ.update(node_metadata)
+    os.environ["CHECKS_PLATFORM_TAG"] = os.environ[SOPERATOR_NODE_PLATFORM_TAG]
+    os.environ["CHECKS_PLATFORM_TAGS"] = os.environ[SOPERATOR_NODE_PLATFORM_TAGS]
+    os.environ["CHECKS_NODE_REAL_MEM_BYTES"] = os.environ[SOPERATOR_NODE_REAL_MEMORY_BYTES]
+except (OSError, ValueError) as error:
+    logging.error(f"Read node metadata: {error}; skipping checks")
+    sys.exit(0)
 
 # Get environment variables
 try:
@@ -142,8 +172,25 @@ try:
     CHECKS_OUTPUTS_BASE_DIR = os.environ["CHECKS_OUTPUTS_BASE_DIR"]
     CHECKS_CONTEXT = os.environ["CHECKS_CONTEXT"]
     CHECKS_CONFIG = os.environ["CHECKS_CONFIG"]
-except KeyError as ke:
-    logging.error(f"Failed to get environment variable '{ke.args[0]}', exiting: {ke}")
+    CHECKS_PLATFORM_TAG = os.environ["CHECKS_PLATFORM_TAG"]
+    CHECKS_PLATFORM_TAGS = os.environ["CHECKS_PLATFORM_TAGS"].split(",")
+    CHECKS_NODE_REAL_MEM_BYTES = int(os.environ["CHECKS_NODE_REAL_MEM_BYTES"])
+    if not re.fullmatch(r"[0-9]+", os.environ["CHECKS_NODE_REAL_MEM_BYTES"]) or CHECKS_NODE_REAL_MEM_BYTES <= 0:
+        raise ValueError("invalid CHECKS_NODE_REAL_MEM_BYTES")
+    if os.environ["NODESET_GPU_ENABLED"] == "false":
+        if CHECKS_PLATFORM_TAG != "CPU" or CHECKS_PLATFORM_TAGS != ["CPU"]:
+            raise ValueError("invalid CPU platform metadata")
+    elif os.environ["NODESET_GPU_ENABLED"] == "true":
+        match = re.fullmatch(r"([1-9][0-9]*)x([A-Z0-9]+)", CHECKS_PLATFORM_TAG)
+        if not match:
+            raise ValueError("invalid CHECKS_PLATFORM_TAG on a GPU worker")
+        expected_tags = [CHECKS_PLATFORM_TAG] if match[2] == "GPU" else [CHECKS_PLATFORM_TAG, f"{match[1]}xGPU"]
+        if CHECKS_PLATFORM_TAGS != expected_tags:
+            raise ValueError("inconsistent CHECKS_PLATFORM_TAGS")
+    else:
+        raise ValueError("invalid NODESET_GPU_ENABLED")
+except (KeyError, ValueError) as error:
+    logging.error(f"Initialize check runner environment: {error}; skipping checks")
     sys.exit(0)
 
 def main():
@@ -238,12 +285,11 @@ def filter_by_platform(checks: list[Check]) -> list[Check]:
     # Skip if all checks don't care
     if all("any" in check.platforms for check in checks):
         return checks
-    platform_tags = get_platform_tags()
     return [
         check for check in checks
         if (
             "any" in check.platforms or
-            any(tag in check.platforms for tag in platform_tags)
+            any(tag in check.platforms for tag in CHECKS_PLATFORM_TAGS)
         )
     ]
 
@@ -255,13 +301,12 @@ def filter_by_skip_for_partial_gpu_jobs(checks: list[Check]) -> list[Check]:
     if not job_related_run():
         return checks
     job_alloc_gpus = get_job_alloc_gpus()
-    node_platform_tags = get_platform_tags()
     return [
         check for check in checks
         if not (
             check.skip_for_partial_gpu_jobs and
             job_alloc_gpus > 0 and
-            f"{job_alloc_gpus}xGPU" not in node_platform_tags
+            f"{job_alloc_gpus}xGPU" not in CHECKS_PLATFORM_TAGS
         )
     ]
 
@@ -379,91 +424,12 @@ def run_check(check: Check, in_jail=False):
 # Their values are obtained from long-running commands, that's why they aren't exported by default
 def export_needed_env(check: Check):
     for env in check.need_env:
-        if env == "CHECKS_PLATFORM_TAG":
-            os.environ["CHECKS_PLATFORM_TAG"] = get_platform_tags()[0]
-        if env == "CHECKS_PLATFORM_TAGS":
-            os.environ["CHECKS_PLATFORM_TAGS"] = ",".join(get_platform_tags())
         if env == "CHECKS_NODE_STATE_FLAGS":
             os.environ["CHECKS_NODE_STATE_FLAGS"] = "+".join(get_node_info().state_flags)
         if env == "CHECKS_NODE_REASON":
             os.environ["CHECKS_NODE_REASON"] = get_node_info().reason
         if env == "CHECKS_NODE_COMMENT":
             os.environ["CHECKS_NODE_COMMENT"] = get_node_info().comment
-        if env == "CHECKS_NODE_REAL_MEM_BYTES":
-            os.environ["CHECKS_NODE_REAL_MEM_BYTES"] = str(get_node_real_memory_bytes())
-
-# Get node RealMemory from node-local metadata, avoiding a controller RPC in the normal path.
-# Fall back to Slurm node info for compatibility with workers that have not yet been restarted
-# with an image and pod specification that publish the metadata file.
-@functools.lru_cache(maxsize=1)
-def get_node_real_memory_bytes() -> int:
-    try:
-        with open(SOPERATOR_NODE_METADATA_FILE, encoding="utf-8") as metadata_file:
-            for raw_line in metadata_file:
-                key, separator, value = raw_line.rstrip("\n").partition("=")
-                if key != SOPERATOR_NODE_REAL_MEMORY_BYTES:
-                    continue
-                if separator == "" or not value.isdecimal() or int(value) <= 0:
-                    raise ValueError(f"Invalid {SOPERATOR_NODE_REAL_MEMORY_BYTES} value")
-
-                real_memory_bytes = int(value)
-                logging.info(
-                    f"Node RealMemory from {SOPERATOR_NODE_METADATA_FILE}: "
-                    f"{real_memory_bytes} bytes"
-                )
-                return real_memory_bytes
-
-        raise ValueError(f"Missing {SOPERATOR_NODE_REAL_MEMORY_BYTES} value")
-    except Exception as e:
-        logging.warning(
-            f"Failed to get node RealMemory from {SOPERATOR_NODE_METADATA_FILE}: {e}; "
-            "falling back to Slurm node info"
-        )
-        return get_node_info().real_memory_bytes
-
-# Get GPU platform tags, e.g. ["8xH200", "8xGPU] from "nvidia-smi"
-# Please note, this command can be executed from both jail or host rootfs
-# The list starts with more specific tags, and ends with less specific ones
-# It's guaranteed that the list has at least one item
-# This function returns the cached value for subsequent calls
-@functools.lru_cache(maxsize=1)
-def get_platform_tags() -> list[str]:
-    try:
-        # Warning: this command can be executed from both jail or host rootfs
-        res = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True
-        )
-        gpu_names = [line.strip() for line in res.stdout.strip().splitlines() if line.strip()]
-        count = len(gpu_names)
-
-        if count == 0:
-            return ["CPU"]
-
-        first = gpu_names[0]
-        all_same = all(name == first for name in gpu_names)
-
-        tags = []
-        if all_same:
-            if "NVIDIA H100" in first:
-                tags.append(f"{count}xH100")
-            elif "NVIDIA H200" in first:
-                tags.append(f"{count}xH200")
-            elif "NVIDIA B200" in first:
-                tags.append(f"{count}xB200")
-            elif "NVIDIA B300" in first:
-                tags.append(f"{count}xB300")
-            elif "NVIDIA GB300" in first:
-                tags.append(f"{count}xGB300")
-
-        tags.append(f"{count}xGPU")
-
-        logging.info(f"Detected platform tags: {', '.join(tags)}")
-        return tags
-
-    except Exception as e:
-        logging.warning(f"Failed to detect GPU platform, assuming 'CPU': {e}")
-        return ["CPU"]
 
 # Get info about the Slurm node from "scontrol show node"
 # Please note, this command can be executed from both jail or host rootfs
@@ -483,13 +449,10 @@ def get_node_info() -> NodeInfo:
             raise ValueError("No nodes data found")
 
         node = nodes[0]
-        real_memory_mib = node.get("real_memory", 0)
-
         info = NodeInfo(
             state_flags=node.get("state", []),
             reason=node.get("reason", ""),
             comment=node.get("comment", ""),
-            real_memory_bytes=(real_memory_mib * 1024 * 1024),
             effective_cpus=node.get("effective_cpus", 0)
         )
         logging.info(f"Slurm node info: {json.dumps(info._asdict(), indent=2)}")
