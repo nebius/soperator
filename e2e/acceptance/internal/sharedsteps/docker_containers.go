@@ -360,15 +360,15 @@ func (s *DockerContainers) dockerImageAndRuntimeStorageIsPopulatedOnAWorker(ctx 
 				return false, err
 			}
 			for containerID := range containerIDs {
-				paths, err := s.dockerContainerGraphDriverPaths(waitCtx, s.connectionWorker, containerID)
+				paths, err := s.dockerContainerRuntimePaths(waitCtx, s.connectionWorker, containerID)
 				if err != nil {
 					return false, err
 				}
 				if paths == "" {
 					return false, nil
 				}
-				if !graphDriverPathsUnder(paths, dockerLocalStorageRoot) {
-					return false, fmt.Errorf("expected Docker graph-driver paths under %s, got:\n%s", dockerLocalStorageRoot, paths)
+				if !runtimePathsUnder(paths, dockerLocalStorageRoot) {
+					return false, fmt.Errorf("expected Docker runtime paths under %s, got:\n%s", dockerLocalStorageRoot, paths)
 				}
 
 				cgroupParent, err := s.dockerContainerCgroupParent(waitCtx, s.connectionWorker, containerID)
@@ -545,9 +545,12 @@ func (s *DockerContainers) dockerImageID(ctx context.Context, worker framework.W
 	return strings.TrimSpace(out), nil
 }
 
-func (s *DockerContainers) dockerContainerGraphDriverPaths(ctx context.Context, worker framework.WorkerInfo, containerID string) (string, error) {
+func (s *DockerContainers) dockerContainerRuntimePaths(ctx context.Context, worker framework.WorkerInfo, containerID string) (string, error) {
 	out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx,
-		fmt.Sprintf("sudo docker inspect --format '{{range $key, $value := .GraphDriver.Data}}{{println $value}}{{end}}' %s", framework.ShellQuote(containerID)))
+		fmt.Sprintf(
+			"sudo docker inspect --type container --format '{{println .ResolvConfPath}}{{println .HostnamePath}}{{println .HostsPath}}{{println .LogPath}}' %s",
+			framework.ShellQuote(containerID),
+		))
 	if err != nil {
 		return "", err
 	}
@@ -609,22 +612,19 @@ func parseIDSet(output string) map[string]struct{} {
 	return result
 }
 
-func graphDriverPathsUnder(output, root string) bool {
+func runtimePathsUnder(output, root string) bool {
 	foundPath := false
 	for _, line := range strings.Split(output, "\n") {
-		value := strings.TrimSpace(line)
-		if value == "" {
+		candidate := strings.TrimSpace(line)
+		if candidate == "" {
 			continue
 		}
-		for _, field := range strings.Split(value, ":") {
-			candidate := strings.TrimSpace(field)
-			if candidate == "" || !strings.HasPrefix(candidate, "/") {
-				continue
-			}
-			foundPath = true
-			if !pathIsUnder(candidate, root) {
-				return false
-			}
+		if !strings.HasPrefix(candidate, "/") {
+			return false
+		}
+		foundPath = true
+		if !pathIsUnder(candidate, root) {
+			return false
 		}
 	}
 	return foundPath
