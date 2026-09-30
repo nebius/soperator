@@ -58,6 +58,10 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	tfVars["active_checks_scope"] = "testing"
 	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
 	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
+	if nfs, ok := tfVars["nfs_in_k8s"].(map[string]interface{}); ok && nfs != nil {
+		nfs["version"] = cfg.NFSVersion
+		nfs["use_stable_repo"] = !cfg.SoperatorUnstable
+	}
 	tfVars["production"] = false
 	tfVars["company_name"] = "e2e-test"
 

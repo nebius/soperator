@@ -378,9 +378,16 @@ jobs:
         run: |
           SOPERATOR_VERSION=$(sed -n '1p' version.txt)
           SOPERATOR_UNSTABLE=$(sed -n '2p' version.txt)
+          NFS_VERSION=$(sed -n '3p' version.txt)
+
+          if [[ -z "$NFS_VERSION" ]]; then
+            echo "::error::Build metadata lacks NFS version; rebuild with the updated workflow."
+            exit 1
+          fi
 
           echo "SOPERATOR_VERSION=$SOPERATOR_VERSION" >> $GITHUB_ENV
           echo "SOPERATOR_UNSTABLE=$SOPERATOR_UNSTABLE" >> $GITHUB_ENV
+          echo "NFS_VERSION=$NFS_VERSION" >> $GITHUB_ENV
 
       - name: Checkout Terraform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
