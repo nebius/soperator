@@ -1,15 +1,15 @@
-# TEMPORARY: verifies that the "Build versions" check run from one_job.yml shows up
-# on the PR Checks tab. one_job.yml runs on pull_request_target with the definition
+# TEMPORARY: verifies that the "Build versions" commit status from one_job.yml shows up
+# in the PR checks list. one_job.yml runs on pull_request_target with the definition
 # from main, so its own change cannot be seen on the PR that introduces it.
 # Delete this file before merging.
-name: TMP Build versions check run
+name: TMP Build versions commit status
 
 on:
   pull_request:
 
 permissions:
   contents: read
-  checks: write
+  statuses: write
 
 jobs:
   pre-build:
@@ -40,8 +40,9 @@ jobs:
             cat versions.md
           } >> "$GITHUB_STEP_SUMMARY"
 
-          gh api -X POST "repos/${GITHUB_REPOSITORY}/check-runs" \
-            -f name="Build versions" -f head_sha="$HEAD_SHA" \
-            -f status=completed -f conclusion=success \
-            -f "output[title]=$VERSION" -f "output[summary]=$(cat versions.md)" > /dev/null \
-            || echo "::warning::Create check run with build versions: exit code $?"
+          DESCRIPTION="${VERSION}, image ${IMAGE_VERSION}"
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+            -f context="Build versions" -f state=success \
+            -f description="${DESCRIPTION:0:140}" \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" > /dev/null \
+            || echo "::warning::Create commit status with build versions: exit code $?"

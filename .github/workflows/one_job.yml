@@ -33,7 +33,7 @@ on:
 
 permissions:
   contents: read
-  checks: write
+  statuses: write
   packages: write
   attestations: write
   id-token: write
@@ -147,13 +147,14 @@ jobs:
             cat versions.md
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # The step summary is shown only on the run page. The PR Checks tab renders
-          # check run output, so publish the same text as a separate check run.
-          gh api -X POST "repos/${GITHUB_REPOSITORY}/check-runs" \
-            -f name="Build versions" -f head_sha="$HEAD_SHA" \
-            -f status=completed -f conclusion=success \
-            -f "output[title]=$VERSION" -f "output[summary]=$(cat versions.md)" > /dev/null \
-            || echo "::warning::Create check run with build versions: exit code $?"
+          # The step summary is shown only on the run page. A commit status shows its
+          # description right in the PR checks list, so publish the main versions there.
+          DESCRIPTION="${VERSION}, image ${IMAGE_VERSION}"
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+            -f context="Build versions" -f state=success \
+            -f description="${DESCRIPTION:0:140}" \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" > /dev/null \
+            || echo "::warning::Create commit status with build versions: exit code $?"
 
       # This artifact is consumed by e2e_test.yml to determine which version to test.
       - name: Upload version artifact
