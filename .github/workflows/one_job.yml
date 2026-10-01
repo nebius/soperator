@@ -121,6 +121,25 @@ jobs:
           echo "${UNSTABLE}" >> version.txt
           make get-nfs-version UNSTABLE=${UNSTABLE} >> version.txt
 
+      - name: Publish versions to summary
+        shell: bash
+        env:
+          UNSTABLE: ${{ steps.set_vars.outputs.unstable }}
+          VERSION: ${{ steps.set_vars.outputs.version }}
+          IMAGE_VERSION: ${{ steps.set_vars.outputs.image_version }}
+          OPERATOR_IMAGE_TAG: ${{ steps.set_vars.outputs.operator_image_tag }}
+          NFS_VERSION: ${{ steps.set_vars.outputs.nfs_version }}
+        run: |
+          {
+            echo "### Build Versions"
+            echo ""
+            echo "- Version: \`$VERSION\`"
+            echo "- Unstable: \`$UNSTABLE\`"
+            echo "- Image version: \`$IMAGE_VERSION\`"
+            echo "- Operator image tag: \`$OPERATOR_IMAGE_TAG\`"
+            echo "- NFS version: \`$NFS_VERSION\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # This artifact is consumed by e2e_test.yml to determine which version to test.
       - name: Upload version artifact
         uses: actions/upload-artifact@v7
@@ -316,15 +335,6 @@ jobs:
           go-version-file: "go.mod"
           cache: false
 
-      - name: Read version and unstable
-        id: read-version
-        run: |
-          echo "Version: $VERSION"
-          echo "Unstable: $UNSTABLE"
-          echo "Image version: $IMAGE_VERSION"
-          echo "Operator image tag: $OPERATOR_IMAGE_TAG"
-          echo "Nfs version: $NFS_VERSION"
-
       - name: Log in to the Github Container registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
@@ -433,15 +443,6 @@ jobs:
         with:
           go-version-file: "go.mod"
           cache: false
-
-      - name: Read version and unstable
-        id: read-version
-        run: |
-          echo "Version: $VERSION"
-          echo "Unstable: $UNSTABLE"
-          echo "Image version: $IMAGE_VERSION"
-          echo "Operator image tag: $OPERATOR_IMAGE_TAG"
-          echo "Nfs version: $NFS_VERSION"
 
       - name: Log in to the Github Container registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
