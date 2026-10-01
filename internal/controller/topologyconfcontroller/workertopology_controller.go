@@ -728,7 +728,7 @@ func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 				},
 			})).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(WorkerTopologyReconcilerName, r))
 }
 
 // findSlurmClusterForNodeSet maps NodeSet events to SlurmCluster reconcile requests.

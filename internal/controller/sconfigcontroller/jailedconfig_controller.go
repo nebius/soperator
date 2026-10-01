@@ -54,6 +54,9 @@ import (
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
+// ControllerName is the controller-runtime name of the JailedConfig reconciler.
+const ControllerName = "jailedconfig"
+
 const (
 	configMapField = ".spec.configMap.name"
 
@@ -775,9 +778,9 @@ func (r *JailedConfigReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForConfigMap),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
-		Named("jailedconfig").
+		Named(ControllerName).
 		WithOptions(controllerconfig.ControllerOptionsWithRateLimit(maxConcurrency, cacheSyncTimeout, 15*time.Second, 1*time.Minute)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(ControllerName, r))
 }
 
 func (r *JailedConfigReconciler) findObjectsForConfigMap(ctx context.Context, configMapObject client.Object) []reconcile.Request {

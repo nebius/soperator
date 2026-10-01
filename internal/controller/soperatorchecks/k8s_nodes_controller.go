@@ -117,7 +117,7 @@ func (r *K8SNodesController) SetupWithManager(mgr ctrl.Manager,
 			},
 		})).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(K8SNodesControllerName, r))
 }
 
 func (c *K8SNodesController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

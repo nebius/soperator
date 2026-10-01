@@ -236,6 +236,7 @@ func main() {
 	}
 
 	config := ctrl.GetConfigOrDie()
+	metricsopts.InstrumentRESTConfig(config)
 	config.QPS = float32(restConfigQPS)
 	config.Burst = restConfigBurst
 	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.QPS, config.Burst)

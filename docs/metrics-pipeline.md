@@ -129,6 +129,20 @@ Each ServiceMonitor sets a static `component` target label so processes can be t
 is dropped (the public remote-write to Nebius o11y). The `controller` label is the controller-runtime name;
 workqueue metrics carry the same value in `name`.
 
+Kubernetes API usage is attributed per controller by two soperator metrics recorded in an HTTP transport
+wrapper installed on the manager's `rest.Config` in every process:
+
+- `soperator_kube_api_requests_total{controller, verb, resource, code}`: requests that reached the API server.
+  `resource` is `group/resource[/subresource]` (`pods`, `pods/status`, `apps.kruise.io/statefulsets`); names and
+  namespaces are never labels. `verb` is get, list, watch, create, update, patch, delete or deletecollection.
+- `soperator_kube_api_request_duration_seconds{controller, verb, resource}`: latency histogram up to the response
+  headers. Client-side rate limiter wait is not included.
+
+`controller` is the reconcile that issued the request; `controller="manager"` covers informer list/watch, leader
+election, webhooks and runnables. Reads served from the informer cache never reach the API server and are not
+counted. The per-process client-go counter `rest_client_requests_total{code, method, host}` stays available for
+cross-checks.
+
 | `component` | Chart | Controllers |
 | --- | --- | --- |
 | `soperator` | `helm/soperator` | `cluster`, `nodeset`, `nodeconfigurator`, `rollingupdate`, `nodetopology`, `workertopology`, `soperatorchecks.slurmapiclients` |

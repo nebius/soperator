@@ -717,7 +717,7 @@ func (r *RollingUpdateReconciler) SetupWithManager(
 		For(&kruisev1b1.StatefulSet{}, builder.WithPredicates(rollingUpdateLoopStartPredicate())).
 		Named(RollingUpdateControllerName).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(RollingUpdateControllerName, r))
 }
 
 func rollingUpdateLoopStartPredicate() predicate.Funcs {

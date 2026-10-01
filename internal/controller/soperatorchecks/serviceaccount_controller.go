@@ -82,7 +82,7 @@ func (r *ServiceAccountReconciler) SetupWithManager(
 			},
 		)).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(SlurmChecksServiceAccountControllerName, r))
 }
 
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks,verbs=get;list;watch

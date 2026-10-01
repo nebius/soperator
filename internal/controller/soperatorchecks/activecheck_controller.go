@@ -90,7 +90,7 @@ func (r *ActiveCheckReconciler) SetupWithManager(
 			},
 		)).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(SlurmActiveCheckControllerName, r))
 }
 
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=activechecks,verbs=get;list;watch;create;update;patch;delete
