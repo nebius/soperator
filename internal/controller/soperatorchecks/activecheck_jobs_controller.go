@@ -95,7 +95,7 @@ func (r *ActiveCheckJobReconciler) SetupWithManager(mgr ctrl.Manager,
 			},
 		})).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(SlurmActiveCheckJobControllerName, r))
 }
 
 func isValidJob(cm *batchv1.Job) bool {

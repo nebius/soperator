@@ -152,7 +152,7 @@ func (r *PodEphemeralStorageCheck) SetupWithManager(mgr ctrl.Manager, maxConcurr
 			},
 		}).
 		WithOptions(controllerconfig.ControllerOptionsWithRateLimit(maxConcurrency, cacheSyncTimeout, 15*time.Second, 1*time.Minute)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(PodEphemeralStorageCheckName, r))
 }
 
 func (r *PodEphemeralStorageCheck) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

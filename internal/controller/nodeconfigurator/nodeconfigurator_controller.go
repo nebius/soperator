@@ -34,6 +34,9 @@ import (
 	render "nebius.ai/slurm-operator/internal/render/nodeconfigurator"
 )
 
+// ControllerName is the controller-runtime name of the NodeConfigurator reconciler.
+const ControllerName = "nodeconfigurator"
+
 // NodeConfiguratorReconciler reconciles a NodeConfigurator object
 type NodeConfiguratorReconciler struct {
 	client.Client
@@ -158,7 +161,7 @@ func (r *NodeConfiguratorReconciler) SetupWithManager(mgr ctrl.Manager, maxConcu
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&slurmv1alpha1.NodeConfigurator{}).
 		Owns(&appsv1.DaemonSet{}).
-		Named("nodeconfigurator").
+		Named(ControllerName).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(ControllerName, r))
 }

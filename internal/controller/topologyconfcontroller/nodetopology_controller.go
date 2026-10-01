@@ -519,7 +519,7 @@ func (r *NodeTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 				},
 			})).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(NodeTopologyReconcilerName, r))
 }
 
 // reconcileResourceDistributionToRequests handles ResourceDistribution deletion and recreates it

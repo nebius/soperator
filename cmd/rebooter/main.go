@@ -188,7 +188,9 @@ func main() {
 		TLSOpts: tlsOpts,
 	})
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	config := ctrl.GetConfigOrDie()
+	metricsopts.InstrumentRESTConfig(config)
+	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme: scheme,
 		// The rebooter runs on every node, so an unrestricted cache would hold the whole cluster in every pod.
 		// The field selectors below are server-side: any informer this manager ever starts LISTs and WATCHes

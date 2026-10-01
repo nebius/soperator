@@ -72,7 +72,7 @@ func (r *SlurmAPIClientsController) SetupWithManager(mgr ctrl.Manager,
 			},
 		})).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(SlurmAPIClientsControllerName, r))
 }
 
 func (c *SlurmAPIClientsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

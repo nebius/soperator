@@ -142,7 +142,7 @@ func (r *NodeSetReconciler) SetupWithManager(mgr ctrl.Manager, name string, maxC
 		}
 	}
 
-	return controllerBuilder.Complete(r)
+	return controllerBuilder.Complete(controllerconfig.NamedReconciler(name, r))
 }
 
 func (r *NodeSetReconciler) createResourceChecks(saPredicate predicate.Funcs) []controllercommon.ResourceCheck {

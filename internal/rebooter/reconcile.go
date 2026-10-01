@@ -621,7 +621,7 @@ func (r *RebooterReconciler) SetupWithManager(
 			}),
 		)).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(ControllerName, r))
 }
 
 // Update writes the node spec to the API server. controller-runtime mutates the

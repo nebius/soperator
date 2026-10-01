@@ -93,7 +93,7 @@ func (r *SlurmNodesController) SetupWithManager(mgr ctrl.Manager,
 			},
 		})).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(SlurmNodesControllerName, r))
 }
 
 func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

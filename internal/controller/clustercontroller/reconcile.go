@@ -45,6 +45,9 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
+// ControllerName is the controller-runtime name of the SlurmCluster reconciler.
+const ControllerName = "cluster"
+
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters/finalizers,verbs=update
@@ -586,7 +589,7 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 	saPredicate := controllercommon.CreateServiceAccountPredicate()
 
 	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
-		Named("cluster").
+		Named(ControllerName).
 		For(
 			&slurmv1.SlurmCluster{},
 			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
@@ -628,7 +631,7 @@ func (r *SlurmClusterReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurren
 
 	controllerBuilder.WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout))
 
-	return controllerBuilder.Complete(r)
+	return controllerBuilder.Complete(controllerconfig.NamedReconciler(ControllerName, r))
 }
 
 func (r *SlurmClusterReconciler) setupConfigMapIndexer(mgr ctrl.Manager) error {

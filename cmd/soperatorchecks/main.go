@@ -250,7 +250,9 @@ func main() {
 		TLSOpts: tlsOpts,
 	})
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	config := ctrl.GetConfigOrDie()
+	metricsopts.InstrumentRESTConfig(config)
+	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsopts.ServerOptions(metricsAddr, secureMetrics, tlsOpts),
 		WebhookServer:          webhookServer,
@@ -362,7 +364,7 @@ func main() {
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(soperatorchecks.PodEphemeralStorageCheckName),
-			ctrl.GetConfigOrDie(),
+			config,
 			requeueAfterPodEphemeralStorageCheck,
 			ephemeralStorageThreshold,
 			ephemeralStorageResumeThreshold,
