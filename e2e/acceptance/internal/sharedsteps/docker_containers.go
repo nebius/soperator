@@ -79,6 +79,7 @@ func (s *DockerContainers) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the Docker container succeeds over worker SSH$`, s.theDockerContainerSucceedsOverWorkerSSH)
 	sc.Step(`^a long-running Docker container job is submitted on two workers$`, s.aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers)
 	sc.Step(`^the Docker container job is running$`, s.theDockerContainerJobIsRunning)
+	sc.Step(`^Docker graph-driver image and runtime storage is populated on a worker$`, s.dockerGraphDriverImageAndRuntimeStorageIsPopulatedOnAWorker)
 	sc.Step(`^Docker image and runtime storage is populated on a worker$`, s.dockerImageAndRuntimeStorageIsPopulatedOnAWorker)
 	sc.Step(`^Docker containers from the job are running on selected workers$`, s.dockerContainersFromTheJobAreRunningOnSelectedWorkers)
 	sc.Step(`^the Docker container job is cancelled$`, s.theDockerContainerJobIsCancelled)
@@ -333,6 +334,19 @@ func (s *DockerContainers) theDockerContainerJobIsRunning(ctx context.Context) e
 }
 
 func (s *DockerContainers) dockerImageAndRuntimeStorageIsPopulatedOnAWorker(ctx context.Context) error {
+	return s.dockerStorageIsPopulatedOnAWorker(ctx, "runtime", s.dockerContainerRuntimePaths, runtimePathsUnder)
+}
+
+func (s *DockerContainers) dockerGraphDriverImageAndRuntimeStorageIsPopulatedOnAWorker(ctx context.Context) error {
+	return s.dockerStorageIsPopulatedOnAWorker(ctx, "graph-driver", s.dockerContainerGraphDriverPaths, graphDriverPathsUnder)
+}
+
+func (s *DockerContainers) dockerStorageIsPopulatedOnAWorker(
+	ctx context.Context,
+	pathKind string,
+	containerStoragePaths func(context.Context, framework.WorkerInfo, string) (string, error),
+	storagePathsUnder func(string, string) bool,
+) error {
 	if s.connectionWorker.Name == "" {
 		return fmt.Errorf("Docker connection worker is not selected")
 	}
@@ -360,15 +374,15 @@ func (s *DockerContainers) dockerImageAndRuntimeStorageIsPopulatedOnAWorker(ctx 
 				return false, err
 			}
 			for containerID := range containerIDs {
-				paths, err := s.dockerContainerGraphDriverPaths(waitCtx, s.connectionWorker, containerID)
+				paths, err := containerStoragePaths(waitCtx, s.connectionWorker, containerID)
 				if err != nil {
 					return false, err
 				}
 				if paths == "" {
 					return false, nil
 				}
-				if !graphDriverPathsUnder(paths, dockerLocalStorageRoot) {
-					return false, fmt.Errorf("expected Docker graph-driver paths under %s, got:\n%s", dockerLocalStorageRoot, paths)
+				if !storagePathsUnder(paths, dockerLocalStorageRoot) {
+					return false, fmt.Errorf("expected Docker %s paths under %s, got:\n%s", pathKind, dockerLocalStorageRoot, paths)
 				}
 
 				cgroupParent, err := s.dockerContainerCgroupParent(waitCtx, s.connectionWorker, containerID)
@@ -554,6 +568,18 @@ func (s *DockerContainers) dockerContainerGraphDriverPaths(ctx context.Context, 
 	return strings.TrimSpace(out), nil
 }
 
+func (s *DockerContainers) dockerContainerRuntimePaths(ctx context.Context, worker framework.WorkerInfo, containerID string) (string, error) {
+	out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx,
+		fmt.Sprintf(
+			"sudo docker inspect --type container --format '{{println .ResolvConfPath}}{{println .HostnamePath}}{{println .HostsPath}}{{println .LogPath}}' %s",
+			framework.ShellQuote(containerID),
+		))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
 func (s *DockerContainers) dockerContainerCgroupParent(ctx context.Context, worker framework.WorkerInfo, containerID string) (string, error) {
 	out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx,
 		fmt.Sprintf("sudo docker inspect --format '{{.HostConfig.CgroupParent}}' %s", framework.ShellQuote(containerID)))
@@ -625,6 +651,24 @@ func graphDriverPathsUnder(output, root string) bool {
 			if !pathIsUnder(candidate, root) {
 				return false
 			}
+		}
+	}
+	return foundPath
+}
+
+func runtimePathsUnder(output, root string) bool {
+	foundPath := false
+	for _, line := range strings.Split(output, "\n") {
+		candidate := strings.TrimSpace(line)
+		if candidate == "" {
+			continue
+		}
+		if !strings.HasPrefix(candidate, "/") {
+			return false
+		}
+		foundPath = true
+		if !pathIsUnder(candidate, root) {
+			return false
 		}
 	}
 	return foundPath

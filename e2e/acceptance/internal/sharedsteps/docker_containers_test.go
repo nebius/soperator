@@ -55,6 +55,59 @@ func TestGraphDriverPathsUnderRejectsUnexpectedPaths(t *testing.T) {
 	}
 }
 
+func TestRuntimePathsUnderAcceptsDockerInspectPaths(t *testing.T) {
+	const root = "/mnt/image-storage/docker"
+	output := `
+/mnt/image-storage/docker/containers/ac9f51a97037/resolv.conf
+/mnt/image-storage/docker/containers/ac9f51a97037/hostname
+/mnt/image-storage/docker/containers/ac9f51a97037/hosts
+/mnt/image-storage/docker/containers/ac9f51a97037/ac9f51a97037-json.log
+`
+
+	if !runtimePathsUnder(output, root) {
+		t.Fatalf("runtimePathsUnder() = false, want true")
+	}
+}
+
+func TestRuntimePathsUnderRejectsUnexpectedPaths(t *testing.T) {
+	const root = "/mnt/image-storage/docker"
+	tests := []struct {
+		name   string
+		output string
+		want   bool
+	}{
+		{
+			name:   "metadata without paths",
+			output: "7a233c2a9c9881f79238b610bcfbe8b7bcd014a43b8c1dc17fcab60fa3e61c4c",
+			want:   false,
+		},
+		{
+			name:   "path outside root",
+			output: "/var/lib/docker/containers/ac9f51a97037/hosts",
+			want:   false,
+		},
+		{
+			name: "one runtime path outside root",
+			output: `/mnt/image-storage/docker/containers/ac9f51a97037/hosts
+/var/lib/docker/containers/ac9f51a97037/hostname`,
+			want: false,
+		},
+		{
+			name:   "path under root",
+			output: "/mnt/image-storage/docker/containers/ac9f51a97037/hosts",
+			want:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := runtimePathsUnder(tt.output, root); got != tt.want {
+				t.Fatalf("runtimePathsUnder() = %t, want %t", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPathIsUnder(t *testing.T) {
 	const root = "/mnt/image-storage/docker"
 	tests := []struct {
