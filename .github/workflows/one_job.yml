@@ -33,6 +33,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
   packages: write
   attestations: write
   id-token: write
@@ -124,6 +125,8 @@ jobs:
       - name: Publish versions to summary
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           UNSTABLE: ${{ steps.set_vars.outputs.unstable }}
           VERSION: ${{ steps.set_vars.outputs.version }}
           IMAGE_VERSION: ${{ steps.set_vars.outputs.image_version }}
@@ -131,14 +134,26 @@ jobs:
           NFS_VERSION: ${{ steps.set_vars.outputs.nfs_version }}
         run: |
           {
-            echo "### Build Versions"
-            echo ""
             echo "- Version: \`$VERSION\`"
             echo "- Unstable: \`$UNSTABLE\`"
             echo "- Image version: \`$IMAGE_VERSION\`"
             echo "- Operator image tag: \`$OPERATOR_IMAGE_TAG\`"
             echo "- NFS version: \`$NFS_VERSION\`"
+          } > versions.md
+
+          {
+            echo "### Build Versions"
+            echo ""
+            cat versions.md
           } >> "$GITHUB_STEP_SUMMARY"
+
+          # The step summary is shown only on the run page. The PR Checks tab renders
+          # check run output, so publish the same text as a separate check run.
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/check-runs" \
+            -f name="Build versions" -f head_sha="$HEAD_SHA" \
+            -f status=completed -f conclusion=success \
+            -f "output[title]=$VERSION" -f "output[summary]=$(cat versions.md)" > /dev/null \
+            || echo "::warning::Create check run with build versions: exit code $?"
 
       # This artifact is consumed by e2e_test.yml to determine which version to test.
       - name: Upload version artifact

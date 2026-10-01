@@ -9,6 +9,7 @@ jobs:
     name: Build stable release
     permissions:
       contents: read
+      checks: write
       packages: write
       attestations: write
       id-token: write
