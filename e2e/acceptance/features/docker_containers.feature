@@ -12,6 +12,16 @@ Feature: Docker containers
     When the user runs a Docker container over SSH on a worker node
     Then the Docker container succeeds over worker SSH
 
+  @soperator_version_>=4.0.0,<5.0.0
+  Scenario: Docker container lifecycle uses graph-driver local storage
+    Given a long-running Docker container job is submitted on two workers
+    When the Docker container job is running
+    Then Docker graph-driver image and runtime storage is populated on a worker
+    And Docker containers from the job are running on selected workers
+    When the Docker container job is cancelled
+    And Docker containers from the job are stopped explicitly
+    Then Docker containers from the job are no longer running
+
   @soperator_version_>=5.0.0
   Scenario: Docker container lifecycle uses local storage
     Given a long-running Docker container job is submitted on two workers
