@@ -15,6 +15,8 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"nebius.ai/slurm-operator/internal/metrics"
 )
 
 // stalePendingMaxAge is the maximum submission age for a still-pending accounting record before
@@ -82,6 +84,7 @@ func DefaultHTTPClient() *http.Client {
 		}
 		return nil, fmt.Errorf("giving up after %d attempt(s)", numTries)
 	}
+	metrics.InstrumentRetryableClient(retryClient)
 	return retryClient.StandardClient()
 }
 

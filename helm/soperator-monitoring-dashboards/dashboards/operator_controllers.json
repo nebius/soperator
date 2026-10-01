@@ -2656,8 +2656,8 @@
       }
     },
     {
-      "id": 36,
-      "title": "Rebooter · per-node detail",
+      "id": 33,
+      "title": "Slurm REST",
       "type": "row",
       "gridPos": {
         "x": 0,
@@ -2665,15 +2665,624 @@
         "w": 24,
         "h": 1
       },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 34,
+      "title": "Slurm REST attempts / min by controller",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 8,
+        "h": 8
+      },
+      "description": "HTTP attempts sent to slurmrestd per minute, retries included, attributed to the controller whose reconcile issued them. nodecache is the background node list refresh in soperatorchecks, exporter is the metrics exporter collection loop, manager is anything untagged.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "opm",
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "60 * sum by (cluster, component, namespace, controller) (rate(soperator_slurm_rest_requests_total{cluster=~\"$cluster\", component=~\"$component\", component!=\"\", controller=~\"$controller\"}[$__rate_interval]))",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{component}} / {{namespace}} / {{controller}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 35,
+      "title": "Slurm REST attempts / min by path · top 15",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 8,
+        "y": 80,
+        "w": 8,
+        "h": 8
+      },
+      "description": "Which slurmrestd paths carry the load across the selected controllers. Object names are replaced by {id}; host is the per-cluster REST service.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "opm",
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "topk(15, 60 * sum by (cluster, host, method, path) (rate(soperator_slurm_rest_requests_total{cluster=~\"$cluster\", component=~\"$component\", component!=\"\", controller=~\"$controller\"}[$__rate_interval])))",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{host}} {{method}} {{path}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 36,
+      "title": "Slurm REST non-2xx responses / min",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 16,
+        "y": 80,
+        "w": 8,
+        "h": 8
+      },
+      "description": "Attempts per minute that did not return 2xx, per controller and status code. error is a transport failure (connection refused, timeout). Each failed attempt is retried up to 3 times by the client.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.01
+              }
+            ]
+          },
+          "unit": "opm",
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "60 * sum by (cluster, component, namespace, controller, code) (rate(soperator_slurm_rest_requests_total{cluster=~\"$cluster\", component=~\"$component\", component!=\"\", controller=~\"$controller\", code!~\"2..\"}[$__rate_interval]))",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{component}} / {{namespace}} / {{controller}} / {{code}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 37,
+      "title": "Slurm REST latency · p95 by controller",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 88,
+        "w": 8,
+        "h": 8
+      },
+      "description": "95th percentile time from sending an attempt to receiving slurmrestd response headers.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s",
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "histogram_quantile(0.95, sum by (cluster, component, namespace, controller, le) (rate(soperator_slurm_rest_request_duration_seconds_bucket{cluster=~\"$cluster\", component=~\"$component\", component!=\"\", controller=~\"$controller\"}[$__rate_interval])))",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{component}} / {{namespace}} / {{controller}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 38,
+      "title": "Slurm REST latency · p95 by path · top 15",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 8,
+        "y": 88,
+        "w": 8,
+        "h": 8
+      },
+      "description": "Slowest slurmrestd paths across the selected controllers. Large node or job listings dominate here.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s",
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "topk(15, histogram_quantile(0.95, sum by (cluster, method, path, le) (rate(soperator_slurm_rest_request_duration_seconds_bucket{cluster=~\"$cluster\", component=~\"$component\", component!=\"\", controller=~\"$controller\"}[$__rate_interval]))))",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{method}} {{path}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 39,
+      "title": "Slurm REST retries / min",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 16,
+        "y": 88,
+        "w": 8,
+        "h": 8
+      },
+      "description": "Retried attempts per minute per controller and path. Near zero in steady state; a sustained rate means slurmrestd or slurmctld is refusing or timing out requests.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.01
+              }
+            ]
+          },
+          "unit": "opm",
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "60 * sum by (cluster, component, namespace, controller, path) (rate(soperator_slurm_rest_retries_total{cluster=~\"$cluster\", component=~\"$component\", component!=\"\", controller=~\"$controller\"}[$__rate_interval]))",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{component}} / {{namespace}} / {{controller}} / {{path}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 43,
+      "title": "Rebooter · per-node detail",
+      "type": "row",
+      "gridPos": {
+        "x": 0,
+        "y": 96,
+        "w": 24,
+        "h": 1
+      },
       "collapsed": true,
       "panels": [
         {
-          "id": 33,
+          "id": 40,
           "title": "Scraped rebooter pods",
           "type": "stat",
           "gridPos": {
             "x": 0,
-            "y": 80,
+            "y": 97,
             "w": 6,
             "h": 7
           },
@@ -2736,12 +3345,12 @@
           }
         },
         {
-          "id": 34,
+          "id": 41,
           "title": "Top 10 rebooter pods by errors / min",
           "type": "timeseries",
           "gridPos": {
             "x": 6,
-            "y": 80,
+            "y": 97,
             "w": 9,
             "h": 7
           },
@@ -2838,12 +3447,12 @@
           }
         },
         {
-          "id": 35,
+          "id": 42,
           "title": "Top 10 rebooter pods by reconcile duration · p95",
           "type": "timeseries",
           "gridPos": {
             "x": 15,
-            "y": 80,
+            "y": 97,
             "w": 9,
             "h": 7
           },
@@ -2938,24 +3547,24 @@
       ]
     },
     {
-      "id": 40,
+      "id": 47,
       "title": "Process",
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 87,
+        "y": 104,
         "w": 24,
         "h": 1
       },
       "collapsed": true,
       "panels": [
         {
-          "id": 37,
+          "id": 44,
           "title": "CPU",
           "type": "timeseries",
           "gridPos": {
             "x": 0,
-            "y": 88,
+            "y": 105,
             "w": 8,
             "h": 7
           },
@@ -3048,12 +3657,12 @@
           }
         },
         {
-          "id": 38,
+          "id": 45,
           "title": "Resident memory",
           "type": "timeseries",
           "gridPos": {
             "x": 8,
-            "y": 88,
+            "y": 105,
             "w": 8,
             "h": 7
           },
@@ -3146,12 +3755,12 @@
           }
         },
         {
-          "id": 39,
+          "id": 46,
           "title": "Goroutines",
           "type": "timeseries",
           "gridPos": {
             "x": 16,
-            "y": 88,
+            "y": 105,
             "w": 8,
             "h": 7
           },
@@ -3246,24 +3855,24 @@
       ]
     },
     {
-      "id": 42,
+      "id": 49,
       "title": "Definitions",
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 95,
+        "y": 112,
         "w": 24,
         "h": 1
       },
       "collapsed": true,
       "panels": [
         {
-          "id": 41,
+          "id": 48,
           "title": "Controllers and how to read this dashboard",
           "type": "text",
           "gridPos": {
             "x": 0,
-            "y": 96,
+            "y": 113,
             "w": 24,
             "h": 26
           },
@@ -3271,7 +3880,7 @@
           "pluginVersion": "11.5.1",
           "options": {
             "mode": "markdown",
-            "content": "All panels come from the metrics that controller-runtime registers for every manager: `controller_runtime_*` for the reconcile loop, `workqueue_*` for its queue, `leader_election_master_status`, and the Go and process collectors. No soperator-specific metric code is involved.\n\n**Component and controller labels**\n\n`component` is a static target label set by each ServiceMonitor (`soperator`, `soperatorchecks`, `sconfigcontroller`, `rebooter`). It survives the o11y remote-write, unlike `job`, and separates processes that register a controller with the same name. `controller` is the controller-runtime name passed to `Named()`; workqueue metrics carry the same value in the `name` label. `namespace` is the namespace of the metrics pod, which separates several sconfigcontroller instances.\n\n| Component | Controller | Reconciles |\n| --- | --- | --- |\n| soperator | cluster | SlurmCluster CR: renders and applies every Slurm component. |\n| soperator | nodeset | NodeSet CR: worker StatefulSets, power state and node-local config. |\n| soperator | nodeconfigurator | NodeConfigurator CR: per-node DaemonSets (rebooter, sysctl, custom containers). |\n| soperator | rollingupdate | Worker StatefulSet rollouts with Slurm drain and handoff. See Soperator / Rollouts. |\n| soperator | nodetopology | Kubernetes Node topology labels into the cluster topology ResourceDistribution. |\n| soperator | workertopology | SlurmCluster topology settings into topology.conf. |\n| soperator, soperatorchecks | soperatorchecks.slurmapiclients | Keeps a Slurm REST client per SlurmCluster for the other controllers in the process. |\n| soperatorchecks | soperatorchecks.activecheck | ActiveCheck CR: CronJobs and Jobs that run health checks. |\n| soperatorchecks | soperatorchecks.activecheckjob | Finished check Jobs: results into Slurm node state and conditions. |\n| soperatorchecks | soperatorchecks.slurmnodes | Slurm node drain reasons into Kubernetes Node conditions; undrains nodes whose compute instance was replaced. |\n| soperatorchecks | soperatorchecks.k8snodes | Kubernetes Node drain and reboot conditions: drains the Slurm node and requests reboots. |\n| soperatorchecks | soperatorchecks.serviceaccount | ServiceAccount and RBAC used by check Jobs. |\n| soperatorchecks | soperatorchecks.podephemeralstorage | Worker pod ephemeral storage usage checks. |\n| sconfigcontroller | jailedconfig | JailedConfig CR: files inside the jail and Slurm reconfigure. |\n| rebooter | rebooter | One per node: reboots the node when requested by soperator. |\n\n**Kube API panels** come from `soperator_kube_api_requests_total` and `soperator_kube_api_request_duration_seconds`, recorded by an HTTP transport wrapper in every soperator process. The `controller` label is the reconcile that issued the request; `manager` is everything else in the process (informer list/watch, leader election, webhooks, runnables). Informer cache reads never reach the API server and are not counted. Latency excludes the client-side rate limiter wait. The per-process client-go counter `rest_client_requests_total` (code, method, host) remains available for cross-checks.\n\n**Reading the panels**\n\n- `result=success` is a reconcile that returned without requeue, `requeue` and `requeue_after` are explicit requeues, `error` is a returned error that the workqueue retries with backoff.\n- A controller can fail without incrementing errors: rollingupdate logs operational failures and returns nil to keep its polling interval, so use Soperator / Rollouts for rollout health.\n- Workqueue depth above zero for long periods, or worker saturation near 100%, means the controller cannot keep up with events. Check reconcile duration first, then Kube API and Slurm REST latency.\n- Rebooter runs one pod per node. Controller rows sum or max its pods into one series; the per-pod panels (Leader election, Process) exclude it, and the Rebooter row shows per-pod detail. Series without a `component` label (other controller-runtime operators in the cluster, such as the VictoriaMetrics operator) are excluded everywhere.\n- Missing series mean the component is not scraped: check the ServiceMonitor, its metrics Service endpoints and vmagent targets.\n\n**Scope:** `$cluster` is the physical cluster label added by remote-write; a local datasource without the label uses All. For manual imports `var-datasource=<UID>` selects another datasource."
+            "content": "All panels come from the metrics that controller-runtime registers for every manager: `controller_runtime_*` for the reconcile loop, `workqueue_*` for its queue, `leader_election_master_status`, and the Go and process collectors. No soperator-specific metric code is involved.\n\n**Component and controller labels**\n\n`component` is a static target label set by each ServiceMonitor (`soperator`, `soperatorchecks`, `sconfigcontroller`, `rebooter`). It survives the o11y remote-write, unlike `job`, and separates processes that register a controller with the same name. `controller` is the controller-runtime name passed to `Named()`; workqueue metrics carry the same value in the `name` label. `namespace` is the namespace of the metrics pod, which separates several sconfigcontroller instances.\n\n| Component | Controller | Reconciles |\n| --- | --- | --- |\n| soperator | cluster | SlurmCluster CR: renders and applies every Slurm component. |\n| soperator | nodeset | NodeSet CR: worker StatefulSets, power state and node-local config. |\n| soperator | nodeconfigurator | NodeConfigurator CR: per-node DaemonSets (rebooter, sysctl, custom containers). |\n| soperator | rollingupdate | Worker StatefulSet rollouts with Slurm drain and handoff. See Soperator / Rollouts. |\n| soperator | nodetopology | Kubernetes Node topology labels into the cluster topology ResourceDistribution. |\n| soperator | workertopology | SlurmCluster topology settings into topology.conf. |\n| soperator, soperatorchecks | soperatorchecks.slurmapiclients | Keeps a Slurm REST client per SlurmCluster for the other controllers in the process. |\n| soperatorchecks | soperatorchecks.activecheck | ActiveCheck CR: CronJobs and Jobs that run health checks. |\n| soperatorchecks | soperatorchecks.activecheckjob | Finished check Jobs: results into Slurm node state and conditions. |\n| soperatorchecks | soperatorchecks.slurmnodes | Slurm node drain reasons into Kubernetes Node conditions; undrains nodes whose compute instance was replaced. |\n| soperatorchecks | soperatorchecks.k8snodes | Kubernetes Node drain and reboot conditions: drains the Slurm node and requests reboots. |\n| soperatorchecks | soperatorchecks.serviceaccount | ServiceAccount and RBAC used by check Jobs. |\n| soperatorchecks | soperatorchecks.podephemeralstorage | Worker pod ephemeral storage usage checks. |\n| sconfigcontroller | jailedconfig | JailedConfig CR: files inside the jail and Slurm reconfigure. |\n| rebooter | rebooter | One per node: reboots the node when requested by soperator. |\n\n**Kube API panels** come from `soperator_kube_api_requests_total` and `soperator_kube_api_request_duration_seconds`, recorded by an HTTP transport wrapper in every soperator process. The `controller` label is the reconcile that issued the request; `manager` is everything else in the process (informer list/watch, leader election, webhooks, runnables). Informer cache reads never reach the API server and are not counted. Latency excludes the client-side rate limiter wait. The per-process client-go counter `rest_client_requests_total` (code, method, host) remains available for cross-checks.\n\n**Slurm REST panels** come from `soperator_slurm_rest_requests_total`, `soperator_slurm_rest_request_duration_seconds` and `soperator_slurm_rest_retries_total`, recorded inside the retrying HTTP client every soperator process uses for slurmrestd. Counts are per attempt, so one logical call that is retried three times shows as four attempts and three retries. `path` is the request path with object names replaced by `{id}`, `host` is the per-cluster REST service. `controller` values beyond the reconcilers: `nodecache` (soperatorchecks background node refresh), `exporter` (metrics exporter collection loop, scraped from its port 8081 with `component=exporter`), `manager` (untagged).\n\n**Reading the panels**\n\n- `result=success` is a reconcile that returned without requeue, `requeue` and `requeue_after` are explicit requeues, `error` is a returned error that the workqueue retries with backoff.\n- A controller can fail without incrementing errors: rollingupdate logs operational failures and returns nil to keep its polling interval, so use Soperator / Rollouts for rollout health.\n- Workqueue depth above zero for long periods, or worker saturation near 100%, means the controller cannot keep up with events. Check reconcile duration first, then Kube API and Slurm REST latency.\n- Rebooter runs one pod per node. Controller rows sum or max its pods into one series; the per-pod panels (Leader election, Process) exclude it, and the Rebooter row shows per-pod detail. Series without a `component` label (other controller-runtime operators in the cluster, such as the VictoriaMetrics operator) are excluded everywhere.\n- Missing series mean the component is not scraped: check the ServiceMonitor, its metrics Service endpoints and vmagent targets.\n\n**Scope:** `$cluster` is the physical cluster label added by remote-write; a local datasource without the label uses All. For manual imports `var-datasource=<UID>` selects another datasource."
           }
         }
       ]

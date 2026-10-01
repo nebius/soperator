@@ -14,6 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"nebius.ai/slurm-operator/internal/controllerconfig"
+	"nebius.ai/slurm-operator/internal/metrics"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
@@ -112,7 +114,7 @@ func (e *Exporter) Start(ctx context.Context, addr string) error {
 		Handler: mux,
 	}
 
-	go e.collectionLoop(ctx)
+	go e.collectionLoop(controllerconfig.WithControllerName(ctx, "exporter"))
 
 	go func() {
 		logger.Info("Starting metrics server", "addr", addr)
@@ -254,6 +256,11 @@ func (e *Exporter) StartMonitoring(ctx context.Context, addr string) error {
 
 	if err := e.monitoringMetrics.Register(e.monitoringRegistry); err != nil {
 		return fmt.Errorf("failed to register monitoring metrics: %w", err)
+	}
+	for _, collector := range metrics.SlurmRESTCollectors() {
+		if err := e.monitoringRegistry.Register(collector); err != nil {
+			return fmt.Errorf("register Slurm REST client metrics: %w", err)
+		}
 	}
 
 	mux := http.NewServeMux()
