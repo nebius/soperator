@@ -1,11 +1,16 @@
 package topologyconfcontroller
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"reflect"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+const blockOrderFingerprintPrefix = ":blocks="
 
 // topologyYAMLEntry is one entry of topology.yaml.
 //
@@ -62,8 +67,9 @@ func renderTopologyYAML(entries []topologyYAMLEntry) (string, error) {
 }
 
 // topologyStructure fingerprints the rendered settings that slurmctld can only learn by
-// re-reading topology.yaml. Node membership is deliberately omitted because workers push their
-// placement into the running controller with scontrol update.
+// re-reading topology.yaml, including the ordered block names of block topologies: slurmctld takes
+// the block order from the file and rejects a node registering into a block it has not loaded.
+// Node lists are omitted because workers push their placement into the running controller.
 func topologyStructure(rendered string) (string, error) {
 	var entries []topologyYAMLEntry
 	if err := yaml.Unmarshal([]byte(rendered), &entries); err != nil {
@@ -72,20 +78,81 @@ func topologyStructure(rendered string) (string, error) {
 
 	parts := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		plugin := ""
 		var blockSizes []int
-		switch {
-		case entry.Tree != nil:
-			plugin = "tree"
-		case entry.Block != nil:
-			plugin = "block"
+		if entry.Block != nil {
 			blockSizes = entry.Block.BlockSizes
-		case entry.Flat:
-			plugin = "flat"
 		}
-		parts = append(parts, fmt.Sprintf("%s=%s:%v:%t",
-			entry.Topology, plugin, blockSizes, entry.ClusterDefault))
+		part := fmt.Sprintf("%s=%s:%v:%t", entry.Topology, topologyPlugin(entry), blockSizes, entry.ClusterDefault)
+		if entry.Block != nil {
+			var names []string
+			for _, block := range entry.Block.Blocks {
+				names = append(names, block.Block)
+			}
+			// A fixed-size hash keeps the annotation bounded on large clusters.
+			part += fmt.Sprintf("%s%x", blockOrderFingerprintPrefix, sha256.Sum256([]byte(strings.Join(names, "\x00"))))
+		}
+		parts = append(parts, part)
 	}
 
 	return strings.Join(parts, ","), nil
+}
+
+func topologyPlugin(entry topologyYAMLEntry) string {
+	switch {
+	case entry.Tree != nil:
+		return "tree"
+	case entry.Block != nil:
+		return "block"
+	case entry.Flat:
+		return "flat"
+	}
+	return ""
+}
+
+// deferrableTopologyChange reports whether desired differs from published only in block order or in
+// blocks that disappeared. Until slurmctld re-reads the file, a stale order only worsens placement
+// and a vanished block stays loaded but harmless, so such a change can wait. A new block cannot:
+// slurmctld drains a node that registers into a block it has not loaded.
+func deferrableTopologyChange(published, desired string) bool {
+	var before, after []topologyYAMLEntry
+	if yaml.Unmarshal([]byte(published), &before) != nil || yaml.Unmarshal([]byte(desired), &after) != nil {
+		return false
+	}
+	if len(before) != len(after) {
+		return false
+	}
+
+	changed := false
+	for i := range after {
+		b, a := before[i], after[i]
+		if a.Topology != b.Topology || a.ClusterDefault != b.ClusterDefault || topologyPlugin(a) != topologyPlugin(b) {
+			return false
+		}
+		if (a.Block == nil) != (b.Block == nil) {
+			return false
+		}
+		// Only block changes may wait: holding back anything else would leave it out of the file
+		// slurmctld reads on its next restart.
+		if a.Block == nil {
+			if !reflect.DeepEqual(a, b) {
+				return false
+			}
+			continue
+		}
+		if !slices.Equal(a.Block.BlockSizes, b.Block.BlockSizes) {
+			return false
+		}
+		known := make(map[string]struct{}, len(b.Block.Blocks))
+		for _, block := range b.Block.Blocks {
+			known[block.Block] = struct{}{}
+		}
+		for j, block := range a.Block.Blocks {
+			if _, ok := known[block.Block]; !ok {
+				return false
+			}
+			changed = changed || j >= len(b.Block.Blocks) || block.Block != b.Block.Blocks[j].Block
+		}
+		changed = changed || len(a.Block.Blocks) != len(b.Block.Blocks)
+	}
+	return changed
 }

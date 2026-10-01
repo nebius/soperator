@@ -135,6 +135,7 @@ func TestBuildMultiTopologyYAML_Golden(t *testing.T) {
     blocks:
         - block: block7
           nodes: h100-[0-3]
+        - block: unknown
 `,
 		},
 		{
@@ -161,6 +162,7 @@ func TestBuildMultiTopologyYAML_Golden(t *testing.T) {
     blocks:
         - block: block1
           nodes: h100-[0-1]
+        - block: unknown
 - topology: as-tree
   cluster_default: true
   tree:

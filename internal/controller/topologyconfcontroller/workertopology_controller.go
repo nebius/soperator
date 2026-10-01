@@ -9,7 +9,9 @@ import (
 	"maps"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -53,17 +55,22 @@ var (
 
 type WorkerTopologyReconciler struct {
 	BaseReconciler
-	namespace string
-	recorder  events.EventRecorder
+	namespace        string
+	recorder         events.EventRecorder
+	blockConflictsMu sync.Mutex
+	blockConflicts   map[types.NamespacedName]map[string]string
+
+	deferrableReconfigures reconfigureLimiter
 }
 
 // Event reasons reported against the SlurmCluster whose topology is misconfigured. They exist
 // because these situations are otherwise invisible: the config renders, the operator stays healthy,
 // and the first symptom is a job that cannot be scheduled.
 const (
-	reasonTopologyReachesNoNode  = "TopologyReachesNoNode"
-	reasonUnresolvedTopologyRef  = "UnresolvedTopologyRef"
-	reasonClusterDefaultConflict = "ClusterDefaultConflict"
+	reasonTopologyReachesNoNode   = "TopologyReachesNoNode"
+	reasonUnresolvedTopologyRef   = "UnresolvedTopologyRef"
+	reasonClusterDefaultConflict  = "ClusterDefaultConflict"
+	reasonBlockIBTopologyConflict = "BlockIBTopologyConflict"
 
 	actionRenderTopology = "RenderTopology"
 )
@@ -77,6 +84,7 @@ type Link struct {
 
 func NewWorkerTopologyReconciler(
 	client client.Client, scheme *runtime.Scheme, namespace string, recorder events.EventRecorder,
+	deferrableReconfigureInterval time.Duration, deferrableReconfigureBurst int,
 ) *WorkerTopologyReconciler {
 	return &WorkerTopologyReconciler{
 		BaseReconciler: BaseReconciler{
@@ -85,8 +93,16 @@ func NewWorkerTopologyReconciler(
 		},
 		namespace: namespace,
 		recorder:  recorder,
+		deferrableReconfigures: reconfigureLimiter{
+			interval: deferrableReconfigureInterval,
+			burst:    deferrableReconfigureBurst,
+		},
 	}
 }
+
+// eventNoteLimit is the events.k8s.io/v1 limit on an event note: the API server rejects longer
+// notes, so the event would be lost.
+const eventNoteLimit = 1024
 
 // recordTopologyIssue reports a topology misconfiguration on the SlurmCluster.
 func (r *WorkerTopologyReconciler) recordTopologyIssue(
@@ -95,7 +111,20 @@ func (r *WorkerTopologyReconciler) recordTopologyIssue(
 	if r.recorder == nil {
 		return
 	}
-	r.recorder.Eventf(slurmCluster, nil, corev1.EventTypeWarning, reason, actionRenderTopology, note, args...)
+	r.recorder.Eventf(slurmCluster, nil, corev1.EventTypeWarning, reason, actionRenderTopology,
+		"%s", truncateEventNote(fmt.Sprintf(note, args...)))
+}
+
+func truncateEventNote(note string) string {
+	const ellipsis = "..."
+	if len(note) <= eventNoteLimit {
+		return note
+	}
+	cut := eventNoteLimit - len(ellipsis)
+	for cut > 0 && !utf8.RuneStart(note[cut]) {
+		cut--
+	}
+	return note[:cut] + ellipsis
 }
 
 func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -106,12 +135,17 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	slurmCluster := &slurmv1.SlurmCluster{}
 	if err := r.Client.Get(ctx, req.NamespacedName, slurmCluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			r.forgetCluster(req.NamespacedName)
+			return ctrl.Result{}, nil
+		}
 		return ctrl.Result{}, fmt.Errorf("get SlurmCluster %q in namespace %q: %w", req.Name, req.Namespace, err)
 	}
 
 	shouldReconcileCluster := r.isClusterReconciliationNeeded(slurmCluster)
 
 	if !shouldReconcileCluster {
+		r.forgetCluster(req.NamespacedName)
 		return DefaultRequeueResult, nil
 	}
 
@@ -161,12 +195,32 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return DefaultRequeueResult, nil
 	}
 
+	// Held back rather than published without a request: sconfigcontroller would then record the new
+	// content as applied, and the request raised later over the same content could never be confirmed.
+	deferrable := deferrableTopologyChange(existingTopology, desiredTopology)
+	if deferrable && !r.deferrableReconfigures.hasToken(req.NamespacedName, time.Now()) {
+		logger.Info("Deferring topology change that only reorders or removes blocks, reconfigure rate limit reached")
+		publishedStructure, err := topologyStructure(existingTopology)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("calculate published topology structure: %w", err)
+		}
+		if err := r.ensureJailedConfig(ctx, req.Namespace, topoConfigName, slurmCluster.Name, configKey, publishedStructure); err != nil {
+			return ctrl.Result{}, fmt.Errorf("ensure JailedConfig: %w", err)
+		}
+		return DefaultRequeueResult, nil
+	}
+
 	// The content is published before the request, on purpose: requesting first would let
 	// sconfigcontroller reconfigure the old content and satisfy the request against it. Publishing
 	// first means the request only ever stands over content already in the ConfigMap.
 	if err := r.updateTopologyConfigMap(ctx, req.Namespace, topoConfigName, desiredTopology, configKey); err != nil {
 		logger.Error(err, "Update ConfigMap with topology config")
 		return ctrl.Result{}, fmt.Errorf("update ConfigMap with topology config: %w", err)
+	}
+	// Once published the change is committed to a reconfigure: the next reconcile sees no difference
+	// and raises the request even if ensureJailedConfig below fails now.
+	if deferrable {
+		r.deferrableReconfigures.take(req.NamespacedName, time.Now())
 	}
 
 	if err := r.ensureJailedConfig(
@@ -177,6 +231,11 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	logger.Info("Reconciliation completed successfully")
 	return DefaultRequeueResult, nil
+}
+
+func (r *WorkerTopologyReconciler) forgetCluster(key types.NamespacedName) {
+	r.forgetBlockConflicts(key)
+	r.deferrableReconfigures.forget(key)
 }
 
 // isClusterReconciliationNeeded reports whether the cluster describes a network topology at all.
@@ -577,7 +636,7 @@ func (r *WorkerTopologyReconciler) ensureJailedConfig(
 // reconcileReconfigureRequest decides whether the topology config should ask sconfigcontroller for
 // a `scontrol reconfigure`.
 //
-// It asks when the set of topologies, their plugins or their block sizes changed, because only a
+// It asks when the set of topologies, their plugins, block sizes or block order changed, because only a
 // re-read teaches slurmctld about those. It keeps asking until a reconfigure is confirmed for the
 // current generation, and withdraws the request only then: clearing it a reconcile later would race
 // with sconfigcontroller reading the spec, and the reconfigure would be lost.

@@ -111,9 +111,7 @@ func scenarioHasTags(scenario *messages.Scenario, requiredTags ...string) bool {
 // manualFeatures are embedded scenarios deliberately kept out of the default suite: they need a
 // cluster shaped a particular way, or they change the cluster while they run, so they are started
 // by hand with --scenario instead of by every e2e run.
-var manualFeatures = []string{
-	"features/topology_block.feature",
-}
+var manualFeatures []string
 
 // TestEveryEmbeddedFeatureIsRegisteredOrManual keeps a new feature file from being embedded and
 // then silently never running: it either belongs to the default suite or is declared manual here.

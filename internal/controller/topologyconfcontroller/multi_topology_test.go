@@ -121,7 +121,7 @@ func TestBuildTopologyEntry(t *testing.T) {
 		entry, err := buildTopologyEntry(ctx, slurmv1.NamedTopology{
 			Name: "topo-block",
 			Topo: slurmv1.TopologyPlugin{Type: consts.SlurmTopologyTypeBlock, BlockSizes: []int{4, 16}},
-		}, labelsByNode, gpuPodsByNode, nodeSets)
+		}, labelsByNode, gpuPodsByNode, nodeSets, blockIBPaths(labelsByNode))
 		require.NoError(t, err)
 
 		require.NotNil(t, entry.Block)
@@ -137,7 +137,7 @@ func TestBuildTopologyEntry(t *testing.T) {
 		entry, err := buildTopologyEntry(ctx, slurmv1.NamedTopology{
 			Name: "topo-tree",
 			Topo: slurmv1.TopologyPlugin{Type: consts.SlurmTopologyTypeTree},
-		}, labelsByNode, gpuPodsByNode, nodeSets)
+		}, labelsByNode, gpuPodsByNode, nodeSets, blockIBPaths(labelsByNode))
 		require.NoError(t, err)
 
 		require.NotNil(t, entry.Tree)
@@ -149,7 +149,7 @@ func TestBuildTopologyEntry(t *testing.T) {
 		_, err := buildTopologyEntry(ctx, slurmv1.NamedTopology{
 			Name: "topo-x",
 			Topo: slurmv1.TopologyPlugin{Type: "torus3d"},
-		}, labelsByNode, gpuPodsByNode, nodeSets)
+		}, labelsByNode, gpuPodsByNode, nodeSets, blockIBPaths(labelsByNode))
 		assert.ErrorContains(t, err, `unsupported topology type "torus3d"`)
 	})
 }

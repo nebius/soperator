@@ -1,6 +1,7 @@
 package sharedsteps
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"regexp"
 	"slices"
@@ -162,9 +163,8 @@ func yamlNodeCarriesValue(node *yaml.Node) bool {
 	}
 }
 
-// topologyStructure fingerprints what slurmctld can only learn by re-reading topology.yaml. It
-// mirrors the operator's own fingerprint, so the rendered config and the loaded one can be compared
-// without depending on node membership, which travels through the workers' own registrations.
+// topologyStructure compares topology settings without node membership. Block order is checked
+// separately with polling, because the file can be published before Slurm reloads it.
 func topologyStructure(entries []topologyEntry) string {
 	parts := make([]string, 0, len(entries))
 	for _, entry := range entries {
@@ -174,10 +174,31 @@ func topologyStructure(entries []topologyEntry) string {
 	return strings.Join(parts, ",")
 }
 
+// topologyReconfigureStructure mirrors the operator's JailedConfig annotation, including block order.
+func topologyReconfigureStructure(entries []topologyEntry) string {
+	parts := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		part := topologyStructure([]topologyEntry{entry})
+		if entry.Kind == topologyKindBlock {
+			var names []string
+			for _, block := range entry.Blocks {
+				names = append(names, block.Name)
+			}
+			part += fmt.Sprintf(":blocks=%x", sha256.Sum256([]byte(strings.Join(names, "\x00"))))
+		}
+		parts = append(parts, part)
+	}
+	return strings.Join(parts, ",")
+}
+
+func isUnknownTopologyUnit(name string) bool {
+	return name == "unknown" || strings.HasSuffix(name, ".unknown")
+}
+
 func validateNoWorkersUnderUnknown(entries []topologyEntry) error {
 	var problems []string
 	check := func(topology, name, nodes string) {
-		if name != "unknown" && !strings.HasSuffix(name, ".unknown") {
+		if !isUnknownTopologyUnit(name) {
 			return
 		}
 		if len(splitSlurmList(nodes)) > 0 {
@@ -361,8 +382,8 @@ func registeredLeaf(unit string) string {
 	return segments[len(segments)-1]
 }
 
-// partitionInfo is what `scontrol show partition` says about one partition. Slurm prints Topology=
-// on every partition, including the ones that fall back to the cluster default.
+// partitionInfo is what `scontrol show partition` says about one partition. An omitted Topology=
+// means the partition uses the cluster default.
 type partitionInfo struct {
 	Name     string
 	Topology string
