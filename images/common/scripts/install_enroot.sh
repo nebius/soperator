@@ -2,7 +2,7 @@
 
 set -e # Exit immediately if any command returns a non-zero error code
 
-ENROOT_VERSION=4.1.2
+ENROOT_VERSION=4.2.1
 
 apt-get update
 apt -y install \
