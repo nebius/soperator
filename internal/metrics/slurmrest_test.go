@@ -40,6 +40,22 @@ func TestNormalizeSlurmRESTPath(t *testing.T) {
 	}
 }
 
+func TestNormalizeSlurmRESTHost(t *testing.T) {
+	tests := map[string]string{
+		"soperator-rest-svc.soperator:6820":                   "soperator-rest-svc.soperator:6820",
+		"soperator-rest-svc.soperator.svc:6820":               "soperator-rest-svc.soperator:6820",
+		"soperator-rest-svc.soperator.svc.cluster.local:6820": "soperator-rest-svc.soperator:6820",
+		"soperator-rest-svc.soperator.svc":                    "soperator-rest-svc.soperator",
+		"localhost:6820":                                      "localhost:6820",
+		"127.0.0.1:6820":                                      "127.0.0.1:6820",
+	}
+	for host, want := range tests {
+		t.Run(host, func(t *testing.T) {
+			require.Equal(t, want, normalizeSlurmRESTHost(host))
+		})
+	}
+}
+
 func newInstrumentedRetryClient(t *testing.T, reg prometheus.Registerer) *http.Client {
 	t.Helper()
 	m := newSlurmRESTMetrics(reg)

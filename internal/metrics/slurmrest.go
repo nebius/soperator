@@ -82,7 +82,7 @@ func (m *slurmRESTMetrics) instrument(c *retryablehttp.Client) {
 	previousHook := c.RequestLogHook
 	c.RequestLogHook = func(logger retryablehttp.Logger, req *http.Request, attempt int) {
 		if attempt > 0 {
-			m.retries.WithLabelValues(slurmRESTController(req), req.URL.Host, normalizeSlurmRESTPath(req.URL.Path)).Inc()
+			m.retries.WithLabelValues(slurmRESTController(req), normalizeSlurmRESTHost(req.URL.Host), normalizeSlurmRESTPath(req.URL.Path)).Inc()
 		}
 		if previousHook != nil {
 			previousHook(logger, req, attempt)
@@ -97,6 +97,7 @@ type slurmRESTTransport struct {
 
 func (t *slurmRESTTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	controller := slurmRESTController(req)
+	host := normalizeSlurmRESTHost(req.URL.Host)
 	path := normalizeSlurmRESTPath(req.URL.Path)
 
 	start := time.Now()
@@ -105,7 +106,7 @@ func (t *slurmRESTTransport) RoundTrip(req *http.Request) (*http.Response, error
 	if err == nil {
 		code = strconv.Itoa(resp.StatusCode)
 	}
-	t.metrics.requests.WithLabelValues(controller, req.URL.Host, req.Method, path, code).Inc()
+	t.metrics.requests.WithLabelValues(controller, host, req.Method, path, code).Inc()
 	t.metrics.duration.WithLabelValues(controller, req.Method, path).Observe(time.Since(start).Seconds())
 	return resp, err
 }
@@ -136,4 +137,20 @@ func normalizeSlurmRESTPath(path string) string {
 		normalized = append(normalized, fourth)
 	}
 	return "/" + strings.Join(normalized, "/")
+}
+
+// normalizeSlurmRESTHost strips the cluster-local DNS suffixes so that the same Service reached as
+// rest-svc.ns, rest-svc.ns.svc or rest-svc.ns.svc.cluster.local lands in one host label.
+func normalizeSlurmRESTHost(host string) string {
+	name, port, hasPort := strings.Cut(host, ":")
+	for _, suffix := range []string{".svc.cluster.local", ".svc.cluster", ".svc"} {
+		if trimmed, ok := strings.CutSuffix(name, suffix); ok {
+			name = trimmed
+			break
+		}
+	}
+	if hasPort {
+		return name + ":" + port
+	}
+	return name
 }

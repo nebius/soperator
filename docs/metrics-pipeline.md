@@ -148,7 +148,7 @@ Slurm API client is built on (`slurmapi.DefaultHTTPClient`):
 
 - `soperator_slurm_rest_requests_total{controller, host, method, path, code}`: one increment per HTTP attempt,
   retries included. `path` is the request path with object names replaced by `{id}` (`/slurm/v0.0.44/node/{id}`),
-  `host` is the per-cluster REST service.
+  `host` is the per-cluster REST service with the `.svc` and `.svc.cluster.local` suffixes stripped, so the operator and the exporter report one host.
 - `soperator_slurm_rest_request_duration_seconds{controller, method, path}`: per-attempt latency up to the
   response headers.
 - `soperator_slurm_rest_retries_total{controller, host, path}`: retried attempts.
