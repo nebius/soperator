@@ -143,6 +143,21 @@ election, webhooks and runnables. Reads served from the informer cache never rea
 counted. The per-process client-go counter `rest_client_requests_total{code, method, host}` stays available for
 cross-checks.
 
+Slurm REST (slurmrestd) usage is attributed the same way, recorded inside the retrying HTTP client that every
+Slurm API client is built on (`slurmapi.DefaultHTTPClient`):
+
+- `soperator_slurm_rest_requests_total{controller, host, method, path, code}`: one increment per HTTP attempt,
+  retries included. `path` is the request path with object names replaced by `{id}` (`/slurm/v0.0.44/node/{id}`),
+  `host` is the per-cluster REST service.
+- `soperator_slurm_rest_request_duration_seconds{controller, method, path}`: per-attempt latency up to the
+  response headers.
+- `soperator_slurm_rest_retries_total{controller, host, path}`: retried attempts.
+
+Besides the reconcilers, `controller` takes the values `nodecache` (soperatorchecks background node list
+refresh), `exporter` (metrics exporter collection loop) and `manager` (untagged callers). The exporter has no
+controller-runtime manager, so it exposes these metrics from its self-monitoring port 8081, whose PodMonitor
+endpoint carries `component=exporter`; its Slurm metrics port 8080 is left unlabeled on purpose.
+
 | `component` | Chart | Controllers |
 | --- | --- | --- |
 | `soperator` | `helm/soperator` | `cluster`, `nodeset`, `nodeconfigurator`, `rollingupdate`, `nodetopology`, `workertopology`, `soperatorchecks.slurmapiclients` |

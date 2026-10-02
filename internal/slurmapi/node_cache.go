@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+
+	"nebius.ai/slurm-operator/internal/controllerconfig"
 )
 
 const (
@@ -44,7 +46,7 @@ func StartNodeCache(ctx context.Context, client Client, refreshInterval time.Dur
 		refreshInterval: refreshInterval,
 		ready:           make(chan struct{}),
 	}
-	go nc.run(ctx)
+	go nc.run(controllerconfig.WithControllerName(ctx, "nodecache"))
 	return nc
 }
 
