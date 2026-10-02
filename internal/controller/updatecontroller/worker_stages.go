@@ -4,6 +4,7 @@ import (
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
@@ -23,6 +24,7 @@ const (
 	workerMissingSlurmNode
 	workerBlocked
 	workerUnknown
+	workerWaitingForNodeReplacement
 	workerStageCount
 )
 
@@ -30,7 +32,7 @@ const (
 var workerStageLabelValues = [workerStageCount]string{
 	"ready", "waiting_for_slot", "waiting_for_jobs", "waiting_for_slurm", "stopping_worker",
 	"waiting_for_eviction", "deleting_pod", "starting_pod", "waiting_for_pod", "restoring_slurm",
-	"missing_slurm_node", "blocked", "unknown",
+	"missing_slurm_node", "blocked", "unknown", "waiting_for_node_replacement",
 }
 
 type workerStageObservation struct {
@@ -61,6 +63,9 @@ func (o *rolloutObservation) observeWorkerPlan(sts *kruisev1b1.StatefulSet, pods
 	for _, replacement := range replacements {
 		if worker := o.workers[replacement.pod.Name]; worker != nil {
 			worker.replacing = true
+			if worker.stage != workerDeleting && workerOperationPhase(&replacement.pod, replacement.operationID) == consts.LabelSoperatorWorkerOperationPhaseRecovering {
+				worker.stage = workerWaitingForNodeReplacement
+			}
 		}
 	}
 	for _, pod := range pods {
@@ -137,6 +142,8 @@ func (o *rolloutObservation) observeWorkerDecision(name string, node *slurmapi.N
 	cpus, knownCPUs := node.CPUAllocated()
 	worker.hasJobs = (knownCPUs && cpus > 0) || (node.AllocMemoryMB != nil && *node.AllocMemoryMB > 0) || node.IsCompletingState()
 	switch decision.action {
+	case workerUpdateActionWaitNodeReplacement, workerUpdateActionRecoverPod:
+		worker.stage = workerWaitingForNodeReplacement
 	case workerUpdateActionUndrain:
 		worker.stage = workerRestoringSlurm
 	case workerUpdateActionWait:

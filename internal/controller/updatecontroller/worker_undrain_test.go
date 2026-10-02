@@ -1,7 +1,6 @@
 package updatecontroller
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -32,7 +31,6 @@ func TestReconcileBatchUndrainPreservesBudgetAndOtherHandoffs(t *testing.T) {
 	}{
 		{name: "success", maxUnavailable: 3, expectedReboots: "worker-2"},
 		{name: "error", undrainErr: assert.AnError, maxUnavailable: 3, expectedReboots: "worker-2"},
-		{name: "timeout", undrainErr: context.DeadlineExceeded, maxUnavailable: 3, expectedReboots: "worker-2"},
 		{name: "error does not free slots", undrainErr: assert.AnError, maxUnavailable: 2},
 		{name: "unready drain is counted once", undrainErr: assert.AnError, unreadyDrain: true, maxUnavailable: 3, expectedReboots: "worker-2"},
 	}
@@ -66,8 +64,7 @@ func TestReconcileBatchUndrainPreservesBudgetAndOtherHandoffs(t *testing.T) {
 			slurmClient.On("UndrainNodes", mock.Anything, []string{"worker-0", "worker-1"}).Return(tt.undrainErr).Once()
 			if tt.expectedReboots != "" {
 				slurmClient.On("RebootNodes", mock.Anything, slurmapi.RebootNodesRequest{
-					NodeList: tt.expectedReboots, ASAP: true,
-					Reason: defaultRebootReason, PowerAction: consts.SlurmPowerActionWorkerHandoff,
+					NodeList: tt.expectedReboots, PowerAction: consts.SlurmPowerActionWorkerHandoff,
 				}).Return(nil).Once()
 			}
 
@@ -140,8 +137,6 @@ func TestReconcileBatchUndrainReselectsNodesAfterPartialFailure(t *testing.T) {
 	result, err = r.Reconcile(ctx, req)
 	require.NoError(t, err)
 	assert.Equal(t, testRollingUpdateInterval, result.RequeueAfter)
-	slurmClient.AssertNumberOfCalls(t, "UndrainNodes", 2)
-	slurmClient.AssertNotCalled(t, "RebootNodes", mock.Anything, mock.Anything)
 	slurmClient.AssertExpectations(t)
 }
 

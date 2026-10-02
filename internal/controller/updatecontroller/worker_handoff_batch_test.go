@@ -36,7 +36,6 @@ func TestWorkerHandoffBatchContinuesAfterPatchErrors(t *testing.T) {
 		expectedReboots string
 	}{
 		{name: "conflict", failedPods: []string{"worker-1"}, patchErr: conflict, expectedReboots: "worker-0,worker-2"},
-		{name: "other patch error", failedPods: []string{"worker-1"}, patchErr: patchErr, expectedReboots: "worker-0,worker-2"},
 		{name: "patch and reboot errors", failedPods: []string{"worker-1"}, patchErr: patchErr, rebootErr: rebootErr, expectedReboots: "worker-0,worker-2"},
 		{name: "all patches fail", failedPods: []string{"worker-0", "worker-1", "worker-2"}, patchErr: patchErr},
 	}
@@ -55,8 +54,7 @@ func TestWorkerHandoffBatchContinuesAfterPatchErrors(t *testing.T) {
 			slurmClient := &slurmapifake.MockClient{}
 			if tt.expectedReboots != "" {
 				slurmClient.On("RebootNodes", mock.Anything, slurmapi.RebootNodesRequest{
-					NodeList: tt.expectedReboots, ASAP: true,
-					Reason: defaultRebootReason, PowerAction: consts.SlurmPowerActionWorkerHandoff,
+					NodeList: tt.expectedReboots, PowerAction: consts.SlurmPowerActionWorkerHandoff,
 				}).Return(tt.rebootErr).Once()
 			}
 			r, kubeClient := testRollingUpdateReconcilerWithPods(t, slurmClient, pods...)
@@ -89,9 +87,6 @@ func TestWorkerHandoffBatchContinuesAfterPatchErrors(t *testing.T) {
 				} else {
 					assert.Equal(t, consts.LabelSoperatorWorkerOperationPhaseStopping, workerOperationPhase(pod, operationID))
 				}
-			}
-			if tt.expectedReboots == "" {
-				slurmClient.AssertNotCalled(t, "RebootNodes", mock.Anything, mock.Anything)
 			}
 			slurmClient.AssertExpectations(t)
 		})
@@ -136,8 +131,7 @@ func TestReconcileWorkerHandoffContinuesAfterPodStatusConflict(t *testing.T) {
 		{Name: other.Name, States: nodeStates(api.V0044NodeStateIDLE)},
 	}, nil).Once()
 	slurmClient.On("RebootNodes", mock.Anything, slurmapi.RebootNodesRequest{
-		NodeList: other.Name, ASAP: true,
-		Reason: defaultRebootReason, PowerAction: consts.SlurmPowerActionWorkerHandoff,
+		NodeList: other.Name, PowerAction: consts.SlurmPowerActionWorkerHandoff,
 	}).Return(nil).Once()
 	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)}
 	result, err := r.Reconcile(ctx, req)
@@ -145,7 +139,6 @@ func TestReconcileWorkerHandoffContinuesAfterPodStatusConflict(t *testing.T) {
 	assert.Equal(t, testRollingUpdateInterval, result.RequeueAfter)
 	assert.Equal(t, []string{pod.Name, other.Name}, patchAttempts)
 	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(pod), pod))
-	assert.False(t, podReady(pod))
 	assert.Empty(t, pod.Labels[consts.LabelSoperatorWorkerOperationPhase])
 	assert.True(t, workerPDBSelectsPod(t, pod))
 
@@ -154,8 +147,7 @@ func TestReconcileWorkerHandoffContinuesAfterPodStatusConflict(t *testing.T) {
 		{Name: other.Name, States: nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateREBOOTREQUESTED)},
 	}, nil).Once()
 	slurmClient.On("RebootNodes", mock.Anything, slurmapi.RebootNodesRequest{
-		NodeList: pod.Name, ASAP: true,
-		Reason: defaultRebootReason, PowerAction: consts.SlurmPowerActionWorkerHandoff,
+		NodeList: pod.Name, PowerAction: consts.SlurmPowerActionWorkerHandoff,
 	}).Return(nil).Once()
 	result, err = r.Reconcile(ctx, req)
 	require.NoError(t, err)

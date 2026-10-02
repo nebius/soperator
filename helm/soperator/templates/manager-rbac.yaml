@@ -56,6 +56,15 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
+  - containerrecreaterequests
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
   - resourcedistributions
   - statefulsets
   verbs:

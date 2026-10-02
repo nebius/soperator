@@ -28,6 +28,8 @@ func TestNodeFromAPI(t *testing.T) {
 					api.V0044NodeStateIDLE:        {},
 					api.V0044NodeStateDYNAMICNORM: {},
 				},
+				NextStateAfterReboot: []api.V0044NodeNextStateAfterReboot{api.V0044NodeNextStateAfterRebootINVALID},
+
 				Reason:              nil,
 				Partitions:          []string{"main"},
 				Tres:                "cpu=16,mem=191356M,billing=16,gres/gpu=1",
@@ -68,6 +70,7 @@ func TestNodeFromAPI(t *testing.T) {
 			assert.Equal(t, tt.want.ClusterName, got.ClusterName)
 			assert.Equal(t, tt.want.InstanceID, got.InstanceID)
 			assert.Equal(t, tt.want.States, got.States)
+			assert.Equal(t, tt.want.NextStateAfterReboot, got.NextStateAfterReboot)
 			assert.Equal(t, tt.want.Partitions, got.Partitions)
 			assert.Equal(t, tt.want.Tres, got.Tres)
 			assert.Equal(t, tt.want.Address, got.Address)

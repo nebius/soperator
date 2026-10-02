@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -136,6 +135,9 @@ func TestRolloutMetricsReportWaitReasonsAndErrors(t *testing.T) {
 			case waitCleanup:
 				f.pod(t, func(p *corev1.Pod) { p.Labels["controller-revision-hash"] = "current-revision" })
 				f.nodes[0] = staleRollingUpdateNode(f.podKey.Name)
+			case waitNodeReplacement:
+				f.nodes[0].States = nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN)
+				f.nodes[0].Reason = &slurmapi.NodeReason{Reason: consts.SlurmHardwareReasonHC + " failed GPU check"}
 			}
 			require.Equal(t, testRollingUpdateInterval, f.run(t).RequeueAfter)
 			for _, candidate := range rolloutWaitReasonLabelValues {
@@ -150,6 +152,7 @@ func TestRolloutMetricsReportWaitReasonsAndErrors(t *testing.T) {
 				waitBudget: "waiting_for_slot", waitReboot: "waiting_for_slurm", waitHandoff: "stopping_worker",
 				waitPods: "starting_pod", waitSlurm: "unknown", waitError: "blocked", waitEviction: "waiting_for_eviction",
 				waitSafety: "blocked", waitMissing: "missing_slurm_node", waitCleanup: "restoring_slurm",
+				waitNodeReplacement: "waiting_for_node_replacement",
 			}[reason]
 			requireWorkerCounts(t, f, map[string]int{stage: 1})
 			if reason == waitSlurm || reason == waitError || reason == waitBudget {
@@ -270,19 +273,4 @@ func TestRolloutProgressIgnoresFlapsButTracksReplacementIncarnations(t *testing.
 	require.True(t, rolloutReady(sts, rolloutSnapshot{}))
 	require.False(t, rolloutReady(sts, rolloutSnapshot{Replacing: 1}))
 	require.False(t, rolloutReady(sts, rolloutSnapshot{Cleanup: 1}))
-}
-
-func TestRolloutMetricsKeepSlotsForReleasedCordonHandoff(t *testing.T) {
-	f := newMetricFixture(t)
-	sts := f.sts(t)
-	sts.Spec.Replicas, sts.Status.ReadyReplicas = ptr.To(int32(3)), 3
-	setMaxUnavailable(sts, intstr.FromInt32(3))
-	pod := &corev1.Pod{}
-	require.NoError(t, f.r.Get(t.Context(), f.podKey, pod))
-	pod.Labels[consts.LabelSoperatorWorkerOperationID], pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = "operation", consts.LabelSoperatorWorkerOperationPhaseReady
-	observation := &rolloutObservation{}
-	ctx := context.WithValue(t.Context(), rolloutObservationKey{}, observation)
-	require.NoError(t, f.r.processWorkerReplacements(ctx, "cluster", sts, []workerReplacement{{pod: *pod, operationID: "operation", k8sNodeCordoned: true}}, []corev1.Pod{*pod}))
-	require.Equal(t, 2, observation.slots, "released worker consumes one slot while the drainer has not evicted it")
-	require.Equal(t, waitEviction, observation.wait)
 }

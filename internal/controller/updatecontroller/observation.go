@@ -50,7 +50,19 @@ func (o *rolloutObservation) waiting(reason string) {
 		return
 	}
 	// Errors and unsafe worker state outrank expected waits.
-	priority := map[string]int{waitPods: 1, waitCleanup: 2, waitReboot: 3, waitHandoff: 4, waitBudget: 5, waitEviction: 6, waitSafety: 7, waitMissing: 8, waitSlurm: 9, waitError: 10}
+	priority := map[string]int{
+		waitPods:            1,
+		waitCleanup:         2,
+		waitReboot:          3,
+		waitHandoff:         4,
+		waitBudget:          5,
+		waitEviction:        6,
+		waitNodeReplacement: 7,
+		waitSafety:          8,
+		waitMissing:         9,
+		waitSlurm:           10,
+		waitError:           11,
+	}
 	if priority[reason] > priority[o.wait] {
 		o.wait = reason
 	}

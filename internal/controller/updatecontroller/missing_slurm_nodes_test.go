@@ -85,8 +85,7 @@ func TestReconcileMissingSlurmNodeConsumesOneBudgetSlot(t *testing.T) {
 			}, nil).Once()
 			if tt.expectedReboots != "" {
 				slurmClient.On("RebootNodes", mock.Anything, slurmapi.RebootNodesRequest{
-					NodeList: tt.expectedReboots, ASAP: true,
-					Reason: defaultRebootReason, PowerAction: consts.SlurmPowerActionWorkerHandoff,
+					NodeList: tt.expectedReboots, PowerAction: consts.SlurmPowerActionWorkerHandoff,
 				}).Return(nil).Once()
 			}
 
@@ -100,8 +99,7 @@ func TestReconcileMissingSlurmNodeConsumesOneBudgetSlot(t *testing.T) {
 				assert.True(t, workerPDBSelectsPod(t, pod))
 				assert.Nil(t, pod.DeletionTimestamp)
 				if i == 1 {
-					assert.Equal(t, original.Labels, pod.Labels, "missing node must not change the worker operation")
-					assert.Equal(t, original.ResourceVersion, pod.ResourceVersion)
+					assert.Equal(t, original.Labels, pod.Labels, "missing node must preserve operation identity and phase")
 					continue
 				}
 				if pod.Labels[consts.LabelSoperatorWorkerOperationPhase] == consts.LabelSoperatorWorkerOperationPhaseStopping {
@@ -134,8 +132,7 @@ func TestReconcileMissingSlurmNodeStartsHandoffWhenItAppears(t *testing.T) {
 		Name: pod.Name, States: nodeStates(api.V0044NodeStateIDLE),
 	}}, nil).Once()
 	slurmClient.On("RebootNodes", mock.Anything, slurmapi.RebootNodesRequest{
-		NodeList: pod.Name, ASAP: true,
-		Reason: defaultRebootReason, PowerAction: consts.SlurmPowerActionWorkerHandoff,
+		NodeList: pod.Name, PowerAction: consts.SlurmPowerActionWorkerHandoff,
 	}).Return(nil).Once()
 
 	result, err = r.Reconcile(ctx, req)

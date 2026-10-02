@@ -149,6 +149,7 @@ func TestWorkerStagesKeepKnownPartialDeletionAndReportUnvisitedWorkers(t *testin
 		other := pod.DeepCopy()
 		other.Name, other.UID, other.ResourceVersion = fmt.Sprintf("worker-%d", i), types.UID(fmt.Sprintf("uid-%d", i)), ""
 		require.NoError(t, f.r.Create(t.Context(), other))
+		f.nodes = append(f.nodes, slurmapi.Node{Name: other.Name, States: nodeStates(api.V0044NodeStateIDLE)})
 	}
 	f.r.Client = interceptor.NewClient(f.r.Client.(client.WithWatch), interceptor.Funcs{Delete: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.DeleteOption) error {
 		if obj.GetName() == "worker-1" {
@@ -160,4 +161,24 @@ func TestWorkerStagesKeepKnownPartialDeletionAndReportUnvisitedWorkers(t *testin
 	// Owned pods can exceed desired during scale-down. A successful delete remains
 	// present in this snapshot, and later unvisited workers are not claimed ready.
 	requireWorkerCounts(t, f, map[string]int{"deleting_pod": 1, "blocked": 1, "unknown": 1})
+}
+
+func TestWorkerStagesKeepRecoveryVisibleWhenSlurmIsUnavailable(t *testing.T) {
+	f := newMetricFixture(t)
+	f.pod(t, func(pod *corev1.Pod) {
+		pod.Labels[consts.LabelSoperatorWorkerOperationID] = "current-revision"
+		pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseRecovering
+	})
+	f.listErr = errors.New("Slurm unavailable")
+	f.run(t)
+	requireWorkerCounts(t, f, map[string]int{"waiting_for_node_replacement": 1})
+	require.Equal(t, 1.0, metricValue(f.r.metrics.waiting, waitSlurm))
+	require.Equal(t, 1.0, metricValue(f.r.metrics.active))
+
+	// The phase is observed afresh; it must not survive once the worker leaves recovery.
+	f.pod(t, func(pod *corev1.Pod) {
+		pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseStopping
+	})
+	f.run(t)
+	requireWorkerCounts(t, f, map[string]int{"unknown": 1})
 }
