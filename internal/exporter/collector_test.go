@@ -88,9 +88,9 @@ func TestMetricsCollector_RefreshDiagDropsStaleSequence(t *testing.T) {
 	serverThreadCount1 := int32(1)
 
 	mockClient.EXPECT().GetDiag(mock.Anything).
-		Return(&api.V0044OpenapiDiagResp{Statistics: api.V0044StatsMsg{ServerThreadCount: &serverThreadCount2}}, nil).Once()
+		Return(&slurmapi.Diag{Statistics: slurmapi.Statistics{ServerThreadCount: &serverThreadCount2}}, nil).Once()
 	mockClient.EXPECT().GetDiag(mock.Anything).
-		Return(&api.V0044OpenapiDiagResp{Statistics: api.V0044StatsMsg{ServerThreadCount: &serverThreadCount1}}, nil).Once()
+		Return(&slurmapi.Diag{Statistics: slurmapi.Statistics{ServerThreadCount: &serverThreadCount1}}, nil).Once()
 
 	require.NoError(t, collector.refreshDiag(context.Background(), 2))
 	require.NoError(t, collector.refreshDiag(context.Background(), 1))
@@ -138,7 +138,7 @@ func TestMetricsCollector_PreservesLastSuccessfulJobsOnRefreshFailure(t *testing
 }
 
 // Helper function to setup mocks and collect state for tests
-func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *fake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *api.V0044OpenapiDiagResp) {
+func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *fake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *slurmapi.Diag) {
 	mockClient.EXPECT().ListNodes(mock.Anything).Return(nodes, nil).Once()
 	mockClient.EXPECT().ListJobsWithParams(mock.Anything, mock.Anything).Return(jobs, nil).Once()
 	mockClient.EXPECT().GetDiag(mock.Anything).Return(diag, nil).Once()
@@ -367,14 +367,14 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 
 		// Mock GetDiag response with realistic data
 		serverThreadCount := int32(1)
-		testDiag := &api.V0044OpenapiDiagResp{
-			Statistics: api.V0044StatsMsg{
+		testDiag := &slurmapi.Diag{
+			Statistics: slurmapi.Statistics{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}
 
 		arrayTaskID := int32(42)
-		userID := int32(1000)
+		userID := int64(1000)
 
 		// Define timestamps for the test job
 		submitTime := metav1.NewTime(time.Unix(1722697200, 0)) // 2024-08-03 10:00:00 UTC
@@ -495,8 +495,8 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		}
 
 		serverThreadCount := int32(1)
-		testDiag := &api.V0044OpenapiDiagResp{
-			Statistics: api.V0044StatsMsg{
+		testDiag := &slurmapi.Diag{
+			Statistics: slurmapi.Statistics{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}
@@ -610,7 +610,7 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 
 		// Mock realistic RPC diagnostics data based on production output
 		serverThreadCount := int32(1)
-		rpcsByMessageType := api.V0044StatsMsgRpcsByType{
+		rpcsByMessageType := []slurmapi.RPCByType{
 			{
 				MessageType: "REQUEST_NODE_INFO",
 				Count:       576,
@@ -627,7 +627,7 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 				TotalTime:   14239,
 			},
 		}
-		rpcsByUser := api.V0044StatsMsgRpcsByUser{
+		rpcsByUser := []slurmapi.RPCByUser{
 			{
 				User:      "root",
 				UserId:    0,
@@ -642,8 +642,8 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 			},
 		}
 
-		testDiag := &api.V0044OpenapiDiagResp{
-			Statistics: api.V0044StatsMsg{
+		testDiag := &slurmapi.Diag{
+			Statistics: slurmapi.Statistics{
 				ServerThreadCount: &serverThreadCount,
 				RpcsByMessageType: &rpcsByMessageType,
 				RpcsByUser:        &rpcsByUser,
@@ -701,7 +701,7 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 		collector := newTestMetricsCollector(mockClient)
 
 		serverThreadCount := int32(0)
-		rpcsByMessageType := api.V0044StatsMsgRpcsByType{
+		rpcsByMessageType := []slurmapi.RPCByType{
 			{
 				MessageType: "ZERO_COUNT",
 				Count:       0,
@@ -718,7 +718,7 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 				TotalTime:   1,
 			},
 		}
-		rpcsByUser := api.V0044StatsMsgRpcsByUser{
+		rpcsByUser := []slurmapi.RPCByUser{
 			{
 				User:      "zero_user",
 				UserId:    999,
@@ -733,8 +733,8 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 			},
 		}
 
-		testDiag := &api.V0044OpenapiDiagResp{
-			Statistics: api.V0044StatsMsg{
+		testDiag := &slurmapi.Diag{
+			Statistics: slurmapi.Statistics{
 				ServerThreadCount: &serverThreadCount,
 				RpcsByMessageType: &rpcsByMessageType,
 				RpcsByUser:        &rpcsByUser,
@@ -859,8 +859,8 @@ func TestMetricsCollector_GetDiag_NilFields(t *testing.T) {
 		collector := newTestMetricsCollector(mockClient)
 
 		// Mock GetDiag response with nil fields
-		testDiag := &api.V0044OpenapiDiagResp{
-			Statistics: api.V0044StatsMsg{
+		testDiag := &slurmapi.Diag{
+			Statistics: slurmapi.Statistics{
 				ServerThreadCount: nil, // Should not emit metric
 				RpcsByMessageType: nil, // Should not emit metrics
 				RpcsByUser:        nil, // Should not emit metrics
@@ -910,7 +910,7 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 		startTime := metav1.NewTime(now.Add(-31 * time.Second))  // 31 seconds ago
 		endTime := metav1.NewTime(now)                           // now (for completed jobs)
 		zeroTime := metav1.NewTime(time.Unix(0, 0))              // Unix epoch (should be treated as empty)
-		userID := int32(1000)
+		userID := int64(1000)
 
 		testJobs := []slurmapi.Job{
 			{
@@ -985,8 +985,8 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 
 		// Mock GetDiag response
 		serverThreadCount := int32(1)
-		testDiag := &api.V0044OpenapiDiagResp{
-			Statistics: api.V0044StatsMsg{
+		testDiag := &slurmapi.Diag{
+			Statistics: slurmapi.Statistics{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}
@@ -1155,8 +1155,8 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 		}
 
 		serverThreadCount := int32(1)
-		testDiag := &api.V0044OpenapiDiagResp{
-			Statistics: api.V0044StatsMsg{
+		testDiag := &slurmapi.Diag{
+			Statistics: slurmapi.Statistics{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}

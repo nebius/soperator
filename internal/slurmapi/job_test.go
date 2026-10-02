@@ -81,13 +81,13 @@ func TestJobFromAPI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := JobFromAPI(tt.apiJob)
+			got, err := jobFromControllerAPI(jobResponseFixture[controllerJob](t, tt.apiJob))
 			if (err != nil) != tt.wantErr {
-				t.Errorf("JobFromAPI() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("jobFromControllerAPI() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("JobFromAPI() = %v, want %v", got, tt.want)
+				t.Errorf("jobFromControllerAPI() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -367,9 +367,9 @@ func TestJobFromAccountingAPI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := JobFromAccountingAPI(tt.apiJob)
+			got, err := jobFromAccountingAPI(jobResponseFixture[accountingJob](t, tt.apiJob))
 			if (err != nil) != tt.wantErr {
-				t.Fatalf("JobFromAccountingAPI() error = %v, wantErr %v", err, tt.wantErr)
+				t.Fatalf("jobFromAccountingAPI() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.wantErr {
 				return
@@ -451,7 +451,7 @@ func TestJobFromAccountingAPI_RunningProjectsEndTime(t *testing.T) {
 		Number: ptr.To(limitMinutes),
 	})
 
-	got, err := JobFromAccountingAPI(apiJob)
+	got, err := jobFromAccountingAPI(jobResponseFixture[accountingJob](t, apiJob))
 	require.NoError(t, err)
 
 	require.NotNil(t, got.EndTime)
@@ -463,7 +463,7 @@ func TestJobFromAccountingAPI_RunningWithUnlimitedTimeLeavesEndNil(t *testing.T)
 		Infinite: ptr.To(true),
 	})
 
-	got, err := JobFromAccountingAPI(apiJob)
+	got, err := jobFromAccountingAPI(jobResponseFixture[accountingJob](t, apiJob))
 	require.NoError(t, err)
 	assert.Nil(t, got.EndTime)
 }
@@ -471,7 +471,7 @@ func TestJobFromAccountingAPI_RunningWithUnlimitedTimeLeavesEndNil(t *testing.T)
 func TestJobFromAccountingAPI_RunningWithUnsetTimeLimitLeavesEndNil(t *testing.T) {
 	apiJob := runningJobWithTimeLimit(t, int64(1722697230), nil)
 
-	got, err := JobFromAccountingAPI(apiJob)
+	got, err := jobFromAccountingAPI(jobResponseFixture[accountingJob](t, apiJob))
 	require.NoError(t, err)
 	assert.Nil(t, got.EndTime)
 }
@@ -499,7 +499,7 @@ func TestJobFromAccountingAPI_NormalizesUnallocatedNodes(t *testing.T) {
 				},
 				Nodes: ptr.To(tt.nodes),
 			}
-			got, err := JobFromAccountingAPI(apiJob)
+			got, err := jobFromAccountingAPI(jobResponseFixture[accountingJob](t, apiJob))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got.Nodes)
 		})
@@ -551,7 +551,7 @@ func TestIsStaleAccountingPending(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, isStaleAccountingPending(tt.job, cutoff))
+			assert.Equal(t, tt.want, isStaleAccountingPending(jobResponseFixture[accountingJob](t, tt.job), cutoff))
 		})
 	}
 }
@@ -600,7 +600,7 @@ func TestJobFromAPI_SmokeTest(t *testing.T) {
 			err = json.Unmarshal(data, &apiJob)
 			require.NoError(t, err)
 
-			got, err := JobFromAPI(apiJob)
+			got, err := jobFromControllerAPI(jobResponseFixture[controllerJob](t, apiJob))
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -791,9 +791,18 @@ func TestJobFromAccountingAPI_PreservesArrayTaskString(t *testing.T) {
 			// TaskId intentionally unset — slurmdbd's master-record shape.
 		},
 	}
-	got, err := JobFromAccountingAPI(apiJob)
+	got, err := jobFromAccountingAPI(jobResponseFixture[accountingJob](t, apiJob))
 	require.NoError(t, err)
 	assert.Nil(t, got.ArrayTaskID)
 	assert.Equal(t, "1-5", got.ArrayTaskString)
 	assert.Equal(t, "1-5", got.GetArrayTaskIDString())
+}
+
+func jobResponseFixture[T any](t *testing.T, input any) T {
+	t.Helper()
+	data, err := json.Marshal(input)
+	require.NoError(t, err)
+	var result T
+	require.NoError(t, json.Unmarshal(data, &result))
+	return result
 }
