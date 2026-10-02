@@ -8,17 +8,18 @@ import (
 )
 
 type Node struct {
-	Name        string
-	ClusterName string
-	InstanceID  string
-	States      map[api.V0044NodeState]struct{}
-	Reason      *NodeReason
-	Partitions  []string
-	Tres        string    // Trackable Resources (e.g., CPUs, GPUs) assigned to the node.
-	Address     string    // IP Address of the node in the Kubernetes cluster.
-	BootTime    time.Time // The boot time of the node.
-	Comment     string
-	Reservation string
+	Name                 string
+	ClusterName          string
+	InstanceID           string
+	States               map[api.V0044NodeState]struct{}
+	Reason               *NodeReason
+	Partitions           []string
+	Tres                 string    // Trackable Resources (e.g., CPUs, GPUs) assigned to the node.
+	Address              string    // IP Address of the node in the Kubernetes cluster.
+	BootTime             time.Time // The boot time of the node.
+	Comment              string
+	Reservation          string
+	NextStateAfterReboot []api.V0044NodeNextStateAfterReboot
 
 	// Resource-related fields (nullable to detect missing data)
 	CPUs                *int32
@@ -84,6 +85,10 @@ func NodeFromAPI(node api.V0044Node) (Node, error) {
 		Tres:        *node.Tres,
 		Address:     *node.Address,
 		Comment:     *node.Comment,
+	}
+
+	if node.NextStateAfterReboot != nil {
+		res.NextStateAfterReboot = *node.NextStateAfterReboot
 	}
 
 	res.CPUs = node.Cpus

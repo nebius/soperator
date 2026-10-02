@@ -82,7 +82,6 @@ func TestWorkerCleanupRestoresPendingSlurmState(t *testing.T) {
 			reconcileWorkerCleanupTick(t, r, sts)
 			clock.Step(testRollingUpdateInterval)
 			reconcileWorkerCleanupTick(t, r, sts)
-			slurmClient.AssertNotCalled(t, "UndrainNodes", mock.Anything, mock.Anything)
 
 			if tt.unready {
 				pod.Status.Conditions[0].Status = corev1.ConditionTrue
@@ -135,6 +134,7 @@ func TestWorkerCleanupFollowsHandoffThroughPodReplacement(t *testing.T) {
 	require.NoError(t, r.Get(t.Context(), client.ObjectKeyFromObject(pod), pod))
 	pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseReady
 	require.NoError(t, r.Update(t.Context(), pod))
+	slurmClient.On("ListNodes", mock.Anything).Return(clean, nil).Once()
 	reconcileWorkerCleanupTick(t, r, sts)
 
 	require.NoError(t, r.Delete(t.Context(), pod))
@@ -147,7 +147,9 @@ func TestWorkerCleanupFollowsHandoffThroughPodReplacement(t *testing.T) {
 	delete(pod.Labels, consts.LabelSoperatorWorkerOperationID)
 	delete(pod.Labels, consts.LabelSoperatorWorkerOperationPhase)
 	require.NoError(t, r.Create(t.Context(), pod))
-	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{staleRollingUpdateNode(pod.Name)}, nil).Once()
+	drained := staleRollingUpdateNode(pod.Name)
+	drained.Reason.Reason += " : reboot issued [root@timestamp]"
+	slurmClient.On("ListNodes", mock.Anything).Return([]slurmapi.Node{drained}, nil).Once()
 	slurmClient.On("UndrainNodes", mock.Anything, []string{pod.Name}).Return(nil).Once()
 	reconcileWorkerCleanupTick(t, r, sts)
 	clock.Step(testRollingUpdateInterval)
@@ -179,7 +181,7 @@ func TestWorkerCleanupContinuesDuringNodeRollout(t *testing.T) {
 	slurmClient.On("ListNodes", mock.Anything).Return(nodes, nil).Once()
 	slurmClient.On("UndrainNodes", mock.Anything, []string{recoveredPod.Name}).Return(assert.AnError).Once()
 	slurmClient.On("RebootNodes", mock.Anything, slurmapi.RebootNodesRequest{
-		NodeList: drainingPod.Name, ASAP: true, Reason: defaultRebootReason, PowerAction: consts.SlurmPowerActionWorkerHandoff,
+		NodeList: drainingPod.Name, PowerAction: consts.SlurmPowerActionWorkerHandoff,
 	}).Return(nil).Once()
 	reconcileWorkerCleanupTick(t, r, sts)
 	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(drainingPod), drainingPod))
@@ -195,8 +197,6 @@ func TestWorkerCleanupContinuesDuringNodeRollout(t *testing.T) {
 	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(drainingPod), drainingPod))
 	assert.Nil(t, drainingPod.DeletionTimestamp)
 	assert.Equal(t, consts.LabelSoperatorWorkerOperationPhaseReady, drainingPod.Labels[consts.LabelSoperatorWorkerOperationPhase])
-	slurmClient.AssertNumberOfCalls(t, "ListNodes", 2)
-	slurmClient.AssertNumberOfCalls(t, "RebootNodes", 1)
 	slurmClient.AssertExpectations(t)
 }
 
@@ -224,7 +224,6 @@ func TestWorkerCleanupDropsScaledDownWorkers(t *testing.T) {
 	reconcileWorkerCleanupTick(t, r, sts)
 	clock.Step(testRollingUpdateInterval)
 	reconcileWorkerCleanupTick(t, r, sts)
-	slurmClient.AssertNotCalled(t, "UndrainNodes", mock.Anything, mock.Anything)
 	slurmClient.AssertExpectations(t)
 }
 

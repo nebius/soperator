@@ -43,8 +43,12 @@ const (
 
 	AnnotationConfigHash = K8sGroupNameSoperator + "/config-hash"
 
-	LabelSoperatorWorkerOperationID            = K8sGroupNameSoperator + "/worker-operation-id"
-	LabelSoperatorWorkerOperationPhase         = K8sGroupNameSoperator + "/worker-operation-phase"
-	LabelSoperatorWorkerOperationPhaseStopping = "stopping"
-	LabelSoperatorWorkerOperationPhaseReady    = "ready"
+	LabelSoperatorWorkerOperationID                = K8sGroupNameSoperator + "/worker-operation-id"
+	LabelSoperatorWorkerOperationPhase             = K8sGroupNameSoperator + "/worker-operation-phase"
+	LabelSoperatorWorkerOperationPhaseStopping     = "stopping"
+	LabelSoperatorWorkerOperationPhaseReady        = "ready"
+	LabelSoperatorWorkerOperationPhaseAcknowledged = "acknowledged"
+	LabelSoperatorWorkerOperationPhaseRecovering   = "recovering"
+	AnnotationSoperatorWorkerRecoveryRequest       = K8sGroupNameSoperator + "/worker-recovery-request"
+	AnnotationSoperatorWorkerRecoveryContainerID   = K8sGroupNameSoperator + "/worker-recovery-container-id"
 )

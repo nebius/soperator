@@ -20,10 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
 
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -64,25 +66,25 @@ const (
 	workerUpdateActionTrackInFlight
 	workerUpdateActionUndrain
 	workerUpdateActionDeleteOfflinePod
+	workerUpdateActionDeleteFailedInitPod
+	workerUpdateActionWaitNodeReplacement
+	workerUpdateActionDeleteReadyPod
+	workerUpdateActionRecoverPod
+	workerUpdateActionReleasePod
 )
 
 type workerUpdateDecision struct {
-	action                  workerUpdateAction
-	operationPhase          string
-	slurmdCrashLooping      bool
-	rebootHandoffInProgress bool
-	managedRebootInProgress bool
+	action                 workerUpdateAction
+	operationPhase         string
+	slurmdCrashLooping     bool
+	workerInitCrashLooping bool
 }
 
 type workerReplacement struct {
 	pod             corev1.Pod
 	operationID     string
 	k8sNodeCordoned bool
-}
-
-type workerHandoffProgress struct {
-	pending                  []workerReplacement
-	readyPodsConsumingBudget int
+	preserveDrain   bool
 }
 
 type RollingUpdateReconciler struct {
@@ -115,6 +117,7 @@ func NewRollingUpdateReconciler(
 }
 
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=containerrecreaterequests,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 
@@ -217,7 +220,10 @@ func planWorkerPodReplacements(
 		operationID := pod.Labels[consts.LabelSoperatorWorkerOperationID]
 		phase := pod.Labels[consts.LabelSoperatorWorkerOperationPhase]
 		hasActiveHandoff := operationID != "" &&
-			(phase == consts.LabelSoperatorWorkerOperationPhaseStopping || phase == consts.LabelSoperatorWorkerOperationPhaseReady)
+			(phase == consts.LabelSoperatorWorkerOperationPhaseStopping ||
+				phase == consts.LabelSoperatorWorkerOperationPhaseAcknowledged ||
+				phase == consts.LabelSoperatorWorkerOperationPhaseReady ||
+				phase == consts.LabelSoperatorWorkerOperationPhaseRecovering)
 		needsRevisionUpdate := sts.Status.UpdateRevision != "" && pod.Labels["controller-revision-hash"] != sts.Status.UpdateRevision
 		if !k8sNodeCordoned && !needsRevisionUpdate && !hasActiveHandoff {
 			continue
@@ -258,14 +264,16 @@ func (r *RollingUpdateReconciler) processWorkerReplacements(
 	cleanupPods := workerPodsWithoutReplacements(pods, replacements)
 
 	prioritizeCordonedWorkers(replacements)
-	progress, err := r.reconcileWorkerPodHandoffs(ctx, replacements)
-	if err != nil {
-		return err
+	var pending []workerReplacement
+	for _, replacement := range replacements {
+		if replacement.pod.DeletionTimestamp == nil {
+			pending = append(pending, replacement)
+		}
 	}
 	if observation != nil {
-		observation.slots = max(0, rebootBudget(sts)-unavailableReplicas(sts)-progress.readyPodsConsumingBudget)
+		observation.slots = max(0, rebootBudget(sts)-unavailableReplicas(sts))
 	}
-	if len(progress.pending) == 0 &&
+	if len(pending) == 0 &&
 		(len(cleanupPods) == 0 || !cleanup.needsCheck(r.clock.Now(), r.idleSlurmAuditInterval)) {
 		return nil
 	}
@@ -288,12 +296,11 @@ func (r *RollingUpdateReconciler) processWorkerReplacements(
 	}
 	nodesToUndrain := staleWorkerCleanupDrains(sts, cleanupPods, slurmNodes)
 	candidates, readyPodsConsumingBudget, err := r.reconcileSlurmWorkerHandoffs(
-		ctx, slurmClient, slurmNodes, progress.pending, nodesToUndrain,
+		ctx, slurmClient, slurmNodes, pending, nodesToUndrain,
 	)
-	if err != nil || len(progress.pending) == 0 {
+	if err != nil || len(pending) == 0 {
 		return err
 	}
-	readyPodsConsumingBudget += progress.readyPodsConsumingBudget
 	availableSlots := availableWorkerHandoffSlots(ctx, sts, readyPodsConsumingBudget)
 	if observation != nil {
 		observation.slots = availableSlots
@@ -310,44 +317,6 @@ func prioritizeCordonedWorkers(replacements []workerReplacement) {
 	})
 }
 
-func (r *RollingUpdateReconciler) reconcileWorkerPodHandoffs(
-	ctx context.Context, replacements []workerReplacement,
-) (workerHandoffProgress, error) {
-	var progress workerHandoffProgress
-	for _, replacement := range replacements {
-		pod := replacement.pod
-		if pod.DeletionTimestamp != nil {
-			continue
-		}
-		handoffReady := workerOperationPhase(&pod, replacement.operationID) == consts.LabelSoperatorWorkerOperationPhaseReady
-		if replacement.k8sNodeCordoned && handoffReady {
-			observationFromContext(ctx).waiting(waitEviction)
-			observationFromContext(ctx).setWorkerStage(pod.Name, workerWaitingForEviction)
-			// A released worker still consumes capacity until its replacement is Ready.
-			if podReady(&pod) {
-				progress.readyPodsConsumingBudget++
-			}
-			continue
-		}
-		// A crash-loop snapshot cannot release a cordoned worker for later eviction:
-		// it may recover and accept jobs before the drainer removes it.
-		if handoffReady || (!replacement.k8sNodeCordoned &&
-			containerCrashLoopBackOff(pod.Status.InitContainerStatuses, consts.ContainerNameWorkerInit)) {
-			if err := r.deleteWorkerPod(ctx, &pod); err != nil {
-				return workerHandoffProgress{}, err
-			}
-			// Account for this handoff against the readiness snapshot taken before deletion.
-			// Unready pods are already included in unavailableReplicas.
-			if podReady(&pod) {
-				progress.readyPodsConsumingBudget++
-			}
-			continue
-		}
-		progress.pending = append(progress.pending, replacement)
-	}
-	return progress, nil
-}
-
 func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
 	ctx context.Context, slurmClient slurmapi.Client, slurmNodes []slurmapi.Node,
 	replacements []workerReplacement, nodesToUndrain []string,
@@ -361,19 +330,26 @@ func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
 	for _, replacement := range replacements {
 		pod := replacement.pod
 		slurmNode, found := slurmNodesByName[pod.Name]
+		decision := decideWorkerUpdateAction(replacement, &slurmNode)
 		if !found {
-			observationFromContext(ctx).waiting(waitMissing)
-			observationFromContext(ctx).setWorkerStage(pod.Name, workerMissingSlurmNode)
-			missingSlurmNodes = append(missingSlurmNodes, pod.Name)
-			// Unknown Slurm state consumes a slot even when Kubernetes reports Ready.
-			if podReady(&pod) {
-				readyPodsConsumingBudget++
+			// Failed init can be replaced before first registration, but an existing
+			// Slurm node must pass the health gate before we move its worker.
+			if !replacement.k8sNodeCordoned &&
+				decision.operationPhase != consts.LabelSoperatorWorkerOperationPhaseRecovering &&
+				decision.workerInitCrashLooping {
+				decision.action = workerUpdateActionDeleteFailedInitPod
+			} else {
+				observationFromContext(ctx).waiting(waitMissing)
+				observationFromContext(ctx).setWorkerStage(pod.Name, workerMissingSlurmNode)
+				missingSlurmNodes = append(missingSlurmNodes, pod.Name)
+				// Unknown Slurm state consumes a slot even when Kubernetes reports Ready.
+				if podReady(&pod) {
+					readyPodsConsumingBudget++
+				}
+				continue
 			}
-			continue
 		}
 
-		decision := decideWorkerUpdateAction(replacement, &slurmNode)
-		observationFromContext(ctx).observeWorkerDecision(pod.Name, &slurmNode, decision)
 		if observation := observationFromContext(ctx); observation != nil {
 			if slurmNode.IsRebootIssuedState() {
 				observation.snapshot.Issued++
@@ -381,10 +357,74 @@ func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
 				observation.snapshot.Requested++
 			}
 		}
+		if workerOperationPhase(&pod, replacement.operationID) == consts.LabelSoperatorWorkerOperationPhaseRecovering {
+			complete, err := r.reconcileWorkerRecovery(ctx, &pod, &slurmNode)
+			if err != nil {
+				observationFromContext(ctx).setWorkerStage(pod.Name, workerBlocked)
+				return nil, 0, err
+			}
+			if !complete {
+				observationFromContext(ctx).waiting(waitNodeReplacement)
+				observationFromContext(ctx).setWorkerStage(pod.Name, workerWaitingForNodeReplacement)
+				if podReady(&pod) {
+					readyPodsConsumingBudget++
+				}
+				continue
+			}
+		}
+
+		if decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseReady &&
+			(decision.action == workerUpdateActionWaitNodeReplacement || decision.action == workerUpdateActionRecoverPod) {
+			// Revoke the eviction release before waiting or attempting recovery.
+			patchBase := pod.DeepCopy()
+			pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseAcknowledged
+			if decision.action == workerUpdateActionRecoverPod {
+				pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseRecovering
+			}
+			if err := r.Patch(ctx, &pod, client.StrategicMergeFrom(patchBase, client.MergeFromWithOptimisticLock{})); err != nil {
+				observationFromContext(ctx).setWorkerStage(pod.Name, workerBlocked)
+				return nil, 0, fmt.Errorf("protect worker %s/%s for maintenance: %w", pod.Namespace, pod.Name, err)
+			}
+		}
+
+		observationFromContext(ctx).observeWorkerDecision(pod.Name, &slurmNode, decision)
+
 		switch decision.action {
+		case workerUpdateActionWaitNodeReplacement:
+			observationFromContext(ctx).waiting(waitNodeReplacement)
+			logger.Info("Waiting for unhealthy worker's Kubernetes node to recover before rolling update",
+				"pod", pod.Name, "slurmNode", slurmNode.Name, "reason", slurmNode.Reason)
+			if podReady(&pod) && (slurmNode.IsRebootRequestedState() || slurmNode.IsRebootIssuedState() ||
+				decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseRecovering ||
+				decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseReady ||
+				decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseAcknowledged) {
+				readyPodsConsumingBudget++
+			}
+			continue
+		case workerUpdateActionRecoverPod:
+			observationFromContext(ctx).waiting(waitNodeReplacement)
+			if _, err := r.reconcileWorkerRecovery(ctx, &pod, &slurmNode); err != nil {
+				observationFromContext(ctx).setWorkerStage(pod.Name, workerBlocked)
+				return nil, 0, err
+			}
+		case workerUpdateActionReleasePod:
+			if err := r.releaseWorkerForEviction(ctx, &pod); err != nil {
+				return nil, 0, err
+			}
+			observationFromContext(ctx).waiting(waitEviction)
+			observationFromContext(ctx).setWorkerStage(pod.Name, workerWaitingForEviction)
+		case workerUpdateActionDeleteReadyPod:
+			if err := r.deleteWorkerPod(ctx, &pod); err != nil {
+				return nil, 0, err
+			}
 		case workerUpdateActionUndrain:
 			observationFromContext(ctx).waiting(waitCleanup)
 			nodesToUndrain = append(nodesToUndrain, slurmNode.Name)
+		case workerUpdateActionDeleteFailedInitPod:
+			if err := r.deleteWorkerPod(ctx, &pod); err != nil {
+				return nil, 0, err
+			}
+			logger.Info("Replacing worker with crash-looping init", "pod", pod.Name)
 		case workerUpdateActionDeleteOfflinePod:
 			if err := r.deleteWorkerPod(ctx, &pod); err != nil {
 				return nil, 0, err
@@ -394,8 +434,6 @@ func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
 				"pod", pod.Name,
 				"slurmNode", slurmNode.Name,
 				"slurmdCrashLooping", decision.slurmdCrashLooping,
-				"rebootHandoffInProgress", decision.rebootHandoffInProgress,
-				"managedRebootInProgress", decision.managedRebootInProgress,
 				"operationID", replacement.operationID,
 				"operationPhase", decision.operationPhase,
 			)
@@ -415,6 +453,7 @@ func (r *RollingUpdateReconciler) reconcileSlurmWorkerHandoffs(
 				observationFromContext(ctx).waiting(waitReboot)
 			}
 		case workerUpdateActionScheduleReboot:
+			replacement.preserveDrain = slurmNode.IsDrainState()
 			candidates = append(candidates, replacement)
 			continue
 		}
@@ -465,6 +504,7 @@ func (r *RollingUpdateReconciler) startWorkerHandoffsWithinBudget(
 ) error {
 	logger := log.FromContext(ctx)
 	var slurmNodesToReboot []string
+	var drainedSlurmNodesToReboot []string
 	var handoffErrors []error
 	for _, candidate := range candidates {
 		pod := candidate.pod
@@ -484,31 +524,93 @@ func (r *RollingUpdateReconciler) startWorkerHandoffsWithinBudget(
 			handoffErrors = append(handoffErrors, err)
 			continue
 		}
-		slurmNodesToReboot = append(slurmNodesToReboot, pod.Name)
+		if candidate.preserveDrain {
+			drainedSlurmNodesToReboot = append(drainedSlurmNodesToReboot, pod.Name)
+		} else {
+			slurmNodesToReboot = append(slurmNodesToReboot, pod.Name)
+		}
 	}
 	if observation := observationFromContext(ctx); observation != nil {
 		observation.slots = availableSlots
 	}
-	if len(slurmNodesToReboot) == 0 {
+	if len(slurmNodesToReboot) == 0 && len(drainedSlurmNodesToReboot) == 0 {
 		logger.Info("No additional worker handoffs can be scheduled")
 		return errors.Join(handoffErrors...)
 	}
 
-	if err := slurmClient.RebootNodes(ctx, slurmapi.RebootNodesRequest{
-		NodeList:    strings.Join(slurmNodesToReboot, ","),
-		ASAP:        true,
-		Reason:      defaultRebootReason,
-		PowerAction: consts.SlurmPowerActionWorkerHandoff,
-	}); err != nil {
-		observationFromContext(ctx).waiting(waitSlurm)
-		observationFromContext(ctx).observeWorkerRebootRequest(slurmNodesToReboot, true)
-		handoffErrors = append(handoffErrors, fmt.Errorf("schedule slurm reboot through rest api: %w", err))
-		return errors.Join(handoffErrors...)
+	// Drain explicitly and use plain reboot to avoid arming an automatic UNDRAIN.
+	// Leave Reason unset on the reboot itself so health failures arriving after
+	// the drain remain associated with the original Kubernetes node.
+	var batches = []struct {
+		nodes []string
+		drain bool
+	}{
+		{nodes: slurmNodesToReboot, drain: true},
+		{nodes: drainedSlurmNodesToReboot},
 	}
-	logger.Info("Scheduled Slurm reboot through REST API", "nodes", slurmNodesToReboot)
-	observationFromContext(ctx).observeWorkerRebootRequest(slurmNodesToReboot, false)
-	observationFromContext(ctx).waiting(waitReboot)
+	for _, batch := range batches {
+		if len(batch.nodes) == 0 {
+			continue
+		}
+		if batch.drain {
+			if err := drainWorkersForReboot(ctx, slurmClient, batch.nodes); err != nil {
+				observationFromContext(ctx).waiting(waitSlurm)
+				observationFromContext(ctx).observeWorkerRebootRequest(batch.nodes, true)
+				handoffErrors = append(handoffErrors, err)
+				continue
+			}
+		}
+		if err := slurmClient.RebootNodes(ctx, slurmapi.RebootNodesRequest{
+			NodeList:    strings.Join(batch.nodes, ","),
+			PowerAction: consts.SlurmPowerActionWorkerHandoff,
+		}); err != nil {
+			observationFromContext(ctx).waiting(waitSlurm)
+			observationFromContext(ctx).observeWorkerRebootRequest(batch.nodes, true)
+			handoffErrors = append(handoffErrors, fmt.Errorf("schedule slurm reboot through rest api: %w", err))
+			continue
+		}
+		logger.Info("Scheduled Slurm reboot through REST API", "nodes", batch.nodes)
+		observationFromContext(ctx).observeWorkerRebootRequest(batch.nodes, false)
+		observationFromContext(ctx).waiting(waitReboot)
+	}
 	return errors.Join(handoffErrors...)
+}
+
+func drainWorkersForReboot(ctx context.Context, slurmClient slurmapi.Client, names []string) error {
+	states := []api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateDRAIN}
+	reason := defaultRebootReason
+	response, err := slurmClient.SlurmV0044PostNodesWithResponse(ctx, api.V0044UpdateNodeMsg{
+		Name: &names, State: &states, Reason: &reason,
+	})
+	if err != nil {
+		return fmt.Errorf("drain workers before reboot: %w", err)
+	}
+	if response == nil {
+		return fmt.Errorf("drain workers before reboot: empty slurm response")
+	}
+	if response.StatusCode() < http.StatusOK || response.StatusCode() >= http.StatusMultipleChoices {
+		return fmt.Errorf("drain workers before reboot: status=%d body=%s", response.StatusCode(), response.Body)
+	}
+	if response.JSON200 == nil {
+		if len(response.Body) != 0 {
+			return fmt.Errorf("drain workers before reboot: invalid slurm response: %s", response.Body)
+		}
+	} else if response.JSON200.Errors != nil && len(*response.JSON200.Errors) != 0 {
+		return fmt.Errorf("drain workers before reboot: slurm errors: %v", *response.JSON200.Errors)
+	}
+	return nil
+}
+
+func (r *RollingUpdateReconciler) releaseWorkerForEviction(ctx context.Context, pod *corev1.Pod) error {
+	if pod.Labels[consts.LabelSoperatorWorkerOperationPhase] == consts.LabelSoperatorWorkerOperationPhaseReady {
+		return nil
+	}
+	patchBase := pod.DeepCopy()
+	pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseReady
+	if err := r.Patch(ctx, pod, client.StrategicMergeFrom(patchBase, client.MergeFromWithOptimisticLock{})); err != nil {
+		return fmt.Errorf("release worker %s/%s for eviction: %w", pod.Namespace, pod.Name, err)
+	}
+	return nil
 }
 
 func (r *RollingUpdateReconciler) markWorkerOperationStopping(ctx context.Context, pod *corev1.Pod, operationID string) error {
@@ -521,6 +623,8 @@ func (r *RollingUpdateReconciler) markWorkerOperationStopping(ctx context.Contex
 	}
 	pod.Labels[consts.LabelSoperatorWorkerOperationID] = operationID
 	pod.Labels[consts.LabelSoperatorWorkerOperationPhase] = consts.LabelSoperatorWorkerOperationPhaseStopping
+	delete(pod.Annotations, consts.AnnotationSoperatorWorkerRecoveryRequest)
+	delete(pod.Annotations, consts.AnnotationSoperatorWorkerRecoveryContainerID)
 	if err := r.Patch(ctx, pod, client.StrategicMergeFrom(patchBase, client.MergeFromWithOptimisticLock{})); err != nil {
 		return fmt.Errorf("start worker operation %s on pod %s/%s: %w", operationID, pod.Namespace, pod.Name, err)
 	}
@@ -531,8 +635,8 @@ func (r *RollingUpdateReconciler) markWorkerOperationStopping(ctx context.Contex
 }
 
 func (r *RollingUpdateReconciler) deleteWorkerPod(ctx context.Context, pod *corev1.Pod) error {
-	// UID preconditions prevent a delayed reconcile from deleting a replacement pod.
-	if err := r.Delete(ctx, pod, client.Preconditions{UID: &pod.UID}); client.IgnoreNotFound(err) != nil {
+	// Reject deletion when the pod or its operation changed since the observation.
+	if err := r.Delete(ctx, pod, client.Preconditions{UID: &pod.UID, ResourceVersion: &pod.ResourceVersion}); client.IgnoreNotFound(err) != nil {
 		observationFromContext(ctx).setWorkerStage(pod.Name, workerBlocked)
 		return fmt.Errorf("delete worker pod %s/%s after handoff: %w", pod.Namespace, pod.Name, err)
 	}
@@ -630,21 +734,38 @@ func decideWorkerUpdateAction(replacement workerReplacement, node *slurmapi.Node
 	pod := &replacement.pod
 	rebootInProgress := node.IsRebootIssuedState() || node.IsRebootRequestedState()
 	decision := workerUpdateDecision{
-		operationPhase:          workerOperationPhase(pod, replacement.operationID),
-		slurmdCrashLooping:      containerCrashLoopBackOff(pod.Status.ContainerStatuses, consts.ContainerNameSlurmd),
-		managedRebootInProgress: rebootInProgress && hasRollingUpdateReason(node),
+		operationPhase:         workerOperationPhase(pod, replacement.operationID),
+		slurmdCrashLooping:     containerCrashLoopBackOff(pod.Status.ContainerStatuses, consts.ContainerNameSlurmd),
+		workerInitCrashLooping: containerCrashLoopBackOff(pod.Status.InitContainerStatuses, consts.ContainerNameWorkerInit),
 	}
-	decision.rebootHandoffInProgress = rebootInProgress &&
-		decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseStopping
 
 	switch {
-	case staleRollingUpdateDrain(node):
+	case decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseRecovering &&
+		(rebootInProgress || !workerRecoveryRegistered(node)):
+		decision.action = workerUpdateActionWaitNodeReplacement
+	case hasUnhealthyDrain(node) && node.IsRebootIssuedState() &&
+		(decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseAcknowledged ||
+			decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseReady):
+		decision.action = workerUpdateActionRecoverPod
+	case hasUnhealthyDrain(node):
+		// Maintenance owns unhealthy workers, including those on cordoned hosts.
+		decision.action = workerUpdateActionWaitNodeReplacement
+	case replacement.k8sNodeCordoned &&
+		(decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseAcknowledged ||
+			decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseReady ||
+			(decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseRecovering && node.IsDrainState())):
+		decision.action = workerUpdateActionReleasePod
+	case decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseReady ||
+		decision.operationPhase == consts.LabelSoperatorWorkerOperationPhaseAcknowledged:
+		decision.action = workerUpdateActionDeleteReadyPod
+	case !replacement.k8sNodeCordoned && decision.workerInitCrashLooping:
+		decision.action = workerUpdateActionDeleteFailedInitPod
+	case decision.operationPhase != consts.LabelSoperatorWorkerOperationPhaseStopping &&
+		decision.operationPhase != consts.LabelSoperatorWorkerOperationPhaseRecovering && staleRollingUpdateDrain(node):
 		decision.action = workerUpdateActionUndrain
-	case !replacement.k8sNodeCordoned && (decision.slurmdCrashLooping ||
-		decision.rebootHandoffInProgress ||
-		decision.managedRebootInProgress) && safeToDeleteOfflineSlurmNode(node):
-		// Supervisord can keep the Pod Ready while repeatedly restarting slurmd.
-		// Slurm state is the source of truth for safely completing an in-flight handoff.
+	case !replacement.k8sNodeCordoned && decision.slurmdCrashLooping && safeToDeleteOfflineSlurmNode(node):
+		// An accepted reboot must reach the action script's acknowledgement.
+		// Only a failed container can bypass that handshake after the health gate.
 		decision.action = workerUpdateActionDeleteOfflinePod
 	case !replacement.k8sNodeCordoned && decision.slurmdCrashLooping:
 		decision.action = workerUpdateActionWait
@@ -655,6 +776,27 @@ func decideWorkerUpdateAction(replacement workerReplacement, node *slurmapi.Node
 	}
 
 	return decision
+}
+
+func workerRecoveryRegistered(node *slurmapi.Node) bool {
+	cpus, known := node.CPUAllocated()
+	return node.IsIdleState() && !node.IsCompletingState() &&
+		!node.IsInvalidState() && !node.IsNotRespondingState() && known && cpus == 0 &&
+		node.AllocMemoryMB != nil && *node.AllocMemoryMB == 0
+}
+
+func hasUnhealthyDrain(node *slurmapi.Node) bool {
+	if !node.IsDrainState() || node.Reason == nil {
+		return false
+	}
+	// Match the maintenance controller's first reason, including its precedence.
+	// User problems do not request infrastructure recovery.
+	for _, reason := range consts.SlurmNodeReasonsList {
+		if strings.Contains(node.Reason.Reason, reason) {
+			return reason != consts.SlurmUserReasonHC
+		}
+	}
+	return false
 }
 
 func hasRollingUpdateReason(node *slurmapi.Node) bool {
@@ -673,7 +815,7 @@ func staleRollingUpdateDrain(node *slurmapi.Node) bool {
 	if node.IsRebootIssuedState() || node.IsRebootRequestedState() {
 		return false
 	}
-	return hasRollingUpdateReason(node)
+	return !hasUnhealthyDrain(node) && hasRollingUpdateReason(node)
 }
 
 // safeToDeleteOfflineSlurmNode identifies an offline worker with zero known allocations

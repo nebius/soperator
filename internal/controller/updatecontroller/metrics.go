@@ -24,19 +24,20 @@ const (
 
 // Values of the reason label on rollout_waiting.
 const (
-	waitBudget   = "budget_exhausted"
-	waitReboot   = "reboot_pending"
-	waitHandoff  = "handoff_pending"
-	waitPods     = "pods_not_ready"
-	waitSlurm    = "slurm_unavailable"
-	waitError    = "reconcile_error"
-	waitEviction = "eviction_pending"
-	waitSafety   = "safety_pending"
-	waitMissing  = "slurm_node_missing"
-	waitCleanup  = "cleanup_pending"
+	waitBudget          = "budget_exhausted"
+	waitReboot          = "reboot_pending"
+	waitHandoff         = "handoff_pending"
+	waitPods            = "pods_not_ready"
+	waitSlurm           = "slurm_unavailable"
+	waitError           = "reconcile_error"
+	waitEviction        = "eviction_pending"
+	waitSafety          = "safety_pending"
+	waitMissing         = "slurm_node_missing"
+	waitCleanup         = "cleanup_pending"
+	waitNodeReplacement = "node_replacement_pending"
 )
 
-var rolloutWaitReasonLabelValues = []string{waitBudget, waitReboot, waitHandoff, waitPods, waitSlurm, waitError, waitEviction, waitSafety, waitMissing, waitCleanup}
+var rolloutWaitReasonLabelValues = []string{waitBudget, waitReboot, waitHandoff, waitPods, waitSlurm, waitError, waitEviction, waitSafety, waitMissing, waitCleanup, waitNodeReplacement}
 
 type rolloutLabelValues struct {
 	resourceNamespace string
