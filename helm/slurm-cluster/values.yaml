@@ -3,6 +3,8 @@ clusterName: "slurm1"
 # Supported values: enabled, disabled.
 # Use disabled only when the namespace contains a single SlurmCluster.
 podNamePrefix: "enabled"
+# Name of the slurm-scripts ConfigMap. Defaults to "<clusterName>-slurm-scripts".
+slurmScriptsConfigMapName: ""
 # Additional annotations for the cluster
 annotations: {}
 # Maintenance defines the maintenance window for the cluster.
