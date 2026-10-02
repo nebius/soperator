@@ -212,6 +212,7 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 				SupervisorDConfigMapName: "supervisord-config",
 				SSHDConfigMapName:        "sshd-config",
 				GPU:                      &slurmv1alpha1.GPUSpec{Enabled: tt.nodeSetGPUEnabled},
+				NodeStatic:               "GRES=gpu:h200:8",
 			}
 
 			result, err := worker.RenderNodeSetStatefulSet(
@@ -263,6 +264,7 @@ func TestRenderNodeSetStatefulSet_NvidiaIMEXCLIMount(t *testing.T) {
 		SupervisorDConfigMapName: "supervisord-config",
 		SSHDConfigMapName:        "sshd-config",
 		GPU:                      &slurmv1alpha1.GPUSpec{Enabled: true},
+		NodeStatic:               "GRES=gpu:h200:8",
 	}
 
 	result, err := worker.RenderNodeSetStatefulSet(
@@ -1053,6 +1055,13 @@ func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 	for _, envName := range []string{
 		consts.EnvDockerEnabled,
 		consts.EnvNodeRealMemoryBytes,
+		consts.EnvNodePlatformTag,
+		consts.EnvNodePlatformTags,
+		"SOPERATOR_NODE_CPUS",
+		"NODESET_GPU_ENABLED",
+		"CHECKS_PLATFORM_TAG",
+		"CHECKS_PLATFORM_TAGS",
+		"CHECKS_NODE_REAL_MEM_BYTES",
 	} {
 		t.Run("rejects a custom override of "+envName, func(t *testing.T) {
 			nodeSet := createNodeSet()
@@ -1069,6 +1078,41 @@ func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 				false,
 			)
 			assert.ErrorContains(t, err, "is managed by Soperator")
+		})
+	}
+
+	for _, gpuEnabled := range []bool{false, true} {
+		t.Run("GPU platform configuration enabled="+strconv.FormatBool(gpuEnabled), func(t *testing.T) {
+			nodeSet := createNodeSet()
+			nodeSet.GPU.Enabled = gpuEnabled
+			nodeSet.NodeStatic = "CPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCore=2 GRES=gpu:nvidia_h200:8"
+			result, err := worker.RenderNodeSetStatefulSet(nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, true, false)
+			if !assert.NoError(t, err) {
+				return
+			}
+			for _, container := range result.Spec.Template.Spec.Containers {
+				if container.Name != consts.ContainerNameSlurmd {
+					continue
+				}
+				assertEnvValue(t, container.Env, "NODESET_GPU_ENABLED", strconv.FormatBool(gpuEnabled))
+				for name, value := range map[string]string{
+					"CPUS": "128", "SOCKETSPERBOARD": "2", "CORESPERSOCKET": "32",
+					"THREADSPERCORE": "2", "GRES": "gpu:nvidia_h200:8",
+				} {
+					assertEnvValue(t, container.Env, consts.EnvNodePrefix+name, value)
+				}
+				for _, env := range container.Env {
+					assert.NotEqual(t, consts.EnvNodePrefix+"BOARDS", env.Name)
+				}
+				tag, tags := "CPU", "CPU"
+				if gpuEnabled {
+					tag, tags = "8xH200", "8xH200,8xGPU"
+				}
+				assertEnvValue(t, container.Env, consts.EnvNodePlatformTag, tag)
+				assertEnvValue(t, container.Env, consts.EnvNodePlatformTags, tags)
+				return
+			}
+			t.Fatal("slurmd container not found")
 		})
 	}
 }

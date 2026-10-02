@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import runpy
 import subprocess
 import tempfile
 import unittest
@@ -9,6 +10,11 @@ from unittest import mock
 
 
 CHECK_RUNNER_PATH = Path(__file__).with_name("check_runner.py")
+DEFAULT_METADATA = (
+    "NODESET_GPU_ENABLED=false\nSOPERATOR_NODE_PLATFORM_TAG=CPU\nSOPERATOR_NODE_PLATFORM_TAGS=CPU\n"
+    "SOPERATOR_NODE_REAL_MEMORY_BYTES=1024\n"
+)
+
 
 
 class CheckRunnerOnOkContextTest(unittest.TestCase):
@@ -27,7 +33,8 @@ class CheckRunnerOnOkContextTest(unittest.TestCase):
         module_name = f"check_runner_under_test_{context}_{id(self)}"
         spec = importlib.util.spec_from_file_location(module_name, CHECK_RUNNER_PATH)
         runner = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(runner)
+        with mock.patch("builtins.open", mock.mock_open(read_data=DEFAULT_METADATA)):
+            spec.loader.exec_module(runner)
         return runner
 
     def test_undrain_on_ok_is_ignored_outside_hc_program(self):
@@ -118,14 +125,17 @@ class CheckRunnerOnOkContextTest(unittest.TestCase):
             self.assertEqual(["uncomment"], calls)
 
 
-def load_check_runner():
+def load_check_runner(metadata=DEFAULT_METADATA):
     required_env = {
         "SLURMD_NODENAME": "worker-1",
         "CHECKS_OUTPUTS_BASE_DIR": "/opt/soperator-outputs",
         "CHECKS_CONTEXT": "hc_program",
         "CHECKS_CONFIG": "/opt/slurm_scripts/checks.json",
     }
-    with mock.patch.dict(os.environ, required_env), mock.patch("logging.basicConfig"):
+    with (
+        mock.patch.dict(os.environ, required_env), mock.patch("logging.basicConfig"),
+        mock.patch("builtins.open", mock.mock_open(read_data=metadata)),
+    ):
         spec = importlib.util.spec_from_file_location(
             "check_runner_under_test", CHECK_RUNNER_PATH
         )
@@ -138,90 +148,136 @@ def load_check_runner():
 check_runner = load_check_runner()
 
 
-class NodeRealMemoryMetadataTest(unittest.TestCase):
-    def setUp(self):
-        check_runner.get_node_real_memory_bytes.cache_clear()
+class NodeMetadataTest(unittest.TestCase):
+    def test_platform_and_memory_are_read_once_at_startup(self):
+        data = ("NODESET_GPU_ENABLED=true\nSOPERATOR_NODE_PLATFORM_TAG=8xH200\n"
+                "SOPERATOR_NODE_PLATFORM_TAGS=8xH200,8xGPU\nSOPERATOR_NODE_REAL_MEMORY_BYTES=999292928\n")
+        runner = load_check_runner(data)
+        self.assertEqual("8xH200", runner.CHECKS_PLATFORM_TAG)
+        self.assertEqual(["8xH200", "8xGPU"], runner.CHECKS_PLATFORM_TAGS)
+        self.assertEqual(999292928, runner.CHECKS_NODE_REAL_MEM_BYTES)
+        with mock.patch("builtins.open", side_effect=AssertionError("must not reread metadata")):
+            check = runner.Check(platforms=["8xGPU"])
+            self.assertEqual([check], runner.filter_by_platform([check]))
+            with mock.patch.object(runner, "CHECKS_CONTEXT", "prolog"), mock.patch.object(runner, "SLURM_JOB_GPUS", "0"):
+                self.assertEqual([], runner.filter_by_skip_for_partial_gpu_jobs([check._replace(skip_for_partial_gpu_jobs=True)]))
 
-    def test_reads_real_memory_from_local_metadata_without_node_rpc(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            metadata_file = Path(tmpdir) / "node_metadata.env"
-            metadata_file.write_text(
-                "IGNORED=value\n"
-                "SOPERATOR_NODE_REAL_MEMORY_BYTES=999292928\n",
-                encoding="utf-8",
-            )
+    def test_reader_returns_all_variables_or_value_by_key(self):
+        with mock.patch("builtins.open", mock.mock_open(read_data=DEFAULT_METADATA + "EXTRA_METADATA=value=with=equals\n")):
+            self.assertEqual("value=with=equals", check_runner.read_node_metadata("EXTRA_METADATA"))
+            self.assertEqual("CPU", check_runner.read_node_metadata()[check_runner.SOPERATOR_NODE_PLATFORM_TAG])
+            with self.assertRaises(KeyError):
+                check_runner.read_node_metadata("MISSING")
 
-            with (
-                mock.patch.object(
-                    check_runner, "SOPERATOR_NODE_METADATA_FILE", str(metadata_file)
-                ),
-                mock.patch.object(check_runner, "get_node_info") as get_node_info,
-            ):
-                result = check_runner.get_node_real_memory_bytes()
+    def test_gpu_checks_remain_selected_when_nvidia_smi_cannot_run(self):
+        for tag in ("8xH100", "8xH200", "8xB200", "8xB300", "4xGB300"):
+            data = (f"NODESET_GPU_ENABLED=true\nSOPERATOR_NODE_PLATFORM_TAG={tag}\n"
+                    f"SOPERATOR_NODE_PLATFORM_TAGS={tag},{tag.split('x')[0]}xGPU\nSOPERATOR_NODE_REAL_MEMORY_BYTES=1024\n")
+            for failure in (FileNotFoundError("nvidia-smi"), subprocess.CalledProcessError(1, "nvidia-smi")):
+                with self.subTest(tag=tag, failure=type(failure).__name__), mock.patch("subprocess.run", side_effect=failure) as run:
+                    runner = load_check_runner(data)
+                    checks = [runner.Check(**json.loads(CHECK_RUNNER_PATH.with_name(name).read_text())) for name in
+                              ("gpu_health_check.py.json", "alloc_gpus_busy.drain.sh.json")]
+                    self.assertEqual(checks, runner.filter_by_platform(checks))
+                    run.assert_not_called()
 
-            self.assertEqual(999292928, result)
-            get_node_info.assert_not_called()
+    def test_any_gpu_model_from_gres_type_is_accepted(self):
+        data = ("NODESET_GPU_ENABLED=true\nSOPERATOR_NODE_PLATFORM_TAG=4xA100\n"
+                "SOPERATOR_NODE_PLATFORM_TAGS=4xA100,4xGPU\nSOPERATOR_NODE_REAL_MEMORY_BYTES=1024\n")
+        runner = load_check_runner(data)
+        model, generic, other = (runner.Check(platforms=[tag]) for tag in ("4xA100", "4xGPU", "8xH100"))
+        self.assertEqual([model, generic], runner.filter_by_platform([model, generic, other]))
 
-    def test_exports_local_real_memory_for_checks(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            metadata_file = Path(tmpdir) / "node_metadata.env"
-            metadata_file.write_text(
-                "SOPERATOR_NODE_REAL_MEMORY_BYTES=999292928\n",
-                encoding="utf-8",
-            )
-            check = check_runner.Check(need_env=["CHECKS_NODE_REAL_MEM_BYTES"])
+    def test_cpu_worker_selects_only_cpu_and_any_platforms(self):
+        runner = load_check_runner()
+        cpu = runner.Check(platforms=["CPU"])
+        any_platform = runner.Check()
+        gpu = runner.Check(platforms=["8xGPU"])
+        self.assertEqual([cpu, any_platform], runner.filter_by_platform([cpu, any_platform, gpu]))
 
-            with (
-                mock.patch.object(
-                    check_runner, "SOPERATOR_NODE_METADATA_FILE", str(metadata_file)
-                ),
-                mock.patch.object(check_runner, "get_node_info") as get_node_info,
-                mock.patch.dict(os.environ, {}, clear=False),
-            ):
-                check_runner.export_needed_env(check)
-                exported_value = os.environ["CHECKS_NODE_REAL_MEM_BYTES"]
+    def test_builtin_checks_no_longer_request_metadata_in_need_env(self):
+        metadata_keys = {"CHECKS_PLATFORM_TAG", "CHECKS_PLATFORM_TAGS", "CHECKS_NODE_REAL_MEM_BYTES"}
+        for path in CHECK_RUNNER_PATH.parent.glob("*.json"):
+            with self.subTest(path=path.name):
+                self.assertFalse(metadata_keys.intersection(json.loads(path.read_text()).get("need_env", [])))
 
-            self.assertEqual("999292928", exported_value)
-            get_node_info.assert_not_called()
 
-    def test_falls_back_to_slurm_when_metadata_is_missing(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            missing_file = Path(tmpdir) / "missing.env"
-            node_info = check_runner.NodeInfo(real_memory_bytes=2147483648)
+class MetadataStartupTest(unittest.TestCase):
+    def run_runner(self, tmpdir, context, metadata, check, mock_commands=True):
+        metadata_path = Path(tmpdir) / "node_metadata.env"
+        config_path = Path(tmpdir) / "checks.json"
+        config_path.write_text(json.dumps([check]))
+        if isinstance(metadata, str):
+            metadata_path.write_text(metadata)
+        elif isinstance(metadata, bytes):
+            metadata_path.write_bytes(metadata)
+        real_open = open
 
-            with (
-                mock.patch.object(
-                    check_runner, "SOPERATOR_NODE_METADATA_FILE", str(missing_file)
-                ),
-                mock.patch.object(
-                    check_runner, "get_node_info", return_value=node_info
-                ) as get_node_info,
-            ):
-                result = check_runner.get_node_real_memory_bytes()
+        def open_with_metadata(path, *args, **kwargs):
+            if path == check_runner.SOPERATOR_NODE_METADATA_FILE:
+                if isinstance(metadata, OSError):
+                    raise metadata
+                path = metadata_path
+            return real_open(path, *args, **kwargs)
 
-            self.assertEqual(2147483648, result)
-            get_node_info.assert_called_once_with()
+        env = {
+            "SLURMD_NODENAME": "worker-1", "CHECKS_CONTEXT": context,
+            "CHECKS_CONFIG": str(config_path), "CHECKS_OUTPUTS_BASE_DIR": tmpdir,
+            "SLURM_JOB_COMMENT": "", "CHECKS_PLATFORM_TAG": "stale",
+            "CHECKS_PLATFORM_TAGS": "stale", "CHECKS_NODE_REAL_MEM_BYTES": "999",
+        }
+        with (
+            mock.patch.dict(os.environ, env),
+            mock.patch("builtins.open", side_effect=open_with_metadata) as open_file,
+            mock.patch("logging.basicConfig"), mock.patch("os.chdir"), mock.patch("os.chroot", create=True),
+            mock.patch("subprocess.run", wraps=subprocess.run if not mock_commands else None) as run,
+            self.assertRaises(SystemExit) as exited,
+        ):
+            try:
+                runpy.run_path(str(CHECK_RUNNER_PATH), run_name="__main__")
+            finally:
+                self.assertEqual(1, sum(call.args[0] == check_runner.SOPERATOR_NODE_METADATA_FILE
+                                        for call in open_file.call_args_list))
+                if mock_commands:
+                    run.assert_not_called()
+        self.assertEqual(0, exited.exception.code)
 
-    def test_falls_back_to_slurm_when_metadata_is_invalid(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            metadata_file = Path(tmpdir) / "node_metadata.env"
-            metadata_file.write_text(
-                "SOPERATOR_NODE_REAL_MEMORY_BYTES=invalid\n", encoding="utf-8"
-            )
-            node_info = check_runner.NodeInfo(real_memory_bytes=1073741824)
+    def test_metadata_errors_log_and_exit_zero_even_for_checks_without_need_env(self):
+        values = dict(line.split("=", 1) for line in DEFAULT_METADATA.splitlines())
+        cases = [None, PermissionError("metadata is unreadable"), b"\xff", "MALFORMED\n",
+                 DEFAULT_METADATA + "SOPERATOR_NODE_PLATFORM_TAG=CPU\n", DEFAULT_METADATA + "BAD-KEY=value\n"]
+        for key in values:
+            cases.append("".join(f"{name}={value}\n" for name, value in values.items() if name != key))
+        for key, value in ((check_runner.SOPERATOR_NODE_REAL_MEMORY_BYTES, "0"), (check_runner.SOPERATOR_NODE_REAL_MEMORY_BYTES, "bad"),
+                           (check_runner.SOPERATOR_NODE_REAL_MEMORY_BYTES, "-1"), (check_runner.SOPERATOR_NODE_PLATFORM_TAG, "8xH200"),
+                           (check_runner.SOPERATOR_NODE_PLATFORM_TAGS, ""), ("NODESET_GPU_ENABLED", "invalid"),
+                           ("NODESET_GPU_ENABLED", "true")):
+            cases.append("".join(f"{name}={value if name == key else original}\n" for name, original in values.items()))
+        for context in ("prolog", "epilog", "hc_program"):
+            for metadata in cases:
+                with self.subTest(context=context, metadata=metadata), tempfile.TemporaryDirectory() as tmpdir:
+                    with self.assertLogs(level="ERROR") as logs:
+                        self.run_runner(tmpdir, context, metadata, {"name": "metadata-regression", "need_env": []})
+                    self.assertTrue(any("skipping checks" in line for line in logs.output), logs.output)
 
-            with (
-                mock.patch.object(
-                    check_runner, "SOPERATOR_NODE_METADATA_FILE", str(metadata_file)
-                ),
-                mock.patch.object(
-                    check_runner, "get_node_info", return_value=node_info
-                ) as get_node_info,
-            ):
-                result = check_runner.get_node_real_memory_bytes()
-
-            self.assertEqual(1073741824, result)
-            get_node_info.assert_called_once_with()
+    def test_child_check_inherits_all_metadata_without_need_env(self):
+        for tag, tags, enabled in (("CPU", "CPU", "false"), ("8xH200", "8xH200,8xGPU", "true"), ("1xGPU", "1xGPU", "true")):
+            with self.subTest(tag=tag), tempfile.TemporaryDirectory() as tmpdir:
+                writer = CHECK_RUNNER_PATH.parents[3] / "images/worker/write_soperator_metadata.sh"
+                metadata_path = Path(tmpdir) / "writer.env"
+                env = dict(PATH=os.environ["PATH"], NODESET_GPU_ENABLED=enabled,
+                           SOPERATOR_NODE_REAL_MEMORY_BYTES="1024",
+                           SOPERATOR_NODE_PLATFORM_TAG=tag, SOPERATOR_NODE_PLATFORM_TAGS=tags,
+                           SOPERATOR_NODE_CPUS="128")
+                result = subprocess.run(["bash", str(writer), str(metadata_path)], env=env, capture_output=True, text=True)
+                self.assertEqual(0, result.returncode, result.stderr)
+                metadata = metadata_path.read_text() + "EXTRA_METADATA=value=with=equals\n"
+                check = {
+                    "name": "metadata-inheritance", "need_env": [], "run_in_jail": True, "log": "child.out",
+                    "command": "printf '%s\\n' \"$CHECKS_PLATFORM_TAG\" \"$CHECKS_PLATFORM_TAGS\" \"$CHECKS_NODE_REAL_MEM_BYTES\" \"$EXTRA_METADATA\" \"$SOPERATOR_NODE_CPUS\"",
+                }
+                self.run_runner(tmpdir, "hc_program", metadata, check, mock_commands=False)
+                self.assertEqual(f"{tag}\n{tags}\n1024\nvalue=with=equals\n128\n", (Path(tmpdir) / "child.out").read_text())
 
 
 class PartialCPUJobsTest(unittest.TestCase):
@@ -232,7 +288,7 @@ class PartialCPUJobsTest(unittest.TestCase):
         )
         patcher.start()
         self.addCleanup(patcher.stop)
-        for name in ("get_job_alloc_cpus", "get_node_info", "get_platform_tags"):
+        for name in ("get_job_alloc_cpus", "get_node_info"):
             getter = getattr(check_runner, name)
             getter.cache_clear()
             self.addCleanup(getter.cache_clear)
@@ -368,7 +424,7 @@ class PartialCPUJobsTest(unittest.TestCase):
             self.assertEqual(check_runner.filter_applicable_checks([check]), [check])
         self.assertEqual(check_runner.get_node_info(), check_runner.NodeInfo(
             state_flags=["DRAIN"], reason="test reason", comment="test comment",
-            real_memory_bytes=1024 * 1024 * 1024, effective_cpus=64,
+            effective_cpus=64,
         ))
         self.subprocess_run.assert_called_once()
 
@@ -391,7 +447,7 @@ class PartialCPUJobsTest(unittest.TestCase):
             with self.subTest(gpus=gpus), mock.patch.object(check_runner, "SLURM_JOB_GPUS", gpus):
                 self.assertEqual(check_runner.filter_applicable_checks(self.checks), self.checks)
                 check = self.guarded._replace(skip_for_partial_gpu_jobs=True)
-                with mock.patch.object(check_runner, "get_platform_tags", return_value=["8xGPU"]):
+                with mock.patch.object(check_runner, "CHECKS_PLATFORM_TAGS", ["8xGPU"]):
                     expected = [] if gpus == "0" else [check]
                     self.assertEqual(check_runner.filter_applicable_checks([check]), expected)
         self.assertEqual(check_runner.get_node_info.cache_info().misses, 0)
@@ -429,7 +485,7 @@ class PartialCPUJobsTest(unittest.TestCase):
                     mock.patch.multiple(check_runner,
                         CHECKS_CONTEXT=context, SLURM_JOB_GPUS=gpus, SLURM_JOB_CPUS_PER_NODE=cpus,
                     ),
-                    mock.patch.object(check_runner, "get_platform_tags", return_value=["8xGPU"]),
+                    mock.patch.object(check_runner, "CHECKS_PLATFORM_TAGS", ["8xGPU"]),
                 ):
                     check_runner.get_job_alloc_cpus.cache_clear()
                     expected = [check] if should_run else []
