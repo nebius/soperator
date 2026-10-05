@@ -38,6 +38,7 @@ ns:
   interval: 5m
   timeout: 5m
   version: 2.0.0
+  # postRenderers: []
   driftDetection:
     mode: warn
 certManager:
@@ -118,10 +119,12 @@ certManager:
     remediation:
       retries: 3
       remediateLastFailure: true
+  # postRenderers: []
   driftDetection:
     mode: warn
 backup:
   enabled: true
+  # postRenderers: []
   driftDetection:
     mode: warn
   interval: 5m
@@ -160,6 +163,7 @@ backup:
       retries: 3
       remediateLastFailure: true
   config:
+    # postRenderers: []
     driftDetection:
       mode: warn
     enabled: true
@@ -252,8 +256,10 @@ mariadbOperator:
     remediation:
       retries: 3
       remediateLastFailure: true
+    # postRenderers: []
     driftDetection:
       mode: warn
+  # postRenderers: []
   driftDetection:
     mode: warn
 observability:
@@ -278,6 +284,7 @@ observability:
       enabled: true
       interval: 5m
       version: 2.0.0
+      # postRenderers: []
       driftDetection:
         mode: warn
       # Token source: `imds` fetches from IMDS_BASE_URL; `file` reads a mounted host token.
@@ -375,6 +382,7 @@ observability:
           limits:
             memory: 200Mi
       overrideValues: null
+      # postRenderers: []
       driftDetection:
         mode: warn
     events:
@@ -410,6 +418,7 @@ observability:
           limits:
             memory: 128Mi
       overrideValues: null
+      # postRenderers: []
       driftDetection:
         mode: warn
   prometheusOperator:
@@ -418,6 +427,7 @@ observability:
     timeout: 5m
     version: 19.1.*
     namespace: monitoring-system
+    # postRenderers: []
     driftDetection:
       mode: warn
   vmStack:
@@ -435,6 +445,7 @@ observability:
         remediation:
           retries: 3
           remediateLastFailure: true
+      # postRenderers: []
       driftDetection:
         mode: warn
     interval: 5m
@@ -588,6 +599,7 @@ observability:
         enabled: true
         extraArgs: null
     overrideValues: null
+    # postRenderers: []
     driftDetection:
       mode: warn
   vmLogs:
@@ -629,6 +641,7 @@ observability:
         limits:
           memory: 2Gi
     overrideValues: null
+    # postRenderers: []
     driftDetection:
       mode: warn
   dcgmExporter:
@@ -655,6 +668,7 @@ observability:
         requests:
           memory: 128Mi
           cpu: 100m
+    # postRenderers: []
     driftDetection:
       mode: warn
   ncclProfiles:
@@ -673,6 +687,7 @@ observability:
       remediation:
         retries: 3
         remediateLastFailure: true
+    # postRenderers: []
     driftDetection:
       mode: warn
     releaseName: opentelemetry-collector-nccl-profiles
@@ -749,13 +764,16 @@ slurmCluster:
       remediation:
         retries: 6
         remediateLastFailure: true
+    # postRenderers: []
     driftDetection:
       mode: warn
+  # postRenderers: []
   driftDetection:
     mode: warn
 nodesets:
   enabled: false
   clusterName: ""
+  # postRenderers: []
   driftDetection:
     mode: warn
   interval: 5m
@@ -791,6 +809,7 @@ soperatorActiveChecks:
     remediation:
       retries: 3
       remediateLastFailure: true
+  # postRenderers: []
   driftDetection:
     mode: warn
 soperator:
@@ -836,7 +855,7 @@ soperator:
     enabled: true
     interval: 5m
     timeout: 30m
-    version: 1.8.3-custom
+    version: 1.9.1-custom
     releaseName: soperator-kruise
     install:
       crds: CreateReplace
@@ -851,6 +870,9 @@ soperator:
       crds:
         managed: true
       daemon:
+        # The chart runs the daemon from manager.image; only the pull policy is separate.
+        image:
+          pullPolicy: IfNotPresent
         nodeSelector: {}
         affinity:
           nodeAffinity:
@@ -866,7 +888,8 @@ soperator:
         replicas: 2
         image:
           repository: cr.nebius.cloud/soperator/kruise-manager
-          tag: v1.8.3
+          tag: v1.9.1
+          pullPolicy: IfNotPresent
         # The chart exposes no manager.affinity, so the two replicas get the pin but no
         # anti-affinity term.
         nodeSelector:
@@ -882,6 +905,104 @@ soperator:
           repository: cr.nebius.cloud/soperator/kruise-helm-hook
           tag: v0.1.0
       featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true,ResourceDistributionGate=true"
+    # Flux HelmRelease spec.postRenderers. Every HelmRelease in this chart accepts this key next to
+    # driftDetection. It is rendered with tpl, so patches may reference chart values such as
+    # {{ .Values.slurmCluster.namespace }}. An override replaces the whole list.
+    # Webhooks are patched by index: mutating 0 is mpod, validating 0-8 are the builtin-resource
+    # webhooks of the kruise chart version above. Re-check the indexes when bumping the version.
+    postRenderers:
+      - kustomize:
+          patches:
+            - target:
+                group: apps
+                version: v1
+                kind: DaemonSet
+                name: kruise-daemon
+              patch: |
+                - op: add
+                  path: /spec/updateStrategy
+                  value:
+                    type: RollingUpdate
+                    rollingUpdate:
+                      maxUnavailable: 50%
+            - target:
+                kind: MutatingWebhookConfiguration
+                name: kruise-mutating-webhook-configuration
+              patch: |
+                - op: replace
+                  path: /webhooks/0/namespaceSelector/matchExpressions
+                  value:
+                    - key: kubernetes.io/metadata.name
+                      operator: In
+                      values:
+                        - {{ .Values.slurmCluster.namespace }}
+            - target:
+                kind: ValidatingWebhookConfiguration
+                name: kruise-validating-webhook-configuration
+              patch: |
+                - op: replace
+                  path: /webhooks/0/namespaceSelector/matchExpressions
+                  value:
+                    - key: kubernetes.io/metadata.name
+                      operator: In
+                      values:
+                        - {{ .Values.slurmCluster.namespace }}
+                - op: replace
+                  path: /webhooks/1/namespaceSelector/matchExpressions
+                  value:
+                    - key: kubernetes.io/metadata.name
+                      operator: In
+                      values:
+                        - {{ .Values.slurmCluster.namespace }}
+                - op: replace
+                  path: /webhooks/2/namespaceSelector/matchExpressions
+                  value:
+                    - key: kubernetes.io/metadata.name
+                      operator: In
+                      values:
+                        - {{ .Values.slurmCluster.namespace }}
+                - op: replace
+                  path: /webhooks/3/namespaceSelector/matchExpressions
+                  value:
+                    - key: kubernetes.io/metadata.name
+                      operator: In
+                      values:
+                        - {{ .Values.slurmCluster.namespace }}
+                - op: replace
+                  path: /webhooks/4/namespaceSelector/matchExpressions
+                  value:
+                    - key: kubernetes.io/metadata.name
+                      operator: In
+                      values:
+                        - {{ .Values.slurmCluster.namespace }}
+                - op: replace
+                  path: /webhooks/5/namespaceSelector/matchExpressions
+                  value:
+                    - key: kubernetes.io/metadata.name
+                      operator: In
+                      values:
+                        - {{ .Values.slurmCluster.namespace }}
+                - op: replace
+                  path: /webhooks/6/namespaceSelector/matchExpressions
+                  value:
+                    - key: kubernetes.io/metadata.name
+                      operator: In
+                      values:
+                        - {{ .Values.slurmCluster.namespace }}
+                - op: replace
+                  path: /webhooks/7/namespaceSelector/matchExpressions
+                  value:
+                    - key: kubernetes.io/metadata.name
+                      operator: In
+                      values:
+                        - {{ .Values.slurmCluster.namespace }}
+                - op: replace
+                  path: /webhooks/8/namespaceSelector/matchExpressions
+                  value:
+                    - key: kubernetes.io/metadata.name
+                      operator: In
+                      values:
+                        - {{ .Values.slurmCluster.namespace }}
     driftDetection:
       mode: warn
   soperatorChecks:
@@ -910,6 +1031,7 @@ soperator:
                     matchLabels:
                       control-plane: soperatorchecks
     overrideValues: null
+    # postRenderers: []
     driftDetection:
       mode: warn
   nodeConfigurator:
@@ -944,6 +1066,7 @@ soperator:
           limits:
             memory: 200Mi
     overrideValues: null
+    # postRenderers: []
     driftDetection:
       mode: warn
   monitoringDashboards:
@@ -961,8 +1084,10 @@ soperator:
       remediation:
         retries: 3
     overrideValues: null
+    # postRenderers: []
     driftDetection:
       mode: warn
+  # postRenderers: []
   driftDetection:
     mode: warn
 notifier:
@@ -983,6 +1108,7 @@ notifier:
     slack:
       webhookUrl: null
   overrideValues: null
+  # postRenderers: []
   driftDetection:
     mode: warn
 csiDriverNfs:
@@ -1013,6 +1139,7 @@ csiDriverNfs:
     remediation:
       retries: 6
       remediateLastFailure: true
+  # postRenderers: []
   driftDetection:
     mode: warn
 nfsServer:
@@ -1033,6 +1160,7 @@ nfsServer:
     remediation:
       retries: 3
       remediateLastFailure: true
+  # postRenderers: []
   driftDetection:
     mode: warn
 storageClasses:
@@ -1052,6 +1180,7 @@ storageClasses:
     remediation:
       retries: 3
       remediateLastFailure: true
+  # postRenderers: []
   driftDetection:
     mode: warn
 customConfigmaps:
@@ -1072,6 +1201,7 @@ customConfigmaps:
     remediation:
       retries: 3
       remediateLastFailure: true
+  # postRenderers: []
   driftDetection:
     mode: warn
 tailscale:
@@ -1088,5 +1218,6 @@ tailscale:
     remediation:
       retries: 3
       remediateLastFailure: true
+  # postRenderers: []
   driftDetection:
     mode: warn
