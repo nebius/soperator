@@ -80,7 +80,7 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        uses: mikepenz/release-changelog-builder-action@cb021f9b36a51a7c6f18e4679b6fa2cb77a1260c # v5
+        uses: mikepenz/release-changelog-builder-action@aa013739bbc8e7067dbbecd4525ff11aeb51a84b # v5
         with:
           mode: "PR"
           fromTag: ${{ needs.tag.outputs.previous-tag }}
