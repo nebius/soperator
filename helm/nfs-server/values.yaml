@@ -3,7 +3,7 @@ fullnameOverride: ""
 image:
   repository: cr.nebius.cloud/soperator/nfs-server
   pullPolicy: IfNotPresent
-  tag: "1.2.1"
+  tag: "1.2.2"
 imagePullSecrets: []
 # NFS Server Configuration
 nfs:

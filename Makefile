@@ -348,6 +348,8 @@ sync-version: yq ## Sync versions from file
 
 	@# region helm/soperator-fluxcd/values.yaml
 	@echo 'Syncing helm/soperator-fluxcd/values.yaml'
+	@$(YQ) -i ".helmRepository.nfsServer.url = \"oci://$(IMAGE_REPO)\"" "helm/soperator-fluxcd/values.yaml"
+	@$(YQ) -i ".nfsServer.version = \"$(NFS_VERSION)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".slurmCluster.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".soperatorActiveChecks.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".soperator.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
@@ -370,8 +372,8 @@ sync-version: yq ## Sync versions from file
 	@echo 'Syncing fluxcd/environment/local/values.yaml'
 	@$(YQ) -i ".soperator.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
 	@$(YQ) -i ".slurmCluster.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
-	@$(YQ) -i ".nfsServer.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
-	@$(YQ) -i ".nfsServer.overrideValues.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
+	@$(YQ) -i ".nfsServer.version = \"$(NFS_VERSION)\"" "fluxcd/environment/local/values.yaml"
+	@$(YQ) -i ".nfsServer.overrideValues.image.tag = \"$(NFS_VERSION)\"" "fluxcd/environment/local/values.yaml"
 	@echo 'Syncing fluxcd/environment/local/slurmCluster.yml'
 	@$(YQ) -i ".slurmCluster.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/slurmCluster.yml"
 	@# endregion fluxcd/environment/local
