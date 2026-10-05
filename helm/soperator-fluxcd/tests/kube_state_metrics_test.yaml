@@ -30,6 +30,32 @@ tests:
           path: spec.values.kube-state-metrics.vmScrape.spec.endpoints[0].max_scrape_size
           value: "150554432"
 
+  - it: should export persistent volume metrics for disk mapping
+    asserts:
+      - hasDocuments:
+          count: 1
+      - contains:
+          path: spec.values.kube-state-metrics.collectors
+          content: persistentvolumes
+      - contains:
+          path: spec.values.kube-state-metrics.collectors
+          content: persistentvolumeclaims
+      - contains:
+          path: spec.values.kube-state-metrics.extraArgs
+          content: '--metric-allowlist=kube_persistentvolume_info'
+      - contains:
+          path: spec.values.kube-state-metrics.extraArgs
+          content: '--metric-allowlist=kube_persistentvolume_capacity_bytes'
+      - contains:
+          path: spec.values.kube-state-metrics.extraArgs
+          content: '--metric-allowlist=kube_persistentvolumeclaim_info'
+      - contains:
+          path: spec.values.kube-state-metrics.extraArgs
+          content: '--metric-allowlist=kube_persistentvolumeclaim_resource_requests_storage_bytes'
+      - contains:
+          path: spec.values.kube-state-metrics.extraArgs
+          content: '--metric-allowlist=kube_persistentvolumeclaim_status_phase'
+
   - it: should request a cpu floor for kube-state-metrics by default
     asserts:
       - hasDocuments:

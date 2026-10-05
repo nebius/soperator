@@ -103,9 +103,9 @@ Key Metrics:
 - Ports:
   - 8080 - Main metrics endpoint (Kubernetes object state)
   - 8081 - Telemetry endpoint (self-monitoring)
-- Metrics: Pod state metrics (filtered subset)
+- Metrics: Pod, node, PersistentVolume and PersistentVolumeClaim state metrics (filtered subset)
 - Deployment: Single replica deployment in `monitoring-system` namespace
-- Configuration: pod/node collectors with metric allowlist filtering
+- Configuration: pod/node/persistentvolume/persistentvolumeclaim collectors with metric allowlist filtering
 - Scrape size: inherits the global vmagent scrape size by default; `observability.vmStack.values.kubeStateMetrics.maxScrapeSize` can raise the main `http` endpoint limit for large clusters
 
 Connection Example:
@@ -116,6 +116,23 @@ curl http://localhost:8080/metrics
 ```
 
 Note: Port 8080 provides Kubernetes object metrics, while port 8081 provides self-monitoring metrics. VMServiceScrape targets port 8080 for cluster monitoring.
+
+Volume metrics connect a PVC to the cloud disk behind it, e.g. to check the NBS disk of the NFS server:
+
+- `kube_persistentvolumeclaim_info{namespace, persistentvolumeclaim, storageclass, volumename}` - PVC to PV mapping
+- `kube_persistentvolume_info{persistentvolume, storageclass, csi_driver, csi_volume_handle}` - PV to disk mapping;
+  for Nebius Compute CSI `csi_volume_handle` is the disk ID (`computedisk-...`)
+- `kube_persistentvolume_capacity_bytes`, `kube_persistentvolumeclaim_resource_requests_storage_bytes` - provisioned and requested size
+- `kube_persistentvolumeclaim_status_phase{phase}` - Bound/Pending/Lost
+
+```promql
+label_replace(kube_persistentvolumeclaim_info{persistentvolumeclaim="nfs-server-storage"},
+              "persistentvolume", "$1", "volumename", "(.+)")
+* on(cluster, persistentvolume) group_left(csi_volume_handle)
+kube_persistentvolume_info
+```
+
+PV-level phase, labels and annotations are not exported to keep cardinality low on clusters with per-worker PVCs.
 
 #### 6. Soperator Controller Metrics
 - Purpose: Exports controller-runtime metrics of every soperator process: `controller_runtime_*` (reconcile
