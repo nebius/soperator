@@ -3,7 +3,7 @@
 - name: Ensure sssd package is installed
   ansible.builtin.apt:
     name:
-      - sssd-common=2.9.4-1.1ubuntu6.3
+      - sssd-common=2.9.4-1.1ubuntu6.8
     state: present
     update_cache: true
   tags:

@@ -1,7 +1,7 @@
 # syntax=docker.io/docker/dockerfile-upstream:1.20.0
 
-# https://github.com/nebius/ml-containers/pull/107
-FROM cr.nebius.cloud/ml-containers/ansible_roles:noble-20260928080259 AS sansible
+# https://github.com/nebius/ml-containers/pull/110
+FROM cr.nebius.cloud/ml-containers/ansible_roles:noble-20261002131853 AS sansible
 
 # Install common packages
 RUN apt update && \
@@ -19,5 +19,7 @@ RUN chmod +x /opt/bin/sansible_entrypoint.sh
 
 ARG SLURM_VERSION
 ENV SLURM_VERSION=$SLURM_VERSION
+ARG SLURM_DEB_VERSION
+ENV SLURM_DEB_VERSION=$SLURM_DEB_VERSION
 
 ENTRYPOINT ["/opt/bin/sansible_entrypoint.sh"]

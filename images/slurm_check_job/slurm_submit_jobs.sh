@@ -73,7 +73,7 @@ for node in "${SELECTED_NODES[@]}"; do
     echo "Submitting Slurm job for node $node..."
 
     # Here we use env variables instead of --output and --error because they do not support %N (node name) parameter.
-    OUT_PATTERN='/opt/soperator-outputs/slurm_jobs/%N.%x.%j.out'
+    OUT_PATTERN='/opt/soperator-outputs/local/slurm_jobs/%N.%x.%j.out'
     JOB_ID=$(
         SBATCH_OUTPUT="$OUT_PATTERN" \
         SBATCH_ERROR="$OUT_PATTERN" \

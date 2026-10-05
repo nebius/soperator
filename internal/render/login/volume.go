@@ -1,11 +1,14 @@
 package login
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -25,6 +28,9 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeInMemory(login.ContainerSshd.Resources.Memory()),
 		common.RenderVolumeTmpDisk(),
 		renderVolumeSshdConfigs(login.SSHDConfigMapName),
+	}
+	if login.UserIsolation != nil && ptr.Deref(login.UserIsolation.Enabled, false) {
+		volumes = append(volumes, renderVolumeUserIsolation(clusterName))
 	}
 	if login.ContainerSSSD != nil {
 		volumes = append(volumes,
@@ -88,6 +94,37 @@ func renderVolumesAndClaimTemplateSpecs(
 	return volumes, pvcTemplateSpecs, nil
 }
 
+func resolveDockerImageStorageMount(login *values.SlurmLogin) (slurmv1.NodeVolumeMount, error) {
+	for _, env := range login.ContainerSshd.CustomEnv {
+		if env.Name == consts.EnvDockerEnabled {
+			return slurmv1.NodeVolumeMount{}, fmt.Errorf(
+				"remove environment variable %q from login.sshd.customEnv because it is managed by Soperator",
+				consts.EnvDockerEnabled,
+			)
+		}
+	}
+
+	if !login.DockerEnabled {
+		return slurmv1.NodeVolumeMount{}, nil
+	}
+	if login.UserIsolation == nil || !ptr.Deref(login.UserIsolation.Enabled, false) {
+		return slurmv1.NodeVolumeMount{}, fmt.Errorf("configure login.userIsolation.enabled=true when login Docker is enabled")
+	}
+
+	for i := range login.JailSubMounts {
+		mount := &login.JailSubMounts[i]
+		if mount.MountPath != consts.ImageStorageMountPath {
+			continue
+		}
+		if mount.ReadOnly {
+			return slurmv1.NodeVolumeMount{}, fmt.Errorf("configure login Docker image storage at %s as writable", consts.ImageStorageMountPath)
+		}
+		return *mount, nil
+	}
+
+	return slurmv1.NodeVolumeMount{}, fmt.Errorf("configure a writable login jail sub-mount at %s when login Docker is enabled", consts.ImageStorageMountPath)
+}
+
 // region configs
 
 // RenderVolumeSshdConfigs renders [corev1.Volume] containing SSHD configs contents
@@ -110,6 +147,31 @@ func renderVolumeMountSshdConfigs() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      consts.VolumeNameSSHDConfigsLogin,
 		MountPath: consts.VolumeMountPathSSHConfigs,
+		ReadOnly:  true,
+	}
+}
+
+// renderVolumeUserIsolation renders [corev1.Volume] containing per-user isolation config contents
+func renderVolumeUserIsolation(clusterName string) corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameUserIsolation,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: naming.BuildConfigMapUserIsolationName(clusterName),
+				},
+				DefaultMode: ptr.To(common.DefaultFileMode),
+			},
+		},
+	}
+}
+
+// renderVolumeMountUserIsolation renders [corev1.VolumeMount] defining the mounting path for the per-user isolation config
+func renderVolumeMountUserIsolation() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameUserIsolation,
+		MountPath: consts.VolumeMountPathUserIsolation,
+		SubPath:   consts.VolumeMountSubPathUserIsolation,
 		ReadOnly:  true,
 	}
 }

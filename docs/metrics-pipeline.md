@@ -67,6 +67,7 @@ The exporter applies metric relabeling to drop volatile Kubernetes labels (`pod`
 - Metrics: GPU temperature, power, utilization, memory, errors
 - Scrape Interval: 15s
 - DaemonSet: Runs on nodes with `nvidia.com/gpu.deploy.dcgm-exporter=true`
+- Job attribution: DCGM metrics carry no job labels; per-job GPU views join them with the Slurm exporter's `slurm_node_job` metric on `node_name`, which is added to DCGM series at scrape time from the worker Pod name (see [slurm-exporter.md](slurm-exporter.md))
 
 Connection Example:
 ```bash
@@ -104,7 +105,8 @@ Key Metrics:
   - 8081 - Telemetry endpoint (self-monitoring)
 - Metrics: Pod state metrics (filtered subset)
 - Deployment: Single replica deployment in `monitoring-system` namespace
-- Configuration: `--resources=pods` with metric allowlist filtering
+- Configuration: pod/node collectors with metric allowlist filtering
+- Scrape size: inherits the global vmagent scrape size by default; `observability.vmStack.values.kubeStateMetrics.maxScrapeSize` can raise the main `http` endpoint limit for large clusters
 
 Connection Example:
 ```bash
@@ -116,21 +118,74 @@ curl http://localhost:8080/metrics
 Note: Port 8080 provides Kubernetes object metrics, while port 8081 provides self-monitoring metrics. VMServiceScrape targets port 8080 for cluster monitoring.
 
 #### 6. Soperator Controller Metrics
-- Purpose: Exports controller runtime metrics
-- Port: 8443 (through kube-rbac-proxy)
-- Metrics: Reconciliation metrics, controller health
-- Deployment: Runs on system nodes with the controller manager
-- Namespace: `soperator-system`
-- Access: Protected by RBAC proxy, requires proper authentication
+- Purpose: Exports controller-runtime metrics of every soperator process: `controller_runtime_*` (reconcile
+  rate, results, errors, panics, duration, workers), `workqueue_*` (depth, adds, retries, latency),
+  `leader_election_master_status`, plus Go and process collectors
+- Port: 8443 (controller-runtime secure metrics); the rebooter uses plain http on 8080
+- Access: Protected by controller-runtime authn/authz, requires proper authentication
+- Dashboard: Soperator / Controllers (`helm/soperator-monitoring-dashboards/dashboards/operator_controllers.json`)
+
+Each ServiceMonitor sets a static `component` target label so processes can be told apart even where `job`
+is dropped (the public remote-write to Nebius o11y). The `controller` label is the controller-runtime name;
+workqueue metrics carry the same value in `name`.
+
+Kubernetes API usage is attributed per controller by two soperator metrics recorded in an HTTP transport
+wrapper installed on the manager's `rest.Config` in every process:
+
+- `soperator_kube_api_requests_total{controller, verb, resource, code}`: requests that reached the API server.
+  `resource` is `group/resource[/subresource]` (`pods`, `pods/status`, `apps.kruise.io/statefulsets`); names and
+  namespaces are never labels. `verb` is get, list, watch, create, update, patch, delete or deletecollection.
+- `soperator_kube_api_request_duration_seconds{controller, verb, resource}`: latency histogram up to the response
+  headers. Client-side rate limiter wait is not included.
+
+`controller` is the reconcile that issued the request; `controller="manager"` covers informer list/watch, leader
+election, webhooks and runnables. Reads served from the informer cache never reach the API server and are not
+counted. The per-process client-go counter `rest_client_requests_total{code, method, host}` stays available for
+cross-checks.
+
+Slurm REST (slurmrestd) usage is attributed the same way, recorded inside the retrying HTTP client that every
+Slurm API client is built on (`slurmapi.DefaultHTTPClient`):
+
+- `soperator_slurm_rest_requests_total{controller, host, method, path, code}`: one increment per HTTP attempt,
+  retries included. `path` is the request path with object names replaced by `{id}` (`/slurm/v0.0.44/node/{id}`),
+  `host` is the per-cluster REST service with the `.svc` and `.svc.cluster.local` suffixes stripped, so the operator and the exporter report one host.
+- `soperator_slurm_rest_request_duration_seconds{controller, method, path}`: per-attempt latency up to the
+  response headers.
+- `soperator_slurm_rest_retries_total{controller, host, path}`: retried attempts.
+
+Besides the reconcilers, `controller` takes the values `nodecache` (soperatorchecks background node list
+refresh), `exporter` (metrics exporter collection loop) and `manager` (untagged callers). The exporter has no
+controller-runtime manager, so it exposes these metrics from its self-monitoring port 8081, whose PodMonitor
+endpoint carries `component=exporter`; its Slurm metrics port 8080 is left unlabeled on purpose.
+
+| `component` | Chart | Controllers |
+| --- | --- | --- |
+| `soperator` | `helm/soperator` | `cluster`, `nodeset`, `nodeconfigurator`, `rollingupdate`, `nodetopology`, `workertopology`, `soperatorchecks.slurmapiclients` |
+| `soperatorchecks` | `helm/soperatorchecks` | `soperatorchecks.activecheck`, `.activecheckjob`, `.slurmnodes`, `.k8snodes`, `.serviceaccount`, `.slurmapiclients`, `.podephemeralstorage` |
+| `sconfigcontroller` | `helm/slurm-cluster` (one per SlurmCluster) | `jailedconfig` |
+| `rebooter` | `helm/nodeconfigurator` (DaemonSet, one pod per node) | `rebooter` |
 
 Connection Example:
 ```bash
-# Port-forward to controller (bypasses RBAC)
-kubectl port-forward -n soperator-system deployment/soperator-controller-manager 8080:8080
-curl http://localhost:8080/metrics
+# Port-forward to controller metrics and authenticate with a token allowed to get /metrics
+kubectl port-forward -n soperator-system deployment/soperator-controller-manager 8443:8443
+curl -k -H "Authorization: Bearer ${TOKEN}" https://localhost:8443/metrics
 ```
 
 Note: Production scraping requires a ServiceMonitor with proper RBAC authentication.
+
+#### 7. NCCL Profiles Collector
+- Purpose: Reads NCCL profile files from the jail filesystem and exports metrics through an OpenTelemetry collector
+- Deployment: Single deployment on system nodes by default, or DaemonSet on worker nodes with `observability.ncclProfiles.values.mode: nodeLocal`
+- Storage: Uses file storage under `/var/lib/otelcol` when `observability.ncclProfiles.values.enableFileStorage` is enabled
+- Runtime limits: Sets `GOMAXPROCS` from `observability.ncclProfiles.values.resources`; passes `useGoMemLimit` through to upstream `useGOMEMLIMIT`
+
+The NCCL profiles collector follows the same Go runtime sizing rules as the log collectors:
+
+- CPU limits are preferred over CPU requests; values are rounded up to at least one process (`500m` -> `1`, `2` -> `2`).
+- When `useGoMemLimit` is enabled, the upstream OpenTelemetry collector chart derives `GOMEMLIMIT` from `resources.limits.memory`.
+- Upstream `GOMEMLIMIT` targets about 80% of the memory limit and does not fall back to memory requests.
+- When `spec.values.useGOMEMLIMIT` is false, the upstream chart does not inject a `GOMEMLIMIT` environment variable.
 
 ### Metrics Processing & Storage
 
@@ -162,8 +217,12 @@ curl "http://localhost:8429/api/v1/query?query=up"
 
 #### Remote Write to Nebius Cloud
 - Endpoint: `https://write.monitoring.{region}.nebius.cloud/projects/{projectId}/buckets/soperator/prometheus`
-- Authentication: Bearer token from `/mnt/imds/tsa-token`, populated and refreshed by the vmagent IMDS token sidecar
+- Authentication: Bearer token from the `o11y-writer-sa-token` Secret, populated and refreshed by the shared TSA token writer
 - When: Enabled with `publicEndpointEnabled: true`
+
+The default token writer source is IMDS (`observability.tsaToken.writer.source: imds`).
+Set `observability.publicEndpointTokenKind: hostPath` only when the token should be
+read directly from a host-mounted file such as `/mnt/cloud-metadata/tsa-token`.
 
 ### Visualization
 
@@ -185,7 +244,19 @@ kubectl port-forward -n monitoring-system svc/metrics-grafana 3000:80
 ```
 
 Pre-configured Dashboards:
+
 - Victoria Metrics K8s Stack: Grafana, Kubelet, Kubernetes system, Node Exporter, VictoriaMetrics health
-- Soperator Custom: Cluster health, Jobs overview, Workers stats and overview
+- Soperator Custom: Cluster Health & Overview, Slurm Controller, Jobs overview, Workers stats and overview,
+  Soperator / Controllers (reconcile and workqueue metrics per controller), Soperator / Rollouts
+
+Cluster Health & Overview and Slurm Controller each include **Nodes by Categories**
+and **Nodes by State** panels. They share mutually exclusive category definitions
+and stacking order: the first shows category totals, while the second shows exact
+Slurm state combinations within each category, including cloud and power-state
+flags. Powered down groups DOWN, POWERED_DOWN, POWER_UP, and POWERING_UP;
+Other/error includes ERROR, NOT_RESPONDING, INVALID, FAIL, and otherwise
+unclassified nodes.
+See [Grafana Dashboards](slurm-exporter.md#grafana-dashboards) for definitions
+and example legends.
 
 Dashboards are auto-discovered from ConfigMaps with label `grafana_dashboard: "1"` in monitored namespaces.

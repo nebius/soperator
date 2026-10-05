@@ -5,6 +5,7 @@ import (
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/naming"
 )
 
 // SlurmWorker contains the data needed to deploy and reconcile the Slurm Workers
@@ -21,6 +22,7 @@ type SConfigController struct {
 	ReconfigurePollInterval *string
 	ReconfigureWaitTimeout  *string
 	ServiceAccountName      string
+	Deployment              Deployment
 }
 
 func buildSConfigControllerFrom(
@@ -32,6 +34,7 @@ func buildSConfigControllerFrom(
 	reconfigurePollInterval *string,
 	reconfigureWaitTimeout *string,
 	serviceAccountName string,
+	namePrefix string,
 ) SConfigController {
 	containerSConfigController := buildContainerFrom(
 		container,
@@ -50,6 +53,7 @@ func buildSConfigControllerFrom(
 		ReconfigurePollInterval: reconfigurePollInterval,
 		ReconfigureWaitTimeout:  reconfigureWaitTimeout,
 		ServiceAccountName:      serviceAccountName,
+		Deployment:              buildDeploymentFrom(naming.BuildDeploymentName(consts.ComponentTypeSConfigController, namePrefix)),
 	}
 
 	return res

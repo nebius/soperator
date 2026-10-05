@@ -1,0 +1,13 @@
+suite: test Grafana plugins
+templates:
+  - templates/vm-stack.yaml
+
+tests:
+  - it: should use Grafana v13 plugin preinstall syntax for URL plugins
+    asserts:
+      - equal:
+          path: spec.values.grafana.plugins[0]
+          value: grafana-lokiexplore-app@1.0.14@https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip
+      - equal:
+          path: spec.values.grafana.plugins[1]
+          value: victoriametrics-logs-datasource

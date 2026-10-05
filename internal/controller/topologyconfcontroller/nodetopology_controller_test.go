@@ -8,12 +8,15 @@ import (
 
 	kruisev1alpha1 "github.com/openkruise/kruise-api/apps/v1alpha1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	tc "nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -44,6 +47,44 @@ func TestExtractTierLabels(t *testing.T) {
 	}
 }
 
+func TestCollectNodesWithAnyTier(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kruisev1alpha1.AddToScheme(scheme))
+	require.NoError(t, slurmv1.AddToScheme(scheme))
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	for name, labels := range map[string]map[string]string{
+		"node0": {consts.DefaultTopologyLabelPrefix + "/tier-0": "nvl0"},
+		"node2": {consts.DefaultTopologyLabelPrefix + "/tier-2": "spine2"},
+		"other": {"kubernetes.io/hostname": "other"},
+	} {
+		require.NoError(t, fakeClient.Create(ctx, &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels},
+		}))
+	}
+	r := tc.NewNodeTopologyReconciler(fakeClient, scheme, "default", consts.DefaultTopologyLabelPrefix)
+
+	cm, err := r.GetOrCreateTopologyLabelsConfigMap(ctx)
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{
+		"node0": `{"tier-0":"nvl0"}`,
+		"node2": `{"tier-2":"spine2"}`,
+	}, cm.Data)
+
+	node := &corev1.Node{}
+	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{Name: "node2"}, node))
+	node.Labels[consts.DefaultTopologyLabelPrefix+"/tier-2"] = "spine3"
+	require.NoError(t, fakeClient.Update(ctx, node))
+	_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: node.Name}})
+	require.NoError(t, err)
+
+	cm, err = r.GetOrCreateTopologyLabelsConfigMap(ctx)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"tier-2":"spine3"}`, cm.Data["node2"])
+}
+
 func TestUpdateTopologyConfigMap(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
@@ -58,8 +99,6 @@ func TestUpdateTopologyConfigMap(t *testing.T) {
 			Scheme: scheme,
 		},
 		Namespace: "default",
-		// Use the same fakeClient as APIReader for tests
-		APIReader: fakeClient,
 	}
 
 	ctx := context.TODO()
@@ -123,8 +162,6 @@ func TestRemoveTopologyConfigMap(t *testing.T) {
 			Scheme: scheme,
 		},
 		Namespace: "default",
-		// Use the same fakeClient as APIReader for tests
-		APIReader: fakeClient,
 	}
 
 	ctx := context.TODO()

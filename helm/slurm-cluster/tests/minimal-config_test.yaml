@@ -149,9 +149,6 @@ tests:
           path: spec.maintenance
           value: none
       - equal:
-          path: spec.useDefaultAppArmorProfile
-          value: false
-      - equal:
           path: spec.partitionConfiguration.configType
           value: default
       - equal:
