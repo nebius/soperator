@@ -40,6 +40,7 @@ func FeaturePaths() []string {
 		"features/soperator_utils.feature",
 		"features/nodeset_ephemeral_mode_transition.feature",
 		"features/node_replacement.feature",
+		"features/worker_rolling_update.feature",
 		"features/docker_containers.feature",
 		"features/enroot_containers.feature",
 		"features/passive_checks.feature",

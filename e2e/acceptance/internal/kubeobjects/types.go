@@ -17,6 +17,8 @@ const (
 
 	NodeSetPhaseReady = "Ready"
 
+	NodeSetUpdateStrategySlurmAwareRollingUpdate = "slurmAwareRollingUpdate"
+
 	ActiveCheckTypeK8sJob   = "k8sJob"
 	ActiveCheckTypeSlurmJob = "slurmJob"
 
@@ -144,6 +146,7 @@ type NodeSetSpec struct {
 	EphemeralNodes              *bool          `json:"ephemeralNodes"`
 	InitialNumberEphemeralNodes int32          `json:"initialNumberEphemeralNodes"`
 	GPU                         NodeSetGPUSpec `json:"gpu"`
+	UpdateStrategy              string         `json:"updateStrategy"`
 }
 
 type NodeSetGPUSpec struct {
