@@ -1,3 +1,4 @@
+{{- if .Values.volume.controllerSpool.enabled }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -23,3 +24,4 @@ spec:
       nodeSelectorTerms:
         - matchExpressions:
 {{ .Values.storage.controllerSpool.matchExpressions | toYaml | indent 12 }}
+{{- end }}

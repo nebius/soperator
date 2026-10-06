@@ -14,6 +14,9 @@ volume:
     # Required in case of 'glusterfs' type
     glusterfsHostName: ""
   controllerSpool:
+    # Keep enabled by default for backward compatibility. New deployments that
+    # store controller state on a PVC should disable this explicitly.
+    enabled: true
     name: "controller-spool"
     size: "30Gi"
     filestoreDeviceName: "controller-spool"
