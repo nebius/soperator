@@ -332,6 +332,75 @@
       "type": "stat"
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "NBS disk backing the NFS server PVC, taken from the CSI volume handle of its PersistentVolume. Use it to look up the disk stats in Nebius Compute.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "light-blue",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "noValue": "No NFS server in K8S Cluster",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 276,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "name",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.14",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "label_replace(\n  kube_persistentvolumeclaim_info{cluster=~\"$cluster\", persistentvolumeclaim=\"nfs-server-storage\"},\n  \"persistentvolume\", \"$1\", \"volumename\", \"(.+)\"\n)\n* on(cluster, persistentvolume) group_left(csi_volume_handle)\nkube_persistentvolume_info{cluster=~\"$cluster\"}",
+          "instant": true,
+          "legendFormat": "{{csi_volume_handle}}",
+          "range": false,
+          "refId": "A",
+          "useCustomValues": false,
+          "useDashValues": false
+        }
+      ],
+      "title": "NFS server NBS disk",
+      "type": "stat"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
