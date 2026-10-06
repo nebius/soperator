@@ -111,6 +111,7 @@ spec:
           - '--metric-allowlist=kube_pod_container_status_terminated_reason'
           - '--metric-allowlist=kube_pod_container_status_terminated_signal'
           - '--metric-allowlist=kube_node_status_condition'
+          - '--metric-allowlist=kube_node_spec_taint'
           - '--metric-allowlist=kube_node_info'
           - '--metric-allowlist=kube_customresource_.*'
           - '--metric-allowlist=kube_node_labels'
@@ -244,6 +245,10 @@ spec:
                 max_scrape_size: {{ $kubeStateMetrics.maxScrapeSize | quote }}
                 {{- end }}
                 metricRelabelConfigs:
+                  - action: drop
+                    if:
+                      - 'kube_node_spec_taint{key!="node.kubernetes.io/unschedulable"}'
+                      - 'kube_node_spec_taint{effect!="NoSchedule"}'
                   - action: labeldrop
                     regex: (uid|container_id|image_id)
                 port: http

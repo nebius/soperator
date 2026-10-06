@@ -30,6 +30,27 @@ tests:
           path: spec.values.kube-state-metrics.vmScrape.spec.endpoints[0].max_scrape_size
           value: "150554432"
 
+  - it: should export node conditions and only unschedulable NoSchedule taints
+    asserts:
+      - contains:
+          path: spec.values.kube-state-metrics.collectors
+          content: nodes
+      - contains:
+          path: spec.values.kube-state-metrics.extraArgs
+          content: '--metric-allowlist=kube_node_status_condition'
+      - contains:
+          path: spec.values.kube-state-metrics.extraArgs
+          content: '--metric-allowlist=kube_node_spec_taint'
+      - equal:
+          path: spec.values.kube-state-metrics.vmScrape.spec.endpoints[0].metricRelabelConfigs
+          value:
+            - action: drop
+              if:
+                - 'kube_node_spec_taint{key!="node.kubernetes.io/unschedulable"}'
+                - 'kube_node_spec_taint{effect!="NoSchedule"}'
+            - action: labeldrop
+              regex: (uid|container_id|image_id)
+
   - it: should export persistent volume metrics for disk mapping
     asserts:
       - hasDocuments:
