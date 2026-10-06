@@ -3,6 +3,70 @@ templates:
   - templates/statefulset.yaml
   - templates/configmap.yaml
 tests:
+  - it: should pass the default connection limit to the server
+    template: templates/statefulset.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MAX_CONNECTIONS
+            value: "8192"
+
+  - it: should pass a provisioning connection limit to the server
+    template: templates/statefulset.yaml
+    set:
+      nfs.maxConnections: 16384
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MAX_CONNECTIONS
+            value: "16384"
+
+  - it: should render a large connection limit from a values file as decimal
+    template: templates/statefulset.yaml
+    values:
+      - fixtures/large-max-connections.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MAX_CONNECTIONS
+            value: "1000000"
+
+  - it: should render the maximum connection limit from a values file as decimal
+    template: templates/statefulset.yaml
+    values:
+      - fixtures/maximum-max-connections.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MAX_CONNECTIONS
+            value: "4294967295"
+
+  - it: should default the connection limit when the key is absent
+    template: templates/statefulset.yaml
+    set:
+      nfs.maxConnections: null
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MAX_CONNECTIONS
+            value: "8192"
+
+  - it: should preserve zero to select the kernel default
+    template: templates/statefulset.yaml
+    set:
+      nfs.maxConnections: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MAX_CONNECTIONS
+            value: "0"
+
   - it: should use default replica count
     template: templates/statefulset.yaml
     asserts:
