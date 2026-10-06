@@ -147,41 +147,11 @@ func (s *NodeReplacement) theTestJobIsCancelled(ctx context.Context) error {
 }
 
 func (s *NodeReplacement) theOldInstanceIsRemoved(ctx context.Context) error {
-	originalInstanceID := s.originalInstanceID
-	return s.runtime.WaitFor(ctx, "old instance removal", nodeReplacementRemoveTimeout, 30*time.Second, func(waitCtx context.Context) (bool, error) {
-		_, err := s.runtime.Local().Run(waitCtx, "nebius", "compute", "instance", "get", "--id", originalInstanceID, "--format", "json")
-		if err != nil {
-			if strings.Contains(err.Error(), "not found") {
-				return true, nil
-			}
-			return false, err
-		}
-		return false, nil
-	})
+	return framework.WaitForInstanceRemoval(ctx, s.runtime, s.originalInstanceID, nodeReplacementRemoveTimeout, 30*time.Second)
 }
 
 func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) error {
-	workerName := s.replacementWorker.Name
-	originalInstanceID := s.originalInstanceID
-	return s.runtime.WaitFor(ctx, "replacement node ready", nodeReplacementReadyTimeout, 60*time.Second, func(waitCtx context.Context) (bool, error) {
-		node, err := s.slurm.NodeInfo(waitCtx, workerName)
-		if err != nil {
-			return false, err
-		}
-
-		if node.InstanceID == "" || node.InstanceID == originalInstanceID {
-			return false, nil
-		}
-
-		if node.State == "" {
-			return false, nil
-		}
-		if !node.IsUsable() {
-			return false, nil
-		}
-
-		return true, nil
-	})
+	return framework.WaitForUsableReplacement(ctx, s.runtime, s.slurm, s.replacementWorker.Name, s.originalInstanceID, nodeReplacementReadyTimeout, 60*time.Second)
 }
 
 func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Context) error {
