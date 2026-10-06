@@ -1,0 +1,93 @@
+suite: test kruise
+templates:
+  - templates/kruise.yaml
+tests:
+  # The post-renderer patches kruise webhooks by index. The indexes below were checked against
+  # this chart version: mutating 0 is mpod, validating 0-8 are the builtin-resource webhooks.
+  # Re-render the chart and re-check them before bumping the version.
+  - it: should pin the kruise chart version the webhook patch indexes were verified against
+    asserts:
+      - equal:
+          path: spec.chart.spec.version
+          value: 1.9.1-custom
+      - equal:
+          path: spec.values.manager.image.tag
+          value: v1.9.1
+
+  - it: should set kruise images explicitly
+    asserts:
+      - equal:
+          path: spec.values.manager.image
+          value:
+            repository: cr.nebius.cloud/soperator/kruise-manager
+            tag: v1.9.1
+            pullPolicy: IfNotPresent
+      - equal:
+          path: spec.values.daemon.image.pullPolicy
+          value: IfNotPresent
+      - equal:
+          path: spec.values.helmHooks.image
+          value:
+            repository: cr.nebius.cloud/soperator/kruise-helm-hook
+            tag: v0.1.0
+
+  - it: should scope the kruise pod mutating webhook to the slurm namespace
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[1].target.kind
+          value: MutatingWebhookConfiguration
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[1].patch
+          pattern: "path: /webhooks/0/namespaceSelector/matchExpressions"
+      - notMatchRegex:
+          path: spec.postRenderers[0].kustomize.patches[1].patch
+          pattern: "/webhooks/[1-9]"
+
+  - it: should scope only the builtin-resource validating webhooks to the slurm namespace
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[2].target.kind
+          value: ValidatingWebhookConfiguration
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[2].patch
+          pattern: "path: /webhooks/8/namespaceSelector/matchExpressions"
+      - notMatchRegex:
+          path: spec.postRenderers[0].kustomize.patches[2].patch
+          pattern: "/webhooks/(9|[1-9][0-9])/"
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[2].patch
+          pattern: "- soperator\\n"
+
+  - it: should render the slurm namespace into the webhook patches from values
+    set:
+      slurmCluster.namespace: custom-ns
+    asserts:
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[1].patch
+          pattern: "- custom-ns\\n"
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[2].patch
+          pattern: "path: /webhooks/8/namespaceSelector/matchExpressions\\n(.*\\n){4}\\s+- custom-ns\\n"
+      - notMatchRegex:
+          path: spec.postRenderers[0].kustomize.patches[2].patch
+          pattern: "- soperator\\n"
+
+  - it: should keep the kruise-daemon rolling update patch
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            group: apps
+            version: v1
+            kind: DaemonSet
+            name: kruise-daemon
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "maxUnavailable: 50%"
+
+  - it: should omit post-renderers when they are unset
+    set:
+      soperator.kruise.postRenderers: null
+    asserts:
+      - notExists:
+          path: spec.postRenderers

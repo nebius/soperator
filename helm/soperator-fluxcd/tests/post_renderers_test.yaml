@@ -1,0 +1,1169 @@
+suite: test post-renderers of every HelmRelease
+templates:
+  - templates/backup-config.yaml
+  - templates/backup.yaml
+  - templates/cert-manager.yaml
+  - templates/csi-driver-nfs.yaml
+  - templates/dcgm-exporter.yaml
+  - templates/kruise.yaml
+  - templates/mariadb-operator-crds.yaml
+  - templates/mariadb-operator.yaml
+  - templates/monitoring-dashboards.yaml
+  - templates/namespaces.yaml
+  - templates/nfs-server.yaml
+  - templates/nodeconfigurator.yaml
+  - templates/nodesets.yaml
+  - templates/notifier.yaml
+  - templates/o11y-tsa-token-writer.yaml
+  - templates/opentelemetry-collector-events.yaml
+  - templates/opentelemetry-collector-jail-logs.yaml
+  - templates/opentelemetry-collector-logs.yaml
+  - templates/opentelemetry-collector-nccl-profiles.yaml
+  - templates/prometheus-operator-crds.yaml
+  - templates/slurm-cluster-storage.yaml
+  - templates/slurm-cluster.yaml
+  - templates/soperator-activechecks.yaml
+  - templates/soperator-custom-configmaps.yaml
+  - templates/soperator.yaml
+  - templates/soperatorchecks.yaml
+  - templates/storageclasses.yaml
+  - templates/tailscale.yaml
+  - templates/victoria-metrics-operator-crds.yaml
+  - templates/vm-logs.yaml
+  - templates/vm-stack.yaml
+release:
+  name: t
+set:
+  soperator: {enabled: true, kruise: {enabled: true}, nodeConfigurator: {enabled: true}, soperatorChecks: {enabled: true}, monitoringDashboards: {enabled: true}}
+  backup: {enabled: true, config: {enabled: true}}
+  certManager: {enabled: true}
+  nfsServer: {enabled: true}
+  mariadbOperator: {enabled: true}
+  notifier: {enabled: true, values: {slack: {webhookUrl: "https://hooks.example/x"}}}
+  soperatorActiveChecks: {enabled: true}
+  customConfigmaps: {enabled: true}
+  nodesets: {enabled: true}
+  storageClasses: {enabled: true}
+  tailscale: {enabled: true}
+  slurmCluster: {enabled: true, slurmClusterStorage: {enabled: true}}
+  observability:
+    enabled: true
+    publicEndpointEnabled: true
+    publicEndpointTokenKind: secret
+    dcgmExporter: {enabled: true}
+    prometheusOperator: {enabled: true}
+    vmLogs: {enabled: true}
+    vmStack: {enabled: true}
+    ncclProfiles: {enabled: true}
+    opentelemetry: {enabled: true, logs: {values: {jailLogs: {enabled: true}}}}
+tests:
+  - it: should not render post-renderers for k8up by default
+    template: templates/backup.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-k8up
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for k8up from backup.postRenderers
+    template: templates/backup.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-k8up
+    set:
+      backup.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for backup-config by default
+    template: templates/backup-config.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-backup-config
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for backup-config from backup.config.postRenderers
+    template: templates/backup-config.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-backup-config
+    set:
+      backup.config.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for cert-manager by default
+    template: templates/cert-manager.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-cert-manager
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for cert-manager from certManager.postRenderers
+    template: templates/cert-manager.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-cert-manager
+    set:
+      certManager.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for csi-driver-nfs by default
+    template: templates/csi-driver-nfs.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-csi-driver-nfs
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for csi-driver-nfs from csiDriverNfs.postRenderers
+    template: templates/csi-driver-nfs.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-csi-driver-nfs
+    set:
+      csiDriverNfs.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for dcgm-exporter by default
+    template: templates/dcgm-exporter.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-dcgm-exporter
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for dcgm-exporter from observability.dcgmExporter.postRenderers
+    template: templates/dcgm-exporter.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-dcgm-exporter
+    set:
+      observability.dcgmExporter.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should render post-renderers for kruise from soperator.kruise.postRenderers
+    template: templates/kruise.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-kruise
+    set:
+      soperator.kruise.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for mariadb-operator by default
+    template: templates/mariadb-operator.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-mariadb-operator
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for mariadb-operator from mariadbOperator.postRenderers
+    template: templates/mariadb-operator.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-mariadb-operator
+    set:
+      mariadbOperator.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for mariadb-operator-crds by default
+    template: templates/mariadb-operator-crds.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-mariadb-operator-crds
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for mariadb-operator-crds from mariadbOperator.crds.postRenderers
+    template: templates/mariadb-operator-crds.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-mariadb-operator-crds
+    set:
+      mariadbOperator.crds.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for monitoring-dashboards by default
+    template: templates/monitoring-dashboards.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-monitoring-dashboards
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for monitoring-dashboards from soperator.monitoringDashboards.postRenderers
+    template: templates/monitoring-dashboards.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-monitoring-dashboards
+    set:
+      soperator.monitoringDashboards.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for ns by default
+    template: templates/namespaces.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-ns
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for ns from ns.postRenderers
+    template: templates/namespaces.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-ns
+    set:
+      ns.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for nfs-server by default
+    template: templates/nfs-server.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-nfs-server
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for nfs-server from nfsServer.postRenderers
+    template: templates/nfs-server.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-nfs-server
+    set:
+      nfsServer.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for nodeconfigurator by default
+    template: templates/nodeconfigurator.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-nodeconfigurator
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for nodeconfigurator from soperator.nodeConfigurator.postRenderers
+    template: templates/nodeconfigurator.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-nodeconfigurator
+    set:
+      soperator.nodeConfigurator.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for nodesets by default
+    template: templates/nodesets.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-nodesets
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for nodesets from nodesets.postRenderers
+    template: templates/nodesets.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-nodesets
+    set:
+      nodesets.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for soperator-notifier by default
+    template: templates/notifier.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-soperator-notifier
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for soperator-notifier from notifier.postRenderers
+    template: templates/notifier.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-soperator-notifier
+    set:
+      notifier.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for tsa-token-writer by default
+    template: templates/o11y-tsa-token-writer.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-tsa-token-writer
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for tsa-token-writer from observability.tsaToken.writer.postRenderers
+    template: templates/o11y-tsa-token-writer.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-tsa-token-writer
+    set:
+      observability.tsaToken.writer.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for opentelemetry-collector-events by default
+    template: templates/opentelemetry-collector-events.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-opentelemetry-collector-events
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for opentelemetry-collector-events from observability.opentelemetry.events.postRenderers
+    template: templates/opentelemetry-collector-events.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-opentelemetry-collector-events
+    set:
+      observability.opentelemetry.events.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for opentelemetry-collector-jail-logs by default
+    template: templates/opentelemetry-collector-jail-logs.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-opentelemetry-collector-jail-logs
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for opentelemetry-collector-jail-logs from observability.opentelemetry.logs.postRenderers
+    template: templates/opentelemetry-collector-jail-logs.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-opentelemetry-collector-jail-logs
+    set:
+      observability.opentelemetry.logs.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for opentelemetry-collector-logs by default
+    template: templates/opentelemetry-collector-logs.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-opentelemetry-collector-logs
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for opentelemetry-collector-logs from observability.opentelemetry.logs.postRenderers
+    template: templates/opentelemetry-collector-logs.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-opentelemetry-collector-logs
+    set:
+      observability.opentelemetry.logs.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for otelcol-nccl-profiles-cm by default
+    template: templates/opentelemetry-collector-nccl-profiles.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-otelcol-nccl-profiles-cm
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for otelcol-nccl-profiles-cm from observability.ncclProfiles.postRenderers
+    template: templates/opentelemetry-collector-nccl-profiles.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-otelcol-nccl-profiles-cm
+    set:
+      observability.ncclProfiles.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for otelcol-nccl-profiles by default
+    template: templates/opentelemetry-collector-nccl-profiles.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-otelcol-nccl-profiles
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for otelcol-nccl-profiles from observability.ncclProfiles.postRenderers
+    template: templates/opentelemetry-collector-nccl-profiles.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-otelcol-nccl-profiles
+    set:
+      observability.ncclProfiles.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for prometheus-operator-crds by default
+    template: templates/prometheus-operator-crds.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-prometheus-operator-crds
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for prometheus-operator-crds from observability.prometheusOperator.postRenderers
+    template: templates/prometheus-operator-crds.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-prometheus-operator-crds
+    set:
+      observability.prometheusOperator.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for slurm-cluster by default
+    template: templates/slurm-cluster.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-slurm-cluster
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for slurm-cluster from slurmCluster.postRenderers
+    template: templates/slurm-cluster.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-slurm-cluster
+    set:
+      slurmCluster.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for slurm-cluster-storage by default
+    template: templates/slurm-cluster-storage.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-slurm-cluster-storage
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for slurm-cluster-storage from slurmCluster.slurmClusterStorage.postRenderers
+    template: templates/slurm-cluster-storage.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-slurm-cluster-storage
+    set:
+      slurmCluster.slurmClusterStorage.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for soperator by default
+    template: templates/soperator.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-soperator
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for soperator from soperator.postRenderers
+    template: templates/soperator.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-soperator
+    set:
+      soperator.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for soperator-activechecks by default
+    template: templates/soperator-activechecks.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-soperator-activechecks
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for soperator-activechecks from soperatorActiveChecks.postRenderers
+    template: templates/soperator-activechecks.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-soperator-activechecks
+    set:
+      soperatorActiveChecks.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for custom-configmaps by default
+    template: templates/soperator-custom-configmaps.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-custom-configmaps
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for custom-configmaps from customConfigmaps.postRenderers
+    template: templates/soperator-custom-configmaps.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-custom-configmaps
+    set:
+      customConfigmaps.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for soperatorchecks by default
+    template: templates/soperatorchecks.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-soperatorchecks
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for soperatorchecks from soperator.soperatorChecks.postRenderers
+    template: templates/soperatorchecks.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-soperatorchecks
+    set:
+      soperator.soperatorChecks.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for storageclasses by default
+    template: templates/storageclasses.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-storageclasses
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for storageclasses from storageClasses.postRenderers
+    template: templates/storageclasses.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-storageclasses
+    set:
+      storageClasses.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for tailscale by default
+    template: templates/tailscale.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-tailscale
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for tailscale from tailscale.postRenderers
+    template: templates/tailscale.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-tailscale
+    set:
+      tailscale.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for victoria-metrics-operator-crds by default
+    template: templates/victoria-metrics-operator-crds.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-victoria-metrics-operator-crds
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for victoria-metrics-operator-crds from observability.vmStack.crds.postRenderers
+    template: templates/victoria-metrics-operator-crds.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-victoria-metrics-operator-crds
+    set:
+      observability.vmStack.crds.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for vm-logs by default
+    template: templates/vm-logs.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-vm-logs
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for vm-logs from observability.vmLogs.postRenderers
+    template: templates/vm-logs.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-vm-logs
+    set:
+      observability.vmLogs.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"
+
+  - it: should not render post-renderers for vm-stack by default
+    template: templates/vm-stack.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-vm-stack
+    asserts:
+      - notExists:
+          path: spec.postRenderers
+
+  - it: should render post-renderers for vm-stack from observability.vmStack.postRenderers
+    template: templates/vm-stack.yaml
+    documentSelector:
+      path: metadata.name
+      value: t-vm-stack
+    set:
+      observability.vmStack.postRenderers:
+        - kustomize:
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: test
+                patch: |
+                  - op: add
+                    path: /metadata/annotations/namespace
+                    value: {{ .Values.slurmCluster.namespace }}
+    asserts:
+      - equal:
+          path: spec.postRenderers[0].kustomize.patches[0].target
+          value:
+            kind: ConfigMap
+            name: test
+      - matchRegex:
+          path: spec.postRenderers[0].kustomize.patches[0].patch
+          pattern: "value: soperator\\n"

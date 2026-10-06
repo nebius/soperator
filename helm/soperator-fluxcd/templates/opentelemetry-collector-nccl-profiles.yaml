@@ -16,6 +16,10 @@ spec:
   driftDetection:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .Values.observability.ncclProfiles.postRenderers }}
+  postRenderers:
+    {{- tpl (toYaml .) $ | nindent 4 }}
+  {{- end }}
 
   chart:
     spec:
@@ -193,6 +197,10 @@ spec:
   {{- with .Values.observability.ncclProfiles.driftDetection }}
   driftDetection:
     {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.observability.ncclProfiles.postRenderers }}
+  postRenderers:
+    {{- tpl (toYaml .) $ | nindent 4 }}
   {{- end }}
 
   chart:

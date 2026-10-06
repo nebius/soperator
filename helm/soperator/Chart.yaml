@@ -7,6 +7,6 @@ appVersion: "5.0.0"
 kubeVersion: ">=1.29.0-0"
 dependencies:
   - name: kruise
-    version: 1.8.0
+    version: 1.9.1
     repository: https://openkruise.github.io/charts/
     condition: kruise.installOperator

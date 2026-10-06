@@ -10,6 +10,10 @@ spec:
   driftDetection:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .Values.soperator.kruise.postRenderers }}
+  postRenderers:
+    {{- tpl (toYaml .) $ | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: kruise
@@ -44,97 +48,4 @@ spec:
     name: kruise
     optional: true
     valuesKey: values.yaml
-  postRenderers:
-  - kustomize:
-      patches:
-      - target:
-          group: apps
-          version: v1
-          kind: DaemonSet
-          name: kruise-daemon
-        patch: |
-          - op: add
-            path: /spec/updateStrategy
-            value:
-              type: RollingUpdate
-              rollingUpdate:
-                maxUnavailable: 50%
-      - target:
-          kind: MutatingWebhookConfiguration
-          name: kruise-mutating-webhook-configuration
-        patch: |
-          - op: replace
-            path: /webhooks/0/namespaceSelector/matchExpressions
-            value:
-              - key: kubernetes.io/metadata.name
-                operator: In
-                values:
-                  - {{ .Values.slurmCluster.namespace }}
-      - target:
-          kind: ValidatingWebhookConfiguration
-          name: kruise-validating-webhook-configuration
-        patch: |
-          - op: replace
-            path: /webhooks/0/namespaceSelector/matchExpressions
-            value:
-              - key: kubernetes.io/metadata.name
-                operator: In
-                values:
-                  - {{ .Values.slurmCluster.namespace }}
-          - op: replace
-            path: /webhooks/1/namespaceSelector/matchExpressions
-            value:
-              - key: kubernetes.io/metadata.name
-                operator: In
-                values:
-                  - {{ .Values.slurmCluster.namespace }}
-          - op: replace
-            path: /webhooks/2/namespaceSelector/matchExpressions
-            value:
-              - key: kubernetes.io/metadata.name
-                operator: In
-                values:
-                  - {{ .Values.slurmCluster.namespace }}
-          - op: replace
-            path: /webhooks/3/namespaceSelector/matchExpressions
-            value:
-              - key: kubernetes.io/metadata.name
-                operator: In
-                values:
-                  - {{ .Values.slurmCluster.namespace }}
-          - op: replace
-            path: /webhooks/4/namespaceSelector/matchExpressions
-            value:
-              - key: kubernetes.io/metadata.name
-                operator: In
-                values:
-                  - {{ .Values.slurmCluster.namespace }}
-          - op: replace
-            path: /webhooks/5/namespaceSelector/matchExpressions
-            value:
-              - key: kubernetes.io/metadata.name
-                operator: In
-                values:
-                  - {{ .Values.slurmCluster.namespace }}
-          - op: replace
-            path: /webhooks/6/namespaceSelector/matchExpressions
-            value:
-              - key: kubernetes.io/metadata.name
-                operator: In
-                values:
-                  - {{ .Values.slurmCluster.namespace }}
-          - op: replace
-            path: /webhooks/7/namespaceSelector/matchExpressions
-            value:
-              - key: kubernetes.io/metadata.name
-                operator: In
-                values:
-                  - {{ .Values.slurmCluster.namespace }}
-          - op: replace
-            path: /webhooks/8/namespaceSelector/matchExpressions
-            value:
-              - key: kubernetes.io/metadata.name
-                operator: In
-                values:
-                  - {{ .Values.slurmCluster.namespace }}
 {{- end }}
