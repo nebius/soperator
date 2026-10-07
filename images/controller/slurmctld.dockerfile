@@ -30,8 +30,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -v -o power-manager ./cmd/powermanager
 
-# https://github.com/nebius/ml-containers/pull/109
-FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260929115231 AS controller_slurmctld
+# https://github.com/nebius/ml-containers/pull/111
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20261007141043 AS controller_slurmctld
 
 COPY ansible/sssd.yml /opt/ansible/sssd.yml
 COPY ansible/roles/sssd /opt/ansible/roles/sssd
