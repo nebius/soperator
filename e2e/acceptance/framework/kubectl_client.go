@@ -12,7 +12,10 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
 
-const SoperatorNamespace = "soperator"
+const (
+	SoperatorNamespace       = "soperator"
+	SoperatorSystemNamespace = "soperator-system"
+)
 
 type KubectlClient struct {
 	exec Exec
