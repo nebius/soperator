@@ -263,8 +263,9 @@ kubectl port-forward -n monitoring-system svc/metrics-grafana 3000:80
 Pre-configured Dashboards:
 
 - Victoria Metrics K8s Stack: Grafana, Kubelet, Kubernetes system, Node Exporter, VictoriaMetrics health
-- Soperator Custom: Cluster Health & Overview, Slurm Controller, Jobs overview, Workers stats and overview,
-  Soperator / Controllers (reconcile and workqueue metrics per controller), Soperator / Rollouts
+- Soperator Custom: Cluster Health & Overview, Slurm Controller, Slurm Exporter health, Jobs overview,
+  Workers stats and overview, Soperator / Controllers (reconcile and workqueue metrics per controller),
+  Soperator / Rollouts
 
 Cluster Health & Overview and Slurm Controller each include **Nodes by Categories**
 and **Nodes by State** panels. They share mutually exclusive category definitions
