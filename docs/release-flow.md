@@ -80,18 +80,6 @@ This ensures quality standards for both development and release branches.
 - Wait for automatic merge-back PR (targets the next release branch, or `main` if none)
 - Ensure each merge-back PR in the chain is merged without conflicts, resolve conflicts if needed
 
-## Release Notes
-
-GitHub releases include the text under `## Release Notes` in each merged PR's
-description, grouped into the existing changelog categories. Each entry includes
-the PR title and a link to the PR, followed by its release notes.
-
-Write user-facing release notes in the PR template, including any breaking changes
-or migration steps. Markdown formatting is preserved, and HTML comments from the
-template are removed. The section ends at the next level-one or level-two heading,
-or at the end of the description. If the section is missing or empty, the release
-entry contains only the PR title and link.
-
 ## Release Tracking Issue
 
 To start a release:

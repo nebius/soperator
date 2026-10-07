@@ -88,26 +88,6 @@ jobs:
           configurationJson: |
             {
               "template": "#{{CHANGELOG}}\n\nContributors:\n#{{CONTRIBUTORS}}",
-              "pr_template": "### #{{TITLE}} (##{{NUMBER}})\n\n#{{RELEASE_NOTES}}\n",
-              "trim_values": true,
-              "transformers": [
-                {
-                  "pattern": "<!--[\\s\\S]*?-->",
-                  "target": ""
-                }
-              ],
-              "custom_placeholders": [
-                {
-                  "name": "RELEASE_NOTES",
-                  "source": "BODY",
-                  "transformer": {
-                    "pattern": "^##[\\t ]+Release Notes[\\t ]*\\r?\\n([\\s\\S]*?)(?=^#{1,2}[\\t ]+|(?![\\s\\S]))",
-                    "flags": "gimu",
-                    "method": "regexr",
-                    "target": "$1"
-                  }
-                }
-              ],
               "categories": [
                 {
                     "key": "features",
