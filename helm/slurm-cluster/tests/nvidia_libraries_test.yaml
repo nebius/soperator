@@ -1,0 +1,39 @@
+suite: test NVIDIA libraries health check
+templates:
+  - slurm-scripts-cm.yaml
+tests:
+  - it: should enable the NVIDIA libraries check in prolog and hc_program
+    asserts:
+      - isNotNull:
+          path: data["nvidia_libraries.py"]
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"name": "nvidia_libraries"'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"command": "/usr/bin/python3 ./nvidia_libraries.py"'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"command": "/usr/bin/python3 ./nvidia_libraries\.py"[^}]*?"contexts": \[\s*"prolog",\s*"hc_program"\s*\]'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"command": "/usr/bin/python3 ./nvidia_libraries\.py"[^}]*?"on_fail": "drain"[^}]*?"on_ok": "undrain"[^}]*?"reason_base": "\[software_problem\] \$name"'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"command": "/usr/bin/python3 ./nvidia_libraries\.py"[^}]*?"run_in_jail": true'
+      - notMatchRegex:
+          path: data["checks.json"]
+          pattern: '"command": "/usr/bin/python3 ./nvidia_libraries\.py"[^}]*?"reason_base": "\[node_problem\]'
+
+  - it: should allow the NVIDIA libraries check to be disabled
+    set:
+      slurmScripts:
+        builtIn:
+          nvidia_libraries.py:
+            enabled: false
+    asserts:
+      - isNull:
+          path: data["nvidia_libraries.py"]
+      - notMatchRegex:
+          path: data["checks.json"]
+          pattern: '"command": "/usr/bin/python3 ./nvidia_libraries.py"'

@@ -887,6 +887,10 @@ slurmScripts:
       enabled: true
       customContent: null
       customConfig: null
+    nvidia_libraries.py:
+      enabled: true
+      customContent: null
+      customConfig: null
   extra: null
   # extra:
   #   example.sh:
