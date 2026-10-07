@@ -6,7 +6,6 @@ import (
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -54,7 +53,6 @@ type SlurmNodeSet struct {
 	VolumeJail                           corev1.VolumeSource
 	JailSubMounts                        []slurmv1alpha1.NodeVolumeMount
 	CustomVolumeMounts                   []slurmv1alpha1.NodeVolumeMount
-	SharedMemorySize                     *resource.Quantity
 	PersistentVolumeClaimRetentionPolicy *kruisev1b1.StatefulSetPersistentVolumeClaimRetentionPolicy
 
 	Maintenance                  *consts.MaintenanceMode
@@ -138,9 +136,8 @@ func BuildSlurmNodeSetFrom(
 		Service:         buildServiceFrom(naming.BuildNodeSetServiceName(clusterName, nodeSet.Name)),
 		ServiceUmbrella: buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeNodeSet, clusterName)),
 		//
-		VolumeSpool:      *nsSpec.Slurmd.Volumes.Spool.DeepCopy(),
-		VolumeJail:       *nsSpec.Slurmd.Volumes.Jail.DeepCopy(),
-		SharedMemorySize: nsSpec.Slurmd.Volumes.SharedMemorySize,
+		VolumeSpool: *nsSpec.Slurmd.Volumes.Spool.DeepCopy(),
+		VolumeJail:  *nsSpec.Slurmd.Volumes.Jail.DeepCopy(),
 		PersistentVolumeClaimRetentionPolicy: defaultPersistentVolumeClaimRetentionPolicy(
 			nsSpec.Slurmd.Volumes.PersistentVolumeClaimRetentionPolicy,
 		),

@@ -25,7 +25,19 @@ Worker `NodeSet`s can be configured as Slurm `State=CLOUD` capacity and powered 
 
 ### Cgroups
 Cgroups V2 are used for limiting access of jobs to resources on a node. All available cgroups are enabled except for the 
-swap space.
+swap space. Job namespaces require cgroup v2; cgroup v1 is not supported for this feature.
+
+
+### Temporary Filesystems for Jobs
+Every job receives private, node-local tmpfs filesystems at `/mnt/memory`, `/tmp`, and `/dev/shm`. Job steps on the
+same worker share them. Memory used by job writes
+counts toward the job's cgroup memory limit. Slurm releases the namespaces when the job ends, allowing the kernel
+to reclaim their contents.
+
+Use `/mnt/memory` directly. `namespaceConfig.enabled` in the `slurm-cluster` Helm chart defaults to `true`.
+`namespaceConfig.configMapRef.name` selects a ConfigMap containing a custom `namespace.yaml` instead of generating
+the default configuration. Setting `enabled: false` disables namespaces even when a reference is present.
+See [temporary filesystems for jobs](architecture.md#temporary-filesystems-for-jobs) for configuration and accounting.
 
 
 ### Job Containers

@@ -32,8 +32,9 @@ import (
 // [consts.ConfigMapKeySpankConfig] - SPANK plugins config
 // [consts.ConfigMapKeyGresConfig] - GRES config
 // [consts.ConfigMapKeyMPIConfig] - PMIx config
+// [consts.ConfigMapKeyNamespaceConfig] - Job mount namespace config
 func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) corev1.ConfigMap {
-	return corev1.ConfigMap{
+	res := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      naming.BuildConfigMapSlurmConfigsName(cluster.Name),
 			Namespace: cluster.Namespace,
@@ -50,9 +51,13 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) corev1.ConfigMap 
 			consts.ConfigMapKeyMPIConfig:           WithManagedSlurmConfigWarning(generateMPIConfig(cluster)).Render(),
 		},
 	}
+	if cluster.NamespaceConfig.Enabled && cluster.NamespaceConfig.ConfigMapName == "" {
+		res.Data[consts.ConfigMapKeyNamespaceConfig] = WithManagedSlurmConfigWarning(generateNamespaceConfig()).Render()
+	}
+	return res
 }
 
-// RenderJailedConfigSlurmConfigs renders new [slurmv1alpha1.JailedConfig] for every config in `RenderConfigMapSlurmConfigs` result
+// RenderJailedConfigSlurmConfigs renders a JailedConfig for standard Slurm configs; namespace.yaml has its own JailedConfig.
 func RenderJailedConfigSlurmConfigs(cluster *values.SlurmCluster) slurmv1alpha1.JailedConfig {
 	// This must match ConfigMap name in `RenderConfigMapSlurmConfigs`
 	name := naming.BuildConfigMapSlurmConfigsName(cluster.Name)
@@ -338,6 +343,9 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("MailProg", "/usr/bin/true")
 	res.AddProperty("PluginDir", "/usr/lib/"+consts.Slurm)
 	res.AddProperty("ProctrackType", "proctrack/cgroup")
+	if cluster.NamespaceConfig.Enabled {
+		res.AddProperty("NamespaceType", "namespace/linux")
+	}
 	res.AddProperty("ReturnToService", 2)
 	res.AddComment("")
 

@@ -37,6 +37,10 @@ spec:
   pamSlurmAdopt:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .Values.namespaceConfig }}
+  namespaceConfig:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   healthCheckConfig:
     healthCheckInterval: 120
     healthCheckProgram: /opt/slurm_scripts/hc_program.sh

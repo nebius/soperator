@@ -39,6 +39,8 @@ type SlurmClusterInfo struct {
 	LoginUserIsolationEnabled bool
 	LoginJailSubMounts        []JailSubMountInfo
 	PAMSlurmAdoptEnabled      bool
+	NamespaceConfigEnabled    bool
+	NamespaceConfigMapName    string
 	CustomSlurmConfig         *string
 }
 
@@ -80,8 +82,22 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 		LoginUserIsolationEnabled: cluster.Spec.SlurmNodes.Login.UserIsolation.Enabled,
 		LoginJailSubMounts:        jailSubMountInfos(cluster.Spec.SlurmNodes.Login.Volumes.JailSubMounts),
 		PAMSlurmAdoptEnabled:      cluster.Spec.PAMSlurmAdopt.Enabled,
+		NamespaceConfigEnabled:    namespaceConfigEnabled(cluster.Spec.NamespaceConfig),
+		NamespaceConfigMapName:    namespaceConfigMapName(cluster.Spec.NamespaceConfig),
 		CustomSlurmConfig:         cluster.Spec.CustomSlurmConfig,
 	}, nil
+}
+
+// namespaceConfigEnabled treats an omitted setting as enabled, matching the SlurmCluster CRD default.
+func namespaceConfigEnabled(config *kubeobjects.SlurmClusterNamespaceConfig) bool {
+	return config == nil || config.Enabled == nil || *config.Enabled
+}
+
+func namespaceConfigMapName(config *kubeobjects.SlurmClusterNamespaceConfig) string {
+	if config == nil || config.ConfigMapRef == nil {
+		return ""
+	}
+	return config.ConfigMapRef.Name
 }
 
 func (c *KubectlClient) ReadyWorkloadPodName(ctx context.Context, clusterName, component string) (string, error) {
