@@ -123,8 +123,15 @@ test: manifests generate fmt vet envtest ## Run tests.
 	go test ./...
 
 .PHONY: test-python
-test-python: ## Temporarily retained while removing Python unit tests from CI.
-	@echo "Python unit tests are disabled in CI."
+test-python: ## Run all Python unit tests, each test file from its own directory.
+	@rc=0; \
+	while IFS= read -r -d '' test_file; do \
+		echo "Running $$test_file"; \
+		PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+			-s "$$(dirname "$$test_file")" -p "$$(basename "$$test_file")" -v || rc=1; \
+	done < <(find . -path ./.git -prune -o -path ./e2e -prune -o \
+		-type f \( -name '*_test.py' -o -name 'test_*.py' \) -print0); \
+	exit $$rc
 
 .PHONY: test-coverage
 test-coverage: manifests generate fmt vet envtest ## Run tests and generate test coverage.
