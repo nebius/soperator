@@ -3300,6 +3300,7 @@
               "showLegend": true
             },
             "mergeValues": true,
+            "perPage": 25,
             "rowHeight": 0.9,
             "showValue": "never",
             "tooltip": {
@@ -5291,6 +5292,7 @@
               "showLegend": false
             },
             "mergeValues": true,
+            "perPage": 20,
             "rowHeight": 0.9,
             "showValue": "never",
             "tooltip": {

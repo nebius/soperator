@@ -752,6 +752,7 @@
           "showLegend": true
         },
         "mergeValues": true,
+        "perPage": 25,
         "rowHeight": 0.9,
         "showValue": "never",
         "tooltip": {

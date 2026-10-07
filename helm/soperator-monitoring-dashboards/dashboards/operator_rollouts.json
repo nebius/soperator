@@ -1220,6 +1220,7 @@
       "options": {
         "alignValue": "left",
         "mergeValues": true,
+        "perPage": 20,
         "rowHeight": 0.85,
         "showValue": "auto",
         "legend": {
