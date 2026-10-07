@@ -55,7 +55,7 @@ func TestRenderConfigMapPAMSlurmAdopt(t *testing.T) {
 	assert.Contains(t, pamConfig, "action_adopt_failure=deny")
 	assert.Contains(t, pamConfig, "action_generic_failure=deny")
 	assert.Contains(t, pamConfig, "disable_x11=1")
-	assert.Contains(t, pamConfig, "join_container=false")
+	assert.Contains(t, pamConfig, "join_container=true")
 	lines := strings.Split(pamConfig, "\n")
 	assert.Contains(t, lines[len(lines)-1], "pam_slurm_adopt.so")
 

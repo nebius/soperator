@@ -489,6 +489,7 @@ func TestRenderConfigMapSlurmConfigs_FileNamesAndWarnings(t *testing.T) {
 		consts.ConfigMapKeySpankConfig,
 		consts.ConfigMapKeyGresConfig,
 		consts.ConfigMapKeyMPIConfig,
+		consts.ConfigMapKeyNamespaceConfig,
 	} {
 		assert.Contains(t, result.Data[key], ManagedSlurmConfigWarning())
 	}

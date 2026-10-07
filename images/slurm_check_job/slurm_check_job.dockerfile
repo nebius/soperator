@@ -8,7 +8,7 @@ FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20261007141043 AS slur
 ARG SLURM_VERSION
 
 # Install slurm сhroot plugin
-COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY images/common/chroot-plugin/chroot.c images/common/job_mount_namespace.h /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \

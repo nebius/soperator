@@ -129,7 +129,7 @@ func generatePAMSlurmAdoptConfig(config values.PAMSlurmAdopt) renderutils.Config
 		"account sufficient pam_listfile.so item=group sense=allow onerr=fail file=%s",
 		consts.VolumeMountPathPAMSlurmAdoptGroups,
 	))
-	res.AddLine("-account required pam_slurm_adopt.so action_no_jobs=deny action_unknown=newest action_adopt_failure=deny action_generic_failure=deny disable_x11=1 join_container=false")
+	res.AddLine("-account required pam_slurm_adopt.so action_no_jobs=deny action_unknown=newest action_adopt_failure=deny action_generic_failure=deny disable_x11=1 join_container=true")
 	return res
 }
 

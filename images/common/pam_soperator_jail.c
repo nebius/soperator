@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <sched.h>
+#include <stdbool.h>
 #include <security/pam_ext.h>
 #include <security/pam_modules.h>
 #include <stdarg.h>
@@ -18,6 +19,7 @@
 #include <sys/syscall.h>
 #include <syslog.h>
 #include <unistd.h>
+#include "job_mount_namespace.h"
 
 #ifndef SYS_pivot_root
 #error "SYS_pivot_root unavailable on this system"
@@ -151,7 +153,62 @@ static int validate_old_root(
     return PAM_SUCCESS;
 }
 
-static int enter_jail(const struct jail_context *context, const char *jail_path)
+static bool is_extern_step_cgroup(const char *line)
+{
+    const char *component;
+
+    if (strncmp(line, "0::/", 4) != 0) {
+        return false;
+    }
+    component = line + 4;
+    while (*component != '\0') {
+        const size_t length = strcspn(component, "/\n");
+
+        if (length == strlen("step_extern") && strncmp(component, "step_extern", length) == 0) {
+            return true;
+        }
+        component += length;
+        if (*component != '/') {
+            break;
+        }
+        component++;
+    }
+    return false;
+}
+
+/* This selects the job aliases after pam_slurm_adopt. Ordinary login and
+ * exempt worker sessions retain their existing service-level mounts. */
+static bool in_adopted_job_namespace(void)
+{
+    struct stat current_namespace;
+    struct stat service_namespace;
+    FILE *cgroups;
+    char *line = NULL;
+    size_t capacity = 0;
+    bool adopted = false;
+
+    if (stat("/proc/self/ns/mnt", &current_namespace) != 0 ||
+        stat("/proc/1/ns/mnt", &service_namespace) != 0 ||
+        (current_namespace.st_dev == service_namespace.st_dev &&
+         current_namespace.st_ino == service_namespace.st_ino)) {
+        return false;
+    }
+    cgroups = fopen("/proc/self/cgroup", "re");
+    if (cgroups == NULL) {
+        return false;
+    }
+    while (getline(&line, &capacity, cgroups) >= 0) {
+        if (is_extern_step_cgroup(line)) {
+            adopted = true;
+            break;
+        }
+    }
+    free(line);
+    (void)fclose(cgroups);
+    return adopted;
+}
+
+static int enter_jail(const struct jail_context *context, const char *jail_path, bool job_namespace)
 {
     char old_root[PATH_MAX];
     int result;
@@ -170,6 +227,17 @@ static int enter_jail(const struct jail_context *context, const char *jail_path)
     }
     if (mount(NULL, "/", NULL, MS_SLAVE | MS_REC, NULL) != 0) {
         return jail_errno(context, "make root mount recursively slave");
+    }
+
+    if (job_namespace) {
+        const char *failed_source;
+
+        if (soperator_bind_job_tmpfs(jail_path, &failed_source) != 0) {
+            const int saved_errno = errno;
+
+            jail_log(context, "bind job tmpfs %s into jail: %s", failed_source, strerror(saved_errno));
+            return PAM_SESSION_ERR;
+        }
     }
 
     /* pivot_root requires new_root to be a mount point. The bind mount is
@@ -221,7 +289,7 @@ PAM_EXTERN int pam_sm_open_session(
         jail_log(&context, "expected exactly one argument: <jail-path>");
         result = PAM_SESSION_ERR;
     } else {
-        result = enter_jail(&context, argv[0]);
+        result = enter_jail(&context, argv[0], in_adopted_job_namespace());
     }
 
     if (context.container_log_fd >= 0) {

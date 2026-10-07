@@ -32,6 +32,7 @@ import (
 // [consts.ConfigMapKeySpankConfig] - SPANK plugins config
 // [consts.ConfigMapKeyGresConfig] - GRES config
 // [consts.ConfigMapKeyMPIConfig] - PMIx config
+// [consts.ConfigMapKeyNamespaceConfig] - Job mount namespace config
 func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) corev1.ConfigMap {
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -48,6 +49,7 @@ func RenderConfigMapSlurmConfigs(cluster *values.SlurmCluster) corev1.ConfigMap 
 			consts.ConfigMapKeySpankConfig:         WithManagedSlurmConfigWarning(generateSpankConfig(cluster)).Render(),
 			consts.ConfigMapKeyGresConfig:          WithManagedSlurmConfigWarning(generateGresConfig(cluster)).Render(),
 			consts.ConfigMapKeyMPIConfig:           WithManagedSlurmConfigWarning(generateMPIConfig(cluster)).Render(),
+			consts.ConfigMapKeyNamespaceConfig:     WithManagedSlurmConfigWarning(generateNamespaceConfig(cluster)).Render(),
 		},
 	}
 }
@@ -79,6 +81,7 @@ func RenderJailedConfigSlurmConfigs(cluster *values.SlurmCluster) slurmv1alpha1.
 				{Key: consts.ConfigMapKeySpankConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeySpankConfig)},
 				{Key: consts.ConfigMapKeyGresConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyGresConfig)},
 				{Key: consts.ConfigMapKeyMPIConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyMPIConfig)},
+				{Key: consts.ConfigMapKeyNamespaceConfig, Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyNamespaceConfig)},
 			},
 			UpdateActions: []slurmv1alpha1.UpdateAction{slurmv1alpha1.UpdateActionReconfigure},
 		},
@@ -338,6 +341,7 @@ func generateSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	res.AddProperty("MailProg", "/usr/bin/true")
 	res.AddProperty("PluginDir", "/usr/lib/"+consts.Slurm)
 	res.AddProperty("ProctrackType", "proctrack/cgroup")
+	res.AddProperty("NamespaceType", "namespace/linux")
 	res.AddProperty("ReturnToService", 2)
 	res.AddComment("")
 
