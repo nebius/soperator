@@ -55,7 +55,7 @@ func readTFVars(filename string) (map[string]interface{}, error) {
 }
 
 func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]interface{} {
-	tfVars["active_checks_scope"] = "testing"
+	tfVars["active_checks_scope"] = "essential"
 	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
 	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
 	if nfs, ok := tfVars["nfs_in_k8s"].(map[string]interface{}); ok {
@@ -101,7 +101,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			},
 			"boot_disk": map[string]interface{}{
 				"type":                 "NETWORK_SSD",
-				"size_gibibytes":       2048,
+				"size_gibibytes":       128,
 				"block_size_kibibytes": 4,
 			},
 			"gpu_cluster":      gpuClusterValue(ns.InfinibandFabric),
@@ -112,7 +112,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 				{
 					"name":            "local-data",
 					"mount_path":      "/scratch",
-					"size_gibibytes":  1024,
+					"size_gibibytes":  256,
 					"disk_type":       "NETWORK_SSD",
 					"filesystem_type": "ext4",
 				},
@@ -120,7 +120,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"node_local_image_disk": map[string]interface{}{
 				"enabled": true,
 				"spec": map[string]interface{}{
-					"size_gibibytes":  930,
+					"size_gibibytes":  93,
 					"filesystem_type": "ext4",
 					"disk_type":       "NETWORK_SSD_IO_M3",
 				},
@@ -130,8 +130,22 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	}
 	tfVars["slurm_nodeset_workers"] = nodesetWorkers
 
+	tfVars["slurm_nodesets_partitions"] = []interface{}{
+		map[string]interface{}{
+			"name":     "main",
+			"is_all":   true,
+			"topology": "flat",
+			"config":   "Default=YES PriorityTier=10 PreemptMode=OFF MaxTime=INFINITE State=UP OverSubscribe=YES",
+		},
+		map[string]interface{}{
+			"name":     "hidden",
+			"is_all":   true,
+			"topology": "flat",
+			"config":   "Default=NO PriorityTier=10 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES",
+		},
+	}
+
 	tfVars["slurm_login_ssh_root_public_keys"] = []string{cfg.SSHPublicKey}
-	tfVars["etcd_cluster_size"] = 1
 	tfVars["cleanup_bucket_on_destroy"] = true
 
 	return tfVars
