@@ -66,13 +66,6 @@ This is only applicable to NVIDIA GPUs.
 The operator performs GPU health checks periodically. If any Slurm node shows an unsatisfactory result, the operator
 “drains” it, which excludes the node from scheduling new jobs on it.
 
-There are two checks at the moment:
-1. **NCCL tests**. Soperator creates a K8s CronJob that schedules a normal job in Slurm. This job performs the 
-`all_reduce_perf` NCCL test and depending on the results either finish successfully, or draining the Slurm node where it
-was executed.
-2. **Nvidia-smi**. We use the Slurm's `HealthCheckProgram` parameter to execute `nvidia-smi` on each node every 30 sec.
-If it completes with a non-zero exit code, the node is drained as well.
-
 When a node is drained Slurm allows already executing jobs to finish, but excludes the node from scheduling other jobs.
 
 

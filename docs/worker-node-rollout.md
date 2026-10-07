@@ -151,8 +151,8 @@ sequenceDiagram
 
 The recognized node failure reasons are `Kill task failed`, `[compute_maintenance] node replacement process`,
 `[compute_maintenance] node reboot process`, `[node_problem]`, and `[hardware_problem]`. Reason matching uses the
-same precedence as the maintenance controller. A `[user_problem]` drain or a manual drain can remain in place
-while the worker is updated.
+same precedence as the maintenance controller. A `[user_problem]` drain, a `[software_problem]` drain (for example
+broken NVIDIA driver libraries in the jail) or a manual drain can remain in place while the worker is updated.
 
 The maintenance controller owns node replacement or reboot. Other workers can continue updating within the
 available budget while this worker waits.
