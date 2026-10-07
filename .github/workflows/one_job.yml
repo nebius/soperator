@@ -296,6 +296,35 @@ jobs:
         shell: bash
         run: go build -o /dev/null ./cmd/e2e
 
+  test-python:
+    name: Python Unit Tests
+    needs: [changes, authorize]
+    if: needs.changes.outputs.should_build == 'true'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          allow-unsafe-pr-checkout: true
+
+      # pull_request_target uses this definition from main for every PR head, including release
+      # branches, so the runner is inlined here instead of calling a Make target that the checked
+      # out tree may not have. Each test file runs from its own directory to keep local imports working.
+      - name: Run Python unit tests
+        shell: bash
+        run: |
+          rc=0
+          while IFS= read -r -d '' test_file; do
+            echo "::group::${test_file}"
+            PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+              -s "$(dirname "${test_file}")" -p "$(basename "${test_file}")" -v || rc=1
+            echo "::endgroup::"
+          done < <(find . -path ./.git -prune -o -path ./e2e -prune -o \
+            -type f \( -name '*_test.py' -o -name 'test_*.py' \) -print0)
+          exit "${rc}"
+
   build-soperator-images:
     needs:
       - changes
@@ -948,6 +977,7 @@ jobs:
       - changes
       - pre-build
       - lint
+      - test-python
       - build-e2e
       - build-slurm-images
       - build-soperator-images
