@@ -1,13 +1,7 @@
 Feature: Slurm block-topology scheduling
-  # Tagged @unstable, so the default suite skips it: it needs a cluster with a block topology, and one
-  # scenario reconfigures that topology while it runs. Run it with --run-unstable, alone or with the
-  # rest of the unstable scenarios:
-  #
-  #   go run ./e2e/cmd/acceptance --kubectl-context <ctx> --run-unstable --scenario features/topology_block.feature
-  #
   # Each scenario skips itself on a cluster without the block topology it needs. The resize scenario
   # restores the original blockSizes when it ends, however it ends.
-  @gpu @block_topology @unstable @soperator_version_>=5.0.0
+  @gpu @block_topology @soperator_version_>=5.0.0
   Scenario: A job assigns task ranks in rendered block order
     Given the cluster is configured with a topology spanning multiple blocks
     And the operator published the topology config
@@ -15,14 +9,14 @@ Feature: Slurm block-topology scheduling
     Then Slurm loaded exactly the topologies the operator rendered
     And a multi-block job assigns SLURM_PROCID in rendered block order
 
-  @gpu @block_topology @unstable @soperator_version_>=5.0.0
+  @gpu @block_topology @soperator_version_>=5.0.0
   Scenario: Blocks are sorted according to IB topology labels
     Given the cluster is configured with a topology spanning multiple blocks
     And the K8s nodes of its blocks carry IB topology labels
     When Slurm loaded the published block order
     Then blocks sharing an IB switch are adjacent in the block order
 
-  @gpu @block_topology @unstable @soperator_version_>=5.0.0
+  @gpu @block_topology @soperator_version_>=5.0.0
   Scenario: A block topology schedules jobs after its base size changes
     Given the cluster is configured with a block topology whose base size can be changed
     And the operator published the topology config
