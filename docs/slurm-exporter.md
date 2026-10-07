@@ -216,6 +216,14 @@ curl localhost:8080/metrics
 
 ## Grafana Dashboards
 
+The [Slurm Exporter](../helm/soperator-monitoring-dashboards/dashboards/slurm_exporter_health.json)
+dashboard uses the self-monitoring metrics to show endpoint availability, Slurm
+collection and Prometheus scrape cadence, collection headroom, process restarts,
+exported sample counts, and per-collector errors, skipped runs, duration, and
+in-flight concurrency. Collection cadence and scrape cadence are separate because
+the exporter refreshes its internal data asynchronously while Prometheus pulls the
+current metrics independently.
+
 The [Cluster Health & Overview](../helm/soperator-monitoring-dashboards/dashboards/cluster_health.json)
 and [Slurm Controller](../helm/soperator-monitoring-dashboards/dashboards/slurm_controller.json)
 dashboards include two complementary panels based on `slurm_node_info`:
