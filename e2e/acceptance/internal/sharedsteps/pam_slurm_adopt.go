@@ -29,6 +29,7 @@ type pamSlurmAdoptSSHResult struct {
 }
 
 type PAMSlurmAdopt struct {
+	info     *framework.ClusterInfo
 	runtime  framework.Runtime
 	slurm    *framework.SlurmClient
 	kubectl  *framework.KubectlClient
@@ -42,12 +43,14 @@ type PAMSlurmAdopt struct {
 }
 
 func NewPAMSlurmAdopt(
+	info *framework.ClusterInfo,
 	runtime framework.Runtime,
 	slurm *framework.SlurmClient,
 	kubectl *framework.KubectlClient,
 	selector *framework.WorkerSelector,
 ) *PAMSlurmAdopt {
 	return &PAMSlurmAdopt{
+		info:     info,
 		runtime:  runtime,
 		slurm:    slurm,
 		kubectl:  kubectl,
@@ -56,10 +59,24 @@ func NewPAMSlurmAdopt(
 }
 
 func (s *PAMSlurmAdopt) RegisterSteps(sc *godog.ScenarioContext) {
+	sc.Step("^PAM Slurm adopt is enabled$", s.pamSlurmAdoptIsEnabled)
 	sc.Step("^a PAM Slurm adopt test user and GPU worker are ready$", s.aTestUserAndGPUWorkerAreReady)
 	sc.Step("^SSH to the worker without a job is denied$", s.sshWithoutAJobIsDenied)
 	sc.Step("^the user starts a GPU job and opens SSH to its worker$", s.startGPUJobAndSSH)
 	sc.Step("^the SSH session is adopted and ends with the job$", s.sshSessionIsAdoptedAndEndsWithJob)
+}
+
+func (s *PAMSlurmAdopt) pamSlurmAdoptIsEnabled(ctx context.Context) error {
+	cluster, err := s.kubectl.SlurmCluster(ctx, s.info.SlurmClusterName)
+	if err != nil {
+		return err
+	}
+	if !cluster.PAMSlurmAdoptEnabled {
+		s.runtime.Logf("PAM Slurm adopt is disabled, skipping scenario")
+		return godog.ErrSkip
+	}
+
+	return nil
 }
 
 func (s *PAMSlurmAdopt) CleanupAndReset(ctx context.Context) {
