@@ -59,6 +59,12 @@ func TestOverrideTestValuesWithoutNFS(t *testing.T) {
 	}
 }
 
+func TestOverrideTestValuesEnablesTailscale(t *testing.T) {
+	result := overrideTestValues(map[string]interface{}{"tailscale_enabled": false}, Config{})
+
+	assert.Equal(t, true, result["tailscale_enabled"])
+}
+
 func TestOverrideTestValuesCreatesWorkerPartitions(t *testing.T) {
 	tfVars := map[string]interface{}{}
 	cfg := Config{

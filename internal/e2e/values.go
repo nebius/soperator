@@ -66,6 +66,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	}
 	tfVars["production"] = false
 	tfVars["company_name"] = "e2e-test"
+	tfVars["tailscale_enabled"] = true
 
 	tfVars["filesystem_jail"] = map[string]interface{}{
 		"spec": map[string]interface{}{

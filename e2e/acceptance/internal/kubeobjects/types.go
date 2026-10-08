@@ -66,7 +66,13 @@ type SlurmClusterAccounting struct {
 }
 
 type SlurmClusterLogin struct {
-	Docker SlurmClusterLoginDocker `json:"docker"`
+	Size                 int32                   `json:"size"`
+	Docker               SlurmClusterLoginDocker `json:"docker"`
+	CustomInitContainers []NamedContainer        `json:"customInitContainers"`
+}
+
+type NamedContainer struct {
+	Name string `json:"name"`
 }
 
 type SlurmClusterLoginDocker struct {
