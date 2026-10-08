@@ -18,7 +18,7 @@ type Job struct {
 	StateReason    string
 	Partition      string
 	UserName       string
-	UserID         *int32
+	UserID         *int64
 	UserMail       string
 	StandardError  string
 	StandardOutput string
@@ -43,7 +43,7 @@ type Job struct {
 	MemoryPerNode   *int64 // in MB
 }
 
-func JobFromAPI(apiJob api.V0044JobInfo) (Job, error) {
+func jobFromControllerAPI(apiJob controllerJob) (Job, error) {
 	job := Job{}
 	if apiJob.JobId == nil {
 		return job, fmt.Errorf("job ID is missing")
@@ -126,7 +126,7 @@ func JobFromAPI(apiJob api.V0044JobInfo) (Job, error) {
 	return job, nil
 }
 
-func JobFromAccountingAPI(apiJob api.V0044Job) (Job, error) {
+func jobFromAccountingAPI(apiJob accountingJob) (Job, error) {
 	job := Job{}
 	if apiJob.JobId == nil {
 		return job, fmt.Errorf("job ID is missing")
@@ -402,7 +402,7 @@ func expandNodeRange(nodePattern string) ([]string, error) {
 	return nodes, nil
 }
 
-func convertToMetav1Time(input *api.V0044Uint64NoValStruct) *metav1.Time {
+func convertToMetav1Time(input *optionalNumber[int64]) *metav1.Time {
 	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
 		return nil
 	}
@@ -430,7 +430,7 @@ func unixTimeToMetav1Time(input *int64) *metav1.Time {
 // `(t1.time_end >= start_time OR t1.time_end = 0)`), so leftovers from a scancel that didn't
 // propagate or a controller crash accumulate as permanent Prometheus series until PurgeJobAfter
 // sweeps them. Dropping them at fetch time avoids that cardinality leak.
-func isStaleAccountingPending(j api.V0044Job, submitCutoff int64) bool {
+func isStaleAccountingPending(j accountingJob, submitCutoff int64) bool {
 	if j.Time == nil {
 		return false
 	}
@@ -457,7 +457,7 @@ func isUnallocatedNodeList(s string) bool {
 	return s == "" || s == "None assigned" || s == "(null)"
 }
 
-func convertToInt(input *api.V0044Uint32NoValStruct) *int32 {
+func convertToInt(input *optionalNumber[int32]) *int32 {
 	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
 		return nil
 	}
@@ -469,7 +469,7 @@ func convertToInt(input *api.V0044Uint32NoValStruct) *int32 {
 	return input.Number
 }
 
-func convertToInt64(input *api.V0044Uint64NoValStruct) *int64 {
+func convertToInt64(input *optionalNumber[int64]) *int64 {
 	if input == nil || input.Set == nil || !*input.Set || input.Number == nil {
 		return nil
 	}

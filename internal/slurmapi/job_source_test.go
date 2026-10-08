@@ -3,6 +3,9 @@ package slurmapi
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -16,7 +19,7 @@ import (
 // sdkStub is a tiny v0044 SDK fake that intercepts only the two endpoints exercised by ListJobsWithParams.
 // Any other SDK method panics via the nil embedded interface — that's deliberate, so unexpected calls fail loudly.
 type sdkStub struct {
-	api.ClientWithResponsesInterface
+	api.ClientInterface
 
 	controllerCalls int
 	accountingCalls int
@@ -25,20 +28,20 @@ type sdkStub struct {
 	lastAccountingParams *api.SlurmdbV0044GetJobsParams
 }
 
-func (s *sdkStub) SlurmV0044GetJobsWithResponse(_ context.Context, params *api.SlurmV0044GetJobsParams, _ ...api.RequestEditorFn) (*api.SlurmV0044GetJobsResponse, error) {
+func (s *sdkStub) SlurmV0044GetJobs(_ context.Context, params *api.SlurmV0044GetJobsParams, _ ...api.RequestEditorFn) (*http.Response, error) {
 	s.controllerCalls++
 	s.lastControllerParams = params
-	return &api.SlurmV0044GetJobsResponse{JSON200: &api.V0044OpenapiJobInfoResp{Jobs: nil}}, nil
+	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"jobs": []}`))}, nil
 }
 
-func (s *sdkStub) SlurmdbV0044GetJobsWithResponse(_ context.Context, params *api.SlurmdbV0044GetJobsParams, _ ...api.RequestEditorFn) (*api.SlurmdbV0044GetJobsResponse, error) {
+func (s *sdkStub) SlurmdbV0044GetJobs(_ context.Context, params *api.SlurmdbV0044GetJobsParams, _ ...api.RequestEditorFn) (*http.Response, error) {
 	s.accountingCalls++
 	s.lastAccountingParams = params
-	return &api.SlurmdbV0044GetJobsResponse{JSON200: &api.V0044OpenapiSlurmdbdJobsResp{Jobs: nil}}, nil
+	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"jobs": []}`))}, nil
 }
 
 func newTestClient(stub *sdkStub) *client {
-	return &client{ClientWithResponsesInterface: stub}
+	return &client{rawClient: stub}
 }
 
 func TestListJobsWithParams_ControllerSource(t *testing.T) {

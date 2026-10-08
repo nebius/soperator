@@ -3,8 +3,6 @@ package exporter
 import (
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0044"
-
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
@@ -15,7 +13,7 @@ type metricsCollectorState struct {
 	nodesCollectionSequence      uint64
 	jobs                         []slurmapi.Job
 	jobsCollectionSequence       uint64
-	diag                         *api.V0044OpenapiDiagResp
+	diag                         *slurmapi.Diag
 	diagCollectionSequence       uint64
 	nodeTopologies               map[string]NodeTopology
 	topologyCollectionSequence   uint64
