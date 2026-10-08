@@ -450,7 +450,11 @@ endif
 	done; \
 	echo "Sources:$$IMAGES"; \
 	docker buildx imagetools create -t "$$NEBIUS_MANIFEST" $$IMAGES; \
-	.github/workflows/scripts/warm_registry.sh "$$NEBIUS_MANIFEST" || echo "::warning::Registry warming failed"; \
+	if [ -n "$${REGISTRY_WARMING_FILE:-}" ]; then \
+	  printf '%s\n' "$$NEBIUS_MANIFEST" >> "$$REGISTRY_WARMING_FILE" || echo "::warning::Cannot record image for warming"; \
+	else \
+	  .github/actions/warm-registry/warm_registry.sh "$$NEBIUS_MANIFEST" || echo "::warning::Registry warming failed"; \
+	fi; \
 	docker buildx imagetools inspect "$$NEBIUS_MANIFEST"; \
 	\
 	if [ "$(UNSTABLE)" = "false" ]; then \
