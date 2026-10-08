@@ -450,6 +450,7 @@ endif
 	done; \
 	echo "Sources:$$IMAGES"; \
 	docker buildx imagetools create -t "$$NEBIUS_MANIFEST" $$IMAGES; \
+	.github/workflows/scripts/warm_registry.sh "$$NEBIUS_MANIFEST" || echo "::warning::Registry warming failed"; \
 	docker buildx imagetools inspect "$$NEBIUS_MANIFEST"; \
 	\
 	if [ "$(UNSTABLE)" = "false" ]; then \
@@ -467,12 +468,8 @@ endif
 .PHONY: release-helm
 release-helm: ## Build & push helm docker image
 	mkdir -p "helm-releases"
-	@echo "helm release for unstable version"
+	@echo "helm release to $(IMAGE_REPO)"
 	./release_helm.sh -u "$(IMAGE_REPO)"
-ifeq ($(UNSTABLE), false)
-	@echo "helm release for stable version"
-	./release_helm.sh -u "$(NEBIUS_REPO)"
-endif
 	rm -rf /helm-releases/*
 
 ##@ Deployment

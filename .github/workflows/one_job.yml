@@ -845,6 +845,7 @@ jobs:
       - build-e2e
       - build-slurm-images
       - build-soperator-images
+      - manifest-docker-images
       - manifest-populate-jail
       - build-helm-charts
       - helm-integration-test
