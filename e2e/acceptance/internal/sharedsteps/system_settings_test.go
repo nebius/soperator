@@ -77,6 +77,27 @@ func TestValidateResourceLimitSnapshotsAggregatesProfileAndNestedFailures(t *tes
 	assert.ErrorContains(t, err, "compare direct and nested Bash resource limits")
 }
 
+func TestValidateSlurmResourceLimitSnapshots(t *testing.T) {
+	direct := computeResourceLimitProfile()
+	direct[limitMaxMemory] = "10485760"
+	nested := computeResourceLimitProfile()
+	nested[limitMaxMemory] = "10485760"
+
+	assert.NoError(t, validateSlurmResourceLimitSnapshots(resourceLimitSnapshots{direct: direct, nested: nested}))
+}
+
+func TestValidateSlurmResourceLimitSnapshotsRejectsInvalidMaxMemory(t *testing.T) {
+	direct := computeResourceLimitProfile()
+	direct[limitMaxMemory] = "unlimited"
+	nested := computeResourceLimitProfile()
+	nested[limitMaxMemory] = "10485760"
+
+	err := validateSlurmResourceLimitSnapshots(resourceLimitSnapshots{direct: direct, nested: nested})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "want a positive integer set from Slurm job memory")
+	assert.ErrorContains(t, err, "compare direct and nested Bash resource limits")
+}
+
 func TestParseAndValidateKernelSettings(t *testing.T) {
 	output := `cpu-bind: worker-0
 fs.file-max=9223372036854775807

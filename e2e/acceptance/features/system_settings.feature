@@ -5,26 +5,25 @@ Feature: System settings
     When root collects direct and nested Bash resource limits over SSH to the login node
     Then direct and nested login SSH resource limits match the expected default profile
 
-  # SCHED-2688: remove @unstable after root worker SSH and Slurm jobs receive the compute limit profile.
-  @unstable @soperator_version_>=4.0.0
+  @soperator_version_>=5.0.0
   Scenario: Worker SSH sessions expose the compute resource-limit profile
     Given a healthy worker is selected for system-settings checks
     When root collects direct and nested Bash resource limits over SSH to the worker
     Then direct and nested worker SSH resource limits match the compute profile
 
-  @essential @unstable @soperator_version_>=4.0.0
+  @essential @soperator_version_>=5.0.0
   Scenario: Native Slurm jobs expose the compute resource-limit profile
     Given a healthy worker is selected for system-settings checks
     When a native Slurm job collects direct and nested Bash resource limits
     Then the native system-settings job succeeds
-    And its direct and nested resource limits match the compute profile
+    And its direct and nested resource limits match the Slurm compute profile
 
-  @unstable @soperator_version_>=4.0.0
+  @soperator_version_>=5.0.0
   Scenario: Enroot Slurm jobs expose the compute resource-limit profile
     Given a healthy worker is selected for system-settings checks
     When an Enroot Slurm job collects direct and nested Bash resource limits
     Then the Enroot system-settings job succeeds
-    And its direct and nested resource limits match the compute profile
+    And its direct and nested resource limits match the Slurm compute profile
 
   @essential @soperator_version_>=4.0.0
   Scenario: Required kernel settings are visible in SSH sessions and Slurm jobs

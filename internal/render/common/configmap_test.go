@@ -287,6 +287,21 @@ func TestRenderConfigMapSecurityLimits(t *testing.T) {
 	}
 }
 
+func TestRenderConfigMapSecurityLimitsForNodeSetIncludesRoot(t *testing.T) {
+	nodeSet := &values.SlurmNodeSet{
+		Name:            "worker",
+		ParentalCluster: types.NamespacedName{Namespace: "slurm", Name: "test"},
+	}
+
+	result := RenderConfigMapSecurityLimitsForNodeSet(nodeSet)
+	limits := result.Data[consts.ConfigMapKeySecurityLimits]
+	assert.Contains(t, limits, "*    soft    nofile      1048576")
+	assert.Contains(t, limits, "root    soft    nofile      1048576")
+	assert.Contains(t, limits, "root    hard    memlock     unlimited")
+	assert.Contains(t, limits, "*    soft    nice        -20")
+	assert.NotContains(t, limits, "root    soft    nice")
+}
+
 func TestRenderSlurmSchedulingConfig(t *testing.T) {
 	for _, tt := range []struct {
 		name        string

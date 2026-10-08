@@ -144,7 +144,7 @@ func (s *SystemSettings) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^direct and nested worker SSH resource limits match the compute profile$`, s.resourceLimitsMatchComputeProfile)
 	sc.Step(`^a native Slurm job collects direct and nested Bash resource limits$`, s.submitNativeResourceLimitsJob)
 	sc.Step(`^the native system-settings job succeeds$`, s.resourceLimitsJobSucceeds)
-	sc.Step(`^its direct and nested resource limits match the compute profile$`, s.resourceLimitsMatchComputeProfile)
+	sc.Step(`^its direct and nested resource limits match the Slurm compute profile$`, s.resourceLimitsMatchSlurmComputeProfile)
 	sc.Step(`^an Enroot Slurm job collects direct and nested Bash resource limits$`, s.submitEnrootResourceLimitsJob)
 	sc.Step(`^the Enroot system-settings job succeeds$`, s.resourceLimitsJobSucceeds)
 	sc.Step(`^kernel settings are collected from login and worker SSH sessions$`, s.collectSSHKernelSettings)
@@ -228,6 +228,10 @@ func (s *SystemSettings) loginLimitsMatchDefaultProfile() error {
 
 func (s *SystemSettings) resourceLimitsMatchComputeProfile() error {
 	return validateResourceLimitSnapshots(s.limits, computeResourceLimitProfile(), false)
+}
+
+func (s *SystemSettings) resourceLimitsMatchSlurmComputeProfile() error {
+	return validateSlurmResourceLimitSnapshots(s.limits)
 }
 
 func (s *SystemSettings) submitNativeResourceLimitsJob(ctx context.Context) error {
@@ -584,12 +588,16 @@ func validateResourceLimitProfile(actual, expected resourceLimitSnapshot, pendin
 			}
 			continue
 		}
-		if actual[limit.name] != expected[limit.name] {
+		expectedValue, validate := expected[limit.name]
+		if !validate {
+			continue
+		}
+		if actual[limit.name] != expectedValue {
 			validationErrors = append(validationErrors, fmt.Errorf(
 				"check resource limit %s=%q: want %q",
 				limit.name,
 				actual[limit.name],
-				expected[limit.name],
+				expectedValue,
 			))
 		}
 	}
@@ -629,6 +637,34 @@ func validateResourceLimitSnapshots(
 		comparisonErr = fmt.Errorf("compare direct and nested Bash resource limits: %w", err)
 	}
 	return errors.Join(directErr, nestedErr, comparisonErr)
+}
+
+func validateSlurmResourceLimitSnapshots(snapshots resourceLimitSnapshots) error {
+	expected := computeResourceLimitProfile()
+	delete(expected, limitMaxMemory)
+
+	var validationErrors []error
+	for name, snapshot := range map[string]resourceLimitSnapshot{
+		"direct":      snapshots.direct,
+		"nested Bash": snapshots.nested,
+	} {
+		if err := validateResourceLimitProfile(snapshot, expected, false); err != nil {
+			validationErrors = append(validationErrors, fmt.Errorf("validate %s resource limits: %w", name, err))
+		}
+		value, err := strconv.ParseUint(snapshot[limitMaxMemory], 10, 64)
+		if err != nil || value == 0 {
+			validationErrors = append(validationErrors, fmt.Errorf(
+				"check %s resource limit %s=%q: want a positive integer set from Slurm job memory",
+				name,
+				limitMaxMemory,
+				snapshot[limitMaxMemory],
+			))
+		}
+	}
+	if err := compareResourceLimitSnapshots(snapshots.direct, snapshots.nested); err != nil {
+		validationErrors = append(validationErrors, fmt.Errorf("compare direct and nested Bash resource limits: %w", err))
+	}
+	return errors.Join(validationErrors...)
 }
 
 func parseKernelSettings(output string) (kernelSettingSnapshot, error) {
