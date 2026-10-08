@@ -158,6 +158,7 @@ open-source, cloud-agnostic version of Soperator. It covers:
 - Current limitations.
 - Guidance for deploying Soperator on any cloud or on-premises.
 - [AppArmor configuration and provisioning](docs/apparmor.md).
+- [Active checks](docs/active-checks.md) and [passive checks](docs/passive-checks.md) that drain unhealthy nodes.
 - Local development with Kind.
 - The release process for both the `soperator` and `nebius-solutions-library` repositories.
 - Metrics collection and processing.
