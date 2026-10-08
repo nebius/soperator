@@ -52,6 +52,8 @@ chart() {
 
   echo "Pushing helm-${CHART_TARGET} to Container registry - ${OCI_REPO}"
   helm push "${RELEASE_PATH}/helm-${CHART_TARGET}" "${OCI_REPO}"
+  .github/workflows/scripts/warm_registry.sh "${OCI_REPO#oci://}/helm-${CHART_NAME}:${CHART_VERSION//+/_}" \
+    || echo "::warning::Registry warming failed"
 
   echo '---'
 }
