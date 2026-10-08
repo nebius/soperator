@@ -18,6 +18,7 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 			"metadata": {"name": "soperator", "namespace": "soperator"},
 			"spec": {
 				"customSlurmConfig": "JobRequeue=0",
+				"pamSlurmAdopt": {"enabled": true},
 				"slurmNodes": {
 					"accounting": {"enabled": true},
 					"login": {"docker": {"enabled": true}}
@@ -29,12 +30,33 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 	cluster, err := NewKubectlClient(exec).SlurmCluster(t.Context(), "soperator")
 	require.NoError(t, err)
 	assert.Equal(t, SlurmClusterInfo{
-		Name:               "soperator",
-		Namespace:          "soperator",
-		AccountingEnabled:  true,
-		LoginDockerEnabled: true,
-		CustomSlurmConfig:  &customConfig,
+		Name:                 "soperator",
+		Namespace:            "soperator",
+		AccountingEnabled:    true,
+		LoginDockerEnabled:   true,
+		PAMSlurmAdoptEnabled: true,
+		CustomSlurmConfig:    &customConfig,
 	}, cluster)
+}
+
+func TestKubectlClientSlurmClusterPAMSlurmAdoptDisabled(t *testing.T) {
+	for name, spec := range map[string]string{
+		"explicitly disabled": `"pamSlurmAdopt": {"enabled": false}`,
+		"omitted":             ``,
+	} {
+		t.Run(name, func(t *testing.T) {
+			exec := &kubectlClientTestExec{kubectl: map[string]string{
+				"get\x00slurmcluster\x00soperator\x00-n\x00soperator\x00-o\x00json": fmt.Sprintf(`{
+					"metadata": {"name": "soperator", "namespace": "soperator"},
+					"spec": {%s}
+				}`, spec),
+			}}
+
+			cluster, err := NewKubectlClient(exec).SlurmCluster(t.Context(), "soperator")
+			require.NoError(t, err)
+			assert.False(t, cluster.PAMSlurmAdoptEnabled)
+		})
+	}
 }
 
 func TestKubectlClientReadyWorkloadPodName(t *testing.T) {

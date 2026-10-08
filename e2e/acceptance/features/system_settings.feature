@@ -5,7 +5,7 @@ Feature: System settings
     When root collects direct and nested Bash resource limits over SSH to the login node
     Then direct and nested login SSH resource limits match the expected default profile
 
-  # SCHED-2442: remove @unstable after root worker SSH and Slurm jobs receive the compute limit profile.
+  # SCHED-2688: remove @unstable after root worker SSH and Slurm jobs receive the compute limit profile.
   @unstable @soperator_version_>=4.0.0
   Scenario: Worker SSH sessions expose the compute resource-limit profile
     Given a healthy worker is selected for system-settings checks

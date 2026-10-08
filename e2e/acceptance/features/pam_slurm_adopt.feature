@@ -1,8 +1,9 @@
 Feature: PAM Slurm adopt
 
-  @gpu @unstable @soperator_version_>=5.0.0
+  @gpu @soperator_version_>=5.0.0
   Scenario: Worker SSH is adopted into a running job
-    Given the effective Slurm configuration is read
+    Given PAM Slurm adopt is enabled
+    And the effective Slurm configuration is read
     And it contains the following settings:
       | setting          | value                                    |
       | PrologFlags      | Alloc,Contain                            |
