@@ -73,13 +73,19 @@ pushd "${jaildir}"
     echo "Bind-mount slurm-smd-client package content from container to the jail"
     SLURM_BINARIES=(
         sacct salloc sbatch scancel scrontab sdiag sinfo squeue srun sstat
-        sacctmgr sattach sbcast scontrol scrun sh5util sprio sreport sshare strigger
+        sacctmgr sattach sbcast scrun sh5util sprio sreport sshare strigger
     )
 
     for binary in "${SLURM_BINARIES[@]}"; do
         touch "usr/bin/$binary"
         mount --bind "/usr/bin/$binary" "usr/bin/$binary"
     done
+
+    # scontrol is wrapped to warn about non-persistent configuration changes.
+    # The real binary is exposed as scontrol.real, the wrapper takes its place.
+    touch usr/bin/scontrol.real usr/bin/scontrol
+    mount --bind /usr/bin/scontrol usr/bin/scontrol.real
+    mount --bind /opt/bin/slurm/scontrol_wrapper.sh usr/bin/scontrol
 
     # bash completions
     touch usr/share/bash-completion/completions/slurm_completion.sh

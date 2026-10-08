@@ -24,7 +24,8 @@ Login nodes can be exposed differently to users. The default option is to balanc
 the cluster via SSH, they're directed to a random node.
 
 Various Slurm and system configs that Soperator controls are represented via ConfigMaps. Secrets are used as well for
-storing Munge and SSH server keys.
+storing Munge and SSH server keys. See [`slurm-configuration.md`](slurm-configuration.md) for how Slurm configuration
+is rendered, delivered to the nodes and changed.
 
 While all containers have ephemeral filesystems (changes are lost after node restarts), we use Kubernetes Persistent
 Volumes to keep data around.
