@@ -299,7 +299,7 @@ jobs:
           NEBIUS_INSTALL_FOLDER: "${{ github.workspace }}/bin"
         run: |
           echo "Installing Nebius CLI ${NEBIUS_CLI_VERSION}..."
-          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          curl -sSL https://artifacts.nebius.cloud/cli/install.sh | bash
 
       - name: Configure Nebius CLI
         shell: bash

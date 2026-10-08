@@ -378,7 +378,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          curl -sSL https://artifacts.nebius.cloud/cli/install.sh | bash
           echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
           mkdir -p "$HOME/.nebius"
           echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
@@ -487,7 +487,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          curl -sSL https://artifacts.nebius.cloud/cli/install.sh | bash
           echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
           mkdir -p "$HOME/.nebius"
           echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
@@ -625,7 +625,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          curl -sSL https://artifacts.nebius.cloud/cli/install.sh | bash
           echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
           mkdir -p "$HOME/.nebius"
           echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
@@ -689,7 +689,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          curl -sSL https://artifacts.nebius.cloud/cli/install.sh | bash
           echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
           mkdir -p "$HOME/.nebius"
           echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
@@ -819,7 +819,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          curl -sSL https://artifacts.nebius.cloud/cli/install.sh | bash
           echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
           mkdir -p "$HOME/.nebius"
           echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
@@ -877,7 +877,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          curl -sSL https://artifacts.nebius.cloud/cli/install.sh | bash
           echo "$HOME/.nebius/bin" >> "$GITHUB_PATH"
           mkdir -p "$HOME/.nebius"
           echo "${{ secrets.NEBIUS_CONFIG_YAML_B64 }}" | base64 -d > "$HOME/.nebius/config.yaml"
