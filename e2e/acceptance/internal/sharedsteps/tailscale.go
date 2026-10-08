@@ -19,17 +19,13 @@ const (
 	tailscaleContainerName         = "tailscale"
 	tailscaleAuthenticationPrompt  = "To authenticate, visit:"
 	tailscaleAuthenticationTimeout = 2 * time.Minute
-	tailscaleStatefulSetResource   = "statefulsets.apps.kruise.io"
-	tailscaleInstanceLabel         = "app.kubernetes.io/instance"
-	tailscaleComponentLabel        = "app.kubernetes.io/component"
-	tailscaleLoginComponent        = "login"
 )
 
 type Tailscale struct {
-	info       *framework.ClusterInfo
-	runtime    framework.Runtime
-	kubectl    *framework.KubectlClient
-	configured bool
+	info    *framework.ClusterInfo
+	runtime framework.Runtime
+	kubectl *framework.KubectlClient
+	login   *loginWorkload
 }
 
 func NewTailscale(
@@ -41,6 +37,7 @@ func NewTailscale(
 		info:    info,
 		runtime: runtime,
 		kubectl: kubectl,
+		login:   newLoginWorkload(info.SlurmClusterName, kubectl),
 	}
 }
 
@@ -49,9 +46,7 @@ func (s *Tailscale) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^every login pod reports a Tailscale authentication URL$`, s.everyLoginPodReportsAuthenticationURL)
 }
 
-func (s *Tailscale) CleanupAndReset(context.Context) {
-	s.configured = false
-}
+func (s *Tailscale) CleanupAndReset(context.Context) {}
 
 func (s *Tailscale) tailscaleIsConfigured(ctx context.Context) error {
 	var cluster kubeobjects.SlurmCluster
@@ -71,15 +66,10 @@ func (s *Tailscale) tailscaleIsConfigured(ctx context.Context) error {
 		return godog.ErrSkip
 	}
 
-	s.configured = true
 	return nil
 }
 
 func (s *Tailscale) everyLoginPodReportsAuthenticationURL(ctx context.Context) error {
-	if !s.configured {
-		return fmt.Errorf("check Tailscale authentication URLs: Tailscale configuration was not verified")
-	}
-
 	var podNames []string
 	err := s.runtime.WaitFor(
 		ctx,
@@ -87,11 +77,11 @@ func (s *Tailscale) everyLoginPodReportsAuthenticationURL(ctx context.Context) e
 		tailscaleAuthenticationTimeout,
 		framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			statefulSet, err := s.loginStatefulSet(waitCtx)
+			statefulSet, err := s.login.statefulSet(waitCtx)
 			if err != nil {
 				return false, err
 			}
-			pods, err := s.loginPods(waitCtx)
+			pods, err := s.login.pods(waitCtx)
 			if err != nil {
 				return false, err
 			}
@@ -121,39 +111,6 @@ func (s *Tailscale) everyLoginPodReportsAuthenticationURL(ctx context.Context) e
 
 	s.runtime.Logf("Tailscale: login pods %s report authentication URLs", strings.Join(podNames, ", "))
 	return nil
-}
-
-func (s *Tailscale) loginStatefulSet(ctx context.Context) (kubeobjects.LoginStatefulSet, error) {
-	var statefulSets kubeobjects.LoginStatefulSetList
-	if err := s.kubectl.GetJSON(ctx, &statefulSets,
-		"get", tailscaleStatefulSetResource,
-		"-n", framework.SoperatorNamespace,
-		"-l", s.loginSelector(), "-o", "json",
-	); err != nil {
-		return kubeobjects.LoginStatefulSet{}, fmt.Errorf("list login StatefulSets: %w", err)
-	}
-	if len(statefulSets.Items) != 1 {
-		return kubeobjects.LoginStatefulSet{}, fmt.Errorf("find login StatefulSet: got %d, expected 1", len(statefulSets.Items))
-	}
-	return statefulSets.Items[0], nil
-}
-
-func (s *Tailscale) loginPods(ctx context.Context) ([]corev1.Pod, error) {
-	var pods corev1.PodList
-	if err := s.kubectl.GetJSON(ctx, &pods,
-		"get", "pods", "-n", framework.SoperatorNamespace,
-		"-l", s.loginSelector(), "-o", "json",
-	); err != nil {
-		return nil, fmt.Errorf("list login pods: %w", err)
-	}
-	return pods.Items, nil
-}
-
-func (s *Tailscale) loginSelector() string {
-	return fmt.Sprintf("%s=%s,%s=%s",
-		tailscaleInstanceLabel, s.info.SlurmClusterName,
-		tailscaleComponentLabel, tailscaleLoginComponent,
-	)
 }
 
 func validateTailscaleLoginPods(statefulSet kubeobjects.LoginStatefulSet, pods []corev1.Pod) ([]string, error) {
