@@ -51,6 +51,10 @@ Such software versions must be explicitly supported in container images Soperato
 While setting some configuration options for Slurm should indeed be done by Soperator, there are such ones that some
 people would like to customize themselves. Not all of this is supported.
 
+Configuration changes made with `scontrol` or by editing files under `/etc/slurm` in the jail are not persistent:
+the operator renders Slurm configuration from the `SlurmCluster` resource and rewrites it on the next reconciliation.
+See [`slurm-configuration.md`](slurm-configuration.md) for how configuration is delivered and how to change it.
+
 
 ### Some kernel parameters aren't configurable
 For example, Soperator sets some [sysctl](https://man7.org/linux/man-pages/man8/sysctl.8.html) params on its own, and
