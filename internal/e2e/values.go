@@ -55,7 +55,7 @@ func readTFVars(filename string) (map[string]interface{}, error) {
 }
 
 func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]interface{} {
-	tfVars["active_checks_scope"] = "essential"
+	tfVars["active_checks_scope"] = "testing"
 	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
 	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
 	if nfs, ok := tfVars["nfs_in_k8s"].(map[string]interface{}); ok {
