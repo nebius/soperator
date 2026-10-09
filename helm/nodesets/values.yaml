@@ -6,6 +6,8 @@
 nameOverride: ""
 fullnameOverride: ""
 clusterName: ""
+# Name of the slurm-scripts ConfigMap. Defaults to "<clusterName>-slurm-scripts".
+slurmScriptsConfigMapName: ""
 # Priority Classes configuration
 # Define priority classes that can be used by NodeSets
 priorityClasses:

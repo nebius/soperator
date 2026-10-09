@@ -153,14 +153,40 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
-      {{- with (.jailSubMounts | default list) }}
+      {{- $slurmScriptsCMName := include "nodesets.slurmScriptsCMName" $ }}
+      {{- $jailSubMounts := .jailSubMounts | default list }}
+      {{- $customVolumeMounts := .customVolumeMounts | default list }}
+      {{- $injectJailSlurmScripts := and $slurmScriptsCMName (not (eq "true" (include "nodesets.hasMountName" (dict "list" $jailSubMounts "name" "slurm-scripts-jail")))) }}
+      {{- $injectCustomSlurmScripts := and $slurmScriptsCMName (not (eq "true" (include "nodesets.hasMountName" (dict "list" $customVolumeMounts "name" "slurm-scripts")))) }}
+
+      {{- if or $injectJailSlurmScripts $jailSubMounts }}
       jailSubMounts:
+        {{- if $injectJailSlurmScripts }}
+        - name: slurm-scripts-jail
+          mountPath: /opt/slurm_scripts
+          volumeSource:
+            configMap:
+              name: {{ $slurmScriptsCMName | quote }}
+              defaultMode: 0755
+        {{- end }}
+        {{- with $jailSubMounts }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
 
-      {{- with (.customVolumeMounts | default list) }}
+      {{- if or $injectCustomSlurmScripts $customVolumeMounts }}
       customVolumeMounts:
+        {{- if $injectCustomSlurmScripts }}
+        - name: slurm-scripts
+          mountPath: /opt/slurm_scripts
+          volumeSource:
+            configMap:
+              name: {{ $slurmScriptsCMName | quote }}
+              defaultMode: 0755
+        {{- end }}
+        {{- with $customVolumeMounts }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
 
       {{- with (.sharedMemorySize | default "") }}
