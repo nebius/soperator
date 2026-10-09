@@ -29,14 +29,13 @@ func gpuProfile(projectID, region, platform, fabric string, size int) Profile {
 }
 
 // testConfig mirrors the real config shape: two regions with one project each, plus a
-// second profile sharing the us-central1 project (as KCS_B200 and KCS_CPU do). Only
-// the two GPU profiles carry the auto-select label.
+// CPU profile sharing the us-central1 project with KCS_B200.
 func testConfig() E2EConfig {
 	kcs := gpuProfile("project-kcs", "us-central1", "gpu-b200-sxm", "us-central1-b", 2)
-	kcs.Labels = []string{autoSelectLabel}
+	kcs.Labels = []string{autoGPULabel}
 
 	mdc := gpuProfile("project-mdc", "me-west1", "gpu-b200-sxm-a", "me-west1-a", 2)
-	mdc.Labels = []string{autoSelectLabel}
+	mdc.Labels = []string{autoGPULabel}
 
 	return E2EConfig{
 		Scheduler: SchedulerSettings{RunsPerTick: 1, MaxInFlight: 2},
@@ -45,6 +44,7 @@ func testConfig() E2EConfig {
 			"KCS_B200": kcs,
 			"MDC_B200": mdc,
 			"KCS_CPU": {
+				Labels:           []string{autoCPULabel},
 				NebiusProjectID:  "project-kcs",
 				NebiusRegion:     "us-central1",
 				NebiusTenantID:   "tenant-456",
@@ -71,7 +71,7 @@ func neverAvailable(Profile, map[affinityKey]uint64) (bool, error) { return fals
 
 func TestFilterFeasible_AllFree(t *testing.T) {
 	cfg := testConfig()
-	feasible, err := filterFeasible(cfg, cfg.Candidates(autoSelectLabel), nil, alwaysAvailable)
+	feasible, err := filterFeasible(cfg, cfg.Candidates(autoGPULabel), nil, alwaysAvailable)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"KCS_B200", "MDC_B200"}, feasible)
 }
@@ -79,35 +79,41 @@ func TestFilterFeasible_AllFree(t *testing.T) {
 func TestFilterFeasible_SkipsClaimedProject(t *testing.T) {
 	cfg := testConfig()
 	claims := []RunClaim{{RunID: 1, ProfileName: "KCS_B200", ProjectID: "project-kcs"}}
-	feasible, err := filterFeasible(cfg, cfg.Candidates(autoSelectLabel), claims, alwaysAvailable)
+	feasible, err := filterFeasible(cfg, cfg.Candidates(autoGPULabel), claims, alwaysAvailable)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"MDC_B200"}, feasible)
 }
 
 func TestFilterFeasible_SiblingProfileSharesTheClaimedProject(t *testing.T) {
-	cfg := withLabel(testConfig(), "KCS_CPU", autoSelectLabel)
+	cfg := withLabel(testConfig(), "KCS_CPU", autoGPULabel)
 
 	// A run holding project-kcs through KCS_CPU also blocks KCS_B200: they share the
 	// project, and therefore the concurrency group.
 	claims := []RunClaim{{RunID: 7, ProfileName: "KCS_CPU", ProjectID: "project-kcs"}}
-	feasible, err := filterFeasible(cfg, cfg.Candidates(autoSelectLabel), claims, alwaysAvailable)
+	feasible, err := filterFeasible(cfg, cfg.Candidates(autoGPULabel), claims, alwaysAvailable)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"MDC_B200"}, feasible)
 }
 
 func TestFilterFeasible_SkipsProfileWithoutCapacity(t *testing.T) {
 	cfg := testConfig()
-	feasible, err := filterFeasible(cfg, cfg.Candidates(autoSelectLabel), nil, neverAvailable)
+	feasible, err := filterFeasible(cfg, cfg.Candidates(autoGPULabel), nil, neverAvailable)
 	require.NoError(t, err)
 	assert.Empty(t, feasible)
 }
 
-func TestFilterFeasible_IgnoresUnlabelledProfiles(t *testing.T) {
-	// KCS_CPU is configured but unlabelled, so it is never returned.
+func TestFilterFeasible_IgnoresProfilesWithDifferentLabel(t *testing.T) {
 	cfg := testConfig()
-	feasible, err := filterFeasible(cfg, cfg.Candidates(autoSelectLabel), nil, alwaysAvailable)
+	feasible, err := filterFeasible(cfg, cfg.Candidates(autoGPULabel), nil, alwaysAvailable)
 	require.NoError(t, err)
 	assert.NotContains(t, feasible, "KCS_CPU")
+}
+
+func TestFilterFeasible_SelectsCPUProfile(t *testing.T) {
+	cfg := testConfig()
+	feasible, err := filterFeasible(cfg, cfg.Candidates(autoCPULabel), nil, alwaysAvailable)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"KCS_CPU"}, feasible)
 }
 
 func TestFilterFeasible_PassesReservedDemandToOracle(t *testing.T) {
@@ -119,7 +125,7 @@ func TestFilterFeasible_PassesReservedDemandToOracle(t *testing.T) {
 
 	cfg := testConfig()
 	claims := []RunClaim{{RunID: 1, ProfileName: "KCS_B200", ProjectID: "project-kcs"}}
-	_, err := filterFeasible(cfg, cfg.Candidates(autoSelectLabel), claims, oracle)
+	_, err := filterFeasible(cfg, cfg.Candidates(autoGPULabel), claims, oracle)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint64(16), seen[affinityKey{Platform: "gpu-b200-sxm", Fabric: "us-central1-b"}])
@@ -128,7 +134,7 @@ func TestFilterFeasible_PassesReservedDemandToOracle(t *testing.T) {
 func TestFilterFeasible_OracleError(t *testing.T) {
 	boom := errors.New("capacity api down")
 	cfg := testConfig()
-	_, err := filterFeasible(cfg, cfg.Candidates(autoSelectLabel), nil, func(Profile, map[affinityKey]uint64) (bool, error) {
+	_, err := filterFeasible(cfg, cfg.Candidates(autoGPULabel), nil, func(Profile, map[affinityKey]uint64) (bool, error) {
 		return false, boom
 	})
 	assert.ErrorIs(t, err, boom)
@@ -175,9 +181,16 @@ func testOptions(oracle capacityOracle) selectOptions {
 }
 
 func TestSelectProfile_PicksAvailableProfile(t *testing.T) {
-	name, profile, err := selectProfile(context.Background(), testConfig(), autoSelectLabel, testOptions(alwaysAvailable))
+	name, profile, err := selectProfile(context.Background(), testConfig(), autoGPULabel, testOptions(alwaysAvailable))
 	require.NoError(t, err)
 	assert.Equal(t, "KCS_B200", name)
+	assert.Equal(t, "project-kcs", profile.NebiusProjectID)
+}
+
+func TestSelectProfile_PicksCPUProfile(t *testing.T) {
+	name, profile, err := selectProfile(context.Background(), testConfig(), autoCPULabel, testOptions(alwaysAvailable))
+	require.NoError(t, err)
+	assert.Equal(t, "KCS_CPU", name)
 	assert.Equal(t, "project-kcs", profile.NebiusProjectID)
 }
 
@@ -196,7 +209,7 @@ func TestSelectProfile_PickIsRandomOverFeasibleOnly(t *testing.T) {
 		return 0
 	}
 
-	name, _, err := selectProfile(context.Background(), cfg, autoSelectLabel, opts)
+	name, _, err := selectProfile(context.Background(), cfg, autoGPULabel, opts)
 	require.NoError(t, err)
 	assert.Equal(t, "MDC_B200", name)
 }
@@ -208,7 +221,7 @@ func TestSelectProfile_RetriesUntilCapacityFrees(t *testing.T) {
 		return attempts >= 3, nil
 	})
 
-	name, _, err := selectProfile(context.Background(), testConfig(), autoSelectLabel, opts)
+	name, _, err := selectProfile(context.Background(), testConfig(), autoGPULabel, opts)
 	require.NoError(t, err)
 	assert.Equal(t, "KCS_B200", name)
 	assert.GreaterOrEqual(t, attempts, 3)
@@ -218,7 +231,7 @@ func TestSelectProfile_TimesOut(t *testing.T) {
 	opts := testOptions(neverAvailable)
 	opts.timeout = 20 * time.Millisecond
 
-	_, _, err := selectProfile(context.Background(), testConfig(), autoSelectLabel, opts)
+	_, _, err := selectProfile(context.Background(), testConfig(), autoGPULabel, opts)
 	assert.ErrorIs(t, err, ErrNoProfileAvailable)
 }
 
@@ -229,8 +242,8 @@ func TestSelectProfile_NoLabelledProfiles(t *testing.T) {
 		cfg.Profiles[name] = profile
 	}
 
-	_, _, err := selectProfile(context.Background(), cfg, autoSelectLabel, testOptions(alwaysAvailable))
-	assert.ErrorContains(t, err, `no profile carries the label "auto-select"`)
+	_, _, err := selectProfile(context.Background(), cfg, autoGPULabel, testOptions(alwaysAvailable))
+	assert.ErrorContains(t, err, `no profile carries the label "auto-gpu"`)
 }
 
 func TestSelectProfile_ContextCancelled(t *testing.T) {
@@ -238,7 +251,7 @@ func TestSelectProfile_ContextCancelled(t *testing.T) {
 	cancel()
 
 	opts := testOptions(neverAvailable)
-	_, _, err := selectProfile(ctx, testConfig(), autoSelectLabel, opts)
+	_, _, err := selectProfile(ctx, testConfig(), autoGPULabel, opts)
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
@@ -247,6 +260,6 @@ func TestSelectProfile_ClaimsError(t *testing.T) {
 	opts := testOptions(alwaysAvailable)
 	opts.claims = func(context.Context) ([]RunClaim, error) { return nil, boom }
 
-	_, _, err := selectProfile(context.Background(), testConfig(), autoSelectLabel, opts)
+	_, _, err := selectProfile(context.Background(), testConfig(), autoGPULabel, opts)
 	assert.ErrorIs(t, err, boom)
 }
