@@ -40,6 +40,8 @@ spec:
         - name: SLURM_OPERATOR_WATCH_NAMESPACES
           value: {{ quote .Values.controllerManager.manager.env.slurmOperatorWatchNamespaces
             }}
+        - name: SLURM_OPERATOR_IGNORED_SECRET_TYPES
+          value: {{ quote .Values.controllerManager.manager.env.slurmOperatorIgnoredSecretTypes }}
         {{- $controllersSpec := include "soperator.controllersSpec" . | trim -}}
         {{- if $controllersSpec }}
         - name: SLURM_OPERATOR_CONTROLLERS

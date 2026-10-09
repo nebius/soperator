@@ -66,6 +66,25 @@ Soperator consists of the following components:
   recommended not to try to write them from scratch. Instead, *derive* your container images from these adding or changing
   things you want.
 
+## Controller Secret cache
+
+When installed using the Helm charts, the operator and `soperatorchecks` exclude Secrets of type
+`helm.sh/release.v1` from their API LIST/WATCH requests and caches by default. These Secrets contain
+Helm release history; application Secrets installed by Helm remain available to controllers.
+
+Set `SLURM_OPERATOR_IGNORED_SECRET_TYPES` on each manager to configure exclusions with a comma-separated
+list, for example `helm.sh/release.v1,example.com/archive`. Whitespace and empty entries are ignored.
+An unset or empty value disables filtering. Changes take effect when the manager restarts.
+
+For Helm installations, set `controllerManager.manager.env.slurmOperatorIgnoredSecretTypes` in
+the `soperator` chart and `checks.manager.env.slurmOperatorIgnoredSecretTypes` in the
+`soperatorchecks` chart. Both default to `"helm.sh/release.v1"`; set both to `""` to disable filtering.
+
+With `--log-level=debug`, each manager logs the ignored types and API field selector at startup,
+or logs that filtering is disabled. Individual excluded Secrets never reach the manager, so there
+are no per-Secret skip logs. Excluded types are unavailable through the cached client; only exclude
+types that controllers do not need.
+
 ## Helm charts
 - **slurm-cluster**. It allows you to create the custom resource representing a Slurm cluster. You can apply it many
   times if you need more than one Slurm cluster. The Slurm cluster is actually configured by values in this chart.

@@ -272,7 +272,7 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 		Cache: cache.Options{
 			DefaultNamespaces: watchNsCacheByName,
-			ByObject:          controllerconfig.NodeCacheByObject(),
+			ByObject:          controllerconfig.CacheByObject(controllerconfig.IgnoredSecretTypesFromEnv(), setupLog),
 		},
 	})
 	if err != nil {
