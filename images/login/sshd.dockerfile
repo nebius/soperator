@@ -24,7 +24,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY images/common/pam_soperator_jail.c /usr/src/pam-soperator-jail/
+COPY images/common/pam_soperator_jail.c images/common/job_mount_namespace.h /usr/src/pam-soperator-jail/
 COPY images/common/scripts/build_pam_soperator_jail.sh /usr/src/pam-soperator-jail/
 RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
     /usr/src/pam-soperator-jail/pam_soperator_jail.c \
@@ -67,7 +67,7 @@ RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local sssd.yml
 
 # Install slurm сhroot plugin
-COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY images/common/chroot-plugin/chroot.c images/common/job_mount_namespace.h /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \

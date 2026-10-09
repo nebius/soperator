@@ -2,6 +2,47 @@ suite: test Slurm scripts configuration
 templates:
   - slurm-scripts-cm.yaml
 tests:
+  - it: should leave job temporary filesystem lifecycle to Slurm namespaces
+    asserts:
+      - notExists:
+          path: data["job_tmpfs_recreate.sh"]
+      - notExists:
+          path: data["job_tmpfs_delete.sh"]
+      - notExists:
+          path: data["job_tmpfs_delete_leftover.sh"]
+      - notExists:
+          path: data["drop_posix_shmem.sh"]
+      - notMatchRegex:
+          path: data["checks.json"]
+          pattern: 'job_tmpfs_|drop_posix_shmem'
+
+  - it: should reject obsolete enabled tmpfs hooks during upgrade
+    set:
+      slurmScripts:
+        builtIn:
+          job_tmpfs_recreate.sh:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "slurmScripts.builtIn.job_tmpfs_recreate.sh is enabled but no bundled script exists; remove this obsolete entry or set customContent"
+
+  - it: should allow disabling obsolete tmpfs hooks during upgrade
+    set:
+      slurmScripts:
+        builtIn:
+          job_tmpfs_recreate.sh:
+            enabled: false
+          job_tmpfs_delete.sh:
+            enabled: false
+          job_tmpfs_delete_leftover.sh:
+            enabled: false
+          drop_posix_shmem.sh:
+            enabled: false
+    asserts:
+      - notMatchRegex:
+          path: data["checks.json"]
+          pattern: 'job_tmpfs_|drop_posix_shmem'
+
   - it: should reject an enabled built-in without a bundled script
     set:
       slurmScripts:

@@ -22,6 +22,7 @@ const (
 	ConfigMapKeySpankConfig         = "plugstack.conf"
 	ConfigMapKeyGresConfig          = "gres.conf"
 	ConfigMapKeyMPIConfig           = "mpi.conf"
+	ConfigMapKeyNamespaceConfig     = "namespace.yaml"
 	ConfigMapKeySlurmdbdConfig      = "slurmdbd.conf"
 	// ConfigMapKeyTopologyYAML holds the cluster's named topologies.
 	ConfigMapKeyTopologyYAML = "topology.yaml"

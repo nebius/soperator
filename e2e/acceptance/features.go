@@ -44,6 +44,7 @@ func FeaturePaths() []string {
 		"features/docker_containers.feature",
 		"features/enroot_containers.feature",
 		"features/passive_checks.feature",
+		"features/job_tmpfs.feature",
 		"features/active_checks.feature",
 		"features/system_checks.feature",
 		"features/topology.feature",

@@ -37,6 +37,7 @@ type PAMSlurmAdopt struct {
 
 	worker      framework.WorkerInfo
 	job         framework.SbatchJob
+	jobDevices  string
 	identitySet bool
 	sshCancel   context.CancelFunc
 	sshResults  chan pamSlurmAdoptSSHResult
@@ -104,6 +105,7 @@ func (s *PAMSlurmAdopt) CleanupAndReset(ctx context.Context) {
 
 	s.worker = framework.WorkerInfo{}
 	s.job = framework.SbatchJob{}
+	s.jobDevices = ""
 	s.identitySet = false
 	s.sshCancel = nil
 	s.sshResults = nil
@@ -188,12 +190,18 @@ func (s *PAMSlurmAdopt) sshWithoutAJobIsDenied(ctx context.Context) error {
 }
 
 func (s *PAMSlurmAdopt) startGPUJobAndSSH(ctx context.Context) error {
+	probe := `import os, pathlib, time
+for directory in ("/mnt/memory", "/dev/shm", "/tmp"):
+    (pathlib.Path(directory) / "soperator-pam-tmpfs").write_text(os.environ["SLURM_JOB_ID"])
+print("PAM_JOB_DEVICES=" + ",".join(str(pathlib.Path(p).stat().st_dev) for p in ("/mnt/memory", "/dev/shm", "/tmp")), flush=True)
+time.sleep(3600)
+`
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:     "e2e-pam-slurm-adopt",
 		Nodes:       1,
 		Nodelist:    []string{s.worker.Name},
 		GPUsPerNode: 1,
-		Wrap:        "sleep 3600",
+		Wrap:        "python3 -u -c " + framework.ShellQuote(probe),
 		RunAsUser:   pamSlurmAdoptUser,
 	})
 	if err != nil {
@@ -203,13 +211,27 @@ func (s *PAMSlurmAdopt) startGPUJobAndSSH(ctx context.Context) error {
 	if err := s.slurm.WaitForJobRunning(ctx, job.ID, pamSlurmAdoptJobTimeout); err != nil {
 		return err
 	}
+	if err := framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, job, "PAM job tmpfs markers", pamSlurmAdoptSessionTimeout, framework.DefaultPollInterval,
+		func(waitCtx context.Context) (bool, error) {
+			output, err := readJobFile(waitCtx, s.runtime, job.StdoutPath)
+			if err != nil {
+				return false, err
+			}
+			s.jobDevices = parseKeyValueLine(output, "PAM_JOB_DEVICES")
+			return s.jobDevices != "", nil
+		}); err != nil {
+		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, err)
+	}
 
 	remoteCommand := fmt.Sprintf(
 		"set -euo pipefail; status=%s; "+
+			"for directory in /mnt/memory /dev/shm /tmp; do test \"$(cat \"$directory/soperator-pam-tmpfs\")\" = %s; done; "+
 			"gpu_count=$(nvidia-smi --query-gpu=index --format=csv,noheader | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]'); "+
-			"{ printf 'cgroup=%%s\\n' \"$(cat /proc/self/cgroup)\"; printf 'gpu_count=%%s\\n' \"$gpu_count\"; } >\"$status\"; "+
+			"{ printf 'cgroup=%%s\\n' \"$(cat /proc/self/cgroup)\"; printf 'gpu_count=%%s\\n' \"$gpu_count\"; "+
+			"printf 'tmpfs_devices=%%s\\n' \"$(stat -c '%%d' /mnt/memory /dev/shm /tmp | paste -sd,)\"; } >\"$status\"; "+
 			"exec sleep 3600",
 		framework.ShellQuote(pamSlurmAdoptStatusPath),
+		framework.ShellQuote(job.ID),
 	)
 	sshCtx, cancel := context.WithCancel(context.Background())
 	s.sshCancel = cancel
@@ -246,7 +268,7 @@ func (s *PAMSlurmAdopt) startGPUJobAndSSH(ctx context.Context) error {
 			if readErr != nil {
 				return false, readErr
 			}
-			return validatePAMSlurmAdoptStatus(output)
+			return validatePAMSlurmAdoptStatus(output, s.jobDevices)
 		},
 	)
 }
@@ -330,7 +352,7 @@ func (s *PAMSlurmAdopt) stopSSH(ctx context.Context) {
 	s.sshResults = nil
 }
 
-func validatePAMSlurmAdoptStatus(output string) (bool, error) {
+func validatePAMSlurmAdoptStatus(output, expectedDevices string) (bool, error) {
 	values := make(map[string]string)
 	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		key, value, found := strings.Cut(line, "=")
@@ -340,6 +362,9 @@ func validatePAMSlurmAdoptStatus(output string) (bool, error) {
 	}
 	if !isSlurmExternCgroup(values["cgroup"]) {
 		return false, fmt.Errorf("SSH session cgroup %q does not contain step_extern", values["cgroup"])
+	}
+	if expectedDevices == "" || values["tmpfs_devices"] != expectedDevices {
+		return false, fmt.Errorf("SSH tmpfs devices %q differ from job devices %q", values["tmpfs_devices"], expectedDevices)
 	}
 	gpuCount, err := strconv.Atoi(values["gpu_count"])
 	if err != nil {

@@ -859,10 +859,6 @@ slurmScripts:
       enabled: true
       customContent: null
       customConfig: null
-    drop_posix_shmem.sh:
-      enabled: true
-      customContent: null
-      customConfig: null
     gpu_health_check.py:
       enabled: true
       customContent: null
@@ -872,18 +868,6 @@ slurmScripts:
       customContent: null
       customConfig: null
     idle_mem_used.undrain.py:
-      enabled: true
-      customContent: null
-      customConfig: null
-    job_tmpfs_delete.sh:
-      enabled: true
-      customContent: null
-      customConfig: null
-    job_tmpfs_delete_leftover.sh:
-      enabled: true
-      customContent: null
-      customConfig: null
-    job_tmpfs_recreate.sh:
       enabled: true
       customContent: null
       customConfig: null

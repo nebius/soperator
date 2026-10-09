@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include "job_mount_namespace.h"
 
 // pivot_root is not available directly in glibc, so we use syscall
 #ifndef SYS_pivot_root
@@ -53,6 +54,15 @@ int change_root(const char *jail_path) {
     if (mount(NULL, "/", NULL, MS_SLAVE | MS_REC, NULL) != 0) {
         fprintf(stderr, "mount --make-rslave /: %s\n", strerror(errno));
         return 30;
+    }
+
+    /* Slurmd resolves sbcast destinations outside the jail. Bind the job tmpfs
+     * mounts into the jail before pivot_root so job tasks see the same files
+     * at /tmp, /dev/shm and /mnt/memory. */
+    const char *failed_source;
+    if (soperator_bind_job_tmpfs(jail_path, &failed_source) != 0) {
+        fprintf(stderr, "bind job tmpfs %s into jail: %s\n", failed_source, strerror(errno));
+        return 35;
     }
 
     slurm_debug("chroot: change_root: Pivot jail and host roots");

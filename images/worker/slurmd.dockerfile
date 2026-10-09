@@ -24,7 +24,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY images/common/pam_soperator_jail.c /usr/src/pam-soperator-jail/
+COPY images/common/pam_soperator_jail.c images/common/job_mount_namespace.h /usr/src/pam-soperator-jail/
 COPY images/common/scripts/build_pam_soperator_jail.sh /usr/src/pam-soperator-jail/
 RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
     /usr/src/pam-soperator-jail/pam_soperator_jail.c \
@@ -34,6 +34,9 @@ RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
 FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20261007141043 AS worker_slurmd
 
 ARG SLURM_VERSION
+
+# namespace/linux mounts this canonical path before entering the jail.
+RUN mkdir -p /mnt/memory
 
 # Install useful packages
 RUN apt-get update && \
@@ -62,7 +65,7 @@ RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local sssd.yml
 
 # Install slurm сhroot plugin
-COPY images/common/chroot-plugin/chroot.c /usr/src/chroot-plugin/
+COPY images/common/chroot-plugin/chroot.c images/common/job_mount_namespace.h /usr/src/chroot-plugin/
 COPY images/common/scripts/install_chroot_plugin.sh /opt/bin/
 RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     /opt/bin/install_chroot_plugin.sh && \

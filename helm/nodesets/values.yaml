@@ -175,10 +175,11 @@ nodesets:
           persistentVolumeClaim:
             claimName: &jailPvcClaimName "jail-pvc"
         # Volumes being mounted inside Jail mount
+        # Job-private tmpfs mounts hide submounts below /tmp, /dev/shm, and /mnt/memory.
         # Optional, defaults to empty list
         jailSubMounts:
           - name: "tmp1"
-            mountPath: "/tmp/1"
+            mountPath: "/mnt/local/1"
             # Optional
             subPath: "1"
             # Optional
@@ -187,7 +188,7 @@ nodesets:
             volumeSource:
               emptyDir: {}
           - name: "tmp2"
-            mountPath: "/tmp/2"
+            mountPath: "/mnt/local/2"
             # Optional
             subPath: "2"
             # Optional
@@ -198,7 +199,7 @@ nodesets:
         # Optional, defaults to empty list
         customVolumeMounts:
           - name: "foo"
-            mountPath: "/tmp/foo"
+            mountPath: "/mnt/local/foo"
             # Optional
             subPath: "bar"
             # Optional

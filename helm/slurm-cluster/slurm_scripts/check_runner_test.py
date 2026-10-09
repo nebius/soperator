@@ -468,9 +468,10 @@ class PartialCPUJobsTest(unittest.TestCase):
                 config.pop("skip_for_partial_cpu_jobs", None)
                 self.assertFalse(check_runner.Check(**config).skip_for_partial_cpu_jobs)
 
-    def test_builtin_cleanup_runs_only_for_full_cpu_or_gpu_allocations(self):
-        config_path = CHECK_RUNNER_PATH.with_name("drop_posix_shmem.sh.json")
-        check = check_runner.Check(**json.loads(config_path.read_text()))
+    def test_check_runs_only_for_full_cpu_or_gpu_allocations(self):
+        check = self.guarded._replace(
+            skip_for_partial_gpu_jobs=True, contexts=["prolog", "epilog"],
+        )
         cases = (
             ("", "8", False),
             ("", "64", True),
