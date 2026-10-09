@@ -115,7 +115,7 @@ jobs:
             --ref "$HEAD_REF" \
             -f "terraform_repo_ref=$TERRAFORM_REF" \
             -f "soperator_e2e_repo_branch=$HEAD_REF" \
-            -f profile=@auto-select \
+            -f profile=@auto-gpu \
             -f run_unstable_tests=false \
             -f "run_essential_tests=$RUN_ESSENTIAL_TESTS" \
             -f "scenarios=$SCENARIOS" \

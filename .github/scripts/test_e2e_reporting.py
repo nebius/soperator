@@ -36,7 +36,7 @@ def context(**overrides):
         "SOPERATOR_BUILD_BRANCH": "soperator-release-4.1",
         "TERRAFORM_BRANCH": "main",
         "SOPERATOR_E2E_BRANCH": "feature",
-        "REQUESTED_PROFILE": "@auto-select",
+        "REQUESTED_PROFILE": "@auto-gpu",
         "RESOLVED_PROFILE": "KCS_B200",
         "RUN_UNSTABLE_TESTS": "false",
         "RUN_ESSENTIAL_TESTS": "true",
