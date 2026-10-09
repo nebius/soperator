@@ -593,7 +593,7 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
         """Non-GPU node immediately applies topology=default:root:unknown."""
         worker_init.wait_for_topology()
 
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
+        mock_wait_hostname.assert_not_called()
         mock_apply.assert_called_once_with("worker-0", "topology=default:root:unknown")
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
@@ -605,7 +605,7 @@ class TestWaitForTopologyNonGpu(unittest.TestCase):
         with mock.patch("worker_init.read_topology_for_node") as mock_read:
             worker_init.wait_for_topology()
             mock_read.assert_not_called()
-        mock_wait_hostname.assert_called_once_with("worker-0", 180, 5)
+        mock_wait_hostname.assert_not_called()
 
     @mock.patch("worker_init.wait_for_hostname_in_topology_conf")
     @mock.patch("worker_init.apply_node_topology")

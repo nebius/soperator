@@ -52,7 +52,10 @@ def create_slurm_config_symlink() -> None:
         SLURM_CONFIG_LINK_TARGET,
         SLURM_CONFIG_LINK_SOURCE,
     )
-    shutil.rmtree(SLURM_CONFIG_LINK_TARGET)
+    if os.path.islink(SLURM_CONFIG_LINK_TARGET) or os.path.isfile(SLURM_CONFIG_LINK_TARGET):
+        os.unlink(SLURM_CONFIG_LINK_TARGET)
+    elif os.path.isdir(SLURM_CONFIG_LINK_TARGET):
+        shutil.rmtree(SLURM_CONFIG_LINK_TARGET)
     os.symlink(SLURM_CONFIG_LINK_SOURCE, SLURM_CONFIG_LINK_TARGET)
 
 
