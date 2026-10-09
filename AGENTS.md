@@ -3,6 +3,10 @@
 The role of this file is to describe common mistakes and confusion points that agents might encounter as they work
 in this project.
 
+## Mandatory skill usage
+
+- Use `$e2e-scenario-development` before designing, adding, or materially changing an E2E acceptance scenario.
+
 ## Architecture
 
 Kubernetes operator for Slurm, built with kubebuilder. Manages Slurm cluster lifecycle on Kubernetes via custom resources.

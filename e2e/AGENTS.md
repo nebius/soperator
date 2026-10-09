@@ -19,6 +19,8 @@ intentionally remain local.
 Gather enough information to answer:
 
 - What user-visible behavior is being introduced or changed?
+- What product capability or user or operator workflow does the scenario
+  protect, and why does it belong in E2E rather than a lower-level test?
 - Which Soperator versions have the old and new behavior?
 - What cluster configuration and capacity does the scenario require, and for
   each unmet prerequisite should the scenario skip or fail?
@@ -47,8 +49,12 @@ again.
 
 ## Scenario design
 
-- Describe observable behavior in Gherkin. Keep kubectl, Slurm command syntax,
-  parsing, retries, and other implementation details in Go steps.
+- Describe a user- or operator-visible product workflow in Gherkin. For a bug
+  fix, test the product behavior that the bug broke instead of encoding an
+  implementation-specific regression or isolated corner case. If there is no
+  meaningful product workflow that would fail, prefer a unit, controller,
+  Helm, or integration test. Keep kubectl, Slurm command syntax, parsing,
+  retries, and other implementation details in Go steps.
 - Keep scenarios independent. Do not rely on scenario execution order or state
   left by another scenario.
 - Reuse an existing step only when its wording and semantics mean exactly the

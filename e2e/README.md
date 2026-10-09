@@ -12,9 +12,11 @@ runner through a kube context.
 
 ## Contributing scenarios
 
-Scenario authors and coding agents should follow [AGENTS.md](AGENTS.md). It
-defines the required design review, tagging, skip-versus-fail, implementation,
-cleanup, and development-cluster validation practices.
+Coding agents should use `$e2e-scenario-development` before designing, adding,
+or materially changing an acceptance scenario. Human contributors can read
+[AGENTS.md](AGENTS.md) directly. It defines the required design review,
+tagging, skip-versus-fail, implementation, cleanup, and development-cluster
+validation practices.
 
 ## Standalone CLI
 
