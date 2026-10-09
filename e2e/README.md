@@ -10,6 +10,14 @@ Cluster lifecycle is intentionally outside this module. Create, select, update,
 and delete the target cluster in the caller, then pass Kubernetes access to the
 runner through a kube context.
 
+## Contributing scenarios
+
+Coding agents should use `$e2e-scenario-development` before designing, adding,
+or materially changing an acceptance scenario. Human contributors can read
+[AGENTS.md](AGENTS.md) directly. It defines the required design review,
+tagging, skip-versus-fail, implementation, cleanup, and development-cluster
+validation practices.
+
 ## Standalone CLI
 
 > !!! WARNING !!!
@@ -67,11 +75,11 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
   also reported directly through native test service messages and JUnit files
   are placed in the `junit/` subdirectory to avoid duplicate test imports.
 
-CPU/GPU scenarios are selected by tags like other scenarios. Steps that need a
-specific worker kind query live Slurm and NodeSet state at scenario time. They
-skip when the required capacity is not configured, but fail when it is
-configured and too few workers are usable. Scenarios that cover all workers
-also fail on partial degradation.
+Steps that need a specific worker kind query live Slurm and NodeSet state at
+scenario time. They skip when the required capacity is not configured, but fail
+when it is configured and too few workers are usable. Scenarios that cover all
+workers also fail on partial degradation. CPU, GPU, and topology tags in feature
+files are descriptive only; no current runner or workflow consumes them.
 
 For focused manual runs on a dev cluster, pass the scenario location:
 
