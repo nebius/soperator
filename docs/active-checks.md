@@ -216,7 +216,7 @@ The Active Checks framework integrates with the cluster observability stack.
 ### Logging
 - **K8s jobs** → logs are available from the Pods of the Kubernetes Jobs.
 - **Slurm jobs** → logs are written under `/opt/soperator-outputs/local/slurm_jobs/`, node-local on the worker that ran the job, and shipped by the per-node jail-logs collector.
-- Other logs (e.g., passive checks) also exist under the broader `/soperator-outputs/` path, but are out of scope for this doc.
+- Other logs (e.g., passive checks) also exist under the broader `/soperator-outputs/` path, but are out of scope for this doc. See [passive-checks.md](passive-checks.md).
 
 ### Dashboards
 This repository does not expose a separate ActiveCheck-specific metrics surface. Use ActiveCheck status, Kubernetes Job/Pod state, Slurm accounting, and centralized logs for troubleshooting.
