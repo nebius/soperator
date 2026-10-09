@@ -222,7 +222,3 @@ bin/acceptance run \
 
 If no safe cluster is available, stop after static validation and give the user
 the exact focused command to run. Do not report the scenario as live-validated.
-
-The acceptance implementation mirrors the standalone `soperator-e2e`
-repository. Keep shared source and tests synchronized according to the current
-repository workflow; do not assume that changing only one copy is sufficient.
