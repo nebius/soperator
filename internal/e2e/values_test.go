@@ -59,6 +59,11 @@ func TestOverrideTestValuesWithoutNFS(t *testing.T) {
 	}
 }
 
+func TestOverrideTestValuesUsesTestingActiveChecksScope(t *testing.T) {
+	result := overrideTestValues(map[string]interface{}{}, Config{})
+	assert.Equal(t, "testing", result["active_checks_scope"])
+}
+
 func TestOverrideTestValuesCreatesWorkerPartitions(t *testing.T) {
 	tfVars := map[string]interface{}{}
 	cfg := Config{
