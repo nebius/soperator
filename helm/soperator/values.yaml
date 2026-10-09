@@ -27,6 +27,8 @@ controllerManager:
       isOpentelemetryCollectorCrdInstalled: "false"
       isPrometheusCrdInstalled: "false"
       slurmOperatorWatchNamespaces: '*'
+      # Comma-separated Secret types to exclude from the cache; an empty string disables filtering.
+      slurmOperatorIgnoredSecretTypes: "helm.sh/release.v1"
       topologyLabelPrefix: "topology.nebius.com"
     image:
       repository: cr.nebius.cloud/soperator/slurm-operator
