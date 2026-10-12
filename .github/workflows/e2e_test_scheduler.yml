@@ -2,8 +2,8 @@ name: E2E Test Scheduler
 
 on:
   schedule:
-    - cron: '0 0,3,6,9,12,15,18,21 * * *'
-    - cron: '30 1,4,7,10,13,16,19,22 * * *'
+    - cron: &cpu_schedule '0 0,12 * * *'
+    - cron: &gpu_schedule '0 2,4,6,8,10,14,16,18,20,22 * * *'
   workflow_dispatch:  # Allow manual trigger for testing
 
 permissions:
@@ -28,12 +28,33 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           E2E_CONFIG: ${{ vars.E2E_CONFIG }}
+          SCHEDULE: ${{ github.event.schedule }}
+          CPU_SCHEDULE: *cpu_schedule
+          GPU_SCHEDULE: *gpu_schedule
         shell: bash
         run: |
           if [[ -z "$E2E_CONFIG" ]]; then
             echo "::error::E2E_CONFIG variable is not set"
             exit 1
           fi
+
+          case "$SCHEDULE" in
+            "$CPU_SCHEDULE")
+              PROFILE='@auto-cpu'
+              ;;
+            "$GPU_SCHEDULE")
+              PROFILE='@auto-gpu'
+              ;;
+            '')
+              PROFILE='@auto-gpu'
+              echo "::notice::Manual scheduler run defaults to $PROFILE"
+              ;;
+            *)
+              echo "::error::Unknown schedule: $SCHEDULE"
+              exit 1
+              ;;
+          esac
+          echo "Requested profile: $PROFILE"
 
           # Parse before readarray so invalid configuration stops the step.
           RELEASE_BRANCH_NAMES=$(yq -o=json '.' <<<"$E2E_CONFIG" | jq -r '
@@ -106,11 +127,15 @@ jobs:
             exit 1
           fi
 
-          # Rotation pointer: the newest scheduler-dispatched run's branch — continue
-          # from the next one. The pointer advances only when something was actually
-          # dispatched, so skipped and double-dispatch ticks cannot skew the rotation.
-          # Unknown or missing branch: start from the top of the list.
-          LAST_BRANCH=$(jq -r '.[0].head_branch // ""' <<<"$RUNS")
+          # CPU and GPU selectors rotate across branches independently. The concrete
+          # profile selected later does not affect this pointer.
+          PROFILE_RUNS=$(jq --arg title "E2E $PROFILE" \
+            '[.[] | select(.display_title == $title)]' <<<"$RUNS")
+
+          # Continue from the branch of the newest run for this selector. The pointer
+          # advances only when a run was actually dispatched. Unknown or missing
+          # branch: start from the top of the list.
+          LAST_BRANCH=$(jq -r '.[0].head_branch // ""' <<<"$PROFILE_RUNS")
           START=0
           for i in "${!BRANCHES[@]}"; do
             if [[ "${BRANCHES[$i]}" == "$LAST_BRANCH" ]]; then
@@ -118,19 +143,17 @@ jobs:
               break
             fi
           done
-          echo "Last scheduled branch: ${LAST_BRANCH:-none}, starting from: ${BRANCHES[$START]}"
+          echo "Last scheduled $PROFILE branch: ${LAST_BRANCH:-none}, starting from: ${BRANCHES[$START]}"
 
           for (( i = 0; i < DISPATCHES; i++ )); do
             BRANCH_INDEX=$(( (START + i) % BRANCH_COUNT ))
             REF="${BRANCHES[$BRANCH_INDEX]}"
 
-            # No profile input on purpose: the default declared on e2e_test.yml's profile input applies,
-            # so what scheduled runs select by is decided there, not here.
-            # Omitting the input also keeps this dispatch valid against branches that predate it.
             gh workflow run e2e_test.yml \
               --ref "$REF" \
               -f terraform_repo_ref="$REF" \
-              -f is_scheduled=true
+              -f is_scheduled=true \
+              -f profile="$PROFILE"
 
-            echo "Triggered E2E test on branch $REF (index $BRANCH_INDEX)"
+            echo "Triggered E2E test with $PROFILE on branch $REF (index $BRANCH_INDEX)"
           done
