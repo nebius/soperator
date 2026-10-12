@@ -223,7 +223,7 @@ type SlurmConfig struct {
 	// TopologyParam is list of comma-separated options identifying network topology options.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="SwitchAsNodeRank"
+	// +kubebuilder:default="BlockAsNodeRank,SwitchAsNodeRank"
 	TopologyParam string `json:"topologyParam,omitempty"`
 	// SuspendTime is the idle time in seconds after which ephemeral (CLOUD) nodes become eligible
 	// for automatic power down. The default is a large finite value so Slurm power-save remains
