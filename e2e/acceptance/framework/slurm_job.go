@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -14,6 +15,7 @@ type SlurmJobInfo struct {
 	SacctState  string
 	SacctExit   string
 	SacctReason string
+	Restarts    *int // nil means unknown; pointer to 0 means no restarts.
 }
 
 // JobInfo returns the current squeue state and a parsed sacct record for the
@@ -32,6 +34,7 @@ func (s *SlurmClient) JobInfo(ctx context.Context, jobID string) (SlurmJobInfo, 
 		QueueState: strings.TrimSpace(rawState),
 	}
 	s.addBestEffortSacctInfo(ctx, &info)
+	s.addBestEffortJobRestartCount(ctx, &info)
 	return info, nil
 }
 
@@ -45,6 +48,31 @@ func (s *SlurmClient) addBestEffortSacctInfo(ctx context.Context, info *SlurmJob
 	}
 	info.SacctDump = strings.TrimSpace(rawDump)
 	info.SacctState, info.SacctExit, info.SacctReason, info.SacctFound = parseSacctJob(info.SacctDump, info.ID)
+}
+
+func (s *SlurmClient) addBestEffortJobRestartCount(ctx context.Context, info *SlurmJobInfo) {
+	out, err := s.runtime.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf(
+		"scontrol -o show job %s",
+		ShellQuote(info.ID),
+	))
+	if err != nil {
+		return
+	}
+
+	for _, field := range strings.Fields(out) {
+		value, found := strings.CutPrefix(field, "Restarts=")
+		if !found {
+			continue
+		}
+
+		count, err := strconv.Atoi(value)
+		if err != nil || count < 0 {
+			return
+		}
+		info.Restarts = &count
+	}
+
+	return
 }
 
 // AssertJobRunning returns an error if jobID is not currently in RUNNING state.
@@ -63,6 +91,17 @@ func (s *SlurmClient) AssertJobRunning(ctx context.Context, jobID string) error 
 	return nil
 }
 
+func (s *SlurmClient) AssertJobRunningWithoutRestarts(ctx context.Context, jobID string) error {
+	info, err := s.JobInfo(ctx, jobID)
+	if err != nil {
+		return err
+	}
+	if info.QueueState != "RUNNING" || !info.HasNoRestarts() {
+		return fmt.Errorf("expected job %s to be RUNNING, got state=%q", strings.TrimSpace(jobID), info.QueueState)
+	}
+	return nil
+}
+
 func (i SlurmJobInfo) IsAlive() bool {
 	if strings.TrimSpace(i.QueueState) != "" {
 		return IsJobAliveState(i.QueueState)
@@ -75,6 +114,14 @@ func (i SlurmJobInfo) IsAlive() bool {
 
 func (i SlurmJobInfo) CompletedSuccessfully() bool {
 	return i.SacctFound && i.SacctState == "COMPLETED" && i.SacctExit == "0:0"
+}
+
+func (i SlurmJobInfo) HasNoRestarts() bool {
+	return i.Restarts != nil && *i.Restarts == 0
+}
+
+func (i SlurmJobInfo) CompletedSuccessfullyWithoutRestarts() bool {
+	return i.CompletedSuccessfully() && i.HasNoRestarts()
 }
 
 func parseSacctJob(dump, jobID string) (state, exitCode, reason string, found bool) {
