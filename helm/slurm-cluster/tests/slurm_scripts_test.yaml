@@ -24,3 +24,21 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "slurmScripts.builtIn.removed_check.sh is enabled but no bundled check configuration exists; remove this obsolete entry or set customConfig"
+
+  - it: should render task prolog env exports when enabled
+    set:
+      slurmScripts:
+        taskPrologEnv:
+          enabled: true
+          sourceFiles:
+            - /etc/profile.d/90-nccl-network-vars.sh
+          exportVars:
+            - UCX_NET_DEVICES
+            - NCCL_IB_HCA
+    asserts:
+      - matchRegex:
+          path: data["task_prolog.sh"]
+          pattern: 'for env_file in "/etc/profile.d/90-nccl-network-vars.sh"; do'
+      - matchRegex:
+          path: data["task_prolog.sh"]
+          pattern: 'for env_var in "UCX_NET_DEVICES" "NCCL_IB_HCA"; do'

@@ -832,6 +832,10 @@ slurmScripts:
   epilog.sh: null
   hc_program.sh: null
   pyxis_caching_importer.sh: null
+  taskPrologEnv:
+    enabled: false
+    sourceFiles: []
+    exportVars: []
   # Built-in scripts can be overridden or disabled here
   # Keys must match file names in slurm_scripts/
   builtIn:
