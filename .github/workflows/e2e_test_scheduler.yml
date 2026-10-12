@@ -2,8 +2,8 @@ name: E2E Test Scheduler
 
 on:
   schedule:
-    - cron: '0 0,12 * * *'
-    - cron: '0 2,4,6,8,10,14,16,18,20,22 * * *'
+    - cron: &cpu_schedule '0 0,12 * * *'
+    - cron: &gpu_schedule '0 2,4,6,8,10,14,16,18,20,22 * * *'
   workflow_dispatch:  # Allow manual trigger for testing
 
 permissions:
@@ -29,6 +29,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           E2E_CONFIG: ${{ vars.E2E_CONFIG }}
           SCHEDULE: ${{ github.event.schedule }}
+          CPU_SCHEDULE: *cpu_schedule
+          GPU_SCHEDULE: *gpu_schedule
         shell: bash
         run: |
           if [[ -z "$E2E_CONFIG" ]]; then
@@ -37,10 +39,10 @@ jobs:
           fi
 
           case "$SCHEDULE" in
-            '0 0,12 * * *')
+            "$CPU_SCHEDULE")
               PROFILE='@auto-cpu'
               ;;
-            '0 2,4,6,8,10,14,16,18,20,22 * * *')
+            "$GPU_SCHEDULE")
               PROFILE='@auto-gpu'
               ;;
             '')
