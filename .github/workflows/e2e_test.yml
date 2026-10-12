@@ -21,10 +21,11 @@ on:
       profile:
         description: "Profile name or @label, see E2E_CONFIG"
         required: false
-        default: "@auto-select"
+        default: "@auto-gpu"
         type: choice
         options:
-          - "@auto-select"
+          - "@auto-gpu"
+          - "@auto-cpu"
           - MAN_H100
           - MAN_H200
           - KCS_B200
