@@ -301,6 +301,9 @@ common Kubernetes, Slurm, and worker primitives:
 - `SbatchJob`, `SbatchOptions`, `ShellQuote`, `BashLC`, and `WorkerNames`.
 - `WaitForWithJobAlive` and `AnnotateWithJobLog` for polling while a Slurm job
   is still alive and attaching useful job logs to failures.
+- `WaitForInstanceRemoval` and `WaitForUsableReplacement` for checking that a
+  worker's old Compute instance disappears and its Slurm node becomes usable
+  on a different instance.
 
 Concrete public Soperator step structs are intentionally internal. Reuse shared
 steps through `acceptance.SharedStepRegistrar()` and add caller-specific steps
