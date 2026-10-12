@@ -14,8 +14,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux \
     go build -trimpath -ldflags='-s -w' -o soperator-docker-proxy ./cmd/soperator-docker-proxy
 
-# https://github.com/nebius/ml-containers/pull/111
-FROM cr.nebius.cloud/ml-containers/neubuntu:noble-20261007141033 AS worker_pam_builder
+# https://github.com/nebius/ml-containers/pull/112
+FROM cr.nebius.cloud/ml-containers/neubuntu:noble-20261012080917 AS worker_pam_builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
