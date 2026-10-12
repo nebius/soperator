@@ -27,7 +27,10 @@ Gather enough information to answer:
 - Which action should the scenario perform, and what observations prove that it
   worked?
 - Should the scenario be part of the essential suite?
-- What cluster state will the scenario mutate? Which mutations must be restored?
+- What cluster state will the scenario mutate? For each persistent mutation,
+  could the resulting state affect later scenarios or a rerun in any way, harm
+  cluster health, consume resources, or incur cost? Which mutations therefore
+  require cleanup?
 - What timing, stability, and diagnostic requirements are known?
 
 If material requirements are missing or conflicting, ask the user instead of
@@ -56,7 +59,9 @@ again.
   Helm, or integration test. Keep kubectl, Slurm command syntax, parsing,
   retries, and other implementation details in Go steps.
 - Keep scenarios independent. Do not rely on scenario execution order or state
-  left by another scenario.
+  left by another scenario. Independence does not require reversing every
+  successful product operation: use the cleanup criteria below to decide
+  whether its resulting state may safely remain.
 - Reuse an existing step only when its wording and semantics mean exactly the
   same thing. Prefer a new precise step to broadening an existing one until its
   behavior becomes surprising.
@@ -176,16 +181,35 @@ after each scenario. It must be cheap and idempotent. Always reset in-memory
 scenario state. An empty `CleanupAndReset` is correct for a stateless family
 that owns no external state requiring cleanup.
 
-Clean up external state when leaving it behind could affect another scenario or
-rerun, consume scarce or billable resources, leave a disruptive process or
-job, or keep shared cluster configuration changed. Record the original value
-before a mutation so it can be restored after partial execution.
+Clean up external state when leaving it behind could:
 
-Do not add complicated cleanup solely to remove harmless leftovers that cannot
-affect later acceptance tests, reruns, cluster operation, or cost. In that case,
-less code and fewer cleanup failure modes are preferable. When cleanup is
-best-effort, log failures with enough resource identifiers to handle them
-manually; cleanup must not replace the scenario's original failure.
+- affect later scenarios in any way, including their setup, behavior, outcome,
+  duration, or reliability;
+- affect a rerun of the same scenario;
+- leave the cluster degraded, for example with a broken, drained, cordoned, or
+  unready node;
+- leave a disruptive process, job, or temporary resource running;
+- consume scarce or billable resources; or
+- leave shared configuration in a state that is not a healthy, supported
+  baseline for the rest of the suite.
+
+When cleanup is required, record the original value before the mutation so it
+can also be restored after partial execution.
+
+Do not restore state merely because the scenario changed it. A successful
+product operation may leave the cluster in a new healthy and supported steady
+state when the scenario can run first, later scenarios and reruns are unaffected
+by the resulting state, and the remaining state has no operational or cost
+impact. For example, a node-group update that intentionally restarts or
+recreates workers does not need to be reversed if the resulting workers are
+healthy and compatible with the rest of the suite. Reversing it would only
+repeat an expensive disruption. In contrast, a node deliberately broken,
+drained, or cordoned for a test must be repaired and returned to service.
+
+Keep cleanup cheap and idempotent. Do not add complicated cleanup for harmless
+state that satisfies the criteria above. When cleanup is best-effort, log
+failures with enough resource identifiers to handle them manually; cleanup
+must not replace the scenario's original failure.
 
 If a scenario produces an artifact that should survive the run, such as a
 report, profile, dump, or substantial command output, obtain its assigned paths
