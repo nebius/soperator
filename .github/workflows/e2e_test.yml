@@ -26,8 +26,8 @@ on:
         default: "main"
         type: string
       # Keep the options in sync with the profiles and labels in E2E_CONFIG.
-      # The default is what scheduler dispatches resolve with too — they omit
-      # this input, and the code refuses an empty profile rather than assuming one.
+      # The scheduler passes this input explicitly. The default is used by other
+      # callers that omit it, and the code refuses an empty profile.
       profile:
         description: "Profile name or @label, see E2E_CONFIG"
         required: false
