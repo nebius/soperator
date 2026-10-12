@@ -10,11 +10,23 @@ spec:
     matchLabels:
       app.kubernetes.io/name: sconfigcontroller-metrics
   endpoints:
-    - port: http-metrics
+    - port: https-metrics
       path: /metrics
-      scheme: http
+      scheme: https
       interval: {{ .Values.sConfigController.serviceMonitor.interval }}
       scrapeTimeout: {{ .Values.sConfigController.serviceMonitor.scrapeTimeout }}
+      tlsConfig:
+        insecureSkipVerify: true
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      relabelings:
+        {{- /*
+        Static component label identifying the scraping process.
+        The job label is dropped on the public remote-write, so dashboards use component + controller instead.
+        One sconfigcontroller runs per SlurmCluster; the namespace label separates them.
+        */}}
+        - action: replace
+          targetLabel: component
+          replacement: sconfigcontroller
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}

@@ -11,6 +11,23 @@ tests:
           path: spec.maintenance
           value: none
 
+  - it: should enable pod name prefixes by default
+    set:
+      clusterName: test-cluster
+    asserts:
+      - equal:
+          path: spec.podNamePrefix
+          value: enabled
+
+  - it: should allow pod name prefixes to be disabled
+    set:
+      clusterName: test-cluster
+      podNamePrefix: disabled
+    asserts:
+      - equal:
+          path: spec.podNamePrefix
+          value: disabled
+
   # Test slurmConfig default values
   - it: should set slurmConfig default values
     set:
@@ -24,10 +41,13 @@ tests:
           value: 4
       - equal:
           path: spec.slurmConfig.completeWait
-          value: 5
+          value: 0
       - equal:
           path: spec.slurmConfig.prolog
           value: "/opt/slurm_scripts/prolog.sh"
+      - equal:
+          path: spec.slurmConfig.taskProlog
+          value: "/opt/slurm_scripts/task_prolog.sh"
       - equal:
           path: spec.slurmConfig.epilog
           value: "/opt/slurm_scripts/epilog.sh"
@@ -36,21 +56,35 @@ tests:
           value: ""
       - equal:
           path: spec.slurmConfig.maxJobCount
-          value: 20000
+          value: 100000
       - equal:
           path: spec.slurmConfig.minJobAge
-          value: 28800
+          value: 600
       - equal:
           path: spec.slurmConfig.messageTimeout
           value: 60
       - equal:
-          path: spec.slurmConfig.topologyPlugin
-          value: "topology/tree"
-      - equal:
           path: spec.slurmConfig.topologyParam
           value: "SwitchAsNodeRank"
 
-  # Test mpiConfig default values  
+  - it: should preserve explicit Slurm scheduling and retention values
+    set:
+      clusterName: test-cluster
+      slurmConfig.completeWait: 5
+      slurmConfig.maxJobCount: 20000
+      slurmConfig.minJobAge: 0
+    asserts:
+      - equal:
+          path: spec.slurmConfig.completeWait
+          value: 5
+      - equal:
+          path: spec.slurmConfig.maxJobCount
+          value: 20000
+      - equal:
+          path: spec.slurmConfig.minJobAge
+          value: 0
+
+  # Test mpiConfig default values
   - it: should set mpiConfig default values
     set:
       clusterName: test-cluster
@@ -69,6 +103,9 @@ tests:
       - equal:
           path: spec.plugStackConfig.pyxis.required
           value: true
+      - equal:
+          path: spec.plugStackConfig.pyxis.useSquashfuse
+          value: false
       - equal:
           path: spec.plugStackConfig.pyxis.importerPath
           value: "/opt/slurm_scripts/pyxis_caching_importer.sh"
@@ -89,7 +126,7 @@ tests:
           value: false
       - equal:
           path: spec.plugStackConfig.ncclDebug.outputDirectory
-          value: "/opt/soperator-outputs/nccl_logs"
+          value: "/opt/soperator-outputs/local/nccl_logs"
       - equal:
           path: spec.plugStackConfig.customPlugins
           value: []
@@ -140,7 +177,7 @@ tests:
           value: "CPU,Mem,Node,VMem,Gres/gpu"
       - equal:
           path: spec.slurmNodes.accounting.slurmConfig.jobAcctGatherType
-          value: "jobacct_gather/cgroup"
+          value: "jobacct_gather/none"
       - equal:
           path: spec.slurmNodes.accounting.slurmConfig.jobAcctGatherFrequency
           value: 0
@@ -186,6 +223,15 @@ tests:
       - equal:
           path: spec.slurmNodes.exporter.collectionInterval
           value: "30s"
+      - equal:
+          path: spec.slurmNodes.exporter.maxCollectorInflight
+          value: 1
+      - equal:
+          path: spec.slurmNodes.exporter.jobSource
+          value: "controller"
+      - equal:
+          path: spec.slurmNodes.exporter.accountingJobsLookback
+          value: "1h"
       - equal:
           path: spec.slurmNodes.exporter.podMonitorConfig.jobLabel
           value: "slurm-exporter"
@@ -235,12 +281,3 @@ tests:
       - equal:
           path: spec.sConfigController.reconfigureWaitTimeout
           value: "1m"
-
-  # Test useDefaultAppArmorProfile default value
-  - it: should set useDefaultAppArmorProfile default value
-    set:
-      clusterName: test-cluster
-    asserts:
-      - equal:
-          path: spec.useDefaultAppArmorProfile
-          value: false

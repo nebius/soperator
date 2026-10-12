@@ -23,10 +23,10 @@
       {
         "datasource": {
           "type": "prometheus",
-          "uid": "VictoriaMetrics"
+          "uid": "${datasource}"
         },
         "enable": false,
-        "expr": "group by (node, pod) (\n  changes(\n      sum without (uid, pod_ip)(\n          kube_pod_info{pod=~\"worker-.*\", node!=\"\"}\n      )\n  ) > 0\n  and on (pod) \n  sum by (pod)(\n      kube_pod_info{pod=~\"worker-.*\", node!=\"\"}\n  )\n)",
+        "expr": "group by (node, pod) (\n  changes(\n      sum without (uid, pod_ip)(\n          kube_pod_info{cluster=~\"$cluster\", pod=~\"worker-.*\", node!=\"\"}\n      )\n  ) > 0\n  and on (pod) \n  sum by (pod)(\n      kube_pod_info{cluster=~\"$cluster\", pod=~\"worker-.*\", node!=\"\"}\n  )\n)",
         "filter": {
           "exclude": true,
           "ids": [324]
@@ -49,7 +49,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -95,6 +95,7 @@
           "showLegend": false
         },
         "mergeValues": true,
+        "perPage": 20,
         "rowHeight": 1,
         "showValue": "never",
         "tooltip": {
@@ -107,10 +108,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "group by (node) (kube_pod_info{pod=\"$worker\",node!=\"\"})",
+          "expr": "group by (node) (kube_pod_info{cluster=~\"$cluster\", pod=\"$worker\",node!=\"\"})",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -123,7 +124,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -182,10 +183,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_SM_CLOCK{Hostname=~\"$node\"}*1000000)",
+          "expr": "avg(DCGM_FI_DEV_SM_CLOCK{cluster=~\"$cluster\", Hostname=~\"$node\"}*1000000)",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -200,7 +202,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -259,10 +261,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_MEM_CLOCK{Hostname=~\"$node\"}*1000000)",
+          "expr": "avg(DCGM_FI_DEV_MEM_CLOCK{cluster=~\"$cluster\", Hostname=~\"$node\"}*1000000)",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -290,7 +293,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -372,10 +375,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (gpu) (\n  DCGM_FI_DEV_FB_USED{Hostname=~\"$node\", exported_pod=~\"$worker\"}/(DCGM_FI_DEV_FB_USED{Hostname=~\"$node\", exported_pod=~\"$worker\"}+DCGM_FI_DEV_FB_FREE{Hostname=~\"$node\", exported_pod=~\"$worker\"})\n)",
+          "expr": "sum by (gpu) (\n  DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"}/(DCGM_FI_DEV_FB_USED{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"}+DCGM_FI_DEV_FB_FREE{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"})\n)",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -391,7 +395,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -474,10 +478,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(gpu) (DCGM_FI_DEV_GPU_UTIL{Hostname=~\"$node\", exported_pod=~\"$worker\"})",
+          "expr": "sum by(gpu) (DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -493,7 +498,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -575,10 +580,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "1e6*sum(DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL{Hostname=~\"$node\", exported_pod=~\"$worker\"})",
+          "expr": "1e6*sum(DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -594,7 +600,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -677,10 +683,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(gpu) (DCGM_FI_DEV_MEM_COPY_UTIL{Hostname=~\"$node\", exported_pod=~\"$worker\"})",
+          "expr": "sum by(gpu) (DCGM_FI_DEV_MEM_COPY_UTIL{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -696,7 +703,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -777,10 +784,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(gpu) (DCGM_FI_DEV_POWER_USAGE{Hostname=~\"$node\", exported_pod=~\"$worker\"})",
+          "expr": "sum by(gpu) (DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -796,7 +804,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -877,10 +885,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(gpu) (DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$node\", exported_pod=~\"$worker\"})",
+          "expr": "sum by(gpu) (DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -896,7 +905,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -990,10 +999,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(DCGM_FI_PROF_PCIE_TX_BYTES{Hostname=~\"$node\", exported_pod=~\"$worker\"})",
+          "expr": "sum(DCGM_FI_PROF_PCIE_TX_BYTES{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1004,10 +1014,11 @@
         },
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(DCGM_FI_PROF_PCIE_RX_BYTES{Hostname=~\"$node\", exported_pod=~\"$worker\"})",
+          "expr": "sum(DCGM_FI_PROF_PCIE_RX_BYTES{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"})",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1022,7 +1033,8 @@
     },
     {
       "datasource": {
-        "uid": "VictoriaMetrics"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1116,10 +1128,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(\n  rate(node_infiniband_port_data_transmitted_bytes_total{instance=~\"$ip\"}[$__interval])\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n)\n",
+          "expr": "sum(\n  rate(node_infiniband_port_data_transmitted_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n)\n",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1130,10 +1143,11 @@
         },
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(\n  rate(node_infiniband_port_data_received_bytes_total{instance=~\"$ip\"}[$__interval])\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
+          "expr": "sum(\n  rate(node_infiniband_port_data_received_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n)",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -1149,7 +1163,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1230,10 +1244,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(gpu) (DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{Hostname=~\"$node\", exported_pod=~\"$worker\"} * 100)",
+          "expr": "sum by(gpu) (DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"} * 100)",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1249,7 +1264,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1330,10 +1345,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(gpu) (DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{Hostname=~\"$node\", exported_pod=~\"$worker\"} * 1979)",
+          "expr": "sum by(gpu) (DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"} * 1979)",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1349,7 +1365,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "VictoriaMetrics"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1430,10 +1446,11 @@
       "targets": [
         {
           "datasource": {
-            "uid": "VictoriaMetrics"
+            "type": "prometheus",
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(gpu) (DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{Hostname=~\"$node\", exported_pod=~\"$worker\"} * 989.7)",
+          "expr": "sum by(gpu) (DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"} * 989.7)",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1459,7 +1476,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -1666,10 +1683,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{instance=~\"$ip\", mode=\"system\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"system\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -1681,10 +1698,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{instance=~\"$ip\", mode=\"user\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"user\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "User - Normal processes executing in user mode",
@@ -1695,10 +1712,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{instance=~\"$ip\", mode=\"nice\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"nice\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Nice - Niced processes executing in user mode",
@@ -1709,10 +1726,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{instance=~\"$ip\", mode=\"iowait\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"iowait\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Iowait - Waiting for I/O to complete",
@@ -1723,10 +1740,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{instance=~\"$ip\", mode=\"irq\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"irq\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Irq - Servicing interrupts",
@@ -1737,10 +1754,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{instance=~\"$ip\", mode=\"softirq\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"softirq\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Softirq - Servicing softirqs",
@@ -1751,10 +1768,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{instance=~\"$ip\", mode=\"steal\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"steal\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Steal - Time spent in other operating systems when running in a virtualized environment",
@@ -1765,10 +1782,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(\n  irate(node_cpu_seconds_total{instance=~\"$ip\", mode=\"idle\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info\n  * on(nodename) group_left(exported_pod) clamp(count by (nodename, hpc_job) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{instance=~\"$ip\"}) by (cpu)))",
+              "expr": "sum(\n  irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"idle\"}[$__rate_interval])\n  * on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n  * on(nodename) group_left() clamp(count by (nodename) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)\n) / scalar(count(count(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}) by (cpu)))",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -1784,7 +1801,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -2171,10 +2188,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "(node_memory_MemTotal_bytes{instance=~\"$ip\"} - node_memory_MemFree_bytes{instance=~\"$ip\"} - node_memory_Buffers_bytes{instance=~\"$ip\"} - node_memory_Cached_bytes{instance=~\"$ip\"} - node_memory_Slab_bytes{instance=~\"$ip\"} - node_memory_PageTables_bytes{instance=~\"$ip\"} - node_memory_SwapCached_bytes{instance=~\"$ip\"})\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "(node_memory_MemTotal_bytes{cluster=~\"$cluster\", instance=~\"$ip\"} - node_memory_MemFree_bytes{cluster=~\"$cluster\", instance=~\"$ip\"} - node_memory_Buffers_bytes{cluster=~\"$cluster\", instance=~\"$ip\"} - node_memory_Cached_bytes{cluster=~\"$cluster\", instance=~\"$ip\"} - node_memory_Slab_bytes{cluster=~\"$cluster\", instance=~\"$ip\"} - node_memory_PageTables_bytes{cluster=~\"$cluster\", instance=~\"$ip\"} - node_memory_SwapCached_bytes{cluster=~\"$cluster\", instance=~\"$ip\"})\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -2186,9 +2203,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_PageTables_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_PageTables_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -2199,9 +2216,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_SwapCached_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_SwapCached_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "SwapCache - Memory that keeps track of pages that have been fetched from swap but not yet been modified",
@@ -2211,9 +2228,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Slab_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Slab_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -2224,9 +2241,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Cached_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Cached_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -2237,9 +2254,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Buffers_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Buffers_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -2250,9 +2267,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_MemFree_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_MemFree_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -2263,9 +2280,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "(node_memory_SwapTotal_bytes{instance=~\"$ip\"} - node_memory_SwapFree_bytes{instance=~\"$ip\"})\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "(node_memory_SwapTotal_bytes{cluster=~\"$cluster\", instance=~\"$ip\"} - node_memory_SwapFree_bytes{cluster=~\"$cluster\", instance=~\"$ip\"})\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -2276,9 +2293,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_HardwareCorrupted_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_HardwareCorrupted_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -2293,7 +2310,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -2449,9 +2466,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_network_receive_bytes_total{instance=~\"$ip\"}[$__rate_interval])*8\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_network_receive_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])*8\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{device}} - Receive",
@@ -2461,9 +2478,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_network_transmit_bytes_total{instance=~\"$ip\"}[$__rate_interval])*8\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_network_transmit_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])*8\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{device}} - Transmit",
@@ -2477,7 +2494,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -2562,10 +2579,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "(node_filesystem_size_bytes{instance=~\"$ip\",device!~'rootfs'} - node_filesystem_avail_bytes{instance=~\"$ip\",device!~'rootfs'})\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "(node_filesystem_size_bytes{cluster=~\"$cluster\", instance=~\"$ip\",device!~'rootfs'} - node_filesystem_avail_bytes{cluster=~\"$cluster\", instance=~\"$ip\",device!~'rootfs'})\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{mountpoint}}",
@@ -2580,7 +2597,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -2992,9 +3009,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_reads_completed_total{instance=~\"$ip\",device=~\"$diskdevices\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_reads_completed_total{cluster=~\"$cluster\", instance=~\"$ip\",device=~\"$diskdevices\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "intervalFactor": 4,
               "legendFormat": "{{device}} - Reads completed",
               "refId": "A",
@@ -3003,9 +3020,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_writes_completed_total{instance=~\"$ip\",device=~\"$diskdevices\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_writes_completed_total{cluster=~\"$cluster\", instance=~\"$ip\",device=~\"$diskdevices\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "intervalFactor": 1,
               "legendFormat": "{{device}} - Writes completed",
               "refId": "B",
@@ -3018,7 +3035,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -3217,9 +3234,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_read_bytes_total{instance=~\"$ip\",device=~\"$diskdevices\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_read_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\",device=~\"$diskdevices\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -3230,9 +3247,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_written_bytes_total{instance=~\"$ip\",device=~\"$diskdevices\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_written_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\",device=~\"$diskdevices\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -3247,7 +3264,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -3360,9 +3377,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_io_time_seconds_total{instance=~\"$ip\",device=~\"$diskdevices\"} [$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_io_time_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\",device=~\"$diskdevices\"} [$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -3378,7 +3395,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3492,10 +3509,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by(instance) (irate(node_cpu_guest_seconds_total{instance=~\"$ip\", mode=\"user\"}[1m])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{instance=~\"$ip\"}[1m])))",
+              "expr": "sum by(instance) (irate(node_cpu_guest_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"user\"}[1m])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[1m])))",
               "hide": false,
               "legendFormat": "Guest - Time spent running a virtual CPU for a guest operating system",
               "range": true,
@@ -3504,10 +3521,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by(instance) (irate(node_cpu_guest_seconds_total{instance=~\"$ip\", mode=\"nice\"}[1m])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{instance=~\"$ip\"}[1m])))",
+              "expr": "sum by(instance) (irate(node_cpu_guest_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\", mode=\"nice\"}[1m])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[1m])))",
               "hide": false,
               "legendFormat": "GuestNice - Time spent running a niced guest  (virtual CPU for guest operating system)",
               "range": true,
@@ -3534,7 +3551,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -3875,9 +3892,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Inactive_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Inactive_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Inactive - Memory which has been less recently used.  It is more eligible to be reclaimed for other purposes",
@@ -3887,9 +3904,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Active_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Active_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Active - Memory that has been used more recently and usually not reclaimed unless absolutely necessary",
@@ -3903,7 +3920,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -4263,9 +4280,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Committed_AS_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Committed_AS_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Committed_AS - Amount of memory presently allocated on the system",
@@ -4275,9 +4292,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_CommitLimit_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_CommitLimit_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "CommitLimit - Amount of  memory currently available to be allocated on the system",
@@ -4291,7 +4308,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -4632,9 +4649,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Inactive_file_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Inactive_file_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -4645,9 +4662,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Inactive_anon_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Inactive_anon_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -4658,9 +4675,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Active_file_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Active_file_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -4671,9 +4688,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Active_anon_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Active_anon_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -4688,7 +4705,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -5058,9 +5075,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Writeback_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Writeback_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Writeback - Memory which is actively being written back to disk",
@@ -5070,9 +5087,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_WritebackTmp_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_WritebackTmp_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "WritebackTmp - Memory used by FUSE for temporary writeback buffers",
@@ -5082,9 +5099,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Dirty_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Dirty_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Dirty - Memory which is waiting to get written back to the disk",
@@ -5098,7 +5115,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -5463,9 +5480,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Mapped_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Mapped_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Mapped - Used memory in mapped pages files which have been mapped, such as libraries",
@@ -5475,9 +5492,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Shmem_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Shmem_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Shmem - Used shared memory (shared between several processes, thus including RAM disks)",
@@ -5487,9 +5504,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_ShmemHugePages_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_ShmemHugePages_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -5500,9 +5517,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_ShmemPmdMapped_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_ShmemPmdMapped_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -5517,7 +5534,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -5858,9 +5875,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_KernelStack_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_KernelStack_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "KernelStack - Kernel memory stack. This is not reclaimable",
@@ -5870,9 +5887,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_Percpu_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_Percpu_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -5887,7 +5904,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -6242,9 +6259,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_VmallocChunk_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_VmallocChunk_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -6255,9 +6272,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_VmallocTotal_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_VmallocTotal_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -6268,9 +6285,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_VmallocUsed_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_VmallocUsed_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -6285,7 +6302,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -6652,9 +6669,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_AnonHugePages_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_AnonHugePages_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "AnonHugePages - Memory in anonymous huge pages",
@@ -6664,9 +6681,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_AnonPages_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_AnonPages_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "AnonPages - Memory in user pages not backed by files",
@@ -6680,7 +6697,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -7050,9 +7067,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_memory_NFS_Unstable_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_memory_NFS_Unstable_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "NFS Unstable - Memory in NFS pages sent to the server, but not yet committed to the storage",
@@ -7066,7 +7083,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -7436,9 +7453,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_vmstat_oom_kill{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_vmstat_oom_kill{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -7453,7 +7470,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -7549,9 +7566,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_vmstat_pgpgin{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_vmstat_pgpgin{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Pagesin - Page in operations",
@@ -7561,9 +7578,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_vmstat_pgpgout{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_vmstat_pgpgout{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Pagesout - Page out operations",
@@ -7577,7 +7594,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -7937,9 +7954,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_vmstat_pgfault{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_vmstat_pgfault{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Pgfault - Page major and minor fault operations",
@@ -7949,9 +7966,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_vmstat_pgmajfault{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_vmstat_pgmajfault{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Pgmajfault - Major page fault operations",
@@ -7961,9 +7978,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_vmstat_pgfault{instance=~\"$ip\"}[$__rate_interval])  - irate(node_vmstat_pgmajfault{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_vmstat_pgfault{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])  - irate(node_vmstat_pgmajfault{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Pgminfault - Minor page fault operations",
@@ -7991,7 +8008,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "The number (after merges) of I/O requests completed per second for the device",
           "fieldConfig": {
@@ -8388,9 +8405,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_reads_completed_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_reads_completed_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "intervalFactor": 4,
               "legendFormat": "{{device}} - Reads completed",
               "refId": "A",
@@ -8399,9 +8416,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_writes_completed_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_writes_completed_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "intervalFactor": 1,
               "legendFormat": "{{device}} - Writes completed",
               "refId": "B",
@@ -8414,7 +8431,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "The number of bytes read from or written to the device per second",
           "fieldConfig": {
@@ -8811,9 +8828,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_read_bytes_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_read_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 4,
               "legendFormat": "{{device}} - Read bytes",
@@ -8823,9 +8840,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_written_bytes_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_written_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{device}} - Written bytes",
@@ -8839,7 +8856,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "The average time for requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.",
           "fieldConfig": {
@@ -9236,9 +9253,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_read_time_seconds_total{instance=~\"$ip\"}[$__rate_interval]) / irate(node_disk_reads_completed_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_read_time_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval]) / irate(node_disk_reads_completed_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "hide": false,
               "interval": "",
               "intervalFactor": 4,
@@ -9249,9 +9266,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_write_time_seconds_total{instance=~\"$ip\"}[$__rate_interval]) / irate(node_disk_writes_completed_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_write_time_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval]) / irate(node_disk_writes_completed_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "hide": false,
               "interval": "",
               "intervalFactor": 1,
@@ -9266,7 +9283,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "The average queue length of the requests that were issued to the device",
           "fieldConfig": {
@@ -9652,9 +9669,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_io_time_weighted_seconds_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_io_time_weighted_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "interval": "",
               "intervalFactor": 4,
               "legendFormat": "{{device}}",
@@ -9668,7 +9685,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "The number of read and write requests merged per second that were queued to the device",
           "fieldConfig": {
@@ -10065,9 +10082,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_reads_merged_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_reads_merged_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "intervalFactor": 1,
               "legendFormat": "{{device}} - Read merged",
               "refId": "A",
@@ -10076,9 +10093,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_writes_merged_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_writes_merged_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "intervalFactor": 1,
               "legendFormat": "{{device}} - Write merged",
               "refId": "B",
@@ -10091,7 +10108,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "Percentage of elapsed time during which I/O requests were issued to the device (bandwidth utilization for the device). Device saturation occurs when this value is close to 100% for devices serving requests serially.  But for devices  serving requests in parallel, such as RAID arrays and modern SSDs, this number does not reflect their performance limits.",
           "fieldConfig": {
@@ -10477,9 +10494,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_io_time_seconds_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_io_time_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "interval": "",
               "intervalFactor": 4,
               "legendFormat": "{{device}} - IO",
@@ -10489,9 +10506,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_discard_time_seconds_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_discard_time_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "interval": "",
               "intervalFactor": 4,
               "legendFormat": "{{device}} - discard",
@@ -10505,7 +10522,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "The number of outstanding requests at the instant the sample was taken. Incremented as requests are given to appropriate struct request_queue and decremented as they finish.",
           "fieldConfig": {
@@ -10891,9 +10908,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_disk_io_now{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_disk_io_now{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "interval": "",
               "intervalFactor": 4,
               "legendFormat": "{{device}} - IO now",
@@ -10907,7 +10924,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -11292,9 +11309,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_discards_completed_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_discards_completed_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "interval": "",
               "intervalFactor": 4,
               "legendFormat": "{{device}} - Discards completed",
@@ -11304,9 +11321,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_disk_discards_merged_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_disk_discards_merged_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "interval": "",
               "intervalFactor": 1,
               "legendFormat": "{{device}} - Discards merged",
@@ -11334,7 +11351,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -11419,9 +11436,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_filesystem_avail_bytes{instance=~\"$ip\",device!~'rootfs'}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_filesystem_avail_bytes{cluster=~\"$cluster\", instance=~\"$ip\",device!~'rootfs'}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -11433,9 +11450,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_filesystem_free_bytes{instance=~\"$ip\",device!~'rootfs'}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_filesystem_free_bytes{cluster=~\"$cluster\", instance=~\"$ip\",device!~'rootfs'}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": true,
               "intervalFactor": 1,
@@ -11446,9 +11463,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_filesystem_size_bytes{instance=~\"$ip\",device!~'rootfs'}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_filesystem_size_bytes{cluster=~\"$cluster\", instance=~\"$ip\",device!~'rootfs'}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": true,
               "intervalFactor": 1,
@@ -11463,7 +11480,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -11548,9 +11565,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_filesystem_files_free{instance=~\"$ip\",device!~'rootfs'}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_filesystem_files_free{cluster=~\"$cluster\", instance=~\"$ip\",device!~'rootfs'}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -11565,7 +11582,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -11650,9 +11667,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_filefd_maximum{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_filefd_maximum{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 4,
               "legendFormat": "Max open files",
@@ -11662,9 +11679,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_filefd_allocated{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_filefd_allocated{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Open files",
@@ -11678,7 +11695,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -11763,9 +11780,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_filesystem_files{instance=~\"$ip\",device!~'rootfs'}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_filesystem_files{cluster=~\"$cluster\", instance=~\"$ip\",device!~'rootfs'}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -11780,7 +11797,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -11882,9 +11899,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_filesystem_readonly{instance=~\"$ip\",device!~'rootfs'}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_filesystem_readonly{cluster=~\"$cluster\", instance=~\"$ip\",device!~'rootfs'}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{mountpoint}} - ReadOnly",
@@ -11894,9 +11911,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_filesystem_device_error{instance=~\"$ip\",device!~'rootfs',fstype!~'tmpfs'}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_filesystem_device_error{cluster=~\"$cluster\", instance=~\"$ip\",device!~'rootfs',fstype!~'tmpfs'}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -11925,7 +11942,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -12082,9 +12099,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_network_receive_packets_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_network_receive_packets_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -12095,9 +12112,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_network_transmit_packets_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_network_transmit_packets_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -12112,7 +12129,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -12209,9 +12226,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_network_receive_errs_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_network_receive_errs_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{device}} - Receive errors",
@@ -12221,9 +12238,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_network_transmit_errs_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_network_transmit_errs_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{device}} - Transmit errors",
@@ -12237,7 +12254,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -12334,9 +12351,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_network_receive_drop_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_network_receive_drop_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{device}} - Receive drop",
@@ -12346,9 +12363,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_network_transmit_drop_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_network_transmit_drop_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{device}} - Transmit drop",
@@ -12362,7 +12379,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -12466,9 +12483,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_nf_conntrack_entries{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_nf_conntrack_entries{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "NF conntrack entries",
@@ -12478,9 +12495,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_nf_conntrack_entries_limit{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_nf_conntrack_entries_limit{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "NF conntrack limit",
@@ -12494,7 +12511,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -12579,9 +12596,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_network_speed_bytes{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_network_speed_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{ device }} - Speed",
@@ -12595,7 +12612,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -12679,9 +12696,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_network_up{operstate=\"up\",instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_network_up{cluster=~\"$cluster\", operstate=\"up\",instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{interface}} - Operational state UP",
@@ -12691,9 +12708,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_network_carrier{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_network_carrier{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "instant": false,
               "legendFormat": "{{device}} - Physical link state",
@@ -12720,7 +12737,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "$worker\n\n$node\n\n$ip",
           "fieldConfig": {
@@ -12829,9 +12846,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Udp_InDatagrams{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Udp_InDatagrams{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -12842,9 +12859,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Udp_OutDatagrams{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Udp_OutDatagrams{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -12859,7 +12876,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -12942,9 +12959,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Udp_InErrors{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Udp_InErrors{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -12955,9 +12972,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Udp_NoPorts{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Udp_NoPorts{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -12968,9 +12985,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_UdpLite_InErrors{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_UdpLite_InErrors{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "interval": "",
               "legendFormat": "InErrors Lite - UDPLite Datagrams that could not be delivered to an application",
               "refId": "C"
@@ -12978,9 +12995,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Udp_RcvbufErrors{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Udp_RcvbufErrors{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -12991,9 +13008,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Udp_SndbufErrors{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Udp_SndbufErrors{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -13008,7 +13025,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -13116,9 +13133,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Tcp_InSegs{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Tcp_InSegs{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -13130,9 +13147,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Tcp_OutSegs{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Tcp_OutSegs{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -13147,7 +13164,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -13232,9 +13249,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_TcpExt_ListenOverflows{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_TcpExt_ListenOverflows{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -13246,9 +13263,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_TcpExt_ListenDrops{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_TcpExt_ListenDrops{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -13260,9 +13277,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_TcpExt_TCPSynRetrans{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -13273,9 +13290,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Tcp_RetransSegs{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Tcp_RetransSegs{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "interval": "",
               "legendFormat": "RetransSegs - Segments retransmitted - that is, the number of TCP segments transmitted containing one or more previously transmitted octets",
               "refId": "D"
@@ -13283,9 +13300,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Tcp_InErrs{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Tcp_InErrs{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "interval": "",
               "legendFormat": "InErrs - Segments received in error (e.g., bad TCP checksums)",
               "refId": "E"
@@ -13293,9 +13310,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Tcp_OutRsts{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Tcp_OutRsts{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "interval": "",
               "legendFormat": "OutRsts - Segments sent with RST flag",
               "refId": "F"
@@ -13303,10 +13320,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_TCPRcvQDrop{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_TcpExt_TCPRcvQDrop{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "hide": false,
               "interval": "",
               "legendFormat": "TCPRcvQDrop - Packets meant to be queued in rcv queue but dropped because socket rcvbuf limit hit",
@@ -13316,10 +13333,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(node_netstat_TcpExt_TCPOFOQueue{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_TcpExt_TCPOFOQueue{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "hide": false,
               "interval": "",
               "legendFormat": "TCPOFOQueue - TCP layer receives an out of order packet and has enough memory to queue it",
@@ -13333,7 +13350,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -13437,9 +13454,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_netstat_Tcp_CurrEstab{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_netstat_Tcp_CurrEstab{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -13451,9 +13468,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_netstat_Tcp_MaxConn{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_netstat_Tcp_MaxConn{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -13469,7 +13486,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -13553,9 +13570,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Tcp_ActiveOpens{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Tcp_ActiveOpens{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -13566,9 +13583,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_netstat_Tcp_PassiveOpens{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_netstat_Tcp_PassiveOpens{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -13597,7 +13614,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -13681,9 +13698,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_context_switches_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_context_switches_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Context switches",
@@ -13693,9 +13710,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_intr_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_intr_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -13710,7 +13727,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -13794,9 +13811,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_load1{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_load1{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 4,
               "legendFormat": "Load 1m",
@@ -13806,9 +13823,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_load5{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_load5{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 4,
               "legendFormat": "Load 5m",
@@ -13818,9 +13835,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_load15{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_load15{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 4,
               "legendFormat": "Load 15m",
@@ -13834,7 +13851,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -13918,9 +13935,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_entropy_available_bits{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_entropy_available_bits{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Entropy available to random number generators",
@@ -13934,7 +13951,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "https://docs.kernel.org/accounting/psi.html",
           "fieldConfig": {
@@ -14080,10 +14097,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(node_pressure_cpu_waiting_seconds_total{instance=~\"$ip\"}[$__rate_interval])",
+              "expr": "rate(node_pressure_cpu_waiting_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "CPU some",
@@ -14094,10 +14111,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(node_pressure_memory_waiting_seconds_total{instance=~\"$ip\"}[$__rate_interval])",
+              "expr": "rate(node_pressure_memory_waiting_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -14109,10 +14126,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(node_pressure_memory_stalled_seconds_total{instance=~\"$ip\"}[$__rate_interval])",
+              "expr": "rate(node_pressure_memory_stalled_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -14124,10 +14141,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(node_pressure_io_waiting_seconds_total{instance=~\"$ip\"}[$__rate_interval])",
+              "expr": "rate(node_pressure_io_waiting_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -14139,10 +14156,10 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(node_pressure_io_stalled_seconds_total{instance=~\"$ip\"}[$__rate_interval])",
+              "expr": "rate(node_pressure_io_stalled_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -14158,7 +14175,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -14262,9 +14279,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "process_max_fds{instance=~\"$ip\"}",
+              "expr": "process_max_fds{cluster=~\"$cluster\", instance=~\"$ip\"}",
               "interval": "",
               "intervalFactor": 1,
               "legendFormat": "Maximum open file descriptors",
@@ -14274,9 +14291,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "process_open_fds{instance=~\"$ip\"}",
+              "expr": "process_open_fds{cluster=~\"$cluster\", instance=~\"$ip\"}",
               "interval": "",
               "intervalFactor": 1,
               "legendFormat": "Open file descriptors",
@@ -14290,7 +14307,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -14373,9 +14390,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(node_schedstat_timeslices_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(node_schedstat_timeslices_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -14390,7 +14407,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -14473,9 +14490,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "irate(process_cpu_seconds_total{instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "irate(process_cpu_seconds_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__rate_interval])\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -14504,7 +14521,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -14604,9 +14621,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_timex_estimated_error_seconds{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_timex_estimated_error_seconds{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -14618,9 +14635,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_timex_offset_seconds{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_timex_offset_seconds{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -14632,9 +14649,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_timex_maxerror_seconds{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_timex_maxerror_seconds{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -14650,7 +14667,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -14734,9 +14751,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_timex_loop_time_constant{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_timex_loop_time_constant{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -14751,7 +14768,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -14851,9 +14868,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_timex_sync_status{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_timex_sync_status{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -14864,9 +14881,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_timex_frequency_adjustment_ratio{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_timex_frequency_adjustment_ratio{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -14881,7 +14898,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "VictoriaMetrics"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -14965,9 +14982,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_timex_tick_seconds{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_timex_tick_seconds{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -14978,9 +14995,9 @@
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "VictoriaMetrics"
+                "uid": "${datasource}"
               },
-              "expr": "node_timex_tai_offset_seconds{instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
+              "expr": "node_timex_tai_offset_seconds{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(exported_pod) clamp(count by (nodename, exported_pod) (label_move(DCGM_FI_DEV_GPU_TEMP{cluster=~\"$cluster\", exported_pod=~\"$worker\"}, \"Hostname\", \"nodename\")), 1, 1)",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -15005,14 +15022,72 @@
     "list": [
       {
         "current": {
+          "selected": true,
+          "text": "VictoriaMetrics",
+          "value": "VictoriaMetrics"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "baseFilters": [],
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "filters": [],
+        "hide": 2,
+        "label": "O11y",
+        "name": "o11y",
+        "type": "adhoc"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(node_os_info, cluster)",
+        "hide": 2,
+        "includeAll": true,
+        "label": "Cluster",
+        "multi": false,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(node_os_info, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
           "text": "worker-0",
           "value": "worker-0"
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "VictoriaMetrics"
+          "uid": "${datasource}"
         },
-        "definition": "label_values(kube_pod_info,pod)",
+        "definition": "label_values(kube_pod_info{cluster=~\"$cluster\"},pod)",
         "description": "Select one worker to check it's detailed stats in panels.",
         "includeAll": false,
         "label": "Worker",
@@ -15020,7 +15095,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(kube_pod_info,pod)",
+          "query": "label_values(kube_pod_info{cluster=~\"$cluster\"},pod)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -15034,18 +15109,19 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "VictoriaMetrics"
+          "uid": "${datasource}"
         },
-        "definition": "label_values(kube_pod_info{pod=~\"$worker\"},node)",
+        "definition": "label_values(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"},node)",
         "hide": 2,
         "includeAll": true,
+        "allValue": ".*",
         "label": "node",
         "multi": true,
         "name": "node",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(kube_pod_info{pod=~\"$worker\"},node)",
+          "query": "label_values(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"},node)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -15078,17 +15154,18 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "VictoriaMetrics"
+          "uid": "${datasource}"
         },
-        "definition": "label_values(node_uname_info{nodename=~\"$node\"},instance)",
+        "definition": "label_values(node_uname_info{cluster=~\"$cluster\", nodename=~\"$node\"},instance)",
         "hide": 2,
         "includeAll": true,
+        "allValue": ".*",
         "multi": true,
         "name": "ip",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(node_uname_info{nodename=~\"$node\"},instance)",
+          "query": "label_values(node_uname_info{cluster=~\"$cluster\", nodename=~\"$node\"},instance)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,

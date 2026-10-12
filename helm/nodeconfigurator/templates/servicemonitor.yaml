@@ -18,4 +18,14 @@ spec:
       scheme: http
       interval: {{ .Values.serviceMonitor.interval }}
       scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+      relabelings:
+        {{- /*
+        Static component label identifying the scraping process.
+        The job label is dropped on the public remote-write, so dashboards use component + controller instead.
+        The value is "rebooter", not "nodeconfigurator": only the rebooter binary in this DaemonSet serves /metrics,
+        and "nodeconfigurator" is already the name of the soperator controller that reconciles NodeConfigurator CRs.
+        */}}
+        - action: replace
+          targetLabel: component
+          replacement: rebooter
 {{- end }}

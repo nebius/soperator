@@ -340,8 +340,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 
 					if !isAccountingEnabled {
 						stepLogger.V(1).Info("Removing")
-						deploymentName := naming.BuildDeploymentName(consts.ComponentTypeAccounting)
-						if err = r.Deployment.Cleanup(stepCtx, cluster, deploymentName); err != nil {
+						if err = r.Deployment.Cleanup(stepCtx, cluster, clusterValues.NodeAccounting.Deployment.Name); err != nil {
 							return fmt.Errorf("cleanup accounting Deployment: %w", err)
 						}
 						stepLogger.V(1).Info("Reconciled")
@@ -565,7 +564,7 @@ func (r SlurmClusterReconciler) updateAccountingAvailabilityStatus(
 		return ctrl.Result{}, err
 	}
 	if conditionStatus != metav1.ConditionTrue {
-		return ctrl.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
+		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
 
 	return ctrl.Result{}, nil

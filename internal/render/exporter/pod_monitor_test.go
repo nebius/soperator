@@ -140,3 +140,30 @@ func Test_RenderPodMonitor_WithUserMetricRelabelConfigs(t *testing.T) {
 	assert.Equal(t, "replace", result.Spec.PodMetricsEndpoints[1].MetricRelabelConfigs[1].Action)
 	assert.Equal(t, "custom-regex", result.Spec.PodMetricsEndpoints[1].MetricRelabelConfigs[1].Regex)
 }
+
+func Test_RenderPodMonitor_ComponentLabelOnMonitoringEndpointOnly(t *testing.T) {
+	userRelabel := prometheusv1.RelabelConfig{Action: "labeldrop", Regex: "custom"}
+	slurmExporter := values.SlurmExporter{
+		Enabled: true,
+		PodMonitorConfig: slurmv1.PodMonitorConfig{
+			JobLabel:      "slurm-exporter-test",
+			Interval:      prometheusv1.Duration("1m"),
+			ScrapeTimeout: prometheusv1.Duration("30s"),
+			RelabelConfig: []prometheusv1.RelabelConfig{userRelabel},
+		},
+	}
+
+	result := exporter.RenderPodMonitor(defaultNameCluster, defaultNamespace, slurmExporter)
+
+	// Slurm metrics endpoint keeps only the user relabelings: a static label there would
+	// change the identity of every Slurm series.
+	assert.Equal(t, []prometheusv1.RelabelConfig{userRelabel}, result.Spec.PodMetricsEndpoints[0].RelabelConfigs)
+
+	// Self-monitoring endpoint gets component=exporter first, then the user relabelings.
+	monitoring := result.Spec.PodMetricsEndpoints[1].RelabelConfigs
+	assert.Len(t, monitoring, 2)
+	assert.Equal(t, "replace", monitoring[0].Action)
+	assert.Equal(t, "component", monitoring[0].TargetLabel)
+	assert.Equal(t, ptr.To(consts.Exporter), monitoring[0].Replacement)
+	assert.Equal(t, userRelabel, monitoring[1])
+}

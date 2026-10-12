@@ -24,7 +24,8 @@ Login nodes can be exposed differently to users. The default option is to balanc
 the cluster via SSH, they're directed to a random node.
 
 Various Slurm and system configs that Soperator controls are represented via ConfigMaps. Secrets are used as well for
-storing Munge and SSH server keys.
+storing Munge and SSH server keys. See [`slurm-configuration.md`](slurm-configuration.md) for how Slurm configuration
+is rendered, delivered to the nodes and changed.
 
 While all containers have ephemeral filesystems (changes are lost after node restarts), we use Kubernetes Persistent
 Volumes to keep data around.
@@ -65,6 +66,25 @@ Soperator consists of the following components:
   recommended not to try to write them from scratch. Instead, *derive* your container images from these adding or changing
   things you want.
 
+## Controller Secret cache
+
+When installed using the Helm charts, the operator and `soperatorchecks` exclude Secrets of type
+`helm.sh/release.v1` from their API LIST/WATCH requests and caches by default. These Secrets contain
+Helm release history; application Secrets installed by Helm remain available to controllers.
+
+Set `SLURM_OPERATOR_IGNORED_SECRET_TYPES` on each manager to configure exclusions with a comma-separated
+list, for example `helm.sh/release.v1,example.com/archive`. Whitespace and empty entries are ignored.
+An unset or empty value disables filtering. Changes take effect when the manager restarts.
+
+For Helm installations, set `controllerManager.manager.env.slurmOperatorIgnoredSecretTypes` in
+the `soperator` chart and `checks.manager.env.slurmOperatorIgnoredSecretTypes` in the
+`soperatorchecks` chart. Both default to `"helm.sh/release.v1"`; set both to `""` to disable filtering.
+
+With `--log-level=debug`, each manager logs the ignored types and API field selector at startup,
+or logs that filtering is disabled. Individual excluded Secrets never reach the manager, so there
+are no per-Secret skip logs. Excluded types are unavailable through the cached client; only exclude
+types that controllers do not need.
+
 ## Helm charts
 - **slurm-cluster**. It allows you to create the custom resource representing a Slurm cluster. You can apply it many
   times if you need more than one Slurm cluster. The Slurm cluster is actually configured by values in this chart.
@@ -75,7 +95,7 @@ Soperator consists of the following components:
 - **soperator-activechecks**. This chart is optional. It is used to deploy Kubernetes resources of `kind: ActiveCheck`, which perform active jobs to monitor and validate the state of a Slurm cluster.
 - **soperator-crds**. It deploys the schema of the `SlurmCluster` custom resource, it should always be applied when
   you upgrade the version of Soperator in your cluster.
-- **soperator-dcgm-exporter**. This chart is optional. It is a custom Helm chart with `hpc-jobs-dir` where Slurm stores information about jobs.
+- **soperator-dcgm-exporter**. This chart is optional. It deploys the NVIDIA DCGM exporter with soperator's curated metric set and Slurm-aware relabelings (NVLink instance group and NodeSet labels).
 - **soperator-fluxcd**. This chart is optional. It is an umbrella chart with various components designed for convenient use in a cluster with soperator. It includes `kind: HelmRelease` and `kind: HelmRepository`. This approach was chosen because customizing components through Kustomize is difficult, and Helm dependencies lack flexibility in configuration. Therefore, this umbrella chart was created to deploy HelmReleases with properly configured dependencies.
 - **soperatorchecks**. This chart is optional. It is used to deploy additional controller that runs Slurm and Kubernetes jobs to actively check the state of the Slurm cluster.
 
@@ -131,8 +151,9 @@ As you can see, it's pretty short and doesn't do anything supernatural.
 
 This plugin isn’t bound to Soperator setup and could theoretically work in typical (non-Kubernetes) Slurm installations.
 
-We use a different approach to change the root directory for user-established SSH sessions to Login nodes. We simply use
-OpenSSH’s ChrootDirectory feature.
+SSH sessions on login and worker nodes enter the same jail through a PAM session module. The module creates a private
+mount namespace for each session and uses `pivot_root`, allowing tools such as Enroot to create their own namespaces
+inside the jail.
 
 The jail storage is initially populated at the moment of creating the cluster. It's done by the K8s job "populate-jail"
 that runs only once. It uses [images/populate_jail/](../images/populate_jail) container image. The content this job

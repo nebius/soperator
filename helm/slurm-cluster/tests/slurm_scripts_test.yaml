@@ -1,0 +1,26 @@
+suite: test Slurm scripts configuration
+templates:
+  - slurm-scripts-cm.yaml
+tests:
+  - it: should reject an enabled built-in without a bundled script
+    set:
+      slurmScripts:
+        builtIn:
+          removed_check.sh:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "slurmScripts.builtIn.removed_check.sh is enabled but no bundled script exists; remove this obsolete entry or set customContent"
+
+  - it: should reject an enabled built-in without a bundled check configuration
+    set:
+      slurmScripts:
+        builtIn:
+          removed_check.sh:
+            enabled: true
+            customContent: |-
+              #!/bin/bash
+              exit 0
+    asserts:
+      - failedTemplate:
+          errorMessage: "slurmScripts.builtIn.removed_check.sh is enabled but no bundled check configuration exists; remove this obsolete entry or set customConfig"

@@ -18,15 +18,20 @@ example: `gpu:nvidia_h100_80gb_hbm3:8`.
 Worker nodes register themselves in the controller upon start.
 
 
+### Ephemeral Nodes
+Worker `NodeSet`s can be configured as Slurm `State=CLOUD` capacity and powered on or off through Slurm's
+`ResumeProgram` and `SuspendProgram`. See [Ephemeral Nodes](ephemeral-nodes.md) for the short operational flow.
+
+
 ### Cgroups
 Cgroups V2 are used for limiting access of jobs to resources on a node. All available cgroups are enabled except for the 
 swap space.
 
 
 ### Job Containers
-This solution supports (and pre-installs) Pyxis+enroot containerization plugin. Pulled images are stored on the "jail" 
-shared storage so users don't need to separately pull it on each node. Container filesystems are stored either on tmpfs 
-or node-local volumes.
+This solution supports (and pre-installs) Pyxis+enroot containerization plugin. Pulled images are stored on the "jail"
+shared storage so users don't need to separately pull it on each node. Direct startup from cached SquashFS images with
+an ephemeral overlay can be enabled through `plugStackConfig.pyxis.useSquashfuse`. You can also set `enroot.useDedicatedImageStorage=false` so Enroot uses its default data/runtime paths while the cache uses shared `/var/cache`.
 
 
 ### Client Commands Auto-Completion
@@ -61,14 +66,13 @@ This is only applicable to NVIDIA GPUs.
 The operator performs GPU health checks periodically. If any Slurm node shows an unsatisfactory result, the operator
 “drains” it, which excludes the node from scheduling new jobs on it.
 
-There are two checks at the moment:
-1. **NCCL tests**. Soperator creates a K8s CronJob that schedules a normal job in Slurm. This job performs the 
-`all_reduce_perf` NCCL test and depending on the results either finish successfully, or draining the Slurm node where it
-was executed.
-2. **Nvidia-smi**. We use the Slurm's `HealthCheckProgram` parameter to execute `nvidia-smi` on each node every 30 sec.
-If it completes with a non-zero exit code, the node is drained as well.
-
 When a node is drained Slurm allows already executing jobs to finish, but excludes the node from scheduling other jobs.
+
+
+### Slurm-aware Worker and Node Rollout
+
+NodeSets using `updateStrategy: slurmAwareRollingUpdate` coordinate worker replacement and Kubernetes node drain
+with Slurm so running jobs can finish. See [Worker and node rollout](worker-node-rollout.md) for configuration and behavior.
 
 
 ### Easy Scaling
@@ -76,6 +80,9 @@ This solution allows Slurm to reuse the unique Kubernetes' ability to scale auto
 needs. You can simply change a single value in the YAML manifest, and watch the cluster changes in size.
 
 Node groups of each type (Worker, Login, and Controller) can be changed independently and on the fly.
+
+Login pods also support [CPU-based autoscaling](login-autoscaling.md), with configurable
+replica bounds and no automatic scale-down when CPU utilization falls.
 
 
 ### High Availability
@@ -131,7 +138,7 @@ this information on the dashboards we provide as well.
 
 At the moment, the following information is gathered and can be viewed by users:
 - Logs for all K8s pods + K8s events.
-- Centralized Slurm workload logs: Structured collection of job outputs with automatic categorization.
+- Centralized Slurm workload logs: Structured collection of job outputs with automatic categorization. Outputs are staged on worker boot disks and shipped by a per-node collector, so log traffic never loads the shared filesystem.
 - K8s cluster metrics: node states, stateful set & deployment sizes, etc.
 - K8s node metrics: CPU, memory, network, disk usage, etc.
 - K8s pod resource metrics: resource usage by pods & containers.
