@@ -28,31 +28,70 @@ fi
 {{- with .Values.slurmScripts.taskPrologEnv }}
 {{- if .enabled }}
 
-for env_file in{{ range .sourceFiles }} {{ . | quote }}{{ end }}; do
-    if [ ! -r "$env_file" ]; then
-        echo print "Skipping unreadable task prolog env file: $env_file"
-        continue
-    fi
+task_prolog_env_source_files=({{ range .sourceFiles }} {{ . | quote }}{{ end }})
+task_prolog_env_export_vars=({{ range .exportVars }} {{ . | quote }}{{ end }})
+task_prolog_env_vars_to_export=()
 
-    # shellcheck disable=SC1090
-    if ! source "$env_file"; then
-        echo print "Failed to source task prolog env file: $env_file"
-        continue
-    fi
-done
-
-for env_var in{{ range .exportVars }} {{ . | quote }}{{ end }}; do
+for env_var in "${task_prolog_env_export_vars[@]}"; do
     case "$env_var" in
         ''|[0-9]*|*[!A-Za-z0-9_]*)
-            echo print "Ignoring invalid task prolog env var name: $env_var"
+            printf 'Ignoring invalid task prolog env var name: %s\n' "$env_var" >&2
             continue
             ;;
     esac
 
-    env_value="${!env_var:-}"
-    if [ -n "$env_value" ]; then
-        echo export "${env_var}=${env_value}"
+    if [ -n "${!env_var+x}" ]; then
+        continue
     fi
+
+    task_prolog_env_vars_to_export+=("$env_var")
 done
+
+if [ "${#task_prolog_env_vars_to_export[@]}" -gt 0 ]; then
+    if task_prolog_env_output="$(
+        set +eu
+
+        for env_file in "${task_prolog_env_source_files[@]}"; do
+            if [ ! -r "$env_file" ]; then
+                continue
+            fi
+
+            # shellcheck disable=SC1090
+            source "$env_file" >/dev/null 2>&1 || true
+        done
+
+        for env_var in "${task_prolog_env_vars_to_export[@]}"; do
+            env_value="${!env_var-}"
+            if [ -z "$env_value" ]; then
+                continue
+            fi
+            case "$env_value" in
+                *$'\n'*|*$'\r'*)
+                    printf 'Ignoring task prolog env var %s with multiline value\n' "$env_var" >&2
+                    continue
+                    ;;
+            esac
+
+            printf '%s=%s\n' "$env_var" "$env_value"
+        done
+    )"; then
+        while IFS= read -r env_line; do
+            env_var="${env_line%%=*}"
+            env_value="${env_line#*=}"
+            if [ "$env_var" = "$env_line" ]; then
+                continue
+            fi
+
+            printf 'export %s=%s\n' "$env_var" "$env_value"
+        done <<< "$task_prolog_env_output"
+    else
+        printf 'Failed to load task prolog env files\n' >&2
+    fi
+fi
+
+unset task_prolog_env_output
+unset task_prolog_env_vars_to_export
+unset task_prolog_env_export_vars
+unset task_prolog_env_source_files
 {{- end }}
 {{- end }}

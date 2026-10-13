@@ -1,3 +1,6 @@
+{{- if and .Values.slurmScripts.taskPrologEnv.enabled (index .Values.slurmScripts "task_prolog.sh") }}
+{{- fail "slurmScripts.taskPrologEnv.enabled cannot be used with a slurmScripts.task_prolog.sh override; merge the taskPrologEnv behavior into the custom script or disable taskPrologEnv" }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

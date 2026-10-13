@@ -38,7 +38,25 @@ tests:
     asserts:
       - matchRegex:
           path: data["task_prolog.sh"]
-          pattern: 'for env_file in "/etc/profile.d/90-nccl-network-vars.sh"; do'
+          pattern: 'task_prolog_env_source_files=\( "/etc/profile\.d/90-nccl-network-vars\.sh"\)'
       - matchRegex:
           path: data["task_prolog.sh"]
-          pattern: 'for env_var in "UCX_NET_DEVICES" "NCCL_IB_HCA"; do'
+          pattern: 'task_prolog_env_export_vars=\( "UCX_NET_DEVICES" "NCCL_IB_HCA"\)'
+      - matchRegex:
+          path: data["task_prolog.sh"]
+          pattern: 'source "\$env_file" >/dev/null 2>&1 \|\| true'
+      - matchRegex:
+          path: data["task_prolog.sh"]
+          pattern: "printf 'export %s=%s\\\\n' \"\\$env_var\" \"\\$env_value\""
+
+  - it: should reject task prolog env with a custom task prolog script
+    set:
+      slurmScripts:
+        task_prolog.sh: |-
+          #!/bin/bash
+          true
+        taskPrologEnv:
+          enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "slurmScripts.taskPrologEnv.enabled cannot be used with a slurmScripts.task_prolog.sh override; merge the taskPrologEnv behavior into the custom script or disable taskPrologEnv"

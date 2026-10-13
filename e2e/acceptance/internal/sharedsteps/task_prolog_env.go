@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -19,9 +18,15 @@ const (
 
 	ucxNetDevicesName = "UCX_NET_DEVICES"
 	ncclIBHCAName     = "NCCL_IB_HCA"
-)
 
-var taskPrologNetworkValuePattern = regexp.MustCompile(`^mlx5_[0-9]+:[0-9]+(,mlx5_[0-9]+:[0-9]+)*$`)
+	actualUCXNetDevicesName   = "ACTUAL_" + ucxNetDevicesName
+	actualNCCLIBHCAName       = "ACTUAL_" + ncclIBHCAName
+	expectedUCXNetDevicesName = "EXPECTED_" + ucxNetDevicesName
+	expectedNCCLIBHCAName     = "EXPECTED_" + ncclIBHCAName
+
+	taskPrologScriptPath          = "/opt/slurm_scripts/task_prolog.sh"
+	taskPrologNCCLNetworkVarsPath = "/etc/profile.d/90-nccl-network-vars.sh"
+)
 
 type TaskPrologEnv struct {
 	runtime  framework.Runtime
@@ -39,6 +44,7 @@ func NewTaskPrologEnv(runtime framework.Runtime, selector *framework.WorkerSelec
 }
 
 func (s *TaskPrologEnv) RegisterSteps(sc *godog.ScenarioContext) {
+	sc.Step(`^task-prolog environment injection is enabled$`, s.taskPrologEnvInjectionIsEnabled)
 	sc.Step(`^a healthy GPU worker is selected for task-prolog environment checks$`, s.selectHealthyGPUWorker)
 	sc.Step(`^a GPU Slurm job launched from the login node prints its network environment$`, s.runGPUJobFromLogin)
 	sc.Step(`^the job environment contains NCCL network variables$`, s.jobEnvironmentContainsNetworkVariables)
@@ -49,13 +55,28 @@ func (s *TaskPrologEnv) CleanupAndReset(ctx context.Context) {
 	s.output = ""
 }
 
+func (s *TaskPrologEnv) taskPrologEnvInjectionIsEnabled(ctx context.Context) error {
+	command := fmt.Sprintf(
+		"grep -F %s %s >/dev/null && grep -F %s %s >/dev/null",
+		framework.ShellQuote("task_prolog_env_export_vars"),
+		framework.ShellQuote(taskPrologScriptPath),
+		framework.ShellQuote(ucxNetDevicesName),
+		framework.ShellQuote(taskPrologScriptPath),
+	)
+	if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
+		s.runtime.Logf("Task prolog env: injection is disabled, skipping scenario")
+		return godog.ErrSkip
+	}
+	return nil
+}
+
 func (s *TaskPrologEnv) selectHealthyGPUWorker(ctx context.Context) error {
 	workers, err := s.selector.PickGPUWorkers(ctx, 1)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	s.worker = workers[0]
-	s.runtime.Logf("task prolog env: selected GPU worker=%s", s.worker.Name)
+	s.runtime.Logf("Task prolog env: selected GPU worker=%s", s.worker.Name)
 	return nil
 }
 
@@ -67,7 +88,7 @@ func (s *TaskPrologEnv) runGPUJobFromLogin(ctx context.Context) error {
 	command := taskPrologNetworkEnvCommand(s.worker.Name, taskPrologEnvImmediate, taskPrologEnvTimeout)
 	output, err := s.runtime.Jail().Run(ctx, command)
 	s.output = output
-	s.runtime.Logf("task prolog env: %s\n%s", command, strings.TrimSpace(output))
+	s.runtime.Logf("Task prolog env: %s\n%s", command, strings.TrimSpace(output))
 	if err != nil {
 		return fmt.Errorf("run GPU Slurm job from login node on worker %s: %w; output:\n%s",
 			s.worker.Name,
@@ -100,22 +121,34 @@ func taskPrologNetworkEnvCommand(worker string, immediate, timeout time.Duration
 		"--nodes=1",
 		"--ntasks=1",
 		"--gpus-per-node=1",
-		framework.BashLC(taskPrologNetworkEnvProbe()),
+		bashC(taskPrologNetworkEnvProbe()),
 	}
 	return fmt.Sprintf("timeout %d srun %s", int(timeout.Seconds()), strings.Join(args, " "))
 }
 
+func bashC(script string) string {
+	return "bash -c " + framework.ShellQuote(script)
+}
+
 func taskPrologNetworkEnvProbe() string {
 	return strings.Join([]string{
-		fmt.Sprintf("printf '%s=%%s\\n' \"${%s:-}\"", ucxNetDevicesName, ucxNetDevicesName),
-		fmt.Sprintf("printf '%s=%%s\\n' \"${%s:-}\"", ncclIBHCAName, ncclIBHCAName),
+		fmt.Sprintf("actual_ucx=\"${%s:-}\"", ucxNetDevicesName),
+		fmt.Sprintf("actual_nccl=\"${%s:-}\"", ncclIBHCAName),
+		fmt.Sprintf("unset %s %s", ucxNetDevicesName, ncclIBHCAName),
+		fmt.Sprintf("source %s >/dev/null 2>&1 || true", framework.ShellQuote(taskPrologNCCLNetworkVarsPath)),
+		fmt.Sprintf("printf '%s=%%s\\n' \"$actual_ucx\"", actualUCXNetDevicesName),
+		fmt.Sprintf("printf '%s=%%s\\n' \"$actual_nccl\"", actualNCCLIBHCAName),
+		fmt.Sprintf("printf '%s=%%s\\n' \"${%s:-}\"", expectedUCXNetDevicesName, ucxNetDevicesName),
+		fmt.Sprintf("printf '%s=%%s\\n' \"${%s:-}\"", expectedNCCLIBHCAName, ncclIBHCAName),
 	}, "; ")
 }
 
 func parseTaskPrologEnvOutput(output string) (map[string]string, error) {
 	wanted := map[string]struct{}{
-		ucxNetDevicesName: {},
-		ncclIBHCAName:     {},
+		actualUCXNetDevicesName:   {},
+		actualNCCLIBHCAName:       {},
+		expectedUCXNetDevicesName: {},
+		expectedNCCLIBHCAName:     {},
 	}
 	vars := make(map[string]string, len(wanted))
 	scanner := bufio.NewScanner(strings.NewReader(output))
@@ -141,18 +174,39 @@ func parseTaskPrologEnvOutput(output string) (map[string]string, error) {
 
 func validateTaskPrologNetworkEnv(vars map[string]string) error {
 	var problems []string
-	for _, name := range []string{ucxNetDevicesName, ncclIBHCAName} {
-		value, found := vars[name]
-		if !found {
-			problems = append(problems, fmt.Sprintf("%s is missing", name))
+	for _, pair := range []struct {
+		actual   string
+		expected string
+		label    string
+	}{
+		{actual: actualUCXNetDevicesName, expected: expectedUCXNetDevicesName, label: ucxNetDevicesName},
+		{actual: actualNCCLIBHCAName, expected: expectedNCCLIBHCAName, label: ncclIBHCAName},
+	} {
+		actual, actualFound := vars[pair.actual]
+		expected, expectedFound := vars[pair.expected]
+		if !actualFound {
+			problems = append(problems, fmt.Sprintf("%s is missing from job environment output", pair.label))
 			continue
 		}
-		if value == "" {
-			problems = append(problems, fmt.Sprintf("%s is empty", name))
+		if !expectedFound {
+			problems = append(problems, fmt.Sprintf("%s is missing from %s output", pair.label, taskPrologNCCLNetworkVarsPath))
 			continue
 		}
-		if !taskPrologNetworkValuePattern.MatchString(value) {
-			problems = append(problems, fmt.Sprintf("%s=%q does not match mlx5 device list format", name, value))
+		if expected == "" {
+			problems = append(problems, fmt.Sprintf("%s is empty in %s", pair.label, taskPrologNCCLNetworkVarsPath))
+			continue
+		}
+		if actual == "" {
+			problems = append(problems, fmt.Sprintf("%s is empty in the job environment", pair.label))
+			continue
+		}
+		if actual != expected {
+			problems = append(problems, fmt.Sprintf("%s=%q in job environment, want %q from %s",
+				pair.label,
+				actual,
+				expected,
+				taskPrologNCCLNetworkVarsPath,
+			))
 		}
 	}
 	if len(problems) > 0 {

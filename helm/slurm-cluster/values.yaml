@@ -832,6 +832,8 @@ slurmScripts:
   epilog.sh: null
   hc_program.sh: null
   pyxis_caching_importer.sh: null
+  # taskPrologEnv is rendered only into the bundled task_prolog.sh. If task_prolog.sh is overridden,
+  # merge this behavior into the custom script instead of enabling this option.
   taskPrologEnv:
     enabled: false
     sourceFiles: []
