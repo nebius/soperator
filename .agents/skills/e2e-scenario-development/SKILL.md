@@ -6,6 +6,8 @@ description: Plan and implement new or changed Soperator E2E acceptance scenario
 # E2E scenario development
 
 Read `e2e/AGENTS.md` completely and follow its scenario-development workflow.
+Treat the mandatory reuse audit as blocking and complete it before proposing a
+design.
 
 Gather any missing product and test requirements, then propose the scenario
 design before editing. Do not implement until the user approves that design. If
