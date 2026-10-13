@@ -1,0 +1,25 @@
+suite: test Tailscale RBAC
+templates:
+  - templates/tailscale.yaml
+tests:
+  - it: should allow Tailscale to persist state for any login pod
+    set:
+      tailscale.enabled: true
+    asserts:
+      - equal:
+          path: spec.values.resources[0].rules[0].resources[0]
+          value: secrets
+      - contains:
+          path: spec.values.resources[0].rules[0].verbs
+          content: get
+      - contains:
+          path: spec.values.resources[0].rules[0].verbs
+          content: create
+      - contains:
+          path: spec.values.resources[0].rules[0].verbs
+          content: update
+      - contains:
+          path: spec.values.resources[0].rules[0].verbs
+          content: patch
+      - notExists:
+          path: spec.values.resources[0].rules[0].resourceNames

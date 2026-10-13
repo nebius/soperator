@@ -22,6 +22,7 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 				"slurmNodes": {
 					"accounting": {"enabled": true},
 					"login": {
+						"customInitContainers": [{"name": "tailscale"}],
 						"docker": {"enabled": true},
 						"userIsolation": {"enabled": true},
 						"volumes": {"jailSubMounts": [
@@ -40,6 +41,7 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 		Namespace:                 "soperator",
 		AccountingEnabled:         true,
 		LoginDockerEnabled:        true,
+		LoginTailscaleEnabled:     true,
 		LoginUserIsolationEnabled: true,
 		LoginJailSubMounts: []JailSubMountInfo{
 			{Name: "image-storage", MountPath: "/mnt/local-data"},
