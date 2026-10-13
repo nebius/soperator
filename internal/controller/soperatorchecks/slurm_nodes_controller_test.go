@@ -160,6 +160,37 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 	}
 }
 
+func TestSlurmNodesController_Reconcile_continuesOtherClustersWhenOneClusterFails(t *testing.T) {
+	ctx := context.Background()
+	controller, k8sClient, healthyCluster, k8sNode, slurmNode := newSlurmNodesControllerForUnhealthyTest(
+		t,
+		ctx,
+		slurmapi.Node{States: map[api.V0044NodeState]struct{}{
+			api.V0044NodeStateDOWN:  {},
+			api.V0044NodeStateDRAIN: {},
+		}},
+	)
+	slurmNode.Reason.Reason = slurmNode.Reason.OriginalReason
+
+	healthyClient, found := controller.slurmAPIClients.GetClient(healthyCluster)
+	require.True(t, found)
+	healthyMock := healthyClient.(*slurmapifake.MockClient)
+	healthyMock.On("ListNodes", ctx).Return([]slurmapi.Node{slurmNode}, nil).Once()
+
+	unreachableCluster := types.NamespacedName{Namespace: "deleted-ns", Name: "deleted-cluster"}
+	unreachableMock := slurmapifake.NewMockClient(t)
+	unreachableMock.On("ListNodes", ctx).Return(nil, errors.New("dial tcp: lookup deleted-cluster: no such host")).Once()
+	controller.slurmAPIClients.AddClient(unreachableCluster, unreachableMock)
+
+	_, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: healthyCluster})
+	require.ErrorContains(t, err, "no such host")
+	require.True(
+		t,
+		hasHardwareIssuesSuspected(t, ctx, k8sClient, k8sNode.Name),
+		"healthy cluster degraded node must still be remediated when another cluster's ListNodes fails",
+	)
+}
+
 func TestToCamelCase(t *testing.T) {
 	tests := []struct {
 		input    string

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -62,10 +63,10 @@ func (r *SlurmAPIClientsController) SetupWithManager(mgr ctrl.Manager,
 				return true
 			},
 			DeleteFunc: func(e event.DeleteEvent) bool {
-				return false
+				return true
 			},
 			UpdateFunc: func(e event.UpdateEvent) bool {
-				return false
+				return e.ObjectNew != nil && !e.ObjectNew.GetDeletionTimestamp().IsZero()
 			},
 			GenericFunc: func(e event.GenericEvent) bool {
 				return false
@@ -77,6 +78,22 @@ func (r *SlurmAPIClientsController) SetupWithManager(mgr ctrl.Manager,
 
 func (c *SlurmAPIClientsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithName("SlurmAPIClientsController.reconcile")
+
+	slurmCluster := &slurmv1.SlurmCluster{}
+	if err := c.Get(ctx, req.NamespacedName, slurmCluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("Removing slurm api client for deleted cluster")
+			c.slurmAPIClients.RemoveClient(req.NamespacedName)
+			return ctrl.Result{}, nil
+		}
+		logger.Error(err, "failed to get slurm cluster")
+		return ctrl.Result{}, err
+	}
+	if !slurmCluster.DeletionTimestamp.IsZero() {
+		logger.Info("Removing slurm api client for deleting cluster")
+		c.slurmAPIClients.RemoveClient(req.NamespacedName)
+		return ctrl.Result{}, nil
+	}
 
 	logger.Info("Adding new slurm api client")
 
