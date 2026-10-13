@@ -67,11 +67,16 @@ type SlurmClusterAccounting struct {
 }
 
 type SlurmClusterLogin struct {
-	Docker SlurmClusterLoginDocker `json:"docker"`
+	Docker  SlurmClusterLoginDocker  `json:"docker"`
+	Volumes SlurmClusterLoginVolumes `json:"volumes"`
 }
 
 type SlurmClusterLoginDocker struct {
 	Enabled bool `json:"enabled"`
+}
+
+type SlurmClusterLoginVolumes struct {
+	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
 }
 
 type SlurmClusterPAMAdopt struct {
@@ -151,7 +156,22 @@ type NodeSetSpec struct {
 	EphemeralNodes              *bool          `json:"ephemeralNodes"`
 	InitialNumberEphemeralNodes int32          `json:"initialNumberEphemeralNodes"`
 	GPU                         NodeSetGPUSpec `json:"gpu"`
+	Slurmd                      NodeSetSlurmd  `json:"slurmd"`
 	UpdateStrategy              string         `json:"updateStrategy"`
+}
+
+type NodeSetSlurmd struct {
+	Volumes NodeSetVolumes `json:"volumes"`
+}
+
+type NodeSetVolumes struct {
+	JailSubMounts []NodeVolumeMount `json:"jailSubMounts"`
+}
+
+type NodeVolumeMount struct {
+	Name      string `json:"name"`
+	MountPath string `json:"mountPath"`
+	ReadOnly  bool   `json:"readOnly"`
 }
 
 type NodeSetGPUSpec struct {

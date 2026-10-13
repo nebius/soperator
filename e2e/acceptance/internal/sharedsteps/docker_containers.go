@@ -17,7 +17,7 @@ const (
 	dockerLifecycleImage   = "cr.nebius.cloud/soperator/busybox"
 	dockerLifecycleCommand = "echo ready; sleep 3600"
 
-	dockerLocalStorageRoot = "/mnt/image-storage/docker"
+	dockerHostJailRoot = "/mnt/jail"
 
 	dockerJobStartTimeout      = 5 * time.Minute
 	dockerProbeTimeout         = 5 * time.Minute
@@ -49,6 +49,7 @@ type DockerContainers struct {
 	connectionWorker    framework.WorkerInfo
 
 	loginSSHContainerName string
+	loginJailSubMounts    []framework.JailSubMountInfo
 	dockerSSHIdentitySet  bool
 	loginSSHOutput        string
 	workerSSHOutput       string
@@ -123,6 +124,7 @@ func (s *DockerContainers) CleanupAndReset(ctx context.Context) {
 	s.containerNamePrefix = ""
 	s.connectionWorker = framework.WorkerInfo{}
 	s.loginSSHContainerName = ""
+	s.loginJailSubMounts = nil
 	s.dockerSSHIdentitySet = false
 	s.loginSSHOutput = ""
 	s.workerSSHOutput = ""
@@ -137,6 +139,7 @@ func (s *DockerContainers) loginDockerIsEnabled(ctx context.Context) error {
 		s.runtime.Logf("login Docker is disabled, skipping scenario")
 		return godog.ErrSkip
 	}
+	s.loginJailSubMounts = cluster.LoginJailSubMounts
 
 	return nil
 }
@@ -197,11 +200,17 @@ docker exec "${name}" true
 }
 
 func (s *DockerContainers) dockerUsesTheLoginProxyImageStorageAndTheUsersCgroup() error {
-	if got := dockerSSHOutputValue(s.loginSSHOutput, "DOCKER_ROOT"); got != dockerLocalStorageRoot {
+	rawRoot := dockerSSHOutputValue(s.loginSSHOutput, "DOCKER_ROOT")
+	root, err := dockerJailVisiblePath(rawRoot)
+	if err != nil {
+		return fmt.Errorf("validate login Docker root %q: %w; output: %s", rawRoot, err, strings.TrimSpace(s.loginSSHOutput))
+	}
+	if _, err := writableJailSubMountContaining(root, s.loginJailSubMounts); err != nil {
 		return fmt.Errorf(
-			"login Docker root = %q, want %q; output: %s",
-			got,
-			dockerLocalStorageRoot,
+			"validate login Docker root: raw=%q normalized=%q: %w; output: %s",
+			rawRoot,
+			root,
+			err,
 			strings.TrimSpace(s.loginSSHOutput),
 		)
 	}
@@ -350,15 +359,31 @@ func (s *DockerContainers) dockerStorageIsPopulatedOnAWorker(
 	if s.connectionWorker.Name == "" {
 		return fmt.Errorf("Docker connection worker is not selected")
 	}
+	nodeSet, err := nodeSetForWorker(ctx, s.kubectl, s.info.SlurmClusterName, s.connectionWorker)
+	if err != nil {
+		return err
+	}
 
-	err := framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, s.job, "Docker image and runtime storage on local disk",
+	err = framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, s.job, "Docker image and runtime storage on local disk",
 		dockerProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-			rootDir, err := s.dockerRootDir(waitCtx, s.connectionWorker)
+			rawRootDir, err := s.dockerRootDir(waitCtx, s.connectionWorker)
 			if err != nil {
 				return false, err
 			}
-			if !pathIsUnder(rootDir, dockerLocalStorageRoot) {
-				return false, fmt.Errorf("expected Docker root dir under %s, got %q", dockerLocalStorageRoot, rootDir)
+			rootDir, err := dockerJailVisiblePath(rawRootDir)
+			if err != nil {
+				return false, fmt.Errorf("validate Docker root on worker %s: %w", s.connectionWorker.Name, err)
+			}
+			mount, err := writableJailSubMountContaining(rootDir, nodeSet.JailSubMounts)
+			if err != nil {
+				return false, fmt.Errorf(
+					"validate Docker root on worker %s in NodeSet %s: raw=%q normalized=%q: %w",
+					s.connectionWorker.Name,
+					nodeSet.Name,
+					rawRootDir,
+					rootDir,
+					err,
+				)
 			}
 
 			imageID, err := s.dockerImageID(waitCtx, s.connectionWorker, dockerLifecycleImage)
@@ -381,8 +406,15 @@ func (s *DockerContainers) dockerStorageIsPopulatedOnAWorker(
 				if paths == "" {
 					return false, nil
 				}
-				if !storagePathsUnder(paths, dockerLocalStorageRoot) {
-					return false, fmt.Errorf("expected Docker %s paths under %s, got:\n%s", pathKind, dockerLocalStorageRoot, paths)
+				if !storagePathsUnder(paths, rootDir) {
+					return false, fmt.Errorf(
+						"expected Docker %s paths under normalized root %s on mount %s; raw root=%q; got:\n%s",
+						pathKind,
+						rootDir,
+						mount.MountPath,
+						rawRootDir,
+						paths,
+					)
 				}
 
 				cgroupParent, err := s.dockerContainerCgroupParent(waitCtx, s.connectionWorker, containerID)
@@ -647,6 +679,10 @@ func graphDriverPathsUnder(output, root string) bool {
 			if candidate == "" || !strings.HasPrefix(candidate, "/") {
 				continue
 			}
+			candidate, err := dockerJailVisiblePath(candidate)
+			if err != nil {
+				return false
+			}
 			foundPath = true
 			if !pathIsUnder(candidate, root) {
 				return false
@@ -666,12 +702,30 @@ func runtimePathsUnder(output, root string) bool {
 		if !strings.HasPrefix(candidate, "/") {
 			return false
 		}
+		candidate, err := dockerJailVisiblePath(candidate)
+		if err != nil {
+			return false
+		}
 		foundPath = true
 		if !pathIsUnder(candidate, root) {
 			return false
 		}
 	}
 	return foundPath
+}
+
+func dockerJailVisiblePath(value string) (string, error) {
+	cleaned, err := cleanAbsolutePath(value)
+	if err != nil {
+		return "", err
+	}
+	if cleaned == dockerHostJailRoot {
+		return "/", nil
+	}
+	if strings.HasPrefix(cleaned, dockerHostJailRoot+"/") {
+		return strings.TrimPrefix(cleaned, dockerHostJailRoot), nil
+	}
+	return cleaned, nil
 }
 
 func dockerCgroupParentBelongsToJob(value, jobID string) bool {

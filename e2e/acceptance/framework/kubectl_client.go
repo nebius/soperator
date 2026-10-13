@@ -28,6 +28,7 @@ type NodeSetInfo struct {
 	ReadyReplicas int
 	HasGPU        bool
 	Phase         string
+	JailSubMounts []JailSubMountInfo
 }
 
 type SlurmClusterInfo struct {
@@ -35,13 +36,21 @@ type SlurmClusterInfo struct {
 	Namespace            string
 	AccountingEnabled    bool
 	LoginDockerEnabled   bool
+	LoginJailSubMounts   []JailSubMountInfo
 	PAMSlurmAdoptEnabled bool
 	CustomSlurmConfig    *string
+}
+
+type JailSubMountInfo struct {
+	Name      string
+	MountPath string
+	ReadOnly  bool
 }
 
 type WorkerPodInfo struct {
 	SlurmNodeName      string
 	PodName            string
+	NodeSetName        string
 	KubernetesNodeName string
 	Ready              bool
 	HasLocalNVMe       bool
@@ -67,6 +76,7 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 		Namespace:            cluster.Metadata.Namespace,
 		AccountingEnabled:    cluster.Spec.SlurmNodes.Accounting.Enabled,
 		LoginDockerEnabled:   cluster.Spec.SlurmNodes.Login.Docker.Enabled,
+		LoginJailSubMounts:   jailSubMountInfos(cluster.Spec.SlurmNodes.Login.Volumes.JailSubMounts),
 		PAMSlurmAdoptEnabled: cluster.Spec.PAMSlurmAdopt.Enabled,
 		CustomSlurmConfig:    cluster.Spec.CustomSlurmConfig,
 	}, nil
@@ -162,6 +172,7 @@ func (c *KubectlClient) NodeSets(ctx context.Context, clusterName string) ([]Nod
 			ReadyReplicas: int(nodeSet.Status.Replicas),
 			HasGPU:        nodeSet.Spec.GPU.Enabled,
 			Phase:         nodeSet.Status.Phase,
+			JailSubMounts: jailSubMountInfos(nodeSet.Spec.Slurmd.Volumes.JailSubMounts),
 		})
 	}
 
@@ -195,6 +206,7 @@ func (c *KubectlClient) WorkerPods(ctx context.Context) ([]WorkerPodInfo, error)
 		out = append(out, WorkerPodInfo{
 			SlurmNodeName:      slurmNodeName,
 			PodName:            pod.Name,
+			NodeSetName:        strings.TrimSpace(pod.Labels["slurm.nebius.ai/nodeset"]),
 			KubernetesNodeName: pod.Spec.NodeName,
 			Ready:              kubeobjects.PodReady(pod),
 			HasLocalNVMe:       podHasVolume(pod, "local-nvme"),
@@ -205,6 +217,21 @@ func (c *KubectlClient) WorkerPods(ctx context.Context) ([]WorkerPodInfo, error)
 		return out[i].SlurmNodeName < out[j].SlurmNodeName
 	})
 	return out, nil
+}
+
+func jailSubMountInfos(mounts []kubeobjects.NodeVolumeMount) []JailSubMountInfo {
+	if len(mounts) == 0 {
+		return nil
+	}
+	out := make([]JailSubMountInfo, 0, len(mounts))
+	for _, mount := range mounts {
+		out = append(out, JailSubMountInfo{
+			Name:      mount.Name,
+			MountPath: mount.MountPath,
+			ReadOnly:  mount.ReadOnly,
+		})
+	}
+	return out
 }
 
 func podHasVolume(pod corev1.Pod, name string) bool {

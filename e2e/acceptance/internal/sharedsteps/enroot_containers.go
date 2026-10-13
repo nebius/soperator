@@ -19,8 +19,6 @@ const (
 
 	enrootSquashRoot = "/var/cache/enroot-container-images"
 
-	enrootDedicatedDataPath = "/mnt/image-storage/enroot/data"
-
 	enrootJobStartTimeout = 5 * time.Minute
 	enrootProbeTimeout    = 5 * time.Minute
 	enrootStopTimeout     = 3 * time.Minute
@@ -32,8 +30,10 @@ const (
 )
 
 type EnrootContainers struct {
+	info     *framework.ClusterInfo
 	runtime  framework.Runtime
 	slurm    *framework.SlurmClient
+	kubectl  *framework.KubectlClient
 	selector *framework.WorkerSelector
 
 	workers          []framework.WorkerInfo
@@ -46,6 +46,7 @@ type EnrootContainers struct {
 	runtimeNamePrefix  string
 
 	directSquashFS *bool
+	enrootDataPath string
 
 	sshEnrootOutput    string
 	sshEnrootTarget    string
@@ -54,10 +55,18 @@ type EnrootContainers struct {
 	sshIdentitySet     bool
 }
 
-func NewEnrootContainers(runtime framework.Runtime, slurm *framework.SlurmClient, selector *framework.WorkerSelector) *EnrootContainers {
+func NewEnrootContainers(
+	info *framework.ClusterInfo,
+	runtime framework.Runtime,
+	slurm *framework.SlurmClient,
+	kubectl *framework.KubectlClient,
+	selector *framework.WorkerSelector,
+) *EnrootContainers {
 	return &EnrootContainers{
+		info:     info,
 		runtime:  runtime,
 		slurm:    slurm,
+		kubectl:  kubectl,
 		selector: selector,
 	}
 }
@@ -93,6 +102,7 @@ func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
 	s.squashStatBefore = ""
 	s.runtimeNamePrefix = ""
 	s.directSquashFS = nil
+	s.enrootDataPath = ""
 	if s.sshEnrootImagePath != "" {
 		if cleanupErr := s.removeEnrootSSHImage(ctx); cleanupErr != nil {
 			s.runtime.Logf("cleanup: remove imported Enroot SSH image: %v", cleanupErr)
@@ -671,7 +681,51 @@ func (s *EnrootContainers) squashStatForPath(ctx context.Context, squashPath str
 }
 
 func (s *EnrootContainers) legacyEnrootDataTree(ctx context.Context, worker framework.WorkerInfo) (string, error) {
-	return s.runtime.Worker(worker).RunWithDefaultRetry(ctx, fmt.Sprintf("sudo tree -L 1 %s", framework.ShellQuote(enrootDedicatedDataPath)))
+	dataPath, err := s.configuredEnrootDataPath(ctx, worker)
+	if err != nil {
+		return "", err
+	}
+	return s.runtime.Worker(worker).RunWithDefaultRetry(ctx, fmt.Sprintf("sudo tree -L 1 %s", framework.ShellQuote(dataPath)))
+}
+
+func (s *EnrootContainers) configuredEnrootDataPath(ctx context.Context, worker framework.WorkerInfo) (string, error) {
+	if s.enrootDataPath != "" {
+		return s.enrootDataPath, nil
+	}
+
+	output, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx,
+		`sudo awk '$1 == "ENROOT_DATA_PATH" { value = $2 } END { print value }' /etc/enroot/enroot.conf /etc/enroot/enroot.conf.d/*.conf 2>/dev/null`)
+	if err != nil {
+		return "", fmt.Errorf("read ENROOT_DATA_PATH on worker %s: %w", worker.Name, err)
+	}
+	dataPath, err := parseConfiguredEnrootDataPath(output)
+	if err != nil {
+		return "", fmt.Errorf("read ENROOT_DATA_PATH on worker %s: %w", worker.Name, err)
+	}
+
+	nodeSet, err := nodeSetForWorker(ctx, s.kubectl, s.info.SlurmClusterName, worker)
+	if err != nil {
+		return "", err
+	}
+	mount, err := writableJailSubMountContaining(dataPath, nodeSet.JailSubMounts)
+	if err != nil {
+		return "", fmt.Errorf("validate ENROOT_DATA_PATH on worker %s in NodeSet %s: %w", worker.Name, nodeSet.Name, err)
+	}
+
+	s.runtime.Logf("Enroot storage: worker=%s NodeSet=%s data_path=%s jail_submount=%s", worker.Name, nodeSet.Name, dataPath, mount.MountPath)
+	s.enrootDataPath = dataPath
+	return dataPath, nil
+}
+
+func parseConfiguredEnrootDataPath(output string) (string, error) {
+	value := strings.TrimSpace(output)
+	if value == "" {
+		return "", fmt.Errorf("validate ENROOT_DATA_PATH: setting is empty")
+	}
+	if strings.ContainsAny(value, "$`") {
+		return "", fmt.Errorf("validate ENROOT_DATA_PATH %q: dynamic values are not supported", value)
+	}
+	return cleanAbsolutePath(value)
 }
 
 func (s *EnrootContainers) enrootRuntimeNamePrefix() (string, error) {
