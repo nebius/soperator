@@ -37,6 +37,7 @@ func FeaturePaths() []string {
 		"features/package_installation.feature",
 		"features/gpu_profiling.feature",
 		"features/system_settings.feature",
+		"features/task_prolog_env.feature",
 		"features/soperator_utils.feature",
 		"features/nodeset_ephemeral_mode_transition.feature",
 		"features/node_replacement.feature",

@@ -33,6 +33,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewPackageInstallation(runtime, selector),
 		NewGPUProfiling(runtime, slurm, selector),
 		NewSystemSettings(runtime, slurm, kubectl, selector),
+		NewTaskPrologEnv(runtime, selector),
 		NewSoperatorUtils(runtime, selector),
 		NewNodeSetEphemeralModeTransition(info, runtime, kubectl),
 		NewNodeReplacement(runtime, slurm, selector),
