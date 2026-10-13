@@ -14,8 +14,7 @@ import (
 
 const (
 	// Small mirrored image; Docker lifecycle only needs sh/sleep and storage population.
-	dockerLifecycleImage   = "cr.nebius.cloud/soperator/busybox"
-	dockerLifecycleCommand = "echo ready; sleep 3600"
+	dockerLifecycleImage = "cr.nebius.cloud/soperator/busybox"
 
 	dockerHostJailRoot = "/mnt/jail"
 
@@ -200,7 +199,7 @@ docker exec "${name}" true
 }
 
 func (s *DockerContainers) dockerUsesTheLoginProxyImageStorageAndTheUsersCgroup() error {
-	rawRoot := dockerSSHOutputValue(s.loginSSHOutput, "DOCKER_ROOT")
+	rawRoot := parseKeyValueLine(s.loginSSHOutput, "DOCKER_ROOT")
 	root, err := dockerJailVisiblePath(rawRoot)
 	if err != nil {
 		return fmt.Errorf("validate login Docker root %q: %w; output: %s", rawRoot, err, strings.TrimSpace(s.loginSSHOutput))
@@ -215,8 +214,8 @@ func (s *DockerContainers) dockerUsesTheLoginProxyImageStorageAndTheUsersCgroup(
 		)
 	}
 
-	expectedSessionCgroup := dockerSSHOutputValue(s.loginSSHOutput, "EXPECTED_SESSION_CGROUP")
-	sessionCgroup := dockerSSHOutputValue(s.loginSSHOutput, "SESSION_CGROUP")
+	expectedSessionCgroup := parseKeyValueLine(s.loginSSHOutput, "EXPECTED_SESSION_CGROUP")
+	sessionCgroup := parseKeyValueLine(s.loginSSHOutput, "SESSION_CGROUP")
 	if expectedSessionCgroup == "" || !strings.HasSuffix(sessionCgroup, expectedSessionCgroup) {
 		return fmt.Errorf(
 			"login Docker SSH session cgroup %q does not end with %q; output: %s",
@@ -226,8 +225,8 @@ func (s *DockerContainers) dockerUsesTheLoginProxyImageStorageAndTheUsersCgroup(
 		)
 	}
 
-	expectedCgroup := dockerSSHOutputValue(s.loginSSHOutput, "EXPECTED_USER_CGROUP")
-	containerCgroup := dockerSSHOutputValue(s.loginSSHOutput, "CONTAINER_CGROUP")
+	expectedCgroup := parseKeyValueLine(s.loginSSHOutput, "EXPECTED_USER_CGROUP")
+	containerCgroup := parseKeyValueLine(s.loginSSHOutput, "CONTAINER_CGROUP")
 	if expectedCgroup == "" || !strings.Contains(containerCgroup, expectedCgroup) {
 		return fmt.Errorf(
 			"login Docker container cgroup %q does not contain per-user parent %q; output: %s",
@@ -295,16 +294,6 @@ func (s *DockerContainers) theDockerContainerSucceedsOverWorkerSSH() error {
 	return nil
 }
 
-func dockerSSHOutputValue(output, key string) string {
-	prefix := key + "="
-	for line := range strings.SplitSeq(output, "\n") {
-		if value, ok := strings.CutPrefix(strings.TrimSpace(line), prefix); ok {
-			return value
-		}
-	}
-	return ""
-}
-
 func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers(ctx context.Context) error {
 	workers, err := s.selector.PickWorkers(ctx, 2)
 	if err != nil {
@@ -315,7 +304,7 @@ func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers
 
 	wrap := fmt.Sprintf("srun docker run --rm --name e2e-docker-${SLURM_JOB_ID}-${SLURM_NODEID} %s sh -c %s",
 		framework.ShellQuote(dockerLifecycleImage),
-		framework.ShellQuote(dockerLifecycleCommand),
+		framework.ShellQuote(containerLifecycleCommand),
 	)
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      "e2e-docker-containers",

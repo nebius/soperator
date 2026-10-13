@@ -9,7 +9,11 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
-const sshTestUserPropagationTimeout = time.Minute
+const (
+	sshTestUserName               = "bob"
+	soperatorChecksUserName       = "soperatorchecks"
+	sshTestUserPropagationTimeout = time.Minute
+)
 
 func ensureSSHTestUser(ctx context.Context, runtime framework.Runtime, userName string) error {
 	quotedUserName := framework.ShellQuote(userName)

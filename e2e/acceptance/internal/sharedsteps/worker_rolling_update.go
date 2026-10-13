@@ -27,7 +27,6 @@ const (
 	workerRolloutReplaceBase    = 3 * time.Minute
 	workerRolloutReplacePerPod  = 6 * time.Minute
 	workerRolloutStuckMargin    = 90 * time.Second
-	workerRolloutSmokeTimeout   = 3 * time.Minute
 	workerRolloutCleanupTimeout = 2 * time.Minute
 )
 
@@ -96,16 +95,13 @@ func (s *WorkerRollingUpdate) CleanupAndReset(ctx context.Context) {
 }
 
 func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
-	var nodeSets kubeobjects.NodeSetList
-	if err := s.kubectl.GetJSON(ctx, &nodeSets, "get", "nodesets", "-n", framework.SoperatorNamespace, "-o", "json"); err != nil {
-		return fmt.Errorf("list NodeSets: %w", err)
+	nodeSets, err := listClusterNodeSets(ctx, s.kubectl, s.info.SlurmClusterName)
+	if err != nil {
+		return err
 	}
-	sort.Slice(nodeSets.Items, func(i, j int) bool {
-		return nodeSets.Items[i].Metadata.Name < nodeSets.Items[j].Metadata.Name
-	})
 
 	var rejected []string
-	for _, nodeSet := range nodeSets.Items {
+	for _, nodeSet := range nodeSets {
 		if reason := workerRolloutCandidateProblem(nodeSet, s.info.SlurmClusterName); reason != "" {
 			rejected = append(rejected, fmt.Sprintf("%s: %s", nodeSet.Metadata.Name, reason))
 			continue
@@ -119,7 +115,7 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 		return godog.ErrSkip
 	}
 
-	pods, err := s.nodeSetPods(ctx)
+	pods, err := nodeSetWorkerPods(ctx, s.kubectl, s.nodeSet)
 	if err != nil {
 		return err
 	}
@@ -208,9 +204,9 @@ func (s *WorkerRollingUpdate) submitJobOnWorker(ctx context.Context) error {
 	}
 	worker := s.workers[0]
 	opts := framework.SbatchOptions{
-		JobName:    workerRolloutJobName,
-		ExtraFlags: []string{fmt.Sprintf("-w %s", framework.ShellQuote(worker.Name))},
-		Wrap:       fmt.Sprintf("sleep %.0f", workerRolloutJobSleep.Seconds()),
+		JobName:  workerRolloutJobName,
+		Nodelist: []string{worker.Name},
+		Wrap:     fmt.Sprintf("sleep %.0f", workerRolloutJobSleep.Seconds()),
 	}
 	if s.nodeSet.Spec.GPU.Enabled {
 		opts.GPUsPerNode = 1
@@ -272,7 +268,7 @@ func (s *WorkerRollingUpdate) waitForWorkersReplaced(ctx context.Context) error 
 	var lastProgress string
 	err := s.runtime.WaitFor(ctx, fmt.Sprintf("NodeSet %s worker pods replaced", s.nodeSet.Metadata.Name), timeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			pods, err := s.nodeSetPods(waitCtx)
+			pods, err := nodeSetWorkerPods(waitCtx, s.kubectl, s.nodeSet)
 			if err != nil {
 				return false, err
 			}
@@ -308,15 +304,7 @@ func (s *WorkerRollingUpdate) waitForWorkersIdle(ctx context.Context) error {
 func (s *WorkerRollingUpdate) runSmokeJobs(ctx context.Context) error {
 	var problems []string
 	for _, worker := range s.workers {
-		command := fmt.Sprintf("timeout %.0f srun -w %s hostname", workerRolloutSmokeTimeout.Seconds(), framework.ShellQuote(worker.Name))
-		if s.nodeSet.Spec.GPU.Enabled {
-			command = fmt.Sprintf("timeout %.0f srun -w %s --gpus-per-node=1 nvidia-smi -L >/dev/null",
-				workerRolloutSmokeTimeout.Seconds(), framework.ShellQuote(worker.Name))
-		}
-		jobCtx, cancel := context.WithTimeout(ctx, workerRolloutSmokeTimeout+time.Minute)
-		_, err := s.runtime.Jail().Run(jobCtx, command)
-		cancel()
-		if err != nil {
+		if err := runTargetedWorkerSmoke(ctx, s.runtime, worker); err != nil {
 			problems = append(problems, fmt.Sprintf("worker %s smoke job failed: %v", worker.Name, err))
 		}
 	}
@@ -343,16 +331,6 @@ func (s *WorkerRollingUpdate) waitForIdle(ctx context.Context, description strin
 			}
 			return true, nil
 		})
-}
-
-func (s *WorkerRollingUpdate) nodeSetPods(ctx context.Context) ([]corev1.Pod, error) {
-	var pods corev1.PodList
-	selector := fmt.Sprintf("%s=%s", nodeSetLabelKey, s.nodeSet.Metadata.Name)
-	if err := s.kubectl.GetJSON(ctx, &pods, "get", "pods", "-n", s.nodeSet.Metadata.Namespace,
-		"-l", selector, "-o", "json"); err != nil {
-		return nil, fmt.Errorf("list worker pods for NodeSet %s: %w", s.nodeSet.Metadata.Name, err)
-	}
-	return pods.Items, nil
 }
 
 func (s *WorkerRollingUpdate) systemDaemonSets(ctx context.Context) ([]appsv1.DaemonSet, error) {

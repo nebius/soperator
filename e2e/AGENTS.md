@@ -188,6 +188,14 @@ Place shared code at the narrowest layer that fits:
 - Add operations to `acceptance/framework` clients when they are broadly
   reusable Kubernetes, Slurm, execution, polling, or selection primitives.
 
+Treat filenames as ownership and discovery signals. When a helper, constant,
+or type is used by unrelated step families, move it from a scenario-named file
+into a neutral domain file such as `job_helpers.go`, `ssh_helpers.go`, or
+`nodeset_helpers.go`. Declarations shared only within one coherent component or
+scenario family may remain with that family. All files in
+`internal/sharedsteps` belong to one Go package; a declaration is not private
+to the file where it is defined.
+
 If a step needs a kubectl, `scontrol`, or similar operation, consider a typed
 client method even when there is only one caller today if the operation has
 plausible broad reuse or benefits from centralized parsing, errors, or retries.

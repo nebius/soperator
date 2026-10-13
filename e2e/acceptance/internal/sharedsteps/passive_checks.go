@@ -3,7 +3,6 @@ package sharedsteps
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -31,10 +30,6 @@ const (
 	allocMemPressureMargin      = uint64(2 * 1024 * 1024 * 1024)
 	allocMemPressureMinimum     = uint64(1 * 1024 * 1024 * 1024)
 	gpuCountCommand             = "set -o pipefail; timeout 30s nvidia-smi -L | wc -l"
-)
-
-var (
-	keyValueLinePattern = regexp.MustCompile(`(?m)^([A-Z_]+)=(.+)$`)
 )
 
 type PassiveChecks struct {
@@ -264,25 +259,11 @@ func (s *PassiveChecks) anAllMemorySlurmJobIsSubmittedToTheSelectedWorker(ctx co
 
 	// alloc_mem_used should reject the allocation in Prolog while the node has
 	// less available memory than the job requested, then drain the node.
-	if err := framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, s.slurm.WaitForJobGone(ctx, job.ID, passiveAllocMemJobTimeout)); err != nil {
-		return err
-	}
-
-	info, err := s.slurm.JobInfo(ctx, job.ID)
+	info, err := waitForExpectedPrologFailure(
+		ctx, s.runtime, s.slurm, job, passiveAllocMemJobTimeout, "alloc_mem_used",
+	)
 	if err != nil {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, err)
-	}
-	if !info.SacctFound {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
-			fmt.Errorf("expected Slurm job %s to be recorded in sacct after Prolog failure, got:\n%s", job.ID, info.SacctDump))
-	}
-	if info.CompletedSuccessfully() {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
-			fmt.Errorf("expected Slurm job %s to fail in Prolog due to alloc_mem_used, got state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit))
-	}
-	if info.IsAlive() {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
-			fmt.Errorf("expected Slurm job %s to be finished after leaving squeue, got state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit))
+		return err
 	}
 	s.runtime.Logf("alloc_mem_used trigger job %s finished as expected: state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit)
 	s.allocMemJob = framework.SbatchJob{}
@@ -513,28 +494,14 @@ func (s *PassiveChecks) aFullNodeGPUSlurmJobIsSubmittedToTheSelectedGPUWorker(ct
 	// Prolog failure still runs Slurm/Epilog cleanup and can keep the job in
 	// COMPLETING for a few minutes. Wait for squeue to clear so later scenarios
 	// do not inherit unfinished cleanup from this disruptive check.
-	if err := framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, s.slurm.WaitForJobGone(ctx, job.ID, passiveAllocGPUJobTimeout)); err != nil {
-		return err
-	}
-
 	// After the job leaves squeue, verify sacct recorded a terminal non-success
 	// outcome. COMPLETED/0:0 would mean the Prolog guard did not catch the
 	// unmanaged GPU process.
-	info, err := s.slurm.JobInfo(ctx, job.ID)
+	info, err := waitForExpectedPrologFailure(
+		ctx, s.runtime, s.slurm, job, passiveAllocGPUJobTimeout, "alloc_gpus_busy",
+	)
 	if err != nil {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, err)
-	}
-	if !info.SacctFound {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
-			fmt.Errorf("expected Slurm job %s to be recorded in sacct after Prolog failure, got:\n%s", job.ID, info.SacctDump))
-	}
-	if info.CompletedSuccessfully() {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
-			fmt.Errorf("expected Slurm job %s to fail in Prolog due to alloc_gpus_busy, got state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit))
-	}
-	if info.IsAlive() {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
-			fmt.Errorf("expected Slurm job %s to be finished after leaving squeue, got state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit))
+		return err
 	}
 	s.runtime.Logf("alloc_gpus_busy trigger job %s finished as expected: state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit)
 	s.allocGPUJob = framework.SbatchJob{}
@@ -775,13 +742,4 @@ func (s *PassiveChecks) stopUnmanagedGPUWorkload(ctx context.Context) error {
 		return fmt.Errorf("stop unmanaged GPU workload on %s: %w", worker.Name, err)
 	}
 	return nil
-}
-
-func parseKeyValueLine(output, key string) string {
-	for _, match := range keyValueLinePattern.FindAllStringSubmatch(output, -1) {
-		if len(match) == 3 && match[1] == key {
-			return strings.TrimSpace(match[2])
-		}
-	}
-	return ""
 }

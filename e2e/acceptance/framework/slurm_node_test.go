@@ -60,6 +60,33 @@ func TestParseSlurmNodeNames(t *testing.T) {
 	assert.Equal(t, []string{"worker-0", "worker-1"}, ParseSlurmNodeNames("\nworker-0\nworker-1\nworker-0\n"))
 }
 
+func TestSlurmNodeHealthAndImmediateReadiness(t *testing.T) {
+	tests := []struct {
+		state          string
+		healthy        bool
+		immediateReady bool
+	}{
+		{state: "IDLE", healthy: true, immediateReady: true},
+		{state: "ALLOCATED+CLOUD", healthy: true, immediateReady: true},
+		{state: "IDLE+POWERED_DOWN", healthy: true, immediateReady: false},
+		{state: "IDLE+POWERING_UP", healthy: true, immediateReady: false},
+		{state: "IDLE+POWERING_DOWN", healthy: true, immediateReady: false},
+		{state: "IDLE+POWER_DOWN", healthy: true, immediateReady: false},
+		{state: "IDLE+DRAIN", healthy: false, immediateReady: false},
+		{state: "DOWN", healthy: false, immediateReady: false},
+		{state: "IDLE+NOT_RESPONDING", healthy: false, immediateReady: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.state, func(t *testing.T) {
+			node := SlurmNodeInfo{State: tt.state}
+			assert.Equal(t, tt.healthy, node.IsHealthy())
+			assert.Equal(t, tt.healthy, node.IsUsable())
+			assert.Equal(t, tt.immediateReady, node.IsReadyForImmediateWork())
+		})
+	}
+}
+
 func TestSlurmClientActiveWorkerStartTimes(t *testing.T) {
 	runtime := &slurmNodeRuntime{outputs: map[string]string{
 		`sinfo -hN -p main -o '%N'`:     "worker-0\nworker-1\nworker-2\nworker-3\n",

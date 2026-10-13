@@ -44,3 +44,21 @@ func TestNodeLocalJailSubmountPathsRequiresConfiguredLocalNVMe(t *testing.T) {
 	_, err := nodeLocalJailSubmountPaths(nil, true)
 	assert.ErrorContains(t, err, "no local-nvme jail submount")
 }
+
+func TestValidateSlurmNodeHealthOutputAllowsHealthyPoweredDownNodes(t *testing.T) {
+	output := "NodeName=worker-0 State=IDLE+CLOUD+POWERED_DOWN\nNodeName=worker-1 State=IDLE+POWERING_UP"
+	require.NoError(t, validateSlurmNodeHealthOutput(output))
+}
+
+func TestValidateSlurmNodeHealthOutputRejectsExactUnhealthyFlags(t *testing.T) {
+	err := validateSlurmNodeHealthOutput("NodeName=worker-0 State=IDLE+DRAIN\nNodeName=worker-1 State=DOWN")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "worker-0 state=IDLE+DRAIN")
+	assert.ErrorContains(t, err, "worker-1 state=DOWN")
+}
+
+func TestValidateSlurmNodeHealthOutputRejectsMissingState(t *testing.T) {
+	err := validateSlurmNodeHealthOutput("NodeName=worker-0 CPUs=16")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "State is missing")
+}

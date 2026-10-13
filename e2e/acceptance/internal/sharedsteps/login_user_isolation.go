@@ -41,6 +41,7 @@ type loginCPUWorkloadResult struct {
 type LoginUserIsolation struct {
 	info    *framework.ClusterInfo
 	runtime framework.Runtime
+	kubectl *framework.KubectlClient
 
 	capacity       int
 	balancedWork   loginCPUWork
@@ -48,8 +49,12 @@ type LoginUserIsolation struct {
 	workloadActive bool
 }
 
-func NewLoginUserIsolation(info *framework.ClusterInfo, runtime framework.Runtime) *LoginUserIsolation {
-	return &LoginUserIsolation{info: info, runtime: runtime}
+func NewLoginUserIsolation(
+	info *framework.ClusterInfo,
+	runtime framework.Runtime,
+	kubectl *framework.KubectlClient,
+) *LoginUserIsolation {
+	return &LoginUserIsolation{info: info, runtime: runtime, kubectl: kubectl}
 }
 
 func (s *LoginUserIsolation) RegisterSteps(sc *godog.ScenarioContext) {
@@ -101,20 +106,11 @@ func (s *LoginUserIsolation) twoRegularUsersCanSSHToTheLoginNode(ctx context.Con
 }
 
 func (s *LoginUserIsolation) loginUserIsolationIsEnabled(ctx context.Context) (bool, error) {
-	output, err := s.runtime.Kubectl().RunWithDefaultRetry(
-		ctx,
-		"get",
-		"slurmcluster",
-		s.info.SlurmClusterName,
-		"-n",
-		framework.SoperatorNamespace,
-		"-o",
-		"jsonpath={.spec.slurmNodes.login.userIsolation.enabled}",
-	)
+	cluster, err := s.kubectl.SlurmCluster(ctx, s.info.SlurmClusterName)
 	if err != nil {
 		return false, fmt.Errorf("read login user isolation configuration: %w", err)
 	}
-	return strings.TrimSpace(output) == "true", nil
+	return cluster.LoginUserIsolationEnabled, nil
 }
 
 func (s *LoginUserIsolation) bothUsersRunAtTwiceCapacity(ctx context.Context) error {
@@ -193,12 +189,15 @@ func (s *LoginUserIsolation) firstUsersAmountOfWorkRemainsStable() error {
 }
 
 func (s *LoginUserIsolation) verifyUserCanSSH(ctx context.Context, userName string) error {
-	command := fmt.Sprintf(
-		"su - %s -c %s",
-		framework.ShellQuote(userName),
-		framework.ShellQuote(loginCPUSSHCommand("true")),
-	)
-	if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
+	if _, err := runSSHCommand(
+		ctx,
+		s.runtime,
+		userName,
+		"id_ecdsa",
+		"localhost",
+		loginCPUCommandTimeout,
+		"true",
+	); err != nil {
 		return fmt.Errorf("verify login CPU isolation SSH connectivity for %s: %w", userName, err)
 	}
 	return nil
@@ -256,7 +255,15 @@ func (s *LoginUserIsolation) startCPUWorkload(
 	results chan<- loginCPUWorkloadResult,
 ) {
 	go func() {
-		output, err := s.runtime.Jail().Run(ctx, loginCPUWorkloadCommand(userName, burners))
+		output, err := runSSHCommand(
+			ctx,
+			s.runtime,
+			userName,
+			"id_ecdsa",
+			"localhost",
+			loginCPUCommandTimeout,
+			loginCPUWorkloadScript(burners),
+		)
 		if err != nil {
 			err = fmt.Errorf("run login CPU workload for %s: %w", userName, err)
 		}
@@ -299,7 +306,7 @@ func waitForLoginCPUWorkloads(ctx context.Context, results <-chan loginCPUWorklo
 	return work, nil
 }
 
-func loginCPUWorkloadCommand(userName string, burners int) string {
+func loginCPUWorkloadScript(burners int) string {
 	burnScript := fmt.Sprintf(`
 marker=%s
 count=0
@@ -309,7 +316,7 @@ while ((SECONDS < deadline)); do
 done
 printf '%%s\n' "${count}"
 `, framework.ShellQuote(loginCPUBurnMarker), loginCPUWorkloadDuration.Seconds())
-	remoteScript := fmt.Sprintf(`
+	return fmt.Sprintf(`
 set -euo pipefail
 workdir="$(mktemp -d /tmp/soperator-e2e-login-cpu.XXXXXX)"
 trap 'rm -r -- "${workdir}"' EXIT
@@ -330,19 +337,6 @@ if ((worker_failed)); then
 fi
 awk '{total += $1} END {printf "SOPERATOR_E2E_LOGIN_CPU_WORK %%.0f\n", total}' "${workdir}"/*
 `, burners, framework.ShellQuote(burnScript))
-	return fmt.Sprintf(
-		"su - %s -c %s",
-		framework.ShellQuote(userName),
-		framework.ShellQuote(loginCPUSSHCommand(framework.BashLC(remoteScript))),
-	)
-}
-
-func loginCPUSSHCommand(command string) string {
-	return fmt.Sprintf(
-		"timeout %.0f ssh -i ~/.ssh/id_ecdsa -o IdentitiesOnly=yes -o BatchMode=yes -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null localhost %s",
-		loginCPUCommandTimeout.Seconds(),
-		framework.ShellQuote(command),
-	)
 }
 
 func parseLoginCPUWork(output string) (uint64, error) {

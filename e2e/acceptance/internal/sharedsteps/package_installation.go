@@ -39,9 +39,8 @@ func (s *PackageInstallation) theNVIDIADriverIsWorkingOnAWorkerNode(ctx context.
 	}
 	s.packageWorker = workers[0]
 
-	cmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(s.packageWorker.Name))
-	if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
-		s.logInstallFailureDiagnostics(ctx, s.packageWorker.Name)
+	if _, err := s.runtime.Worker(s.packageWorker).RunWithDefaultRetry(ctx, "nvidia-smi >/dev/null"); err != nil {
+		s.logInstallFailureDiagnostics(ctx, s.packageWorker)
 		return fmt.Errorf("verify nvidia-smi before install: %w", err)
 	}
 	return nil
@@ -51,55 +50,50 @@ func (s *PackageInstallation) jqIsInstalledOnTheWorkerNode(ctx context.Context) 
 	// TODO(SCHED-1498): switch this test back to installing nvitop.
 	// nvitop currently pulls NVIDIA user-space packages, and dpkg fails in our jail/chroot layout
 	// with "Invalid cross-device link" when creating backup hardlinks during package replacement.
-	workerName := s.packageWorker.Name
-	updateCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get update'", framework.ShellQuote(workerName))
-	if _, err := s.runtime.Jail().Run(ctx, updateCmd); err != nil {
-		s.logInstallFailureDiagnostics(ctx, workerName)
+	updateCmd := "DEBIAN_FRONTEND=noninteractive apt-get update"
+	if _, err := s.runtime.Worker(s.packageWorker).Run(ctx, updateCmd); err != nil {
+		s.logInstallFailureDiagnostics(ctx, s.packageWorker)
 		return fmt.Errorf("apt-get update: %w", err)
 	}
 
-	installCmd := fmt.Sprintf("ssh %s 'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq'", framework.ShellQuote(workerName))
-	if _, err := s.runtime.Jail().Run(ctx, installCmd); err != nil {
-		s.logInstallFailureDiagnostics(ctx, workerName)
+	installCmd := "DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq"
+	if _, err := s.runtime.Worker(s.packageWorker).Run(ctx, installCmd); err != nil {
+		s.logInstallFailureDiagnostics(ctx, s.packageWorker)
 		return fmt.Errorf("apt-get install jq: %w", err)
 	}
 	return nil
 }
 
 func (s *PackageInstallation) theNVIDIADriverIsStillWorkingOnTheWorkerNode(ctx context.Context) error {
-	workerName := s.packageWorker.Name
-	cmd := fmt.Sprintf("ssh %s 'nvidia-smi >/dev/null'", framework.ShellQuote(workerName))
-	if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
-		s.logInstallFailureDiagnostics(ctx, workerName)
+	if _, err := s.runtime.Worker(s.packageWorker).RunWithDefaultRetry(ctx, "nvidia-smi >/dev/null"); err != nil {
+		s.logInstallFailureDiagnostics(ctx, s.packageWorker)
 		return fmt.Errorf("verify nvidia-smi after install: %w", err)
 	}
 	return nil
 }
 
 func (s *PackageInstallation) jqIsAvailableOnTheWorkerNode(ctx context.Context) error {
-	workerName := s.packageWorker.Name
-	cmd := fmt.Sprintf("ssh %s 'jq --version >/dev/null'", framework.ShellQuote(workerName))
-	if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, cmd); err != nil {
-		s.logInstallFailureDiagnostics(ctx, workerName)
+	if _, err := s.runtime.Worker(s.packageWorker).RunWithDefaultRetry(ctx, "jq --version >/dev/null"); err != nil {
+		s.logInstallFailureDiagnostics(ctx, s.packageWorker)
 		return fmt.Errorf("verify jq after install: %w", err)
 	}
 	return nil
 }
 
-func (s *PackageInstallation) logInstallFailureDiagnostics(ctx context.Context, workerName string) {
+func (s *PackageInstallation) logInstallFailureDiagnostics(ctx context.Context, worker framework.WorkerInfo) {
 	commands := []string{
-		fmt.Sprintf("ssh %s 'dpkg --audit || true'", framework.ShellQuote(workerName)),
-		fmt.Sprintf("ssh %s 'apt-cache policy jq || true'", framework.ShellQuote(workerName)),
-		fmt.Sprintf("ssh %s 'tail -n 60 /var/log/dpkg.log || true'", framework.ShellQuote(workerName)),
-		fmt.Sprintf("ssh %s 'tail -n 60 /var/log/apt/term.log || true'", framework.ShellQuote(workerName)),
+		"dpkg --audit || true",
+		"apt-cache policy jq || true",
+		"tail -n 60 /var/log/dpkg.log || true",
+		"tail -n 60 /var/log/apt/term.log || true",
 	}
 
 	for _, command := range commands {
-		output, err := s.runtime.Jail().RunWithRetry(ctx, command, 2, 10*time.Second)
+		output, err := s.runtime.Worker(worker).RunWithRetry(ctx, command, 2, 10*time.Second)
 		if err != nil {
-			s.runtime.Logf("package installation debug command failed (%s): %v", command, err)
+			s.runtime.Logf("package installation debug command failed on %s (%s): %v", worker.Name, command, err)
 			continue
 		}
-		s.runtime.Logf("package installation debug output (%s):\n%s", command, strings.TrimSpace(output))
+		s.runtime.Logf("package installation debug output on %s (%s):\n%s", worker.Name, command, strings.TrimSpace(output))
 	}
 }

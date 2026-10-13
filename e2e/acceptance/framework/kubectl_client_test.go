@@ -23,6 +23,7 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 					"accounting": {"enabled": true},
 					"login": {
 						"docker": {"enabled": true},
+						"userIsolation": {"enabled": true},
 						"volumes": {"jailSubMounts": [
 							{"name": "image-storage", "mountPath": "/mnt/local-data", "volumeClaimTemplateSpec": {"accessModes": ["ReadWriteOnce"]}}
 						]}
@@ -35,10 +36,11 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 	cluster, err := NewKubectlClient(exec).SlurmCluster(t.Context(), "soperator")
 	require.NoError(t, err)
 	assert.Equal(t, SlurmClusterInfo{
-		Name:               "soperator",
-		Namespace:          "soperator",
-		AccountingEnabled:  true,
-		LoginDockerEnabled: true,
+		Name:                      "soperator",
+		Namespace:                 "soperator",
+		AccountingEnabled:         true,
+		LoginDockerEnabled:        true,
+		LoginUserIsolationEnabled: true,
 		LoginJailSubMounts: []JailSubMountInfo{
 			{Name: "image-storage", MountPath: "/mnt/local-data"},
 		},

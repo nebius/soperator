@@ -31,10 +31,6 @@ const (
 	topologyCleanupTimeout  = 10 * time.Minute
 )
 
-// powerStateFlags are the node state flags of a worker that has no slurmd running, so it carries no
-// topology registration and cannot take a job without being powered up first.
-var powerStateFlags = []string{"POWERED_DOWN", "POWERING_UP", "POWERING_DOWN", "POWER_DOWN"}
-
 // slurmNodeView is what `scontrol show node` says about one worker.
 type slurmNodeView struct {
 	Info framework.SlurmNodeInfo
@@ -46,15 +42,7 @@ type slurmNodeView struct {
 // registration. Powered-down workers are excluded rather than woken up: a scenario that powers a
 // node on measures the power-up path, not topology.
 func (n slurmNodeView) Ready() bool {
-	if !n.Info.IsUsable() {
-		return false
-	}
-	for _, flag := range powerStateFlags {
-		if n.Info.HasStateFlag(flag) {
-			return false
-		}
-	}
-	return true
+	return n.Info.IsReadyForImmediateWork()
 }
 
 // Idle reports whether the worker can take a job right now. Ready is not enough for that: a worker
@@ -1449,28 +1437,10 @@ func (s *Topology) slurmBlocksOf(ctx context.Context, topology string) ([]slurmB
 // expandHostlist turns a Slurm hostlist into node names, asking scontrol only for the values that
 // carry a range.
 func (s *Topology) expandHostlist(ctx context.Context, value string) ([]string, error) {
-	if nodes, ok := plainHostlist(value); ok {
-		return nodes, nil
-	}
-	if cached, ok := s.hostlists[value]; ok {
-		return cached, nil
-	}
-
-	out, err := s.runtime.Controller().RunWithDefaultRetry(ctx,
-		fmt.Sprintf("scontrol show hostnames %s", framework.ShellQuote(value)))
-	if err != nil {
-		return nil, fmt.Errorf("expand hostlist %q: %w", value, err)
-	}
-	nodes := framework.ParseSlurmNodeNames(out)
-	if len(nodes) == 0 {
-		return nil, fmt.Errorf("hostlist %q expanded to nothing", value)
-	}
-
 	if s.hostlists == nil {
 		s.hostlists = make(map[string][]string)
 	}
-	s.hostlists[value] = nodes
-	return nodes, nil
+	return expandSlurmHostlist(ctx, s.runtime, value, s.hostlists)
 }
 
 // region srun

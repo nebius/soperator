@@ -9,22 +9,14 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
-const (
-	containerSmokeSacctTimeout = 2 * time.Minute
-
-	// Cluster-supported GPU diagnostic image; includes nvidia-smi for container GPU visibility.
-	// https://github.com/nebius/ml-containers/pull/111
-	gpuSmokeImageRef    = "ml-containers/training_diag:13.0.3-ubuntu24.04-20261013071503"
-	gpuSmokeDockerImage = "cr.nebius.cloud/" + gpuSmokeImageRef
-	gpuSmokeEnrootImage = "docker://cr.nebius.cloud#" + gpuSmokeImageRef
-)
+const jobSacctTimeout = 2 * time.Minute
 
 func waitForJobSucceeded(ctx context.Context, exec framework.Exec, slurm *framework.SlurmClient, job framework.SbatchJob, timeout time.Duration) error {
 	if err := framework.AnnotateWithJobLog(ctx, exec, slurm, job, slurm.WaitForJobGone(ctx, job.ID, timeout)); err != nil {
 		return err
 	}
 
-	waitCtx, cancel := context.WithTimeout(ctx, containerSmokeSacctTimeout)
+	waitCtx, cancel := context.WithTimeout(ctx, jobSacctTimeout)
 	defer cancel()
 
 	for {
@@ -54,19 +46,41 @@ func waitForJobSucceeded(ctx context.Context, exec framework.Exec, slurm *framew
 	}
 }
 
-func assertJobStdoutReportsVisibleGPUs(ctx context.Context, exec framework.Exec, job framework.SbatchJob) error {
-	stdout, err := readJobFile(ctx, exec, job.StdoutPath)
-	if err != nil {
-		return err
+func waitForExpectedPrologFailure(
+	ctx context.Context,
+	exec framework.Exec,
+	slurm *framework.SlurmClient,
+	job framework.SbatchJob,
+	timeout time.Duration,
+	reason string,
+) (framework.SlurmJobInfo, error) {
+	if err := framework.AnnotateWithJobLog(ctx, exec, slurm, job, slurm.WaitForJobGone(ctx, job.ID, timeout)); err != nil {
+		return framework.SlurmJobInfo{}, err
 	}
-	return assertGPUListing(stdout, fmt.Sprintf("job stdout %s", job.StdoutPath))
+
+	info, err := slurm.JobInfo(ctx, job.ID)
+	if err != nil {
+		return framework.SlurmJobInfo{}, framework.AnnotateWithJobLog(ctx, exec, slurm, job, err)
+	}
+	if err := validateExpectedPrologFailure(job.ID, reason, info); err != nil {
+		return framework.SlurmJobInfo{}, framework.AnnotateWithJobLog(ctx, exec, slurm, job, err)
+	}
+	return info, nil
 }
 
-func assertGPUListing(output, source string) error {
-	if strings.Contains(output, "GPU ") {
-		return nil
+func validateExpectedPrologFailure(jobID, reason string, info framework.SlurmJobInfo) error {
+	if !info.SacctFound {
+		return fmt.Errorf("expected Slurm job %s to be recorded in sacct after Prolog failure, got:\n%s", jobID, info.SacctDump)
 	}
-	return fmt.Errorf("expected nvidia-smi GPU listing in %s, got output:\n%s", source, strings.TrimSpace(output))
+	if info.CompletedSuccessfully() {
+		return fmt.Errorf("expected Slurm job %s to fail in Prolog due to %s, got state=%s exit_code=%s",
+			jobID, reason, info.SacctState, info.SacctExit)
+	}
+	if info.IsAlive() {
+		return fmt.Errorf("expected Slurm job %s to be finished after leaving squeue, got state=%s exit_code=%s",
+			jobID, info.SacctState, info.SacctExit)
+	}
+	return nil
 }
 
 func readJobFile(ctx context.Context, exec framework.Exec, path string) (string, error) {

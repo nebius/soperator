@@ -67,11 +67,16 @@ type SlurmClusterAccounting struct {
 }
 
 type SlurmClusterLogin struct {
-	Docker  SlurmClusterLoginDocker  `json:"docker"`
-	Volumes SlurmClusterLoginVolumes `json:"volumes"`
+	Docker        SlurmClusterLoginDocker        `json:"docker"`
+	UserIsolation SlurmClusterLoginUserIsolation `json:"userIsolation"`
+	Volumes       SlurmClusterLoginVolumes       `json:"volumes"`
 }
 
 type SlurmClusterLoginDocker struct {
+	Enabled bool `json:"enabled"`
+}
+
+type SlurmClusterLoginUserIsolation struct {
 	Enabled bool `json:"enabled"`
 }
 
