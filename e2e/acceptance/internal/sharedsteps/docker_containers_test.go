@@ -17,6 +17,16 @@ func TestGraphDriverPathsUnderAcceptsDockerOverlayInspectData(t *testing.T) {
 	}
 }
 
+func TestGraphDriverPathsUnderAcceptsHostVisibleJailPaths(t *testing.T) {
+	const root = "/mnt/image-storage/docker"
+	output := `/mnt/jail/mnt/image-storage/docker/overlay2/init/diff:/mnt/jail/mnt/image-storage/docker/overlay2/base/diff
+/mnt/jail/mnt/image-storage/docker/overlay2/container/merged`
+
+	if !graphDriverPathsUnder(output, root) {
+		t.Fatalf("graphDriverPathsUnder() = false, want true")
+	}
+}
+
 func TestGraphDriverPathsUnderRejectsUnexpectedPaths(t *testing.T) {
 	const root = "/mnt/image-storage/docker"
 	tests := []struct {
@@ -63,6 +73,16 @@ func TestRuntimePathsUnderAcceptsDockerInspectPaths(t *testing.T) {
 /mnt/image-storage/docker/containers/ac9f51a97037/hosts
 /mnt/image-storage/docker/containers/ac9f51a97037/ac9f51a97037-json.log
 `
+
+	if !runtimePathsUnder(output, root) {
+		t.Fatalf("runtimePathsUnder() = false, want true")
+	}
+}
+
+func TestRuntimePathsUnderAcceptsHostVisibleJailPaths(t *testing.T) {
+	const root = "/mnt/local-data/docker"
+	output := `/mnt/jail/mnt/local-data/docker/containers/ac9f51a97037/resolv.conf
+/mnt/jail/mnt/local-data/docker/containers/ac9f51a97037/hostname`
 
 	if !runtimePathsUnder(output, root) {
 		t.Fatalf("runtimePathsUnder() = false, want true")
@@ -128,6 +148,37 @@ func TestPathIsUnder(t *testing.T) {
 				t.Fatalf("pathIsUnder(%q, %q) = %t, want %t", tt.value, root, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestDockerJailVisiblePath(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{name: "jail visible", value: "/mnt/image-storage/docker", want: "/mnt/image-storage/docker"},
+		{name: "host visible", value: "/mnt/jail/mnt/image-storage/docker", want: "/mnt/image-storage/docker"},
+		{name: "jail root", value: "/mnt/jail", want: "/"},
+		{name: "similar prefix", value: "/mnt/jail-other/docker", want: "/mnt/jail-other/docker"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := dockerJailVisiblePath(tt.value)
+			if err != nil {
+				t.Fatalf("dockerJailVisiblePath() error = %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("dockerJailVisiblePath() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDockerJailVisiblePathRejectsTraversal(t *testing.T) {
+	if _, err := dockerJailVisiblePath("/mnt/jail/mnt/image-storage/../docker"); err == nil {
+		t.Fatal("dockerJailVisiblePath() error = nil, want error")
 	}
 }
 

@@ -4,16 +4,43 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
 func TestNodeLocalJailSubmountPermissionsCommand(t *testing.T) {
-	command := nodeLocalJailSubmountPermissionsCommand(false)
+	command := nodeLocalJailSubmountPermissionsCommand([]string{"/mnt/local-data"})
 
-	assert.Contains(t, command, "for path in /scratch")
-	assert.NotContains(t, command, "/mnt/local-nvme")
+	assert.Contains(t, command, "for path in '/mnt/local-data'")
 	assert.Contains(t, command, `stat -c '%a'`)
 	assert.Contains(t, command, `[ "$mode" != "777" ]`)
+}
 
-	command = nodeLocalJailSubmountPermissionsCommand(true)
-	assert.Contains(t, command, "for path in /scratch /mnt/local-nvme")
+func TestNodeLocalJailSubmountPaths(t *testing.T) {
+	mounts := []framework.JailSubMountInfo{
+		{Name: "home", MountPath: "/home"},
+		{Name: "image-storage", MountPath: "/mnt/image-storage"},
+		{Name: "local-data", MountPath: "/mnt/local-data"},
+		{Name: "local-nvme", MountPath: "/mnt/local-nvme"},
+	}
+
+	paths, err := nodeLocalJailSubmountPaths(mounts, false)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/mnt/local-data"}, paths)
+
+	paths, err = nodeLocalJailSubmountPaths(mounts, true)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/mnt/local-data", "/mnt/local-nvme"}, paths)
+}
+
+func TestNodeLocalJailSubmountPathsAllowsNoLocalData(t *testing.T) {
+	paths, err := nodeLocalJailSubmountPaths([]framework.JailSubMountInfo{{Name: "image-storage", MountPath: "/mnt/image-storage"}}, false)
+	require.NoError(t, err)
+	assert.Empty(t, paths)
+}
+
+func TestNodeLocalJailSubmountPathsRequiresConfiguredLocalNVMe(t *testing.T) {
+	_, err := nodeLocalJailSubmountPaths(nil, true)
+	assert.ErrorContains(t, err, "no local-nvme jail submount")
 }

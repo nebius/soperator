@@ -21,7 +21,12 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 				"pamSlurmAdopt": {"enabled": true},
 				"slurmNodes": {
 					"accounting": {"enabled": true},
-					"login": {"docker": {"enabled": true}}
+					"login": {
+						"docker": {"enabled": true},
+						"volumes": {"jailSubMounts": [
+							{"name": "image-storage", "mountPath": "/mnt/local-data", "volumeClaimTemplateSpec": {"accessModes": ["ReadWriteOnce"]}}
+						]}
+					}
 				}
 			}
 		}`,
@@ -30,10 +35,13 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 	cluster, err := NewKubectlClient(exec).SlurmCluster(t.Context(), "soperator")
 	require.NoError(t, err)
 	assert.Equal(t, SlurmClusterInfo{
-		Name:                 "soperator",
-		Namespace:            "soperator",
-		AccountingEnabled:    true,
-		LoginDockerEnabled:   true,
+		Name:               "soperator",
+		Namespace:          "soperator",
+		AccountingEnabled:  true,
+		LoginDockerEnabled: true,
+		LoginJailSubMounts: []JailSubMountInfo{
+			{Name: "image-storage", MountPath: "/mnt/local-data"},
+		},
 		PAMSlurmAdoptEnabled: true,
 		CustomSlurmConfig:    &customConfig,
 	}, cluster)
@@ -138,7 +146,15 @@ func TestKubectlClientNodeSetsFiltersByClusterName(t *testing.T) {
 			"items": [
 				{
 					"metadata": {"name": "worker-gpu", "namespace": "soperator"},
-					"spec": {"clusterName": "soperator", "replicas": 2, "gpu": {"enabled": true}},
+					"spec": {
+						"clusterName": "soperator",
+						"replicas": 2,
+						"gpu": {"enabled": true},
+						"slurmd": {"volumes": {"jailSubMounts": [
+							{"name": "local-data", "mountPath": "/scratch", "volumeClaimTemplateSpec": {"accessModes": ["ReadWriteOnce"]}},
+							{"name": "config", "mountPath": "/etc/config", "readOnly": true, "volumeSource": {"configMap": {"name": "config"}}}
+						]}}
+					},
 					"status": {"phase": "Ready", "replicas": 1}
 				},
 				{
@@ -173,6 +189,10 @@ func TestKubectlClientNodeSetsFiltersByClusterName(t *testing.T) {
 		ReadyReplicas: 1,
 		HasGPU:        true,
 		Phase:         "Ready",
+		JailSubMounts: []JailSubMountInfo{
+			{Name: "local-data", MountPath: "/scratch"},
+			{Name: "config", MountPath: "/etc/config", ReadOnly: true},
+		},
 	}, nodeSets[1])
 }
 
@@ -198,7 +218,7 @@ func TestKubectlClientWorkerPods(t *testing.T) {
 		"get\x00pods\x00-n\x00soperator\x00-l\x00slurm.nebius.ai/worker=true\x00-o\x00json": `{
 			"items": [
 				{
-					"metadata": {"name": "kube-worker-a"},
+					"metadata": {"name": "kube-worker-a", "labels": {"slurm.nebius.ai/nodeset": "worker-a-set"}},
 					"spec": {"hostname": "worker-a", "nodeName": "node-a", "volumes": [{"name": "local-nvme", "emptyDir": {}}]},
 					"status": {"conditions": [{"type": "Ready", "status": "True"}]}
 				},
@@ -214,7 +234,7 @@ func TestKubectlClientWorkerPods(t *testing.T) {
 	pods, err := NewKubectlClient(exec).WorkerPods(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, []WorkerPodInfo{
-		{SlurmNodeName: "worker-a", PodName: "kube-worker-a", KubernetesNodeName: "node-a", Ready: true, HasLocalNVMe: true},
+		{SlurmNodeName: "worker-a", PodName: "kube-worker-a", NodeSetName: "worker-a-set", KubernetesNodeName: "node-a", Ready: true, HasLocalNVMe: true},
 		{SlurmNodeName: "worker-b", PodName: "kube-worker-b", KubernetesNodeName: "node-b"},
 	}, pods)
 }
