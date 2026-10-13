@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,6 +73,134 @@ func TestSubmitBatchFallsBackOutsideScenario(t *testing.T) {
 	assert.Equal(t, AcceptanceJobOutputDir+"/smoke-123.out", job.StdoutPath)
 }
 
+func TestSubmitBatchRetriesPreExecutionConnectionErrors(t *testing.T) {
+	testCases := []struct {
+		name string
+		err  string
+	}{
+		{
+			name: "API dial timeout",
+			err:  "kubectl exec login-0: exit status 1: Unable to connect to the server: dial tcp [::1]:443: i/o timeout",
+		},
+		{
+			name: "no route to API",
+			err:  "kubectl exec login-0: exit status 1: error: dial tcp [::1]:443: connect: no route to host",
+		},
+		{
+			name: "API connection timeout",
+			err:  "kubectl exec login-0: exit status 1: error: dial tcp [::1]:443: connect: connection timed out",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			runtime := &submitBatchRuntime{results: []submitBatchResult{
+				{err: errors.New(tt.err)},
+				{out: "123"},
+			}}
+			client := NewSlurmClient(runtime)
+			client.submitRetryDelay = 0
+
+			job, err := client.SubmitBatch(t.Context(), SbatchOptions{
+				JobName: "smoke",
+				Wrap:    "true",
+			})
+			require.NoError(t, err)
+
+			assert.Equal(t, "123", job.ID)
+			assert.Equal(t, 2, runtime.jailCalls)
+		})
+	}
+}
+
+func TestSubmitBatchDoesNotRetryUncertainFailures(t *testing.T) {
+	testCases := []struct {
+		name string
+		out  string
+		err  error
+	}{
+		{
+			name: "unexpected EOF",
+			err:  errors.New("kubectl exec login-0: exit status 1: error: unexpected EOF"),
+		},
+		{
+			name: "sbatch rejection",
+			err:  errors.New("kubectl exec login-0: exit status 1: sbatch: error: Invalid account"),
+		},
+		{
+			name: "partial stdout",
+			out:  "123\n",
+			err:  errors.New("kubectl exec login-0: exit status 1: error: dial tcp [::1]:443: i/o timeout"),
+		},
+		{
+			name: "non-kubectl dial error",
+			err:  errors.New("dial tcp [::1]:443: i/o timeout"),
+		},
+		{
+			name: "context canceled",
+			err:  context.Canceled,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			runtime := &submitBatchRuntime{results: []submitBatchResult{
+				{out: tt.out, err: tt.err},
+				{out: "123"},
+			}}
+			client := NewSlurmClient(runtime)
+			client.submitRetryDelay = 0
+
+			_, err := client.SubmitBatch(t.Context(), SbatchOptions{
+				JobName: "smoke",
+				Wrap:    "true",
+			})
+			require.Error(t, err)
+
+			assert.Equal(t, 1, runtime.jailCalls)
+		})
+	}
+}
+
+func TestSubmitBatchStopsAfterRetryLimit(t *testing.T) {
+	retryableErr := errors.New("kubectl exec login-0: exit status 1: error: dial tcp [::1]:443: i/o timeout")
+	runtime := &submitBatchRuntime{results: []submitBatchResult{
+		{err: retryableErr},
+		{err: retryableErr},
+		{err: retryableErr},
+		{out: "123"},
+	}}
+	client := NewSlurmClient(runtime)
+	client.submitRetryDelay = 0
+
+	_, err := client.SubmitBatch(t.Context(), SbatchOptions{
+		JobName: "smoke",
+		Wrap:    "true",
+	})
+	require.Error(t, err)
+
+	assert.ErrorIs(t, err, retryableErr)
+	assert.Equal(t, submitBatchRetryAttempts, runtime.jailCalls)
+}
+
+func TestSubmitBatchStopsWhenRetryBecomesUncertain(t *testing.T) {
+	runtime := &submitBatchRuntime{results: []submitBatchResult{
+		{err: errors.New("kubectl exec login-0: exit status 1: error: dial tcp [::1]:443: connect: no route to host")},
+		{err: errors.New("kubectl exec login-0: exit status 1: error: unexpected EOF")},
+		{out: "123"},
+	}}
+	client := NewSlurmClient(runtime)
+	client.submitRetryDelay = 0
+
+	_, err := client.SubmitBatch(t.Context(), SbatchOptions{
+		JobName: "smoke",
+		Wrap:    "true",
+	})
+	require.ErrorContains(t, err, "unexpected EOF")
+
+	assert.Equal(t, 2, runtime.jailCalls)
+}
+
 func TestParseSacctJob(t *testing.T) {
 	dump := `
 123.batch|COMPLETED|0:0||
@@ -100,11 +229,23 @@ func TestSlurmJobInfoCompletedSuccessfully(t *testing.T) {
 type submitBatchRuntime struct {
 	Runtime
 	jailCommand string
+	jailCalls   int
+	results     []submitBatchResult
+}
+
+type submitBatchResult struct {
+	out string
+	err error
 }
 
 func (r *submitBatchRuntime) Jail() CommandScope {
 	return NewCommandScope(func(ctx context.Context, command string) (string, error) {
 		r.jailCommand = command
+		resultIndex := r.jailCalls
+		r.jailCalls++
+		if resultIndex < len(r.results) {
+			return r.results[resultIndex].out, r.results[resultIndex].err
+		}
 		return "123", nil
 	})
 }

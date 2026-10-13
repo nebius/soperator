@@ -12,12 +12,18 @@ import (
 // volume captured by the CI jail artifact, so job output survives past the run.
 const AcceptanceJobOutputDir = "/opt/soperator-outputs/shared/acceptance"
 
+const submitBatchRetryAttempts = 3
+
 type SlurmClient struct {
-	runtime Runtime
+	runtime          Runtime
+	submitRetryDelay time.Duration
 }
 
 func NewSlurmClient(runtime Runtime) *SlurmClient {
-	return &SlurmClient{runtime: runtime}
+	return &SlurmClient{
+		runtime:          runtime,
+		submitRetryDelay: DefaultRetryDelay,
+	}
 }
 
 // SbatchOptions describes a Slurm batch submission from an acceptance test.
@@ -104,8 +110,15 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	}
 	command := mkdirCommand + " && " + sbatchCommand
 
-	// TODO: Add safe retries for sbatch without creating duplicate jobs.
-	out, err := s.runtime.Jail().Run(ctx, command)
+	out, err := retryIf(
+		ctx,
+		submitBatchRetryAttempts,
+		s.submitRetryDelay,
+		isRetryableSbatchPreExecutionError,
+		func(attemptCtx context.Context) (string, error) {
+			return s.runtime.Jail().Run(attemptCtx, command)
+		},
+	)
 	if err != nil {
 		return SbatchJob{}, fmt.Errorf("submit sbatch job %q: %w", jobName, err)
 	}
@@ -119,6 +132,25 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 		StdoutPath: fmt.Sprintf("%s/%s-%s.out", outputDir, jobName, jobID),
 		StderrPath: fmt.Sprintf("%s/%s-%s.err", outputDir, jobName, jobID),
 	}, nil
+}
+
+// isRetryableSbatchPreExecutionError recognizes failures that kubectl reports
+// before it establishes the exec stream, so the remote sbatch command cannot
+// have started. Unknown failures, partial stdout, and stream errors such as EOF
+// deliberately fail closed to avoid duplicate job submissions.
+func isRetryableSbatchPreExecutionError(out string, err error) bool {
+	if err == nil || strings.TrimSpace(out) != "" {
+		return false
+	}
+
+	message := strings.ToLower(err.Error())
+	if !strings.Contains(message, "kubectl") || !strings.Contains(message, "dial tcp") {
+		return false
+	}
+
+	return strings.Contains(message, "i/o timeout") ||
+		strings.Contains(message, "no route to host") ||
+		strings.Contains(message, "connection timed out")
 }
 
 func (s *SlurmClient) WaitForJobRunning(ctx context.Context, jobID string, timeout time.Duration) error {
