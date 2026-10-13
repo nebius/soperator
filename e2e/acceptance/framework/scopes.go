@@ -52,6 +52,16 @@ func (s commandScope) RunWithDefaultRetry(ctx context.Context, command string) (
 }
 
 func retry(ctx context.Context, attempts int, delay time.Duration, run func(context.Context) (string, error)) (string, error) {
+	return retryIf(ctx, attempts, delay, func(string, error) bool { return true }, run)
+}
+
+func retryIf(
+	ctx context.Context,
+	attempts int,
+	delay time.Duration,
+	shouldRetry func(string, error) bool,
+	run func(context.Context) (string, error),
+) (string, error) {
 	if attempts < 1 {
 		attempts = 1
 	}
@@ -63,7 +73,7 @@ func retry(ctx context.Context, attempts int, delay time.Duration, run func(cont
 		if lastErr == nil {
 			return out, nil
 		}
-		if attempt == attempts {
+		if attempt == attempts || !shouldRetry(out, lastErr) {
 			break
 		}
 
