@@ -14,7 +14,7 @@ const (
 
 	// Cluster-supported GPU diagnostic image; includes nvidia-smi for container GPU visibility.
 	// https://github.com/nebius/ml-containers/pull/111
-	gpuSmokeImageRef    = "ml-containers/training_diag:13.0.3-ubuntu24.04-20261012083831"
+	gpuSmokeImageRef    = "ml-containers/training_diag:13.0.3-ubuntu24.04-20261013071503"
 	gpuSmokeDockerImage = "cr.nebius.cloud/" + gpuSmokeImageRef
 	gpuSmokeEnrootImage = "docker://cr.nebius.cloud#" + gpuSmokeImageRef
 )
