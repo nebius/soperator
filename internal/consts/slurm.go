@@ -38,12 +38,12 @@ var (
 
 // order of reasons is important, because we use it to determine if node is in maintenance
 var SlurmNodeReasonsList = []string{
-	SlurmNodeReasonKillTaskFailed,
 	SlurmNodeReasonNodeReplacement,
 	SlurmNodeReasonNodeReboot,
 	SlurmNodeReasonHC,
 	SlurmUserReasonHC,
 	SlurmHardwareReasonHC,
+	SlurmNodeReasonKillTaskFailed,
 }
 
 const (

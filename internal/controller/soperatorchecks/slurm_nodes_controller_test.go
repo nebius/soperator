@@ -138,6 +138,138 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 			want:         map[types.NamespacedName][]slurmapi.Node{},
 			wantErr:      false,
 		},
+		{
+			name:        "happy-path/node-problem-prefix-beats-kill-task-failed-diagnostic",
+			k8sNodeName: "k8s-node",
+			slurmClusterName: types.NamespacedName{
+				Namespace: "namespace",
+				Name:      "name",
+			},
+			listNodesOut: []slurmapi.Node{
+				{
+					Name:        "node",
+					ClusterName: "slurm-cluster",
+					InstanceID:  "k8s-node",
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateDRAIN: {},
+					},
+					Reason: ptr.To(slurmapi.NodeReason{
+						Reason:    "[node_problem] active-check: Kill task failed",
+						ChangedAt: time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
+					}),
+				},
+			},
+			listNodesErr: nil,
+			want: map[types.NamespacedName][]slurmapi.Node{
+				{
+					Namespace: "namespace",
+					Name:      "name",
+				}: {
+					{
+						Name:        "node",
+						ClusterName: "slurm-cluster",
+						InstanceID:  "k8s-node",
+						States: map[api.V0044NodeState]struct{}{
+							api.V0044NodeStateDRAIN: {},
+						},
+						Reason: ptr.To(slurmapi.NodeReason{
+							Reason:         consts.SlurmNodeReasonHC,
+							OriginalReason: "[node_problem] active-check: Kill task failed",
+							ChangedAt:      time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
+						}),
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:        "happy-path/hardware-problem-prefix-beats-kill-task-failed-diagnostic",
+			k8sNodeName: "k8s-node",
+			slurmClusterName: types.NamespacedName{
+				Namespace: "namespace",
+				Name:      "name",
+			},
+			listNodesOut: []slurmapi.Node{
+				{
+					Name:        "node",
+					ClusterName: "slurm-cluster",
+					InstanceID:  "k8s-node",
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateDRAIN: {},
+					},
+					Reason: ptr.To(slurmapi.NodeReason{
+						Reason:    "[hardware_problem] gpu-check: Kill task failed",
+						ChangedAt: time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
+					}),
+				},
+			},
+			listNodesErr: nil,
+			want: map[types.NamespacedName][]slurmapi.Node{
+				{
+					Namespace: "namespace",
+					Name:      "name",
+				}: {
+					{
+						Name:        "node",
+						ClusterName: "slurm-cluster",
+						InstanceID:  "k8s-node",
+						States: map[api.V0044NodeState]struct{}{
+							api.V0044NodeStateDRAIN: {},
+						},
+						Reason: ptr.To(slurmapi.NodeReason{
+							Reason:         consts.SlurmHardwareReasonHC,
+							OriginalReason: "[hardware_problem] gpu-check: Kill task failed",
+							ChangedAt:      time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
+						}),
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:        "happy-path/user-problem-prefix-beats-kill-task-failed-diagnostic",
+			k8sNodeName: "k8s-node",
+			slurmClusterName: types.NamespacedName{
+				Namespace: "namespace",
+				Name:      "name",
+			},
+			listNodesOut: []slurmapi.Node{
+				{
+					Name:        "node",
+					ClusterName: "slurm-cluster",
+					InstanceID:  "k8s-node",
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateDRAIN: {},
+					},
+					Reason: ptr.To(slurmapi.NodeReason{
+						Reason:    "[user_problem] check: Kill task failed",
+						ChangedAt: time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
+					}),
+				},
+			},
+			listNodesErr: nil,
+			want: map[types.NamespacedName][]slurmapi.Node{
+				{
+					Namespace: "namespace",
+					Name:      "name",
+				}: {
+					{
+						Name:        "node",
+						ClusterName: "slurm-cluster",
+						InstanceID:  "k8s-node",
+						States: map[api.V0044NodeState]struct{}{
+							api.V0044NodeStateDRAIN: {},
+						},
+						Reason: ptr.To(slurmapi.NodeReason{
+							Reason:         consts.SlurmUserReasonHC,
+							OriginalReason: "[user_problem] check: Kill task failed",
+							ChangedAt:      time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
+						}),
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

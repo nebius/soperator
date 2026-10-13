@@ -153,22 +153,40 @@ func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types
 				continue
 			}
 
-			for _, wellKnownReason := range consts.SlurmNodeReasonsList {
-				if strings.Contains(node.Reason.Reason, wellKnownReason) {
-					// For simplicity, we keep only well known part
-					node.Reason.OriginalReason = node.Reason.Reason
-					node.Reason.Reason = wellKnownReason
+			if wellKnownReason, ok := matchWellKnownSlurmNodeReason(node.Reason.Reason); ok {
+				// For simplicity, we keep only well known part
+				node.Reason.OriginalReason = node.Reason.Reason
+				node.Reason.Reason = wellKnownReason
 
-					nodes := degradedNodes[slurmClusterName]
-					nodes = append(nodes, node)
-					degradedNodes[slurmClusterName] = nodes
-					break
-				}
+				nodes := degradedNodes[slurmClusterName]
+				nodes = append(nodes, node)
+				degradedNodes[slurmClusterName] = nodes
 			}
 		}
 	}
 
 	return degradedNodes, nil
+}
+
+func matchWellKnownSlurmNodeReason(rawReason string) (string, bool) {
+	trimmed := strings.TrimSpace(rawReason)
+	if trimmed == "" {
+		return "", false
+	}
+
+	for _, wellKnownReason := range consts.SlurmNodeReasonsList {
+		if strings.HasPrefix(trimmed, wellKnownReason) {
+			return wellKnownReason, true
+		}
+	}
+
+	for _, wellKnownReason := range consts.SlurmNodeReasonsList {
+		if strings.Contains(trimmed, wellKnownReason) {
+			return wellKnownReason, true
+		}
+	}
+
+	return "", false
 }
 
 func (c *SlurmNodesController) processDegradedNode(
