@@ -249,7 +249,7 @@ func (s *DockerContainers) theUserRunsADockerContainerOverSSHOnAWorkerNode(ctx c
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	worker := workers[0]
-	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, dockerSSHUserName, worker); err != nil {
+	if err := waitForSSHTestUserInGroupOnWorker(ctx, s.runtime, dockerSSHUserName, "docker", worker); err != nil {
 		return err
 	}
 
