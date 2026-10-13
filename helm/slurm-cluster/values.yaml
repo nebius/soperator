@@ -2,7 +2,7 @@ clusterName: "slurm1"
 # Controls whether pod workload resource names are prefixed with clusterName.
 # Supported values: enabled, disabled.
 # Use disabled only when the namespace contains a single SlurmCluster.
-podNamePrefix: "enabled"
+podNamePrefix: "disabled"
 # Additional annotations for the cluster
 annotations: {}
 # Maintenance defines the maintenance window for the cluster.

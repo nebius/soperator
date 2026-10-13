@@ -118,13 +118,13 @@ recreates the HPA.
 
 ## Check status
 
-For a cluster named `soperator` in namespace `soperator`, using the default workload
-name prefix:
+For a cluster named `soperator` in namespace `soperator`, using the Helm chart's
+default `podNamePrefix: disabled`:
 
 ```bash
-kubectl -n soperator get hpa soperator-login
-kubectl -n soperator describe hpa soperator-login
-kubectl -n soperator get statefulsets.apps.kruise.io soperator-login
+kubectl -n soperator get hpa login
+kubectl -n soperator describe hpa login
+kubectl -n soperator get statefulsets.apps.kruise.io login
 kubectl -n soperator get pods -l app.kubernetes.io/instance=soperator,app.kubernetes.io/component=login -o wide
 kubectl -n soperator top pods -l app.kubernetes.io/instance=soperator,app.kubernetes.io/component=login --containers
 ```
@@ -132,9 +132,10 @@ kubectl -n soperator top pods -l app.kubernetes.io/instance=soperator,app.kubern
 Replace the namespace, cluster label, and workload name for your installation.
 The HPA has the same name as the login StatefulSet.
 
-When `podNamePrefix` is set to `disabled`, the workload names are unprefixed:
-`login` for the StatefulSet and HPA, and `login-0`, `login-1`, etc. for pods. In
-that mode, replace `soperator-login` with `login` in the commands above; the label
+When `podNamePrefix` is set to `enabled`, the workload names include the cluster name:
+`soperator-login` for the StatefulSet and HPA, and `soperator-login-0`,
+`soperator-login-1`, etc. for pods. In that mode, replace `login` with
+`soperator-login` in the commands above; the label
 selectors remain unchanged for a cluster named `soperator`.
 
 If the HPA reports unknown CPU utilization, inspect its conditions and events and
