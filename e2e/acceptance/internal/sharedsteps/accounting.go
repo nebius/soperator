@@ -143,7 +143,10 @@ func (s *Accounting) acceptanceTestUserExists(ctx context.Context) error {
 	if err := ensureSSHTestUser(ctx, s.runtime, accountingTestUser); err != nil {
 		return err
 	}
-	return waitForSSHTestUserOnWorker(ctx, s.runtime, accountingTestUser, s.worker)
+	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, accountingTestUser, s.worker); err != nil {
+		return err
+	}
+	return waitForSSHTestUserOnController(ctx, s.runtime, accountingTestUser)
 }
 
 func (s *Accounting) createTestAccountAndAssociation(ctx context.Context) error {

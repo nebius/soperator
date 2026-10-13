@@ -3,6 +3,7 @@ package sharedsteps
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
@@ -33,18 +34,111 @@ func waitForSSHTestUserOnWorker(
 	if worker.Name == "" {
 		return fmt.Errorf("wait for SSH test user %s: worker name is empty", userName)
 	}
-	command := "getent passwd " + framework.ShellQuote(userName) + " >/dev/null"
-	return runtime.WaitFor(ctx,
+	return waitForSSHTestIdentity(ctx, runtime, runtime.Worker(worker),
 		fmt.Sprintf("SSH test user %s visible on worker %s", userName, worker.Name),
+		"getent passwd "+framework.ShellQuote(userName)+" >/dev/null",
+		userName,
+		"",
+	)
+}
+
+func waitForSSHTestUserOnController(
+	ctx context.Context,
+	runtime framework.Runtime,
+	userName string,
+) error {
+	return waitForSSHTestIdentity(ctx, runtime, runtime.Controller(),
+		fmt.Sprintf("SSH test user %s visible on controller", userName),
+		"getent passwd "+framework.ShellQuote(userName)+" >/dev/null",
+		userName,
+		"",
+	)
+}
+
+func waitForSSHTestUserInGroupOnWorker(
+	ctx context.Context,
+	runtime framework.Runtime,
+	userName string,
+	groupName string,
+	worker framework.WorkerInfo,
+) error {
+	if worker.Name == "" {
+		return fmt.Errorf("wait for SSH test user %s in group %s: worker name is empty", userName, groupName)
+	}
+	if strings.TrimSpace(groupName) == "" {
+		return fmt.Errorf("wait for SSH test user %s on worker %s: required group is empty", userName, worker.Name)
+	}
+	command := fmt.Sprintf(
+		"id -nG %s | tr '[:space:]' '\\n' | grep -Fx -- %s >/dev/null",
+		framework.ShellQuote(userName),
+		framework.ShellQuote(groupName),
+	)
+	return waitForSSHTestIdentity(ctx, runtime, runtime.Worker(worker),
+		fmt.Sprintf("SSH test user %s in group %s on worker %s", userName, groupName, worker.Name),
+		command,
+		userName,
+		groupName,
+	)
+}
+
+func waitForSSHTestIdentity(
+	ctx context.Context,
+	runtime framework.Runtime,
+	scope framework.CommandScope,
+	description string,
+	readinessCommand string,
+	userName string,
+	groupName string,
+) error {
+	return runtime.WaitFor(ctx,
+		description,
 		sshTestUserPropagationTimeout,
 		framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			if _, err := runtime.Worker(worker).Run(waitCtx, command); err != nil {
-				return false, err
+			if _, err := scope.Run(waitCtx, readinessCommand); err != nil {
+				diagnostics, diagnosticsErr := scope.Run(
+					waitCtx,
+					sshTestIdentityDiagnosticsCommand(userName, groupName),
+				)
+				if diagnosticsErr != nil {
+					return false, fmt.Errorf(
+						"check %s: %w; collect identity diagnostics: %v",
+						description,
+						err,
+						diagnosticsErr,
+					)
+				}
+				diagnostics = strings.TrimSpace(diagnostics)
+				if diagnostics == "" {
+					diagnostics = "<empty>"
+				}
+				return false, fmt.Errorf(
+					"check %s: %w; identity diagnostics:\n%s",
+					description,
+					err,
+					diagnostics,
+				)
 			}
 			return true, nil
 		},
 	)
+}
+
+func sshTestIdentityDiagnosticsCommand(userName, groupName string) string {
+	quotedUserName := framework.ShellQuote(userName)
+	commands := []string{
+		"printf '%s\\n' " + framework.ShellQuote("id "+userName+":"),
+		"id " + quotedUserName + " 2>&1 || true",
+		"printf '%s\\n' " + framework.ShellQuote("getent passwd "+userName+":"),
+		"getent passwd " + quotedUserName + " 2>&1 || true",
+	}
+	if groupName != "" {
+		commands = append(commands,
+			"printf '%s\\n' "+framework.ShellQuote("getent group "+groupName+":"),
+			"getent group "+framework.ShellQuote(groupName)+" 2>&1 || true",
+		)
+	}
+	return strings.Join(commands, "\n")
 }
 
 func ensureSSHTestIdentity(

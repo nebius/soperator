@@ -82,7 +82,10 @@ func (s *GPUProfiling) theSoperatorchecksUserIsAvailableOnTheWorker(ctx context.
 		"id "+framework.ShellQuote(gpuProfilingUser)+" >/dev/null"); err != nil {
 		return fmt.Errorf("check %s user in the jail: %w", gpuProfilingUser, err)
 	}
-	return waitForSSHTestUserOnWorker(ctx, s.runtime, gpuProfilingUser, s.worker)
+	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, gpuProfilingUser, s.worker); err != nil {
+		return err
+	}
+	return waitForSSHTestUserOnController(ctx, s.runtime, gpuProfilingUser)
 }
 
 func (s *GPUProfiling) gpuProfilingIsEnabledForNonRootUsersOnTheWorker(ctx context.Context) error {

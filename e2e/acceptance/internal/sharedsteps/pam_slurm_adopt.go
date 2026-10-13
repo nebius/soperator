@@ -142,6 +142,9 @@ func (s *PAMSlurmAdopt) aTestUserAndGPUWorkerAreReady(ctx context.Context) error
 	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, pamSlurmAdoptUser, s.worker); err != nil {
 		return err
 	}
+	if err := waitForSSHTestUserOnController(ctx, s.runtime, pamSlurmAdoptUser); err != nil {
+		return err
+	}
 	if _, err := runSSHCommand(
 		ctx,
 		s.runtime,
