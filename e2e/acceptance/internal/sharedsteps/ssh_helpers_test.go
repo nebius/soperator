@@ -66,32 +66,32 @@ func TestWaitForSSHTestUserInGroupOnWorkerIncludesDiagnostics(t *testing.T) {
 			if len(commands) == 1 {
 				return "", errors.New("exit status 1")
 			}
-			return "id dockeruser:\nuid=1000(dockeruser) gid=1000(dockeruser) groups=1000(dockeruser)\n" +
-				"getent passwd dockeruser:\ndockeruser:x:1000:1000::/home/dockeruser:/bin/bash\n" +
-				"getent group docker:\ndocker:x:999:", nil
+			return "id alice:\nuid=1000(alice) gid=1000(alice) groups=1000(alice)\n" +
+				"getent passwd alice:\nalice:x:1000:1000::/home/alice:/bin/bash\n" +
+				"getent group containers:\ncontainers:x:999:", nil
 		}),
 	}
 
 	err := waitForSSHTestUserInGroupOnWorker(
 		t.Context(),
 		runtime,
-		"dockeruser",
-		"docker",
+		"alice",
+		"containers",
 		framework.WorkerInfo{Name: "worker-0"},
 	)
 	require.Error(t, err)
-	assert.Equal(t, "SSH test user dockeruser in group docker on worker worker-0", runtime.description)
+	assert.Equal(t, "SSH test user alice in group containers on worker worker-0", runtime.description)
 	require.Len(t, commands, 2)
 	assert.Equal(t,
-		"id -nG 'dockeruser' | tr '[:space:]' '\\n' | grep -Fx -- 'docker' >/dev/null",
+		"id -nG 'alice' | tr '[:space:]' '\\n' | grep -Fx -- 'containers' >/dev/null",
 		commands[0],
 	)
-	assert.Contains(t, commands[1], "id 'dockeruser' 2>&1 || true")
-	assert.Contains(t, commands[1], "getent passwd 'dockeruser' 2>&1 || true")
-	assert.Contains(t, commands[1], "getent group 'docker' 2>&1 || true")
+	assert.Contains(t, commands[1], "id 'alice' 2>&1 || true")
+	assert.Contains(t, commands[1], "getent passwd 'alice' 2>&1 || true")
+	assert.Contains(t, commands[1], "getent group 'containers' 2>&1 || true")
 	assert.ErrorContains(t, err, "identity diagnostics:")
-	assert.ErrorContains(t, err, "groups=1000(dockeruser)")
-	assert.ErrorContains(t, err, "docker:x:999:")
+	assert.ErrorContains(t, err, "groups=1000(alice)")
+	assert.ErrorContains(t, err, "containers:x:999:")
 }
 
 func TestWaitForSSHTestUserInGroupOnWorkerValidatesTarget(t *testing.T) {
