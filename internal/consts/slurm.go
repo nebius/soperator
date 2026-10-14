@@ -1,5 +1,7 @@
 package consts
 
+import "strings"
+
 const (
 	Slurm       = "slurm"
 	slurmPrefix = Slurm + "-"
@@ -44,6 +46,27 @@ var SlurmNodeReasonsList = []string{
 	SlurmUserReasonHC,
 	SlurmHardwareReasonHC,
 	SlurmNodeReasonKillTaskFailed,
+}
+
+func MatchWellKnownSlurmNodeReason(rawReason string) (string, bool) {
+	trimmed := strings.TrimSpace(rawReason)
+	if trimmed == "" {
+		return "", false
+	}
+
+	for _, wellKnownReason := range SlurmNodeReasonsList {
+		if strings.HasPrefix(trimmed, wellKnownReason) {
+			return wellKnownReason, true
+		}
+	}
+
+	for _, wellKnownReason := range SlurmNodeReasonsList {
+		if strings.Contains(trimmed, wellKnownReason) {
+			return wellKnownReason, true
+		}
+	}
+
+	return "", false
 }
 
 const (

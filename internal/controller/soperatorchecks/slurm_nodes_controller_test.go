@@ -270,6 +270,50 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name:        "happy-path/kill-task-failed-prefix-beats-user-problem-tail",
+			k8sNodeName: "k8s-node",
+			slurmClusterName: types.NamespacedName{
+				Namespace: "namespace",
+				Name:      "name",
+			},
+			listNodesOut: []slurmapi.Node{
+				{
+					Name:        "node",
+					ClusterName: "slurm-cluster",
+					InstanceID:  "k8s-node",
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateDRAIN: {},
+					},
+					Reason: ptr.To(slurmapi.NodeReason{
+						Reason:    "Kill task failed: job 42 [user_problem]",
+						ChangedAt: time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
+					}),
+				},
+			},
+			listNodesErr: nil,
+			want: map[types.NamespacedName][]slurmapi.Node{
+				{
+					Namespace: "namespace",
+					Name:      "name",
+				}: {
+					{
+						Name:        "node",
+						ClusterName: "slurm-cluster",
+						InstanceID:  "k8s-node",
+						States: map[api.V0044NodeState]struct{}{
+							api.V0044NodeStateDRAIN: {},
+						},
+						Reason: ptr.To(slurmapi.NodeReason{
+							Reason:         consts.SlurmNodeReasonKillTaskFailed,
+							OriginalReason: "Kill task failed: job 42 [user_problem]",
+							ChangedAt:      time.Date(2024, time.March, 1, 1, 1, 1, 1, time.UTC),
+						}),
+					},
+				},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

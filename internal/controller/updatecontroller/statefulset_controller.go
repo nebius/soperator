@@ -791,12 +791,8 @@ func hasUnhealthyDrain(node *slurmapi.Node) bool {
 	}
 	// Match the maintenance controller's first reason, including its precedence.
 	// User problems do not request infrastructure recovery.
-	for _, reason := range consts.SlurmNodeReasonsList {
-		if strings.Contains(node.Reason.Reason, reason) {
-			return reason != consts.SlurmUserReasonHC
-		}
-	}
-	return false
+	reason, ok := consts.MatchWellKnownSlurmNodeReason(node.Reason.Reason)
+	return ok && reason != consts.SlurmUserReasonHC
 }
 
 func hasRollingUpdateReason(node *slurmapi.Node) bool {
