@@ -1,0 +1,14 @@
+---
+
+- name: Ensure Docker Engine packages are installed
+  ansible.builtin.apt:
+    name:
+      - "docker-ce={{ docker_engine_docker_ce_version }}"
+      - "docker-ce-cli={{ docker_engine_docker_ce_version }}"
+      - "docker-ce-rootless-extras={{ docker_engine_docker_ce_version }}"
+      - "containerd.io={{ docker_engine_containerd_io_version }}"
+      - docker-buildx-plugin
+    state: present
+    update_cache: true
+  tags:
+    - docker-engine
