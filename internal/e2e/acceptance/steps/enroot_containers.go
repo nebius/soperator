@@ -16,11 +16,12 @@ import (
 const (
 	enrootContainersFeatureFile = "enroot_containers.feature"
 
-	enrootDockerMount  = "/usr/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu,/usr/lib64:/usr/lib64"
-	enrootARP          = "NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring all_reduce_perf -b 8G -e 8G -f 2 -g 8 -N 0"
-	enrootNamedJobName = "kek"
-	enrootSquashRoot   = "/var/cache/enroot-container-images"
-	enrootTasksPerNode = 8
+	enrootDockerMount   = "/usr/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu,/usr/lib64:/usr/lib64"
+	enrootARP           = "NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_ALGO=Ring all_reduce_perf -b 8G -e 8G -f 2 -g 8 -N 0"
+	enrootNamedJobName  = "kek"
+	enrootSquashPattern = ".sqsh"
+	enrootSquashRoot    = "/var/cache/enroot-container-images"
+	enrootTasksPerNode  = 8
 
 	enrootJobStartTimeout = 25 * time.Minute
 	enrootProbeTimeout    = 10 * time.Minute
@@ -35,9 +36,8 @@ type EnrootContainers struct {
 	connectionWorker string
 	job              framework.SbatchJob
 
-	squashPath         string
-	expectedSquashPath string
-	squashStatBefore   string
+	squashPath       string
+	squashStatBefore string
 }
 
 func NewEnrootContainers(exec framework.Exec, slurm *framework.SlurmClient) *EnrootContainers {
@@ -108,20 +108,19 @@ func (s *EnrootContainers) enrootSquashfsImageIsPresentOnAWorker(ctx context.Con
 	if s.connectionWorker == "" {
 		return fmt.Errorf("enroot connection worker is not selected")
 	}
-	if s.expectedSquashPath == "" {
-		return fmt.Errorf("capture expected squashfs path before checking for the image")
-	}
 
 	if err := s.exec.WaitFor(ctx, "enroot squashfs image present", enrootProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-		exists, err := s.pathExists(waitCtx, s.expectedSquashPath)
+		findOutput, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(waitCtx,
+			fmt.Sprintf("sudo find %s -type f -name '*%s' 2>/dev/null | sort", framework.ShellQuote(enrootSquashRoot), enrootSquashPattern))
 		if err != nil {
 			return false, err
 		}
-		if !exists {
+		squashPath := pickSquashPath(findOutput)
+		if squashPath == "" {
 			return false, nil
 		}
-		s.squashPath = s.expectedSquashPath
-		s.exec.Logf("Enroot containers: tracked squashfs path=%s", s.squashPath)
+		s.squashPath = squashPath
+		s.exec.Logf("enroot containers: tracked squashfs path=%s", squashPath)
 		return true, nil
 	}); err != nil {
 		return err
@@ -342,14 +341,6 @@ func (s *EnrootContainers) submitEnrootJob(ctx context.Context, containerName, j
 	if err != nil {
 		return err
 	}
-	if s.expectedSquashPath == "" {
-		expectedSquashPath, err := s.expectedSquashPathForImage(ctx, image)
-		if err != nil {
-			return err
-		}
-		s.expectedSquashPath = expectedSquashPath
-		s.exec.Logf("Enroot containers: expected squashfs path=%s", expectedSquashPath)
-	}
 
 	// Wrap the NCCL body in `bash -lc` so env assignments (NCCL_*=…) are
 	// shell‑parsed inside the container instead of being passed as positional
@@ -416,48 +407,21 @@ func (s *EnrootContainers) removeNamedRuntimeDir(ctx context.Context) error {
 	return nil
 }
 
-func (s *EnrootContainers) expectedSquashPathForImage(ctx context.Context, image string) (string, error) {
-	digest, err := s.enrootImageDigest(ctx, image)
-	if err != nil {
-		return "", err
-	}
-	return path.Join(enrootSquashRoot, digest+".sqsh"), nil
-}
-
-func (s *EnrootContainers) enrootImageDigest(ctx context.Context, image string) (string, error) {
-	if s.connectionWorker == "" {
-		return "", fmt.Errorf("select an Enroot connection worker before resolving image digest")
-	}
-
-	output, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(ctx,
-		fmt.Sprintf("enroot digest %s", framework.ShellQuote(image)))
-	if err != nil {
-		return "", fmt.Errorf("resolve digest for Enroot image %s: %w", image, err)
-	}
-	digest := parseEnrootImageDigest(output)
-	if digest == "" {
-		return "", fmt.Errorf("find digest for Enroot image %s in output:\n%s", image, strings.TrimSpace(output))
-	}
-	return digest, nil
-}
-
-func parseEnrootImageDigest(output string) string {
-	for _, line := range strings.Split(output, "\n") {
+func pickSquashPath(findOutput string) string {
+	var fallback string
+	for _, line := range strings.Split(findOutput, "\n") {
 		candidate := strings.TrimSpace(line)
-		if strings.HasPrefix(candidate, "sha256:") {
+		if candidate == "" {
+			continue
+		}
+		if fallback == "" {
+			fallback = candidate
+		}
+		if strings.Contains(candidate, enrootSquashPattern) {
 			return candidate
 		}
 	}
-	return ""
-}
-
-func (s *EnrootContainers) pathExists(ctx context.Context, targetPath string) (bool, error) {
-	output, err := s.exec.Worker(s.connectionWorker).RunWithDefaultRetry(ctx,
-		fmt.Sprintf("sudo test -f %s && echo exists || true", framework.ShellQuote(targetPath)))
-	if err != nil {
-		return false, err
-	}
-	return strings.TrimSpace(output) == "exists", nil
+	return fallback
 }
 
 func namedEnrootDir(containerName string) string {
