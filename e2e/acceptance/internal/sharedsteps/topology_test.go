@@ -160,10 +160,28 @@ func TestParseTopologyEntriesReadsTopoconfTheSameWay(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t,
-		"flat=flat:[]:true,tree-ib=tree:[]:false,block-nvl72=block:[2]:false",
+		"block-nvl72=block:[2]:false,flat=flat:[]:true,tree-ib=tree:[]:false",
 		topologyStructure(rendered))
 	assert.Equal(t, topologyStructure(rendered), topologyStructure(loaded))
 	assert.Equal(t, topologyReconfigureStructure(rendered), topologyReconfigureStructure(loaded))
+}
+
+// slurmctld prints the cluster default first in topoconf whatever the file order was, so a GPU
+// cluster whose default is tree-ib lists it before flat while the operator rendered flat first.
+func TestTopologyStructureIgnoresEntryOrder(t *testing.T) {
+	rendered := []topologyEntry{
+		{Name: "flat", Kind: topologyKindFlat},
+		{Name: "tree-ib", Kind: topologyKindTree, ClusterDefault: true},
+	}
+	loaded := []topologyEntry{
+		{Name: "tree-ib", Kind: topologyKindTree, ClusterDefault: true},
+		{Name: "flat", Kind: topologyKindFlat},
+	}
+	assert.Equal(t, topologyStructure(rendered), topologyStructure(loaded))
+	assert.Equal(t, "flat", rendered[0].Name, "the caller's slice keeps its order")
+
+	loaded[1].ClusterDefault = true
+	assert.NotEqual(t, topologyStructure(rendered), topologyStructure(loaded), "a settings difference is still reported")
 }
 
 func TestTopologyReconfigureStructureIncludesBlockOrder(t *testing.T) {
