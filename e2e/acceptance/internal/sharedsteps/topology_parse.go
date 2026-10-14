@@ -165,9 +165,17 @@ func yamlNodeCarriesValue(node *yaml.Node) bool {
 
 // topologyStructure compares topology settings without node membership. Block order is checked
 // separately with polling, because the file can be published before Slurm reloads it.
+//
+// Entry order is ignored as well: slurmctld sorts the topologies so that the cluster default comes
+// first and prints them that way in topoconf, while the operator renders topology.yaml in
+// SlurmCluster order. File order carries no meaning, so entries are compared by name.
 func topologyStructure(entries []topologyEntry) string {
-	parts := make([]string, 0, len(entries))
-	for _, entry := range entries {
+	sorted := slices.Clone(entries)
+	slices.SortFunc(sorted, func(a, b topologyEntry) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	parts := make([]string, 0, len(sorted))
+	for _, entry := range sorted {
 		parts = append(parts, fmt.Sprintf("%s=%s:%v:%t",
 			entry.Name, entry.Kind, entry.BlockSizes, entry.ClusterDefault))
 	}
