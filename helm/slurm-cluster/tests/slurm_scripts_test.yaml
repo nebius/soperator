@@ -1,0 +1,62 @@
+suite: test Slurm scripts configuration
+templates:
+  - slurm-scripts-cm.yaml
+tests:
+  - it: should reject an enabled built-in without a bundled script
+    set:
+      slurmScripts:
+        builtIn:
+          removed_check.sh:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "slurmScripts.builtIn.removed_check.sh is enabled but no bundled script exists; remove this obsolete entry or set customContent"
+
+  - it: should reject an enabled built-in without a bundled check configuration
+    set:
+      slurmScripts:
+        builtIn:
+          removed_check.sh:
+            enabled: true
+            customContent: |-
+              #!/bin/bash
+              exit 0
+    asserts:
+      - failedTemplate:
+          errorMessage: "slurmScripts.builtIn.removed_check.sh is enabled but no bundled check configuration exists; remove this obsolete entry or set customConfig"
+
+  - it: should render task prolog env exports when enabled
+    set:
+      slurmScripts:
+        taskPrologEnv:
+          enabled: true
+          sourceFiles:
+            - /etc/profile.d/90-nccl-network-vars.sh
+          exportVars:
+            - UCX_NET_DEVICES
+            - NCCL_IB_HCA
+    asserts:
+      - matchRegex:
+          path: data["task_prolog.sh"]
+          pattern: 'task_prolog_env_source_files=\( "/etc/profile\.d/90-nccl-network-vars\.sh"\)'
+      - matchRegex:
+          path: data["task_prolog.sh"]
+          pattern: 'task_prolog_env_export_vars=\( "UCX_NET_DEVICES" "NCCL_IB_HCA"\)'
+      - matchRegex:
+          path: data["task_prolog.sh"]
+          pattern: 'source "\$env_file" >/dev/null 2>&1 \|\| true'
+      - matchRegex:
+          path: data["task_prolog.sh"]
+          pattern: "printf 'export %s=%s\\\\n' \"\\$env_var\" \"\\$env_value\""
+
+  - it: should reject task prolog env with a custom task prolog script
+    set:
+      slurmScripts:
+        task_prolog.sh: |-
+          #!/bin/bash
+          true
+        taskPrologEnv:
+          enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "slurmScripts.taskPrologEnv.enabled cannot be used with a slurmScripts.task_prolog.sh override; merge the taskPrologEnv behavior into the custom script or disable taskPrologEnv"

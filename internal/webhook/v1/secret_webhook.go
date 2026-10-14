@@ -5,11 +5,9 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -22,7 +20,7 @@ var secretlog = logf.Log.WithName("secret-resource")
 
 // SetupSecretWebhookWithManager registers the webhook for Secret in the manager.
 func SetupSecretWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&corev1.Secret{}).
+	return ctrl.NewWebhookManagedBy(mgr, &corev1.Secret{}).
 		WithValidator(&SecretCustomValidator{Client: mgr.GetClient()}).
 		Complete()
 }
@@ -35,14 +33,10 @@ type SecretCustomValidator struct {
 	Client client.Client
 }
 
-var _ webhook.CustomValidator = &SecretCustomValidator{}
+var _ admission.Validator[*corev1.Secret] = &SecretCustomValidator{}
 
-// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Secret.
-func (v *SecretCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	secret, ok := obj.(*corev1.Secret)
-	if !ok {
-		return nil, fmt.Errorf("expected a Secret object but got %T", obj)
-	}
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type Secret.
+func (v *SecretCustomValidator) ValidateCreate(ctx context.Context, secret *corev1.Secret) (admission.Warnings, error) {
 	secretlog.Info("Validation for Secret upon creation", "name", secret.GetName())
 	_, annotationExists := secret.Annotations[consts.AnnotationClusterName]
 	if !annotationExists {
@@ -51,24 +45,16 @@ func (v *SecretCustomValidator) ValidateCreate(ctx context.Context, obj runtime.
 	return nil, nil
 }
 
-// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Secret.
-func (v *SecretCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	secret, ok := newObj.(*corev1.Secret)
-	if !ok {
-		return nil, fmt.Errorf("expected a Secret object for the newObj but got %T", newObj)
-	}
-	secretlog.Info("Validation for Secret upon update", "name", secret.GetName())
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type Secret.
+func (v *SecretCustomValidator) ValidateUpdate(ctx context.Context, oldSecret, newSecret *corev1.Secret) (admission.Warnings, error) {
+	secretlog.Info("Validation for Secret upon update", "name", newSecret.GetName())
 
 	// Always deny update operations
 	return nil, fmt.Errorf("update operations are not allowed for Secret resources")
 }
 
-// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Secret.
-func (v *SecretCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	secret, ok := obj.(*corev1.Secret)
-	if !ok {
-		return nil, fmt.Errorf("expected a Secret object but got %T", obj)
-	}
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type Secret.
+func (v *SecretCustomValidator) ValidateDelete(ctx context.Context, secret *corev1.Secret) (admission.Warnings, error) {
 	secretlog.Info("Validation for Secret upon deletion", "name", secret.GetName())
 	clusterAnnotation, annotationExists := secret.Annotations[consts.AnnotationClusterName]
 	if annotationExists {

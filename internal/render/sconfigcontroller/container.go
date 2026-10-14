@@ -23,6 +23,8 @@ func renderContainerSConfigController(
 		fmt.Sprintf("--cluster-name=%s", clusterName),
 		fmt.Sprintf("--jail-path=%s", jailMount.MountPath),
 		fmt.Sprintf("--slurmapiserver=%s", slurmAPIServer),
+		"--metrics-bind-address=:8443",
+		"--metrics-secure=true",
 		"--leader-elect",
 	}
 
@@ -48,6 +50,11 @@ func renderContainerSConfigController(
 		Command: []string{
 			"/usr/bin/sconfigcontroller",
 		},
+		Ports: []corev1.ContainerPort{{
+			Name:          "https",
+			ContainerPort: 8443,
+			Protocol:      corev1.ProtocolTCP,
+		}},
 		Args:           args,
 		LivenessProbe:  sConfigController.Container.LivenessProbe,
 		ReadinessProbe: sConfigController.Container.ReadinessProbe,

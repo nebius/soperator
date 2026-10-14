@@ -10,6 +10,10 @@ spec:
   driftDetection:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .Values.observability.dcgmExporter.postRenderers }}
+  postRenderers:
+    {{- tpl (toYaml .) $ | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: helm-soperator-dcgm-exporter
@@ -27,7 +31,6 @@ spec:
   upgrade:
     {{- toYaml .Values.observability.dcgmExporter.upgrade | nindent 4 }}
   values:
-    dcgmHpcJobMappingDir: {{ .Values.observability.dcgmExporter.values.hpcJobMapDir }}
     validateToolkit: {{ .Values.observability.dcgmExporter.values.validateToolkit }}
     {{- if .Values.observability.dcgmExporter.values.resources }}
     daemonSet:

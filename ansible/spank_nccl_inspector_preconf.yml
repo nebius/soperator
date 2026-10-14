@@ -1,0 +1,11 @@
+---
+
+- name: Install NCCL Inspector PreConf SPANK plugin
+  hosts:
+    - all
+    - localhost
+  become: true
+  roles:
+    - spank_nccl_inspector_preconf
+  tags:
+    - spank_nccl_inspector_preconf
