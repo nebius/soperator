@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True)
+class PlatformProfile:
+  name: str
+  gpu_name: str
+  gpus_per_node: int
+  cpus_per_task: int
+  ucx_net_devices: str
+  environment: dict[str, str] = field(default_factory=dict)
+
+
+PLATFORM_PROFILES = (
+  PlatformProfile(
+    name="H100",
+    gpu_name="NVIDIA H100",
+    gpus_per_node=8,
+    cpus_per_task=16,
+    ucx_net_devices=",".join(f"mlx5_{index}:1" for index in range(8)),
+  ),
+  PlatformProfile(
+    name="H200",
+    gpu_name="NVIDIA H200",
+    gpus_per_node=8,
+    cpus_per_task=16,
+    ucx_net_devices=",".join(f"mlx5_{index}:1" for index in range(8)),
+  ),
+  PlatformProfile(
+    name="B200",
+    gpu_name="NVIDIA B200",
+    gpus_per_node=8,
+    cpus_per_task=20,
+    ucx_net_devices=",".join(f"mlx5_{index}:1" for index in range(4, 12)),
+  ),
+  PlatformProfile(
+    name="B300",
+    gpu_name="NVIDIA B300",
+    gpus_per_node=8,
+    cpus_per_task=24,
+    ucx_net_devices=",".join(f"mlx5_{index}:1" for index in range(4, 12)),
+  ),
+  PlatformProfile(
+    name="GB300",
+    gpu_name="NVIDIA GB300",
+    gpus_per_node=4,
+    cpus_per_task=28,
+    ucx_net_devices=",".join(f"mlx5_{index}:1" for index in range(4)),
+    environment={
+      "NCCL_IB_HCA": ",".join(f"mlx5_{index}:1" for index in range(4)),
+      "OMPI_MCA_coll_hcoll_enable": "0",
+      "OMPI_MCA_coll_ucc_enable": "0",
+    },
+  ),
+)
+
+MESSAGE_SIZE_RE = re.compile(r"^[1-9][0-9]*(?:[KMG])?$", re.IGNORECASE)
+TIME_LIMIT_RE = re.compile(r"^(?:[0-9]+-)?[0-9]{1,2}:[0-9]{2}(?::[0-9]{2})?$")
+
+
+def positive_int(value: str) -> int:
+  number = int(value)
+  if number <= 0:
+    raise argparse.ArgumentTypeError("must be greater than zero")
+  return number
+
+
+def message_size(value: str) -> str:
+  if not MESSAGE_SIZE_RE.fullmatch(value):
+    raise argparse.ArgumentTypeError(
+      "must be a positive integer optionally followed by K, M, or G"
+    )
+  return value
+
+
+def message_step_factor(value: str) -> str:
+  try:
+    factor = float(value)
+  except ValueError as error:
+    raise argparse.ArgumentTypeError("must be a number greater than one") from error
+  if factor <= 1:
+    raise argparse.ArgumentTypeError("must be greater than one")
+  return value
+
+
+def time_limit(value: str) -> str:
+  if not TIME_LIMIT_RE.fullmatch(value):
+    raise argparse.ArgumentTypeError(
+      "must use Slurm's minutes:seconds, hours:minutes:seconds, or days-hours:minutes:seconds format"
+    )
+  return value
+
+
+def parse_args(argv=None):
+  parser = argparse.ArgumentParser(
+    prog="soperator-nccl-test",
+    description="Run a multi-node NCCL all-reduce test on a Soperator cluster.",
+  )
+  parser.add_argument(
+    "--nodes",
+    type=positive_int,
+    required=True,
+    help="number of worker nodes to use",
+  )
+  parser.add_argument(
+    "--partition",
+    help="Slurm partition; omitted by default so Slurm uses the user's default",
+  )
+  parser.add_argument(
+    "--segment",
+    type=positive_int,
+    help="Slurm segment size; supported only on GB300",
+  )
+  parser.add_argument(
+    "--min-message-size",
+    type=message_size,
+    default="512M",
+    help="minimum NCCL message size (default: 512M)",
+  )
+  parser.add_argument(
+    "--max-message-size",
+    type=message_size,
+    default="16G",
+    help="maximum NCCL message size (default: 16G)",
+  )
+  parser.add_argument(
+    "--message-step-factor",
+    type=message_step_factor,
+    default="2",
+    help="NCCL message-size multiplication factor (default: 2)",
+  )
+  parser.add_argument(
+    "--time-limit",
+    type=time_limit,
+    default="30:00",
+    help="Slurm time limit (default: 30:00)",
+  )
+  return parser.parse_args(argv)
+
+
+def partition_argument(partition: str | None) -> list[str]:
+  if partition is None:
+    return []
+  return [f"--partition={partition}"]
+
+
+def build_platform_probe_command(partition: str | None) -> list[str]:
+  return [
+    "srun",
+    "--nodes=1",
+    "--ntasks=1",
+    "--gpus-per-node=1",
+    "--time=2:00",
+    *partition_argument(partition),
+    "nvidia-smi",
+    "--query-gpu=name",
+    "--format=csv,noheader",
+  ]
+
+
+def detect_platform(partition: str | None) -> PlatformProfile:
+  command = build_platform_probe_command(partition)
+  try:
+    result = subprocess.run(command, text=True, capture_output=True, check=False)
+  except FileNotFoundError:
+    print("srun is not installed or not available in PATH", file=sys.stderr)
+    raise SystemExit(1)
+
+  if result.returncode != 0:
+    print("failed to detect the GPU platform", file=sys.stderr)
+    if result.stdout:
+      print(result.stdout, end="", file=sys.stderr)
+    if result.stderr:
+      print(result.stderr, end="", file=sys.stderr)
+    raise SystemExit(result.returncode or 1)
+
+  gpu_names = {line.strip() for line in result.stdout.splitlines() if line.strip()}
+  matches = [
+    profile
+    for profile in PLATFORM_PROFILES
+    if any(profile.gpu_name in gpu_name for gpu_name in gpu_names)
+  ]
+  if len(matches) != 1:
+    detected = ", ".join(sorted(gpu_names)) or "none"
+    print(f"unsupported or ambiguous GPU platform: {detected}", file=sys.stderr)
+    raise SystemExit(1)
+
+  return matches[0]
+
+
+def validate_platform_args(args, profile: PlatformProfile) -> None:
+  if args.segment is not None and profile.name != "GB300":
+    raise ValueError("--segment is supported only on GB300")
+
+
+def build_nccl_command(args, profile: PlatformProfile) -> list[str]:
+  command = [
+    "srun",
+    "--job-name=nccl_all_reduce",
+    f"--time={args.time_limit}",
+    f"--nodes={args.nodes}",
+    f"--gpus-per-node={profile.gpus_per_node}",
+    f"--ntasks-per-node={profile.gpus_per_node}",
+    f"--cpus-per-task={profile.cpus_per_task}",
+    "--mem=0",
+    *partition_argument(args.partition),
+  ]
+  if args.segment is not None:
+    command.append(f"--segment={args.segment}")
+  command.extend(
+    [
+      "--mpi=pmix",
+      "all_reduce_perf_mpi",
+      "-b",
+      args.min_message_size,
+      "-e",
+      args.max_message_size,
+      "-f",
+      args.message_step_factor,
+      "-g",
+      "1",
+    ]
+  )
+  return command
+
+
+def build_environment(profile: PlatformProfile) -> dict[str, str]:
+  environment = os.environ.copy()
+  environment.update(
+    {
+      "UCX_NET_DEVICES": profile.ucx_net_devices,
+      "NCCL_IB_QPS_PER_CONNECTION": "2",
+      "NCCL_NVLS_ENABLE": "1",
+      "NCCL_BUFFSIZE": "8388608",
+    }
+  )
+  environment.update(profile.environment)
+  return environment
+
+
+def main(argv=None) -> int:
+  args = parse_args(argv)
+  profile = detect_platform(args.partition)
+  try:
+    validate_platform_args(args, profile)
+  except ValueError as error:
+    print(str(error), file=sys.stderr)
+    return 2
+
+  print(f"Detected platform: {profile.name}", flush=True)
+  print(
+    f"Running NCCL all-reduce on {args.nodes} node(s), "
+    f"{profile.gpus_per_node} GPU(s) per node...",
+    flush=True,
+  )
+
+  command = build_nccl_command(args, profile)
+  try:
+    return subprocess.run(command, env=build_environment(profile), check=False).returncode
+  except FileNotFoundError:
+    print("srun is not installed or not available in PATH", file=sys.stderr)
+    return 1
+  except KeyboardInterrupt:
+    return 130
+
+
+if __name__ == "__main__":
+  sys.exit(main())
