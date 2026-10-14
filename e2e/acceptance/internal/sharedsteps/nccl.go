@@ -74,7 +74,7 @@ func (s *NCCL) selectIdleGPUWorkers(ctx context.Context) error {
 		return fmt.Errorf("inspect workers for NCCL validation: %w", err)
 	}
 
-	workers, err := pickIdleGPUWorkers(snapshot, ncclWorkerCount)
+	workers, err := pickIdleGPUWorkers(snapshot)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
@@ -113,22 +113,18 @@ func (s *NCCL) validateNCCLResult() error {
 	return nil
 }
 
-func pickIdleGPUWorkers(snapshot framework.WorkerSnapshot, count int) ([]framework.WorkerInfo, error) {
-	if count < 1 {
-		return nil, fmt.Errorf("invalid GPU worker count %d", count)
-	}
-
+func pickIdleGPUWorkers(snapshot framework.WorkerSnapshot) ([]framework.WorkerInfo, error) {
 	var configured int
 	for _, nodeSet := range snapshot.NodeSets {
 		if nodeSet.HasGPU && nodeSet.Replicas > 0 {
 			configured += nodeSet.Replicas
 		}
 	}
-	if configured < count {
+	if configured < ncclWorkerCount {
 		return nil, &framework.InsufficientWorkersError{
 			Label: "GPU workers",
 			Found: configured,
-			Need:  count,
+			Need:  ncclWorkerCount,
 		}
 	}
 
@@ -142,19 +138,19 @@ func pickIdleGPUWorkers(snapshot framework.WorkerSnapshot, count int) ([]framewo
 		unavailable = append(unavailable, fmt.Sprintf("%s state=%s reason=%s",
 			worker.Name, worker.SlurmNode.State, worker.SlurmNode.Reason))
 	}
-	if len(idle) < count {
+	if len(idle) < ncclWorkerCount {
 		if missing := configured - len(snapshot.GPUWorkers); missing > 0 {
 			unavailable = append(unavailable, fmt.Sprintf("%d configured GPU workers missing from Slurm", missing))
 		}
 		sort.Strings(unavailable)
 		return nil, fmt.Errorf("found %d idle GPU workers, need %d (%d configured, %d discovered): %s",
-			len(idle), count, configured, len(snapshot.GPUWorkers), strings.Join(unavailable, "; "))
+			len(idle), ncclWorkerCount, configured, len(snapshot.GPUWorkers), strings.Join(unavailable, "; "))
 	}
 
 	sort.Slice(idle, func(i, j int) bool {
 		return idle[i].Name < idle[j].Name
 	})
-	return idle[:count], nil
+	return idle[:ncclWorkerCount], nil
 }
 
 func ncclTestCommand(workers []framework.WorkerInfo) string {

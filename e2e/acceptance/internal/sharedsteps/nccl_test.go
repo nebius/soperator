@@ -19,7 +19,7 @@ func TestPickIdleGPUWorkers(t *testing.T) {
 		},
 	}
 
-	workers, err := pickIdleGPUWorkers(snapshot, 2)
+	workers, err := pickIdleGPUWorkers(snapshot)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"worker-0", "worker-2"}, framework.WorkerNames(workers))
 }
@@ -30,7 +30,7 @@ func TestPickIdleGPUWorkersSkipsUnconfiguredCapacity(t *testing.T) {
 		GPUWorkers: []framework.WorkerInfo{{Name: "worker-0", SlurmNode: framework.SlurmNodeInfo{State: "IDLE"}}},
 	}
 
-	_, err := pickIdleGPUWorkers(snapshot, 2)
+	_, err := pickIdleGPUWorkers(snapshot)
 	require.Error(t, err)
 	assert.True(t, framework.IsInsufficientWorkers(err))
 }
@@ -44,7 +44,7 @@ func TestPickIdleGPUWorkersFailsWhenConfiguredWorkersAreUnavailable(t *testing.T
 		},
 	}
 
-	_, err := pickIdleGPUWorkers(snapshot, 2)
+	_, err := pickIdleGPUWorkers(snapshot)
 	require.Error(t, err)
 	assert.False(t, framework.IsInsufficientWorkers(err))
 	assert.ErrorContains(t, err, "found 1 idle GPU workers, need 2")
