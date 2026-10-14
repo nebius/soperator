@@ -113,9 +113,11 @@ RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local nvidia_container_toolkit.yml -t nvidia_container_toolkit
 
 # Install Docker
-RUN apt-get update && \
-    apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin && \
-    apt clean
+COPY ansible/docker_engine.yml /opt/ansible/docker_engine.yml
+COPY ansible/roles/docker_engine /opt/ansible/roles/docker_engine
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local docker_engine.yml && \
+    apt-get clean
 
 # Copy Docker daemon config
 COPY images/worker/docker/daemon.json /etc/docker/daemon.json
