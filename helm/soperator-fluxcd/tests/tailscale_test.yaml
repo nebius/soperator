@@ -23,3 +23,25 @@ tests:
           content: patch
       - notExists:
           path: spec.values.resources[0].rules[0].resourceNames
+---
+suite: test Tailscale dependency
+templates:
+  - templates/slurm-cluster.yaml
+tests:
+  - it: should make Slurm cluster depend on Tailscale RBAC when enabled
+    set:
+      tailscale.enabled: true
+    asserts:
+      - contains:
+          path: spec.dependsOn
+          content:
+            name: RELEASE-NAME-tailscale
+
+  - it: should not add Tailscale dependency when disabled
+    set:
+      tailscale.enabled: false
+    asserts:
+      - notContains:
+          path: spec.dependsOn
+          content:
+            name: RELEASE-NAME-tailscale
