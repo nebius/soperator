@@ -86,7 +86,7 @@ func (c *SlurmAPIClientsController) Reconcile(ctx context.Context, req ctrl.Requ
 			c.slurmAPIClients.RemoveClient(req.NamespacedName)
 			return ctrl.Result{}, nil
 		}
-		logger.Error(err, "failed to get slurm cluster")
+		logger.Error(err, "Failed to get slurm cluster")
 		return ctrl.Result{}, err
 	}
 	if !slurmCluster.DeletionTimestamp.IsZero() {

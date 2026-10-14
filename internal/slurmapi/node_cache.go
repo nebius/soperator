@@ -2,6 +2,7 @@ package slurmapi
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 	"time"
 
@@ -35,6 +36,7 @@ type NodeCache struct {
 	snapshot atomic.Pointer[cacheSnapshot]
 
 	ready chan struct{}
+	done  chan struct{}
 }
 
 // StartNodeCache starts a background goroutine that refreshes the node list every
@@ -45,16 +47,19 @@ func StartNodeCache(ctx context.Context, client Client, refreshInterval time.Dur
 		logger:          logger,
 		refreshInterval: refreshInterval,
 		ready:           make(chan struct{}),
+		done:            make(chan struct{}),
 	}
 	go nc.run(controllerconfig.WithControllerName(ctx, "nodecache"))
 	return nc
 }
 
-// WaitReady blocks until the first successful ListNodes refresh completes or ctx is done.
+// WaitReady blocks until the first successful ListNodes refresh completes, the cache stops, or ctx is done.
 func (nc *NodeCache) WaitReady(ctx context.Context) error {
 	select {
 	case <-nc.ready:
 		return nil
+	case <-nc.done:
+		return errors.New("node cache stopped")
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -71,6 +76,8 @@ func (nc *NodeCache) GetNode(name string) (Node, bool) {
 }
 
 func (nc *NodeCache) run(ctx context.Context) {
+	defer close(nc.done)
+
 	ticker := time.NewTicker(nc.refreshInterval)
 	defer ticker.Stop()
 
