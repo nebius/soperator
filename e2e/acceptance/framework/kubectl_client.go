@@ -36,6 +36,7 @@ type SlurmClusterInfo struct {
 	Namespace                 string
 	AccountingEnabled         bool
 	LoginDockerEnabled        bool
+	LoginTailscaleEnabled     bool
 	LoginUserIsolationEnabled bool
 	LoginJailSubMounts        []JailSubMountInfo
 	PAMSlurmAdoptEnabled      bool
@@ -72,11 +73,20 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 		"get", "slurmcluster", name, "-n", SoperatorNamespace, "-o", "json"); err != nil {
 		return SlurmClusterInfo{}, fmt.Errorf("get SlurmCluster %s/%s: %w", SoperatorNamespace, name, err)
 	}
+	tailscaleEnabled := false
+	for _, container := range cluster.Spec.SlurmNodes.Login.CustomInitContainers {
+		if container.Name == "tailscale" {
+			tailscaleEnabled = true
+			break
+		}
+	}
+
 	return SlurmClusterInfo{
 		Name:                      cluster.Metadata.Name,
 		Namespace:                 cluster.Metadata.Namespace,
 		AccountingEnabled:         cluster.Spec.SlurmNodes.Accounting.Enabled,
 		LoginDockerEnabled:        cluster.Spec.SlurmNodes.Login.Docker.Enabled,
+		LoginTailscaleEnabled:     tailscaleEnabled,
 		LoginUserIsolationEnabled: cluster.Spec.SlurmNodes.Login.UserIsolation.Enabled,
 		LoginJailSubMounts:        jailSubMountInfos(cluster.Spec.SlurmNodes.Login.Volumes.JailSubMounts),
 		PAMSlurmAdoptEnabled:      cluster.Spec.PAMSlurmAdopt.Enabled,
