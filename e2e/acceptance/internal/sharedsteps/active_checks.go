@@ -121,7 +121,7 @@ func (s *ActiveChecks) gpuActiveCheckOutputsReportPASSOnAllGPUWorkers(ctx contex
 }
 
 func (s *ActiveChecks) activeCheckName(suffix string) string {
-	return fmt.Sprintf("%s-%s", s.info.SlurmClusterName, suffix)
+	return framework.ClusterPrefixedName(s.info.SlurmClusterName, suffix)
 }
 
 func (s *ActiveChecks) createJobFromCronJob(ctx context.Context, cronJobName string) (string, error) {

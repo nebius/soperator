@@ -27,8 +27,7 @@ type NodeReplacement struct {
 	replacementWorker  framework.WorkerInfo
 	originalInstanceID string
 	maintenanceJob     framework.SbatchJob
-	preExistingWorkers []string
-	gpuWorkers         map[string]struct{}
+	preExistingWorkers []framework.WorkerInfo
 }
 
 func NewNodeReplacement(runtime framework.Runtime, slurm *framework.SlurmClient, selector *framework.WorkerSelector) *NodeReplacement {
@@ -60,7 +59,6 @@ func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
 	s.originalInstanceID = ""
 	s.maintenanceJob = framework.SbatchJob{}
 	s.preExistingWorkers = nil
-	s.gpuWorkers = nil
 }
 
 func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnWorkerNode(ctx context.Context, workerType string) error {
@@ -88,8 +86,7 @@ func (s *NodeReplacement) anyWorkersByType(snapshot framework.WorkerSnapshot, wo
 
 func (s *NodeReplacement) submitTestJobOnWorker(ctx context.Context, worker framework.WorkerInfo, snapshot framework.WorkerSnapshot) error {
 	s.replacementWorker = worker
-	s.preExistingWorkers = framework.WorkerNames(snapshot.Workers)
-	s.gpuWorkers = workerNameSet(snapshot.GPUWorkers)
+	s.preExistingWorkers = append([]framework.WorkerInfo(nil), snapshot.Workers...)
 
 	node, err := s.slurm.NodeInfo(ctx, s.replacementWorker.Name)
 	if err != nil {
@@ -102,9 +99,9 @@ func (s *NodeReplacement) submitTestJobOnWorker(ctx context.Context, worker fram
 	s.originalInstanceID = node.InstanceID
 
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
-		JobName:    "e2e-node-replacement",
-		ExtraFlags: []string{fmt.Sprintf("-w %s", framework.ShellQuote(s.replacementWorker.Name))},
-		Wrap:       "sleep 600",
+		JobName:  "e2e-node-replacement",
+		Nodelist: []string{s.replacementWorker.Name},
+		Wrap:     "sleep 600",
 	})
 	if err != nil {
 		return err
@@ -155,9 +152,8 @@ func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) e
 }
 
 func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Context) error {
-	workerName := s.replacementWorker.Name
-	if _, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=1 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
-		node, stateErr := s.slurm.NodeInfo(ctx, workerName)
+	if err := runTargetedWorkerSmoke(ctx, s.runtime, s.replacementWorker); err != nil {
+		node, stateErr := s.slurm.NodeInfo(ctx, s.replacementWorker.Name)
 		if stateErr == nil {
 			s.runtime.Logf("replacement worker state after failed final validation: name=%s state=%s reason=%s instance_id=%s",
 				node.Name, node.State, node.Reason, node.InstanceID)
@@ -172,18 +168,12 @@ func (s *NodeReplacement) allPreExistingWorkerNodesAreOperational(ctx context.Co
 		return fmt.Errorf("no pre-existing workers were recorded before replacement")
 	}
 
-	for _, workerName := range s.preExistingWorkers {
-		if err := s.validateWorkerNodeState(ctx, workerName); err != nil {
+	for _, worker := range s.preExistingWorkers {
+		if err := s.validateWorkerNodeState(ctx, worker.Name); err != nil {
 			return err
 		}
-		if _, isGPU := s.gpuWorkers[workerName]; isGPU {
-			if err := s.validateGPUWorker(ctx, workerName); err != nil {
-				return fmt.Errorf("validate pre-existing GPU worker %s: %w", workerName, err)
-			}
-			continue
-		}
-		if err := s.validateCPUWorker(ctx, workerName); err != nil {
-			return fmt.Errorf("validate pre-existing CPU worker %s: %w", workerName, err)
+		if err := runTargetedWorkerSmoke(ctx, s.runtime, worker); err != nil {
+			return fmt.Errorf("validate pre-existing worker %s: %w", worker.Name, err)
 		}
 	}
 	return nil
@@ -203,20 +193,6 @@ func (s *NodeReplacement) validateWorkerNodeState(ctx context.Context, workerNam
 	return nil
 }
 
-func (s *NodeReplacement) validateCPUWorker(ctx context.Context, workerName string) error {
-	if _, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("srun -w %s true", framework.ShellQuote(workerName))); err != nil {
-		return fmt.Errorf("validate worker accepts a targeted Slurm job: %w", err)
-	}
-	return nil
-}
-
-func (s *NodeReplacement) validateGPUWorker(ctx context.Context, workerName string) error {
-	if _, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("srun -w %s --gpus-per-node=1 nvidia-smi -L >/dev/null", framework.ShellQuote(workerName))); err != nil {
-		return fmt.Errorf("validate worker GPU from login node: %w", err)
-	}
-	return nil
-}
-
 func (s *NodeReplacement) cancelJob(ctx context.Context, maintenanceJobID string) error {
 	if maintenanceJobID == "" {
 		return nil
@@ -226,15 +202,4 @@ func (s *NodeReplacement) cancelJob(ctx context.Context, maintenanceJobID string
 		return fmt.Errorf("cancel maintenance job %s: %w", maintenanceJobID, err)
 	}
 	return nil
-}
-
-func workerNameSet(workers []framework.WorkerInfo) map[string]struct{} {
-	names := make(map[string]struct{}, len(workers))
-	for _, worker := range workers {
-		if strings.TrimSpace(worker.Name) == "" {
-			continue
-		}
-		names[worker.Name] = struct{}{}
-	}
-	return names
 }

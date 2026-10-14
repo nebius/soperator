@@ -28,7 +28,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewLoginAutoscaling(info, runtime, kubectl),
 		NewObservability(kubectl),
 		NewInternalSSH(runtime, selector),
-		NewLoginUserIsolation(info, runtime),
+		NewLoginUserIsolation(info, runtime, kubectl),
 		NewPAMSlurmAdopt(info, runtime, slurm, kubectl, selector),
 		NewPackageInstallation(runtime, selector),
 		NewGPUProfiling(runtime, slurm, selector),

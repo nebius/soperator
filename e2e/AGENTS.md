@@ -10,11 +10,52 @@ context may be a description, code, a pull request, a Jira ticket, a Confluence
 page, a Slack thread, or another source. Inspect the supplied sources and the
 relevant Soperator code before proposing a test.
 
-Before proposing an implementation, search the E2E module for the same
-component, Kubernetes resource types, label selectors, commands, CR fields,
-polling logic, and validation behavior. Identify code that can be reused, code
-that should be extracted for another caller, and any duplication that should
-intentionally remain local.
+## Mandatory reuse audit
+
+The reuse audit is a blocking part of scenario design. Do not propose a design
+until it is complete.
+
+For every capability the scenario needs:
+
+1. Search all of `e2e/acceptance`, not only the target feature's step file.
+   Include `internal/sharedsteps`, `framework`, tests, and feature files.
+2. Search using:
+   - domain concepts and synonyms;
+   - Kubernetes kinds, CR fields, labels, commands, and paths;
+   - exact significant literals;
+   - analogous operations, such as worker selection, job submission, polling,
+     SSH setup, cleanup, parsing, and diagnostics.
+3. Read every plausible implementation and its tests before deciding whether it
+   can be reused.
+4. Remember that every file under `internal/sharedsteps` belongs to the same Go
+   package. Unexported helpers, constants, and types can be reused across files.
+   File boundaries do not make them scenario-private.
+
+Useful discovery commands include:
+
+```bash
+rg -n -i '<concepts and synonyms>' e2e/acceptance
+rg -n -F '<significant literal>' e2e/acceptance
+rg -n '^(func|type|const|var) |^\s+[A-Za-z_][A-Za-z0-9_]*\s*=' \
+  e2e/acceptance/internal/sharedsteps e2e/acceptance/framework \
+  --glob '*.go'
+```
+
+Reuse an existing implementation when its semantics match and doing so reduces
+code or makes the implementation easier to understand and maintain. Routine,
+obvious reuse is an implementation choice and does not require separate user
+approval or inclusion in the design proposal.
+
+Do not force reuse merely because implementations look similar or constants
+have the same value. Keep code local when sharing it would introduce awkward
+parameters, conditionals, indirection, surprising behavior, or less readable
+call sites. Prefer sharing domain knowledge that could otherwise drift, such as
+resource names, selectors, paths, parsing rules, and discovery behavior.
+
+When reuse would require a non-trivial refactor or broadening an existing
+abstraction, or when its semantic equivalence is uncertain, explain the
+tradeoff in the scenario design. Ask the user when the preferred direction is
+not clear.
 
 Gather enough information to answer:
 
@@ -41,8 +82,8 @@ Before editing code, propose a scenario design for user approval. Include:
 - the intended `.feature` changes, preferably with draft Gherkin;
 - the version, essential, unstable, and descriptive tag decisions;
 - the skip-versus-fail decisions and prerequisite checks;
-- the existing implementations and helpers found during the reuse audit,
-  including any small refactor needed before adding the scenario;
+- any non-obvious reuse or refactoring decision that materially affects the
+  implementation, including alternatives when the best choice is uncertain;
 - the important implementation choices, helpers, polling, cleanup, and tests;
 - the focused command and cluster shape needed for live validation.
 
@@ -146,6 +187,14 @@ Place shared code at the narrowest layer that fits:
   helper under `acceptance/internal/sharedsteps`.
 - Add operations to `acceptance/framework` clients when they are broadly
   reusable Kubernetes, Slurm, execution, polling, or selection primitives.
+
+Treat filenames as ownership and discovery signals. When a helper, constant,
+or type is used by unrelated step families, move it from a scenario-named file
+into a neutral domain file such as `job_helpers.go`, `ssh_helpers.go`, or
+`nodeset_helpers.go`. Declarations shared only within one coherent component or
+scenario family may remain with that family. All files in
+`internal/sharedsteps` belong to one Go package; a declaration is not private
+to the file where it is defined.
 
 If a step needs a kubectl, `scontrol`, or similar operation, consider a typed
 client method even when there is only one caller today if the operation has

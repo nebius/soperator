@@ -13,10 +13,9 @@ import (
 )
 
 const (
-	gpuProfilingUser = "soperatorchecks"
 	// Profiling jobs run as soperatorchecks, so their logs and reports need a
 	// user-writable directory. The E2E cluster teardown removes these artifacts.
-	gpuProfilingOutputDir  = "/opt/soperator-home/soperatorchecks/.acceptance/gpu-profiling"
+	gpuProfilingOutputDir  = "/opt/soperator-home/" + soperatorChecksUserName + "/.acceptance/gpu-profiling"
 	gpuProfilingJobTimeout = 15 * time.Minute
 	gpuProfilingCleanup    = 3 * time.Minute
 )
@@ -79,13 +78,13 @@ func (s *GPUProfiling) theSoperatorchecksUserIsAvailableOnTheWorker(ctx context.
 		return fmt.Errorf("GPU profiling worker is not selected")
 	}
 	if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx,
-		"id "+framework.ShellQuote(gpuProfilingUser)+" >/dev/null"); err != nil {
-		return fmt.Errorf("check %s user in the jail: %w", gpuProfilingUser, err)
+		"id "+framework.ShellQuote(soperatorChecksUserName)+" >/dev/null"); err != nil {
+		return fmt.Errorf("check %s user in the jail: %w", soperatorChecksUserName, err)
 	}
-	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, gpuProfilingUser, s.worker); err != nil {
+	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, soperatorChecksUserName, s.worker); err != nil {
 		return err
 	}
-	return waitForSSHTestUserOnController(ctx, s.runtime, gpuProfilingUser)
+	return waitForSSHTestUserOnController(ctx, s.runtime, soperatorChecksUserName)
 }
 
 func (s *GPUProfiling) gpuProfilingIsEnabledForNonRootUsersOnTheWorker(ctx context.Context) error {
@@ -112,7 +111,7 @@ func (s *GPUProfiling) theSoperatorchecksUserSubmitsAnNsightComputeProfilingJob(
 		"test \"$(id -u)\" -ne 0 && test \"$(id -un)\" = %s && export NCCL_GRAPH_DISABLE=1 && "+
 			"ncu --target-processes all --profile-from-start on --replay-mode kernel --set base "+
 			"all_reduce_perf -g 1 -b 32M -e 32M -f 1 -w 1 -n 1",
-		framework.ShellQuote(gpuProfilingUser),
+		framework.ShellQuote(soperatorChecksUserName),
 	)
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      "e2e-gpu-ncu",
@@ -121,7 +120,7 @@ func (s *GPUProfiling) theSoperatorchecksUserSubmitsAnNsightComputeProfilingJob(
 		GPUsPerNode:  1,
 		TasksPerNode: 1,
 		Wrap:         wrap,
-		RunAsUser:    gpuProfilingUser,
+		RunAsUser:    soperatorChecksUserName,
 		OutputDir:    gpuProfilingArtifactDir(ctx),
 	})
 	if err != nil {
@@ -149,7 +148,7 @@ func (s *GPUProfiling) theSoperatorchecksUserSubmitsAFullNodeNsightSystemsProfil
 	wrap := fmt.Sprintf(
 		"test \"$(id -u)\" -ne 0 && test \"$(id -un)\" = %s && "+
 			"nsys profile --trace=cuda,nvtx -o %s all_reduce_perf -b 512M -e 8G -f 2 -g %d",
-		framework.ShellQuote(gpuProfilingUser),
+		framework.ShellQuote(soperatorChecksUserName),
 		framework.ShellQuote(reportBase),
 		s.worker.SlurmNode.GPUCount,
 	)
@@ -160,7 +159,7 @@ func (s *GPUProfiling) theSoperatorchecksUserSubmitsAFullNodeNsightSystemsProfil
 		GPUsPerNode:  s.worker.SlurmNode.GPUCount,
 		TasksPerNode: 1,
 		Wrap:         wrap,
-		RunAsUser:    gpuProfilingUser,
+		RunAsUser:    soperatorChecksUserName,
 		OutputDir:    outputDir,
 	})
 	if err != nil {

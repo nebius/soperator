@@ -93,25 +93,11 @@ func (s *TopologyLegacy) scontrolTopologyIsParsedIntoASwitchTree(ctx context.Con
 	if len(workers) == 0 {
 		return fmt.Errorf("no workers found")
 	}
-	workerNames := make([]string, 0, len(workers))
-	for _, w := range workers {
-		workerNames = append(workerNames, w.Name)
-	}
+	workerNames := framework.WorkerNames(workers)
 
+	hostlists := make(map[string][]string)
 	expand := func(hostlist string) ([]string, error) {
-		cmd := fmt.Sprintf("scontrol show hostnames %s", framework.ShellQuote(hostlist))
-		out, err := s.runtime.Controller().RunWithDefaultRetry(ctx, cmd)
-		if err != nil {
-			return nil, err
-		}
-		var names []string
-		for _, line := range strings.Split(out, "\n") {
-			line = strings.TrimSpace(line)
-			if line != "" {
-				names = append(names, line)
-			}
-		}
-		return names, nil
+		return expandSlurmHostlist(ctx, s.runtime, hostlist, hostlists)
 	}
 
 	graph, err := parseTopology(raw, workerNames, expand)
@@ -158,10 +144,7 @@ func (s *TopologyLegacy) aJobRunsOnAllAvailableWorkers(ctx context.Context) erro
 	// Target every configured worker. Degraded or missing workers are rejected
 	// above so a prior failure is surfaced immediately instead of being skipped
 	// or left to fail through the srun timeout.
-	names := make([]string, 0, len(s.workers))
-	for _, w := range s.workers {
-		names = append(names, w.Name)
-	}
+	names := framework.WorkerNames(s.workers)
 
 	inner := `printf "%s %s\n" "$SLURMD_NODENAME" "$SLURM_TOPOLOGY_ADDR"`
 	cmd := fmt.Sprintf("srun -N %d -w %s --time=1:00 --cpu-bind=none bash -c %s",

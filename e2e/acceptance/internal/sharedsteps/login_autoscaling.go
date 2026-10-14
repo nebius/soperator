@@ -25,7 +25,6 @@ const (
 	loginAutoscalingPressurePercent      = int64(30)
 	loginAutoscalingMaxPressureProcesses = int32(16)
 	loginAutoscalingPressurePIDFile      = "/tmp/soperator-acceptance-login-autoscaling.pids"
-	loginAutoscalingStatefulSetResource  = "statefulsets.apps.kruise.io"
 	loginAutoscalingHPAResource          = "horizontalpodautoscalers.autoscaling"
 	loginAutoscalingSSHDContainer        = "sshd"
 	loginAutoscalingInstanceLabel        = "app.kubernetes.io/instance"
@@ -429,7 +428,7 @@ func (s *LoginAutoscaling) observePodSnapshot(ctx context.Context, expected map[
 func (s *LoginAutoscaling) loginStatefulSet(ctx context.Context) (kubeobjects.LoginStatefulSet, error) {
 	var statefulSets kubeobjects.LoginStatefulSetList
 	if err := s.kubectl.GetJSON(ctx, &statefulSets,
-		"get", loginAutoscalingStatefulSetResource,
+		"get", kruiseStatefulSetResource,
 		"-n", framework.SoperatorNamespace,
 		"-l", s.loginSelector(), "-o", "json",
 	); err != nil {

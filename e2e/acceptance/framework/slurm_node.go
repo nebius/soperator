@@ -20,6 +20,11 @@ var (
 
 const slurmTimestampLayout = "2006-01-02T15:04:05"
 
+var (
+	unhealthySlurmNodeStateFlags = []string{"DRAIN", "DOWN", "FAIL", "NOT_RESPONDING", "INVALID_REG"}
+	inactiveSlurmNodeStateFlags  = []string{"POWERED_DOWN", "POWERING_UP", "POWERING_DOWN", "POWER_DOWN"}
+)
+
 type SlurmNodeInfo struct {
 	Name            string
 	State           string
@@ -99,7 +104,7 @@ func (s *SlurmClient) ActiveWorkerStartTimes(ctx context.Context) (map[string]ti
 		if err != nil {
 			return nil, err
 		}
-		if node.HasStateFlag("NOT_RESPONDING") || node.HasStateFlag("POWERING_DOWN") || node.HasStateFlag("POWERED_DOWN") {
+		if !node.IsReadyForImmediateWork() {
 			continue
 		}
 		if node.SlurmdStartTime.IsZero() {
@@ -144,13 +149,36 @@ func (n SlurmNodeInfo) ReasonContains(reasonPart string) bool {
 	return strings.Contains(n.Reason, reasonPart)
 }
 
-func (n SlurmNodeInfo) IsUsable() bool {
-	for _, flag := range []string{"DRAIN", "DOWN", "FAIL", "NOT_RESPONDING", "INVALID_REG"} {
+// IsHealthy reports whether Slurm has marked the node with a failure or
+// administrative state that prevents normal scheduling. A powered-down node
+// can still be healthy because Slurm may power it up for a job.
+func (n SlurmNodeInfo) IsHealthy() bool {
+	for _, flag := range unhealthySlurmNodeStateFlags {
 		if n.HasStateFlag(flag) {
 			return false
 		}
 	}
 	return true
+}
+
+// IsReadyForImmediateWork reports whether the node is healthy and has a
+// running slurmd rather than being powered down or in a power transition.
+func (n SlurmNodeInfo) IsReadyForImmediateWork() bool {
+	if !n.IsHealthy() {
+		return false
+	}
+	for _, flag := range inactiveSlurmNodeStateFlags {
+		if n.HasStateFlag(flag) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsUsable retains the worker-selection semantics: healthy powered-down nodes
+// remain schedulable because Slurm can power them up on demand.
+func (n SlurmNodeInfo) IsUsable() bool {
+	return n.IsHealthy()
 }
 
 func (s *SlurmClient) WaitForNodeReasonContains(ctx context.Context, worker, reasonPart string, timeout time.Duration) error {

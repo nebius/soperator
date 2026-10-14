@@ -13,10 +13,6 @@ import (
 )
 
 const (
-	// Mirrored Ubuntu has /bin/bash required by the Slurm task prolog under Pyxis.
-	enrootLifecycleImage   = "docker://cr.nebius.cloud#soperator/ubuntu:noble"
-	enrootLifecycleCommand = "echo ready; sleep 3600"
-
 	enrootSquashRoot = "/var/cache/enroot-container-images"
 
 	enrootJobStartTimeout = 5 * time.Minute
@@ -112,7 +108,7 @@ func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
 		if cleanupErr := removeSSHTestIdentity(
 			ctx,
 			s.runtime,
-			sshUserName,
+			sshTestUserName,
 			enrootSSHKeyName,
 			enrootSSHKeyComment,
 		); cleanupErr != nil {
@@ -127,7 +123,7 @@ func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
 }
 
 func (s *EnrootContainers) anEnrootSSHTestUserExists(ctx context.Context) error {
-	if err := ensureSSHTestUser(ctx, s.runtime, sshUserName); err != nil {
+	if err := ensureSSHTestUser(ctx, s.runtime, sshTestUserName); err != nil {
 		return err
 	}
 
@@ -135,7 +131,7 @@ func (s *EnrootContainers) anEnrootSSHTestUserExists(ctx context.Context) error 
 	return ensureSSHTestIdentity(
 		ctx,
 		s.runtime,
-		sshUserName,
+		sshTestUserName,
 		enrootSSHKeyName,
 		enrootSSHKeyComment,
 	)
@@ -148,7 +144,7 @@ func (s *EnrootContainers) theUserImportsAnEnrootImageOverSSH(ctx context.Contex
 		if err != nil {
 			return framework.SkipIfInsufficientWorkers(s.runtime, err)
 		}
-		if err := waitForSSHTestUserOnWorker(ctx, s.runtime, sshUserName, workers[0]); err != nil {
+		if err := waitForSSHTestUserOnWorker(ctx, s.runtime, sshTestUserName, workers[0]); err != nil {
 			return err
 		}
 		host = workers[0].Name
@@ -158,7 +154,7 @@ func (s *EnrootContainers) theUserImportsAnEnrootImageOverSSH(ctx context.Contex
 	s.sshEnrootHost = host
 	s.sshEnrootImagePath = path.Join(
 		"/home",
-		sshUserName,
+		sshTestUserName,
 		".cache",
 		fmt.Sprintf("soperator-e2e-enroot-ssh-%s-%d.sqsh", target, time.Now().UnixNano()),
 	)
@@ -202,7 +198,7 @@ func (s *EnrootContainers) runEnrootSSHCommand(ctx context.Context, remoteComman
 	return runSSHCommand(
 		ctx,
 		s.runtime,
-		sshUserName,
+		sshTestUserName,
 		enrootSSHKeyName,
 		s.sshEnrootHost,
 		enrootSSHSmokeTimeout,
@@ -415,7 +411,7 @@ func (s *EnrootContainers) submitEnrootLifecycleJob(ctx context.Context, jobName
 
 	wrap := fmt.Sprintf("srun --container-image=%s %s",
 		framework.ShellQuote(enrootLifecycleImage),
-		framework.BashLC(enrootLifecycleCommand),
+		framework.BashLC(containerLifecycleCommand),
 	)
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      jobName,

@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	accountingTestUser       = "bob"
-	accountingTestUserHome   = "/home/bob"
+	accountingTestUserHome   = "/home/" + sshTestUserName
 	accountingTestAccount    = "e2e-research"
 	accountingTestJobName    = "e2e-accounting"
 	accountingSmokeTimeout   = 2 * time.Minute
@@ -140,13 +139,13 @@ func (s *Accounting) acceptanceTestUserExists(ctx context.Context) error {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	s.worker = workers[0]
-	if err := ensureSSHTestUser(ctx, s.runtime, accountingTestUser); err != nil {
+	if err := ensureSSHTestUser(ctx, s.runtime, sshTestUserName); err != nil {
 		return err
 	}
-	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, accountingTestUser, s.worker); err != nil {
+	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, sshTestUserName, s.worker); err != nil {
 		return err
 	}
-	return waitForSSHTestUserOnController(ctx, s.runtime, accountingTestUser)
+	return waitForSSHTestUserOnController(ctx, s.runtime, sshTestUserName)
 }
 
 func (s *Accounting) createTestAccountAndAssociation(ctx context.Context) error {
@@ -186,14 +185,14 @@ func (s *Accounting) createTestAccountAndAssociation(ctx context.Context) error 
 	}
 	command := fmt.Sprintf(
 		"sacctmgr -i add user name=%s account=%s cluster=%s",
-		framework.ShellQuote(accountingTestUser), account, cluster,
+		framework.ShellQuote(sshTestUserName), account, cluster,
 	)
 	if !userExists {
 		command += " defaultaccount=" + account
 	}
 	if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
 		return fmt.Errorf("associate Slurm user %s with account %s: %w",
-			accountingTestUser, accountingTestAccount, err)
+			sshTestUserName, accountingTestAccount, err)
 	}
 	return nil
 }
@@ -217,13 +216,13 @@ func (s *Accounting) slurmAccountingAccountExists(ctx context.Context) (bool, er
 func (s *Accounting) slurmAccountingUserExists(ctx context.Context) (bool, error) {
 	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf(
 		"sacctmgr show user where name=%s format=User -nP",
-		framework.ShellQuote(accountingTestUser),
+		framework.ShellQuote(sshTestUserName),
 	))
 	if err != nil {
-		return false, fmt.Errorf("query Slurm user %s: %w", accountingTestUser, err)
+		return false, fmt.Errorf("query Slurm user %s: %w", sshTestUserName, err)
 	}
 	for _, row := range parseAccountingRows(output) {
-		if len(row) > 0 && row[0] == accountingTestUser {
+		if len(row) > 0 && row[0] == sshTestUserName {
 			return true, nil
 		}
 	}
@@ -237,7 +236,7 @@ func (s *Accounting) userAssociationIsVisible(ctx context.Context) error {
 	}
 	if !exists {
 		return fmt.Errorf("Slurm association cluster=%s account=%s user=%s is missing from output:\n%s",
-			s.clusterName, accountingTestAccount, accountingTestUser, strings.TrimSpace(output))
+			s.clusterName, accountingTestAccount, sshTestUserName, strings.TrimSpace(output))
 	}
 	return nil
 }
@@ -247,14 +246,14 @@ func (s *Accounting) queryTestAssociation(ctx context.Context) (bool, string, er
 		"sacctmgr show assoc where cluster=%s account=%s user=%s format=Cluster,Account,User -nP",
 		framework.ShellQuote(s.clusterName),
 		framework.ShellQuote(accountingTestAccount),
-		framework.ShellQuote(accountingTestUser),
+		framework.ShellQuote(sshTestUserName),
 	))
 	if err != nil {
 		return false, output, fmt.Errorf("query Slurm association for %s/%s: %w",
-			accountingTestAccount, accountingTestUser, err)
+			accountingTestAccount, sshTestUserName, err)
 	}
 	return accountingAssociationExists(
-		output, s.clusterName, accountingTestAccount, accountingTestUser,
+		output, s.clusterName, accountingTestAccount, sshTestUserName,
 	), output, nil
 }
 
@@ -267,15 +266,15 @@ func (s *Accounting) submitAccountingSmokeJob(ctx context.Context) error {
 	if artifacts, ok := framework.ScenarioArtifacts(ctx); ok {
 		outputDir = artifacts.JailDir
 		prepareOutputDir = fmt.Sprintf("install -d -o %s -g %s -m 0777 %s && ",
-			framework.ShellQuote(accountingTestUser),
-			framework.ShellQuote(accountingTestUser),
+			framework.ShellQuote(sshTestUserName),
+			framework.ShellQuote(sshTestUserName),
 			framework.ShellQuote(outputDir),
 		)
 	}
 	stdoutPath := outputDir + "/e2e-accounting.out"
 	stderrPath := outputDir + "/e2e-accounting.err"
 	command := strings.Join([]string{
-		prepareOutputDir + "sudo", "-iu", framework.ShellQuote(accountingTestUser), "--", "sbatch",
+		prepareOutputDir + "sudo", "-iu", framework.ShellQuote(sshTestUserName), "--", "sbatch",
 		"--parsable",
 		"--job-name=" + framework.ShellQuote(accountingTestJobName),
 		"--account=" + framework.ShellQuote(accountingTestAccount),
@@ -288,7 +287,7 @@ func (s *Accounting) submitAccountingSmokeJob(ctx context.Context) error {
 	}, " ")
 	output, err := s.runtime.Jail().Run(ctx, command)
 	if err != nil {
-		return fmt.Errorf("submit accounting smoke job as %s: %w", accountingTestUser, err)
+		return fmt.Errorf("submit accounting smoke job as %s: %w", sshTestUserName, err)
 	}
 	jobID, err := framework.ParseSbatchJobID(output)
 	if err != nil {
@@ -301,7 +300,7 @@ func (s *Accounting) submitAccountingSmokeJob(ctx context.Context) error {
 		StderrPath: stderrPath,
 	}
 	s.runtime.Logf("accounting: submitted job=%s user=%s account=%s",
-		jobID, accountingTestUser, accountingTestAccount)
+		jobID, sshTestUserName, accountingTestAccount)
 	return nil
 }
 
@@ -397,7 +396,7 @@ func validateAccountingJobRecord(record accountingJobRecord) error {
 		expected string
 	}{
 		{"job name", record.JobName, accountingTestJobName},
-		{"user", record.User, accountingTestUser},
+		{"user", record.User, sshTestUserName},
 		{"account", record.Account, accountingTestAccount},
 		{"state", record.State, "COMPLETED"},
 		{"exit code", record.ExitCode, "0:0"},

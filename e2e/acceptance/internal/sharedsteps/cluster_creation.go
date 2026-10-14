@@ -3,7 +3,6 @@ package sharedsteps
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -17,13 +16,10 @@ import (
 )
 
 const (
-	clusterCreationHelmNamespace       = "flux-system"
-	clusterCreationSmokeJobTimeout     = 2 * time.Minute
-	clusterCreationPerNodeSmokeTimeout = 3 * time.Minute
-	clusterCreationHCProgramTimeout    = 3 * time.Minute
+	clusterCreationHelmNamespace    = "flux-system"
+	clusterCreationSmokeJobTimeout  = 2 * time.Minute
+	clusterCreationHCProgramTimeout = 3 * time.Minute
 )
-
-var nodeStatePattern = regexp.MustCompile(`State=([^\s]+)`)
 
 type ClusterCreation struct {
 	info     *framework.ClusterInfo
@@ -345,7 +341,10 @@ func (s *ClusterCreation) checkSlurmNodeHealth(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("show nodes: %w", err)
 	}
+	return validateSlurmNodeHealthOutput(nodesOutput)
+}
 
+func validateSlurmNodeHealthOutput(nodesOutput string) error {
 	var unhealthy []string
 	for _, line := range strings.Split(nodesOutput, "\n") {
 		line = strings.TrimSpace(line)
@@ -353,16 +352,15 @@ func (s *ClusterCreation) checkSlurmNodeHealth(ctx context.Context) error {
 			continue
 		}
 		nodeName := extractField(line, "NodeName")
-		state := extractNodeState(line)
-		if nodeName == "" || state == "" {
-			continue
+		if nodeName == "" {
+			return fmt.Errorf("parse Slurm node health: NodeName is missing from %q", line)
 		}
-
-		for _, bad := range []string{"NOT_RESPONDING", "DOWN", "DRAIN", "FAIL", "INVALID_REG"} {
-			if strings.Contains(state, bad) {
-				unhealthy = append(unhealthy, fmt.Sprintf("%s state=%s", nodeName, state))
-				break
-			}
+		node := framework.ParseSlurmNodeInfo(nodeName, line)
+		if node.State == "" {
+			return fmt.Errorf("parse Slurm node health for %s: State is missing", nodeName)
+		}
+		if !node.IsHealthy() {
+			unhealthy = append(unhealthy, fmt.Sprintf("%s state=%s", node.Name, node.State))
 		}
 	}
 
@@ -478,13 +476,13 @@ func (s *ClusterCreation) checkNebiusUserPresent(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkSoperatorchecksUserPresentAndConfigured(ctx context.Context) error {
-	if err := s.checkJailUserHome(ctx, "soperatorchecks"); err != nil {
+	if err := s.checkJailUserHome(ctx, soperatorChecksUserName); err != nil {
 		return err
 	}
 
-	key := "/opt/soperator-home/soperatorchecks/.ssh/soperatorchecks_id_ecdsa"
+	key := "/opt/soperator-home/" + soperatorChecksUserName + "/.ssh/soperatorchecks_id_ecdsa"
 	pub := key + ".pub"
-	authorized := "/opt/soperator-home/soperatorchecks/.ssh/authorized_keys"
+	authorized := "/opt/soperator-home/" + soperatorChecksUserName + "/.ssh/authorized_keys"
 	for _, path := range []string{key, pub, authorized} {
 		if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, fmt.Sprintf("test -s %s", framework.ShellQuote(path))); err != nil {
 			return fmt.Errorf("expected soperatorchecks SSH file %s to exist and be non-empty: %w", path, err)
@@ -582,12 +580,7 @@ func (s *ClusterCreation) checkNodeSetSmokeJobs(ctx context.Context) error {
 		}
 		worker := workers[0]
 
-		command := fmt.Sprintf("timeout %.0f srun -w %s hostname", clusterCreationPerNodeSmokeTimeout.Seconds(), framework.ShellQuote(worker.Name))
-		if nodeSet.HasGPU {
-			command = fmt.Sprintf("timeout %.0f srun -w %s nvidia-smi -L >/dev/null", clusterCreationPerNodeSmokeTimeout.Seconds(), framework.ShellQuote(worker.Name))
-		}
-
-		if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
+		if err := runTargetedWorkerSmoke(ctx, s.runtime, worker); err != nil {
 			problems = append(problems, fmt.Sprintf("%s worker %s smoke job failed: %v", nodeSet.Name, worker.Name, err))
 		}
 	}
@@ -623,15 +616,6 @@ func ownedByJob(pod corev1.Pod) bool {
 	return false
 }
 
-func findMetaCondition(conditions []metav1.Condition, conditionType string) *metav1.Condition {
-	for i := range conditions {
-		if conditions[i].Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
 func extractField(line, field string) string {
 	prefix := field + "="
 	for _, token := range strings.Fields(line) {
@@ -640,12 +624,4 @@ func extractField(line, field string) string {
 		}
 	}
 	return ""
-}
-
-func extractNodeState(line string) string {
-	match := nodeStatePattern.FindStringSubmatch(line)
-	if len(match) != 2 {
-		return ""
-	}
-	return match[1]
 }

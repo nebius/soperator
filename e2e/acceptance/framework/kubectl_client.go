@@ -32,13 +32,14 @@ type NodeSetInfo struct {
 }
 
 type SlurmClusterInfo struct {
-	Name                 string
-	Namespace            string
-	AccountingEnabled    bool
-	LoginDockerEnabled   bool
-	LoginJailSubMounts   []JailSubMountInfo
-	PAMSlurmAdoptEnabled bool
-	CustomSlurmConfig    *string
+	Name                      string
+	Namespace                 string
+	AccountingEnabled         bool
+	LoginDockerEnabled        bool
+	LoginUserIsolationEnabled bool
+	LoginJailSubMounts        []JailSubMountInfo
+	PAMSlurmAdoptEnabled      bool
+	CustomSlurmConfig         *string
 }
 
 type JailSubMountInfo struct {
@@ -72,13 +73,14 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 		return SlurmClusterInfo{}, fmt.Errorf("get SlurmCluster %s/%s: %w", SoperatorNamespace, name, err)
 	}
 	return SlurmClusterInfo{
-		Name:                 cluster.Metadata.Name,
-		Namespace:            cluster.Metadata.Namespace,
-		AccountingEnabled:    cluster.Spec.SlurmNodes.Accounting.Enabled,
-		LoginDockerEnabled:   cluster.Spec.SlurmNodes.Login.Docker.Enabled,
-		LoginJailSubMounts:   jailSubMountInfos(cluster.Spec.SlurmNodes.Login.Volumes.JailSubMounts),
-		PAMSlurmAdoptEnabled: cluster.Spec.PAMSlurmAdopt.Enabled,
-		CustomSlurmConfig:    cluster.Spec.CustomSlurmConfig,
+		Name:                      cluster.Metadata.Name,
+		Namespace:                 cluster.Metadata.Namespace,
+		AccountingEnabled:         cluster.Spec.SlurmNodes.Accounting.Enabled,
+		LoginDockerEnabled:        cluster.Spec.SlurmNodes.Login.Docker.Enabled,
+		LoginUserIsolationEnabled: cluster.Spec.SlurmNodes.Login.UserIsolation.Enabled,
+		LoginJailSubMounts:        jailSubMountInfos(cluster.Spec.SlurmNodes.Login.Volumes.JailSubMounts),
+		PAMSlurmAdoptEnabled:      cluster.Spec.PAMSlurmAdopt.Enabled,
+		CustomSlurmConfig:         cluster.Spec.CustomSlurmConfig,
 	}, nil
 }
 

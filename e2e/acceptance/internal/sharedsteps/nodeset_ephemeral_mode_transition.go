@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -19,7 +18,6 @@ import (
 const (
 	nodeSetEphemeralModeTransitionTimeout = 15 * time.Minute
 	nodeSetEphemeralModeCleanupTimeout    = 5 * time.Minute
-	nodeSetLabelKey                       = "slurm.nebius.ai/nodeset"
 	ephemeralModeApplied                  = "EphemeralModeApplied"
 )
 
@@ -69,18 +67,12 @@ func (s *NodeSetEphemeralModeTransition) CleanupAndReset(ctx context.Context) {
 }
 
 func (s *NodeSetEphemeralModeTransition) selectReadyStaticNodeSet(ctx context.Context) error {
-	var nodeSets kubeobjects.NodeSetList
-	if err := s.kubectl.GetJSON(ctx, &nodeSets, "get", "nodesets", "-n", framework.SoperatorNamespace, "-o", "json"); err != nil {
-		return fmt.Errorf("list NodeSets: %w", err)
+	nodeSets, err := listClusterNodeSets(ctx, s.kubectl, s.info.SlurmClusterName)
+	if err != nil {
+		return err
 	}
-	sort.Slice(nodeSets.Items, func(i, j int) bool {
-		return nodeSets.Items[i].Metadata.Name < nodeSets.Items[j].Metadata.Name
-	})
 
-	for _, nodeSet := range nodeSets.Items {
-		if nodeSet.Spec.ClusterName != "" && nodeSet.Spec.ClusterName != s.info.SlurmClusterName {
-			continue
-		}
+	for _, nodeSet := range nodeSets {
 		if nodeSet.Spec.EphemeralNodes != nil && *nodeSet.Spec.EphemeralNodes {
 			continue
 		}
@@ -98,7 +90,7 @@ func (s *NodeSetEphemeralModeTransition) selectReadyStaticNodeSet(ctx context.Co
 		return fmt.Errorf("wait for selected NodeSet static mode: %w", err)
 	}
 
-	pods, err := s.workerPods(ctx)
+	pods, err := nodeSetWorkerPods(ctx, s.kubectl, s.initialNodeSet)
 	if err != nil {
 		return err
 	}
@@ -168,7 +160,7 @@ func (s *NodeSetEphemeralModeTransition) checkWorkersPreserved(ctx context.Conte
 	return s.runtime.WaitFor(ctx, "original worker pods to remain ready",
 		nodeSetEphemeralModeTransitionTimeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			pods, err := s.workerPods(waitCtx)
+			pods, err := nodeSetWorkerPods(waitCtx, s.kubectl, s.initialNodeSet)
 			if err != nil {
 				return false, err
 			}
@@ -215,7 +207,7 @@ func (s *NodeSetEphemeralModeTransition) checkStaticModeRestored(ctx context.Con
 		func(waitCtx context.Context) (bool, error) {
 			var statefulSet kubeobjects.KruiseStatefulSet
 			if err := s.kubectl.GetJSON(waitCtx, &statefulSet,
-				"get", "statefulsets.apps.kruise.io", s.initialNodeSet.Metadata.Name,
+				"get", kruiseStatefulSetResource, s.initialNodeSet.Metadata.Name,
 				"-n", s.initialNodeSet.Metadata.Namespace, "-o", "json",
 			); err != nil {
 				return false, err
@@ -231,7 +223,7 @@ func (s *NodeSetEphemeralModeTransition) checkStaticModeRestored(ctx context.Con
 	return s.runtime.WaitFor(ctx, "all contiguous static worker pods to become ready",
 		nodeSetEphemeralModeTransitionTimeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			pods, err := s.workerPods(waitCtx)
+			pods, err := nodeSetWorkerPods(waitCtx, s.kubectl, s.initialNodeSet)
 			if err != nil {
 				return false, err
 			}
@@ -265,26 +257,10 @@ func (s *NodeSetEphemeralModeTransition) waitForModeApplied(ctx context.Context,
 			); err != nil {
 				return false, err
 			}
-			for _, condition := range nodeSet.Status.Conditions {
-				if condition.Type == ephemeralModeApplied &&
-					condition.Status == status &&
-					condition.ObservedGeneration == nodeSet.Metadata.Generation {
-					return true, nil
-				}
-			}
-			return false, nil
+			condition := findMetaCondition(nodeSet.Status.Conditions, ephemeralModeApplied)
+			return condition != nil &&
+				condition.Status == status &&
+				condition.ObservedGeneration == nodeSet.Metadata.Generation, nil
 		},
 	)
-}
-
-func (s *NodeSetEphemeralModeTransition) workerPods(ctx context.Context) ([]corev1.Pod, error) {
-	var pods corev1.PodList
-	selector := fmt.Sprintf("%s=%s", nodeSetLabelKey, s.initialNodeSet.Metadata.Name)
-	if err := s.kubectl.GetJSON(ctx, &pods,
-		"get", "pods", "-n", s.initialNodeSet.Metadata.Namespace,
-		"-l", selector, "-o", "json",
-	); err != nil {
-		return nil, fmt.Errorf("list worker pods for NodeSet %s: %w", s.initialNodeSet.Metadata.Name, err)
-	}
-	return pods.Items, nil
 }
