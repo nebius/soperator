@@ -30,6 +30,9 @@ spec:
 {{- if .Values.nfsServer.enabled }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-nfs-server
 {{- end }}
+{{- if .Values.tailscale.enabled }}
+  - name: {{ include "soperator-fluxcd.fullname" . }}-tailscale
+{{- end }}
 
   install:
     {{- toYaml .Values.slurmCluster.install | nindent 4 }}

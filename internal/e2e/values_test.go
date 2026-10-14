@@ -64,6 +64,11 @@ func TestOverrideTestValuesUsesTestingActiveChecksScope(t *testing.T) {
 	assert.Equal(t, "testing", result["active_checks_scope"])
 }
 
+func TestOverrideTestValuesEnablesTailscale(t *testing.T) {
+	result := overrideTestValues(map[string]interface{}{"tailscale_enabled": false}, Config{})
+	assert.Equal(t, true, result["tailscale_enabled"])
+}
+
 func TestOverrideTestValuesCreatesWorkerPartitions(t *testing.T) {
 	tfVars := map[string]interface{}{}
 	cfg := Config{

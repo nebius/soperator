@@ -166,7 +166,7 @@ slurmConfig:
   maxJobCount: 100000
   minJobAge: 600
   messageTimeout: 60
-  topologyParam: "SwitchAsNodeRank"
+  topologyParam: "BlockAsNodeRank,SwitchAsNodeRank"
 # Topology contains topology-related parameters for Slurm.
 #
 # topologies describes several named topologies rendered into topology.yaml, so heterogeneous

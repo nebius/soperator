@@ -38,12 +38,7 @@ spec:
       rules:
         - apiGroups: [ "" ] # "" indicates the core API group
           resources: [ "secrets" ]
-          # Create can not be restricted to a resource name.
-          verbs: [ "create" ]
-        - apiGroups: [ "" ] # "" indicates the core API group
-          resourceNames: [ "login-0", "login-1" ]
-          resources: [ "secrets" ]
-          verbs: [ "get", "update", "patch" ]
+          verbs: [ "get", "create", "update", "patch" ]
         - apiGroups: [ "" ] # "" indicates the core API group
           resources: [ "events" ]
           verbs: [ "get", "create", "patch" ]

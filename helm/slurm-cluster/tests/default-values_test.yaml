@@ -65,7 +65,39 @@ tests:
           value: 60
       - equal:
           path: spec.slurmConfig.topologyParam
+          value: "BlockAsNodeRank,SwitchAsNodeRank"
+
+  - it: should preserve an explicit tree node-ranking option
+    set:
+      slurmConfig.topologyParam: "SwitchAsNodeRank"
+    asserts:
+      - equal:
+          path: spec.slurmConfig.topologyParam
           value: "SwitchAsNodeRank"
+
+  - it: should preserve an explicit block node-ranking option
+    set:
+      slurmConfig.topologyParam: "BlockAsNodeRank"
+    asserts:
+      - equal:
+          path: spec.slurmConfig.topologyParam
+          value: "BlockAsNodeRank"
+
+  - it: should preserve custom topology options
+    set:
+      slurmConfig.topologyParam: "RouteTree"
+    asserts:
+      - equal:
+          path: spec.slurmConfig.topologyParam
+          value: "RouteTree"
+
+  - it: should preserve explicitly empty topology options
+    set:
+      slurmConfig.topologyParam: ""
+    asserts:
+      - equal:
+          path: spec.slurmConfig.topologyParam
+          value: ""
 
   - it: should preserve explicit Slurm scheduling and retention values
     set:
