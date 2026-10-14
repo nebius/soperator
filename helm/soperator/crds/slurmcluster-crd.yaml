@@ -31585,7 +31585,7 @@ spec:
                       job starts. Default value is no task prolog
                     type: string
                   topologyParam:
-                    default: SwitchAsNodeRank
+                    default: BlockAsNodeRank,SwitchAsNodeRank
                     description: TopologyParam is list of comma-separated options
                       identifying network topology options.
                     type: string

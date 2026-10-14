@@ -43,7 +43,7 @@ These tests verify the following kubebuilder default values:
 - `maxJobCount: 100000`
 - `minJobAge: 600`
 - `messageTimeout: 60`
-- `topologyParam: "SwitchAsNodeRank"`
+- `topologyParam: "BlockAsNodeRank,SwitchAsNodeRank"`
 
 ### MPIConfig
 - `pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"`
