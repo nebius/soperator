@@ -36,6 +36,7 @@ func FeaturePaths() []string {
 		"features/pam_slurm_adopt.feature",
 		"features/package_installation.feature",
 		"features/gpu_profiling.feature",
+		"features/nccl.feature",
 		"features/system_settings.feature",
 		"features/task_prolog_env.feature",
 		"features/soperator_utils.feature",

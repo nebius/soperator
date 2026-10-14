@@ -20,6 +20,8 @@ def args(**overrides):
   values = {
     "nodes": 2,
     "partition": None,
+    "nodelist": None,
+    "immediate": None,
     "segment": None,
     "min_message_size": "512M",
     "max_message_size": "16G",
@@ -40,6 +42,8 @@ class ArgumentTests(unittest.TestCase):
 
     self.assertEqual(parsed.nodes, 2)
     self.assertIsNone(parsed.partition)
+    self.assertIsNone(parsed.nodelist)
+    self.assertIsNone(parsed.immediate)
     self.assertIsNone(parsed.segment)
     self.assertEqual(parsed.min_message_size, "512M")
     self.assertEqual(parsed.max_message_size, "16G")
@@ -50,6 +54,9 @@ class ArgumentTests(unittest.TestCase):
     invalid_arguments = (
       ["--nodes", "0"],
       ["--nodes", "2", "--segment", "0"],
+      ["--nodes", "2", "--nodelist", "worker-0,"],
+      ["--nodes", "2", "--nodelist", "worker-0,worker-0"],
+      ["--nodes", "2", "--immediate", "0"],
       ["--nodes", "2", "--min-message-size", "invalid"],
       ["--nodes", "2", "--message-step-factor", "1"],
       ["--nodes", "2", "--time-limit", "invalid"],
@@ -58,6 +65,18 @@ class ArgumentTests(unittest.TestCase):
     for arguments in invalid_arguments:
       with self.subTest(arguments=arguments), self.assertRaises(SystemExit):
         nccl_test.parse_args(arguments)
+
+  def test_parses_nodelist_and_immediate(self):
+    parsed = nccl_test.parse_args(
+      ["--nodes", "2", "--nodelist", "worker-0,worker-1", "--immediate", "120"]
+    )
+
+    self.assertEqual(parsed.nodelist, ("worker-0", "worker-1"))
+    self.assertEqual(parsed.immediate, 120)
+
+  def test_rejects_nodelist_with_wrong_node_count(self):
+    with self.assertRaisesRegex(ValueError, "contains 1 node"):
+      nccl_test.validate_args(args(nodelist=("worker-0",)))
 
 
 class PlatformDetectionTests(unittest.TestCase):
@@ -68,14 +87,14 @@ class PlatformDetectionTests(unittest.TestCase):
         "run",
         return_value=subprocess.CompletedProcess([], 0, f"{expected.gpu_name}\n", ""),
       ):
-        actual = nccl_test.detect_platform(None)
+        actual = nccl_test.detect_platform(args())
         self.assertEqual(actual, expected)
 
   @mock.patch.object(nccl_test.subprocess, "run")
   def test_partition_is_used_for_probe(self, run):
     run.return_value = subprocess.CompletedProcess([], 0, "NVIDIA H200\n", "")
 
-    nccl_test.detect_platform("main")
+    nccl_test.detect_platform(args(partition="main"))
 
     command = run.call_args.args[0]
     self.assertIn("--partition=main", command)
@@ -84,24 +103,50 @@ class PlatformDetectionTests(unittest.TestCase):
   def test_partition_is_omitted_from_probe_by_default(self, run):
     run.return_value = subprocess.CompletedProcess([], 0, "NVIDIA H200\n", "")
 
-    nccl_test.detect_platform(None)
+    nccl_test.detect_platform(args())
 
     command = run.call_args.args[0]
     self.assertFalse(any(value.startswith("--partition=") for value in command))
+
+  @mock.patch.object(nccl_test.subprocess, "run")
+  def test_probes_every_selected_node_and_fails_fast(self, run):
+    run.return_value = subprocess.CompletedProcess(
+      [], 0, "NVIDIA B300\nNVIDIA B300\n", ""
+    )
+
+    profile = nccl_test.detect_platform(
+      args(nodelist=("worker-0", "worker-1"), immediate=120)
+    )
+
+    self.assertEqual(profile.name, "B300")
+    command = run.call_args.args[0]
+    self.assertIn("--nodes=2", command)
+    self.assertIn("--ntasks-per-node=1", command)
+    self.assertIn("--nodelist=worker-0,worker-1", command)
+    self.assertIn("--immediate=120", command)
+
+  @mock.patch.object(nccl_test.subprocess, "run")
+  def test_rejects_mixed_selected_platforms(self, run):
+    run.return_value = subprocess.CompletedProcess(
+      [], 0, "NVIDIA H200\nNVIDIA B300\n", ""
+    )
+
+    with self.assertRaises(SystemExit):
+      nccl_test.detect_platform(args(nodelist=("worker-0", "worker-1")))
 
   @mock.patch.object(nccl_test.subprocess, "run")
   def test_rejects_unsupported_platform(self, run):
     run.return_value = subprocess.CompletedProcess([], 0, "Unknown GPU\n", "")
 
     with self.assertRaises(SystemExit):
-      nccl_test.detect_platform(None)
+      nccl_test.detect_platform(args())
 
   @mock.patch.object(nccl_test.subprocess, "run")
   def test_propagates_probe_failure(self, run):
     run.return_value = subprocess.CompletedProcess([], 7, "", "probe failed\n")
 
     with self.assertRaises(SystemExit) as error:
-      nccl_test.detect_platform(None)
+      nccl_test.detect_platform(args())
 
     self.assertEqual(error.exception.code, 7)
 
@@ -152,6 +197,20 @@ class CommandTests(unittest.TestCase):
     self.assertIn("--gpus-per-node=4", command)
     self.assertIn("--ntasks-per-node=4", command)
     self.assertIn("--cpus-per-task=28", command)
+
+  def test_builds_b300_command_with_nodelist_and_immediate(self):
+    b300 = next(
+      profile for profile in nccl_test.PLATFORM_PROFILES if profile.name == "B300"
+    )
+
+    command = nccl_test.build_nccl_command(
+      args(nodelist=("worker-0", "worker-1"), immediate=120), b300
+    )
+
+    self.assertIn("--nodelist=worker-0,worker-1", command)
+    self.assertIn("--immediate=120", command)
+    self.assertIn("--gpus-per-node=8", command)
+    self.assertIn("--cpus-per-task=24", command)
 
   def test_platform_resource_profiles(self):
     expected_profiles = {
@@ -234,6 +293,17 @@ class MainTests(unittest.TestCase):
     self.assertNotIn("capture_output", run.call_args.kwargs)
     self.assertEqual(run.call_args.kwargs["env"], {"TEST": "1"})
     build_environment.assert_called_once_with(self.h200)
+
+  @mock.patch.object(nccl_test, "detect_platform")
+  @mock.patch.object(nccl_test.subprocess, "run")
+  def test_rejects_invalid_nodelist_before_platform_probe(self, run, detect_platform):
+    exit_code = nccl_test.main(
+      ["--nodes", "2", "--nodelist", "worker-0", "--immediate", "120"]
+    )
+
+    self.assertEqual(exit_code, 2)
+    detect_platform.assert_not_called()
+    run.assert_not_called()
 
   @mock.patch.object(nccl_test, "detect_platform")
   @mock.patch.object(nccl_test.subprocess, "run")

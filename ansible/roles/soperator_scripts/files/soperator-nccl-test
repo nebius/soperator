@@ -98,6 +98,15 @@ def time_limit(value: str) -> str:
   return value
 
 
+def node_list(value: str) -> tuple[str, ...]:
+  nodes = tuple(node.strip() for node in value.split(","))
+  if not nodes or any(not node for node in nodes):
+    raise argparse.ArgumentTypeError("must be a comma-separated list of node names")
+  if len(set(nodes)) != len(nodes):
+    raise argparse.ArgumentTypeError("must not contain duplicate node names")
+  return nodes
+
+
 def parse_args(argv=None):
   parser = argparse.ArgumentParser(
     prog="soperator-nccl-test",
@@ -112,6 +121,16 @@ def parse_args(argv=None):
   parser.add_argument(
     "--partition",
     help="Slurm partition; omitted by default so Slurm uses the user's default",
+  )
+  parser.add_argument(
+    "--nodelist",
+    type=node_list,
+    help="comma-separated worker nodes to use",
+  )
+  parser.add_argument(
+    "--immediate",
+    type=positive_int,
+    help="seconds Slurm may wait for resources before failing",
   )
   parser.add_argument(
     "--segment",
@@ -151,22 +170,45 @@ def partition_argument(partition: str | None) -> list[str]:
   return [f"--partition={partition}"]
 
 
-def build_platform_probe_command(partition: str | None) -> list[str]:
-  return [
+def placement_arguments(args) -> list[str]:
+  arguments = []
+  if args.nodelist is not None:
+    arguments.append(f"--nodelist={','.join(args.nodelist)}")
+  if args.immediate is not None:
+    arguments.append(f"--immediate={args.immediate}")
+  return arguments
+
+
+def validate_args(args) -> None:
+  if args.nodelist is not None and len(args.nodelist) != args.nodes:
+    raise ValueError(
+      f"--nodelist contains {len(args.nodelist)} node(s), expected {args.nodes}"
+    )
+
+
+def build_platform_probe_command(args) -> list[str]:
+  command = [
     "srun",
-    "--nodes=1",
-    "--ntasks=1",
+    f"--nodes={args.nodes if args.nodelist is not None else 1}",
     "--gpus-per-node=1",
     "--time=2:00",
-    *partition_argument(partition),
+    *partition_argument(args.partition),
+    *placement_arguments(args),
+  ]
+  if args.nodelist is None:
+    command.append("--ntasks=1")
+  else:
+    command.append("--ntasks-per-node=1")
+  command.extend([
     "nvidia-smi",
     "--query-gpu=name",
     "--format=csv,noheader",
-  ]
+  ])
+  return command
 
 
-def detect_platform(partition: str | None) -> PlatformProfile:
-  command = build_platform_probe_command(partition)
+def detect_platform(args) -> PlatformProfile:
+  command = build_platform_probe_command(args)
   try:
     result = subprocess.run(command, text=True, capture_output=True, check=False)
   except FileNotFoundError:
@@ -211,6 +253,7 @@ def build_nccl_command(args, profile: PlatformProfile) -> list[str]:
     f"--cpus-per-task={profile.cpus_per_task}",
     "--mem=0",
     *partition_argument(args.partition),
+    *placement_arguments(args),
   ]
   if args.segment is not None:
     command.append(f"--segment={args.segment}")
@@ -247,7 +290,13 @@ def build_environment(profile: PlatformProfile) -> dict[str, str]:
 
 def main(argv=None) -> int:
   args = parse_args(argv)
-  profile = detect_platform(args.partition)
+  try:
+    validate_args(args)
+  except ValueError as error:
+    print(str(error), file=sys.stderr)
+    return 2
+
+  profile = detect_platform(args)
   try:
     validate_platform_args(args, profile)
   except ValueError as error:
