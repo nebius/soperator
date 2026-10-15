@@ -14,7 +14,6 @@ class PlatformProfile:
   gpu_name: str
   gpus_per_node: int
   cpus_per_task: int
-  ucx_net_devices: str
   environment: dict[str, str] = field(default_factory=dict)
 
 
@@ -24,37 +23,31 @@ PLATFORM_PROFILES = (
     gpu_name="NVIDIA H100",
     gpus_per_node=8,
     cpus_per_task=16,
-    ucx_net_devices=",".join(f"mlx5_{index}:1" for index in range(8)),
   ),
   PlatformProfile(
     name="H200",
     gpu_name="NVIDIA H200",
     gpus_per_node=8,
     cpus_per_task=16,
-    ucx_net_devices=",".join(f"mlx5_{index}:1" for index in range(8)),
   ),
   PlatformProfile(
     name="B200",
     gpu_name="NVIDIA B200",
     gpus_per_node=8,
     cpus_per_task=20,
-    ucx_net_devices=",".join(f"mlx5_{index}:1" for index in range(4, 12)),
   ),
   PlatformProfile(
     name="B300",
     gpu_name="NVIDIA B300",
     gpus_per_node=8,
     cpus_per_task=24,
-    ucx_net_devices=",".join(f"mlx5_{index}:1" for index in range(4, 12)),
   ),
   PlatformProfile(
     name="GB300",
     gpu_name="NVIDIA GB300",
     gpus_per_node=4,
     cpus_per_task=28,
-    ucx_net_devices=",".join(f"mlx5_{index}:1" for index in range(4)),
     environment={
-      "NCCL_IB_HCA": ",".join(f"mlx5_{index}:1" for index in range(4)),
       "OMPI_MCA_coll_hcoll_enable": "0",
       "OMPI_MCA_coll_ucc_enable": "0",
     },
@@ -278,7 +271,6 @@ def build_environment(profile: PlatformProfile) -> dict[str, str]:
   environment = os.environ.copy()
   environment.update(
     {
-      "UCX_NET_DEVICES": profile.ucx_net_devices,
       "NCCL_IB_QPS_PER_CONNECTION": "2",
       "NCCL_NVLS_ENABLE": "1",
       "NCCL_BUFFSIZE": "8388608",

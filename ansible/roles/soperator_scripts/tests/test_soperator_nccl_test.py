@@ -214,22 +214,18 @@ class CommandTests(unittest.TestCase):
 
   def test_platform_resource_profiles(self):
     expected_profiles = {
-      "H100": (8, 16, range(8)),
-      "H200": (8, 16, range(8)),
-      "B200": (8, 20, range(4, 12)),
-      "B300": (8, 24, range(4, 12)),
-      "GB300": (4, 28, range(4)),
+      "H100": (8, 16),
+      "H200": (8, 16),
+      "B200": (8, 20),
+      "B300": (8, 24),
+      "GB300": (4, 28),
     }
 
     for profile in nccl_test.PLATFORM_PROFILES:
       with self.subTest(platform=profile.name):
-        gpus, cpus, device_indexes = expected_profiles[profile.name]
+        gpus, cpus = expected_profiles[profile.name]
         self.assertEqual(profile.gpus_per_node, gpus)
         self.assertEqual(profile.cpus_per_task, cpus)
-        self.assertEqual(
-          profile.ucx_net_devices,
-          ",".join(f"mlx5_{index}:1" for index in device_indexes),
-        )
 
   def test_passes_tunable_arguments_to_srun_and_nccl(self):
     command = nccl_test.build_nccl_command(
@@ -254,13 +250,13 @@ class CommandTests(unittest.TestCase):
     with self.assertRaisesRegex(ValueError, "only on GB300"):
       nccl_test.validate_platform_args(args(segment=16), self.h200)
 
-  def test_builds_common_and_gb300_environment(self):
+  def test_builds_common_and_gb300_environment_without_network_overrides(self):
     with mock.patch.dict(nccl_test.os.environ, {"PRESERVED": "value"}, clear=True):
       environment = nccl_test.build_environment(self.gb300)
 
     self.assertEqual(environment["PRESERVED"], "value")
-    self.assertEqual(environment["UCX_NET_DEVICES"], "mlx5_0:1,mlx5_1:1,mlx5_2:1,mlx5_3:1")
-    self.assertEqual(environment["NCCL_IB_HCA"], "mlx5_0:1,mlx5_1:1,mlx5_2:1,mlx5_3:1")
+    self.assertNotIn("UCX_NET_DEVICES", environment)
+    self.assertNotIn("NCCL_IB_HCA", environment)
     self.assertEqual(environment["NCCL_IB_QPS_PER_CONNECTION"], "2")
     self.assertEqual(environment["NCCL_NVLS_ENABLE"], "1")
     self.assertEqual(environment["NCCL_BUFFSIZE"], "8388608")
