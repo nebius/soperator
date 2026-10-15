@@ -176,9 +176,10 @@ type NodeSetVolumes struct {
 }
 
 type NodeVolumeMount struct {
-	Name      string `json:"name"`
-	MountPath string `json:"mountPath"`
-	ReadOnly  bool   `json:"readOnly"`
+	Name                    string           `json:"name"`
+	MountPath               string           `json:"mountPath"`
+	ReadOnly                bool             `json:"readOnly"`
+	VolumeClaimTemplateSpec *json.RawMessage `json:"volumeClaimTemplateSpec"`
 }
 
 type NodeSetGPUSpec struct {

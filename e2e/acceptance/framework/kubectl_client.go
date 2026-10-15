@@ -44,9 +44,10 @@ type SlurmClusterInfo struct {
 }
 
 type JailSubMountInfo struct {
-	Name      string
-	MountPath string
-	ReadOnly  bool
+	Name                    string
+	MountPath               string
+	ReadOnly                bool
+	UsesVolumeClaimTemplate bool
 }
 
 type WorkerPodInfo struct {
@@ -238,9 +239,10 @@ func jailSubMountInfos(mounts []kubeobjects.NodeVolumeMount) []JailSubMountInfo 
 	out := make([]JailSubMountInfo, 0, len(mounts))
 	for _, mount := range mounts {
 		out = append(out, JailSubMountInfo{
-			Name:      mount.Name,
-			MountPath: mount.MountPath,
-			ReadOnly:  mount.ReadOnly,
+			Name:                    mount.Name,
+			MountPath:               mount.MountPath,
+			ReadOnly:                mount.ReadOnly,
+			UsesVolumeClaimTemplate: mount.VolumeClaimTemplateSpec != nil,
 		})
 	}
 	return out
