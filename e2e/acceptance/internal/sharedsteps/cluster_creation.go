@@ -19,6 +19,7 @@ const (
 	clusterCreationHelmNamespace    = "flux-system"
 	clusterCreationSmokeJobTimeout  = 2 * time.Minute
 	clusterCreationHCProgramTimeout = 3 * time.Minute
+	containerRuntimeSubmountName    = "image-storage"
 )
 
 type ClusterCreation struct {
@@ -47,7 +48,7 @@ func (s *ClusterCreation) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^main partition smoke job succeeds$`, s.checkMainSmokeJob)
 	sc.Step(`^hidden partition smoke job succeeds$`, s.checkHiddenSmokeJob)
 	sc.Step(`^each discovered nodeset accepts a targeted smoke job$`, s.checkNodeSetSmokeJobs)
-	sc.Step(`^node-local jail submounts have mode 777$`, s.checkNodeLocalJailSubmountPermissions)
+	sc.Step(`^user-configured node-local jail submounts have mode 777$`, s.checkNodeLocalJailSubmountPermissions)
 }
 
 func (s *ClusterCreation) CleanupAndReset(ctx context.Context) {}
@@ -88,7 +89,7 @@ func (s *ClusterCreation) checkNodeLocalJailSubmountPermissions(ctx context.Cont
 		}
 		if len(paths) == 0 {
 			if !loggedNoMount[nodeSet.Name] {
-				s.runtime.Logf("Node-local jail submount permissions: NodeSet %s has no local-data or local-nvme mount", nodeSet.Name)
+				s.runtime.Logf("Node-local jail submount permissions: NodeSet %s has no user-configured node-local jail submounts", nodeSet.Name)
 				loggedNoMount[nodeSet.Name] = true
 			}
 			continue
@@ -106,14 +107,17 @@ func (s *ClusterCreation) checkNodeLocalJailSubmountPermissions(ctx context.Cont
 }
 
 func nodeLocalJailSubmountPaths(mounts []framework.JailSubMountInfo, hasLocalNVMe bool) ([]string, error) {
-	wanted := map[string]bool{"local-data": true}
+	requiredByName := map[string]bool{"local-data": true}
 	if hasLocalNVMe {
-		wanted["local-nvme"] = true
+		requiredByName["local-nvme"] = true
 	}
 
 	var paths []string
 	for _, mount := range mounts {
-		if !wanted[mount.Name] {
+		if mount.Name == containerRuntimeSubmountName {
+			continue
+		}
+		if !mount.UsesVolumeClaimTemplate && !requiredByName[mount.Name] {
 			continue
 		}
 		if mount.ReadOnly {
@@ -124,9 +128,9 @@ func nodeLocalJailSubmountPaths(mounts []framework.JailSubMountInfo, hasLocalNVM
 			return nil, fmt.Errorf("validate node-local mount %s: %w", mount.Name, err)
 		}
 		paths = append(paths, mountPath)
-		delete(wanted, mount.Name)
+		delete(requiredByName, mount.Name)
 	}
-	if hasLocalNVMe && wanted["local-nvme"] {
+	if hasLocalNVMe && requiredByName["local-nvme"] {
 		return nil, fmt.Errorf("worker pod has local-nvme volume but NodeSet has no local-nvme jail submount")
 	}
 	sort.Strings(paths)

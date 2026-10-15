@@ -20,24 +20,47 @@ func TestNodeLocalJailSubmountPermissionsCommand(t *testing.T) {
 func TestNodeLocalJailSubmountPaths(t *testing.T) {
 	mounts := []framework.JailSubMountInfo{
 		{Name: "home", MountPath: "/home"},
-		{Name: "image-storage", MountPath: "/mnt/image-storage"},
+		{Name: "image-storage", MountPath: "/mnt/image-storage", UsesVolumeClaimTemplate: true},
 		{Name: "local-data", MountPath: "/mnt/local-data"},
 		{Name: "local-nvme", MountPath: "/mnt/local-nvme"},
+		{Name: "scratch", MountPath: "/scratch", UsesVolumeClaimTemplate: true},
 	}
 
 	paths, err := nodeLocalJailSubmountPaths(mounts, false)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"/mnt/local-data"}, paths)
+	assert.Equal(t, []string{"/mnt/local-data", "/scratch"}, paths)
 
 	paths, err = nodeLocalJailSubmountPaths(mounts, true)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"/mnt/local-data", "/mnt/local-nvme"}, paths)
+	assert.Equal(t, []string{"/mnt/local-data", "/mnt/local-nvme", "/scratch"}, paths)
 }
 
-func TestNodeLocalJailSubmountPathsAllowsNoLocalData(t *testing.T) {
-	paths, err := nodeLocalJailSubmountPaths([]framework.JailSubMountInfo{{Name: "image-storage", MountPath: "/mnt/image-storage"}}, false)
+func TestNodeLocalJailSubmountPathsAllowsNoNodeLocalStorage(t *testing.T) {
+	paths, err := nodeLocalJailSubmountPaths([]framework.JailSubMountInfo{
+		{Name: "home", MountPath: "/home"},
+		{Name: "image-storage", MountPath: "/mnt/image-storage", ReadOnly: true, UsesVolumeClaimTemplate: true},
+	}, false)
 	require.NoError(t, err)
 	assert.Empty(t, paths)
+}
+
+func TestNodeLocalJailSubmountPathsRejectsReadOnlyVolumeClaimTemplate(t *testing.T) {
+	_, err := nodeLocalJailSubmountPaths([]framework.JailSubMountInfo{{
+		Name:                    "scratch",
+		MountPath:               "/scratch",
+		ReadOnly:                true,
+		UsesVolumeClaimTemplate: true,
+	}}, false)
+	assert.ErrorContains(t, err, "node-local mount scratch at /scratch is read-only")
+}
+
+func TestNodeLocalJailSubmountPathsRejectsInvalidVolumeClaimTemplatePath(t *testing.T) {
+	_, err := nodeLocalJailSubmountPaths([]framework.JailSubMountInfo{{
+		Name:                    "scratch",
+		MountPath:               "/scratch/../data",
+		UsesVolumeClaimTemplate: true,
+	}}, false)
+	assert.ErrorContains(t, err, "parent traversal is not allowed")
 }
 
 func TestNodeLocalJailSubmountPathsRequiresConfiguredLocalNVMe(t *testing.T) {

@@ -44,7 +44,7 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 		LoginTailscaleEnabled:     true,
 		LoginUserIsolationEnabled: true,
 		LoginJailSubMounts: []JailSubMountInfo{
-			{Name: "image-storage", MountPath: "/mnt/local-data"},
+			{Name: "image-storage", MountPath: "/mnt/local-data", UsesVolumeClaimTemplate: true},
 		},
 		PAMSlurmAdoptEnabled: true,
 		CustomSlurmConfig:    &customConfig,
@@ -194,7 +194,7 @@ func TestKubectlClientNodeSetsFiltersByClusterName(t *testing.T) {
 		HasGPU:        true,
 		Phase:         "Ready",
 		JailSubMounts: []JailSubMountInfo{
-			{Name: "local-data", MountPath: "/scratch"},
+			{Name: "local-data", MountPath: "/scratch", UsesVolumeClaimTemplate: true},
 			{Name: "config", MountPath: "/etc/config", ReadOnly: true},
 		},
 	}, nodeSets[1])
