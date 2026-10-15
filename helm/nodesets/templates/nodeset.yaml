@@ -1,10 +1,32 @@
 {{- range $i, $ns := .Values.nodesets }}
+{{- $nodeSetRange := index $ns "range" | default dict }}
+{{- $hasRange := not (empty $nodeSetRange) }}
+{{- $ordinals := list 0 }}
+{{- if $hasRange }}
+{{- if or (not (hasKey $nodeSetRange "firstOrdinal")) (not (hasKey $nodeSetRange "lastOrdinal")) }}
+{{- fail ".Values.nodesets[*].range.firstOrdinal and lastOrdinal are required when range is configured." }}
+{{- end }}
+{{- if or (not (regexMatch "^[0-9]+$" (toString $nodeSetRange.firstOrdinal))) (not (regexMatch "^[0-9]+$" (toString $nodeSetRange.lastOrdinal))) }}
+{{- fail ".Values.nodesets[*].range ordinals must be non-negative integers." }}
+{{- end }}
+{{- $firstOrdinal := int $nodeSetRange.firstOrdinal }}
+{{- $lastOrdinal := int $nodeSetRange.lastOrdinal }}
+{{- if or (lt $firstOrdinal 0) (lt $lastOrdinal $firstOrdinal) }}
+{{- fail ".Values.nodesets[*].range must satisfy 0 <= firstOrdinal <= lastOrdinal." }}
+{{- end }}
+{{- $ordinals = untilStep $firstOrdinal (add1 $lastOrdinal | int) 1 }}
+{{- end }}
+{{- range $ordinal := $ordinals }}
+{{- $nodeSetName := $ns.name }}
+{{- if $hasRange }}
+{{- $nodeSetName = printf "%s%s%d" $ns.name ($nodeSetRange.suffix | default "") $ordinal }}
+{{- end }}
 {{- with $ns }}
 ---
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: NodeSet
 metadata:
-  name: {{ .name }}
+  name: {{ $nodeSetName }}
   namespace: {{ $.Release.Namespace }}
 
   {{- with (.annotations | default dict) }}
@@ -286,7 +308,11 @@ spec:
   priorityClass: {{ . | quote }}
   {{- end }}
 
-  {{- with .nodeSelector }}
+  {{- $nodeSelector := deepCopy (.nodeSelector | default dict) }}
+  {{- with .nameNodeSelector }}
+  {{- $_ := set $nodeSelector . $nodeSetName }}
+  {{- end }}
+  {{- with $nodeSelector }}
   nodeSelector:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -307,5 +333,6 @@ spec:
   {{- end }}
 
   {{- include "nodesets.customInitContainers" (dict "root" $ "customInitContainers" .customInitContainers "nodeExporter" .nodeExporter) | nindent 2 }}
+{{- end }}
 {{- end }}
 {{- end }}
