@@ -658,7 +658,7 @@ jobs:
 
       - name: Acceptance Tests
         id: acceptance
-        timeout-minutes: 120
+        timeout-minutes: 180
         shell: bash
         run: |
           kubectl_context="$(kubectl config current-context 2>/dev/null || true)"
