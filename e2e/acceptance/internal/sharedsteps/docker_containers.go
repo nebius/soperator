@@ -80,6 +80,7 @@ func (s *DockerContainers) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a long-running Docker container job is submitted on two workers$`, s.aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers)
 	sc.Step(`^the Docker container job is running$`, s.theDockerContainerJobIsRunning)
 	sc.Step(`^Docker image and runtime storage is populated on a worker$`, s.dockerImageAndRuntimeStorageIsPopulatedOnAWorker)
+	sc.Step(`^a Docker container from the job uses the Slurm job cgroup$`, s.aDockerContainerFromTheJobUsesTheSlurmJobCgroup)
 	sc.Step(`^Docker containers from the job are running on selected workers$`, s.dockerContainersFromTheJobAreRunningOnSelectedWorkers)
 	sc.Step(`^the Docker container job is cancelled$`, s.theDockerContainerJobIsCancelled)
 	sc.Step(`^Docker containers from the job are stopped explicitly$`, s.dockerContainersFromTheJobAreStoppedExplicitly)
@@ -401,6 +402,28 @@ func (s *DockerContainers) dockerStorageIsPopulatedOnAWorker(
 					)
 				}
 
+				return true, nil
+			}
+			return false, nil
+		})
+	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job, err)
+}
+
+func (s *DockerContainers) aDockerContainerFromTheJobUsesTheSlurmJobCgroup(ctx context.Context) error {
+	if s.connectionWorker.Name == "" {
+		return fmt.Errorf("Docker connection worker is not selected")
+	}
+	if s.job.IsZero() {
+		return fmt.Errorf("Docker job ID is empty")
+	}
+
+	err := framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, s.job, "Docker container in Slurm job cgroup",
+		dockerProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+			containerIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, s.connectionWorker)
+			if err != nil {
+				return false, err
+			}
+			for containerID := range containerIDs {
 				cgroupParent, err := s.dockerContainerCgroupParent(waitCtx, s.connectionWorker, containerID)
 				if err != nil {
 					return false, err
