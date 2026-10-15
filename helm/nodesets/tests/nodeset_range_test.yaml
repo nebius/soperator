@@ -1,0 +1,139 @@
+suite: test nodeset range rendering
+templates:
+  - templates/nodeset.yaml
+tests:
+  - it: should preserve the old behavior when range is omitted
+    set:
+      nodesets:
+        - name: worker
+          slurmd:
+            resources: {}
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+              jailSubMounts: []
+          munge:
+            resources: {}
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: worker
+
+  - it: should preserve the old behavior when range is null
+    set:
+      nodesets:
+        - name: worker
+          range: null
+          slurmd:
+            resources: {}
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+              jailSubMounts: []
+          munge:
+            resources: {}
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: worker
+
+  - it: should render an inclusive range and derive node selectors from names
+    set:
+      nodesets:
+        - name: worker
+          range:
+            firstOrdinal: 2
+            lastOrdinal: 4
+            suffix: "-rack"
+          nameNodeSelector: slurm.nebius.ai/nodeset-name
+          nodeSelector:
+            kubernetes.io/os: linux
+          slurmd:
+            resources: {}
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+              jailSubMounts: []
+          munge:
+            resources: {}
+    asserts:
+      - hasDocuments:
+          count: 3
+      - equal:
+          path: metadata.name
+          value: worker-rack2
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: worker-rack4
+        documentIndex: 2
+      - equal:
+          path: spec.nodeSelector["slurm.nebius.ai/nodeset-name"]
+          value: worker-rack3
+        documentIndex: 1
+      - equal:
+          path: spec.nodeSelector["kubernetes.io/os"]
+          value: linux
+        documentIndex: 1
+
+  - it: should override a manually configured generated selector
+    set:
+      nodesets:
+        - name: worker
+          range:
+            firstOrdinal: 0
+            lastOrdinal: 0
+            suffix: "-rack"
+          nameNodeSelector: slurm.nebius.ai/nodeset-name
+          nodeSelector:
+            slurm.nebius.ai/nodeset-name: stale-name
+          slurmd:
+            resources: {}
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+              jailSubMounts: []
+          munge:
+            resources: {}
+    asserts:
+      - equal:
+          path: spec.nodeSelector["slurm.nebius.ai/nodeset-name"]
+          value: worker-rack0
+
+  - it: should fail when range bounds are missing
+    set:
+      nodesets:
+        - name: worker
+          range:
+            suffix: "-rack"
+    asserts:
+      - failedTemplate:
+          errorMessage: ".Values.nodesets[*].range.firstOrdinal and lastOrdinal are required when range is configured."
+
+  - it: should fail when range bounds are reversed
+    set:
+      nodesets:
+        - name: worker
+          range:
+            firstOrdinal: 4
+            lastOrdinal: 2
+            suffix: "-rack"
+    asserts:
+      - failedTemplate:
+          errorMessage: ".Values.nodesets[*].range must satisfy 0 <= firstOrdinal <= lastOrdinal."
+
+  - it: should fail when a range ordinal is not an integer
+    set:
+      nodesets:
+        - name: worker
+          range:
+            firstOrdinal: 0
+            lastOrdinal: 1.5
+            suffix: "-rack"
+    asserts:
+      - failedTemplate:
+          errorMessage: ".Values.nodesets[*].range ordinals must be non-negative integers."
