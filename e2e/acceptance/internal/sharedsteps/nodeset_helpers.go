@@ -11,8 +11,6 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
 
-const nodeSetLabelKey = "slurm.nebius.ai/nodeset"
-
 func listClusterNodeSets(
 	ctx context.Context,
 	kubectl *framework.KubectlClient,
@@ -50,12 +48,5 @@ func nodeSetWorkerPods(
 		return nil, fmt.Errorf("list worker pods: NodeSet name is empty")
 	}
 
-	var pods corev1.PodList
-	selector := fmt.Sprintf("%s=%s", nodeSetLabelKey, nodeSet.Metadata.Name)
-	if err := kubectl.GetJSON(ctx, &pods,
-		"get", "pods", "-n", nodeSet.Metadata.Namespace, "-l", selector, "-o", "json",
-	); err != nil {
-		return nil, fmt.Errorf("list worker pods for NodeSet %s: %w", nodeSet.Metadata.Name, err)
-	}
-	return pods.Items, nil
+	return kubectl.NodeSetWorkerPods(ctx, nodeSet.Metadata.Namespace, nodeSet.Metadata.Name)
 }

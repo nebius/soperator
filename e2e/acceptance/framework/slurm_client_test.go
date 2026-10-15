@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -199,6 +200,14 @@ func TestSubmitBatchStopsWhenRetryBecomesUncertain(t *testing.T) {
 	require.ErrorContains(t, err, "unexpected EOF")
 
 	assert.Equal(t, 2, runtime.jailCalls)
+}
+
+func TestJobReleaseGateQuotesPathAndHasDeadline(t *testing.T) {
+	path := "/tmp/a 'job'; $(touch /tmp/unsafe)"
+	script := JobReleaseGate(path, time.Minute)
+
+	assert.Equal(t, "timeout 60s sh -c "+ShellQuote("while [ ! -f "+ShellQuote(path)+" ]; do sleep 1; done"), script)
+	assert.Contains(t, JobReleaseGate(path, 100*time.Millisecond), "timeout 0.1s sh -c ")
 }
 
 func TestParseSacctJob(t *testing.T) {

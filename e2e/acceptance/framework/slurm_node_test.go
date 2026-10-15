@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -35,6 +36,26 @@ func TestParseSlurmNodeInfoLeavesInvalidStartTimeUnset(t *testing.T) {
 		t.Run(value, func(t *testing.T) {
 			info := ParseSlurmNodeInfo("worker-0", "NodeName=worker-0 SlurmdStartTime="+value)
 			assert.True(t, info.SlurmdStartTime.IsZero())
+		})
+	}
+}
+
+func TestParseSlurmNodeAllocations(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		output      string
+		cpu, memory *uint64
+	}{
+		{"idle", "CPUAlloc=0 AllocMem=0", new(uint64(0)), new(uint64(0))},
+		{"allocated", "CPUAlloc=2 AllocMem=128", new(uint64(2)), new(uint64(128))},
+		{"missing", "State=IDLE", nil, nil},
+		{"invalid", "CPUAlloc=N/A AllocMem=0bad", nil, nil},
+		{"negative", "CPUAlloc=-1 AllocMem=-1", nil, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			info := ParseSlurmNodeInfo("worker-0", tc.output)
+			assert.Equal(t, tc.cpu, info.CPUAlloc)
+			assert.Equal(t, tc.memory, info.AllocMemoryMiB)
 		})
 	}
 }
@@ -87,6 +108,31 @@ func TestSlurmNodeHealthAndImmediateReadiness(t *testing.T) {
 	}
 }
 
+func TestSlurmNodeInfoIsUsableReplacement(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		instanceID string
+		state      string
+		want       bool
+	}{
+		{name: "missing instance", state: "IDLE"},
+		{name: "original instance", instanceID: "old-instance", state: "IDLE"},
+		{name: "missing state", instanceID: "new-instance"},
+		{name: "drained", instanceID: "new-instance", state: "IDLE+DRAIN"},
+		{name: "down", instanceID: "new-instance", state: "DOWN"},
+		{name: "failed", instanceID: "new-instance", state: "FAIL"},
+		{name: "not responding", instanceID: "new-instance", state: "IDLE+NOT_RESPONDING"},
+		{name: "invalid registration", instanceID: "new-instance", state: "IDLE+INVALID_REG"},
+		{name: "idle", instanceID: "new-instance", state: "IDLE", want: true},
+		{name: "allocated", instanceID: "new-instance", state: "ALLOCATED", want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			node := SlurmNodeInfo{InstanceID: tc.instanceID, State: tc.state}
+			assert.Equal(t, tc.want, node.IsUsableReplacement("old-instance"))
+		})
+	}
+}
+
 func TestSlurmClientActiveWorkerStartTimes(t *testing.T) {
 	runtime := &slurmNodeRuntime{outputs: map[string]string{
 		`sinfo -hN -p main -o '%N'`:     "worker-0\nworker-1\nworker-2\nworker-3\n",
@@ -114,13 +160,78 @@ func TestSlurmClientActiveWorkerStartTimesRequiresActiveWorker(t *testing.T) {
 	assert.ErrorContains(t, err, "find active workers")
 }
 
+func TestSlurmClientNodeInfosOnceParsesAndOrdersSelectedRecords(t *testing.T) {
+	workerOne := "NodeName=worker-1 InstanceId=instance-1 State=ALLOCATED+DRAIN+REBOOT_REQUESTED CPUAlloc=2 AllocMem=128 Reason=soperator rolling update : test reason"
+	workerZero := "NodeName=worker-0 InstanceId=instance-0 State=IDLE CPUAlloc=0 AllocMem=0"
+	runtime := &slurmNodeRuntime{outputs: map[string]string{
+		"scontrol -o show nodes": "\nNodeName=unselected\n" + workerOne + "\n" + workerZero + "\n",
+	}}
+
+	nodes, err := NewSlurmClient(runtime).NodeInfosOnce(t.Context(), []string{"worker-0", "worker-1"})
+
+	require.NoError(t, err)
+	assert.Equal(t, []SlurmNodeInfo{ParseSlurmNodeInfo("worker-0", workerZero), ParseSlurmNodeInfo("worker-1", workerOne)}, nodes)
+	assert.Equal(t, []string{"scontrol -o show nodes"}, runtime.calls)
+}
+
+func TestSlurmClientNodeInfosOnceValidatesInputsAndRecords(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		names     []string
+		output    string
+		wantError string
+		wantCalls int
+	}{
+		{name: "empty"},
+		{name: "empty name", names: []string{""}, wantError: "invalid or duplicate node name"},
+		{name: "hostlist", names: []string{"worker-[0-1]"}, wantError: "invalid or duplicate node name"},
+		{name: "duplicate input", names: []string{"worker-0", "worker-0"}, wantError: "invalid or duplicate node name"},
+		{name: "empty output", names: []string{"worker-0"}, wantError: "missing record for worker-0", wantCalls: 1},
+		{name: "missing selected record", names: []string{"worker-0", "worker-1"}, output: "NodeName=worker-0 State=IDLE", wantError: "missing record for worker-1", wantCalls: 1},
+		{name: "duplicate selected record", names: []string{"worker-0"}, output: "NodeName=worker-0 State=IDLE\nNodeName=worker-0 State=DOWN", wantError: "duplicate record for worker-0", wantCalls: 1},
+		{name: "malformed leading field", names: []string{"worker-0"}, output: "State=IDLE NodeName=worker-0", wantError: "invalid leading field", wantCalls: 1},
+		{name: "invalid record name", names: []string{"worker-0"}, output: "NodeName=worker-[0-1] State=IDLE", wantError: "invalid leading field", wantCalls: 1},
+		{name: "missing selected state", names: []string{"worker-0"}, output: "NodeName=worker-0 CPUAlloc=0", wantError: "missing state", wantCalls: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			runtime := &slurmNodeRuntime{outputs: map[string]string{"scontrol -o show nodes": test.output}}
+
+			nodes, err := NewSlurmClient(runtime).NodeInfosOnce(t.Context(), test.names)
+
+			if test.wantError != "" {
+				require.ErrorContains(t, err, test.wantError)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Empty(t, nodes)
+			assert.Len(t, runtime.calls, test.wantCalls)
+		})
+	}
+}
+
+func TestSlurmClientNodeInfosOnceReturnsCommandErrorWithoutRetry(t *testing.T) {
+	commandErr := errors.New("controller unavailable")
+	runtime := &slurmNodeRuntime{runError: commandErr}
+
+	_, err := NewSlurmClient(runtime).NodeInfosOnce(t.Context(), []string{"worker-0"})
+
+	require.ErrorIs(t, err, commandErr)
+	assert.Equal(t, []string{"scontrol -o show nodes"}, runtime.calls)
+}
+
 type slurmNodeRuntime struct {
 	Runtime
-	outputs map[string]string
+	outputs  map[string]string
+	calls    []string
+	runError error
 }
 
 func (r *slurmNodeRuntime) Controller() CommandScope {
 	return NewCommandScope(func(ctx context.Context, command string) (string, error) {
+		r.calls = append(r.calls, command)
+		if r.runError != nil {
+			return "", r.runError
+		}
 		output, found := r.outputs[command]
 		if !found {
 			return "", fmt.Errorf("unexpected controller command: %s", strings.TrimSpace(command))
