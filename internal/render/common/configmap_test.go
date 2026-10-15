@@ -448,6 +448,35 @@ func TestRenderSlurmConfigMapPAMSlurmAdoptLaunchParameters(t *testing.T) {
 	}
 }
 
+func TestRenderSlurmConfigMapNamespace(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    values.NamespaceConfig
+		generated bool
+	}{
+		{name: "generated", config: values.NamespaceConfig{Enabled: true}, generated: true},
+		{name: "custom", config: values.NamespaceConfig{Enabled: true, ConfigMapName: "custom-namespace"}},
+		{name: "disabled"},
+		{name: "disabled with custom reference", config: values.NamespaceConfig{ConfigMapName: "custom-namespace"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &values.SlurmCluster{NamespaceConfig: tt.config}
+			result := RenderConfigMapSlurmConfigs(cluster)
+			assert.Equal(t, tt.config.Enabled, strings.Contains(result.Data[consts.ConfigMapKeySlurmBaseConfig], "NamespaceType=namespace/linux"))
+			_, generated := result.Data[consts.ConfigMapKeyNamespaceConfig]
+			assert.Equal(t, tt.generated, generated)
+			if generated {
+				assert.Contains(t, result.Data[consts.ConfigMapKeyNamespaceConfig], ManagedSlurmConfigWarning())
+			}
+			jailedConfig := RenderJailedConfigSlurmConfigs(cluster)
+			for _, item := range jailedConfig.Spec.Items {
+				assert.NotEqual(t, consts.ConfigMapKeyNamespaceConfig, item.Key)
+			}
+		})
+	}
+}
+
 func TestRenderConfigMapSlurmConfigs_FileNamesAndWarnings(t *testing.T) {
 	result := RenderConfigMapSlurmConfigs(&values.SlurmCluster{})
 

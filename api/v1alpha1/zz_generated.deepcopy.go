@@ -1367,11 +1367,6 @@ func (in *WorkerVolumesSpec) DeepCopyInto(out *WorkerVolumesSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.SharedMemorySize != nil {
-		in, out := &in.SharedMemorySize, &out.SharedMemorySize
-		x := (*in).DeepCopy()
-		*out = &x
-	}
 	if in.PersistentVolumeClaimRetentionPolicy != nil {
 		in, out := &in.PersistentVolumeClaimRetentionPolicy, &out.PersistentVolumeClaimRetentionPolicy
 		*out = new(PersistentVolumeClaimRetentionPolicy)

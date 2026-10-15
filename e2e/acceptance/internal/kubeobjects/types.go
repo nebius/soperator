@@ -51,11 +51,12 @@ type SlurmCluster struct {
 }
 
 type SlurmClusterSpec struct {
-	Topology               *SlurmClusterTopology  `json:"topology"`
-	PartitionConfiguration PartitionConfiguration `json:"partitionConfiguration"`
-	SlurmNodes             SlurmClusterNodes      `json:"slurmNodes"`
-	CustomSlurmConfig      *string                `json:"customSlurmConfig"`
-	PAMSlurmAdopt          SlurmClusterPAMAdopt   `json:"pamSlurmAdopt"`
+	Topology               *SlurmClusterTopology        `json:"topology"`
+	PartitionConfiguration PartitionConfiguration       `json:"partitionConfiguration"`
+	SlurmNodes             SlurmClusterNodes            `json:"slurmNodes"`
+	CustomSlurmConfig      *string                      `json:"customSlurmConfig"`
+	PAMSlurmAdopt          SlurmClusterPAMAdopt         `json:"pamSlurmAdopt"`
+	NamespaceConfig        *SlurmClusterNamespaceConfig `json:"namespaceConfig"`
 }
 
 type SlurmClusterNodes struct {
@@ -88,6 +89,15 @@ type SlurmClusterLoginVolumes struct {
 
 type SlurmClusterPAMAdopt struct {
 	Enabled bool `json:"enabled"`
+}
+
+type SlurmClusterNamespaceConfig struct {
+	Enabled      *bool                                    `json:"enabled"`
+	ConfigMapRef *SlurmClusterNamespaceConfigMapReference `json:"configMapRef"`
+}
+
+type SlurmClusterNamespaceConfigMapReference struct {
+	Name string `json:"name"`
 }
 
 type SlurmClusterTopology struct {

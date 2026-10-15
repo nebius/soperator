@@ -4,7 +4,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -459,12 +458,6 @@ type WorkerVolumesSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	CustomVolumeMounts []NodeVolumeMount `json:"customVolumeMounts,omitempty"`
-
-	// SharedMemorySize defines the size of the shared memory (/dev/shm)
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="64Gi"
-	SharedMemorySize *resource.Quantity `json:"sharedMemorySize,omitempty"`
 
 	// PersistentVolumeClaimRetentionPolicy controls PVC retention for all
 	// volumeClaimTemplateSpec volumes in this NodeSet.

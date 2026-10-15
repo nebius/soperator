@@ -9823,15 +9823,6 @@ spec:
                             - Delete
                             type: string
                         type: object
-                      sharedMemorySize:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        default: 64Gi
-                        description: SharedMemorySize defines the size of the shared
-                          memory (/dev/shm)
-                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                        x-kubernetes-int-or-string: true
                       spool:
                         description: Spool represents the spool data volume configuration
                         properties:

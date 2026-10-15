@@ -46,9 +46,39 @@ func TestKubectlClientSlurmCluster(t *testing.T) {
 		LoginJailSubMounts: []JailSubMountInfo{
 			{Name: "image-storage", MountPath: "/mnt/local-data", UsesVolumeClaimTemplate: true},
 		},
-		PAMSlurmAdoptEnabled: true,
-		CustomSlurmConfig:    &customConfig,
+		PAMSlurmAdoptEnabled:   true,
+		NamespaceConfigEnabled: true,
+		CustomSlurmConfig:      &customConfig,
 	}, cluster)
+}
+
+func TestKubectlClientSlurmClusterNamespaceConfig(t *testing.T) {
+	for _, tc := range []struct {
+		spec          string
+		enabled       bool
+		configMapName string
+	}{
+		{spec: ``, enabled: true},
+		{spec: `"namespaceConfig": {}`, enabled: true},
+		{spec: `"namespaceConfig": {"enabled": true}`, enabled: true},
+		{spec: `"namespaceConfig": {"enabled": false}`, enabled: false},
+		{spec: `"namespaceConfig": {"configMapRef": {"name": "custom-namespace"}}`, enabled: true, configMapName: "custom-namespace"},
+		{spec: `"namespaceConfig": {"enabled": false, "configMapRef": {"name": "custom-namespace"}}`, enabled: false, configMapName: "custom-namespace"},
+	} {
+		t.Run(tc.spec, func(t *testing.T) {
+			exec := &kubectlClientTestExec{kubectl: map[string]string{
+				"get\x00slurmcluster\x00soperator\x00-n\x00soperator\x00-o\x00json": fmt.Sprintf(`{
+					"metadata": {"name": "soperator", "namespace": "soperator"},
+					"spec": {%s}
+				}`, tc.spec),
+			}}
+
+			cluster, err := NewKubectlClient(exec).SlurmCluster(t.Context(), "soperator")
+			require.NoError(t, err)
+			assert.Equal(t, tc.enabled, cluster.NamespaceConfigEnabled)
+			assert.Equal(t, tc.configMapName, cluster.NamespaceConfigMapName)
+		})
+	}
 }
 
 func TestKubectlClientSlurmClusterPAMSlurmAdoptDisabled(t *testing.T) {

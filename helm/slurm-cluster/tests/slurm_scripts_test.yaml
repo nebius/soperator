@@ -2,6 +2,43 @@ suite: test Slurm scripts configuration
 templates:
   - slurm-scripts-cm.yaml
 tests:
+  - it: should leave job temporary filesystem lifecycle to Slurm namespaces
+    asserts:
+      - notExists:
+          path: data["job_tmpfs_recreate.sh"]
+      - notExists:
+          path: data["job_tmpfs_delete.sh"]
+      - notExists:
+          path: data["job_tmpfs_delete_leftover.sh"]
+      - notMatchRegex:
+          path: data["checks.json"]
+          pattern: 'job_tmpfs_'
+
+  - it: should drop worker POSIX shared memory around whole-node jobs by default
+    asserts:
+      - matchRegex:
+          path: data["drop_posix_shmem.sh"]
+          pattern: 'SHM_DIR="/mnt/jail/dev/shm"'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"name": "drop_posix_shmem"'
+      - matchRegex:
+          path: data["checks.json"]
+          pattern: '"skip_for_partial_cpu_jobs": true'
+
+  - it: should allow disabling worker POSIX shared memory cleanup
+    set:
+      slurmScripts:
+        builtIn:
+          drop_posix_shmem.sh:
+            enabled: false
+    asserts:
+      - notExists:
+          path: data["drop_posix_shmem.sh"]
+      - notMatchRegex:
+          path: data["checks.json"]
+          pattern: 'drop_posix_shmem'
+
   - it: should reject an enabled built-in without a bundled script
     set:
       slurmScripts:

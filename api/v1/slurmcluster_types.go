@@ -123,6 +123,12 @@ type SlurmClusterSpec struct {
 	// +kubebuilder:validation:Optional
 	PAMSlurmAdopt *PAMSlurmAdopt `json:"pamSlurmAdopt,omitempty"`
 
+	// NamespaceConfig controls Slurm job namespaces and the source of namespace.yaml.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={enabled: true}
+	NamespaceConfig *NamespaceConfig `json:"namespaceConfig,omitempty"`
+
 	// MPIConfig represents the PMIx configuration in mpi.conf. Not all options are supported.
 	//
 	// +kubebuilder:validation:Optional
@@ -165,6 +171,32 @@ type PAMSlurmAdopt struct {
 	//
 	// +kubebuilder:validation:Optional
 	ExemptGroups []string `json:"exemptGroups,omitempty"`
+}
+
+// NamespaceConfig configures the namespace/linux plugin on worker nodes.
+type NamespaceConfig struct {
+	// Enabled enables Slurm job namespaces. Without ConfigMapRef, the operator generates
+	// namespace.yaml with per-job tmpfs mounts at /tmp, /dev/shm and /mnt/memory.
+	// Disabling namespaces takes precedence over ConfigMapRef.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// ConfigMapRef supplies namespace.yaml instead of the generated configuration.
+	// The ConfigMap must be in the SlurmCluster namespace and contain the namespace.yaml key.
+	//
+	// +kubebuilder:validation:Optional
+	ConfigMapRef *NamespaceConfigMapReference `json:"configMapRef,omitempty"`
+}
+
+// NamespaceConfigMapReference identifies a ConfigMap containing namespace.yaml.
+type NamespaceConfigMapReference struct {
+	// Name is the name of the ConfigMap in the SlurmCluster namespace.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
 }
 
 // SlurmConfig represents the Slurm configuration in slurm.conf

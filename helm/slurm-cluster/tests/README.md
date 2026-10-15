@@ -73,7 +73,6 @@ These tests verify the following kubebuilder default values:
 - `maxUnavailable: "20%"`
 - `cgroupVersion: "v2"`
 - `enableGDRCopy: false`
-- `sharedMemorySize: "64Gi"`
 
 ### Accounting
 - `enabled: false`

@@ -229,6 +229,13 @@ pamSlurmAdopt:
   enabled: false
   exemptUsers: []
   exemptGroups: []
+# Enables namespace/linux with generated per-job tmpfs mounts at /tmp, /dev/shm and /mnt/memory.
+# Set configMapRef.name to use a ConfigMap in the same namespace with a namespace.yaml key.
+# Disabling namespaces takes precedence over configMapRef.
+namespaceConfig:
+  enabled: true
+  # configMapRef:
+  #   name: custom-slurm-namespace
 mpiConfig:
   pmixEnv: "OMPI_MCA_btl_tcp_if_include=eth0"
 plugStackConfig:
@@ -865,6 +872,7 @@ slurmScripts:
       enabled: true
       customContent: null
       customConfig: null
+    # Cleans worker-wide /dev/shm for whole-node jobs, including Docker --ipc=host segments.
     drop_posix_shmem.sh:
       enabled: true
       customContent: null
@@ -878,18 +886,6 @@ slurmScripts:
       customContent: null
       customConfig: null
     idle_mem_used.undrain.py:
-      enabled: true
-      customContent: null
-      customConfig: null
-    job_tmpfs_delete.sh:
-      enabled: true
-      customContent: null
-      customConfig: null
-    job_tmpfs_delete_leftover.sh:
-      enabled: true
-      customContent: null
-      customConfig: null
-    job_tmpfs_recreate.sh:
       enabled: true
       customContent: null
       customConfig: null

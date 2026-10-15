@@ -115,6 +115,13 @@ func BuildConfigMapSlurmConfigsName(clusterName string) string {
 	}.String()
 }
 
+func BuildJailedConfigNamespaceName(clusterName string) string {
+	return namedEntity{
+		clusterName: clusterName,
+		entity:      "namespace-config",
+	}.String()
+}
+
 func BuildSecretMungeKeyName(clusterName string) string {
 	return namedEntity{
 		clusterName: clusterName,

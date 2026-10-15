@@ -43,7 +43,7 @@ Feature: Passive checks
     And the GPU job health-check Epilog report is fresh and passing
     And raw GPU health-check command outputs are present
 
-  @soperator_version_>=4.0.0
+  @soperator_version_>=4.0.0,<5.0.0
   Scenario: Job tmpfs directory is scoped to the Slurm job lifetime
     Given a worker is selected
     When a Slurm job checks its job tmpfs directory on the selected worker

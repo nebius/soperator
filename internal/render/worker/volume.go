@@ -29,7 +29,7 @@ func renderVolumesAndClaimTemplateSpecsForNodeSet(
 		renderVolumeBoot(),
 		renderVolumeHostLogJournal(),
 		renderVolumeSoperatorOutputs(),
-		renderVolumeSharedMemory(nodeSet.SharedMemorySize),
+		renderVolumeSharedMemory(nodeSet.ContainerSlurmd.Resources.Memory()),
 		renderVolumeSysctl(nodeSet.ParentalCluster.Name),
 	}
 	if nodeSet.SupervisorDConfigMapName != "" {

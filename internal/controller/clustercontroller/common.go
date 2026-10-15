@@ -8,9 +8,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/naming"
@@ -114,6 +116,12 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 					stepLogger.V(1).Info("Reconciled")
 
 					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm namespace JailedConfig",
+				Func: func(stepCtx context.Context) error {
+					return r.reconcileNamespaceConfig(stepCtx, cluster, clusterValues)
 				},
 			},
 			utils.MultiStepExecutionStep{
@@ -223,6 +231,36 @@ func (r SlurmClusterReconciler) ReconcileCommon(
 		return fmt.Errorf("reconciling common resources: %w", err)
 	}
 	logger.Info("Reconciled common resources")
+	return nil
+}
+
+func (r SlurmClusterReconciler) reconcileNamespaceConfig(
+	ctx context.Context,
+	cluster *slurmv1.SlurmCluster,
+	clusterValues *values.SlurmCluster,
+) error {
+	if clusterValues.NamespaceConfig.Enabled {
+		desired := common.RenderJailedConfigNamespace(clusterValues)
+		return r.JailedConfig.Reconcile(ctx, cluster, &desired)
+	}
+
+	existing := &slurmv1alpha1.JailedConfig{}
+	key := types.NamespacedName{
+		Name:      naming.BuildJailedConfigNamespaceName(cluster.Name),
+		Namespace: cluster.Namespace,
+	}
+	if err := r.Get(ctx, key, existing); err != nil {
+		if err = client.IgnoreNotFound(err); err != nil {
+			return fmt.Errorf("get namespace JailedConfig: %w", err)
+		}
+		return nil
+	}
+	if !metav1.IsControlledBy(existing, cluster) {
+		return nil
+	}
+	if err := client.IgnoreNotFound(r.Delete(ctx, existing, client.Preconditions{UID: &existing.UID, ResourceVersion: &existing.ResourceVersion})); err != nil {
+		return fmt.Errorf("delete namespace JailedConfig: %w", err)
+	}
 	return nil
 }
 
