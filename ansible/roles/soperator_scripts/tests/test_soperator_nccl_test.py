@@ -54,8 +54,7 @@ class ArgumentTests(unittest.TestCase):
     invalid_arguments = (
       ["--nodes", "0"],
       ["--nodes", "2", "--segment", "0"],
-      ["--nodes", "2", "--nodelist", "worker-0,"],
-      ["--nodes", "2", "--nodelist", "worker-0,worker-0"],
+      ["--nodes", "2", "--nodelist", ""],
       ["--nodes", "2", "--immediate", "0"],
       ["--nodes", "2", "--min-message-size", "invalid"],
       ["--nodes", "2", "--message-step-factor", "1"],
@@ -68,96 +67,240 @@ class ArgumentTests(unittest.TestCase):
 
   def test_parses_nodelist_and_immediate(self):
     parsed = nccl_test.parse_args(
-      ["--nodes", "2", "--nodelist", "worker-0,worker-1", "--immediate", "120"]
+      ["--nodes", "2", "--nodelist", "worker-[0-1]", "--immediate", "120"]
     )
 
-    self.assertEqual(parsed.nodelist, ("worker-0", "worker-1"))
+    self.assertEqual(parsed.nodelist, "worker-[0-1]")
     self.assertEqual(parsed.immediate, 120)
 
-  def test_rejects_nodelist_with_wrong_node_count(self):
-    with self.assertRaisesRegex(ValueError, "contains 1 node"):
-      nccl_test.validate_args(args(nodelist=("worker-0",)))
+
+class SlurmMetadataTests(unittest.TestCase):
+  @mock.patch.object(nccl_test, "run_scontrol_json")
+  def test_resolves_default_partition(self, run_scontrol_json):
+    run_scontrol_json.return_value = {
+      "partitions": [
+        {"name": "gpu-b300", "flags": [], "nodes": {"configured": "b-[0-1]"}},
+        {
+          "name": "gpu-h200",
+          "flags": ["DEFAULT"],
+          "nodes": {"configured": "h-[0-3]"},
+        },
+      ]
+    }
+
+    partition, hostlist = nccl_test.resolve_partition(None)
+
+    self.assertEqual(partition, "gpu-h200")
+    self.assertEqual(hostlist, "h-[0-3]")
+    run_scontrol_json.assert_called_once_with(["show", "partitions"])
+
+  @mock.patch.object(nccl_test, "run_scontrol_json")
+  def test_resolves_explicit_partition(self, run_scontrol_json):
+    run_scontrol_json.return_value = {
+      "partitions": [
+        {"name": "gpu-b300", "flags": [], "nodes": {"configured": "b-[0-1]"}}
+      ]
+    }
+
+    partition, hostlist = nccl_test.resolve_partition("gpu-b300")
+
+    self.assertEqual(partition, "gpu-b300")
+    self.assertEqual(hostlist, "b-[0-1]")
+    run_scontrol_json.assert_called_once_with(
+      ["show", "partition", "gpu-b300"]
+    )
+
+  @mock.patch.object(nccl_test, "run_scontrol_json")
+  def test_rejects_missing_default_partition(self, run_scontrol_json):
+    run_scontrol_json.return_value = {
+      "partitions": [
+        {"name": "gpu", "flags": [], "nodes": {"configured": "worker-0"}}
+      ]
+    }
+
+    with self.assertRaisesRegex(ValueError, "expected one default"):
+      nccl_test.resolve_partition(None)
+
+  @mock.patch.object(nccl_test, "run_scontrol", return_value="worker-0\nworker-1\n")
+  def test_expands_slurm_hostlist(self, run_scontrol):
+    nodes = nccl_test.expand_hostlist("worker-[0-1]")
+
+    self.assertEqual(nodes, ("worker-0", "worker-1"))
+    run_scontrol.assert_called_once_with(
+      ["show", "hostnames", "worker-[0-1]"]
+    )
+
+  def test_parses_typed_gpu_gres(self):
+    node = {
+      "name": "worker-0",
+      "gres": "gpu:nvidia_h200:4(S:0),gpu:nvidia_h200:4(S:1)",
+      "cpus": 128,
+    }
+
+    gpu_node = nccl_test.parse_gpu_node(node)
+
+    self.assertEqual(
+      gpu_node,
+      nccl_test.GPUNode("worker-0", "nvidia_h200", 8, 128),
+    )
+
+  def test_ignores_cpu_node(self):
+    self.assertIsNone(
+      nccl_test.parse_gpu_node({"name": "cpu-0", "gres": "", "cpus": 32})
+    )
+
+  def test_rejects_untyped_gpu_gres(self):
+    with self.assertRaisesRegex(ValueError, "untyped or invalid"):
+      nccl_test.parse_gpu_node(
+        {"name": "worker-0", "gres": "gpu:8", "cpus": 128}
+      )
 
 
 class PlatformDetectionTests(unittest.TestCase):
-  def test_detects_every_supported_platform(self):
-    for expected in nccl_test.PLATFORM_PROFILES:
-      with self.subTest(platform=expected.name), mock.patch.object(
-        nccl_test.subprocess,
-        "run",
-        return_value=subprocess.CompletedProcess([], 0, f"{expected.gpu_name}\n", ""),
-      ):
-        actual = nccl_test.detect_platform(args())
-        self.assertEqual(actual, expected)
+  @staticmethod
+  def node(
+    name,
+    gres="gpu:nvidia_h200:8(S:0-1)",
+    cpus=128,
+    partitions=("main",),
+  ):
+    return {
+      "name": name,
+      "gres": gres,
+      "cpus": cpus,
+      "partitions": list(partitions),
+    }
 
-  @mock.patch.object(nccl_test.subprocess, "run")
-  def test_partition_is_used_for_probe(self, run):
-    run.return_value = subprocess.CompletedProcess([], 0, "NVIDIA H200\n", "")
+  def detect(self, nodes, arguments=None, expanded_nodes=None):
+    arguments = arguments or args()
+    expanded_nodes = expanded_nodes or tuple(node["name"] for node in nodes)
+    with (
+      mock.patch.object(
+        nccl_test, "resolve_partition", return_value=("main", "worker-[0-1]")
+      ),
+      mock.patch.object(
+        nccl_test, "expand_hostlist", return_value=expanded_nodes
+      ),
+      mock.patch.object(nccl_test, "load_nodes", return_value=nodes),
+    ):
+      return nccl_test.detect_platform(arguments)
 
-    nccl_test.detect_platform(args(partition="main"))
+  def test_detects_supported_platforms_and_derives_resources(self):
+    platforms = {
+      "nvidia_h100_80gb_hbm3": ("H100", 8, 16, 128),
+      "nvidia_h200": ("H200", 8, 16, 128),
+      "nvidia_b200": ("B200", 8, 20, 160),
+      "nvidia_b300": ("B300", 8, 24, 192),
+      "nvidia_gb300": ("GB300", 4, 28, 112),
+    }
 
-    command = run.call_args.args[0]
-    self.assertIn("--partition=main", command)
+    for gres_type, (name, gpu_count, cpus_per_task, cpu_count) in platforms.items():
+      with self.subTest(platform=name):
+        nodes = [
+          self.node(f"worker-{index}", f"gpu:{gres_type}:{gpu_count}", cpu_count)
+          for index in range(2)
+        ]
 
-  @mock.patch.object(nccl_test.subprocess, "run")
-  def test_partition_is_omitted_from_probe_by_default(self, run):
-    run.return_value = subprocess.CompletedProcess([], 0, "NVIDIA H200\n", "")
+        platform = self.detect(nodes)
 
-    nccl_test.detect_platform(args())
+        self.assertEqual(platform.name, name)
+        self.assertEqual(platform.gres_type, gres_type)
+        self.assertEqual(platform.gpus_per_node, gpu_count)
+        self.assertEqual(platform.cpus_per_task, cpus_per_task)
 
-    command = run.call_args.args[0]
-    self.assertFalse(any(value.startswith("--partition=") for value in command))
+  def test_filters_cpu_nodes_from_partition(self):
+    nodes = [
+      self.node("cpu-0", "", 32),
+      self.node("worker-0"),
+      self.node("worker-1"),
+    ]
 
-  @mock.patch.object(nccl_test.subprocess, "run")
-  def test_probes_every_selected_node_and_fails_fast(self, run):
-    run.return_value = subprocess.CompletedProcess(
-      [], 0, "NVIDIA B300\nNVIDIA B300\n", ""
-    )
+    platform = self.detect(nodes)
 
-    profile = nccl_test.detect_platform(
-      args(nodelist=("worker-0", "worker-1"), immediate=120)
-    )
+    self.assertEqual(platform.name, "H200")
 
-    self.assertEqual(profile.name, "B300")
-    command = run.call_args.args[0]
-    self.assertIn("--nodes=2", command)
-    self.assertIn("--ntasks-per-node=1", command)
-    self.assertIn("--nodelist=worker-0,worker-1", command)
-    self.assertIn("--immediate=120", command)
+  def test_rejects_cpu_node_in_explicit_nodelist(self):
+    nodes = [self.node("cpu-0", "", 32), self.node("worker-0")]
 
-  @mock.patch.object(nccl_test.subprocess, "run")
-  def test_rejects_mixed_selected_platforms(self, run):
-    run.return_value = subprocess.CompletedProcess(
-      [], 0, "NVIDIA H200\nNVIDIA B300\n", ""
-    )
+    with self.assertRaisesRegex(ValueError, "cpu-0 has no GPU GRES"):
+      self.detect(nodes, args(nodelist="cpu-0,worker-0"))
 
-    with self.assertRaises(SystemExit):
-      nccl_test.detect_platform(args(nodelist=("worker-0", "worker-1")))
+  def test_rejects_nodelist_with_wrong_expanded_node_count(self):
+    nodes = [self.node("worker-0")]
 
-  @mock.patch.object(nccl_test.subprocess, "run")
-  def test_rejects_unsupported_platform(self, run):
-    run.return_value = subprocess.CompletedProcess([], 0, "Unknown GPU\n", "")
+    with self.assertRaisesRegex(ValueError, "contains 1 node"):
+      self.detect(
+        nodes,
+        args(nodelist="worker-0"),
+        expanded_nodes=("worker-0",),
+      )
 
-    with self.assertRaises(SystemExit):
-      nccl_test.detect_platform(args())
+  def test_rejects_node_outside_target_partition(self):
+    nodes = [
+      self.node("worker-0"),
+      self.node("worker-1", partitions=("other",)),
+    ]
 
-  @mock.patch.object(nccl_test.subprocess, "run")
-  def test_propagates_probe_failure(self, run):
-    run.return_value = subprocess.CompletedProcess([], 7, "", "probe failed\n")
+    with self.assertRaisesRegex(ValueError, "not in partition 'main'"):
+      self.detect(nodes)
 
-    with self.assertRaises(SystemExit) as error:
-      nccl_test.detect_platform(args())
+  def test_rejects_mixed_gpu_types(self):
+    nodes = [
+      self.node("worker-0"),
+      self.node("worker-1", "gpu:nvidia_b300:8", 192),
+    ]
 
-    self.assertEqual(error.exception.code, 7)
+    with self.assertRaisesRegex(ValueError, "different GPU GRES types"):
+      self.detect(nodes)
+
+  def test_rejects_inconsistent_node_resources(self):
+    nodes = [self.node("worker-0"), self.node("worker-1", cpus=120)]
+
+    with self.assertRaisesRegex(ValueError, "different resource configurations"):
+      self.detect(nodes)
+
+  def test_rejects_insufficient_gpu_nodes(self):
+    nodes = [self.node("cpu-0", "", 32), self.node("worker-0")]
+
+    with self.assertRaisesRegex(ValueError, "contains 1 GPU node"):
+      self.detect(nodes)
+
+  def test_rejects_unsupported_gpu_type(self):
+    nodes = [
+      self.node("worker-0", "gpu:nvidia_future:8"),
+      self.node("worker-1", "gpu:nvidia_future:8"),
+    ]
+
+    with self.assertRaisesRegex(ValueError, "unsupported GPU GRES type"):
+      self.detect(nodes)
+
+  def test_rejects_cpu_count_not_divisible_by_gpu_count(self):
+    nodes = [
+      self.node("worker-0", "gpu:nvidia_h200:8", 127),
+      self.node("worker-1", "gpu:nvidia_h200:8", 127),
+    ]
+
+    with self.assertRaisesRegex(ValueError, "cannot distribute 127 CPUs"):
+      self.detect(nodes)
 
 
 class CommandTests(unittest.TestCase):
   def setUp(self):
-    self.h200 = next(
-      profile for profile in nccl_test.PLATFORM_PROFILES if profile.name == "H200"
+    self.h200 = nccl_test.DetectedPlatform(
+      name="H200",
+      gres_type="nvidia_h200",
+      gpus_per_node=8,
+      cpus_per_task=16,
     )
-    self.gb300 = next(
-      profile for profile in nccl_test.PLATFORM_PROFILES if profile.name == "GB300"
+    self.gb300 = nccl_test.DetectedPlatform(
+      name="GB300",
+      gres_type="nvidia_gb300",
+      gpus_per_node=4,
+      cpus_per_task=28,
+      environment={
+        "OMPI_MCA_coll_hcoll_enable": "0",
+        "OMPI_MCA_coll_ucc_enable": "0",
+      },
     )
 
   def test_builds_h200_command_with_defaults(self):
@@ -170,7 +313,7 @@ class CommandTests(unittest.TestCase):
         "--job-name=nccl_all_reduce",
         "--time=30:00",
         "--nodes=2",
-        "--gpus-per-node=8",
+        "--gpus-per-node=nvidia_h200:8",
         "--ntasks-per-node=8",
         "--cpus-per-task=16",
         "--mem=0",
@@ -194,38 +337,26 @@ class CommandTests(unittest.TestCase):
 
     self.assertIn("--partition=gpu", command)
     self.assertIn("--segment=16", command)
-    self.assertIn("--gpus-per-node=4", command)
+    self.assertIn("--gpus-per-node=nvidia_gb300:4", command)
     self.assertIn("--ntasks-per-node=4", command)
     self.assertIn("--cpus-per-task=28", command)
 
   def test_builds_b300_command_with_nodelist_and_immediate(self):
-    b300 = next(
-      profile for profile in nccl_test.PLATFORM_PROFILES if profile.name == "B300"
+    b300 = nccl_test.DetectedPlatform(
+      name="B300",
+      gres_type="nvidia_b300",
+      gpus_per_node=8,
+      cpus_per_task=24,
     )
 
     command = nccl_test.build_nccl_command(
-      args(nodelist=("worker-0", "worker-1"), immediate=120), b300
+      args(nodelist="worker-[0-1]", immediate=120), b300
     )
 
-    self.assertIn("--nodelist=worker-0,worker-1", command)
+    self.assertIn("--nodelist=worker-[0-1]", command)
     self.assertIn("--immediate=120", command)
-    self.assertIn("--gpus-per-node=8", command)
+    self.assertIn("--gpus-per-node=nvidia_b300:8", command)
     self.assertIn("--cpus-per-task=24", command)
-
-  def test_platform_resource_profiles(self):
-    expected_profiles = {
-      "H100": (8, 16),
-      "H200": (8, 16),
-      "B200": (8, 20),
-      "B300": (8, 24),
-      "GB300": (4, 28),
-    }
-
-    for profile in nccl_test.PLATFORM_PROFILES:
-      with self.subTest(platform=profile.name):
-        gpus, cpus = expected_profiles[profile.name]
-        self.assertEqual(profile.gpus_per_node, gpus)
-        self.assertEqual(profile.cpus_per_task, cpus)
 
   def test_passes_tunable_arguments_to_srun_and_nccl(self):
     command = nccl_test.build_nccl_command(
@@ -266,8 +397,11 @@ class CommandTests(unittest.TestCase):
 
 class MainTests(unittest.TestCase):
   def setUp(self):
-    self.h200 = next(
-      profile for profile in nccl_test.PLATFORM_PROFILES if profile.name == "H200"
+    self.h200 = nccl_test.DetectedPlatform(
+      name="H200",
+      gres_type="nvidia_h200",
+      gpus_per_node=8,
+      cpus_per_task=16,
     )
 
   @mock.patch.object(nccl_test, "build_environment", return_value={"TEST": "1"})
@@ -292,13 +426,24 @@ class MainTests(unittest.TestCase):
 
   @mock.patch.object(nccl_test, "detect_platform")
   @mock.patch.object(nccl_test.subprocess, "run")
-  def test_rejects_invalid_nodelist_before_platform_probe(self, run, detect_platform):
-    exit_code = nccl_test.main(
-      ["--nodes", "2", "--nodelist", "worker-0", "--immediate", "120"]
+  def test_reports_platform_detection_error(self, run, detect_platform):
+    detect_platform.side_effect = ValueError(
+      "--nodelist contains 1 node(s), expected 2"
     )
 
+    exit_code = nccl_test.main(["--nodes", "2", "--nodelist", "worker-0"])
+
     self.assertEqual(exit_code, 2)
-    detect_platform.assert_not_called()
+    run.assert_not_called()
+
+  @mock.patch.object(nccl_test, "detect_platform")
+  @mock.patch.object(nccl_test.subprocess, "run")
+  def test_reports_scontrol_error(self, run, detect_platform):
+    detect_platform.side_effect = nccl_test.ScontrolError("scontrol failed")
+
+    exit_code = nccl_test.main(["--nodes", "2"])
+
+    self.assertEqual(exit_code, 1)
     run.assert_not_called()
 
   @mock.patch.object(nccl_test, "detect_platform")
