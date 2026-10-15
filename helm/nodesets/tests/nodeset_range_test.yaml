@@ -41,6 +41,24 @@ tests:
           path: metadata.name
           value: worker
 
+  - it: should derive the node selector from a standalone NodeSet name
+    set:
+      nodesets:
+        - name: worker
+          nameNodeSelector: slurm.nebius.ai/nodeset-name
+          slurmd:
+            resources: {}
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+              jailSubMounts: []
+          munge:
+            resources: {}
+    asserts:
+      - equal:
+          path: spec.nodeSelector["slurm.nebius.ai/nodeset-name"]
+          value: worker
+
   - it: should render an inclusive range and derive node selectors from names
     set:
       nodesets:
