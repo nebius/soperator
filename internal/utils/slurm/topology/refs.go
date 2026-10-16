@@ -7,36 +7,47 @@
 package topology
 
 import (
+	"slices"
+
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 )
 
-// CoversNodeSet reports whether a topology with the given refs claims the NodeSet. An empty ref
-// list, like the explicit "ALL" ref, covers every NodeSet of the cluster.
-func CoversNodeSet(refs []string, nodeSetName string) bool {
-	if len(refs) == 0 {
-		return true
-	}
+// coversNodeSet reports whether a topology with the given refs claims the NodeSet. The explicit
+// "ALL" ref covers every NodeSet of the cluster.
+//
+// A ref matches a NodeSet by its name or by one of its aggregate Slurm NodeSets. Like in slurm.conf,
+// an aggregate name that is also the name of an existing NodeSet refers to that NodeSet only.
+func coversNodeSet(refs []string, nodeSet v1alpha1.NodeSet, nodeSetNames map[string]struct{}) bool {
 	for _, ref := range refs {
-		if ref == consts.SlurmTopologyNodeSetRefAll || ref == nodeSetName {
+		if ref == consts.SlurmTopologyNodeSetRefAll || ref == nodeSet.Name {
+			return true
+		}
+		if _, shadowed := nodeSetNames[ref]; !shadowed && slices.Contains(nodeSet.Spec.AggregateSlurmNodeSets, ref) {
 			return true
 		}
 	}
 	return false
 }
 
-// SelectNodeSets returns the NodeSets a topology covers. Refs that match no NodeSet are dropped
-// instead of failing: they show up routinely while NodeSets and SlurmCluster are applied one after
-// another, and one stale name must not take the whole topology config down.
+// SelectNodeSets returns the NodeSets a topology covers. An empty ref list covers every NodeSet.
+// Refs that match no NodeSet are dropped instead of failing: they show up routinely while NodeSets
+// and SlurmCluster are applied one after another, and one stale name must not take the whole
+// topology config down.
 func SelectNodeSets(nodeSets []v1alpha1.NodeSet, refs []string) []v1alpha1.NodeSet {
 	if len(refs) == 0 {
 		return nodeSets
 	}
 
+	nodeSetNames := make(map[string]struct{}, len(nodeSets))
+	for _, nodeSet := range nodeSets {
+		nodeSetNames[nodeSet.Name] = struct{}{}
+	}
+
 	var selected []v1alpha1.NodeSet
 	for _, nodeSet := range nodeSets {
-		if CoversNodeSet(refs, nodeSet.Name) {
+		if coversNodeSet(refs, nodeSet, nodeSetNames) {
 			selected = append(selected, nodeSet)
 		}
 	}

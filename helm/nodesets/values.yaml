@@ -55,10 +55,16 @@ nodesets:
   - name: worker-gpu
     # Generate multiple NodeSets from this configuration. The ordinal bounds are inclusive.
     # Optional. When omitted or null, one NodeSet with the configured name is rendered.
+    # The configured name is added to aggregateSlurmNodeSets of every rendered NodeSet,
+    # so partitions can reference all of them by that name.
     # range:
     #   firstOrdinal: 0
     #   lastOrdinal: 3
     #   suffix: "-rack"
+    # Names of aggregate Slurm NodeSets the nodes of this NodeSet also belong to.
+    # Partitions can reference these names in nodeSetRefs.
+    # Optional, defaults to empty list
+    # aggregateSlurmNodeSets: []
     # Add a node selector whose value is the rendered NodeSet name.
     # Optional. Existing node selector keys are preserved.
     # nameNodeSelector: "slurm.nebius.ai/nodeset-name"

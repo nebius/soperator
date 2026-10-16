@@ -27,6 +27,23 @@ Worker nodes are described by separate `NodeSet` resources (see
 `slurm.conf` and the per-node entries of `gres.conf`. A change to a `NodeSet` re-renders the
 configuration the same way a change to the `SlurmCluster` does.
 
+A `NodeSet` can also list `aggregateSlurmNodeSets`: names of aggregate Slurm NodeSets its nodes
+belong to in addition to its own one. Each unique name gets one more `NodeSet=` line with the nodes
+of every `NodeSet` listing it, and partitions can reference it in `nodeSetRefs` like any other
+NodeSet. Named topologies accept it in their `nodeSetRefs` too (see [`topology.md`](topology.md)).
+This is how a GB300 cluster with one `NodeSet` per rack is addressed as a whole:
+
+```
+NodeSet=worker-rack0 Nodes=worker-rack0-[0-17]
+NodeSet=worker-rack1 Nodes=worker-rack1-[0-17]
+NodeSet=worker Nodes=worker-rack0-[0-17],worker-rack1-[0-17]
+```
+
+Adding or removing a rack then changes the `worker` line only, not the partitions or topologies
+referencing it. The `nodesets` Helm chart adds the name of a `range` to `aggregateSlurmNodeSets` of every `NodeSet`
+it generates. A name matching an existing `NodeSet` is ignored, because the `NodeSet` itself takes
+precedence, and a name whose `NodeSet`s all have 0 replicas is left out like an empty `NodeSet`.
+
 The operator renders all of this into the ConfigMap `<cluster>-slurm-configs` (see
 [internal/render/common/configmap.go](../internal/render/common/configmap.go)).
 `slurm.conf` itself is only an entrypoint: it includes `slurm_base.conf.noedit` with the generated configuration and

@@ -970,6 +970,21 @@ spec:
                         x-kubernetes-list-type: atomic
                     type: object
                 type: object
+              aggregateSlurmNodeSets:
+                description: |-
+                  AggregateSlurmNodeSets lists aggregate Slurm NodeSets the nodes of this NodeSet also belong to.
+                  For each unique name across the NodeSets of the cluster, one more `NodeSet=` line is rendered in `slurm.conf`,
+                  containing the nodes of every NodeSet listing that name. Partitions can reference such a name in nodeSetRefs,
+                  e.g. "worker" for NodeSets "worker-rack0", "worker-rack1", ..., so scaling the aggregate doesn't require
+                  changing the partition configuration.
+                  A name matching the name of an existing NodeSet is ignored, as the NodeSet itself takes precedence.
+                items:
+                  maxLength: 63
+                  minLength: 1
+                  pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
               clusterName:
                 description: |-
                   ClusterName is the name of the SlurmCluster this NodeSet belongs to.
