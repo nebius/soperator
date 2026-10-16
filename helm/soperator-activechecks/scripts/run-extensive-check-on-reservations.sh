@@ -58,11 +58,11 @@ for reservationName in $(scontrol show reservation --json | jq -r --arg RESERVAT
   action=$(whatToDo)
   if [[ "$action" == "create" ]]; then
     create
-    ((submitted_jobs++))
+    submitted_jobs=$((submitted_jobs + 1))
   elif [[ "$action" == "delete_create" ]]; then
     delete
     create
-    ((submitted_jobs++))
+    submitted_jobs=$((submitted_jobs + 1))
   else
     echo "doing nothing. The job is still running"
   fi
