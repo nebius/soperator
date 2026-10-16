@@ -25,6 +25,8 @@ Feature: Slurm-aware worker rolling updates
   @soperator_version_>=5.0.0
   Scenario: A worker update preserves maintenance drains before and during handoff
     Given test jobs are running on two workers of a NodeSet with slurmAwareRollingUpdate strategy and maxUnavailable at least 2
+    # TODO: Configure --requeue-after-slurm-nodes in the Helm chart for E2E clusters
+    # to reduce the wait for maintenance reconciliation.
     When a maintenance event is triggered for the first worker
     Then the first worker is drained with a maintenance reason
     When the worker template of the NodeSet is changed
@@ -35,7 +37,4 @@ Feature: Slurm-aware worker rolling updates
     And the second worker is drained with a maintenance reason
     When all test jobs finish without interruption
     Then all active workers of the NodeSet are idle
-    # TODO: Remove this step and the temporary interval override/rollback once
-    # --requeue-after-slurm-nodes is configured in the Helm chart for E2E clusters.
-    When the original maintenance check interval is restored
-    Then the updated NodeSet accepts smoke jobs
+    And the updated NodeSet accepts smoke jobs

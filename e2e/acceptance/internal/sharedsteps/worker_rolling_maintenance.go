@@ -15,7 +15,6 @@ const workerRollingUpdateDrainReason = "soperator rolling update"
 func (s *WorkerRollingUpdate) registerMaintenanceSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a maintenance event is triggered for the (first|second) worker$`, s.triggerMaintenance)
 	sc.Step(`^the (first|second) worker is drained with a (maintenance|rolling update) reason$`, s.assertWorkerDrain)
-	sc.Step(`^the original maintenance check interval is restored$`, s.restoreMaintenanceChecksInterval)
 }
 
 func (s *WorkerRollingUpdate) triggerMaintenance(ctx context.Context, worker string) error {
@@ -30,22 +29,7 @@ func (s *WorkerRollingUpdate) triggerMaintenance(ctx context.Context, worker str
 		}
 		target.replacement = replacement
 	}
-	if worker == "first" && s.checksInterval == nil {
-		// Keep the snapshot even when preparation fails after an accepted write.
-		s.checksInterval, err = prepareMaintenanceChecksInterval(ctx, s.runtime, s.kubectl)
-		if err != nil {
-			return err
-		}
-	}
 	return target.replacement.aMaintenanceEventIsTriggeredForThatNode(ctx)
-}
-
-func (s *WorkerRollingUpdate) restoreMaintenanceChecksInterval(ctx context.Context) error {
-	if err := s.checksInterval.restore(ctx, s.runtime, s.kubectl); err != nil {
-		return err
-	}
-	s.checksInterval = nil
-	return nil
 }
 
 func (s *WorkerRollingUpdate) maintenanceTarget(worker string) (*workerRolloutTarget, error) {

@@ -164,33 +164,6 @@ func TestWorkerRolloutCleanupCancelsBothWorkerJobs(t *testing.T) {
 	assert.Empty(t, steps.targets)
 }
 
-func TestWorkerRolloutCleanupRestoresChecksAfterScenarioCancellation(t *testing.T) {
-	runtime, deployment, release, calls := checksIntervalFixture(t)
-	originalArgs := append([]string(nil), deployment.Spec.Template.Spec.Containers[0].Args...)
-	kubectl := framework.NewKubectlClient(runtime)
-	state, err := prepareMaintenanceChecksInterval(t.Context(), runtime, kubectl)
-	require.NoError(t, err)
-	scope := runtime.kube
-	runtime.kube = rolloutCleanupArgsScope{framework.NewArgsScope(func(ctx context.Context, args ...string) (string, error) {
-		require.NoError(t, ctx.Err(), "restoration must survive cancellation of the scenario")
-		_, bounded := ctx.Deadline()
-		require.True(t, bounded)
-		return scope.Run(ctx, args...)
-	})}
-	steps := WorkerRollingUpdate{runtime: runtime, kubectl: kubectl, checksInterval: state}
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	steps.CleanupAndReset(ctx)
-	assert.Equal(t, originalArgs, deployment.Spec.Template.Spec.Containers[0].Args)
-	assert.Nil(t, release.Spec.Suspend)
-	assert.Equal(t, "original", release.Metadata.Annotations[helmDriftAnnotation])
-	assert.Nil(t, steps.checksInterval)
-	assert.Empty(t, runtime.logs)
-	count := len(*calls)
-	steps.CleanupAndReset(ctx)
-	assert.Len(t, *calls, count, "cleanup after reset must leave the cluster untouched")
-}
-
 func TestWorkerRolloutCleanupWaitsForLostSubmissionAndLogsJobsThatRemain(t *testing.T) {
 	for _, stuck := range []bool{false, true} {
 		t.Run(fmt.Sprintf("stuck=%t", stuck), func(t *testing.T) {
@@ -1196,7 +1169,6 @@ func TestPrepareRolloutWorkersStartsTwoJobsWithoutMaintenanceSnapshots(t *testin
 	assert.NotEqual(t, steps.targets[0].job.job.ID, steps.targets[1].job.job.ID)
 	assert.NotEqual(t, steps.targets[0].job.releasePath, steps.targets[1].job.releasePath)
 	calls := strings.Join(runtime.calls, "\n")
-	assert.NotContains(t, calls, "get deployments", "maintenance tuning belongs to its scenario, not the shared Given")
 	assert.NotContains(t, calls, "containerrecreaterequest", "container recovery is observed from worker state")
 }
 

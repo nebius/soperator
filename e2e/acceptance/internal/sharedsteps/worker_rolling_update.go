@@ -49,7 +49,6 @@ type WorkerRollingUpdate struct {
 	targets             []*workerRolloutTarget
 	mk8s                workerRolloutMK8s
 	power               workerRolloutPower
-	checksInterval      *temporaryChecksInterval
 	requireMK8s         bool
 }
 
@@ -109,8 +108,8 @@ func (s *WorkerRollingUpdate) RegisterSteps(sc *godog.ScenarioContext) {
 
 // CleanupAndReset stops temporary jobs and waits for accepted rollouts and
 // maintenance to leave healthy workers before releasing suspension holds.
-// Worker template annotations are retained; temporary controller settings and
-// MK8s node-group changes are restored before releasing the suspension holds.
+// Worker template annotations are retained; MK8s node-group changes are restored
+// before releasing the suspension holds.
 func (s *WorkerRollingUpdate) CleanupAndReset(ctx context.Context) {
 	// Cancel every held job before waiting for either host's maintenance.
 	for _, target := range s.targets {
@@ -135,13 +134,6 @@ func (s *WorkerRollingUpdate) CleanupAndReset(ctx context.Context) {
 	if s.nodeSet.Metadata.Name != "" {
 		s.cleanupRollout(ctx)
 	}
-	if s.checksInterval != nil {
-		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), workerRolloutDaemonSetWait)
-		if err := s.restoreMaintenanceChecksInterval(cleanupCtx); err != nil {
-			s.runtime.Logf("Cleanup: restore maintenance checks interval: %v", err)
-		}
-		cancel()
-	}
 	s.targets = nil
 	s.cleanupEphemeralWorkerHold(ctx)
 
@@ -152,7 +144,6 @@ func (s *WorkerRollingUpdate) CleanupAndReset(ctx context.Context) {
 	s.initialPods = nil
 	s.annotationValue = ""
 	s.restartedDaemonSets = nil
-	s.checksInterval = nil
 	s.requireMK8s = false
 }
 
