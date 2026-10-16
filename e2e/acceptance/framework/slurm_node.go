@@ -15,6 +15,8 @@ var (
 	slurmNodeInstanceIDPattern = regexp.MustCompile(`\bInstanceId=([^\s]+)`)
 	slurmNodeRealMemoryPattern = regexp.MustCompile(`\bRealMemory=(\d+)`)
 	slurmNodeGPUCountPattern   = regexp.MustCompile(`\bCfgTRES=[^\s]*\bgres/gpu=(\d+)`)
+	slurmNodeCPUAllocPattern   = regexp.MustCompile(`\bCPUAlloc=(\S+)`)
+	slurmNodeAllocMemPattern   = regexp.MustCompile(`\bAllocMem=(\S+)`)
 	slurmdStartTimePattern     = regexp.MustCompile(`\bSlurmdStartTime=([^\s]+)`)
 )
 
@@ -33,6 +35,8 @@ type SlurmNodeInfo struct {
 	RealMemoryMiB   uint64
 	GPUCount        int
 	SlurmdStartTime time.Time
+	CPUAlloc        *uint64
+	AllocMemoryMiB  *uint64
 }
 
 func ParseSlurmNodeInfo(name, output string) SlurmNodeInfo {
@@ -63,7 +67,21 @@ func ParseSlurmNodeInfo(name, output string) SlurmNodeInfo {
 			info.SlurmdStartTime = value
 		}
 	}
+	info.CPUAlloc = parseSlurmAllocation(slurmNodeCPUAllocPattern, output)
+	info.AllocMemoryMiB = parseSlurmAllocation(slurmNodeAllocMemPattern, output)
 	return info
+}
+
+func parseSlurmAllocation(pattern *regexp.Regexp, output string) *uint64 {
+	match := pattern.FindStringSubmatch(output)
+	if len(match) != 2 {
+		return nil
+	}
+	value, err := strconv.ParseUint(match[1], 10, 64)
+	if err != nil {
+		return nil
+	}
+	return &value
 }
 
 func (s *SlurmClient) NodeInfo(ctx context.Context, worker string) (SlurmNodeInfo, error) {
@@ -82,6 +100,56 @@ func (s *SlurmClient) NodeInfoOnce(ctx context.Context, worker string) (SlurmNod
 		return SlurmNodeInfo{}, fmt.Errorf("show Slurm node %s: %w", worker, err)
 	}
 	return ParseSlurmNodeInfo(worker, out), nil
+}
+
+// NodeInfosOnce reads the requested nodes in one controller query without
+// retries and returns them in the caller's order.
+func (s *SlurmClient) NodeInfosOnce(ctx context.Context, names []string) ([]SlurmNodeInfo, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	requested := make(map[string]bool, len(names))
+	for _, name := range names {
+		if !IsSlurmNodeName(name) || requested[name] {
+			return nil, fmt.Errorf("read Slurm nodes: invalid or duplicate node name %q", name)
+		}
+		requested[name] = true
+	}
+	output, err := s.runtime.Controller().Run(ctx, "scontrol -o show nodes")
+	if err != nil {
+		return nil, fmt.Errorf("show Slurm nodes: %w", err)
+	}
+	byName := make(map[string]SlurmNodeInfo, len(names))
+	for _, line := range strings.Split(output, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		name, found := strings.CutPrefix(fields[0], "NodeName=")
+		if !found || !IsSlurmNodeName(name) {
+			return nil, fmt.Errorf("parse Slurm node record: invalid leading field %q", fields[0])
+		}
+		if !requested[name] {
+			continue
+		}
+		if _, found := byName[name]; found {
+			return nil, fmt.Errorf("read Slurm nodes: duplicate record for %s", name)
+		}
+		node := ParseSlurmNodeInfo(name, line)
+		if strings.TrimSpace(node.State) == "" {
+			return nil, fmt.Errorf("read Slurm node %s: missing state", name)
+		}
+		byName[name] = node
+	}
+	nodes := make([]SlurmNodeInfo, 0, len(names))
+	for _, name := range names {
+		node, found := byName[name]
+		if !found {
+			return nil, fmt.Errorf("read Slurm nodes: missing record for %s", name)
+		}
+		nodes = append(nodes, node)
+	}
+	return nodes, nil
 }
 
 func (s *SlurmClient) MainPartitionNodeNames(ctx context.Context) ([]string, error) {
@@ -179,6 +247,10 @@ func (n SlurmNodeInfo) IsReadyForImmediateWork() bool {
 // remain schedulable because Slurm can power them up on demand.
 func (n SlurmNodeInfo) IsUsable() bool {
 	return n.IsHealthy()
+}
+
+func (n SlurmNodeInfo) IsUsableReplacement(originalInstanceID string) bool {
+	return n.InstanceID != "" && n.InstanceID != originalInstanceID && n.State != "" && n.IsUsable()
 }
 
 func (s *SlurmClient) WaitForNodeReasonContains(ctx context.Context, worker, reasonPart string, timeout time.Duration) error {

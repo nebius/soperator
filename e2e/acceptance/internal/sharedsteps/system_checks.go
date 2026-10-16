@@ -308,7 +308,7 @@ func (s *SystemChecks) theSelectedWorkerKubernetesNodeIsRecreated(ctx context.Co
 		return fmt.Errorf("worker Kubernetes node is not captured")
 	}
 	return s.runtime.WaitFor(ctx, fmt.Sprintf("Kubernetes node %s recreated", s.kubeletK8sNodeName), systemKubeletNodeRecreateTimeout, 30*time.Second, func(waitCtx context.Context) (bool, error) {
-		node, found, err := s.k8sNodeByNameOnce(waitCtx, s.kubeletK8sNodeName)
+		node, found, err := s.kubectl.NodeIfPresent(waitCtx, s.kubeletK8sNodeName)
 		if err != nil {
 			return false, err
 		}
@@ -668,34 +668,9 @@ func (s *SystemChecks) k8sNodeByName(ctx context.Context, name string) (corev1.N
 	return node, nil
 }
 
-func (s *SystemChecks) k8sNodeByNameOnce(ctx context.Context, name string) (corev1.Node, bool, error) {
-	output, err := s.runtime.Kubectl().Run(ctx, "get", "node", name, "-o", "json")
-	if err != nil {
-		if isKubectlNotFound(err) {
-			return corev1.Node{}, false, nil
-		}
-		return corev1.Node{}, false, fmt.Errorf("get Kubernetes node %s: %w", name, err)
-	}
-
-	var node corev1.Node
-	if err := json.Unmarshal([]byte(output), &node); err != nil {
-		return corev1.Node{}, false, fmt.Errorf("decode Kubernetes node %s: %w", name, err)
-	}
-	return node, true, nil
-}
-
 func isKubectlNotFound(err error) bool {
 	message := strings.ToLower(err.Error())
 	return strings.Contains(message, "notfound") || strings.Contains(message, "not found")
-}
-
-func k8sNodeReady(node corev1.Node) bool {
-	for _, condition := range node.Status.Conditions {
-		if condition.Type == corev1.NodeReady {
-			return condition.Status == corev1.ConditionTrue
-		}
-	}
-	return false
 }
 
 func parseKubectlDebugPodName(output string) string {

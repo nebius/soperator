@@ -5,6 +5,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -168,13 +169,15 @@ type NodeSet struct {
 }
 
 type NodeSetSpec struct {
-	ClusterName                 string         `json:"clusterName"`
-	Replicas                    int32          `json:"replicas"`
-	EphemeralNodes              *bool          `json:"ephemeralNodes"`
-	InitialNumberEphemeralNodes int32          `json:"initialNumberEphemeralNodes"`
-	GPU                         NodeSetGPUSpec `json:"gpu"`
-	Slurmd                      NodeSetSlurmd  `json:"slurmd"`
-	UpdateStrategy              string         `json:"updateStrategy"`
+	ClusterName                 string              `json:"clusterName"`
+	Replicas                    int32               `json:"replicas"`
+	EphemeralNodes              *bool               `json:"ephemeralNodes"`
+	InitialNumberEphemeralNodes int32               `json:"initialNumberEphemeralNodes"`
+	GPU                         NodeSetGPUSpec      `json:"gpu"`
+	Slurmd                      NodeSetSlurmd       `json:"slurmd"`
+	UpdateStrategy              string              `json:"updateStrategy"`
+	MaxUnavailable              *intstr.IntOrString `json:"maxUnavailable"`
+	WorkerAnnotations           map[string]string   `json:"workerAnnotations"`
 }
 
 type NodeSetSlurmd struct {

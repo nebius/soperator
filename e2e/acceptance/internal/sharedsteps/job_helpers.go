@@ -25,7 +25,7 @@ func waitForJobSucceeded(ctx context.Context, exec framework.Exec, slurm *framew
 				fmt.Errorf("wait for job %s completed successfully: %w", job.ID, err))
 		}
 
-		info, err := slurm.JobInfo(waitCtx, job.ID)
+		info, err := slurm.JobStatus(waitCtx, job.ID)
 		if err != nil {
 			return framework.AnnotateWithJobLog(ctx, exec, slurm, job, err)
 		}

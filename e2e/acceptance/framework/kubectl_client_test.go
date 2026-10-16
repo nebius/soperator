@@ -2,6 +2,7 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -9,7 +10,58 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 )
+
+func TestKubectlClientNodeIfPresent(t *testing.T) {
+	command := "get\x00node\x00worker-host\x00--ignore-not-found\x00-o\x00json"
+	for _, tt := range []struct {
+		name      string
+		output    string
+		queryErr  error
+		present   bool
+		wantError string
+	}{
+		{name: "present", output: `{"metadata":{"name":"worker-host","uid":"host-uid"}}`, present: true},
+		{name: "absent"},
+		{name: "whitespace means absent", output: " \n\t"},
+		{name: "permission denied", queryErr: errors.New("forbidden"), wantError: "read Kubernetes host worker-host: forbidden"},
+		{name: "malformed response", output: "{", wantError: "decode Kubernetes host worker-host"},
+		{name: "missing identity", output: `{}`, wantError: "identify Kubernetes host worker-host"},
+		{name: "missing name", output: `{"metadata":{"uid":"host-uid"}}`, wantError: "identify Kubernetes host worker-host"},
+		{name: "missing UID", output: `{"metadata":{"name":"worker-host"}}`, wantError: "identify Kubernetes host worker-host"},
+		{name: "wrong name", output: `{"metadata":{"name":"other-host","uid":"host-uid"}}`, wantError: "observed name=other-host UID=host-uid"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			exec := &kubectlClientTestExec{
+				kubectl:       map[string]string{command: tt.output},
+				kubectlErrors: map[string]error{command: tt.queryErr},
+			}
+			node, present, err := NewKubectlClient(exec).NodeIfPresent(t.Context(), "worker-host")
+			if tt.wantError == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.wantError)
+			}
+			assert.Equal(t, tt.present, present)
+			assert.Equal(t, 1, exec.kubectlCalls, "query must not retry inside a caller's polling loop")
+			if tt.present {
+				assert.Equal(t, "worker-host", node.Name)
+				assert.Equal(t, "host-uid", string(node.UID))
+			} else {
+				assert.Equal(t, corev1.Node{}, node)
+			}
+		})
+	}
+}
+
+func TestKubectlClientNodeIfPresentRejectsEmptyName(t *testing.T) {
+	exec := &kubectlClientTestExec{}
+	_, present, err := NewKubectlClient(exec).NodeIfPresent(t.Context(), " \t")
+	require.ErrorContains(t, err, "Kubernetes node name is empty")
+	assert.False(t, present)
+	assert.Zero(t, exec.kubectlCalls)
+}
 
 func TestKubectlClientSlurmCluster(t *testing.T) {
 	customConfig := "JobRequeue=0"
@@ -247,6 +299,34 @@ func TestKubectlClientNodeSetsKeepsLegacyMissingClusterName(t *testing.T) {
 	assert.Equal(t, "worker-gpu", nodeSets[1].Name)
 }
 
+func TestKubectlClientNodeSetWorkerPods(t *testing.T) {
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00pods\x00-n\x00test-cluster\x00-l\x00slurm.nebius.ai/nodeset=worker-gpu\x00-o\x00json": `{
+			"items": [
+				{
+					"metadata": {"name": "worker-gpu-0", "uid": "first-pod"},
+					"spec": {"hostname": "worker-gpu-0", "nodeName": "node-a"},
+					"status": {"conditions": [{"type": "Ready", "status": "True"}]}
+				},
+				{
+					"metadata": {"name": "worker-gpu-1", "uid": "second-pod"},
+					"spec": {"hostname": "worker-gpu-1"},
+					"status": {"phase": "Pending"}
+				}
+			]
+		}`,
+	}}
+
+	pods, err := NewKubectlClient(exec).NodeSetWorkerPods(t.Context(), "test-cluster", "worker-gpu")
+	require.NoError(t, err)
+	require.Len(t, pods, 2)
+	assert.Equal(t, "worker-gpu-0", pods[0].Name)
+	assert.Equal(t, "node-a", pods[0].Spec.NodeName)
+	assert.Equal(t, "first-pod", string(pods[0].UID))
+	assert.Equal(t, "worker-gpu-1", pods[1].Name)
+	assert.Equal(t, "Pending", string(pods[1].Status.Phase))
+}
+
 func TestKubectlClientWorkerPods(t *testing.T) {
 	exec := &kubectlClientTestExec{kubectl: map[string]string{
 		"get\x00pods\x00-n\x00soperator\x00-l\x00slurm.nebius.ai/worker=true\x00-o\x00json": `{
@@ -349,12 +429,18 @@ func TestKubectlClientWorkerContainerEnvironmentVariableRejectsValueFrom(t *test
 }
 
 type kubectlClientTestExec struct {
-	kubectl map[string]string
+	kubectl       map[string]string
+	kubectlErrors map[string]error
+	kubectlCalls  int
 }
 
 func (e *kubectlClientTestExec) Kubectl() ArgsScope {
 	return NewArgsScope(func(ctx context.Context, args ...string) (string, error) {
+		e.kubectlCalls++
 		key := strings.Join(args, "\x00")
+		if err := e.kubectlErrors[key]; err != nil {
+			return "", err
+		}
 		out, ok := e.kubectl[key]
 		if !ok {
 			return "", fmt.Errorf("unexpected kubectl args: %s", strings.Join(args, " "))

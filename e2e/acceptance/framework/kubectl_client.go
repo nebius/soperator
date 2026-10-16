@@ -182,6 +182,30 @@ func (c *KubectlClient) GetJSON(ctx context.Context, out any, args ...string) er
 	return nil
 }
 
+// NodeIfPresent reads a node once, distinguishing absence from query or identity errors.
+// Callers that expect eventual replacement own the polling and retry policy.
+func (c *KubectlClient) NodeIfPresent(ctx context.Context, name string) (corev1.Node, bool, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return corev1.Node{}, false, fmt.Errorf("Kubernetes node name is empty")
+	}
+	output, err := c.exec.Kubectl().Run(ctx, "get", "node", name, "--ignore-not-found", "-o", "json")
+	if err != nil {
+		return corev1.Node{}, false, fmt.Errorf("read Kubernetes host %s: %w", name, err)
+	}
+	if strings.TrimSpace(output) == "" {
+		return corev1.Node{}, false, nil
+	}
+	var node corev1.Node
+	if err := json.Unmarshal([]byte(output), &node); err != nil {
+		return corev1.Node{}, false, fmt.Errorf("decode Kubernetes host %s: %w", name, err)
+	}
+	if node.Name != name || node.UID == "" {
+		return corev1.Node{}, false, fmt.Errorf("identify Kubernetes host %s: observed name=%s UID=%s", name, node.Name, node.UID)
+	}
+	return node, true, nil
+}
+
 func (c *KubectlClient) NodeSets(ctx context.Context, clusterName string) ([]NodeSetInfo, error) {
 	var nodeSets kubeobjects.NodeSetList
 	if err := c.GetJSON(ctx, &nodeSets, "get", "nodesets", "-n", SoperatorNamespace, "-o", "json"); err != nil {
@@ -212,6 +236,16 @@ func (c *KubectlClient) NodeSets(ctx context.Context, clusterName string) ([]Nod
 		return out[i].Namespace < out[j].Namespace
 	})
 	return out, nil
+}
+
+func (c *KubectlClient) NodeSetWorkerPods(ctx context.Context, namespace, nodeSetName string) ([]corev1.Pod, error) {
+	var pods corev1.PodList
+	selector := "slurm.nebius.ai/nodeset=" + nodeSetName
+	if err := c.GetJSON(ctx, &pods,
+		"get", "pods", "-n", namespace, "-l", selector, "-o", "json"); err != nil {
+		return nil, fmt.Errorf("list worker pods for NodeSet %s: %w", nodeSetName, err)
+	}
+	return pods.Items, nil
 }
 
 func (c *KubectlClient) WorkerPods(ctx context.Context) ([]WorkerPodInfo, error) {

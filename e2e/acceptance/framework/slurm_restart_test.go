@@ -12,6 +12,7 @@ type restartJobRuntime struct {
 	output     string
 	queueState string
 	err        error
+	commands   []string
 }
 
 type restartJobScope struct {
@@ -19,13 +20,15 @@ type restartJobScope struct {
 	output     string
 	queueState string
 	err        error
+	commands   *[]string
 }
 
 func (r *restartJobRuntime) Jail() CommandScope {
-	return restartJobScope{output: r.output, queueState: r.queueState, err: r.err}
+	return restartJobScope{output: r.output, queueState: r.queueState, err: r.err, commands: &r.commands}
 }
 
 func (s restartJobScope) RunWithDefaultRetry(ctx context.Context, command string) (string, error) {
+	*s.commands = append(*s.commands, command)
 	switch {
 	case strings.HasPrefix(command, "squeue "):
 		return s.queueState, nil
@@ -35,6 +38,20 @@ func (s restartJobScope) RunWithDefaultRetry(ctx context.Context, command string
 		return s.output, s.err
 	default:
 		return "", errors.New("unexpected command: " + command)
+	}
+}
+
+func TestJobStatusOnlyQueriesQueueAndAccounting(t *testing.T) {
+	runtime := &restartJobRuntime{output: "JobId=123 Restarts=2"}
+	info, err := NewSlurmClient(runtime).JobStatus(t.Context(), "123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.CompletedSuccessfully() || info.Restarts != nil {
+		t.Fatalf("unexpected terminal status: %+v", info)
+	}
+	if len(runtime.commands) != 2 || strings.Contains(strings.Join(runtime.commands, "\n"), "scontrol") {
+		t.Fatalf("terminal status queried extra metadata: %v", runtime.commands)
 	}
 }
 

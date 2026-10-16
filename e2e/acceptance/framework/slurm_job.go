@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type SlurmJobInfo struct {
@@ -18,9 +19,27 @@ type SlurmJobInfo struct {
 	Restarts    *int // nil means unknown; pointer to 0 means no restarts.
 }
 
+// JobReleaseGate waits for a release file and exits with status 124 if the
+// deadline expires, allowing a test to hold a job until its observed event.
+func JobReleaseGate(releasePath string, timeout time.Duration) string {
+	seconds := strconv.FormatFloat(timeout.Seconds(), 'f', -1, 64)
+	return fmt.Sprintf("timeout %ss sh -c %s", seconds, ShellQuote(
+		"while [ ! -f "+ShellQuote(releasePath)+" ]; do sleep 1; done"))
+}
+
 // JobInfo returns the current squeue state and a parsed sacct record for the
 // top-level job when sacct has already recorded one.
 func (s *SlurmClient) JobInfo(ctx context.Context, jobID string) (SlurmJobInfo, error) {
+	info, err := s.JobStatus(ctx, jobID)
+	if err != nil {
+		return info, err
+	}
+	s.addBestEffortJobRestartCount(ctx, &info)
+	return info, nil
+}
+
+// JobStatus reads queue and accounting states without querying restart metadata.
+func (s *SlurmClient) JobStatus(ctx context.Context, jobID string) (SlurmJobInfo, error) {
 	id := strings.TrimSpace(jobID)
 	if id == "" {
 		return SlurmJobInfo{}, fmt.Errorf("job id is empty")
@@ -34,7 +53,6 @@ func (s *SlurmClient) JobInfo(ctx context.Context, jobID string) (SlurmJobInfo, 
 		QueueState: strings.TrimSpace(rawState),
 	}
 	s.addBestEffortSacctInfo(ctx, &info)
-	s.addBestEffortJobRestartCount(ctx, &info)
 	return info, nil
 }
 
