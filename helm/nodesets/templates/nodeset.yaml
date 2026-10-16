@@ -1,10 +1,32 @@
 {{- range $i, $ns := .Values.nodesets }}
+{{- $nodeSetRange := index $ns "range" | default dict }}
+{{- $hasRange := not (empty $nodeSetRange) }}
+{{- $ordinals := list 0 }}
+{{- if $hasRange }}
+{{- if or (not (hasKey $nodeSetRange "firstOrdinal")) (not (hasKey $nodeSetRange "lastOrdinal")) }}
+{{- fail ".Values.nodesets[*].range.firstOrdinal and lastOrdinal are required when range is configured." }}
+{{- end }}
+{{- if or (not (regexMatch "^[0-9]+$" (toString $nodeSetRange.firstOrdinal))) (not (regexMatch "^[0-9]+$" (toString $nodeSetRange.lastOrdinal))) }}
+{{- fail ".Values.nodesets[*].range ordinals must be non-negative integers." }}
+{{- end }}
+{{- $firstOrdinal := int $nodeSetRange.firstOrdinal }}
+{{- $lastOrdinal := int $nodeSetRange.lastOrdinal }}
+{{- if or (lt $firstOrdinal 0) (lt $lastOrdinal $firstOrdinal) }}
+{{- fail ".Values.nodesets[*].range must satisfy 0 <= firstOrdinal <= lastOrdinal." }}
+{{- end }}
+{{- $ordinals = untilStep $firstOrdinal (add1 $lastOrdinal | int) 1 }}
+{{- end }}
+{{- range $ordinal := $ordinals }}
+{{- $nodeSetName := $ns.name }}
+{{- if $hasRange }}
+{{- $nodeSetName = printf "%s%s%d" $ns.name ($nodeSetRange.suffix | default "") $ordinal }}
+{{- end }}
 {{- with $ns }}
 ---
 apiVersion: slurm.nebius.ai/v1alpha1
 kind: NodeSet
 metadata:
-  name: {{ .name }}
+  name: {{ $nodeSetName }}
   namespace: {{ $.Release.Namespace }}
 
   {{- with (.annotations | default dict) }}
@@ -19,13 +41,24 @@ metadata:
     {{- end }}
 
 spec:
+  {{- with $.Values.clusterName }}
+  clusterName: {{ . | quote }}
+  {{- end }}
+
+  {{- with (default $.Values.imagePullSecrets (.slurmd.image).imagePullSecrets) }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
   {{- with (.replicas | default 1) }}
   replicas: {{ . }}
   {{- end }}
 
-  {{- with (.maxUnavailable | default "20%") }}
+  {{- with (.maxUnavailable | default 500) }}
   maxUnavailable: {{ . }}
   {{- end }}
+
+  updateStrategy: {{ (.updateStrategy | default "rollingUpdate") | quote }}
 
   {{- if .ephemeralNodes }}
   ephemeralNodes: {{ .ephemeralNodes }}
@@ -49,11 +82,27 @@ spec:
     {{- end }}
   {{- end }}
 
+  {{- if hasKey . "docker" }}
+  docker:
+    enabled: {{ .docker.enabled }}
+  {{- end }}
+
+  {{- with (.topology | default dict) }}
+  {{- with .fabric }}
+  topology:
+    fabric: {{ . | quote }}
+  {{- end }}
+  {{- end }}
+
   {{- with .nodeConfig }}
   nodeConfig:
     {{- with .features }}
     features:
       {{- toYaml . | nindent 6 }}
+    {{- end }}
+
+    {{- if hasKey . "autoResume" }}
+    autoResume: {{ .autoResume }}
     {{- end }}
 
     {{- with .static }}
@@ -80,16 +129,14 @@ spec:
       {{- with .tag }}
       tag: {{ . | quote }}
       {{- end }}
-
-      {{- with .pullPolicy }}
-      pullPolicy: {{ . }}
-      {{- end }}
+      pullPolicy: {{ default $.Values.imagePullPolicy .pullPolicy | quote }}
     {{- end }}
     {{- else }}
       repository: {{ (required ".Values.images.slurmd.repository is required as the default image is used." $.Values.images.slurmd.repository) | quote }}
       {{- with $.Values.images.slurmd.tag }}
       tag: {{ . | quote }}
       {{- end }}
+      pullPolicy: {{ $.Values.imagePullPolicy | quote }}
     {{- end }}
 
     {{- if .customEnv }}
@@ -138,9 +185,6 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
-      {{- with (.sharedMemorySize | default "") }}
-      sharedMemorySize: {{ . | quote }}
-      {{- end }}
       {{- with (.persistentVolumeClaimRetentionPolicy | default dict) }}
       persistentVolumeClaimRetentionPolicy:
         {{- toYaml . | nindent 8 }}
@@ -150,6 +194,7 @@ spec:
     security:
       limitsConfig: {{ get (.security | default dict) "limitsConfig" | quote }}
       appArmorProfile: {{ get (.security | default dict) "appArmorProfile" | default "unconfined" | quote }}
+      procMount: {{ get (.security | default dict) "procMount" | default "Default" | quote }}
   {{- end }}
 
   {{- with (required ".Values.nodesets[*].munge is required." .munge) }}
@@ -162,16 +207,14 @@ spec:
       {{- with .tag }}
       tag: {{ . | quote }}
       {{- end }}
-
-      {{- with .pullPolicy }}
-      pullPolicy: {{ . }}
-      {{- end }}
+      pullPolicy: {{ default $.Values.imagePullPolicy .pullPolicy | quote }}
     {{- end }}
     {{- else }}
       repository: {{ (required ".Values.images.munge.repository is required as the default image is used." $.Values.images.munge.repository) | quote }}
       {{- with $.Values.images.munge.tag }}
       tag: {{ . | quote }}
       {{- end }}
+      pullPolicy: {{ $.Values.imagePullPolicy | quote }}
     {{- end }}
 
     {{- with (required ".Values.nodesets[*].munge.resources is required" .resources) }}
@@ -207,16 +250,14 @@ spec:
       {{- with .tag }}
       tag: {{ . | quote }}
       {{- end }}
-
-      {{- with .pullPolicy }}
-      pullPolicy: {{ . }}
-      {{- end }}
+      pullPolicy: {{ default $.Values.imagePullPolicy .pullPolicy | quote }}
     {{- end }}
     {{- else }}
       repository: {{ (required ".Values.images.sssd.repository is required as the default image is used." $.Values.images.sssd.repository) | quote }}
       {{- with $.Values.images.sssd.tag }}
       tag: {{ . | quote }}
       {{- end }}
+      pullPolicy: {{ $.Values.imagePullPolicy | quote }}
     {{- end }}
 
     resources:
@@ -259,11 +300,19 @@ spec:
   enableHostUserNamespace: {{ . }}
   {{- end }}
 
+  {{- if hasKey . "workerInitRandomDelaySeconds" }}
+  workerInitRandomDelaySeconds: {{ .workerInitRandomDelaySeconds }}
+  {{- end }}
+
   {{- with (.priorityClass | default "") }}
   priorityClass: {{ . | quote }}
   {{- end }}
 
-  {{- with .nodeSelector }}
+  {{- $nodeSelector := deepCopy (.nodeSelector | default dict) }}
+  {{- with .nameNodeSelector }}
+  {{- $_ := set $nodeSelector . $nodeSetName }}
+  {{- end }}
+  {{- with $nodeSelector }}
   nodeSelector:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -283,9 +332,7 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 
-  {{- with (.customInitContainers | default list) }}
-  customInitContainers:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+  {{- include "nodesets.customInitContainers" (dict "root" $ "customInitContainers" .customInitContainers "nodeExporter" .nodeExporter) | nindent 2 }}
+{{- end }}
 {{- end }}
 {{- end }}

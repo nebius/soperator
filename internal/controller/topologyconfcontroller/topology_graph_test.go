@@ -2,6 +2,7 @@ package topologyconfcontroller_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 		labelsByNode  map[string]tc.NodeTopologyLabels
 		gpuPodsByNode map[string][]string
 		allNodeNames  []string
+		fabricByNode  map[string]string
 		expected      []string
 	}{
 		{
@@ -41,10 +43,10 @@ func TestRenderTopologyConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "With root node and tier-0 label - combined tier1 and higher tiers",
+			name: "Tier-0 switches are closest to workers",
 			labelsByNode: map[string]tc.NodeTopologyLabels{
 				"node1": {"tier-0": "block0", "tier-1": "switch1", "tier-2": "spine1"},
-				"node2": {"tier-0": "block0", "tier-1": "switch2", "tier-2": "spine2"},
+				"node2": {"tier-0": "block1", "tier-1": "switch2", "tier-2": "spine2"},
 				"node3": {"tier-0": "block0", "tier-1": "switch1", "tier-2": "spine3"},
 			},
 			gpuPodsByNode: map[string][]string{
@@ -58,9 +60,53 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"SwitchName=spine1 Switches=switch1",
 				"SwitchName=spine2 Switches=switch2",
 				"SwitchName=spine3 Switches=switch1",
-				"SwitchName=switch1 Nodes=pod1,pod2,pod4",
-				"SwitchName=switch2 Nodes=pod3",
+				"SwitchName=switch1 Switches=block0",
+				"SwitchName=switch2 Switches=block1",
+				"SwitchName=block0 Nodes=pod1,pod2,pod4",
+				"SwitchName=block1 Nodes=pod3",
 				"SwitchName=unknown Nodes=pod5,pod6",
+			},
+		},
+		{
+			name: "Tier-0 alone forms a leaf switch",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-0": "nvl0"},
+			},
+			gpuPodsByNode: map[string][]string{"node1": {"worker-0", "worker-1"}},
+			allNodeNames:  []string{"worker-0", "worker-1"},
+			expected: []string{
+				"SwitchName=root Switches=nvl0",
+				"SwitchName=nvl0 Nodes=worker-[0-1]",
+			},
+		},
+		{
+			name: "Present tiers are sorted numerically across gaps",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-10": "core", "tier-0": "nvl", "tier-2": "spine", "other": "ignored"},
+			},
+			gpuPodsByNode: map[string][]string{"node1": {"worker-0"}},
+			allNodeNames:  []string{"worker-0"},
+			expected: []string{
+				"SwitchName=root Switches=core",
+				"SwitchName=core Switches=spine",
+				"SwitchName=spine Switches=nvl",
+				"SwitchName=nvl Nodes=worker-0",
+			},
+		},
+		{
+			name: "Nodes with and without tier-0 share a topology",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-0": "nvl0", "tier-1": "leaf1", "tier-2": "spine"},
+				"node2": {"tier-1": "leaf2", "tier-2": "spine"},
+			},
+			gpuPodsByNode: map[string][]string{"node1": {"worker-0"}, "node2": {"worker-1"}},
+			allNodeNames:  []string{"worker-0", "worker-1"},
+			expected: []string{
+				"SwitchName=root Switches=spine",
+				"SwitchName=spine Switches=leaf1,leaf2",
+				"SwitchName=leaf1 Switches=nvl0",
+				"SwitchName=nvl0 Nodes=worker-0",
+				"SwitchName=leaf2 Nodes=worker-1",
 			},
 		},
 		{
@@ -146,7 +192,7 @@ func TestRenderTopologyConfig(t *testing.T) {
 			allNodeNames:  []string{"gpu-0", "gpu-1", "cpu-0"},
 			expected: []string{
 				"SwitchName=root Switches=unknown",
-				"SwitchName=unknown Nodes=cpu-0,gpu-0,gpu-1",
+				"SwitchName=unknown Nodes=cpu-0,gpu-[0-1]",
 			},
 		},
 		{
@@ -213,13 +259,14 @@ func TestRenderTopologyConfig(t *testing.T) {
 			},
 			allNodeNames: []string{"node1", "node2", "node3", "node4"},
 			expected: []string{
-				"SwitchName=root Switches=spine1,switch3,unknown",
+				"SwitchName=root Switches=spine1,spine2,switch3",
 				"SwitchName=leaf1 Switches=switch1,switch2",
+				"SwitchName=leaf2 Nodes=node4",
 				"SwitchName=spine1 Switches=leaf1",
+				"SwitchName=spine2 Switches=leaf2",
 				"SwitchName=switch1 Nodes=node1",
 				"SwitchName=switch2 Nodes=node2",
 				"SwitchName=switch3 Nodes=node3",
-				"SwitchName=unknown Nodes=node4",
 			},
 		},
 		{
@@ -276,15 +323,37 @@ func TestRenderTopologyConfig(t *testing.T) {
 			labelsByNode: map[string]tc.NodeTopologyLabels{
 				"node1": {"tier-1": "", "tier-2": "leaf1"},
 				"node2": {"tier-1": "switch1", "tier-2": ""},
+				"node3": {"tier-0": "", "tier-1": "switch2"},
 			},
 			gpuPodsByNode: map[string][]string{
 				"node1": {"node1"},
 				"node2": {"node2"},
+				"node3": {"node3"},
 			},
-			allNodeNames: []string{"node1", "node2"},
+			allNodeNames: []string{"node1", "node2", "node3"},
 			expected: []string{
 				"SwitchName=root Switches=unknown",
-				"SwitchName=unknown Nodes=node1,node2",
+				"SwitchName=unknown Nodes=node1,node2,node3",
+			},
+		},
+		{
+			name: "Malformed tier numbers keep workers under unknown",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "leaf1", "tier-bad": "invalid"},
+				"node2": {"tier--1": "invalid"},
+				"node3": {"tier-999999999999999999999999999999": "invalid"},
+				"node4": {"tier-01": "invalid"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"worker-0"},
+				"node2": {"worker-1"},
+				"node3": {"worker-2"},
+				"node4": {"worker-3"},
+			},
+			allNodeNames: []string{"worker-0", "worker-1", "worker-2", "worker-3"},
+			expected: []string{
+				"SwitchName=root Switches=unknown",
+				"SwitchName=unknown Nodes=worker-[0-3]",
 			},
 		},
 		{
@@ -366,12 +435,127 @@ func TestRenderTopologyConfig(t *testing.T) {
 				"SwitchName=spine-X Switches=leaf-A,leaf-B", // Should NOT include leaf-C
 			},
 		},
+		{
+			name: "Two NodeSet fabrics produce two unconnected fabric roots",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1"},
+				"node2": {"tier-1": "switch2", "tier-2": "spine2"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"a-0"},
+				"node2": {"b-0"},
+			},
+			allNodeNames: []string{"a-0", "b-0"},
+			fabricByNode: map[string]string{
+				"a-0": "fab-a",
+				"b-0": "fab-b",
+			},
+			expected: []string{
+				"SwitchName=fab-a Switches=spine1",
+				"SwitchName=fab-b Switches=spine2",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=spine2 Switches=switch2",
+				"SwitchName=switch1 Nodes=a-0",
+				"SwitchName=switch2 Nodes=b-0",
+			},
+		},
+		{
+			name: "Fabric is the root of the tier-1/tier-2 path",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"a-0"},
+			},
+			allNodeNames: []string{"a-0"},
+			fabricByNode: map[string]string{"a-0": "cluster-x"},
+			expected: []string{
+				"SwitchName=cluster-x Switches=spine1",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=switch1 Nodes=a-0",
+			},
+		},
+		{
+			name:          "Powered-down nodes land under their fabric's unknown switch",
+			labelsByNode:  map[string]tc.NodeTopologyLabels{},
+			gpuPodsByNode: map[string][]string{},
+			allNodeNames:  []string{"a-0", "a-1", "b-0"},
+			fabricByNode: map[string]string{
+				"a-0": "fab-a",
+				"a-1": "fab-a",
+				"b-0": "fab-b",
+			},
+			expected: []string{
+				"SwitchName=fab-a Switches=fab-a.unknown",
+				"SwitchName=fab-b Switches=fab-b.unknown",
+				"SwitchName=fab-a.unknown Nodes=a-[0-1]",
+				"SwitchName=fab-b.unknown Nodes=b-0",
+			},
+		},
+		{
+			name: "Mixed: explicit fabric NodeSet and defaulted NodeSet",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"a-0"},
+			},
+			allNodeNames: []string{"a-0", "def-0"},
+			fabricByNode: map[string]string{
+				"a-0": "fab-a",
+				// "def-0" has no fabric -> defaults to "root"/"unknown".
+			},
+			expected: []string{
+				"SwitchName=fab-a Switches=spine1",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=switch1 Nodes=a-0",
+				"SwitchName=root Switches=unknown",
+				"SwitchName=unknown Nodes=def-0",
+			},
+		},
+		{
+			// Regression: a switch ID whose trailing decimal run exceeds the uint64 range
+			// (here a 20-digit tail) must be terminated identically wherever it appears, so the
+			// parent's Switches= reference still matches the child's SwitchName= line and Slurm
+			// does not overflow it to UINT64_MAX (SCHED-1971).
+			name: "Switch ID with overflowing decimal tail is sanitized consistently",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {
+					"tier-1": "6f84b74219aa22869602735141708147",
+					"tier-2": "66b2be03e8b30ab5bcf8c9fd57d6c293",
+				},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"worker-0"},
+			},
+			allNodeNames: []string{"worker-0"},
+			expected: []string{
+				"SwitchName=root Switches=66b2be03e8b30ab5bcf8c9fd57d6c293",
+				"SwitchName=66b2be03e8b30ab5bcf8c9fd57d6c293 Switches=6f84b74219aa22869602735141708147_",
+				"SwitchName=6f84b74219aa22869602735141708147_ Nodes=worker-0",
+			},
+		},
+		{
+			name: "Running node with tiers but no fabric stays under root",
+			labelsByNode: map[string]tc.NodeTopologyLabels{
+				"node1": {"tier-1": "switch1", "tier-2": "spine1"},
+			},
+			gpuPodsByNode: map[string][]string{
+				"node1": {"a-0"},
+			},
+			allNodeNames: []string{"a-0"},
+			expected: []string{
+				"SwitchName=root Switches=spine1",
+				"SwitchName=spine1 Switches=switch1",
+				"SwitchName=switch1 Nodes=a-0",
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			graph := tc.BuildTopologyGraph(context.Background(), tt.labelsByNode, tt.gpuPodsByNode, tt.allNodeNames)
-			result := graph.RenderConfigLines()
+			graph := tc.BuildTopologyGraph(context.Background(), tt.labelsByNode, tt.gpuPodsByNode, tt.allNodeNames, tt.fabricByNode)
+			result := renderedSwitchLines(graph)
 			require.ElementsMatch(t, tt.expected, result)
 		})
 	}
@@ -395,8 +579,22 @@ func TestRenderTopologyConfig_MergesSwitches(t *testing.T) {
 
 	allNodeNames := []string{"worker-a", "worker-b", "worker-c", "worker-d", "worker-e"}
 
-	graph := tc.BuildTopologyGraph(context.Background(), labelsByNode, podsByNode, allNodeNames)
-	lines := graph.RenderConfigLines()
+	graph := tc.BuildTopologyGraph(context.Background(), labelsByNode, podsByNode, allNodeNames, nil)
+	lines := renderedSwitchLines(graph)
 
 	require.Contains(t, lines, "SwitchName=spine-0 Switches=leaf-[0-1],leaf-cpu-[0,2],leafkek1")
+}
+
+// renderedSwitchLines formats the switch entries as single lines, keeping these
+// assertions readable now that the only rendered format is topology.yaml.
+func renderedSwitchLines(graph tc.TopologyGraph) []string {
+	var lines []string
+	for _, sw := range graph.RenderSwitches() {
+		if sw.Children != "" {
+			lines = append(lines, fmt.Sprintf("SwitchName=%s Switches=%s", sw.Switch, sw.Children))
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("SwitchName=%s Nodes=%s", sw.Switch, sw.Nodes))
+	}
+	return lines
 }

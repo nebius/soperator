@@ -6,9 +6,9 @@ usage() {
     echo "Get Soperator filesystem usage." >&2
     echo "" >&2
     echo "usage: ${0} [-s] [-l] [-h]" >&2
-    echo "  -s - only show shared filesystems"
-    echo "  -l - only show local filesystems"
-    echo "  -m - only show in-memory filesystems"
+    echo "  -s - only show shared filesystems" >&2
+    echo "  -l - only show local filesystems" >&2
+    echo "  -m - only show in-memory filesystems" >&2
     exit 1
 }
 

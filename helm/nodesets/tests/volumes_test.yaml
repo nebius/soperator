@@ -25,7 +25,6 @@ tests:
                 persistentVolumeClaim:
                   claimName: "jail-pvc"
               jailSubMounts: []
-              sharedMemorySize: "64Gi"
             security:
               appArmorProfile: "unconfined"
               limitsConfig: ""
@@ -50,9 +49,6 @@ tests:
       - equal:
           path: spec.slurmd.volumes.jail.persistentVolumeClaim.claimName
           value: "jail-pvc"
-      - equal:
-          path: spec.slurmd.volumes.sharedMemorySize
-          value: "64Gi"
 
   - it: should configure jailSubMounts correctly
     set:

@@ -37,68 +37,6 @@ func generateSysctlConfig() renderutils.ConfigFile {
 
 // endregion Sysctl
 
-// region Supervisord
-
-// RenderDefaultConfigMapSupervisord renders new [corev1.ConfigMap] containing supervisord config file
-func RenderDefaultConfigMapSupervisord(cluster *values.SlurmCluster) corev1.ConfigMap {
-	data := generateDefaultSupervisordConfig().Render()
-	return corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.BuildConfigMapSupervisordName(cluster.Name),
-			Namespace: cluster.Namespace,
-			Labels:    common.RenderLabels(consts.ComponentTypeWorker, cluster.Name),
-		},
-		Data: map[string]string{
-			consts.ConfigMapKeySupervisord: data,
-		},
-	}
-}
-
-func generateDefaultSupervisordConfig() renderutils.ConfigFile {
-	res := &renderutils.MultilineStringConfig{}
-	res.AddLine("[supervisord]")
-	res.AddLine("nodaemon=true")
-	res.AddLine("logfile=/dev/null ; Output only to stdout/stderr")
-	res.AddLine("logfile_maxbytes=0")
-	res.AddLine("pidfile=/var/run/supervisord.pid")
-	res.AddLine("")
-	res.AddLine("[program:slurmd]")
-	res.AddLine("priority=1")
-	res.AddLine("stdout_logfile=/dev/fd/1")
-	res.AddLine("stdout_logfile_maxbytes=0")
-	res.AddLine("stderr_logfile=/dev/fd/2")
-	res.AddLine("stderr_logfile_maxbytes=0")
-	res.AddLine("redirect_stderr=true")
-	res.AddLine("command=/opt/bin/slurm/slurmd_entrypoint.sh")
-	res.AddLine("autostart=true")
-	res.AddLine("autorestart=true")
-	res.AddLine("startsecs=0")
-	res.AddLine("stopasgroup=true ; Send SIGTERM to all child processes of supervisord")
-	res.AddLine("killasgroup=true ; Send SIGKILL to all child processes of supervisord")
-	res.AddLine("stopsignal=SIGTERM ; Signal to send to the program to stop it")
-	res.AddLine("stopwaitsecs=10 ; Wait for the process to stop before sending a SIGKILL")
-	res.AddLine("")
-	res.AddLine("[program:sshd]")
-	res.AddLine("priority=10")
-	res.AddLine("stdout_logfile=/dev/fd/1")
-	res.AddLine("stdout_logfile_maxbytes=0")
-	res.AddLine("stderr_logfile=/dev/fd/2")
-	res.AddLine("stderr_logfile_maxbytes=0")
-	res.AddLine("redirect_stderr=true")
-	res.AddLine("command=/usr/sbin/sshd -D -e -f /mnt/ssh-configs/sshd_config")
-	res.AddLine("autostart=true")
-	res.AddLine("autorestart=true")
-	res.AddLine("startsecs=0")
-	res.AddLine("stopasgroup=true ; Send SIGTERM to all child processes of supervisord")
-	res.AddLine("killasgroup=true ; Send SIGKILL to all child processes of supervisord")
-	res.AddLine("stopsignal=SIGTERM ; Signal to send to the program to stop it")
-	res.AddLine("stopwaitsecs=10 ; Wait for the process to stop before sending a SIGKILL")
-
-	return res
-}
-
-// endregion Supervisord
-
 // region SSHD config
 
 // RenderConfigMapSSHDConfigs renders new [corev1.ConfigMap] containing sshd config file
@@ -132,6 +70,7 @@ func generateSshdConfig(login *values.SlurmLogin) renderutils.ConfigFile {
 	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdRSAKeyName)
 	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdECDSAKeyName)
 	res.AddLine("HostKey " + consts.VolumeMountPathSSHDKeys + "/" + consts.SecretSshdECDSA25519KeyName)
+	res.AddLine("# Upgrade fallback for pre-PAM images; PAM-jail images remove this at startup.")
 	res.AddLine("ChrootDirectory " + consts.VolumeMountPathJail)
 	res.AddLine("ClientAliveInterval " + consts.SSHDClientAliveInterval)
 	res.AddLine("ClientAliveCountMax " + consts.SSHDClientAliveCountMax)
@@ -155,3 +94,51 @@ func generateSshdConfig(login *values.SlurmLogin) renderutils.ConfigFile {
 }
 
 // endregion SSHD config
+
+// region PAM Slurm adopt
+
+// RenderConfigMapPAMSlurmAdopt renders the worker PAM account policy and its exemption list.
+func RenderConfigMapPAMSlurmAdopt(cluster *values.SlurmCluster) corev1.ConfigMap {
+	return corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      naming.BuildConfigMapPAMSlurmAdoptName(cluster.Name),
+			Namespace: cluster.Namespace,
+			Labels:    common.RenderLabels(consts.ComponentTypeWorker, cluster.Name),
+		},
+		Data: map[string]string{
+			consts.ConfigMapKeyPAMSlurmAdopt:       generatePAMSlurmAdoptConfig(cluster.PAMSlurmAdopt).Render(),
+			consts.ConfigMapKeyPAMSlurmAdoptUsers:  generatePAMSlurmAdoptIdentityList(cluster.PAMSlurmAdopt.ExemptUsers).Render(),
+			consts.ConfigMapKeyPAMSlurmAdoptGroups: generatePAMSlurmAdoptIdentityList(cluster.PAMSlurmAdopt.ExemptGroups).Render(),
+		},
+	}
+}
+
+func generatePAMSlurmAdoptConfig(config values.PAMSlurmAdopt) renderutils.ConfigFile {
+	res := &renderutils.MultilineStringConfig{}
+	if !config.Enabled {
+		return res
+	}
+
+	// pam_listfile rejects a final-component symlink. ConfigMap keys are symlinks,
+	// but resolving the intermediate ..data link leaves the key as a regular file.
+	res.AddLine(fmt.Sprintf(
+		"account sufficient pam_listfile.so item=user sense=allow onerr=fail file=%s",
+		consts.VolumeMountPathPAMSlurmAdoptUsers,
+	))
+	res.AddLine(fmt.Sprintf(
+		"account sufficient pam_listfile.so item=group sense=allow onerr=fail file=%s",
+		consts.VolumeMountPathPAMSlurmAdoptGroups,
+	))
+	res.AddLine("-account required pam_slurm_adopt.so action_no_jobs=deny action_unknown=newest action_adopt_failure=deny action_generic_failure=deny disable_x11=1 join_container=false")
+	return res
+}
+
+func generatePAMSlurmAdoptIdentityList(identities []string) renderutils.ConfigFile {
+	res := &renderutils.MultilineStringConfig{}
+	for _, identity := range identities {
+		res.AddLine(identity)
+	}
+	return res
+}
+
+// endregion PAM Slurm adopt
