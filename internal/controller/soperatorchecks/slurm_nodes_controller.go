@@ -153,17 +153,14 @@ func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types
 				continue
 			}
 
-			for _, wellKnownReason := range consts.SlurmNodeReasonsList {
-				if strings.Contains(node.Reason.Reason, wellKnownReason) {
-					// For simplicity, we keep only well known part
-					node.Reason.OriginalReason = node.Reason.Reason
-					node.Reason.Reason = wellKnownReason
+			if wellKnownReason, ok := consts.MatchWellKnownSlurmNodeReason(node.Reason.Reason); ok {
+				// For simplicity, we keep only well known part
+				node.Reason.OriginalReason = node.Reason.Reason
+				node.Reason.Reason = wellKnownReason
 
-					nodes := degradedNodes[slurmClusterName]
-					nodes = append(nodes, node)
-					degradedNodes[slurmClusterName] = nodes
-					break
-				}
+				nodes := degradedNodes[slurmClusterName]
+				nodes = append(nodes, node)
+				degradedNodes[slurmClusterName] = nodes
 			}
 		}
 	}
