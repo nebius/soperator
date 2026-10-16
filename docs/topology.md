@@ -209,7 +209,7 @@ the idle workers again. Node order within each block is unconstrained.
 | `topo.type` | yes | `tree`, `block` or `flat`. |
 | `topo.blockSizes` | no | Planning base block size followed by any higher-level sizes to enforce. Each successive value must be a power of two larger than the previous one. Only for `type: block`. |
 | `clusterDefault` | no | Marks the topology used by partitions without a `topologyRef` and by cluster-wide operations not tied to a partition. |
-| `nodeSetRefs` | no | NodeSets the topology covers. `ALL`, like an empty list, covers every NodeSet. A `tree` or `block` topology still lists only the GPU NodeSets among them. |
+| `nodeSetRefs` | no | NodeSets the topology covers. `ALL`, like an empty list, covers every NodeSet. A `tree` or `block` topology still lists only the GPU NodeSets among them. A name listed in `aggregateSlurmNodeSets` of NodeSets covers all of them, so a topology referencing `worker` follows racks being added or removed. |
 
 `clusterDefault` resolution follows Slurm's own rule and never fails the render:
 

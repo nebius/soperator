@@ -90,10 +90,16 @@ func RenderJailedConfigSlurmConfigs(cluster *values.SlurmCluster) slurmv1alpha1.
 	}
 }
 
-// AddNodeSetsToSlurmConfig adds nodeset configuration to the slurm config
+// AddNodeSetsToSlurmConfig adds nodeset configuration to the slurm config.
+//
+// Besides one line per NodeSet, one line is added per aggregate Slurm NodeSet listed by NodeSets,
+// containing the nodes of all NodeSets listing it.
+//
 // Example output:
 // NodeSet=gb200-0 Nodes=gb200-0-[0-17]
-// Nodeset=h100 Nodes=h100--[0-1]
+// NodeSet=gb200-1 Nodes=gb200-1-[0-17]
+// Nodeset=h100 Nodes=h100-[0-1]
+// NodeSet=gb200 Nodes=gb200-0-[0-17],gb200-1-[0-17]
 func AddNodeSetsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
 	res.AddComment("NodeSet section")
 	if len(cluster.NodeSets) == 0 {
@@ -102,14 +108,30 @@ func AddNodeSetsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values
 	}
 
 	for _, nodeSet := range cluster.NodeSets {
-		switch {
-		case nodeSet.Spec.Replicas == 1:
-			res.AddProperty("NodeSet", fmt.Sprintf("%s Nodes=%s-0", nodeSet.Name, nodeSet.Name))
-		case nodeSet.Spec.Replicas > 1:
-			res.AddProperty("NodeSet", fmt.Sprintf("%s Nodes=%s-[0-%d]", nodeSet.Name, nodeSet.Name, nodeSet.Spec.Replicas-1))
-		default:
+		hostlist := nodeSetHostlist(nodeSet)
+		if hostlist == "" {
 			res.AddComment(fmt.Sprintf("WARNING: NodeSet %s has 0 replicas, skipping", nodeSet.Name))
+			continue
 		}
+		res.AddProperty("NodeSet", fmt.Sprintf("%s Nodes=%s", nodeSet.Name, hostlist))
+	}
+
+	aggregates, shadowed := groupAggregateSlurmNodeSets(cluster)
+	for _, name := range shadowed {
+		res.AddComment(fmt.Sprintf("WARNING: Aggregate Slurm NodeSet %s matches the name of a NodeSet, skipping", name))
+	}
+	for _, aggregate := range aggregates {
+		var hostlists []string
+		for _, member := range aggregate.Members {
+			if hostlist := nodeSetHostlist(member); hostlist != "" {
+				hostlists = append(hostlists, hostlist)
+			}
+		}
+		if len(hostlists) == 0 {
+			res.AddComment(fmt.Sprintf("WARNING: Aggregate Slurm NodeSet %s has 0 replicas, skipping", aggregate.Name))
+			continue
+		}
+		res.AddProperty("NodeSet", fmt.Sprintf("%s Nodes=%s", aggregate.Name, strings.Join(hostlists, ",")))
 	}
 }
 

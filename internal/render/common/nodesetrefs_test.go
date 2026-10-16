@@ -94,6 +94,29 @@ func TestResolveNodeSetRefs(t *testing.T) {
 			},
 		},
 		{
+			name: "Aggregate Slurm NodeSets are resolvable",
+			cluster: &values.SlurmCluster{
+				NodeSets: []slurmv1alpha1.NodeSet{
+					nodeSetWithAggregateSlurmNodeSets("worker-rack0", 18, "worker"),
+					nodeSetWithAggregateSlurmNodeSets("worker-rack1", 0, "worker"),
+					nodeSetWithAggregateSlurmNodeSets("spare-rack0", 0, "spare"),
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: slurmv1.PartitionConfigTypeStructured,
+					Partitions: []slurmv1.Partition{
+						{Name: "gpu", NodeSetRefs: []string{"worker", "worker-rack0"}},
+						{Name: "spare", NodeSetRefs: []string{"spare"}},
+					},
+				},
+			},
+			expected: NodeSetRefResolution{
+				Ignored: []IgnoredNodeSetRef{
+					{Partition: "spare", NodeSet: "spare", Reason: NodeSetRefIgnoreReasonNoReplicas},
+				},
+				PartitionsWithoutNodes: []string{"spare"},
+			},
+		},
+		{
 			name: "Non-structured config type keeps its leftover partitions unreported",
 			cluster: &values.SlurmCluster{
 				PartitionConfiguration: values.PartitionConfiguration{

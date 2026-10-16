@@ -16226,6 +16226,21 @@ spec:
                         x-kubernetes-list-type: atomic
                     type: object
                 type: object
+              aggregateSlurmNodeSets:
+                description: |-
+                  AggregateSlurmNodeSets lists aggregate Slurm NodeSets the nodes of this NodeSet also belong to.
+                  For each unique name across the NodeSets of the cluster, one more `NodeSet=` line is rendered in `slurm.conf`,
+                  containing the nodes of every NodeSet listing that name. Partitions can reference such a name in nodeSetRefs,
+                  e.g. "worker" for NodeSets "worker-rack0", "worker-rack1", ..., so scaling the aggregate doesn't require
+                  changing the partition configuration.
+                  A name matching the name of an existing NodeSet is ignored, as the NodeSet itself takes precedence.
+                items:
+                  maxLength: 63
+                  minLength: 1
+                  pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
               clusterName:
                 description: |-
                   ClusterName is the name of the SlurmCluster this NodeSet belongs to.
@@ -28839,7 +28854,8 @@ spec:
                         nodeSetRefs:
                           description: |-
                             NodeSetRefs allows to define a Partition including specific NodeSet[s].
-                            Each value must be unique and correspond to one of the NodeSet.Metadata.Name.
+                            Each value must be unique and correspond to one of the NodeSet.Metadata.Name,
+                            or to one of the NodeSet.Spec.AggregateSlurmNodeSets covering every NodeSet listing it.
                           items:
                             type: string
                           type: array
@@ -50715,7 +50731,8 @@ spec:
                         nodeSetRefs:
                           description: |-
                             NodeSetRefs lists the NodeSets whose Slurm nodes belong to this topology. Each value must
-                            correspond to a NodeSet.Metadata.Name, or be the special value "ALL" covering every NodeSet
+                            correspond to a NodeSet.Metadata.Name, to one of the NodeSet.Spec.AggregateSlurmNodeSets
+                            covering every NodeSet listing it, or be the special value "ALL" covering every NodeSet
                             of the cluster. Topologies may overlap: Slurm lets a node belong to several topologies at
                             once, so the same NodeSet can be described as a tree in one and as blocks in another.
                           items:

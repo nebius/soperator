@@ -1157,6 +1157,97 @@ func nodeSetWithReplicas(name string, replicas int32) slurmv1alpha1.NodeSet {
 	}
 }
 
+func nodeSetWithAggregateSlurmNodeSets(name string, replicas int32, aggregates ...string) slurmv1alpha1.NodeSet {
+	nodeSet := nodeSetWithReplicas(name, replicas)
+	nodeSet.Spec.AggregateSlurmNodeSets = aggregates
+	return nodeSet
+}
+
+func TestAddNodeSetsToSlurmConfig_AggregateSlurmNodeSets(t *testing.T) {
+	tests := []struct {
+		name     string
+		nodeSets []slurmv1alpha1.NodeSet
+		expected []string
+	}{
+		{
+			name: "Aggregate of several NodeSets",
+			nodeSets: []slurmv1alpha1.NodeSet{
+				nodeSetWithAggregateSlurmNodeSets("worker-rack0", 18, "worker"),
+				nodeSetWithAggregateSlurmNodeSets("worker-rack1", 18, "worker"),
+				nodeSetWithReplicas("cpu", 2),
+			},
+			expected: []string{
+				"#NodeSet section",
+				"NodeSet=worker-rack0 Nodes=worker-rack0-[0-17]",
+				"NodeSet=worker-rack1 Nodes=worker-rack1-[0-17]",
+				"NodeSet=cpu Nodes=cpu-[0-1]",
+				"NodeSet=worker Nodes=worker-rack0-[0-17],worker-rack1-[0-17]",
+			},
+		},
+		{
+			name: "NodeSet belonging to several aggregates",
+			nodeSets: []slurmv1alpha1.NodeSet{
+				nodeSetWithAggregateSlurmNodeSets("rack0", 18, "dept1", "all"),
+				nodeSetWithAggregateSlurmNodeSets("rack1", 1, "dept2", "all"),
+			},
+			expected: []string{
+				"#NodeSet section",
+				"NodeSet=rack0 Nodes=rack0-[0-17]",
+				"NodeSet=rack1 Nodes=rack1-0",
+				"NodeSet=all Nodes=rack0-[0-17],rack1-0",
+				"NodeSet=dept1 Nodes=rack0-[0-17]",
+				"NodeSet=dept2 Nodes=rack1-0",
+			},
+		},
+		{
+			name: "Scaled down members are left out of the aggregate",
+			nodeSets: []slurmv1alpha1.NodeSet{
+				nodeSetWithAggregateSlurmNodeSets("worker-rack0", 18, "worker"),
+				nodeSetWithAggregateSlurmNodeSets("worker-rack1", 0, "worker"),
+			},
+			expected: []string{
+				"#NodeSet section",
+				"NodeSet=worker-rack0 Nodes=worker-rack0-[0-17]",
+				"#WARNING: NodeSet worker-rack1 has 0 replicas, skipping",
+				"NodeSet=worker Nodes=worker-rack0-[0-17]",
+			},
+		},
+		{
+			name: "Aggregate without replicas is skipped",
+			nodeSets: []slurmv1alpha1.NodeSet{
+				nodeSetWithAggregateSlurmNodeSets("worker-rack0", 0, "worker"),
+			},
+			expected: []string{
+				"#NodeSet section",
+				"#WARNING: NodeSet worker-rack0 has 0 replicas, skipping",
+				"#WARNING: Aggregate Slurm NodeSet worker has 0 replicas, skipping",
+			},
+		},
+		{
+			name: "Aggregate shadowed by a NodeSet with the same name is skipped",
+			nodeSets: []slurmv1alpha1.NodeSet{
+				nodeSetWithReplicas("worker", 2),
+				nodeSetWithAggregateSlurmNodeSets("worker-rack0", 18, "worker"),
+			},
+			expected: []string{
+				"#NodeSet section",
+				"NodeSet=worker Nodes=worker-[0-1]",
+				"NodeSet=worker-rack0 Nodes=worker-rack0-[0-17]",
+				"#WARNING: Aggregate Slurm NodeSet worker matches the name of a NodeSet, skipping",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := &renderutils.PropertiesConfig{}
+			AddNodeSetsToSlurmConfig(res, &values.SlurmCluster{NodeSets: tt.nodeSets})
+
+			assert.Equal(t, strings.Join(tt.expected, "\n"), res.Render())
+		})
+	}
+}
+
 func TestAddPartitionsToSlurmConfig(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -1434,6 +1525,40 @@ func TestAddPartitionsToSlurmConfig(t *testing.T) {
 				"PartitionName=cpu Nodes=nodeA Default=YES State=UP",
 			},
 			notExpected: []string{"Nodes=missing"},
+		},
+		{
+			name: "Partitions referencing aggregate Slurm NodeSets",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					nodeSetWithAggregateSlurmNodeSets("worker-rack0", 18, "worker"),
+					nodeSetWithAggregateSlurmNodeSets("worker-rack1", 18, "worker"),
+					nodeSetWithAggregateSlurmNodeSets("spare-rack0", 0, "spare"),
+				},
+				PartitionConfiguration: values.PartitionConfiguration{
+					ConfigType: "structured",
+					Partitions: []slurmv1.Partition{
+						{
+							Name:        "gpu",
+							NodeSetRefs: []string{"worker"},
+							Config:      "Default=YES State=UP",
+						},
+						{
+							Name:        "rack",
+							NodeSetRefs: []string{"worker-rack1", "spare"},
+							Config:      "Default=NO State=UP",
+						},
+					},
+				},
+			},
+			expected: []string{
+				"PartitionName=gpu Nodes=worker Default=YES State=UP",
+				"#WARNING: Partition rack references NodeSet spare ignored: NodeSet has no replicas",
+				"PartitionName=rack Nodes=worker-rack1 Default=NO State=UP",
+			},
 		},
 		{
 			name: "No partitions defined",

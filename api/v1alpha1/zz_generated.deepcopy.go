@@ -1097,6 +1097,11 @@ func (in *NodeSetSpec) DeepCopyInto(out *NodeSetSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	in.NodeConfig.DeepCopyInto(&out.NodeConfig)
+	if in.AggregateSlurmNodeSets != nil {
+		in, out := &in.AggregateSlurmNodeSets, &out.AggregateSlurmNodeSets
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	out.GPU = in.GPU
 	in.Docker.DeepCopyInto(&out.Docker)
 	out.Topology = in.Topology

@@ -331,7 +331,8 @@ type NamedTopology struct {
 	Topo TopologyPlugin `json:"topo"`
 
 	// NodeSetRefs lists the NodeSets whose Slurm nodes belong to this topology. Each value must
-	// correspond to a NodeSet.Metadata.Name, or be the special value "ALL" covering every NodeSet
+	// correspond to a NodeSet.Metadata.Name, to one of the NodeSet.Spec.AggregateSlurmNodeSets
+	// covering every NodeSet listing it, or be the special value "ALL" covering every NodeSet
 	// of the cluster. Topologies may overlap: Slurm lets a node belong to several topologies at
 	// once, so the same NodeSet can be described as a tree in one and as blocks in another.
 	//
@@ -649,7 +650,8 @@ type Partition struct {
 	IsAll bool `json:"isAll,omitempty"`
 
 	// NodeSetRefs allows to define a Partition including specific NodeSet[s].
-	// Each value must be unique and correspond to one of the NodeSet.Metadata.Name.
+	// Each value must be unique and correspond to one of the NodeSet.Metadata.Name,
+	// or to one of the NodeSet.Spec.AggregateSlurmNodeSets covering every NodeSet listing it.
 	//
 	// +kubebuilder:validation:Optional
 	NodeSetRefs []string `json:"nodeSetRefs,omitempty"`
