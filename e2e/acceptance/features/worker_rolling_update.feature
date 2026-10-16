@@ -35,5 +35,7 @@ Feature: Slurm-aware worker rolling updates
     And the second worker is drained with a maintenance reason
     When all test jobs finish without interruption
     Then all active workers of the NodeSet are idle
+    # TODO: Remove this step and the temporary interval override/rollback once
+    # --requeue-after-slurm-nodes is configured in the Helm chart for E2E clusters.
     When the original maintenance check interval is restored
     Then the updated NodeSet accepts smoke jobs

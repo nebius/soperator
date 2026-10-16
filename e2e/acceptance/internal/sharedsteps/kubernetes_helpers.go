@@ -72,6 +72,9 @@ type temporaryChecksInterval struct {
 	releaseOwned    bool
 }
 
+// TODO: Remove this temporary interval override, rollback, and associated tests
+// once --requeue-after-slurm-nodes is configured in the Helm chart for E2E clusters.
+//
 // Return the saved state even after a partial mutation so cleanup can restore it.
 func prepareMaintenanceChecksInterval(ctx context.Context, runtime framework.Runtime, kubectl *framework.KubectlClient) (*temporaryChecksInterval, error) {
 	var deployments appsv1.DeploymentList

@@ -50,6 +50,7 @@ type WorkerRollingUpdate struct {
 	mk8s                workerRolloutMK8s
 	power               workerRolloutPower
 	checksInterval      *temporaryChecksInterval
+	requireMK8s         bool
 }
 
 type workerPodSnapshot struct {
@@ -126,7 +127,7 @@ func (s *WorkerRollingUpdate) CleanupAndReset(ctx context.Context) {
 	s.cleanupSystemDaemonSets(ctx)
 	if s.mk8s.requestedMaxPods != nil {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*workerMK8sTimeout)
-		if err := s.restoreMK8sGroup(cleanupCtx); err != nil {
+		if err := s.cleanupMK8sGroup(cleanupCtx); err != nil {
 			s.runtime.Logf("Cleanup: restore MK8s node group %s: %v", s.mk8s.groupID, err)
 		}
 		cancel()
@@ -152,6 +153,7 @@ func (s *WorkerRollingUpdate) CleanupAndReset(ctx context.Context) {
 	s.annotationValue = ""
 	s.restartedDaemonSets = nil
 	s.checksInterval = nil
+	s.requireMK8s = false
 }
 
 func (s *WorkerRollingUpdate) cleanupSystemDaemonSets(ctx context.Context) {
@@ -273,7 +275,7 @@ func (s *WorkerRollingUpdate) cleanupRollout(ctx context.Context) {
 				}
 			}
 			if s.mk8s.requestedMaxPods != nil {
-				if err := s.mk8sCleanupReady(waitCtx, len(names), nodes.Items); err != nil {
+				if err := s.mk8sGroupAndHostsReady(waitCtx, len(names), nodes.Items, true); err != nil {
 					return false, err
 				}
 			}
@@ -380,6 +382,16 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 		if len(hosts) != len(candidate.initialPods) {
 			rejected = append(rejected, fmt.Sprintf("%s: require a separate host for each worker", nodeSet.Metadata.Name))
 			continue
+		}
+		if s.requireMK8s {
+			if err := candidate.selectMK8sGroup(ctx); err != nil {
+				var prerequisite workerRolloutPrerequisiteError
+				if !errors.As(err, &prerequisite) {
+					return err
+				}
+				rejected = append(rejected, fmt.Sprintf("%s: %v", nodeSet.Metadata.Name, err))
+				continue
+			}
 		}
 		*s = candidate
 		if isEphemeralRollout(s.nodeSet) {

@@ -1,6 +1,7 @@
 package sharedsteps
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -214,46 +215,166 @@ func TestWorkerMK8sHostsIncludeIdleGroupMembers(t *testing.T) {
 	require.ErrorAs(t, err, &topology)
 }
 
-func TestSelectMK8sNodeSetSearchesForDedicatedHosts(t *testing.T) {
-	steps, runtime := rolloutSelectionTestSteps(rolloutSelectionTestNodeSet("a-gpu", 2), rolloutSelectionTestNodeSet("b-gpu", 2))
-	first := runtime.podsByNodeSet["a-gpu"]
-	first[1].Spec.NodeName = first[0].Spec.NodeName
-	runtime.nodes = append(runtime.nodes, readyWorkerMK8sHost(first[0].Spec.NodeName, "group-a"))
-	for _, pod := range runtime.podsByNodeSet["b-gpu"] {
-		runtime.nodes = append(runtime.nodes, readyWorkerMK8sHost(pod.Spec.NodeName, "group-1"))
+func TestSelectMK8sNodeSetSearchesPastUnsupportedPrerequisites(t *testing.T) {
+	for _, prerequisite := range []string{"surge", "unrelated workload"} {
+		t.Run(prerequisite, func(t *testing.T) {
+			steps, runtime := rolloutSelectionTestSteps(rolloutSelectionTestNodeSet("a-worker", 2), rolloutSelectionTestNodeSet("b-worker", 2))
+			steps.requireMK8s = true
+			for i, node := range runtime.nodes {
+				group := "group-a"
+				if strings.HasPrefix(node.Name, "b-worker-") {
+					group = "group-1"
+				}
+				runtime.nodes[i] = readyWorkerMK8sHost(node.Name, group)
+			}
+			if prerequisite == "unrelated workload" {
+				pods := append(slices.Clone(runtime.podsByNodeSet["a-worker"]), runtime.podsByNodeSet["b-worker"]...)
+				pods = append(pods, corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "other-workload", Namespace: "default"},
+					Spec:       corev1.PodSpec{NodeName: "a-worker-0-host"},
+				})
+				encoded, err := json.Marshal(corev1.PodList{Items: pods})
+				require.NoError(t, err)
+				runtime.kubeResponses = map[string]string{"get pods --all-namespaces -o json": string(encoded)}
+			}
+			var reads []string
+			runtime.local = func(args ...string) (string, error) {
+				require.Len(t, args, 8)
+				assert.Equal(t, []string{"nebius", "mk8s", "node-group", "get", "--id"}, args[:5])
+				assert.Equal(t, []string{"--format", "json"}, args[6:])
+				assert.Empty(t, runtime.submissions, "validate every prerequisite before starting jobs")
+				reads = append(reads, args[5])
+				group := strings.ReplaceAll(workerMK8sAutoscalingLiveShape, "group-1", args[5])
+				if prerequisite == "surge" && args[5] == "group-a" {
+					group = strings.Replace(group, `"max_surge":{"percent":"0"}`, `"max_surge":{"percent":"50"}`, 1)
+				}
+				return group, nil
+			}
+
+			require.NoError(t, steps.prepareRolloutWorkers(t.Context()))
+			assert.Equal(t, "b-worker", steps.nodeSet.Metadata.Name)
+			assert.Equal(t, "group-1", steps.mk8s.groupID)
+			assert.Equal(t, []string{"group-a", "group-1"}, reads)
+			require.Len(t, runtime.submissions, 2)
+			for _, command := range runtime.submissions {
+				assert.Contains(t, command, "--nodelist='b-worker-")
+			}
+			assert.Empty(t, steps.power.added)
+		})
 	}
-	reads := 0
+}
+
+func TestMK8sScenarioSelectsSuitableWorkersBeforeStartingJobs(t *testing.T) {
+	steps, runtime := rolloutSelectionTestSteps(rolloutSelectionTestNodeSet("a-worker", 2), rolloutSelectionTestNodeSet("b-worker", 2))
+	for i, node := range runtime.nodes {
+		if strings.HasPrefix(node.Name, "b-worker-") {
+			runtime.nodes[i] = readyWorkerMK8sHost(node.Name, "group-1")
+		}
+	}
+	updates := 0
 	runtime.local = func(args ...string) (string, error) {
-		assert.Equal(t, []string{"nebius", "mk8s", "node-group", "get", "--id", "group-1", "--format", "json"}, args)
-		reads++
+		if slices.Contains(args, "update") {
+			updates++
+			return "", errors.New("provider update intentionally stopped")
+		}
 		return workerMK8sAutoscalingLiveShape, nil
 	}
-	require.NoError(t, steps.selectNodeSet(t.Context()))
-	require.NoError(t, steps.selectMK8sGroup(t.Context()))
-	assert.Equal(t, "b-gpu", steps.nodeSet.Metadata.Name)
-	assert.Equal(t, 1, reads)
-	assert.Equal(t, types.UID("b-gpu-0-uid"), steps.initialPods["b-gpu-0"].UID)
-	assert.Empty(t, steps.power.added)
+	var output bytes.Buffer
+	suite := godog.TestSuite{
+		Name:                "worker-rollout-prerequisites",
+		ScenarioInitializer: steps.RegisterSteps,
+		Options: &godog.Options{
+			Format: "progress",
+			Output: &output,
+			Strict: true,
+			FeatureContents: []godog.Feature{{
+				Name: "worker-rollout.feature",
+				Contents: []byte(`Feature: Worker rollout prerequisites
+  Scenario: The node group update uses a suitable NodeSet
+    Given test jobs are running on two workers of a NodeSet with slurmAwareRollingUpdate strategy and maxUnavailable at least 2
+    When ` + workerMK8sUpdateStep + "\n"),
+			}},
+		},
+	}
+
+	assert.Equal(t, 1, suite.Run(), "the injected provider error must end the scenario")
+	assert.Contains(t, output.String(), "provider update intentionally stopped")
+	assert.Equal(t, "b-worker", steps.nodeSet.Metadata.Name)
+	assert.Equal(t, "group-1", steps.mk8s.groupID)
+	assert.Equal(t, 1, updates)
+	require.Len(t, runtime.submissions, 2)
+	for _, command := range runtime.submissions {
+		assert.Contains(t, command, "--nodelist='b-worker-")
+	}
 }
 
 func TestSelectMK8sNodeSetSkipsOnlyUnsupportedTopology(t *testing.T) {
-	steps, runtime := rolloutSelectionTestSteps(rolloutSelectionTestNodeSet("a-gpu", 2), rolloutSelectionTestNodeSet("b-gpu", 2))
-	for _, nodeSet := range runtime.nodeSets {
-		pods := runtime.podsByNodeSet[nodeSet.Metadata.Name]
-		pods[1].Spec.NodeName = pods[0].Spec.NodeName
-		runtime.nodes = append(runtime.nodes, readyWorkerMK8sHost(pods[0].Spec.NodeName, "group-1"))
-	}
-	require.ErrorIs(t, steps.selectNodeSet(t.Context()), godog.ErrSkip)
+	steps, runtime := rolloutSelectionTestSteps(rolloutSelectionTestNodeSet("a-worker", 2), rolloutSelectionTestNodeSet("b-worker", 2))
+	steps.requireMK8s = true
+	require.ErrorIs(t, steps.prepareRolloutWorkers(t.Context()), godog.ErrSkip)
 	assert.Empty(t, steps.nodeSet.Metadata.Name)
 	assert.Empty(t, steps.mk8s.groupID)
 	assert.Empty(t, steps.power.names)
+	assert.Empty(t, steps.targets)
+	assert.Empty(t, runtime.submissions)
 	assert.NotContains(t, strings.Join(runtime.calls, "\n"), "scontrol update")
+	assert.NotContains(t, strings.Join(runtime.calls, "\n"), "nebius mk8s", "nodes without group labels need no provider query")
 
-	runtime.podsByNodeSet["a-gpu"][1].Spec.NodeName = "absent-host"
-	require.NoError(t, steps.selectNodeSet(t.Context()))
-	err := steps.selectMK8sGroup(t.Context())
+	for i, node := range runtime.nodes {
+		runtime.nodes[i] = readyWorkerMK8sHost(node.Name, "group-1")
+	}
+	runtime.podsByNodeSet["a-worker"][1].Spec.NodeName = "absent-host"
+	err := steps.prepareRolloutWorkers(t.Context())
 	require.ErrorContains(t, err, "host absent-host is absent")
 	assert.NotErrorIs(t, err, godog.ErrSkip, "missing configured hosts are a preflight failure")
+	assert.Empty(t, runtime.submissions)
+}
+
+func TestSelectMK8sNodeSetFailsOnConfiguredGroupErrors(t *testing.T) {
+	for _, problem := range []string{"provider query", "unhealthy group"} {
+		t.Run(problem, func(t *testing.T) {
+			steps, runtime := rolloutSelectionTestSteps(rolloutSelectionTestNodeSet("a-worker", 2), rolloutSelectionTestNodeSet("b-worker", 2))
+			steps.requireMK8s = true
+			for i, node := range runtime.nodes {
+				group := "group-a"
+				if strings.HasPrefix(node.Name, "b-worker-") {
+					group = "group-1"
+				}
+				runtime.nodes[i] = readyWorkerMK8sHost(node.Name, group)
+			}
+			var reads []string
+			runtime.local = func(args ...string) (string, error) {
+				reads = append(reads, args[5])
+				if problem == "provider query" {
+					return "", errors.New("provider unavailable")
+				}
+				group := strings.ReplaceAll(workerMK8sAutoscalingLiveShape, "group-1", "group-a")
+				return strings.Replace(group, `"ready_node_count":"2"`, `"ready_node_count":"1"`, 1), nil
+			}
+
+			err := steps.prepareRolloutWorkers(t.Context())
+			require.Error(t, err)
+			assert.NotErrorIs(t, err, godog.ErrSkip)
+			if problem == "provider query" {
+				assert.ErrorContains(t, err, "provider unavailable")
+			} else {
+				assert.ErrorContains(t, err, "not converged")
+			}
+			assert.Equal(t, []string{"group-a"}, reads, "a healthy later candidate must not hide a configured failure")
+			assert.Empty(t, steps.nodeSet.Metadata.Name)
+			assert.Empty(t, steps.mk8s.groupID)
+			assert.Empty(t, runtime.submissions)
+			assert.NotContains(t, strings.Join(runtime.calls, "\n"), "scontrol update")
+		})
+	}
+}
+
+func TestPrepareWorkerTemplateRolloutDoesNotRequireMK8s(t *testing.T) {
+	steps, runtime := rolloutSelectionTestSteps(rolloutSelectionTestNodeSet("worker", 2))
+	require.NoError(t, steps.prepareRolloutWorkers(t.Context()))
+	assert.Len(t, runtime.submissions, 2)
+	assert.Empty(t, steps.mk8s.groupID)
+	assert.NotContains(t, strings.Join(runtime.calls, "\n"), "nebius mk8s")
 }
 
 func TestWorkerMK8sStrategyAndConvergence(t *testing.T) {
@@ -405,7 +526,7 @@ func TestWorkerMK8sCleanupWithLostOperationIDAllowsPartialForwardRecovery(t *tes
 	}
 	steps.mk8s.requestedMaxPods = new(mk8sInteger(111))
 	host := readyWorkerMK8sHost("original-host", "group-1")
-	require.NoError(t, steps.mk8sCleanupReady(t.Context(), 1, []corev1.Node{host}),
+	require.NoError(t, steps.mk8sGroupAndHostsReady(t.Context(), 1, []corev1.Node{host}, true),
 		"healthy untouched hosts must not block undoing a partial forward rollout")
 }
 
@@ -479,9 +600,9 @@ func TestWorkerMK8sCleanupWaitsForOperation(t *testing.T) {
 				return workerMK8sTestGroup(2, new(mk8sInteger(111))), nil
 			}
 			if retry {
-				require.ErrorContains(t, steps.waitForMK8sCleanupReady(t.Context()), "polling budget exhausted")
+				require.ErrorContains(t, steps.waitForMK8sGroupReady(t.Context(), true), "polling budget exhausted")
 			}
-			require.NoError(t, steps.waitForMK8sCleanupReady(t.Context()))
+			require.NoError(t, steps.waitForMK8sGroupReady(t.Context(), true))
 			assert.Equal(t, pendingReads+1, operationReads)
 			assert.Equal(t, "operation-1", steps.mk8s.operationID)
 		})
@@ -645,7 +766,7 @@ func TestWorkerMK8sAutoscalingUpdatePreservesScaling(t *testing.T) {
 	originalFingerprint := steps.mk8s.specFingerprint
 	require.NoError(t, steps.changeMK8sGroup(t.Context()))
 
-	require.NoError(t, steps.mk8sCleanupReady(t.Context(), 1, nodes))
+	require.NoError(t, steps.mk8sGroupAndHostsReady(t.Context(), 1, nodes, true))
 	assert.Equal(t, 1, updates)
 	assert.Equal(t, mk8sInteger(31), maxPods)
 	group, err := decodeWorkerMK8sGroup(workerMK8sAutoscalingTestGroup(t, version, target, maxPods))
@@ -846,7 +967,11 @@ func TestWorkerMK8sRestoresPodCapacityAndOriginalBudget(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-			err = steps.restoreMK8sGroup(t.Context())
+			if tc.forwardFailure {
+				err = steps.cleanupMK8sGroup(t.Context())
+			} else {
+				err = steps.restoreMK8sGroup(t.Context())
+			}
 			if tc.responseLost > 1 {
 				require.ErrorContains(t, err, "response lost")
 				require.NotNil(t, steps.mk8s.requestedMaxPods, "lost responses must retain cleanup ownership")
@@ -873,4 +998,132 @@ func TestWorkerMK8sRejectsMalformedSpecBudget(t *testing.T) {
 		_, err := decodeWorkerMK8sGroup(input)
 		require.ErrorContains(t, err, "specification max_unavailable")
 	}
+}
+
+func TestWorkerMK8sScenarioRejectsFailedOperationsBeforeCleanup(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		operation int
+	}{
+		{name: "forward rollout", operation: 1},
+		{name: "capacity restoration", operation: 2},
+		{name: "budget restoration", operation: 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			updates := 1
+			maxPods, budget := mk8sInteger(111), mk8sInteger(2)
+			operationReads := make(map[int]int)
+			groupJSON := func(capacity, unavailable mk8sInteger) string {
+				data, err := json.Marshal(map[string]any{
+					"metadata": map[string]any{"id": "group-1", "resource_version": updates},
+					"spec": map[string]any{
+						"fixed_node_count": 2,
+						"template":         map[string]any{"max_pods": capacity},
+						"strategy":         map[string]any{"max_unavailable": map[string]any{"count": unavailable}},
+					},
+					"status": map[string]any{
+						"state": "RUNNING", "target_node_count": 2, "node_count": 2, "ready_node_count": 2,
+						"strategy": map[string]any{"max_unavailable": map[string]any{"count": unavailable}},
+					},
+				})
+				require.NoError(t, err)
+				return string(data)
+			}
+			runtime := &workerMK8sTestRuntime{}
+			steps := workerMK8sTestSteps(t, runtime, new(mk8sInteger(110)))
+			original, err := decodeWorkerMK8sGroup(groupJSON(110, 1))
+			require.NoError(t, err)
+			steps.mk8s.specFingerprint = original.fingerprint
+			steps.mk8s.originalMaxUnavailable = &workerMK8sLimit{Count: new(mk8sInteger(1))}
+			steps.mk8s.changedMaxUnavailable = &workerMK8sLimit{Count: new(mk8sInteger(2))}
+			steps.mk8s.requestedMaxPods = new(mk8sInteger(111))
+			steps.mk8s.operationID = "operation-1"
+			runtime.kube = func(args ...string) (string, error) {
+				require.Contains(t, args, "nodes")
+				data, err := json.Marshal(corev1.NodeList{Items: []corev1.Node{
+					readyWorkerMK8sHost("host-0", "group-1"), readyWorkerMK8sHost("host-1", "group-1"),
+				}})
+				return string(data), err
+			}
+			runtime.local = func(args ...string) (string, error) {
+				switch {
+				case slices.Contains(args, "operation"):
+					operationReads[updates]++
+					code := 0
+					if updates == tc.operation {
+						code = 8
+					}
+					return fmt.Sprintf(`{"id":"operation-%d","status":{"code":%d,"message":"private-provider-details"}}`, updates, code), nil
+				case slices.Contains(args, "update"):
+					updates++
+					switch updates {
+					case 2:
+						require.Contains(t, args, "--template-max-pods")
+						maxPods = 110
+					case 3:
+						require.Contains(t, args, "--strategy-max-unavailable-count")
+						budget = 1
+					default:
+						t.Fatalf("unexpected update %d after configuration was restored", updates)
+					}
+					return fmt.Sprintf("operation-%d", updates), nil
+				default:
+					return groupJSON(maxPods, budget), nil
+				}
+			}
+
+			err = steps.restoreMK8sGroup(t.Context())
+			var invariant rolloutInvariantError
+			require.ErrorAs(t, err, &invariant)
+			require.ErrorContains(t, err, fmt.Sprintf("operation-%d failed with status code 8", tc.operation))
+			assert.Equal(t, tc.operation, updates, "a failed operation must stop the scenario before its next mutation")
+			assert.Equal(t, 1, operationReads[tc.operation], "a terminal operation failure must not be retried")
+			assert.Equal(t, fmt.Sprintf("operation-%d", tc.operation), steps.mk8s.operationID)
+			require.NotNil(t, steps.mk8s.requestedMaxPods, "retain ownership so cleanup can recover after the scenario fails")
+			assert.NotContains(t, strings.Join(runtime.logs, "\n"), "ended unsuccessfully")
+
+			require.NoError(t, steps.cleanupMK8sGroup(t.Context()))
+			assert.Equal(t, 3, updates)
+			assert.Equal(t, mk8sInteger(110), maxPods)
+			assert.Equal(t, mk8sInteger(1), budget)
+			assert.Nil(t, steps.mk8s.requestedMaxPods)
+			assert.Contains(t, strings.Join(runtime.logs, "\n"), fmt.Sprintf("Cleanup: MK8s operation operation-%d ended unsuccessfully", tc.operation))
+			assert.NotContains(t, strings.Join(runtime.logs, "\n"), "private-provider-details")
+		})
+	}
+}
+
+func TestWorkerMK8sCleanupDoesNotTolerateFailureBeforeGroupRecovery(t *testing.T) {
+	runtime := &workerMK8sTestRuntime{}
+	steps := workerMK8sTestSteps(t, runtime, new(mk8sInteger(110)))
+	steps.mk8s.requestedMaxPods = new(mk8sInteger(111))
+	steps.mk8s.operationID = "failed-operation"
+	recovered, updates := false, 0
+	runtime.local = func(args ...string) (string, error) {
+		switch {
+		case slices.Contains(args, "operation"):
+			return `{"id":"failed-operation","status":{"code":8}}`, nil
+		case slices.Contains(args, "update"):
+			updates++
+			return "", fmt.Errorf("unexpected mutation before recovery")
+		default:
+			group := workerMK8sTestGroup(2, new(mk8sInteger(111)))
+			if !recovered {
+				group = strings.Replace(group, `"ready_node_count":1`, `"ready_node_count":0`, 1)
+			}
+			return group, nil
+		}
+	}
+
+	require.ErrorContains(t, steps.cleanupMK8sGroup(t.Context()), "not converged")
+	assert.Zero(t, updates)
+	assert.Equal(t, "failed-operation", steps.mk8s.operationID)
+	require.NotNil(t, steps.mk8s.requestedMaxPods)
+	assert.NotContains(t, strings.Join(runtime.logs, "\n"), "ended unsuccessfully")
+
+	recovered = true
+	hosts := []corev1.Node{readyWorkerMK8sHost("replacement-host", "group-1")}
+	require.NoError(t, steps.mk8sGroupAndHostsReady(t.Context(), 1, hosts, true))
+	assert.Empty(t, steps.mk8s.operationID)
+	assert.Contains(t, strings.Join(runtime.logs, "\n"), "ended unsuccessfully")
 }

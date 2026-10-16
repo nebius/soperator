@@ -20,6 +20,7 @@ import (
 const (
 	workerMK8sGroupLabel = "nebius.com/node-group-id"
 	workerMK8sTimeout    = 45 * time.Minute
+	workerMK8sUpdateStep = "the MK8s node group specification is changed to replace its nodes"
 )
 
 type workerRolloutMK8s struct {
@@ -97,7 +98,17 @@ type workerMK8sOperation struct {
 }
 
 func (s *WorkerRollingUpdate) registerMK8sSteps(sc *godog.ScenarioContext) {
-	sc.Step(`^the MK8s node group specification is changed to replace its nodes$`, s.changeMK8sGroup)
+	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
+		s.requireMK8s = false
+		for _, step := range scenario.Steps {
+			if step.Text == workerMK8sUpdateStep {
+				s.requireMK8s = true
+				break
+			}
+		}
+		return ctx, nil
+	})
+	sc.Step(`^`+workerMK8sUpdateStep+`$`, s.changeMK8sGroup)
 	sc.Step(`^the original MK8s node group specification is restored$`, s.restoreMK8sGroup)
 }
 
@@ -483,10 +494,18 @@ func (s *WorkerRollingUpdate) mk8sConfigurationOwned(group workerMK8sGroup) erro
 }
 
 func (s *WorkerRollingUpdate) restoreMK8sGroup(ctx context.Context) error {
+	return s.restoreMK8sGroupState(ctx, false)
+}
+
+func (s *WorkerRollingUpdate) cleanupMK8sGroup(ctx context.Context) error {
+	return s.restoreMK8sGroupState(ctx, true)
+}
+
+func (s *WorkerRollingUpdate) restoreMK8sGroupState(ctx context.Context, allowFailedOperation bool) error {
 	if s.mk8s.requestedMaxPods == nil {
 		return nil
 	}
-	if err := s.waitForMK8sCleanupReady(ctx); err != nil {
+	if err := s.waitForMK8sGroupReady(ctx, allowFailedOperation); err != nil {
 		return err
 	}
 	group, err := s.mk8sGroup(ctx)
@@ -513,7 +532,7 @@ func (s *WorkerRollingUpdate) restoreMK8sGroup(ctx context.Context) error {
 			return err
 		}
 	}
-	if err := s.waitForMK8sCleanupReady(ctx); err != nil {
+	if err := s.waitForMK8sGroupReady(ctx, allowFailedOperation); err != nil {
 		return err
 	}
 	group, err = s.mk8sGroup(ctx)
@@ -530,7 +549,7 @@ func (s *WorkerRollingUpdate) restoreMK8sGroup(ctx context.Context) error {
 			return err
 		}
 	}
-	if err := s.waitForMK8sCleanupReady(ctx); err != nil {
+	if err := s.waitForMK8sGroupReady(ctx, allowFailedOperation); err != nil {
 		return err
 	}
 	group, err = s.mk8sGroup(ctx)
@@ -562,14 +581,14 @@ func (s *WorkerRollingUpdate) startMK8sRestore(ctx context.Context, args []strin
 	return nil
 }
 
-func (s *WorkerRollingUpdate) waitForMK8sCleanupReady(ctx context.Context) error {
+func (s *WorkerRollingUpdate) waitForMK8sGroupReady(ctx context.Context, allowFailedOperation bool) error {
 	return s.waitForRollout(ctx, "MK8s group and workers healthy during restoration", workerMK8sTimeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
 			var nodes corev1.NodeList
 			if err := s.kubectl.GetJSON(waitCtx, &nodes, "get", "nodes", "-o", "json"); err != nil {
 				return false, err
 			}
-			if err := s.mk8sCleanupReady(waitCtx, len(s.workerNames), nodes.Items); err != nil {
+			if err := s.mk8sGroupAndHostsReady(waitCtx, len(s.workerNames), nodes.Items, allowFailedOperation); err != nil {
 				return false, err
 			}
 			workers, err := s.slurm.NodeInfosOnce(waitCtx, s.workerNames)
@@ -583,7 +602,7 @@ func (s *WorkerRollingUpdate) waitForMK8sCleanupReady(ctx context.Context) error
 		})
 }
 
-func (s *WorkerRollingUpdate) mk8sCleanupReady(ctx context.Context, minimumWorkers int, nodes []corev1.Node) error {
+func (s *WorkerRollingUpdate) mk8sGroupAndHostsReady(ctx context.Context, minimumWorkers int, nodes []corev1.Node, allowFailedOperation bool) error {
 	var operationErr error
 	if s.mk8s.operationID != "" {
 		completed, err := s.mk8sOperationCompleted(ctx)
@@ -592,6 +611,9 @@ func (s *WorkerRollingUpdate) mk8sCleanupReady(ctx context.Context, minimumWorke
 				return err
 			}
 			return fmt.Errorf("MK8s operation %s is still in progress", s.mk8s.operationID)
+		}
+		if err != nil && !allowFailedOperation {
+			return err
 		}
 		operationErr = err
 	}
