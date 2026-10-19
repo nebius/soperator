@@ -12,6 +12,7 @@ import (
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
 
@@ -56,12 +57,7 @@ func (r *AdvancedStatefulSetReconciler) patch(existing, desired client.Object) (
 		original := dst.DeepCopy()
 
 		res := client.MergeFrom(original)
-		if len(src.Labels) > 0 {
-			if dst.Labels == nil {
-				dst.Labels = make(map[string]string, len(src.Labels))
-			}
-			maps.Copy(dst.Labels, src.Labels)
-		}
+		syncManagedKeys(dst, src, consts.AnnotationManagedLabels, &dst.Labels, src.Labels)
 		if len(src.Annotations) > 0 {
 			if dst.Annotations == nil {
 				dst.Annotations = make(map[string]string, len(src.Annotations))
@@ -69,12 +65,7 @@ func (r *AdvancedStatefulSetReconciler) patch(existing, desired client.Object) (
 			maps.Copy(dst.Annotations, src.Annotations)
 		}
 
-		dst.Spec.Template.ObjectMeta.Labels = src.Spec.Template.ObjectMeta.Labels
-		// Copy annotations from the desired StatefulSet to the existing StatefulSet
-		// This is necessary because after the StatefulSet is created, patches recreate map of annotations and StatefulSet loses its annotations
-		for k, v := range src.Spec.Template.ObjectMeta.Annotations {
-			dst.Spec.Template.ObjectMeta.Annotations[k] = v
-		}
+		syncPodTemplateMetadata(dst, src, &dst.Spec.Template, &src.Spec.Template)
 		dst.Spec.Replicas = src.Spec.Replicas
 		dst.Spec.UpdateStrategy = src.Spec.UpdateStrategy
 		dst.Spec.VolumeClaimUpdateStrategy = src.Spec.VolumeClaimUpdateStrategy

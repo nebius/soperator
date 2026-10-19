@@ -23,10 +23,13 @@ func Test_RenderK8sCronJob_ClusterExtraLabelsAndAnnotations(t *testing.T) {
 	}
 
 	extraLabels := map[string]string{
-		"gcore.com/project-id":  "123",
+		"gcore.com/project-id":   "123",
 		consts.LabelComponentKey: "hijacked",
 	}
-	extraAnnotations := map[string]string{"gcore.com/note": "abc"}
+	extraAnnotations := map[string]string{
+		"gcore.com/note":                 "abc",
+		consts.AnnotationActiveCheckName: "hijacked",
+	}
 
 	cronJob, err := soperatorchecks.RenderK8sCronJob(check, nil, extraLabels, extraAnnotations)
 	require.NoError(t, err)
@@ -40,4 +43,5 @@ func Test_RenderK8sCronJob_ClusterExtraLabelsAndAnnotations(t *testing.T) {
 
 	podAnnotations := cronJob.Spec.JobTemplate.Spec.Template.Annotations
 	assert.Equal(t, "abc", podAnnotations["gcore.com/note"])
+	assert.Equal(t, check.Name, podAnnotations[consts.AnnotationActiveCheckName])
 }

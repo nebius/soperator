@@ -3,12 +3,14 @@ package reconciler
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
 
@@ -49,6 +51,10 @@ func (r *CronJobReconciler) patch(existing, desired client.Object) (client.Patch
 		dst.Spec.Suspend = src.Spec.Suspend
 		dst.Spec.SuccessfulJobsHistoryLimit = src.Spec.SuccessfulJobsHistoryLimit
 		dst.Spec.FailedJobsHistoryLimit = src.Spec.FailedJobsHistoryLimit
+		syncManagedKeys(dst, src, consts.AnnotationManagedLabels, &dst.Labels, src.Labels)
+		dst.Spec.JobTemplate.Labels = maps.Clone(src.Spec.JobTemplate.Labels)
+		dst.Spec.JobTemplate.Annotations = maps.Clone(src.Spec.JobTemplate.Annotations)
+		syncPodTemplateMetadata(dst, src, &dst.Spec.JobTemplate.Spec.Template, &src.Spec.JobTemplate.Spec.Template)
 		dst.Spec.JobTemplate.Spec.Template.Spec = src.Spec.JobTemplate.Spec.Template.Spec
 
 		return res

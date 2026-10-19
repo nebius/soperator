@@ -1,8 +1,6 @@
 package soperatorchecks
 
 import (
-	"maps"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -50,7 +48,7 @@ func renderPodTemplateSpec(
 
 	annotations = common.RenderDefaultContainerAnnotation(check.Spec.Name)
 	annotations[consts.AnnotationActiveCheckName] = check.Name
-	maps.Copy(annotations, extraAnnotations)
+	common.MergeExtraAnnotations(annotations, extraAnnotations)
 
 	return corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{

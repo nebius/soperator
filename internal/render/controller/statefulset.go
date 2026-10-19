@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"maps"
 	"slices"
 
 	appspub "github.com/openkruise/kruise-api/apps/pub"
@@ -40,7 +39,7 @@ func RenderStatefulSet(
 	annotations := map[string]string{
 		consts.AnnotationDefaultContainerName: consts.ContainerNameSlurmctld,
 	}
-	maps.Copy(annotations, controller.Annotations)
+	common.MergeExtraAnnotations(annotations, controller.Annotations)
 
 	nodeFilter := sliceutils.MustGetBy(
 		nodeFilters,

@@ -49,7 +49,7 @@ func BasePodTemplateSpec(
 	annotations := map[string]string{
 		consts.AnnotationDefaultContainerName: consts.ContainerNameSConfigController,
 	}
-	maps.Copy(annotations, sConfigController.Annotations)
+	common.MergeExtraAnnotations(annotations, sConfigController.Annotations)
 
 	res := &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{

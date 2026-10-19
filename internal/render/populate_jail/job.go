@@ -1,8 +1,6 @@
 package populate_jail
 
 import (
-	"maps"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,7 +24,7 @@ func RenderPopulateJailJob(
 	common.MergeExtraLabels(labels, populateJail.Labels)
 
 	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNamePopulateJail)
-	maps.Copy(annotations, populateJail.Annotations)
+	common.MergeExtraAnnotations(annotations, populateJail.Annotations)
 
 	nodeFilter := utils.MustGetBy(
 		nodeFilters,

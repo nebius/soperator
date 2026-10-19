@@ -2,7 +2,6 @@ package login
 
 import (
 	"fmt"
-	"maps"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -36,7 +35,7 @@ func RenderStatefulSet(
 	common.MergeExtraLabels(labels, login.Labels)
 
 	annotations := renderPodAnnotations()
-	maps.Copy(annotations, login.Annotations)
+	common.MergeExtraAnnotations(annotations, login.Annotations)
 
 	nodeFilter := utils.MustGetBy(
 		nodeFilters,

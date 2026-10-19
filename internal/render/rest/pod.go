@@ -38,7 +38,7 @@ func BasePodTemplateSpec(
 	common.MergeExtraLabels(labels, valuesREST.Labels)
 
 	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNameREST)
-	maps.Copy(annotations, valuesREST.Annotations)
+	common.MergeExtraAnnotations(annotations, valuesREST.Annotations)
 
 	res := &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{

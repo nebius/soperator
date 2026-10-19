@@ -2,7 +2,6 @@ package worker
 
 import (
 	"fmt"
-	"maps"
 	"slices"
 	"sort"
 
@@ -226,7 +225,7 @@ func renderUpdateStrategies(nodeSet *values.SlurmNodeSet) (kruisev1b1.StatefulSe
 
 func renderNodeSetAnnotations(nodeSet *values.SlurmNodeSet) map[string]string {
 	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNameSlurmd)
-	maps.Copy(annotations, nodeSet.Annotations)
+	common.MergeExtraAnnotations(annotations, nodeSet.Annotations)
 	return annotations
 }
 
