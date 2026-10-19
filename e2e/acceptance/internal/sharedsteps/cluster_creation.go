@@ -596,21 +596,6 @@ func (s *ClusterCreation) checkNodeSetSmokeJobs(ctx context.Context) error {
 	return nil
 }
 
-type helmReleaseList struct {
-	Items []helmRelease `json:"items"`
-}
-
-type helmRelease struct {
-	Metadata struct {
-		Name string `json:"name"`
-	} `json:"metadata"`
-	Status helmReleaseStatusRef `json:"status"`
-}
-
-type helmReleaseStatusRef struct {
-	Conditions []metav1.Condition `json:"conditions"`
-}
-
 func ownedByJob(pod corev1.Pod) bool {
 	for _, owner := range pod.OwnerReferences {
 		if owner.Kind == "Job" {
