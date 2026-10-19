@@ -178,8 +178,8 @@ spec:
       {{- $slurmScriptsCMName := include "nodesets.slurmScriptsCMName" $ }}
       {{- $jailSubMounts := .jailSubMounts | default list }}
       {{- $customVolumeMounts := .customVolumeMounts | default list }}
-      {{- $injectJailSlurmScripts := and $slurmScriptsCMName (not (eq "true" (include "nodesets.hasMountName" (dict "list" $jailSubMounts "name" "slurm-scripts-jail")))) }}
-      {{- $injectCustomSlurmScripts := and $slurmScriptsCMName (not (eq "true" (include "nodesets.hasMountName" (dict "list" $customVolumeMounts "name" "slurm-scripts")))) }}
+      {{- $injectJailSlurmScripts := not (eq "true" (include "nodesets.hasMount" (dict "list" $jailSubMounts "name" "slurm-scripts-jail" "path" "/opt/slurm_scripts"))) }}
+      {{- $injectCustomSlurmScripts := not (eq "true" (include "nodesets.hasMount" (dict "list" $customVolumeMounts "name" "slurm-scripts" "path" "/opt/slurm_scripts"))) }}
 
       {{- if or $injectJailSlurmScripts $jailSubMounts }}
       jailSubMounts:

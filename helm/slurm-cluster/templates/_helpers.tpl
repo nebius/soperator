@@ -33,10 +33,13 @@
 {{- end -}}
 {{- end -}}
 
-{{/* True if list has an entry with the given name. Usage: include "slurm-cluster.hasMountName" (dict "list" .volumeSources "name" "x") */}}
-{{- define "slurm-cluster.hasMountName" -}}
+{{/* True if list has an entry with the given name or mountPath. */}}
+{{- define "slurm-cluster.hasMount" -}}
 {{- $found := false -}}
-{{- range .list }}{{- if eq .name $.name }}{{ $found = true }}{{- end }}{{- end -}}
+{{- $path := .path | default "" -}}
+{{- range .list }}
+{{- if or (eq .name $.name) (and $path .mountPath (eq (clean .mountPath) (clean $path))) }}{{ $found = true }}{{- end }}
+{{- end -}}
 {{- $found -}}
 {{- end -}}
 

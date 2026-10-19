@@ -103,7 +103,7 @@ spec:
     {{- end }}
     {{- end }}
   volumeSources:
-    {{- if not (eq "true" (include "slurm-cluster.hasMountName" (dict "list" .Values.volumeSources "name" "slurm-scripts"))) }}
+    {{- if not (eq "true" (include "slurm-cluster.hasMount" (dict "list" .Values.volumeSources "name" "slurm-scripts"))) }}
     - name: slurm-scripts
       configMap:
         name: {{ include "slurm-cluster.slurmScriptsCMName" . }}
@@ -482,12 +482,12 @@ spec:
         jailSubMounts:
           {{- default list .Values.slurmNodes.login.volumes.jailSubMounts | toYaml | nindent 10 }}
         customMounts:
-          {{- if not (eq "true" (include "slurm-cluster.hasMountName" (dict "list" .Values.slurmNodes.login.volumes.customMounts "name" "slurm-scripts"))) }}
+          {{- if not (eq "true" (include "slurm-cluster.hasMount" (dict "list" .Values.slurmNodes.login.volumes.customMounts "name" "slurm-scripts" "path" "/opt/slurm_scripts"))) }}
           - name: slurm-scripts
             mountPath: /opt/slurm_scripts/
             volumeSourceName: slurm-scripts
           {{- end }}
-          {{- if not (eq "true" (include "slurm-cluster.hasMountName" (dict "list" .Values.slurmNodes.login.volumes.customMounts "name" "slurm-scripts-jail"))) }}
+          {{- if not (eq "true" (include "slurm-cluster.hasMount" (dict "list" .Values.slurmNodes.login.volumes.customMounts "name" "slurm-scripts-jail" "path" "/mnt/jail.upper/opt/slurm_scripts"))) }}
           - name: slurm-scripts-jail
             mountPath: /mnt/jail.upper/opt/slurm_scripts/
             volumeSourceName: slurm-scripts

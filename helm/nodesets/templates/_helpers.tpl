@@ -114,19 +114,22 @@ customInitContainers:
 {{- end }}
 {{- end -}}
 
-{{/* Name of the slurm-scripts ConfigMap. Matches slurm-cluster chart's naming convention. */}}
+{{/* Name of the slurm-scripts ConfigMap. Matches slurm-cluster chart, including its default cluster name. */}}
 {{- define "nodesets.slurmScriptsCMName" -}}
 {{- if $.Values.slurmScriptsConfigMapName -}}
 {{- $.Values.slurmScriptsConfigMapName -}}
-{{- else if $.Values.clusterName -}}
-{{- printf "%s-slurm-scripts" (default $.Chart.Name $.Values.clusterName | trunc 63 | trimSuffix "-") -}}
+{{- else -}}
+{{- printf "%s-slurm-scripts" (default "helm-slurm-cluster" $.Values.clusterName | trunc 63 | trimSuffix "-") -}}
 {{- end -}}
 {{- end -}}
 
-{{/* True if list has an entry with the given name. Usage: include "nodesets.hasMountName" (dict "list" .jailSubMounts "name" "x") */}}
-{{- define "nodesets.hasMountName" -}}
+{{/* True if list has an entry with the given name or mountPath. */}}
+{{- define "nodesets.hasMount" -}}
 {{- $found := false -}}
-{{- range .list }}{{- if eq .name $.name }}{{ $found = true }}{{- end }}{{- end -}}
+{{- $path := .path | default "" -}}
+{{- range .list }}
+{{- if or (eq .name $.name) (and $path .mountPath (eq (clean .mountPath) (clean $path))) }}{{ $found = true }}{{- end }}
+{{- end -}}
 {{- $found -}}
 {{- end -}}
 
