@@ -15,5 +15,5 @@ type Client interface {
 	GetJobsByIDFromAccounting(ctx context.Context, jobID string) ([]Job, error)
 	ListJobs(ctx context.Context) ([]Job, error)
 	ListJobsWithParams(ctx context.Context, params ListJobsParams) ([]Job, error)
-	GetDiag(ctx context.Context) (*api.V0044OpenapiDiagResp, error)
+	GetDiag(ctx context.Context) (*Diag, error)
 }
