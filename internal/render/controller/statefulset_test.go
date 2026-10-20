@@ -213,6 +213,77 @@ func TestRenderStatefulSet(t *testing.T) {
 	}
 }
 
+func TestRenderStatefulSet_ProbeConfiguration(t *testing.T) {
+	livenessProbe := &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/livez",
+				Port: intstr.FromInt32(6817),
+			},
+		},
+		TimeoutSeconds: 30,
+	}
+	readinessProbe := &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.FromInt32(6817),
+			},
+		},
+		TimeoutSeconds: 5,
+	}
+
+	controllerValues := &values.SlurmController{
+		K8sNodeFilterName: "test-filter",
+		StatefulSet: values.StatefulSet{
+			Name:           "test-controller-sts",
+			Replicas:       1,
+			MaxUnavailable: intstr.FromInt32(1),
+		},
+		Service: values.Service{Name: "test-controller-svc"},
+		ContainerSlurmctld: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "slurmctld-image",
+				Port:  6817,
+				Resources: corev1.ResourceList{
+					corev1.ResourceCPU:              resource.MustParse("500m"),
+					corev1.ResourceMemory:           resource.MustParse("1Gi"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+				LivenessProbe:  livenessProbe,
+				ReadinessProbe: readinessProbe,
+			},
+			Name: consts.ContainerNameSlurmctld,
+		},
+		ContainerMunge: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "munge-image",
+				Resources: corev1.ResourceList{
+					corev1.ResourceCPU:              resource.MustParse("100m"),
+					corev1.ResourceMemory:           resource.MustParse("256Mi"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+			Name: consts.ContainerNameMunge,
+		},
+		VolumeSpool: slurmv1.NodeVolume{VolumeSourceName: ptr.To("test-volume")},
+		VolumeJail:  slurmv1.NodeVolume{VolumeSourceName: ptr.To("test-volume")},
+	}
+
+	result, err := RenderStatefulSet(
+		"test-namespace",
+		"test-cluster",
+		[]slurmv1.K8sNodeFilter{{Name: "test-filter"}},
+		[]slurmv1.VolumeSource{{Name: "test-volume", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
+		controllerValues,
+		true,
+	)
+	assert.NoError(t, err)
+
+	slurmctld := result.Spec.Template.Spec.Containers[0]
+	assert.Equal(t, livenessProbe, slurmctld.LivenessProbe)
+	assert.Equal(t, readinessProbe, slurmctld.ReadinessProbe)
+}
+
 func TestRenderStatefulSet_SSSD(t *testing.T) {
 	sssdContainer := values.Container{
 		NodeContainer: slurmv1.NodeContainer{

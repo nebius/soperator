@@ -1,0 +1,16 @@
+{{- if and .Values.rebooter.enabled .Values.rebooter.priorityClass.create }}
+{{- $value := int .Values.rebooter.priorityClass.value }}
+{{- if ge $value 100002 }}
+{{- fail (printf "rebooter.priorityClass.value must stay below 100002, the lowest Slurm pod priority (slurm-login); got %d" $value) }}
+{{- end }}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ include "nodeconfigurator.rebooterPriorityClassName" . }}
+  labels:
+    {{- include "nodeconfigurator.labels" . | nindent 4 }}
+value: {{ $value }}
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: {{ .Values.rebooter.priorityClass.description | quote }}
+{{- end }}

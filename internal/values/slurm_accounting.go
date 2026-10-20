@@ -29,7 +29,7 @@ type SlurmAccounting struct {
 	Maintenance    *consts.MaintenanceMode
 }
 
-func buildAccountingFrom(clusterName string, maintenance *consts.MaintenanceMode, accounting *slurmv1.SlurmNodeAccounting) SlurmAccounting {
+func buildAccountingFrom(clusterName, namePrefix string, maintenance *consts.MaintenanceMode, accounting *slurmv1.SlurmNodeAccounting) SlurmAccounting {
 	containerAcc := buildContainerFrom(
 		accounting.Slurmdbd,
 		consts.ContainerNameAccounting,
@@ -48,7 +48,7 @@ func buildAccountingFrom(clusterName string, maintenance *consts.MaintenanceMode
 		CustomInitContainers: accounting.CustomInitContainers,
 		Service:              buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeAccounting, clusterName)),
 		Deployment: buildDeploymentFrom(
-			naming.BuildDeploymentName(consts.ComponentTypeAccounting),
+			naming.BuildDeploymentName(consts.ComponentTypeAccounting, namePrefix),
 		),
 		ExternalDB:     accounting.ExternalDB,
 		MariaDb:        accounting.MariaDbOperator,

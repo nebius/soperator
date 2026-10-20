@@ -56,27 +56,32 @@ func readTFVars(filename string) (map[string]interface{}, error) {
 
 func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]interface{} {
 	tfVars["active_checks_scope"] = "testing"
+	tfVars["tailscale_enabled"] = true
 	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
 	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
-	if nfs, ok := tfVars["nfs_in_k8s"].(map[string]interface{}); ok && nfs != nil {
-		nfs["version"] = cfg.NFSVersion
-		nfs["use_stable_repo"] = !cfg.SoperatorUnstable
+	if nfs, ok := tfVars["nfs_in_k8s"].(map[string]interface{}); ok {
+		if spec, ok := nfs["spec"].(map[string]interface{}); ok && spec != nil {
+			spec["version"] = cfg.NFSVersion
+			spec["use_stable_repo"] = !cfg.SoperatorUnstable
+		}
 	}
 	tfVars["production"] = false
 	tfVars["company_name"] = "e2e-test"
 
-	tfVars["filestore_jail"] = map[string]interface{}{
+	tfVars["filesystem_jail"] = map[string]interface{}{
 		"spec": map[string]interface{}{
+			"type":                 "NETWORK_SSD",
 			"size_gibibytes":       2048,
 			"block_size_kibibytes": 4,
 		},
 	}
 
-	tfVars["filestore_jail_submounts"] = []interface{}{
+	tfVars["filesystem_jail_submounts"] = []interface{}{
 		map[string]interface{}{
 			"name":       "data",
-			"mount_path": "/mnt/data",
+			"mount_path": "/data",
 			"spec": map[string]interface{}{
+				"type":                 "NETWORK_SSD",
 				"size_gibibytes":       2048,
 				"block_size_kibibytes": 4,
 			},
@@ -88,24 +93,27 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 		entry := map[string]interface{}{
 			"name": ns.Name,
 			"size": ns.Size,
+			"autoscaling": map[string]interface{}{
+				"enabled": false,
+			},
 			"resource": map[string]interface{}{
 				"platform": ns.Platform,
 				"preset":   ns.Preset,
 			},
 			"boot_disk": map[string]interface{}{
 				"type":                 "NETWORK_SSD",
-				"size_gibibytes":       2048,
+				"size_gibibytes":       128,
 				"block_size_kibibytes": 4,
 			},
 			"gpu_cluster":      gpuClusterValue(ns.InfinibandFabric),
 			"preemptible":      preemptibleValue(ns.Preemptible),
 			"features":         nil,
-			"create_partition": nil,
+			"create_partition": true,
 			"node_local_jail_submounts": []map[string]interface{}{
 				{
 					"name":            "local-data",
-					"mount_path":      "/mnt/local-data",
-					"size_gibibytes":  1024,
+					"mount_path":      "/scratch",
+					"size_gibibytes":  256,
 					"disk_type":       "NETWORK_SSD",
 					"filesystem_type": "ext4",
 				},
@@ -113,7 +121,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"node_local_image_disk": map[string]interface{}{
 				"enabled": true,
 				"spec": map[string]interface{}{
-					"size_gibibytes":  930,
+					"size_gibibytes":  93,
 					"filesystem_type": "ext4",
 					"disk_type":       "NETWORK_SSD_IO_M3",
 				},
@@ -123,8 +131,22 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	}
 	tfVars["slurm_nodeset_workers"] = nodesetWorkers
 
+	tfVars["slurm_nodesets_partitions"] = []interface{}{
+		map[string]interface{}{
+			"name":     "main",
+			"is_all":   true,
+			"topology": "flat",
+			"config":   "Default=YES PriorityTier=10 PreemptMode=OFF MaxTime=INFINITE State=UP OverSubscribe=YES",
+		},
+		map[string]interface{}{
+			"name":     "hidden",
+			"is_all":   true,
+			"topology": "flat",
+			"config":   "Default=NO PriorityTier=10 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES",
+		},
+	}
+
 	tfVars["slurm_login_ssh_root_public_keys"] = []string{cfg.SSHPublicKey}
-	tfVars["etcd_cluster_size"] = 1
 	tfVars["cleanup_bucket_on_destroy"] = true
 
 	return tfVars

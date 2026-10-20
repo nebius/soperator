@@ -10,6 +10,10 @@ spec:
   driftDetection:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .Values.soperator.postRenderers }}
+  postRenderers:
+    {{- tpl (toYaml .) $ | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: helm-soperator
@@ -45,10 +49,14 @@ spec:
       enabled: true
     {{- end }}
     controllerManager:
-      kubeRbacProxy:
-        image:
-          repository: registry.k8s.io/kubebuilder/kube-rbac-proxy
-          tag: v0.15.0
+      {{- with (.Values.soperator.values.controllerManager | default dict).nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (.Values.soperator.values.controllerManager | default dict).affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       manager:
         {{- if and .Values.soperator.values .Values.soperator.values.manager .Values.soperator.values.manager.resources }}
         resources: {{- toYaml .Values.soperator.values.manager.resources | nindent 10 }}
@@ -59,9 +67,6 @@ spec:
           .Values.mariadbOperator.enabled
         }}
         env:
-          {{- if .Values.securityProfilesOperator.enabled }}
-          isApparmorCrdInstalled: true
-          {{- end }}
           {{- if .Values.mariadbOperator.enabled }}
           isMariadbCrdInstalled: true
           {{- end }}
