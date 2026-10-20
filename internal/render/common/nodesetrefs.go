@@ -116,10 +116,17 @@ func resolvePartitionNodeSetRefs(
 	return resolved, ignored
 }
 
+// nodeSetReplicas maps the name of every Slurm NodeSet in the cluster, including aggregate ones
+// gathering several NodeSets, to its replica count.
 func nodeSetReplicas(cluster *values.SlurmCluster) map[string]int32 {
 	res := make(map[string]int32, len(cluster.NodeSets))
 	for _, nodeSet := range cluster.NodeSets {
 		res[nodeSet.Name] = nodeSet.Spec.Replicas
+	}
+
+	aggregates, _ := groupAggregateSlurmNodeSets(cluster)
+	for _, aggregate := range aggregates {
+		res[aggregate.Name] = aggregate.Replicas()
 	}
 
 	return res

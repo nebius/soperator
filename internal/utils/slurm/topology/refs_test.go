@@ -24,11 +24,10 @@ func nodeSet(name string) v1alpha1.NodeSet {
 	return ns
 }
 
-func TestCoversNodeSet(t *testing.T) {
-	assert.True(t, topologyrefs.CoversNodeSet(nil, "h100"), "no refs covers everything")
-	assert.True(t, topologyrefs.CoversNodeSet([]string{consts.SlurmTopologyNodeSetRefAll}, "h100"))
-	assert.True(t, topologyrefs.CoversNodeSet([]string{"cpu", "h100"}, "h100"))
-	assert.False(t, topologyrefs.CoversNodeSet([]string{"cpu"}, "h100"))
+func aggregatedNodeSet(name string, aggregates ...string) v1alpha1.NodeSet {
+	ns := nodeSet(name)
+	ns.Spec.AggregateSlurmNodeSets = aggregates
+	return ns
 }
 
 func TestSelectNodeSets(t *testing.T) {
@@ -42,6 +41,25 @@ func TestSelectNodeSets(t *testing.T) {
 
 	assert.Empty(t, topologyrefs.SelectNodeSets(all, []string{"never-applied"}),
 		"a ref matching nothing must not silently select everything")
+}
+
+func TestSelectNodeSetsByAggregateSlurmNodeSets(t *testing.T) {
+	rack0 := aggregatedNodeSet("worker-rack0", "worker", "dept1")
+	rack1 := aggregatedNodeSet("worker-rack1", "worker")
+	h100 := nodeSet("h100")
+	all := []v1alpha1.NodeSet{rack0, rack1, h100}
+
+	assert.Equal(t, []v1alpha1.NodeSet{rack0, rack1}, topologyrefs.SelectNodeSets(all, []string{"worker"}),
+		"an aggregate name covers every NodeSet listing it")
+	assert.Equal(t, []v1alpha1.NodeSet{rack0, h100}, topologyrefs.SelectNodeSets(all, []string{"dept1", "h100"}),
+		"aggregate and NodeSet names mix in one ref list")
+	assert.Equal(t, []v1alpha1.NodeSet{rack1}, topologyrefs.SelectNodeSets(all, []string{"worker-rack1"}),
+		"a NodeSet stays addressable by its own name")
+
+	shadowing := nodeSet("worker")
+	withShadowing := []v1alpha1.NodeSet{rack0, rack1, shadowing}
+	assert.Equal(t, []v1alpha1.NodeSet{shadowing}, topologyrefs.SelectNodeSets(withShadowing, []string{"worker"}),
+		"a NodeSet named like an aggregate takes precedence, as in slurm.conf")
 }
 
 func TestDeclaredNames(t *testing.T) {

@@ -252,6 +252,20 @@ type NodeSetSpec struct {
 	// NodeConfig provides possibility to define extra values set for Node in `slurm.conf`.
 	NodeConfig NodeConfig `json:"nodeConfig,omitempty"`
 
+	// AggregateSlurmNodeSets lists aggregate Slurm NodeSets the nodes of this NodeSet also belong to.
+	// For each unique name across the NodeSets of the cluster, one more `NodeSet=` line is rendered in `slurm.conf`,
+	// containing the nodes of every NodeSet listing that name. Partitions can reference such a name in nodeSetRefs,
+	// e.g. "worker" for NodeSets "worker-rack0", "worker-rack1", ..., so scaling the aggregate doesn't require
+	// changing the partition configuration.
+	// A name matching the name of an existing NodeSet is ignored, as the NodeSet itself takes precedence.
+	//
+	// +kubebuilder:validation:Optional
+	// +listType=set
+	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=63
+	// +kubebuilder:validation:items:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+	AggregateSlurmNodeSets []string `json:"aggregateSlurmNodeSets,omitempty"`
+
 	// GPU defines the settings related to GPU support for Slurm workers.
 	//
 	// +kubebuilder:validation:Optional

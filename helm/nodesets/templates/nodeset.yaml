@@ -119,6 +119,15 @@ spec:
     {{- end }}
   {{- end }}
 
+  {{- $aggregateSlurmNodeSets := .aggregateSlurmNodeSets | default list }}
+  {{- if $hasRange }}
+  {{- $aggregateSlurmNodeSets = prepend $aggregateSlurmNodeSets $ns.name | uniq }}
+  {{- end }}
+  {{- with $aggregateSlurmNodeSets }}
+  aggregateSlurmNodeSets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
   {{- with (required ".Values.nodesets[*].slurmd is required." .slurmd) }}
   slurmd:
     image:

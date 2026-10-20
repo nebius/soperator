@@ -390,3 +390,36 @@ func TestBuildMultiTopologyYAML_ZeroReplicas(t *testing.T) {
 	assert.NotContains(t, out, "switches: []")
 	assert.Contains(t, out, "block_sizes:")
 }
+
+// TestBuildMultiTopologyYAML_AggregateSlurmNodeSets pins that a topology referencing an aggregate
+// Slurm NodeSet covers every NodeSet listing it, including racks added after the topology was set.
+func TestBuildMultiTopologyYAML_AggregateSlurmNodeSets(t *testing.T) {
+	r := &WorkerTopologyReconciler{}
+
+	rack := func(name string) v1alpha1.NodeSet {
+		ns := gpuNodeSet(name, 2, "")
+		ns.Spec.AggregateSlurmNodeSets = []string{"worker"}
+		return ns
+	}
+
+	cluster := clusterWithTopologies(slurmv1.NamedTopology{
+		Name:        "block-nvl72",
+		Topo:        slurmv1.TopologyPlugin{Type: consts.SlurmTopologyTypeBlock},
+		NodeSetRefs: []string{"worker"},
+	})
+
+	out, err := r.buildMultiTopologyYAML(
+		context.Background(), cluster,
+		[]v1alpha1.NodeSet{rack("worker-rack0"), rack("worker-rack1"), gpuNodeSet("h100", 2, "")},
+		nodeLabelsCM(nil), nil,
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, `- topology: block-nvl72
+  cluster_default: true
+  block:
+    blocks:
+        - block: unknown
+          nodes: worker-rack0-[0-1],worker-rack1-[0-1]
+`, out)
+}
