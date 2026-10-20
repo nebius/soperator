@@ -279,7 +279,7 @@ func (s *ActiveChecks) ensureDryRunAnsibleResult(ctx context.Context) error {
 			return err
 		}
 	}
-	result, err := parseAnsibleDryRunJSONL(s.dryRunLogs, manageJailStateDryRunTask)
+	result, err := parseAnsibleDryRunJSONL(s.dryRunLogs)
 	if err != nil {
 		return fmt.Errorf("parse manage-jail-state dry-run Ansible JSONL: %w", err)
 	}
@@ -647,7 +647,7 @@ type ansibleJSONLEvent struct {
 	} `json:"stats"`
 }
 
-func parseAnsibleDryRunJSONL(output, managedTaskName string) (ansibleDryRunResult, error) {
+func parseAnsibleDryRunJSONL(output string) (ansibleDryRunResult, error) {
 	var result ansibleDryRunResult
 	for lineNumber, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
@@ -662,7 +662,7 @@ func parseAnsibleDryRunJSONL(output, managedTaskName string) (ansibleDryRunResul
 		result.Parsed = true
 		switch event.Event {
 		case "v2_runner_on_ok":
-			if !strings.HasSuffix(event.Task.Name, managedTaskName) {
+			if !strings.HasSuffix(event.Task.Name, manageJailStateDryRunTask) {
 				continue
 			}
 			for _, host := range event.Hosts {
