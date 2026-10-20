@@ -21,10 +21,11 @@ on:
       profile:
         description: "Profile name or @label, see E2E_CONFIG"
         required: false
-        default: "@auto-select"
+        default: "@auto-gpu"
         type: choice
         options:
-          - "@auto-select"
+          - "@auto-gpu"
+          - "@auto-cpu"
           - MAN_H100
           - MAN_H200
           - KCS_B200
@@ -188,7 +189,7 @@ jobs:
           NEBIUS_INSTALL_FOLDER: "${{ github.workspace }}/bin"
         run: |
           echo "Installing Nebius CLI ${NEBIUS_CLI_VERSION}..."
-          curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
+          curl -sSL https://artifacts.nebius.cloud/cli/install.sh | bash
 
       - name: Configure Nebius CLI
         shell: bash
@@ -378,9 +379,16 @@ jobs:
         run: |
           SOPERATOR_VERSION=$(sed -n '1p' version.txt)
           SOPERATOR_UNSTABLE=$(sed -n '2p' version.txt)
+          NFS_VERSION=$(sed -n '3p' version.txt)
+
+          if [[ -z "$NFS_VERSION" ]]; then
+            echo "::error::Build metadata lacks NFS version; rebuild with the updated workflow."
+            exit 1
+          fi
 
           echo "SOPERATOR_VERSION=$SOPERATOR_VERSION" >> $GITHUB_ENV
           echo "SOPERATOR_UNSTABLE=$SOPERATOR_UNSTABLE" >> $GITHUB_ENV
+          echo "NFS_VERSION=$NFS_VERSION" >> $GITHUB_ENV
 
       - name: Checkout Terraform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1

@@ -26,6 +26,7 @@ func RenderContainerWorkerInit(
 	container *values.Container,
 	topologyEnabled, gpuEnabled bool,
 	waitTimeoutSeconds int32,
+	topologyPlugin string,
 ) corev1.Container {
 	command := []string{
 		"python3",
@@ -114,6 +115,14 @@ func RenderContainerWorkerInit(
 				Value: "5",
 			},
 		)
+		if topologyPlugin != "" {
+			env = append(env,
+				corev1.EnvVar{
+					Name:  "SLURM_TOPOLOGY_PLUGIN",
+					Value: topologyPlugin,
+				},
+			)
+		}
 	}
 
 	return corev1.Container{
@@ -158,6 +167,7 @@ func renderContainerNodeSetSlurmd(
 	}
 	if nodeSet.GPU.Enabled {
 		volumeMounts = append(volumeMounts, renderVolumeMountNvidia())
+		volumeMounts = append(volumeMounts, common.RenderVolumeMountsNvidiaIMEX()...)
 	}
 	if topologyEnabled {
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{

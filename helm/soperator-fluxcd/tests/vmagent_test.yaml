@@ -128,10 +128,10 @@ tests:
             vmagent:
               spec:
                 extraArgs:
-                  "promscrape.dropOriginalLabels": "false"  # Override default
-                  "remoteWrite.rateLimit": "10"             # Override default
-                  "promscrape.maxScrapeSize": "67108864"    # Override default
-                  "custom.newArg": "newValue"               # Add new
+                  "promscrape.dropOriginalLabels": "false" # Override default
+                  "remoteWrite.rateLimit": "10" # Override default
+                  "promscrape.maxScrapeSize": "67108864" # Override default
+                  "custom.newArg": "newValue" # Add new
     asserts:
       - hasDocuments:
           count: 1
@@ -151,9 +151,6 @@ tests:
       - equal:
           path: spec.values.vmagent.spec.extraArgs["promscrape.streamParse"]
           value: "true"
-      # secret token kind must not set a global bearerTokenFile arg
-      - notExists:
-          path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
 
   - it: should handle special characters in projectId
     set:
@@ -182,7 +179,7 @@ tests:
           publicEndpointEnabled: true
           values:
             vmagent:
-              spec: {}  # Empty spec to test conditional blocks
+              spec: {} # Empty spec to test conditional blocks
     asserts:
       - hasDocuments:
           count: 1
@@ -198,19 +195,15 @@ tests:
       - notExists:
           path: spec.values.vmagent.spec.volumes
       - notExists:
-          path: spec.values.vmagent.spec.hostNetwork
-      - notExists:
-          path: spec.values.vmagent.spec.dnsPolicy
-      - notExists:
           path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
 
   - it: should handle boolean and numeric values in extraArgs
     set:
       observability:
         enabled: true
+        publicEndpointEnabled: false
         vmStack:
           enabled: true
-          publicEndpointEnabled: false
           values:
             vmagent:
               spec:
@@ -306,7 +299,7 @@ tests:
       # Should have both default and custom remoteWrite entries
       - lengthEqual:
           path: spec.values.vmagent.spec.remoteWrite
-          count: 3  # 1 default + 2 custom
+          count: 3 # 1 default + 2 custom
       # Check default endpoint (should be first)
       - equal:
           path: spec.values.vmagent.spec.remoteWrite[0].url
@@ -470,10 +463,18 @@ tests:
       # Should have both default token mount and custom volumeMounts
       - lengthEqual:
           path: spec.values.vmagent.spec.volumeMounts
-          count: 3 # 1 default o11ytoken + 2 custom
+          count: 3  # 1 default o11ytoken + 2 custom
+      # Check default o11ytoken mount
       - equal:
           path: spec.values.vmagent.spec.volumeMounts[0].name
           value: "o11ytoken"
+      - equal:
+          path: spec.values.vmagent.spec.volumeMounts[0].mountPath
+          value: "/o11ytoken"
+      - equal:
+          path: spec.values.vmagent.spec.volumeMounts[0].readOnly
+          value: true
+      # Check custom mounts
       - equal:
           path: spec.values.vmagent.spec.volumeMounts[1].name
           value: "custom-config"
@@ -482,12 +483,21 @@ tests:
           value: "/data"
       - lengthEqual:
           path: spec.values.vmagent.spec.volumes
-          count: 3 # 1 default o11ytoken + 2 custom
+          count: 3  # 1 default o11ytoken + 2 custom
+      # Check default o11ytoken volume
       - equal:
           path: spec.values.vmagent.spec.volumes[0].name
           value: "o11ytoken"
-      - exists:
-          path: spec.values.vmagent.spec.volumes[0].hostPath
+      - equal:
+          path: spec.values.vmagent.spec.volumes[0].hostPath.path
+          value: "/mnt/cloud-metadata"
+      - equal:
+          path: spec.values.vmagent.spec.volumes[0].hostPath.type
+          value: "Directory"
+      # Check custom volumes
+      - equal:
+          path: spec.values.vmagent.spec.volumes[1].name
+          value: "custom-config"
       - equal:
           path: spec.values.vmagent.spec.volumes[1].configMap.name
           value: "vmagent-custom-config"
@@ -515,7 +525,7 @@ tests:
       # Should still have the default o11y endpoint when custom arrays are empty
       - lengthEqual:
           path: spec.values.vmagent.spec.remoteWrite
-          count: 1  # Only default
+          count: 1 # Only default
       - equal:
           path: spec.values.vmagent.spec.remoteWrite[0].url
           value: "https://write.monitoring.eu-north1.nebius.cloud/projects/default-project-id/buckets/soperator/prometheus"
@@ -524,6 +534,7 @@ tests:
           path: spec.values.vmagent.spec.volumeMounts
       - notExists:
           path: spec.values.vmagent.spec.volumes
+      # Should not have extraEnv when empty
       - notExists:
           path: spec.values.vmagent.spec.containers
 

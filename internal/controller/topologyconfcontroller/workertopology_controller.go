@@ -393,7 +393,7 @@ func (r *WorkerTopologyReconciler) listPods(
 	return podList, nil
 }
 
-// BuildTopologyBlocks builds topology config.
+// BuildTopologyBlocks builds topology/block config.
 func (r *WorkerTopologyReconciler) BuildTopologyBlocks(
 	ctx context.Context,
 	blockSize *int,
@@ -410,13 +410,16 @@ func (r *WorkerTopologyReconciler) BuildTopologyBlocks(
 	if err != nil {
 		return "", fmt.Errorf("deserialize node block topology: %w", err)
 	}
+
 	blocks := BuildTopologyBlocks(ctx, labelsByNode, gpuPodsByNode, allNodeNames)
+
 	config := strings.Join(blocks.RenderConfigLines(), "\n") + "\n"
 	config = fmt.Sprintf("%sBlockSizes=%d\n", config, bs)
+
 	return config, nil
 }
 
-// BuildTopologyConfig builds topology config.
+// BuildTopologyConfig builds topology/tree config.
 func (r *WorkerTopologyReconciler) BuildTopologyConfig(
 	ctx context.Context,
 	topologyNodeLabelsCM *corev1.ConfigMap,

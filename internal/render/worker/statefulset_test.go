@@ -39,14 +39,22 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 	}
 
 	t.Run("with topology enabled", func(t *testing.T) {
-		result := worker.RenderContainerWorkerInit("test-cluster", container, true, true, 300)
+		result := worker.RenderContainerWorkerInit(
+			"test-cluster",
+			container,
+			true,
+			true,
+			300,
+			consts.SlurmTopologyBlock,
+		)
 
 		assert.Equal(t, consts.ContainerNameWorkerInit, result.Name)
 		assert.Equal(t, container.Image, result.Image)
 		assert.Equal(t, container.ImagePullPolicy, result.ImagePullPolicy)
 		assert.Equal(t, []string{"python3", "/opt/bin/slurm/worker_init.py", "wait-controller", "wait-topology"}, result.Command)
-		assert.Equal(t, 10, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 3 topology
+		assert.Equal(t, 11, len(result.Env)) // 6 base + 1 NODESET_GPU_ENABLED + 4 topology
 		assert.Equal(t, 3, len(result.VolumeMounts))
+		assertEnvValue(t, result.Env, "SLURM_TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
 
 		expectedMounts := map[string]string{
 			consts.VolumeNameJail:               consts.VolumeMountPathJail,
@@ -62,7 +70,14 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 	})
 
 	t.Run("without topology", func(t *testing.T) {
-		result := worker.RenderContainerWorkerInit("test-cluster", container, false, false, 0)
+		result := worker.RenderContainerWorkerInit(
+			"test-cluster",
+			container,
+			false,
+			false,
+			0,
+			"",
+		)
 
 		assert.Equal(t, consts.ContainerNameWorkerInit, result.Name)
 		assert.Equal(t, container.Image, result.Image)
@@ -85,7 +100,12 @@ func Test_RenderContainerWorkerInit(t *testing.T) {
 
 		// Verify no topology env vars
 		for _, envVar := range result.Env {
-			assert.NotContains(t, []string{"TOPOLOGY_CONFIGMAP_PATH", "TOPOLOGY_WAIT_TIMEOUT", "TOPOLOGY_POLL_INTERVAL"}, envVar.Name,
+			assert.NotContains(t, []string{
+				"TOPOLOGY_CONFIGMAP_PATH",
+				"TOPOLOGY_WAIT_TIMEOUT",
+				"TOPOLOGY_POLL_INTERVAL",
+				"SLURM_TOPOLOGY_PLUGIN",
+			}, envVar.Name,
 				"topology env var %s should not be present when topology is disabled", envVar.Name)
 		}
 	})
@@ -142,7 +162,14 @@ func Test_RenderContainerWorkerInit_K8SServiceName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := worker.RenderContainerWorkerInit(tt.clusterName, container, false, tt.gpuEnabled, 0)
+			result := worker.RenderContainerWorkerInit(
+				tt.clusterName,
+				container,
+				false,
+				tt.gpuEnabled,
+				0,
+				"",
+			)
 
 			env, found := findEnv(result.Env, "K8S_SERVICE_NAME")
 			assert.True(t, found, "K8S_SERVICE_NAME env var must be present")
@@ -230,12 +257,189 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 				consts.CGroupV2,
 				tt.clusterWithGPU,
 				false,
+				"",
 			)
 			assert.NoError(t, err)
 
 			assertEnvValue(t, result.Spec.Template.Spec.Containers[0].Env, "SLURM_CLUSTER_WITH_GPU", tt.expectedClusterWithGPUFlag)
 			assertEnvValue(t, result.Spec.Template.Spec.Containers[0].Env, "NODESET_GPU_ENABLED", tt.expectedNodeSetGPUFlag)
 		})
+	}
+}
+
+func TestRenderNodeSetStatefulSet_NvidiaIMEXCLIMount(t *testing.T) {
+	nodeSet := &values.SlurmNodeSet{
+		Name: "test-nodeset",
+		ParentalCluster: client.ObjectKey{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
+		},
+		ContainerSlurmd: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image:           "test-image",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory:           resource.MustParse("1Gi"),
+					corev1.ResourceCPU:              resource.MustParse("100m"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+		ContainerMunge: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "munge-image",
+			},
+		},
+		VolumeSpool: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+		},
+		VolumeJail: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+		},
+		StatefulSet:              values.StatefulSet{Replicas: 1},
+		ServiceUmbrella:          values.Service{Name: "test-umbrella"},
+		SupervisorDConfigMapName: "supervisord-config",
+		SSHDConfigMapName:        "sshd-config",
+		GPU:                      &slurmv1alpha1.GPUSpec{Enabled: true},
+	}
+
+	result, err := worker.RenderNodeSetStatefulSet(
+		"test-cluster",
+		nodeSet,
+		&slurmv1.Secrets{},
+		consts.CGroupV2,
+		true,
+		false,
+		"",
+	)
+	assert.NoError(t, err)
+
+	assertHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXCLI)
+	assertHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXCLIJail)
+	assertHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXConfig)
+	assertHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXConfigJail)
+
+	slurmd := result.Spec.Template.Spec.Containers[0]
+	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXCLI, consts.NvidiaIMEXCLIMountPath)
+	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXCLIJail, consts.NvidiaIMEXCLIJailPath)
+	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXConfig, consts.NvidiaIMEXConfigMountPath)
+	assertVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXConfigJail, consts.NvidiaIMEXConfigJailPath)
+}
+
+func TestRenderNodeSetStatefulSet_NvidiaIMEXNotMountedForCPUWorker(t *testing.T) {
+	nodeSet := &values.SlurmNodeSet{
+		Name: "test-nodeset",
+		ParentalCluster: client.ObjectKey{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
+		},
+		ContainerSlurmd: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image:           "test-image",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Resources: corev1.ResourceList{
+					corev1.ResourceMemory:           resource.MustParse("1Gi"),
+					corev1.ResourceCPU:              resource.MustParse("100m"),
+					corev1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+			},
+		},
+		ContainerMunge: values.Container{
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "munge-image",
+			},
+		},
+		VolumeSpool: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/spool"},
+		},
+		VolumeJail: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{Path: "/tmp/jail"},
+		},
+		StatefulSet:              values.StatefulSet{Replicas: 1},
+		ServiceUmbrella:          values.Service{Name: "test-umbrella"},
+		SupervisorDConfigMapName: "supervisord-config",
+		SSHDConfigMapName:        "sshd-config",
+		GPU:                      &slurmv1alpha1.GPUSpec{Enabled: false},
+	}
+
+	result, err := worker.RenderNodeSetStatefulSet(
+		"test-cluster",
+		nodeSet,
+		&slurmv1.Secrets{},
+		consts.CGroupV2,
+		false,
+		false,
+		"",
+	)
+	assert.NoError(t, err)
+
+	assertNoHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXCLI)
+	assertNoHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXCLIJail)
+	assertNoHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXConfig)
+	assertNoHostPathVolume(t, result.Spec.Template.Spec.Volumes, consts.VolumeNameNvidiaIMEXConfigJail)
+
+	slurmd := result.Spec.Template.Spec.Containers[0]
+	assertNoVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXCLI)
+	assertNoVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXCLIJail)
+	assertNoVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXConfig)
+	assertNoVolumeMount(t, slurmd.VolumeMounts, consts.VolumeNameNvidiaIMEXConfigJail)
+}
+
+func assertHostPathVolume(t *testing.T, volumes []corev1.Volume, name string) {
+	t.Helper()
+
+	for i := range volumes {
+		volume := &volumes[i]
+		if volume.Name == name {
+			if assert.NotNil(t, volume.HostPath) {
+				expectedPath, expectedType := expectedNvidiaIMEXHostPath(name)
+				assert.Equal(t, expectedPath, volume.HostPath.Path)
+				assert.Equal(t, expectedType, *volume.HostPath.Type)
+			}
+			return
+		}
+	}
+
+	t.Fatalf("volume %s not found", name)
+}
+
+func assertNoHostPathVolume(t *testing.T, volumes []corev1.Volume, name string) {
+	t.Helper()
+
+	for i := range volumes {
+		assert.NotEqual(t, name, volumes[i].Name)
+	}
+}
+
+func expectedNvidiaIMEXHostPath(name string) (string, corev1.HostPathType) {
+	switch name {
+	case consts.VolumeNameNvidiaIMEXConfig, consts.VolumeNameNvidiaIMEXConfigJail:
+		return consts.NvidiaIMEXConfigHostPath, corev1.HostPathDirectoryOrCreate
+	default:
+		return consts.NvidiaIMEXCLIHostPath, corev1.HostPathFileOrCreate
+	}
+}
+
+func assertVolumeMount(t *testing.T, mounts []corev1.VolumeMount, name, expectedPath string) {
+	t.Helper()
+
+	for i := range mounts {
+		mount := &mounts[i]
+		if mount.Name == name {
+			assert.Equal(t, expectedPath, mount.MountPath)
+			assert.True(t, mount.ReadOnly)
+			return
+		}
+	}
+
+	t.Fatalf("volume mount %s not found", name)
+}
+
+func assertNoVolumeMount(t *testing.T, mounts []corev1.VolumeMount, name string) {
+	t.Helper()
+
+	for i := range mounts {
+		assert.NotEqual(t, name, mounts[i].Name)
 	}
 }
 
@@ -338,6 +542,7 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 				consts.CGroupV2,
 				true,
 				tt.topologyPluginEnabled,
+				consts.SlurmTopologyBlock,
 			)
 			assert.NoError(t, err)
 
@@ -347,8 +552,10 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 
 			// Verify worker-init container has topology command when topology plugin is enabled
 			var hasWaitForTopology bool
+			var workerInitContainer *corev1.Container
 			for _, container := range result.Spec.Template.Spec.InitContainers {
 				if container.Name == consts.ContainerNameWorkerInit {
+					workerInitContainer = &container
 					for _, arg := range container.Command {
 						if arg == "wait-topology" {
 							hasWaitForTopology = true
@@ -360,6 +567,9 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			}
 			assert.Equal(t, tt.expectWaitForTopology, hasWaitForTopology,
 				"wait-topology command presence mismatch")
+			if tt.expectWaitForTopology && assert.NotNil(t, workerInitContainer) {
+				assertEnvValue(t, workerInitContainer.Env, "SLURM_TOPOLOGY_PLUGIN", consts.SlurmTopologyBlock)
+			}
 
 			// Verify topology-related volumes
 			var hasTopologyNodeLabelsVolume bool
@@ -477,6 +687,7 @@ func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testin
 				consts.CGroupV2,
 				true,
 				false,
+				"",
 			)
 			assert.NoError(t, err)
 			if assert.NotNil(t, result.Spec.PersistentVolumeClaimRetentionPolicy) {
@@ -578,7 +789,15 @@ func TestRenderNodeSetStatefulSet_EphemeralNodesReserveOrdinals(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeSet := createNodeSetWithActiveNodes(tt.ephemeralNodes, tt.activeNodes)
 
-			result, err := worker.RenderNodeSetStatefulSet("test-cluster", nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, true, false)
+			result, err := worker.RenderNodeSetStatefulSet(
+				"test-cluster",
+				nodeSet,
+				&slurmv1.Secrets{},
+				consts.CGroupV2,
+				true,
+				false,
+				"",
+			)
 			assert.NoError(t, err)
 
 			// Verify replicas

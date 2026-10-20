@@ -17,28 +17,56 @@ func TestBuildTopologyBlocks_GroupsWorkersByTierZero(t *testing.T) {
 		"node2": {"tier-0": "block-a"},
 		"node3": {"tier-0": "block-b"},
 	}
-	gpuPodsByNode := map[string][]string{
-		"node1": {"pod1", "pod2"},
-		"node2": {"pod3"},
-		"node3": {"pod4"},
+
+	{
+		gpuPodsByNode := map[string][]string{
+			"node1": {"pod1", "pod2"},
+			"node2": {"pod3"},
+			"node3": {"pod4"},
+		}
+		allNodeNames := []string{"pod1", "pod2", "pod3", "pod4"}
+
+		blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames)
+		lines := blocks.RenderConfigLines()
+
+		require.True(t, len(lines) != 0, "expected non-empty block lines")
+		result := parseBlockLines(t, lines)
+		require.Equal(t, map[string][]string{
+			"block-a": {"pod1", "pod2", "pod3"},
+			"block-b": {"pod4"},
+		}, result)
+
+		require.Equal(t, map[string][]string{
+			"node1": {"pod1", "pod2"},
+			"node2": {"pod3"},
+			"node3": {"pod4"},
+		}, gpuPodsByNode, "BuildTopologyBlocks must not mutate the input gpuPodsByNode map")
 	}
-	allNodeNames := []string{"pod1", "pod2", "pod3", "pod4"}
 
-	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames)
-	lines := blocks.RenderConfigLines()
+	{
+		gpuPodsByNode := map[string][]string{
+			"node1": {"pod-1", "pod-2"},
+			"node2": {"pod-3"},
+			"node3": {"pod-4"},
+		}
+		allNodeNames := []string{"pod-1", "pod-2", "pod-3", "pod-4"}
 
-	require.True(t, len(lines) != 0, "expected non-empty block lines")
-	result := parseBlockLines(t, lines)
-	require.Equal(t, map[string][]string{
-		"block-a": {"pod1", "pod2", "pod3"},
-		"block-b": {"pod4"},
-	}, result)
+		blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, gpuPodsByNode, allNodeNames)
+		lines := blocks.RenderConfigLines()
 
-	require.Equal(t, map[string][]string{
-		"node1": {"pod1", "pod2"},
-		"node2": {"pod3"},
-		"node3": {"pod4"},
-	}, gpuPodsByNode, "BuildTopologyBlocks must not mutate the input gpuPodsByNode map")
+		require.True(t, len(lines) != 0, "expected non-empty block lines")
+		result := parseBlockLines(t, lines)
+		require.Equal(t, map[string][]string{
+			"block-a": {"pod-[1-3]"},
+			"block-b": {"pod-4"},
+		}, result)
+
+		require.Equal(t, map[string][]string{
+			"node1": {"pod-1", "pod-2"},
+			"node2": {"pod-3"},
+			"node3": {"pod-4"},
+		}, gpuPodsByNode, "BuildTopologyBlocks must not mutate the input gpuPodsByNode map")
+	}
 }
 
 func TestBuildTopologyBlocks_AssignsUnknownBlock(t *testing.T) {
@@ -60,6 +88,26 @@ func TestBuildTopologyBlocks_AssignsUnknownBlock(t *testing.T) {
 		"block-a": {"pod1"},
 		"unknown": {"pod2", "pod3"},
 	}, result)
+}
+
+func TestBuildTopologyBlocks_RenderMergesWorkerNodes(t *testing.T) {
+	labelsByNode := map[string]tc.NodeTopologyLabels{
+		"node1": {"tier-0": "block-a"},
+		"node2": {"tier-0": "block-a"},
+	}
+	podsByNode := map[string][]string{
+		"node1": {"worker-0", "worker-1", "worker-cpu-0"},
+		"node2": {"worker-2", "worker-cpu-1", "workerkek1"},
+	}
+
+	allNodeNames := []string{"worker-0", "worker-1", "worker-cpu-0", "worker-2", "worker-cpu-1", "workerkek1"}
+
+	blocks := tc.BuildTopologyBlocks(context.Background(), labelsByNode, podsByNode, allNodeNames)
+	lines := blocks.RenderConfigLines()
+
+	require.Equal(t, []string{
+		"BlockName=block-a Nodes=worker-[0-2],worker-cpu-[0-1],workerkek1",
+	}, lines)
 }
 
 func TestBuildTopologyBlocks_RenderEmpty(t *testing.T) {

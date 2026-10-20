@@ -37,7 +37,7 @@ CHART_FLUXCD_BOOTSTRAP_PATH					= $(CHART_PATH)/soperator-fluxcd-bootstrap
 CHART_STORAGECLASSES						= $(CHART_PATH)/storageclasses
 CHART_BACKUP_CONFIG							= $(CHART_PATH)/soperator-backup-config
 
-SLURM_VERSION		= 25.11.3
+SLURM_VERSION		= 25.11.8
 NFS_VERSION_BASE	= $(shell cat VERSION_NFS)
 VERSION_BASE		= $(shell cat VERSION)
 
@@ -47,7 +47,7 @@ VERSION		= $(VERSION_BASE)
 IMAGE_VERSION			= $(VERSION)-slurm$(SLURM_VERSION)
 GO_CONST_VERSION_FILE	= internal/consts/version.go
 GITHUB_REPO				= ghcr.io/nebius/soperator
-NEBIUS_REPO				= cr.eu-north1.nebius.cloud/soperator
+NEBIUS_REPO				= cr.nebius.cloud/soperator
 IMAGE_REPO				= $(NEBIUS_REPO)
 
 # For version sync test
@@ -335,6 +335,8 @@ sync-version: yq ## Sync versions from file
 
 	@# region helm/soperator-fluxcd/values.yaml
 	@echo 'Syncing helm/soperator-fluxcd/values.yaml'
+	@$(YQ) -i ".helmRepository.nfsServer.url = \"oci://$(IMAGE_REPO)\"" "helm/soperator-fluxcd/values.yaml"
+	@$(YQ) -i ".nfsServer.version = \"$(NFS_VERSION)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".slurmCluster.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".soperatorActiveChecks.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
 	@$(YQ) -i ".soperator.version = \"$(OPERATOR_IMAGE_TAG)\"" "helm/soperator-fluxcd/values.yaml"
@@ -357,8 +359,8 @@ sync-version: yq ## Sync versions from file
 	@echo 'Syncing fluxcd/environment/local/values.yaml'
 	@$(YQ) -i ".soperator.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
 	@$(YQ) -i ".slurmCluster.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
-	@$(YQ) -i ".nfsServer.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
-	@$(YQ) -i ".nfsServer.overrideValues.image.tag = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/values.yaml"
+	@$(YQ) -i ".nfsServer.version = \"$(NFS_VERSION)\"" "fluxcd/environment/local/values.yaml"
+	@$(YQ) -i ".nfsServer.overrideValues.image.tag = \"$(NFS_VERSION)\"" "fluxcd/environment/local/values.yaml"
 	@echo 'Syncing fluxcd/environment/local/slurmCluster.yml'
 	@$(YQ) -i ".slurmCluster.version = \"$(OPERATOR_IMAGE_TAG)\"" "fluxcd/environment/local/slurmCluster.yml"
 	@# endregion fluxcd/environment/local
@@ -448,6 +450,11 @@ endif
 	done; \
 	echo "Sources:$$IMAGES"; \
 	docker buildx imagetools create -t "$$NEBIUS_MANIFEST" $$IMAGES; \
+	if [ -n "$${REGISTRY_WARMING_FILE:-}" ]; then \
+	  printf '%s\n' "$$NEBIUS_MANIFEST" >> "$$REGISTRY_WARMING_FILE" || echo "::warning::Cannot record image for warming"; \
+	else \
+	  .github/actions/warm-registry/warm_registry.sh "$$NEBIUS_MANIFEST" || echo "::warning::Registry warming failed"; \
+	fi; \
 	docker buildx imagetools inspect "$$NEBIUS_MANIFEST"; \
 	\
 	if [ "$(UNSTABLE)" = "false" ]; then \
@@ -465,12 +472,8 @@ endif
 .PHONY: release-helm
 release-helm: ## Build & push helm docker image
 	mkdir -p "helm-releases"
-	@echo "helm release for unstable version"
+	@echo "helm release to $(IMAGE_REPO)"
 	./release_helm.sh -u "$(IMAGE_REPO)"
-ifeq ($(UNSTABLE), false)
-	@echo "helm release for stable version"
-	./release_helm.sh -u "$(NEBIUS_REPO)"
-endif
 	rm -rf /helm-releases/*
 
 ##@ Deployment
@@ -511,16 +514,16 @@ deploy-flux: install-flux kustomize ## Deploy soperator via Flux CD to kind clus
 	@echo "Step 2: Determining OCI registry based on version..."
 	@if echo "$(OPERATOR_IMAGE_TAG)" | grep -q -- "-"; then \
 		echo "Unstable version detected: $(OPERATOR_IMAGE_TAG)"; \
-		OCI_REPO="oci://cr.eu-north1.nebius.cloud/soperator-unstable"; \
+		OCI_REPO="oci://cr.nebius.cloud/soperator-unstable"; \
 	else \
 		echo "Stable version detected: $(OPERATOR_IMAGE_TAG)"; \
-		OCI_REPO="oci://cr.eu-north1.nebius.cloud/soperator"; \
+		OCI_REPO="oci://cr.nebius.cloud/soperator"; \
 	fi; \
 	echo "Using OCI repository: $$OCI_REPO"; \
 	echo ""; \
 	echo "Step 3: Deploying Flux configuration for local environment..."; \
 	$(KUSTOMIZE) build fluxcd/environment/local | \
-		sed "s|url: oci://cr.eu-north1.nebius.cloud/soperator.*|url: $$OCI_REPO|g" | \
+		sed "s|url: oci://cr.nebius.cloud/soperator.*|url: $$OCI_REPO|g" | \
 		$(KUBECTL_CTX) apply -f -; \
 	echo ""; \
 	echo "Step 4: Patching soperator-fluxcd-values ConfigMap with OCI repository..."; \
@@ -583,36 +586,30 @@ MOCKERY_VERSION				?= 2.53.5
 KIND_VERSION				?= v0.30.0
 FLUX_VERSION				?= 2.7.3
 
+# Read the embedded module version: CLI version output can be unset by go install.
+define install-go-tool
+@current_version="$$(go version -m "$(1)" 2>/dev/null | awk '$$1 == "mod" {print $$3}' || true)"; \
+if ! test -x "$(1)" || [ "$$current_version" != "$(3)" ]; then \
+	echo "Installing $(notdir $(1)) $(3) (found: $${current_version:-none})"; \
+	GOBIN=$(LOCALBIN) GO111MODULE=on go install $(2)@$(3); \
+fi
+endef
+
 .PHONY: kustomize
-kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
-$(KUSTOMIZE): $(LOCALBIN)
-	@if test -x $(LOCALBIN)/kustomize && ! $(LOCALBIN)/kustomize version | grep -q $(KUSTOMIZE_VERSION); then \
-		echo "$(LOCALBIN)/kustomize version is not expected $(KUSTOMIZE_VERSION). Removing it before installing."; \
-		rm -rf $(LOCALBIN)/kustomize; \
-	fi
-	test -s $(LOCALBIN)/kustomize || GOBIN=$(LOCALBIN) GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
+kustomize: | $(LOCALBIN) ## Download kustomize locally if necessary.
+	$(call install-go-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5,$(KUSTOMIZE_VERSION))
 
 .PHONY: mockery
-mockery:
-	@mkdir -p $(LOCALBIN)
-	@current_version="$$( $(MOCKERY) --version 2>&1 | grep -o 'version=v[0-9.]*' | cut -d= -f2 || true)"; \
-	if [ "$$current_version" != "v$(MOCKERY_VERSION)" ]; then \
-		echo "🛠  Installing mockery v$(MOCKERY_VERSION) (found: $$current_version)"; \
-		rm -f $(MOCKERY); \
-		GOBIN=$(LOCALBIN) GO111MODULE=on go install github.com/vektra/mockery/v2@v$(MOCKERY_VERSION); \
-	else \
-		echo "✅ mockery v$(MOCKERY_VERSION) already installed"; \
-	fi
+mockery: | $(LOCALBIN) ## Download mockery locally if necessary.
+	$(call install-go-tool,$(MOCKERY),github.com/vektra/mockery/v2,v$(MOCKERY_VERSION))
 
 .PHONY: mock
 mock: mockery ## Generate mocks using mockery
 	$(MOCKERY)
 
 .PHONY: controller-gen
-controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
-$(CONTROLLER_GEN): $(LOCALBIN)
-	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
-	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+controller-gen: | $(LOCALBIN) ## Download controller-gen locally if necessary.
+	$(call install-go-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
@@ -628,14 +625,12 @@ $(GOLANGCI_LINT): $(LOCALBIN)
 	}
 
 .PHONY: helmify
-helmify: $(HELMIFY) ## Download helmify locally if necessary.
-$(HELMIFY): $(LOCALBIN)
-	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@v$(HELMIFY_VERSION)
+helmify: | $(LOCALBIN) ## Download helmify locally if necessary.
+	$(call install-go-tool,$(HELMIFY),github.com/arttor/helmify/cmd/helmify,v$(HELMIFY_VERSION))
 
 .PHONY: yq
-yq: $(YQ) ## Download yq locally if necessary.
-$(YQ): $(LOCALBIN)
-	test -s $(LOCALBIN)/yq || GOBIN=$(LOCALBIN) go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
+yq: | $(LOCALBIN) ## Download yq locally if necessary.
+	$(call install-go-tool,$(YQ),github.com/mikefarah/yq/v4,v$(YQ_VERSION))
 
 .PHONY: install-kind
 install-kind: $(KIND) ## Download kind locally if necessary.

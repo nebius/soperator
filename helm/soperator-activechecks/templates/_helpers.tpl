@@ -126,7 +126,7 @@ Render slurmJobSpec for an ActiveCheck.
 {{- $jobContainer := mustMerge (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") $baseContainer -}}
 {{- $env := default (list) $jobContainer.env -}}
 {{- $workingDir := default "" $jobContainer.workingDir -}}
-{{- with $jobContainerRaw.extraEnv }}{{- $env = concat $env . -}}{{- end }}
+{{- with $jobContainerRaw.extraEnv }}{{- $env = concat $env (fromYamlArray (tpl (toYaml .) $ctx)) -}}{{- end }}
 {{- $volumeMounts := default (list) $jobContainer.volumeMounts -}}
 {{- with $jobContainerRaw.extraVolumeMounts }}{{- $volumeMounts = concat $volumeMounts . -}}{{- end }}
 {{- $volumes := default (list) $jobContainer.volumes -}}
@@ -185,7 +185,7 @@ Render k8sJobSpec for an ActiveCheck.
 {{- $jobContainer := mustMerge (omit $jobContainerRaw "extraEnv" "extraVolumeMounts" "extraVolumes") $baseContainer -}}
 {{- $env := default (list) $jobContainer.env -}}
 {{- $workingDir := default "" $jobContainer.workingDir -}}
-{{- with $jobContainerRaw.extraEnv }}{{- $env = concat $env . -}}{{- end }}
+{{- with $jobContainerRaw.extraEnv }}{{- $env = concat $env (fromYamlArray (tpl (toYaml .) $ctx)) -}}{{- end }}
 {{- if eq $workingDir "/opt/ansible" -}}
   {{- with $ctx.Values.cudaVersion }}{{ $env = concat $env (list (dict "name" "CUDA_VERSION" "value" (printf "%v" .))) -}}{{- end }}
   {{- $env = concat $env (list (dict "name" "NCCL_TESTS_VERSION" "value" (include "soperator-activechecks.ncclTestsVersion" $ctx))) -}}

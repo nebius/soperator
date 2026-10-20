@@ -4,6 +4,6 @@
   hosts: localhost
   become: true
   roles:
-    - soperator-scripts
+    - soperator_scripts
   tags:
     - wrappers

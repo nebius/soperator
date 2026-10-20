@@ -68,8 +68,8 @@ make deploy-flux
 ```
 
 **Note**: The `make deploy-flux` command automatically detects whether the version is stable or unstable based on the `VERSION` file:
-- **Stable versions** (e.g., `1.22.3`) use `oci://cr.eu-north1.nebius.cloud/soperator`
-- **Unstable versions** (e.g., `1.22.3-fed4a485`) use `oci://cr.eu-north1.nebius.cloud/soperator-unstable`
+- **Stable versions** (e.g., `1.22.3`) use `oci://cr.nebius.cloud/soperator`
+- **Unstable versions** (e.g., `1.22.3-fed4a485`) use `oci://cr.nebius.cloud/soperator-unstable`
 
 To deploy an unstable/development version:
 1. Set the unstable version in the `VERSION` file (e.g., `1.22.3-fed4a485`)
@@ -129,14 +129,14 @@ Points to the soperator OCI registry:
 ```yaml
 spec:
   type: oci
-  url: oci://cr.eu-north1.nebius.cloud/soperator
+  url: oci://cr.nebius.cloud/soperator
 ```
 
 For development with unstable images, change to:
 
 ```yaml
 spec:
-  url: oci://cr.eu-north1.nebius.cloud/soperator-unstable
+  url: oci://cr.nebius.cloud/soperator-unstable
 ```
 
 ## Troubleshooting

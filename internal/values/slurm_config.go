@@ -1,6 +1,26 @@
 package values
 
-import slurmv1 "nebius.ai/slurm-operator/api/v1"
+import (
+	"k8s.io/utils/ptr"
+
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
+)
+
+// buildSlurmConfigFrom copies the SlurmConfig spec and fills in defaults that Slurm must not be
+// left to pick on its own. Rendering walks these fields by reflection and skips nil pointers, so
+// an unset field would drop the property from slurm.conf entirely.
+func buildSlurmConfigFrom(slurmConfig *slurmv1.SlurmConfig) slurmv1.SlurmConfig {
+	res := *slurmConfig
+
+	if res.ResumeTimeout == nil {
+		// Slurm's own default is 60 seconds, which no worker pod can meet. Every ephemeral
+		// resume would then hit ResumeFailProgram and tear the pod back down.
+		res.ResumeTimeout = ptr.To[int32](consts.SlurmDefaultResumeTimeout)
+	}
+
+	return res
+}
 
 type PartitionConfiguration struct {
 	ConfigType string

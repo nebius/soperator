@@ -2,35 +2,20 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/79
-FROM cr.eu-north1.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260324153054 AS worker_slurmd
+# https://github.com/nebius/ml-containers/pull/107
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20260925081218 AS worker_slurmd
 
 # Install useful packages
 RUN apt-get update && \
     apt -y install \
         pciutils \
         iproute2 \
-        infiniband-diags \
         kmod \
         libncurses5-dev \
         supervisor \
         openssh-server && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-
-# Install OpenMPI
-ARG OPENMPI_VERSION=4.1.7a1
-COPY images/common/scripts/install_openmpi.sh /opt/bin/
-RUN chmod +x /opt/bin/install_openmpi.sh && \
-    /opt/bin/install_openmpi.sh && \
-    rm /opt/bin/install_openmpi.sh
-
-RUN arch=$(uname -m) && \
-    if [ "$arch" = "x86_64" ]; then alt_arch="x86_64"; \
-    elif [ "$arch" = "aarch64" ]; then alt_arch="aarch64"; \
-    else echo "Unsupported arch: $arch" && exit 1; fi && \
-    echo "LD_LIBRARY_PATH=/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/lib:/lib/${alt_arch}-linux-gnu:/usr/lib/${alt_arch}-linux-gnu:/usr/local/cuda/targets/${alt_arch}-linux/lib" >> /etc/environment
-ENV PATH=${PATH}:/usr/mpi/gcc/openmpi-${OPENMPI_VERSION}/bin
 
 # Create dummy library for replacing GPU-specific libraries on CPU workers in GPU clusters
 RUN ALT_ARCH="$(uname -m)" && \
@@ -76,7 +61,7 @@ RUN chown 0:0 /etc/enroot/enroot.conf && \
 
 # Install slurm pyxis plugin
 ARG SLURM_VERSION
-ARG PYXIS_VERSION=0.23.0
+ARG PYXIS_VERSION=0.24.0
 RUN apt-get update && \
     apt -y install nvslurm-plugin-pyxis=${SLURM_VERSION}-${PYXIS_VERSION}-1 && \
     apt-get clean && \
@@ -84,14 +69,16 @@ RUN apt-get update && \
 
 ## Install nvidia-container-toolkit (for enroot usage)
 COPY ansible/nvidia-container-toolkit.yml /opt/ansible/nvidia-container-toolkit.yml
-COPY ansible/roles/nvidia-container-toolkit /opt/ansible/roles/nvidia-container-toolkit
+COPY ansible/roles/nvidia_container_toolkit /opt/ansible/roles/nvidia_container_toolkit
 RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local nvidia-container-toolkit.yml -t nvidia-container-toolkit
 
 # Install Docker
-RUN apt-get update && \
-    apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin && \
-    apt clean
+COPY ansible/docker_engine.yml /opt/ansible/docker_engine.yml
+COPY ansible/roles/docker_engine /opt/ansible/roles/docker_engine
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local docker_engine.yml && \
+    apt-get clean
 
 # Copy Docker daemon config
 COPY images/worker/docker/daemon.json /etc/docker/daemon.json

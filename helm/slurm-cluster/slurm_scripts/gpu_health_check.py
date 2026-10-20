@@ -7,13 +7,15 @@ import sys
 import traceback
 import typing
 
+
 # Open the directory from which the checks should be run
 def chdir_into_tmp():
-  try:
-    os.chdir("/tmp")
-  except Exception as e:
-    print(f"Failed to chdir into /tmp: {e}")
-    sys.exit(0)
+    try:
+        os.chdir("/tmp")
+    except Exception as e:
+        print(f"Failed to chdir into /tmp: {e}")
+        sys.exit(0)
+
 
 # TODO: Make it log raw health-checker JSON (multi-line is OK - same as in active checks)
 def print_hc_result(
@@ -29,6 +31,7 @@ def print_hc_result(
     print("Health checker stderr:")
     print(hc_stderr)
 
+
 @dataclasses.dataclass
 class HealthCheckerResult:
     json: typing.Optional[dict] = None
@@ -38,6 +41,7 @@ class HealthCheckerResult:
     final_status: str = ""
     first_failed_check: str = ""
     first_failed_error: str = ""
+
 
 def get_hc_result(proc: subprocess.CompletedProcess) -> HealthCheckerResult:
     res = HealthCheckerResult()
@@ -71,7 +75,8 @@ def get_hc_result(proc: subprocess.CompletedProcess) -> HealthCheckerResult:
         return res
     except Exception:
         return res
-    
+
+
 def ensure_output_dir(path_str: str):
     path = pathlib.Path(path_str)
 
@@ -81,6 +86,7 @@ def ensure_output_dir(path_str: str):
         os.chmod(path, 0o777)
     finally:
         os.umask(old_umask)
+
 
 try:
     # Get environment variables
@@ -123,9 +129,15 @@ try:
         "--tests-stdout-path", output_dir,
         "--log-level", "info",
     ]
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, env=env)
+    proc = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+        env=env,
+    )
     result = get_hc_result(proc)
-    #print(result)
+    # print(result)
 
     if result.exitcode == 0:
         if result.final_status == "PASS":
@@ -144,9 +156,9 @@ try:
                 hc_stderr=result.stderr,
             )
             # Return details with the first failed check
-            details=result.first_failed_check
+            details = result.first_failed_check
             if result.first_failed_error:
-                details=f"{result.first_failed_check}: {result.first_failed_error}"
+                details = f"{result.first_failed_check}: {result.first_failed_error}"
             os.write(3, details.encode("utf-8", errors="backslashreplace"))
             sys.exit(1)
         elif result.final_status == "ERROR":

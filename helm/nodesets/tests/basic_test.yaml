@@ -9,7 +9,7 @@ tests:
           replicas: 3
           slurmd:
             image:
-              repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
+              repository: "cr.nebius.cloud/soperator/worker_slurmd"
               tag: "1.22.1-noble-slurm25.05.4"
             resources:
               cpu: "4"
@@ -24,7 +24,7 @@ tests:
               jailSubMounts: []
           munge:
             image:
-              repository: "cr.eu-north1.nebius.cloud/soperator/munge"
+              repository: "cr.nebius.cloud/soperator/munge"
               tag: "1.22.1-noble-slurm25.05.4"
             resources:
               cpu: "100m"
@@ -33,7 +33,7 @@ tests:
           replicas: 5
           slurmd:
             image:
-              repository: "cr.eu-north1.nebius.cloud/soperator/worker_slurmd"
+              repository: "cr.nebius.cloud/soperator/worker_slurmd"
               tag: "1.22.1-noble-slurm25.05.4"
             resources:
               cpu: "2"
@@ -48,7 +48,7 @@ tests:
               jailSubMounts: []
           munge:
             image:
-              repository: "cr.eu-north1.nebius.cloud/soperator/munge"
+              repository: "cr.nebius.cloud/soperator/munge"
               tag: "1.22.1-noble-slurm25.05.4"
             resources:
               cpu: "50m"

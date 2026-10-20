@@ -69,7 +69,7 @@ spec:
         env:
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
-        image: cr.eu-north1.nebius.cloud/soperator/busybox:latest
+        image: cr.nebius.cloud/soperator/busybox:latest
         imagePullPolicy: IfNotPresent
         resources: {}
         securityContext:

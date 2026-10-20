@@ -67,7 +67,7 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster) (
 			cluster.Spec.UseDefaultAppArmorProfile,
 		),
 		SlurmExporter:      buildSlurmExporterFrom(cluster.Spec.Maintenance, &cluster.Spec.SlurmNodes.Exporter),
-		SlurmConfig:        cluster.Spec.SlurmConfig,
+		SlurmConfig:        buildSlurmConfigFrom(&cluster.Spec.SlurmConfig),
 		CustomSlurmConfig:  cluster.Spec.CustomSlurmConfig,
 		CustomCgroupConfig: cluster.Spec.CustomCgroupConfig,
 		CgroupVersion:      cluster.Spec.CgroupVersion,

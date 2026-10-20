@@ -4,4 +4,4 @@ metadata:
   name: soperator-fluxcd
   namespace: flux-system
 spec:
-  url: oci://cr.eu-north1.nebius.cloud/soperator-unstable
+  url: oci://cr.nebius.cloud/soperator-unstable

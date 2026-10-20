@@ -1,7 +1,6 @@
 #!/bin/bash
 #SBATCH --deadline="now+8hours"
 #SBATCH --time=15:00
-#SBATCH --gpus-per-node=8
 #SBATCH --exclusive
 #SBATCH --mem=0
 
@@ -15,6 +14,8 @@ elif [[ "${gpus_on_node}" == *"8 NVIDIA B200"* ]]; then
   platform="8xB200"
 elif [[ "${gpus_on_node}" == *"8 NVIDIA B300"* ]]; then
   platform="8xB300"
+elif [[ "${gpus_on_node}" == *"4 NVIDIA GB300"* ]]; then
+  platform="4xGB300"
 else
   echo "Unsupported platform"
   exit 0
@@ -24,8 +25,8 @@ echo "Platform found: $platform"
 echo "Running mem_perf check on $(hostname)..."
 HC_OUTPUT_DIR="/opt/soperator-outputs/health_checker_cmd_stdout"
 HC_OUTPUT=$(srun --container-image={{ include "activecheck.image.pyxis" . }} \
-  --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR --cpu-bind=cores \
-  bash -l -c "health-checker run -e soperator -p $platform -n mem_bw,mem_lat -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout")
+  --container-mounts=$(which health-checker):/usr/local/bin/health-checker,$HC_OUTPUT_DIR:$HC_OUTPUT_DIR \
+  bash -l -c "health-checker run -e soperator -p $platform -n mem_bw,mem_lat -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info")
 
 echo "Health checker output:"
 echo "$HC_OUTPUT"

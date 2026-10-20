@@ -8,6 +8,12 @@ This helm chart deploys ActiveCheck to soperator cluster
 helm upgrade -n soperator --install all-reduce-perf-nccl ./soperator-activechecks --set slurmClusterRefName=soperator
 ```
 
+For 4-GPU nodes such as GB300, set the Slurm GPU request used by GPU ActiveChecks:
+
+```bash
+helm upgrade -n soperator --install all-reduce-perf-nccl ./soperator-activechecks --set slurmClusterRefName=soperator --set slurmJob.gpusPerNode=4
+```
+
 ### To delete:
 
 ```bash

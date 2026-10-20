@@ -4,7 +4,7 @@ helmRepository:
   namespace: flux-system
   interval: 5m
   type: oci
-  url: oci://cr.eu-north1.nebius.cloud/soperator
+  url: oci://cr.nebius.cloud/soperator
   annotations:
     "helm.sh/resource-policy": keep
 helmRelease:
@@ -15,7 +15,7 @@ helmRelease:
   timeout: 5m
   chart:
     name: helm-soperator-fluxcd
-    version: "4.0.6"
+    version: "4.1.13"
     interval: 5m
   install:
     createNamespace: true

@@ -1,0 +1,31 @@
+name: Warm registry images
+description: Request best-effort BIC and MAN warming for published image references.
+inputs:
+  images:
+    description: Newline-separated tagged image references.
+    required: false
+    default: ''
+  images-file:
+    description: File containing one successfully published image reference per line.
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        IMAGES: ${{ inputs.images }}
+        IMAGES_FILE: ${{ inputs.images-file }}
+      run: |
+        if [[ -n "$IMAGES_FILE" ]]; then
+          if [[ -f "$IMAGES_FILE" ]]; then
+            IMAGES+=$'\n'$(cat -- "$IMAGES_FILE")
+          else
+            echo "::warning::Published image list not found: $IMAGES_FILE"
+          fi
+        fi
+        while IFS= read -r image; do
+          [[ -z "$image" ]] && continue
+          "$ACTION_PATH/warm_registry.sh" "$image" || echo "::warning::Registry warming failed"
+        done <<< "$IMAGES"

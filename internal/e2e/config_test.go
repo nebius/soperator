@@ -125,13 +125,14 @@ func TestNormalizeProfileName(t *testing.T) {
 	}
 }
 
-// autoSelectLabel mirrors the label the real E2E_CONFIG puts on auto-selectable
-// profiles. It means nothing to the code under test — any label would do.
-const autoSelectLabel = "auto-select"
+const (
+	autoGPULabel = "auto-gpu"
+	autoCPULabel = "auto-cpu"
+)
 
 func validConfig() E2EConfig {
 	labelled := validProfile()
-	labelled.Labels = []string{autoSelectLabel}
+	labelled.Labels = []string{autoGPULabel}
 	return E2EConfig{
 		Profiles: map[string]Profile{"MAN_H100": labelled},
 	}
@@ -177,10 +178,10 @@ func TestNormalizeLabel(t *testing.T) {
 		in   string
 		want string
 	}{
-		{"auto-select", "auto-select"},
-		{"Auto-Select", "auto-select"},
-		{"  @auto-select  ", "auto-select"},
-		{"@AUTO-SELECT", "auto-select"},
+		{"auto-gpu", "auto-gpu"},
+		{"Auto-GPU", "auto-gpu"},
+		{"  @auto-gpu  ", "auto-gpu"},
+		{"@AUTO-GPU", "auto-gpu"},
 		{"", ""},
 	}
 	for _, tt := range tests {
@@ -193,10 +194,10 @@ func TestNormalizeLabel(t *testing.T) {
 func TestValidate_NormalizesLabels(t *testing.T) {
 	// The "@" that marks a label in the profile input is tolerated in config too.
 	p := validProfile()
-	p.Labels = []string{"  @Auto-Select "}
+	p.Labels = []string{"  @Auto-GPU "}
 	require.NoError(t, p.Validate())
-	assert.Equal(t, []string{autoSelectLabel}, p.Labels)
-	assert.True(t, p.HasLabel(autoSelectLabel))
+	assert.Equal(t, []string{autoGPULabel}, p.Labels)
+	assert.True(t, p.HasLabel(autoGPULabel))
 }
 
 func TestValidate_EmptyLabel(t *testing.T) {
@@ -207,10 +208,10 @@ func TestValidate_EmptyLabel(t *testing.T) {
 
 func TestValidate_MalformedLabel(t *testing.T) {
 	for _, label := range []string{
-		"auto select",  // space
-		"4-gpu",        // leading digit
-		"-auto-select", // leading hyphen
-		"auto/select",  // separator that is not . _ or -
+		"auto select", // space
+		"4-gpu",       // leading digit
+		"-auto-gpu",   // leading hyphen
+		"auto/select", // separator that is not . _ or -
 	} {
 		t.Run(label, func(t *testing.T) {
 			p := validProfile()
@@ -222,36 +223,39 @@ func TestValidate_MalformedLabel(t *testing.T) {
 
 func TestValidate_AcceptedLabelShapes(t *testing.T) {
 	p := validProfile()
-	p.Labels = []string{"auto-select", "auto-select-cpu", "gpu4", "a.b_c-d"}
+	p.Labels = []string{"auto-gpu", "auto-cpu", "gpu4", "a.b_c-d"}
 	assert.NoError(t, p.Validate())
 }
 
 func TestValidate_DuplicateLabel(t *testing.T) {
 	p := validProfile()
-	p.Labels = []string{autoSelectLabel, "@AUTO-SELECT"}
+	p.Labels = []string{autoGPULabel, "@AUTO-GPU"}
 	assert.ErrorContains(t, p.Validate(), "duplicate label")
 }
 
 func TestConfigCandidates(t *testing.T) {
 	s := validConfig()
-	// Unlabelled, so configured but not auto-selectable.
-	s.Profiles["KCS_CPU"] = validProfile()
-	// Labelled, and sorts before MAN_H100.
+	cpu := validProfile()
+	cpu.Labels = []string{autoCPULabel}
+	s.Profiles["KCS_CPU"] = cpu
+
+	// GPU-labelled, and sorts before MAN_H100.
 	labelled := validProfile()
-	labelled.Labels = []string{autoSelectLabel}
+	labelled.Labels = []string{autoGPULabel}
 	s.Profiles["KCS_B200"] = labelled
 
 	require.NoError(t, s.Validate())
-	assert.Equal(t, []string{"KCS_B200", "MAN_H100"}, s.Candidates(autoSelectLabel))
+	assert.Equal(t, []string{"KCS_B200", "MAN_H100"}, s.Candidates(autoGPULabel))
+	assert.Equal(t, []string{"KCS_CPU"}, s.Candidates(autoCPULabel))
 }
 
 func TestConfigCandidates_NoneLabelled(t *testing.T) {
-	// A config with no candidates is valid; only auto-selection fails on it, so
+	// A config with no candidates is valid; only labelled selection fails on it, so
 	// explicitly requested profiles keep working.
 	s := validConfig()
 	s.Profiles["MAN_H100"] = validProfile()
 	require.NoError(t, s.Validate())
-	assert.Empty(t, s.Candidates(autoSelectLabel))
+	assert.Empty(t, s.Candidates(autoGPULabel))
 }
 
 func TestConfigValidate_DefaultsSettings(t *testing.T) {

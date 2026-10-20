@@ -50,8 +50,8 @@ checks:
       slurmOperatorWatchNamespaces: '*'
       maintenanceIgnoreNodeLabels: "slurm.nebius.ai/nodeset=nfs"
     image:
-      repository: cr.eu-north1.nebius.cloud/soperator/soperatorchecks
-      tag: 4.0.6
+      repository: cr.nebius.cloud/soperator/soperatorchecks
+      tag: 4.1.13
     imagePullPolicy: Always
     resources:
       limits:

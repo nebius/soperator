@@ -1,7 +1,7 @@
 helmRepository:
   interval: 15m
   soperator:
-    url: oci://cr.eu-north1.nebius.cloud/soperator
+    url: oci://cr.nebius.cloud/soperator
     type: oci
   kruise:
     url: https://openkruise.github.io/charts/
@@ -25,7 +25,7 @@ helmRepository:
     url: https://prometheus-community.github.io/helm-charts
     type: default
   securityProfilesOperator:
-    url: oci://cr.eu-north1.nebius.cloud/e00xdc03sb7gpqfd0a
+    url: oci://cr.nebius.cloud/soperator
     type: oci
   victoriaMetrics:
     url: https://victoriametrics.github.io/helm-charts/
@@ -34,7 +34,7 @@ helmRepository:
     url: https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
     type: default
   nfsServer:
-    url: oci://cr.eu-north1.nebius.cloud/soperator
+    url: oci://cr.nebius.cloud/soperator
     type: oci
 ns:
   enabled: true
@@ -75,7 +75,7 @@ backup:
   values:
     cleanup:
       pullPolicy: IfNotPresent
-      registry: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io
+      registry: cr.nebius.cloud/soperator-proxy-docker-io
       repository: alpine/k8s
       tag: 1.34.0
   overrideValues: null
@@ -160,7 +160,7 @@ observability:
       interval: 30s
       scrapeTimeout: 10s
     logs:
-      version: 0.117.*
+      version: 0.149.*
       interval: 15m
       timeout: 15m
       install:
@@ -198,7 +198,7 @@ observability:
       driftDetection:
         mode: warn
     events:
-      version: 0.117.*
+      version: 0.149.*
       interval: 5m
       timeout: 5m
       install:
@@ -280,7 +280,7 @@ observability:
         # Namespaces to maintain the Secret in. Empty means the vmStack namespace.
         namespaces: []
         image:
-          repository: cr.eu-north1.nebius.cloud/soperator-proxy-docker-io/alpine/curl
+          repository: cr.nebius.cloud/soperator-proxy-docker-io/alpine/curl
           tag: "8.19.0"
           pullPolicy: IfNotPresent
         imdsBaseUrl: http://169.254.169.254
@@ -386,7 +386,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 5m
-    version: 4.0.6
+    version: 4.1.13
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     install:
@@ -447,7 +447,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.0.6
+  version: 4.1.13
   namespace: soperator
   releaseName: soperator
   values: null
@@ -485,7 +485,7 @@ nodesets:
     mode: warn
   interval: 5m
   timeout: 5m
-  version: 4.0.6
+  version: 4.1.13
   namespace: soperator
   releaseName: soperator-nodesets
   values: null
@@ -503,7 +503,7 @@ soperatorActiveChecks:
   enabled: true
   interval: 5m
   timeout: 120m
-  version: 4.0.6
+  version: 4.1.13
   releaseName: soperator-activechecks
   namespace: soperator
   overrideValues: null
@@ -522,7 +522,7 @@ soperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.0.6
+  version: 4.1.13
   namespace: "soperator-system"
   releaseName: soperator-controller
   install:
@@ -566,7 +566,8 @@ soperator:
       manager:
         replicas: 2
         image:
-          repository: cr.eu-north1.nebius.cloud/soperator/kruise-manager
+          repository: cr.nebius.cloud/soperator/kruise-manager
+          tag: v1.8.3
         resources:
           limits:
             cpu: 1000m
@@ -576,7 +577,8 @@ soperator:
             memory: 2Gi
       helmHooks:
         image:
-          repository: cr.eu-north1.nebius.cloud/soperator/kruise-helm-hook
+          repository: cr.nebius.cloud/soperator/kruise-helm-hook
+          tag: v0.1.0
       featureGates: "ImagePullJobGate=true,RecreatePodWhenChangeVCTInCloneSetGate=true,StatefulSetAutoResizePVCGate=true,StatefulSetAutoDeletePVC=true,PreDownloadImageForInPlaceUpdate=true,ResourceDistributionGate=true"
     driftDetection:
       mode: warn
@@ -644,7 +646,7 @@ notifier:
   enabled: false
   interval: 5m
   timeout: 5m
-  version: 4.0.6
+  version: 4.1.13
   namespace: monitoring-system
   releaseName: soperator-notifier
   install:
@@ -683,7 +685,7 @@ nfsServer:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 1.2.0
+  version: 1.2.2
   namespace: nfs-system
   releaseName: nfs-server
   overrideValues: null
@@ -703,7 +705,7 @@ storageClasses:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.0.6
+  version: 4.1.13
   namespace: storage-system
   releaseName: soperator-storageclasses
   values: null
@@ -722,7 +724,7 @@ customConfigmaps:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.0.6
+  version: 4.1.13
   namespace: soperator
   releaseName: soperator-custom-configmaps
   overrideValues: null

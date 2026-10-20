@@ -1,7 +1,7 @@
 {
   "name": "map_job_dcgm",
   "command": "./map_job_dcgm.sh",
-  "platforms": ["8xGPU", "1xGPU"],
+  "platforms": ["8xGPU", "1xGPU", "4xGPU"],
   "skip_for_cpu_jobs": true,
   "skip_for_partial_gpu_jobs": false,
   "skip_for_reservation_prefixes": [],

@@ -18,6 +18,8 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-security-profiles-operator
       version: {{ .Values.securityProfilesOperator.version }}
+  dependsOn:
+  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
   install:
     {{- toYaml .Values.securityProfilesOperator.install | nindent 4 }}
   upgrade:
@@ -44,7 +46,7 @@ spec:
     enableSelinux: false
     replicaCount: 2
     spoImage:
-      registry: cr.eu-north1.nebius.cloud/soperator-proxy-gcr-io
+      registry: cr.nebius.cloud/soperator-proxy-gcr-io
       repository: k8s-staging-sp-operator/security-profiles-operator
       tag: v0.8.4
     tolerations: []

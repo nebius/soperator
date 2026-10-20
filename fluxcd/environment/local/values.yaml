@@ -10,7 +10,7 @@ ns:
 soperator:
   enabled: true
   namespace: soperator-system
-  version: "4.0.6"
+  version: "4.1.13"
   interval: 5m
   timeout: 5m
   releaseName: soperator-controller
@@ -57,7 +57,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.0.6
+  version: 4.1.13
   namespace: soperator
   releaseName: soperator
   overrideValues:
@@ -123,7 +123,7 @@ slurmCluster:
             ephemeralStorage: 100Mi
         customInitContainers:
           - name: ensure-jail-virtiofs
-            image: cr.eu-north1.nebius.cloud/soperator/busybox
+            image: cr.nebius.cloud/soperator/busybox
             volumeMounts: [{name: jail, mountPath: /volume-mount}]
             command: ["grep", " /volume-mount virtiofs ", "/proc/mounts"]
       controller:
@@ -276,10 +276,10 @@ backup:
 # NFS Server - disabled for local dev
 nfsServer:
   enabled: false
-  version: 4.0.6
+  version: 1.2.2
   overrideValues:
     image:
-      tag: 4.0.6
+      tag: 1.2.2
 # Notifier - disabled for local dev
 notifier:
   enabled: false

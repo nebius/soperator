@@ -31,6 +31,7 @@ func RenderNodeSetStatefulSet(
 	cgroupVersion string,
 	clusterWithGPU bool,
 	topologyPluginEnabled bool,
+	topologyPlugin string,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	labels[consts.LabelNodeSetKey] = nodeSet.Name
@@ -60,8 +61,12 @@ func RenderNodeSetStatefulSet(
 	}
 	initContainers = append(initContainers,
 		RenderContainerWorkerInit(
-			clusterName, &nodeSet.ContainerSlurmd, topologyPluginEnabled,
-			nodeSet.GPU.Enabled, topologyTimeOut,
+			clusterName,
+			&nodeSet.ContainerSlurmd,
+			topologyPluginEnabled,
+			nodeSet.GPU.Enabled,
+			topologyTimeOut,
+			topologyPlugin,
 		),
 	)
 

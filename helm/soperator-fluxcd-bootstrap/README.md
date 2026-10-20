@@ -27,7 +27,7 @@ helm install soperator-bootstrap ./helm/soperator-fluxcd-bootstrap \
 | `helmRepository.namespace` | Namespace for HelmRepository | `flux-system` |
 | `helmRepository.interval` | Sync interval for repository | `5m` |
 | `helmRepository.type` | Repository type (oci, default) | `oci` |
-| `helmRepository.url` | OCI registry URL | `oci://cr.eu-north1.nebius.cloud/soperator` |
+| `helmRepository.url` | OCI registry URL | `oci://cr.nebius.cloud/soperator` |
 
 ### HelmRelease Settings
 

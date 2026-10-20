@@ -1,7 +1,6 @@
 #!/bin/bash
 #SBATCH --deadline="now+4hours"
 #SBATCH --time=20:00
-#SBATCH --gpus-per-node=8
 #SBATCH --exclusive
 #SBATCH --mem=0
 
@@ -15,6 +14,8 @@ elif [[ "${gpus_on_node}" == *"8 NVIDIA B200"* ]]; then
   platform="8xB200"
 elif [[ "${gpus_on_node}" == *"8 NVIDIA B300"* ]]; then
   platform="8xB300"
+elif [[ "${gpus_on_node}" == *"4 NVIDIA GB300"* ]]; then
+  platform="4xGB300"
 else
   echo "Unsupported platform"
   exit 0
@@ -23,7 +24,7 @@ fi
 echo "Platform found: $platform"
 echo "Running all_reduce_perf_nccl check on $(hostname)..."
 
-HC_OUTPUT=$(srun --cpu-bind=cores sudo bash -l -c "health-checker run -e soperator -p $platform -n all_reduce_without_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info")
+HC_OUTPUT=$(srun sudo bash -l -c "health-checker run -e soperator -p $platform -n all_reduce_without_ib -f json-partial --tests-stdout-path /opt/soperator-outputs/health_checker_cmd_stdout --log-level info")
 echo "Health checker output:"
 echo "$HC_OUTPUT"
 HC_STATUS=$(echo "$HC_OUTPUT" | awk '/^\s*{/,/^\s*}/' | jq -r '.status')
