@@ -2,8 +2,12 @@ package sharedsteps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -15,12 +19,17 @@ import (
 )
 
 const (
-	activeGPUChecksSuffix = "gpu-checks"
+	activeGPUChecksSuffix             = "gpu-checks"
+	manageJailStateDryRunSuffix       = "manage-jail-state-dry-run"
+	manageJailStateDryRunFile         = "/etc/profile.d/path_soperator_utils.sh"
+	manageJailStateDryRunTask         = "Add soperator_utils to PATH for all users"
+	manageJailStateDryRunLogsFilename = "manage-jail-state-dry-run.log"
 
-	activeK8sJobTimeout   = 5 * time.Minute
-	activeGPUCheckTimeout = 25 * time.Minute
-	activeSlurmOutputWait = 20 * time.Minute
-	activeSlurmOutputPoll = 30 * time.Second
+	activeK8sJobTimeout     = 5 * time.Minute
+	activeGPUCheckTimeout   = 25 * time.Minute
+	manageJailDryRunTimeout = 65 * time.Minute
+	activeSlurmOutputWait   = 20 * time.Minute
+	activeSlurmOutputPoll   = 30 * time.Second
 
 	activeSlurmJobOutputDir = "/opt/soperator-outputs/local/slurm_jobs"
 )
@@ -37,6 +46,13 @@ type ActiveChecks struct {
 	gpuCheckK8sJobName string
 	gpuCheckJobIDs     []string
 	gpuWorkers         []framework.WorkerInfo
+
+	dryRunJobName       string
+	dryRunBackupPath    string
+	dryRunMarker        string
+	dryRunChecksum      string
+	dryRunLogs          string
+	dryRunAnsibleResult ansibleDryRunResult
 }
 
 func NewActiveChecks(info *framework.ClusterInfo, runtime framework.Runtime, slurm *framework.SlurmClient, kubectl *framework.KubectlClient, selector *framework.WorkerSelector) *ActiveChecks {
@@ -56,12 +72,219 @@ func (s *ActiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^GPU ActiveCheck outputs report PASS on all GPU workers$`, s.gpuActiveCheckOutputsReportPASSOnAllGPUWorkers)
 	sc.Step(`^GPU ActiveCheck Slurm jobs complete on all GPU workers$`, s.gpuActiveCheckSlurmJobsCompleteOnAllGPUWorkers)
 	sc.Step(`^the GPU ActiveCheck status is Complete$`, s.theGPUActiveCheckStatusIsComplete)
+	sc.Step(`^the manage-jail-state dry-run ActiveCheck is configured$`, s.theManageJailStateDryRunActiveCheckIsConfigured)
+	sc.Step(`^harmless drift is introduced into a managed jail file$`, s.harmlessDriftIsIntroducedIntoAManagedJailFile)
+	sc.Step(`^the manage-jail-state dry-run ActiveCheck is triggered$`, s.theManageJailStateDryRunActiveCheckIsTriggered)
+	sc.Step(`^the manage-jail-state dry-run Kubernetes Job succeeds$`, s.theManageJailStateDryRunKubernetesJobSucceeds)
+	sc.Step(`^Ansible reports the managed jail file as changed$`, s.ansibleReportsTheManagedJailFileAsChanged)
+	sc.Step(`^Ansible reports no failed or unreachable hosts$`, s.ansibleReportsNoFailedOrUnreachableHosts)
+	sc.Step(`^the managed jail file remains unchanged by the dry-run$`, s.theManagedJailFileRemainsUnchangedByTheDryRun)
+	sc.Step(`^the manage-jail-state dry-run ActiveCheck status is Complete$`, s.theManageJailStateDryRunActiveCheckStatusIsComplete)
 }
 
 func (s *ActiveChecks) CleanupAndReset(ctx context.Context) {
+	if s.dryRunBackupPath != "" {
+		command := fmt.Sprintf(
+			"if [ -e %s ]; then cp -a -- %s %s && rm -f -- %s; fi",
+			framework.ShellQuote(s.dryRunBackupPath),
+			framework.ShellQuote(s.dryRunBackupPath),
+			framework.ShellQuote(manageJailStateDryRunFile),
+			framework.ShellQuote(s.dryRunBackupPath),
+		)
+		if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
+			s.runtime.Logf("cleanup: restore managed jail file %s: %v", manageJailStateDryRunFile, err)
+		}
+	}
+	if s.dryRunJobName != "" {
+		if _, err := s.runtime.Kubectl().Run(ctx,
+			"delete", "job", "-n", framework.SoperatorNamespace, s.dryRunJobName,
+			"--ignore-not-found=true", "--wait=false",
+		); err != nil {
+			s.runtime.Logf("cleanup: delete manage-jail-state dry-run Job %s: %v", s.dryRunJobName, err)
+		}
+	}
+
 	s.gpuCheckK8sJobName = ""
 	s.gpuCheckJobIDs = nil
 	s.gpuWorkers = nil
+	s.dryRunJobName = ""
+	s.dryRunBackupPath = ""
+	s.dryRunMarker = ""
+	s.dryRunChecksum = ""
+	s.dryRunLogs = ""
+	s.dryRunAnsibleResult = ansibleDryRunResult{}
+}
+
+func (s *ActiveChecks) theManageJailStateDryRunActiveCheckIsConfigured(ctx context.Context) error {
+	checkName := s.activeCheckName(manageJailStateDryRunSuffix)
+	var check kubeobjects.ActiveCheck
+	if err := s.kubectl.GetJSON(ctx, &check, "get", "activecheck", "-n", framework.SoperatorNamespace, checkName, "-o", "json"); err != nil {
+		return fmt.Errorf("get manage-jail-state dry-run ActiveCheck %s: %w", checkName, err)
+	}
+	if check.Spec.CheckType != kubeobjects.ActiveCheckTypeK8sJob {
+		return fmt.Errorf("expected ActiveCheck %s checkType=%s, got %s", checkName, kubeobjects.ActiveCheckTypeK8sJob, check.Spec.CheckType)
+	}
+
+	var cronJob activeCheckCronJob
+	if err := s.kubectl.GetJSON(ctx, &cronJob, "get", "cronjob", "-n", framework.SoperatorNamespace, checkName, "-o", "json"); err != nil {
+		return fmt.Errorf("get manage-jail-state dry-run CronJob %s: %w", checkName, err)
+	}
+	for _, container := range cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers {
+		if slices.Contains(container.Args, "--check") {
+			return nil
+		}
+	}
+	return fmt.Errorf("expected CronJob %s to run ansible-playbook with --check", checkName)
+}
+
+func (s *ActiveChecks) harmlessDriftIsIntroducedIntoAManagedJailFile(ctx context.Context) error {
+	nonce := time.Now().UnixNano()
+	s.dryRunBackupPath = fmt.Sprintf("/etc/profile.d/.acceptance-manage-jail-state-dry-run-%d.backup", nonce)
+	s.dryRunMarker = fmt.Sprintf("# acceptance-manage-jail-state-dry-run-%d", nonce)
+	command := fmt.Sprintf(
+		"cp -a -- %s %s && printf '%%s\\n' %s >> %s && sha256sum %s | awk '{print $1}'",
+		framework.ShellQuote(manageJailStateDryRunFile),
+		framework.ShellQuote(s.dryRunBackupPath),
+		framework.ShellQuote(s.dryRunMarker),
+		framework.ShellQuote(manageJailStateDryRunFile),
+		framework.ShellQuote(manageJailStateDryRunFile),
+	)
+	checksum, err := s.runtime.Jail().Run(ctx, command)
+	if err != nil {
+		return fmt.Errorf("introduce harmless drift into managed jail file %s: %w", manageJailStateDryRunFile, err)
+	}
+	s.dryRunChecksum = strings.TrimSpace(checksum)
+	if s.dryRunChecksum == "" {
+		return fmt.Errorf("calculate checksum for drifted managed jail file %s", manageJailStateDryRunFile)
+	}
+	return nil
+}
+
+func (s *ActiveChecks) theManageJailStateDryRunActiveCheckIsTriggered(ctx context.Context) error {
+	jobName, err := s.createJobFromCronJob(ctx, s.activeCheckName(manageJailStateDryRunSuffix))
+	if err != nil {
+		return err
+	}
+	s.dryRunJobName = jobName
+	return nil
+}
+
+func (s *ActiveChecks) theManageJailStateDryRunKubernetesJobSucceeds(ctx context.Context) error {
+	if s.dryRunJobName == "" {
+		return fmt.Errorf("manage-jail-state dry-run Job is not captured")
+	}
+	waitErr := s.waitForK8sJobCompleteSuccessfully(ctx, s.dryRunJobName, manageJailDryRunTimeout)
+	logsErr := s.captureDryRunJobLogs(ctx)
+	if waitErr != nil {
+		if logsErr != nil {
+			return fmt.Errorf("%w; additionally, capture Job logs: %v", waitErr, logsErr)
+		}
+		return fmt.Errorf("%w\nJob logs:\n%s", waitErr, strings.TrimSpace(s.dryRunLogs))
+	}
+	return logsErr
+}
+
+func (s *ActiveChecks) ansibleReportsTheManagedJailFileAsChanged(ctx context.Context) error {
+	if err := s.ensureDryRunAnsibleResult(ctx); err != nil {
+		return err
+	}
+	if !s.dryRunAnsibleResult.ManagedFileChanged {
+		return fmt.Errorf("Ansible did not report task %q as changed", manageJailStateDryRunTask)
+	}
+	return nil
+}
+
+func (s *ActiveChecks) ansibleReportsNoFailedOrUnreachableHosts(ctx context.Context) error {
+	if err := s.ensureDryRunAnsibleResult(ctx); err != nil {
+		return err
+	}
+	if !s.dryRunAnsibleResult.StatsFound {
+		return fmt.Errorf("Ansible JSONL output does not contain v2_playbook_on_stats")
+	}
+	if s.dryRunAnsibleResult.Failures != 0 || s.dryRunAnsibleResult.Unreachable != 0 {
+		return fmt.Errorf("expected no failed or unreachable Ansible hosts, got failures=%d unreachable=%d",
+			s.dryRunAnsibleResult.Failures, s.dryRunAnsibleResult.Unreachable)
+	}
+	return nil
+}
+
+func (s *ActiveChecks) theManagedJailFileRemainsUnchangedByTheDryRun(ctx context.Context) error {
+	if s.dryRunChecksum == "" || s.dryRunMarker == "" {
+		return fmt.Errorf("managed jail file drift state is not captured")
+	}
+	command := fmt.Sprintf(
+		"grep -F -- %s %s >/dev/null && sha256sum %s | awk '{print $1}'",
+		framework.ShellQuote(s.dryRunMarker),
+		framework.ShellQuote(manageJailStateDryRunFile),
+		framework.ShellQuote(manageJailStateDryRunFile),
+	)
+	checksum, err := s.runtime.Jail().Run(ctx, command)
+	if err != nil {
+		return fmt.Errorf("verify dry-run left managed jail file %s unchanged: %w", manageJailStateDryRunFile, err)
+	}
+	if actual := strings.TrimSpace(checksum); actual != s.dryRunChecksum {
+		return fmt.Errorf("expected managed jail file checksum %s after dry-run, got %s", s.dryRunChecksum, actual)
+	}
+	return nil
+}
+
+func (s *ActiveChecks) theManageJailStateDryRunActiveCheckStatusIsComplete(ctx context.Context) error {
+	if s.dryRunJobName == "" {
+		return fmt.Errorf("manage-jail-state dry-run Job is not captured")
+	}
+	checkName := s.activeCheckName(manageJailStateDryRunSuffix)
+	return s.runtime.WaitFor(ctx, fmt.Sprintf("ActiveCheck %s Job %s complete", checkName, s.dryRunJobName), activeK8sJobTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+		var check kubeobjects.ActiveCheck
+		if err := s.kubectl.GetJSON(waitCtx, &check, "get", "activecheck", "-n", framework.SoperatorNamespace, checkName, "-o", "json"); err != nil {
+			return false, err
+		}
+		status := check.Status.K8sJobsStatus
+		if status.LastJobName != s.dryRunJobName {
+			return false, nil
+		}
+		switch status.LastJobStatus {
+		case kubeobjects.ActiveCheckK8sJobStatusComplete:
+			return true, nil
+		case kubeobjects.ActiveCheckK8sJobStatusFailed:
+			return false, fmt.Errorf("ActiveCheck %s Job %s finished with status=%s", checkName, s.dryRunJobName, status.LastJobStatus)
+		default:
+			return false, nil
+		}
+	})
+}
+
+func (s *ActiveChecks) captureDryRunJobLogs(ctx context.Context) error {
+	logs, err := s.runtime.Kubectl().RunWithDefaultRetry(ctx,
+		"logs", "-n", framework.SoperatorNamespace, "job/"+s.dryRunJobName, "--all-containers=true",
+	)
+	if err != nil {
+		return fmt.Errorf("capture manage-jail-state dry-run Job %s logs: %w", s.dryRunJobName, err)
+	}
+	s.dryRunLogs = logs
+	if artifacts, ok := framework.ScenarioArtifacts(ctx); ok {
+		artifactPath := filepath.Join(artifacts.RunnerDir, manageJailStateDryRunLogsFilename)
+		if err := os.WriteFile(artifactPath, []byte(logs), 0o644); err != nil {
+			return fmt.Errorf("write manage-jail-state dry-run logs to %s: %w", artifactPath, err)
+		}
+	}
+	return nil
+}
+
+func (s *ActiveChecks) ensureDryRunAnsibleResult(ctx context.Context) error {
+	if s.dryRunAnsibleResult.Parsed {
+		return nil
+	}
+	if s.dryRunLogs == "" {
+		if err := s.captureDryRunJobLogs(ctx); err != nil {
+			return err
+		}
+	}
+	result, err := parseAnsibleDryRunJSONL(s.dryRunLogs, manageJailStateDryRunTask)
+	if err != nil {
+		return fmt.Errorf("parse manage-jail-state dry-run Ansible JSONL: %w", err)
+	}
+	s.dryRunAnsibleResult = result
+	return nil
 }
 
 func (s *ActiveChecks) healthyGPUWorkersAreAvailableForActiveChecks(ctx context.Context) error {
@@ -384,6 +607,81 @@ type k8sJobStatus struct {
 		Succeeded int32 `json:"succeeded"`
 		Failed    int32 `json:"failed"`
 	} `json:"status"`
+}
+
+type activeCheckCronJob struct {
+	Spec struct {
+		JobTemplate struct {
+			Spec struct {
+				Template struct {
+					Spec struct {
+						Containers []struct {
+							Args []string `json:"args"`
+						} `json:"containers"`
+					} `json:"spec"`
+				} `json:"template"`
+			} `json:"spec"`
+		} `json:"jobTemplate"`
+	} `json:"spec"`
+}
+
+type ansibleDryRunResult struct {
+	Parsed             bool
+	StatsFound         bool
+	ManagedFileChanged bool
+	Failures           int
+	Unreachable        int
+}
+
+type ansibleJSONLEvent struct {
+	Event string `json:"_event"`
+	Task  struct {
+		Name string `json:"name"`
+	} `json:"task"`
+	Hosts map[string]struct {
+		Changed bool `json:"changed"`
+	} `json:"hosts"`
+	Stats map[string]struct {
+		Failures    int `json:"failures"`
+		Unreachable int `json:"unreachable"`
+	} `json:"stats"`
+}
+
+func parseAnsibleDryRunJSONL(output, managedTaskName string) (ansibleDryRunResult, error) {
+	var result ansibleDryRunResult
+	for lineNumber, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "{") {
+			continue
+		}
+
+		var event ansibleJSONLEvent
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			return ansibleDryRunResult{}, fmt.Errorf("decode JSONL event on line %d: %w", lineNumber+1, err)
+		}
+		result.Parsed = true
+		switch event.Event {
+		case "v2_runner_on_ok":
+			if !strings.HasSuffix(event.Task.Name, managedTaskName) {
+				continue
+			}
+			for _, host := range event.Hosts {
+				result.ManagedFileChanged = result.ManagedFileChanged || host.Changed
+			}
+		case "v2_playbook_on_stats":
+			result.StatsFound = true
+			result.Failures = 0
+			result.Unreachable = 0
+			for _, stats := range event.Stats {
+				result.Failures += stats.Failures
+				result.Unreachable += stats.Unreachable
+			}
+		}
+	}
+	if !result.Parsed {
+		return ansibleDryRunResult{}, fmt.Errorf("output does not contain JSONL events")
+	}
+	return result, nil
 }
 
 type activeCheckSlurmJobRecord struct {
