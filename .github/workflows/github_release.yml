@@ -7,6 +7,11 @@ jobs:
   # First, build the stable release
   build:
     name: Build stable release
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
     uses: ./.github/workflows/one_job.yml
     with:
       unstable: 'false'
