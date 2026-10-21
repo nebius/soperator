@@ -243,6 +243,7 @@ type ActiveCheckStatus struct {
 }
 
 type ActiveCheckK8sJobsStatus struct {
+	LastJobName   string `json:"lastJobName"`
 	LastJobStatus string `json:"lastJobStatus"`
 }
 
