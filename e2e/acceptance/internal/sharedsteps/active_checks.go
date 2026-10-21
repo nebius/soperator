@@ -48,7 +48,6 @@ type ActiveChecks struct {
 	gpuWorkers         []framework.WorkerInfo
 
 	dryRunJobName       string
-	dryRunBackupPath    string
 	dryRunMarker        string
 	dryRunChecksum      string
 	dryRunLogs          string
@@ -83,24 +82,27 @@ func (s *ActiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *ActiveChecks) CleanupAndReset(ctx context.Context) {
-	if s.dryRunBackupPath != "" {
-		command := fmt.Sprintf(
-			"if [ -e %s ]; then cp -a -- %s %s && rm -f -- %s; fi",
-			framework.ShellQuote(s.dryRunBackupPath),
-			framework.ShellQuote(s.dryRunBackupPath),
+	if s.dryRunMarker != "" {
+		expression := fmt.Sprintf(`\|^%s$|d`, s.dryRunMarker)
+		command := fmt.Sprintf("sed -i -- %s %s",
+			framework.ShellQuote(expression),
 			framework.ShellQuote(manageJailStateDryRunFile),
-			framework.ShellQuote(s.dryRunBackupPath),
 		)
 		if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
-			s.runtime.Logf("cleanup: restore managed jail file %s: %v", manageJailStateDryRunFile, err)
+			s.runtime.Logf("cleanup: remove marker from managed jail file %s: %v", manageJailStateDryRunFile, err)
 		}
 	}
 	if s.dryRunJobName != "" {
-		if _, err := s.runtime.Kubectl().Run(ctx,
-			"delete", "job", "-n", framework.SoperatorNamespace, s.dryRunJobName,
-			"--ignore-not-found=true", "--wait=false",
-		); err != nil {
-			s.runtime.Logf("cleanup: delete manage-jail-state dry-run Job %s: %v", s.dryRunJobName, err)
+		var job k8sJobStatus
+		if err := s.kubectl.GetJSON(ctx, &job, "get", "job", "-n", framework.SoperatorNamespace, s.dryRunJobName, "-o", "json"); err != nil {
+			s.runtime.Logf("cleanup: get manage-jail-state dry-run Job %s: %v", s.dryRunJobName, err)
+		} else if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
+			if _, err := s.runtime.Kubectl().Run(ctx,
+				"delete", "job", "-n", framework.SoperatorNamespace, s.dryRunJobName,
+				"--ignore-not-found=true", "--wait=false",
+			); err != nil {
+				s.runtime.Logf("cleanup: stop manage-jail-state dry-run Job %s: %v", s.dryRunJobName, err)
+			}
 		}
 	}
 
@@ -108,7 +110,6 @@ func (s *ActiveChecks) CleanupAndReset(ctx context.Context) {
 	s.gpuCheckJobIDs = nil
 	s.gpuWorkers = nil
 	s.dryRunJobName = ""
-	s.dryRunBackupPath = ""
 	s.dryRunMarker = ""
 	s.dryRunChecksum = ""
 	s.dryRunLogs = ""
@@ -139,12 +140,9 @@ func (s *ActiveChecks) theManageJailStateDryRunActiveCheckIsConfigured(ctx conte
 
 func (s *ActiveChecks) harmlessDriftIsIntroducedIntoAManagedJailFile(ctx context.Context) error {
 	nonce := time.Now().UnixNano()
-	s.dryRunBackupPath = fmt.Sprintf("/etc/profile.d/.acceptance-manage-jail-state-dry-run-%d.backup", nonce)
 	s.dryRunMarker = fmt.Sprintf("# acceptance-manage-jail-state-dry-run-%d", nonce)
 	command := fmt.Sprintf(
-		"cp -a -- %s %s && printf '%%s\\n' %s >> %s && sha256sum %s | awk '{print $1}'",
-		framework.ShellQuote(manageJailStateDryRunFile),
-		framework.ShellQuote(s.dryRunBackupPath),
+		"printf '%%s\\n' %s >> %s && sha256sum %s | awk '{print $1}'",
 		framework.ShellQuote(s.dryRunMarker),
 		framework.ShellQuote(manageJailStateDryRunFile),
 		framework.ShellQuote(manageJailStateDryRunFile),
