@@ -40,6 +40,8 @@ type SlurmClusterInfo struct {
 	LoginUserIsolationEnabled bool
 	LoginJailSubMounts        []JailSubMountInfo
 	PAMSlurmAdoptEnabled      bool
+	PAMSlurmAdoptExemptUsers  []string
+	PAMSlurmAdoptExemptGroups []string
 	NamespaceConfigEnabled    bool
 	NamespaceConfigMapName    string
 	CustomSlurmConfig         *string
@@ -93,6 +95,8 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 		LoginUserIsolationEnabled: cluster.Spec.SlurmNodes.Login.UserIsolation.Enabled,
 		LoginJailSubMounts:        jailSubMountInfos(cluster.Spec.SlurmNodes.Login.Volumes.JailSubMounts),
 		PAMSlurmAdoptEnabled:      cluster.Spec.PAMSlurmAdopt.Enabled,
+		PAMSlurmAdoptExemptUsers:  cluster.Spec.PAMSlurmAdopt.ExemptUsers,
+		PAMSlurmAdoptExemptGroups: cluster.Spec.PAMSlurmAdopt.ExemptGroups,
 		NamespaceConfigEnabled:    namespaceConfigEnabled(cluster.Spec.NamespaceConfig),
 		NamespaceConfigMapName:    namespaceConfigMapName(cluster.Spec.NamespaceConfig),
 		CustomSlurmConfig:         cluster.Spec.CustomSlurmConfig,

@@ -89,7 +89,9 @@ type SlurmClusterLoginVolumes struct {
 }
 
 type SlurmClusterPAMAdopt struct {
-	Enabled bool `json:"enabled"`
+	Enabled      bool     `json:"enabled"`
+	ExemptUsers  []string `json:"exemptUsers"`
+	ExemptGroups []string `json:"exemptGroups"`
 }
 
 type SlurmClusterNamespaceConfig struct {

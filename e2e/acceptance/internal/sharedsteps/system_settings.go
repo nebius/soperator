@@ -5,6 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"os"
+	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +21,15 @@ import (
 const (
 	systemSettingsJobTimeout = 5 * time.Minute
 	systemSettingsCleanup    = 3 * time.Minute
+	systemSettingsSSHTimeout = time.Minute
+
+	interactiveJobImmediate = 2 * time.Minute
+
+	publicLoginEndpointTimeout = 5 * time.Minute
+	publicLoginSSHKeyName      = "soperator_e2e_public_login_ssh"
+	publicLoginSSHKeyComment   = "soperator-e2e-public-login-ssh"
+
+	jobUserKey = "JOB_USER"
 
 	limitDirectMarker = "__soperator_acceptance_direct_limits__"
 	limitNestedMarker = "__soperator_acceptance_nested_limits__"
@@ -47,12 +60,27 @@ const (
 	kernelTCPReceiveBufferSize = "net.ipv4.tcp_rmem"
 	kernelTCPSendBufferSize    = "net.ipv4.tcp_wmem"
 
-	slurmdContainerName          = "slurmd"
-	nvidiaDriverCapabilitiesName = "NVIDIA_DRIVER_CAPABILITIES"
-	nativeResourceLimitsJobName  = "e2e-system-limits-native"
-	enrootResourceLimitsJobName  = "e2e-system-limits-enroot"
-	nativeKernelSettingsJobName  = "e2e-system-kernel-native"
-	enrootKernelSettingsJobName  = "e2e-system-kernel-enroot"
+	slurmdContainerName              = "slurmd"
+	nvidiaDriverCapabilitiesName     = "NVIDIA_DRIVER_CAPABILITIES"
+	nativeResourceLimitsJobName      = "e2e-system-limits-native"
+	enrootResourceLimitsJobName      = "e2e-system-limits-enroot"
+	dockerResourceLimitsJobName      = "e2e-system-limits-docker"
+	regularUserResourceLimitsJobName = "e2e-system-limits-regular-user"
+	adoptedSSHHolderJobName          = "e2e-system-adopted-ssh-holder"
+	nativeKernelSettingsJobName      = "e2e-system-kernel-native"
+	enrootKernelSettingsJobName      = "e2e-system-kernel-enroot"
+	dockerKernelSettingsJobName      = "e2e-system-kernel-docker"
+
+	systemSettingsDockerContainerPrefix = "e2e-system-settings-"
+)
+
+// probeContainer selects where a system-settings job step runs its probe.
+type probeContainer int
+
+const (
+	probeContainerNone probeContainer = iota
+	probeContainerEnroot
+	probeContainerDocker
 )
 
 var resourceLimitOptions = []struct {
@@ -101,11 +129,22 @@ type resourceLimitSnapshots struct {
 type kernelSettingSnapshot map[string]string
 
 type systemSettingsJob struct {
-	job  framework.SbatchJob
-	kind string
+	job       framework.SbatchJob
+	kind      string
+	container probeContainer
+}
+
+// systemSettingsProbeResult is the raw output of a combined probe and the
+// settings parsed from it.
+type systemSettingsProbeResult struct {
+	kind   string
+	output string
+	limits resourceLimitSnapshots
+	kernel kernelSettingSnapshot
 }
 
 type SystemSettings struct {
+	info     *framework.ClusterInfo
 	runtime  framework.Runtime
 	slurm    *framework.SlurmClient
 	kubectl  *framework.KubectlClient
@@ -120,15 +159,25 @@ type SystemSettings struct {
 	workerKernel kernelSettingSnapshot
 	nativeKernel kernelSettingSnapshot
 	enrootKernel kernelSettingSnapshot
+	dockerKernel kernelSettingSnapshot
+
+	publicLogin              framework.LoginSSHEndpoint
+	publicLoginKeyDir        string
+	publicLoginKeyAuthorized bool
+	publicLoginKernel        kernelSettingSnapshot
+
+	interactive []systemSettingsProbeResult
 }
 
 func NewSystemSettings(
+	info *framework.ClusterInfo,
 	runtime framework.Runtime,
 	slurm *framework.SlurmClient,
 	kubectl *framework.KubectlClient,
 	selector *framework.WorkerSelector,
 ) *SystemSettings {
 	return &SystemSettings{
+		info:     info,
 		runtime:  runtime,
 		slurm:    slurm,
 		kubectl:  kubectl,
@@ -142,16 +191,39 @@ func (s *SystemSettings) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a healthy worker is selected for system-settings checks$`, s.selectHealthyWorker)
 	sc.Step(`^root collects direct and nested Bash resource limits over SSH to the worker$`, s.collectWorkerResourceLimits)
 	sc.Step(`^direct and nested worker SSH resource limits match the compute profile$`, s.resourceLimitsMatchComputeProfile)
+	sc.Step(`^a regular user account is available on the worker$`, s.regularUserIsAvailableOnWorker)
+	sc.Step(`^worker SSH without a job is allowed for the regular user$`, s.workerSSHWithoutJobIsAllowedForRegularUser)
+	sc.Step(`^PAM Slurm adopt requires a job for the regular user$`, s.pamSlurmAdoptRequiresJobForRegularUser)
+	sc.Step(`^the regular user starts a job on the worker and collects direct and nested Bash resource limits over SSH$`, s.collectAdoptedWorkerResourceLimits)
+	sc.Step(`^direct and nested adopted SSH resource limits match the regular-user Slurm compute profile$`, s.resourceLimitsMatchRegularUserSlurmComputeProfile)
+	sc.Step(`^the login node has a public SSH endpoint$`, s.loginHasPublicSSHEndpoint)
+	sc.Step(`^a regular user can log in over the public SSH endpoint$`, s.regularUserCanLogInOverPublicSSH)
+	sc.Step(`^the regular user collects resource limits and kernel settings over public login SSH$`, s.collectPublicLoginSettings)
+	sc.Step(`^the public login SSH session exposes the required kernel settings$`, s.publicLoginExposesRequiredKernelSettings)
+	sc.Step(`^the regular user runs native and Enroot interactive jobs that collect resource limits and kernel settings$`, s.runInteractiveJobs)
+	sc.Step(`^both interactive jobs report their resource limits and kernel settings$`, s.interactiveJobsReportSettings)
+	sc.Step(`^both interactive jobs' resource limits match the Slurm compute profile$`, s.interactiveJobsMatchSlurmComputeProfile)
+	sc.Step(`^both interactive jobs expose the required kernel settings$`, s.interactiveJobsExposeRequiredKernelSettings)
+	sc.Step(`^the regular user collects direct and nested Bash resource limits over SSH to the worker$`, s.collectRegularUserWorkerResourceLimits)
+	sc.Step(`^direct and nested worker SSH resource limits match the regular-user compute profile$`, s.resourceLimitsMatchRegularUserComputeProfile)
 	sc.Step(`^a native Slurm job collects direct and nested Bash resource limits$`, s.submitNativeResourceLimitsJob)
 	sc.Step(`^the native system-settings job succeeds$`, s.resourceLimitsJobSucceeds)
+	sc.Step(`^the regular user submits a native Slurm job that collects direct and nested Bash resource limits$`, s.submitRegularUserResourceLimitsJob)
+	sc.Step(`^the native system-settings job succeeds as the regular user$`, s.resourceLimitsJobSucceedsAsRegularUser)
 	sc.Step(`^its direct and nested resource limits match the Slurm compute profile$`, s.resourceLimitsMatchSlurmComputeProfile)
+	sc.Step(`^its direct and nested resource limits match the compute profile$`, s.resourceLimitsMatchComputeProfile)
 	sc.Step(`^an Enroot Slurm job collects direct and nested Bash resource limits$`, s.submitEnrootResourceLimitsJob)
 	sc.Step(`^the Enroot system-settings job succeeds$`, s.resourceLimitsJobSucceeds)
+	sc.Step(`^a Docker Slurm job collects direct and nested Bash resource limits$`, s.submitDockerResourceLimitsJob)
+	sc.Step(`^the Docker system-settings job succeeds$`, s.resourceLimitsJobSucceeds)
 	sc.Step(`^kernel settings are collected from login and worker SSH sessions$`, s.collectSSHKernelSettings)
 	sc.Step(`^both SSH sessions expose the required kernel settings$`, s.sshSessionsExposeRequiredKernelSettings)
 	sc.Step(`^native and Enroot Slurm jobs collect kernel settings$`, s.submitKernelSettingsJobs)
 	sc.Step(`^both kernel-settings jobs succeed$`, s.kernelSettingsJobsSucceed)
 	sc.Step(`^both jobs expose the required kernel settings$`, s.jobsExposeRequiredKernelSettings)
+	sc.Step(`^a Docker Slurm job collects kernel settings$`, s.submitDockerKernelSettingsJob)
+	sc.Step(`^the Docker kernel-settings job succeeds$`, s.dockerKernelSettingsJobSucceeds)
+	sc.Step(`^it exposes the required kernel settings$`, s.dockerJobExposesRequiredKernelSettings)
 	sc.Step(`^a healthy GPU worker is selected for system-settings checks$`, s.selectHealthyGPUWorker)
 	sc.Step(`^its Slurm container exposes the required NVIDIA driver capabilities$`, s.slurmContainerExposesRequiredNVIDIADriverCapabilities)
 }
@@ -164,6 +236,31 @@ func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
 		if err := s.slurm.CancelJob(ctx, tracked.job.ID, systemSettingsCleanup); err != nil {
 			s.runtime.Logf("cleanup: cancel %s job %s: %v", tracked.kind, tracked.job.ID, err)
 		}
+		if tracked.container == probeContainerDocker && s.worker.Name != "" {
+			// Cancelling the job kills the Docker client, not necessarily the container.
+			name := systemSettingsDockerContainerName(tracked.job.ID)
+			command := fmt.Sprintf("sudo docker rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(name))
+			if _, err := s.runtime.Worker(s.worker).Run(ctx, command); err != nil {
+				s.runtime.Logf("cleanup: remove Docker container %s on worker %s: %v", name, s.worker.Name, err)
+			}
+		}
+	}
+
+	if s.publicLoginKeyAuthorized {
+		if err := removeSSHTestIdentity(
+			ctx,
+			s.runtime,
+			sshTestUserName,
+			publicLoginSSHKeyName,
+			publicLoginSSHKeyComment,
+		); err != nil {
+			s.runtime.Logf("cleanup: remove public login SSH key of %s: %v", sshTestUserName, err)
+		}
+	}
+	if s.publicLoginKeyDir != "" {
+		if err := os.RemoveAll(s.publicLoginKeyDir); err != nil {
+			s.runtime.Logf("cleanup: remove local SSH key directory %s: %v", s.publicLoginKeyDir, err)
+		}
 	}
 
 	s.worker = framework.WorkerInfo{}
@@ -173,6 +270,12 @@ func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
 	s.workerKernel = nil
 	s.nativeKernel = nil
 	s.enrootKernel = nil
+	s.dockerKernel = nil
+	s.publicLogin = framework.LoginSSHEndpoint{}
+	s.publicLoginKeyDir = ""
+	s.publicLoginKeyAuthorized = false
+	s.publicLoginKernel = nil
+	s.interactive = nil
 }
 
 func (s *SystemSettings) selectHealthyWorker(ctx context.Context) error {
@@ -222,6 +325,264 @@ func (s *SystemSettings) collectWorkerResourceLimits(ctx context.Context) error 
 	return nil
 }
 
+func (s *SystemSettings) regularUserIsAvailableOnWorker(ctx context.Context) error {
+	if err := s.requireWorker(); err != nil {
+		return err
+	}
+	if err := ensureSSHTestUser(ctx, s.runtime, sshTestUserName); err != nil {
+		return err
+	}
+	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, sshTestUserName, s.worker); err != nil {
+		return err
+	}
+	// slurmctld must resolve the user before it accepts a job submitted as them.
+	return waitForSSHTestUserOnController(ctx, s.runtime, sshTestUserName)
+}
+
+func (s *SystemSettings) collectRegularUserWorkerResourceLimits(ctx context.Context) error {
+	if err := s.requireWorker(); err != nil {
+		return err
+	}
+	output, err := runInternalSSHAsTestUser(
+		ctx,
+		s.runtime,
+		s.worker.Name,
+		systemSettingsSSHTimeout,
+		pairedResourceLimitProbe(),
+	)
+	if err != nil {
+		return fmt.Errorf("collect resource limits over SSH from worker %s as %s: %w", s.worker.Name, sshTestUserName, err)
+	}
+	s.limits, err = parseResourceLimitSnapshots(output)
+	if err != nil {
+		return fmt.Errorf("parse worker %s SSH resource limits of %s: %w", s.worker.Name, sshTestUserName, err)
+	}
+	return nil
+}
+
+func (s *SystemSettings) workerSSHWithoutJobIsAllowedForRegularUser(ctx context.Context) error {
+	requiresJob, err := s.regularUserNeedsJobForWorkerSSH(ctx)
+	if err != nil {
+		return err
+	}
+	if requiresJob {
+		s.runtime.Logf("system settings: PAM Slurm adopt requires a job for %s on workers, skipping scenario", sshTestUserName)
+		return godog.ErrSkip
+	}
+	return nil
+}
+
+func (s *SystemSettings) pamSlurmAdoptRequiresJobForRegularUser(ctx context.Context) error {
+	requiresJob, err := s.regularUserNeedsJobForWorkerSSH(ctx)
+	if err != nil {
+		return err
+	}
+	if !requiresJob {
+		s.runtime.Logf("system settings: PAM Slurm adopt is disabled or exempts %s, skipping scenario", sshTestUserName)
+		return godog.ErrSkip
+	}
+	return nil
+}
+
+func (s *SystemSettings) regularUserNeedsJobForWorkerSSH(ctx context.Context) (bool, error) {
+	cluster, err := s.kubectl.SlurmCluster(ctx, s.info.SlurmClusterName)
+	if err != nil {
+		return false, err
+	}
+	if !cluster.PAMSlurmAdoptEnabled {
+		return false, nil
+	}
+	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, "id -nG "+framework.ShellQuote(sshTestUserName))
+	if err != nil {
+		return false, fmt.Errorf("list groups of %s: %w", sshTestUserName, err)
+	}
+	return pamSlurmAdoptRequiresJob(cluster, sshTestUserName, strings.Fields(output)), nil
+}
+
+func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context) error {
+	if err := s.requireWorker(); err != nil {
+		return err
+	}
+	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
+		JobName:      adoptedSSHHolderJobName,
+		Nodes:        1,
+		Nodelist:     []string{s.worker.Name},
+		TasksPerNode: 1,
+		Wrap:         "sleep 3600",
+		RunAsUser:    sshTestUserName,
+	})
+	if err != nil {
+		return err
+	}
+	s.trackJob(job, adoptedSSHHolderJobName, probeContainerNone)
+	s.runtime.Logf("system settings: submitted job=%s id=%s worker=%s user=%s",
+		adoptedSSHHolderJobName, job.ID, s.worker.Name, sshTestUserName)
+	if err := s.slurm.WaitForJobRunning(ctx, job.ID, systemSettingsJobTimeout); err != nil {
+		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, err)
+	}
+
+	output, err := runInternalSSHAsTestUser(
+		ctx,
+		s.runtime,
+		s.worker.Name,
+		systemSettingsSSHTimeout,
+		pairedResourceLimitProbe(),
+	)
+	if err != nil {
+		return fmt.Errorf("collect resource limits over SSH adopted into job %s on worker %s: %w", job.ID, s.worker.Name, err)
+	}
+	s.limits, err = parseResourceLimitSnapshots(output)
+	if err != nil {
+		return fmt.Errorf("parse adopted SSH resource limits on worker %s: %w", s.worker.Name, err)
+	}
+	return nil
+}
+
+func (s *SystemSettings) loginHasPublicSSHEndpoint(ctx context.Context) error {
+	exposed := false
+	err := s.runtime.WaitFor(ctx, "login public SSH endpoint address", publicLoginEndpointTimeout, framework.DefaultPollInterval,
+		func(waitCtx context.Context) (bool, error) {
+			endpoint, found, err := s.kubectl.LoginSSHEndpoint(waitCtx, s.info.SlurmClusterName)
+			if err != nil {
+				return false, err
+			}
+			exposed = found
+			s.publicLogin = endpoint
+			return true, nil
+		})
+	if err != nil {
+		return err
+	}
+	if !exposed {
+		s.runtime.Logf("system settings: login SSH is not exposed outside Kubernetes, skipping scenario")
+		return godog.ErrSkip
+	}
+	s.runtime.Logf("system settings: login public SSH endpoint=%s:%d", s.publicLogin.Host, s.publicLogin.Port)
+	return nil
+}
+
+func (s *SystemSettings) regularUserCanLogInOverPublicSSH(ctx context.Context) error {
+	if s.publicLogin.Host == "" {
+		return fmt.Errorf("discover login public SSH endpoint")
+	}
+	if err := ensureSSHTestUser(ctx, s.runtime, sshTestUserName); err != nil {
+		return err
+	}
+
+	keyDir, err := os.MkdirTemp("", "soperator-e2e-public-login-ssh-")
+	if err != nil {
+		return fmt.Errorf("create local SSH key directory: %w", err)
+	}
+	s.publicLoginKeyDir = keyDir
+	keyPath := filepath.Join(keyDir, "id_ed25519")
+	if _, err := s.runtime.Local().Run(ctx,
+		"ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", publicLoginSSHKeyComment, "-f", keyPath,
+	); err != nil {
+		return fmt.Errorf("generate local SSH key: %w", err)
+	}
+	publicKey, err := os.ReadFile(keyPath + ".pub")
+	if err != nil {
+		return fmt.Errorf("read local SSH public key: %w", err)
+	}
+
+	s.publicLoginKeyAuthorized = true
+	return authorizeSSHPublicKey(ctx, s.runtime, sshTestUserName, string(publicKey), publicLoginSSHKeyComment)
+}
+
+func (s *SystemSettings) collectPublicLoginSettings(ctx context.Context) error {
+	if s.publicLoginKeyDir == "" {
+		return fmt.Errorf("prepare local SSH key for public login SSH")
+	}
+	keyPath := filepath.Join(s.publicLoginKeyDir, "id_ed25519")
+	output, err := s.runtime.Local().RunWithDefaultRetry(ctx,
+		publicLoginSSHArgs(keyPath, s.publicLogin, sshTestUserName, resourceLimitsAndKernelSettingsProbe())...,
+	)
+	if err != nil {
+		return fmt.Errorf("collect settings over public login SSH %s@%s:%d: %w",
+			sshTestUserName, s.publicLogin.Host, s.publicLogin.Port, err)
+	}
+	s.limits, err = parseResourceLimitSnapshots(output)
+	if err != nil {
+		return fmt.Errorf("parse public login SSH resource limits: %w", err)
+	}
+	s.publicLoginKernel, err = parseKernelSettings(output)
+	if err != nil {
+		return fmt.Errorf("parse public login SSH kernel settings: %w", err)
+	}
+	return nil
+}
+
+func (s *SystemSettings) publicLoginExposesRequiredKernelSettings() error {
+	return validateKernelSettings("public login SSH", s.publicLoginKernel)
+}
+
+func (s *SystemSettings) runInteractiveJobs(ctx context.Context) error {
+	if err := s.requireWorker(); err != nil {
+		return err
+	}
+	for _, jobSpec := range []struct {
+		kind      string
+		container probeContainer
+	}{
+		{kind: "native", container: probeContainerNone},
+		{kind: "Enroot", container: probeContainerEnroot},
+	} {
+		command := interactiveProbeCommand(
+			sshTestUserName,
+			s.worker.Name,
+			resourceLimitsAndKernelSettingsProbe(),
+			jobSpec.container,
+		)
+		output, err := s.runtime.Jail().Run(ctx, command)
+		if err != nil {
+			return fmt.Errorf("run %s interactive job as %s on worker %s: %w; output:\n%s",
+				jobSpec.kind, sshTestUserName, s.worker.Name, err, strings.TrimSpace(output))
+		}
+		s.interactive = append(s.interactive, systemSettingsProbeResult{kind: jobSpec.kind, output: output})
+	}
+	return nil
+}
+
+func (s *SystemSettings) interactiveJobsReportSettings() error {
+	if len(s.interactive) != 2 {
+		return fmt.Errorf("find interactive job outputs: got %d, want 2", len(s.interactive))
+	}
+	for i := range s.interactive {
+		result := &s.interactive[i]
+		var err error
+		result.limits, err = parseResourceLimitSnapshots(result.output)
+		if err != nil {
+			return fmt.Errorf("parse resource limits from %s interactive job: %w; output:\n%s",
+				result.kind, err, strings.TrimSpace(result.output))
+		}
+		result.kernel, err = parseKernelSettings(result.output)
+		if err != nil {
+			return fmt.Errorf("parse kernel settings from %s interactive job: %w; output:\n%s",
+				result.kind, err, strings.TrimSpace(result.output))
+		}
+	}
+	return nil
+}
+
+func (s *SystemSettings) interactiveJobsMatchSlurmComputeProfile() error {
+	var validationErrors []error
+	for _, result := range s.interactive {
+		if err := validateSlurmResourceLimitSnapshots(result.limits, computeResourceLimitProfile()); err != nil {
+			validationErrors = append(validationErrors, fmt.Errorf("validate %s interactive job: %w", result.kind, err))
+		}
+	}
+	return errors.Join(validationErrors...)
+}
+
+func (s *SystemSettings) interactiveJobsExposeRequiredKernelSettings() error {
+	var validationErrors []error
+	for _, result := range s.interactive {
+		validationErrors = append(validationErrors,
+			validateKernelSettings(result.kind+" interactive job", result.kernel))
+	}
+	return errors.Join(validationErrors...)
+}
+
 func (s *SystemSettings) loginLimitsMatchDefaultProfile() error {
 	return validateResourceLimitSnapshots(s.limits, loginResourceLimitProfile(), true)
 }
@@ -230,40 +591,87 @@ func (s *SystemSettings) resourceLimitsMatchComputeProfile() error {
 	return validateResourceLimitSnapshots(s.limits, computeResourceLimitProfile(), false)
 }
 
+func (s *SystemSettings) resourceLimitsMatchRegularUserComputeProfile() error {
+	return validateResourceLimitSnapshots(s.limits, regularUserComputeResourceLimitProfile(), false)
+}
+
 func (s *SystemSettings) resourceLimitsMatchSlurmComputeProfile() error {
-	return validateSlurmResourceLimitSnapshots(s.limits)
+	return validateSlurmResourceLimitSnapshots(s.limits, computeResourceLimitProfile())
+}
+
+// resourceLimitsMatchRegularUserSlurmComputeProfile expects pam_limits to apply
+// the regular-user profile to an adopted SSH session, while ulimit_pam_adopt
+// sets max_memory from the job it was adopted into.
+func (s *SystemSettings) resourceLimitsMatchRegularUserSlurmComputeProfile() error {
+	return validateSlurmResourceLimitSnapshots(s.limits, regularUserComputeResourceLimitProfile())
 }
 
 func (s *SystemSettings) submitNativeResourceLimitsJob(ctx context.Context) error {
-	return s.submitResourceLimitsJob(ctx, nativeResourceLimitsJobName, false)
+	return s.submitProbeJob(ctx, nativeResourceLimitsJobName, pairedResourceLimitProbe(), probeContainerNone, "")
 }
 
 func (s *SystemSettings) submitEnrootResourceLimitsJob(ctx context.Context) error {
-	return s.submitResourceLimitsJob(ctx, enrootResourceLimitsJobName, true)
+	return s.submitProbeJob(ctx, enrootResourceLimitsJobName, pairedResourceLimitProbe(), probeContainerEnroot, "")
 }
 
-func (s *SystemSettings) submitResourceLimitsJob(ctx context.Context, jobName string, enroot bool) error {
+func (s *SystemSettings) submitDockerResourceLimitsJob(ctx context.Context) error {
+	return s.submitProbeJob(ctx, dockerResourceLimitsJobName, pairedResourceLimitProbe(), probeContainerDocker, "")
+}
+
+func (s *SystemSettings) submitRegularUserResourceLimitsJob(ctx context.Context) error {
+	return s.submitProbeJob(
+		ctx,
+		regularUserResourceLimitsJobName,
+		pairedResourceLimitProbe(),
+		probeContainerNone,
+		sshTestUserName,
+	)
+}
+
+// submitProbeJob submits a single-task job on the selected worker that runs
+// probe in the given container. A non-empty user submits the job as that user
+// and makes the probe report the user its task runs as.
+func (s *SystemSettings) submitProbeJob(
+	ctx context.Context,
+	jobName string,
+	probe string,
+	container probeContainer,
+	user string,
+) error {
 	if err := s.requireWorker(); err != nil {
 		return err
 	}
-	command := srunProbeCommand(pairedResourceLimitProbe(), enroot)
+	if user != "" {
+		probe = jobUserProbe() + "; " + probe
+	}
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      jobName,
 		Nodes:        1,
 		Nodelist:     []string{s.worker.Name},
 		TasksPerNode: 1,
-		Wrap:         command,
+		Wrap:         srunProbeCommand(probe, container),
+		RunAsUser:    user,
 	})
 	if err != nil {
 		return err
 	}
-	s.trackJob(job, jobName)
+	s.trackJob(job, jobName, container)
 	s.runtime.Logf("system settings: submitted job=%s id=%s worker=%s stdout=%s",
 		jobName, job.ID, s.worker.Name, job.StdoutPath)
 	return nil
 }
 
 func (s *SystemSettings) resourceLimitsJobSucceeds(ctx context.Context) error {
+	return s.completeResourceLimitsJob(ctx, "")
+}
+
+func (s *SystemSettings) resourceLimitsJobSucceedsAsRegularUser(ctx context.Context) error {
+	return s.completeResourceLimitsJob(ctx, sshTestUserName)
+}
+
+// completeResourceLimitsJob waits for the latest job, parses its resource
+// limits and, when expectedUser is set, checks the user its task ran as.
+func (s *SystemSettings) completeResourceLimitsJob(ctx context.Context, expectedUser string) error {
 	job, err := s.latestJob()
 	if err != nil {
 		return err
@@ -271,6 +679,11 @@ func (s *SystemSettings) resourceLimitsJobSucceeds(ctx context.Context) error {
 	output, err := s.completeJob(ctx, job)
 	if err != nil {
 		return err
+	}
+	if expectedUser != "" {
+		if err := validateJobUser(output, expectedUser); err != nil {
+			return fmt.Errorf("validate job %s: %w", job.ID, err)
+		}
 	}
 	s.limits, err = parseResourceLimitSnapshots(output)
 	if err != nil {
@@ -311,31 +724,42 @@ func (s *SystemSettings) sshSessionsExposeRequiredKernelSettings() error {
 }
 
 func (s *SystemSettings) submitKernelSettingsJobs(ctx context.Context) error {
-	if err := s.requireWorker(); err != nil {
-		return err
-	}
 	for _, jobSpec := range []struct {
-		name   string
-		enroot bool
+		name      string
+		container probeContainer
 	}{
-		{name: nativeKernelSettingsJobName},
-		{name: enrootKernelSettingsJobName, enroot: true},
+		{name: nativeKernelSettingsJobName, container: probeContainerNone},
+		{name: enrootKernelSettingsJobName, container: probeContainerEnroot},
 	} {
-		job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
-			JobName:      jobSpec.name,
-			Nodes:        1,
-			Nodelist:     []string{s.worker.Name},
-			TasksPerNode: 1,
-			Wrap:         srunProbeCommand(kernelSettingsProbe(), jobSpec.enroot),
-		})
-		if err != nil {
+		if err := s.submitProbeJob(ctx, jobSpec.name, kernelSettingsProbe(), jobSpec.container, ""); err != nil {
 			return err
 		}
-		s.trackJob(job, jobSpec.name)
-		s.runtime.Logf("system settings: submitted job=%s id=%s worker=%s stdout=%s",
-			jobSpec.name, job.ID, s.worker.Name, job.StdoutPath)
 	}
 	return nil
+}
+
+func (s *SystemSettings) submitDockerKernelSettingsJob(ctx context.Context) error {
+	return s.submitProbeJob(ctx, dockerKernelSettingsJobName, kernelSettingsProbe(), probeContainerDocker, "")
+}
+
+func (s *SystemSettings) dockerKernelSettingsJobSucceeds(ctx context.Context) error {
+	job, err := s.latestJob()
+	if err != nil {
+		return err
+	}
+	output, err := s.completeJob(ctx, job)
+	if err != nil {
+		return err
+	}
+	s.dockerKernel, err = parseKernelSettings(output)
+	if err != nil {
+		return fmt.Errorf("parse kernel settings from Docker job %s: %w", job.ID, err)
+	}
+	return nil
+}
+
+func (s *SystemSettings) dockerJobExposesRequiredKernelSettings() error {
+	return validateKernelSettings("Docker Slurm job", s.dockerKernel)
 }
 
 func (s *SystemSettings) kernelSettingsJobsSucceed(ctx context.Context) error {
@@ -410,8 +834,8 @@ func (s *SystemSettings) requireWorker() error {
 	return nil
 }
 
-func (s *SystemSettings) trackJob(job framework.SbatchJob, kind string) {
-	s.jobs = append(s.jobs, systemSettingsJob{job: job, kind: kind})
+func (s *SystemSettings) trackJob(job framework.SbatchJob, kind string, container probeContainer) {
+	s.jobs = append(s.jobs, systemSettingsJob{job: job, kind: kind, container: container})
 }
 
 func (s *SystemSettings) latestJob() (framework.SbatchJob, error) {
@@ -477,14 +901,90 @@ func kernelSettingsProbe() string {
 	return strings.Join(lines, "; ")
 }
 
-func srunProbeCommand(probe string, enroot bool) string {
+func jobUserProbe() string {
+	return fmt.Sprintf("printf '%s=%%s\\n' \"$(id -un)\"", jobUserKey)
+}
+
+func srunProbeCommand(probe string, container probeContainer, flags ...string) string {
 	var args []string
 	args = append(args, "srun", "--nodes=1", "--ntasks=1")
-	if enroot {
+	args = append(args, flags...)
+	switch container {
+	case probeContainerEnroot:
 		args = append(args, "--container-image="+framework.ShellQuote(enrootLifecycleImage))
+	case probeContainerDocker:
+		// The batch shell expands SLURM_JOB_ID, so cleanup can find the container by job ID.
+		args = append(args,
+			"docker", "run", "--rm",
+			"--name", systemSettingsDockerContainerPrefix+"${SLURM_JOB_ID}",
+			framework.ShellQuote(ubuntuDockerImage),
+		)
 	}
 	args = append(args, framework.BashLC(probe))
 	return strings.Join(args, " ")
+}
+
+func resourceLimitsAndKernelSettingsProbe() string {
+	return pairedResourceLimitProbe() + "; " + kernelSettingsProbe()
+}
+
+// interactiveProbeCommand runs probe as userName in an interactive srun --pty
+// job on workerName. srun needs a terminal for --pty, which kubectl exec does
+// not provide, so script allocates one.
+func interactiveProbeCommand(userName, workerName, probe string, container probeContainer) string {
+	srun := srunProbeCommand(probe, container,
+		"--pty",
+		fmt.Sprintf("--immediate=%d", int(interactiveJobImmediate.Seconds())),
+		"--nodelist="+framework.ShellQuote(workerName),
+	)
+	interactive := fmt.Sprintf("timeout %d script -qec %s /dev/null",
+		int(systemSettingsJobTimeout.Seconds()),
+		framework.ShellQuote(srun),
+	)
+	return fmt.Sprintf("su - %s -c %s", framework.ShellQuote(userName), framework.ShellQuote(interactive))
+}
+
+func publicLoginSSHArgs(keyPath string, endpoint framework.LoginSSHEndpoint, userName, remoteCommand string) []string {
+	return []string{
+		"ssh",
+		"-i", keyPath,
+		"-p", strconv.Itoa(int(endpoint.Port)),
+		"-o", "IdentitiesOnly=yes",
+		"-o", "BatchMode=yes",
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "LogLevel=ERROR",
+		"-o", fmt.Sprintf("ConnectTimeout=%d", int(systemSettingsSSHTimeout.Seconds())),
+		userName + "@" + endpoint.Host,
+		remoteCommand,
+	}
+}
+
+// pamSlurmAdoptRequiresJob mirrors the worker PAM account stack: users and
+// groups from the exemption lists bypass pam_slurm_adopt, everyone else needs
+// a running job on the worker.
+func pamSlurmAdoptRequiresJob(cluster framework.SlurmClusterInfo, userName string, userGroups []string) bool {
+	if !cluster.PAMSlurmAdoptEnabled || slices.Contains(cluster.PAMSlurmAdoptExemptUsers, userName) {
+		return false
+	}
+	for _, group := range userGroups {
+		if slices.Contains(cluster.PAMSlurmAdoptExemptGroups, group) {
+			return false
+		}
+	}
+	return true
+}
+
+func systemSettingsDockerContainerName(jobID string) string {
+	return systemSettingsDockerContainerPrefix + jobID
+}
+
+func validateJobUser(output, expected string) error {
+	actual := parseKeyValueLine(output, jobUserKey)
+	if actual != expected {
+		return fmt.Errorf("check Slurm job task user %q: want %q", actual, expected)
+	}
+	return nil
 }
 
 func parseResourceLimitSnapshots(output string) (resourceLimitSnapshots, error) {
@@ -574,6 +1074,15 @@ func computeResourceLimitProfile() resourceLimitSnapshot {
 	return profile
 }
 
+// regularUserComputeResourceLimitProfile is the compute profile of non-root
+// worker SSH sessions. The worker limits.conf applies "* nice -20" only to
+// non-root users, and pam_limits turns it into RLIMIT_NICE=20-(-20)=40.
+func regularUserComputeResourceLimitProfile() resourceLimitSnapshot {
+	profile := computeResourceLimitProfile()
+	profile[limitSchedulingPriority] = "40"
+	return profile
+}
+
 func validateResourceLimitProfile(actual, expected resourceLimitSnapshot, pendingSignalsPositive bool) error {
 	var validationErrors []error
 	for _, limit := range resourceLimitOptions {
@@ -639,8 +1148,10 @@ func validateResourceLimitSnapshots(
 	return errors.Join(directErr, nestedErr, comparisonErr)
 }
 
-func validateSlurmResourceLimitSnapshots(snapshots resourceLimitSnapshots) error {
-	expected := computeResourceLimitProfile()
+// validateSlurmResourceLimitSnapshots validates snapshots against profile,
+// except for max_memory, which Slurm sets from the job memory.
+func validateSlurmResourceLimitSnapshots(snapshots resourceLimitSnapshots, profile resourceLimitSnapshot) error {
+	expected := maps.Clone(profile)
 	delete(expected, limitMaxMemory)
 
 	var validationErrors []error

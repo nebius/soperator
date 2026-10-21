@@ -176,6 +176,41 @@ chmod 0600 "${authorized_keys}"
 	return nil
 }
 
+// authorizeSSHPublicKey replaces any key tagged with keyComment in the user's
+// authorized_keys with publicKey. removeSSHTestIdentity removes it by the same tag.
+func authorizeSSHPublicKey(
+	ctx context.Context,
+	runtime framework.Runtime,
+	userName,
+	publicKey,
+	keyComment string,
+) error {
+	fields := strings.Fields(publicKey)
+	if len(fields) < 2 {
+		return fmt.Errorf("authorize SSH key for %s: malformed public key %q", userName, publicKey)
+	}
+	keyLine := fields[0] + " " + fields[1] + " " + keyComment
+	authorizeKey := fmt.Sprintf(`
+set -euo pipefail
+install -d -m 0700 "${HOME}/.ssh"
+authorized_keys="${HOME}/.ssh/authorized_keys"
+touch "${authorized_keys}"
+sed -i '\# %s$#d' "${authorized_keys}"
+printf '%%s\n' %s >> "${authorized_keys}"
+chmod 0600 "${authorized_keys}"
+`, keyComment, framework.ShellQuote(keyLine))
+	command := fmt.Sprintf(
+		"su - %s -c %s",
+		framework.ShellQuote(userName),
+		framework.ShellQuote(framework.BashLC(authorizeKey)),
+	)
+	if _, err := runtime.Jail().Run(ctx, command); err != nil {
+		return fmt.Errorf("authorize SSH key for %s: %w", userName, err)
+	}
+
+	return nil
+}
+
 func removeSSHTestIdentity(
 	ctx context.Context,
 	runtime framework.Runtime,
@@ -199,6 +234,35 @@ fi
 	)
 	_, err := runtime.Jail().Run(ctx, command)
 	return err
+}
+
+// runInternalSSHAsTestUser runs remoteCommand on host over SSH from the login
+// node as the SSH test user, relying on the cluster's internal SSH setup
+// instead of extra client options or a dedicated test identity.
+func runInternalSSHAsTestUser(
+	ctx context.Context,
+	runtime framework.Runtime,
+	host string,
+	timeout time.Duration,
+	remoteCommand string,
+) (string, error) {
+	quotedHost := framework.ShellQuote(host)
+	// Remove the host key before each SSH attempt so retries don't depend on
+	// persisted known_hosts state from previous attempts.
+	sshCommand := fmt.Sprintf(
+		"mkdir -p ~/.ssh && touch ~/.ssh/known_hosts && (ssh-keygen -R %s -f ~/.ssh/known_hosts >/dev/null 2>&1 || true) && timeout %.0f ssh %s %s </dev/null",
+		quotedHost,
+		timeout.Seconds(),
+		quotedHost,
+		framework.ShellQuote(remoteCommand),
+	)
+	command := fmt.Sprintf(
+		"su - %s -c %s",
+		framework.ShellQuote(sshTestUserName),
+		framework.ShellQuote(sshCommand),
+	)
+
+	return runtime.Jail().RunWithDefaultRetry(ctx, command)
 }
 
 func runSSHCommand(

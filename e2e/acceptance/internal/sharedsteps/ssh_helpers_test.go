@@ -14,9 +14,14 @@ import (
 
 type sshTestUserRuntime struct {
 	framework.Runtime
+	jail        framework.CommandScope
 	controller  framework.CommandScope
 	worker      framework.CommandScope
 	description string
+}
+
+func (r *sshTestUserRuntime) Jail() framework.CommandScope {
+	return r.jail
 }
 
 func (r *sshTestUserRuntime) Controller() framework.CommandScope {
@@ -42,6 +47,47 @@ func (r *sshTestUserRuntime) WaitFor(
 		return errors.New("identity is not ready")
 	}
 	return nil
+}
+
+func TestRunInternalSSHAsTestUser(t *testing.T) {
+	var command string
+	runtime := &sshTestUserRuntime{
+		jail: framework.NewCommandScope(func(_ context.Context, value string) (string, error) {
+			command = value
+			return "worker-0\n", nil
+		}),
+	}
+
+	output, err := runInternalSSHAsTestUser(t.Context(), runtime, "worker-0", 30*time.Second, "ulimit -n")
+	require.NoError(t, err)
+	assert.Equal(t, "worker-0\n", output)
+	assert.Equal(t, "su - 'bob' -c "+framework.ShellQuote(
+		"mkdir -p ~/.ssh && touch ~/.ssh/known_hosts && "+
+			"(ssh-keygen -R 'worker-0' -f ~/.ssh/known_hosts >/dev/null 2>&1 || true) && "+
+			"timeout 30 ssh 'worker-0' 'ulimit -n' </dev/null",
+	), command)
+}
+
+func TestAuthorizeSSHPublicKeyReplacesTaggedKey(t *testing.T) {
+	var command string
+	runtime := &sshTestUserRuntime{
+		jail: framework.NewCommandScope(func(_ context.Context, value string) (string, error) {
+			command = value
+			return "", nil
+		}),
+	}
+
+	require.NoError(t, authorizeSSHPublicKey(t.Context(), runtime, "bob", "ssh-ed25519 AAAAC3Nza runner@host\n", "soperator-e2e-test"))
+	assert.Contains(t, command, "su - 'bob' -c ")
+	assert.Contains(t, command, `\# soperator-e2e-test$#d`)
+	assert.Contains(t, command, "ssh-ed25519 AAAAC3Nza soperator-e2e-test")
+	assert.NotContains(t, command, "runner@host")
+}
+
+func TestAuthorizeSSHPublicKeyRejectsMalformedKey(t *testing.T) {
+	err := authorizeSSHPublicKey(t.Context(), &sshTestUserRuntime{}, "bob", "garbage", "soperator-e2e-test")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "malformed public key")
 }
 
 func TestWaitForSSHTestUserOnController(t *testing.T) {
