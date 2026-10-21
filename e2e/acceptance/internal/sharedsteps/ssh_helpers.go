@@ -201,6 +201,35 @@ fi
 	return err
 }
 
+// runInternalSSHAsTestUser runs remoteCommand on host over SSH from the login
+// node as the SSH test user, relying on the cluster's internal SSH setup
+// instead of extra client options or a dedicated test identity.
+func runInternalSSHAsTestUser(
+	ctx context.Context,
+	runtime framework.Runtime,
+	host string,
+	timeout time.Duration,
+	remoteCommand string,
+) (string, error) {
+	quotedHost := framework.ShellQuote(host)
+	// Remove the host key before each SSH attempt so retries don't depend on
+	// persisted known_hosts state from previous attempts.
+	sshCommand := fmt.Sprintf(
+		"mkdir -p ~/.ssh && touch ~/.ssh/known_hosts && (ssh-keygen -R %s -f ~/.ssh/known_hosts >/dev/null 2>&1 || true) && timeout %.0f ssh %s %s </dev/null",
+		quotedHost,
+		timeout.Seconds(),
+		quotedHost,
+		framework.ShellQuote(remoteCommand),
+	)
+	command := fmt.Sprintf(
+		"su - %s -c %s",
+		framework.ShellQuote(sshTestUserName),
+		framework.ShellQuote(sshCommand),
+	)
+
+	return runtime.Jail().RunWithDefaultRetry(ctx, command)
+}
+
 func runSSHCommand(
 	ctx context.Context,
 	runtime framework.Runtime,
