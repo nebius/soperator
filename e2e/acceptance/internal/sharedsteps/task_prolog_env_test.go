@@ -22,6 +22,19 @@ func TestTaskPrologNetworkEnvCommand(t *testing.T) {
 	assert.Contains(t, command, taskPrologNCCLNetworkVarsPath)
 }
 
+func TestTaskPrologWorkerSSHNetworkEnvCommand(t *testing.T) {
+	command := taskPrologWorkerSSHNetworkEnvCommand("bob", "worker-gpu-0", 30*time.Second)
+
+	assert.Contains(t, command, "su - 'bob' -c")
+	assert.Contains(t, command, "timeout 30 ssh")
+	assert.Contains(t, command, "BatchMode=yes")
+	assert.Contains(t, command, "'worker-gpu-0'")
+	assert.Contains(t, command, "bash -lc")
+	assert.Contains(t, command, "UCX_NET_DEVICES")
+	assert.Contains(t, command, "NCCL_IB_HCA")
+	assert.Contains(t, command, taskPrologNCCLNetworkVarsPath)
+}
+
 func TestParseTaskPrologEnvOutput(t *testing.T) {
 	vars, err := parseTaskPrologEnvOutput(`cpu-bind: worker-gpu-0
 ACTUAL_UCX_NET_DEVICES=mlx5_4:1,mlx5_5:1
@@ -54,7 +67,7 @@ func TestValidateTaskPrologNetworkEnv(t *testing.T) {
 		expectedNCCLIBHCAName:     "=mlx5_4,mlx5_5",
 	}
 
-	assert.NoError(t, validateTaskPrologNetworkEnv(vars))
+	assert.NoError(t, validateTaskPrologNetworkEnv(vars, "job environment"))
 }
 
 func TestValidateTaskPrologNetworkEnvReportsMissingAndMismatchedValues(t *testing.T) {
@@ -64,8 +77,8 @@ func TestValidateTaskPrologNetworkEnvReportsMissingAndMismatchedValues(t *testin
 		expectedNCCLIBHCAName:     "mlx5_4",
 	}
 
-	err := validateTaskPrologNetworkEnv(vars)
+	err := validateTaskPrologNetworkEnv(vars, "worker SSH login environment")
 	require.Error(t, err)
-	assert.ErrorContains(t, err, `UCX_NET_DEVICES="mlx5_0" in job environment, want "mlx5_1"`)
-	assert.ErrorContains(t, err, "NCCL_IB_HCA is missing from job environment output")
+	assert.ErrorContains(t, err, `UCX_NET_DEVICES="mlx5_0" in worker SSH login environment, want "mlx5_1"`)
+	assert.ErrorContains(t, err, "NCCL_IB_HCA is missing from worker SSH login environment output")
 }
