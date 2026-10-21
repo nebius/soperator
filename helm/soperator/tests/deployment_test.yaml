@@ -286,3 +286,21 @@ tests:
           path: spec.template.spec.serviceAccountName
       - exists:
           path: spec.template.spec.terminationGracePeriodSeconds
+
+  - it: should enable all controllers by default
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SLURM_OPERATOR_CONTROLLERS
+            value: cluster,loginupdate,nodeconfigurator,nodeset,rollingupdate,topology
+
+  - it: should disable one controller independently while keeping other controllers enabled
+    set:
+      controllerManager.manager.controllersEnabled.topology: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SLURM_OPERATOR_CONTROLLERS
+            value: cluster,loginupdate,nodeconfigurator,nodeset,rollingupdate,-topology

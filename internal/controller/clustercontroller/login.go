@@ -242,6 +242,36 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 				},
 			},
 			utils.MultiStepExecutionStep{
+				Name: "Slurm Login ServiceAccount",
+				Func: func(stepCtx context.Context) error {
+					desired := login.RenderServiceAccount(clusterValues.Namespace, clusterValues.Name)
+					if err := r.ServiceAccount.Reconcile(stepCtx, cluster, desired); err != nil {
+						return fmt.Errorf("reconcile login ServiceAccount: %w", err)
+					}
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Login Role",
+				Func: func(stepCtx context.Context) error {
+					desired := login.RenderRole(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeLogin)
+					if err := r.Role.Reconcile(stepCtx, cluster, desired); err != nil {
+						return fmt.Errorf("reconcile login Role: %w", err)
+					}
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Login RoleBinding",
+				Func: func(stepCtx context.Context) error {
+					desired := login.RenderRoleBinding(clusterValues.Namespace, clusterValues.Name)
+					if err := r.RoleBinding.Reconcile(stepCtx, cluster, desired); err != nil {
+						return fmt.Errorf("reconcile login RoleBinding: %w", err)
+					}
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
 				Name: "Slurm Login StatefulSet",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)

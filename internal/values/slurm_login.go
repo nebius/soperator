@@ -1,6 +1,11 @@
 package values
 
 import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/robfig/cron/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -21,6 +26,7 @@ type SlurmLogin struct {
 	Service         Service
 	HeadlessService Service
 	StatefulSet     StatefulSet
+	UpdateStrategy  consts.UpdateStrategy
 
 	IsSSHDConfigMapDefault  bool
 	SSHDConfigMapName       string
@@ -63,6 +69,11 @@ func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.Mai
 		sssdConfSecretName = naming.BuildSecretSSSDConfName(clusterName)
 	}
 
+	updateStrategy := login.UpdateStrategy
+	if updateStrategy == "" {
+		updateStrategy = consts.UpdateStrategyDelayedRollout
+	}
+
 	res := SlurmLogin{
 		SlurmNode: *login.SlurmNode.DeepCopy(),
 		ContainerSshd: buildContainerFrom(
@@ -74,6 +85,7 @@ func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.Mai
 			consts.ContainerNameMunge,
 		),
 		CustomInitContainers: login.CustomInitContainers,
+		UpdateStrategy:       updateStrategy,
 		Service:              svc,
 		HeadlessService:      headlessSvc,
 		StatefulSet: buildStatefulSetFrom(
@@ -114,4 +126,34 @@ func buildSlurmLoginFrom(clusterName, namePrefix string, maintenance *consts.Mai
 
 func (l SlurmLogin) IsAutoscalingEnabled() bool {
 	return l.Autoscaling != nil && l.Autoscaling.Enabled
+}
+
+// ResolveLoginUpdatePolicy defaults the notice and validates an optional cron schedule.
+// An omitted schedule returns nil; an explicitly configured zero notice is preserved.
+func ResolveLoginUpdatePolicy(config *slurmv1.LoginUpdatePolicy) (time.Duration, cron.Schedule, error) {
+	minNotice := consts.DefaultLoginUpdateMinNotice
+	if config != nil && config.MinNotice != nil {
+		minNotice = config.MinNotice.Duration
+	}
+	if minNotice < 0 {
+		return 0, nil, fmt.Errorf("configure login update notice: duration must not be negative")
+	}
+
+	if config == nil || config.Schedule == nil {
+		return minNotice, nil, nil
+	}
+
+	spec := strings.TrimSpace(*config.Schedule)
+	if strings.HasPrefix(spec, "CRON_TZ=") || strings.HasPrefix(spec, "TZ=") {
+		// robfig/cron v3.0.1 slices the timezone before validating its separator.
+		zone, _, separated := strings.Cut(spec, " ")
+		if !separated || strings.HasSuffix(zone, "=") {
+			return 0, nil, fmt.Errorf("provide a nonempty cron timezone followed by five cron fields")
+		}
+	}
+	schedule, err := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow).Parse(spec)
+	if err != nil {
+		return 0, nil, fmt.Errorf("parse login update schedule: %w", err)
+	}
+	return minNotice, schedule, nil
 }

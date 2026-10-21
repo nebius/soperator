@@ -20150,6 +20150,41 @@ spec:
                         description: SSSDLdapCAConfigMapRefName is the name of the
                           ConfigMap containing LDAP CA certificates for the sssd sidecar.
                         type: string
+                      updatePolicy:
+                        description: |-
+                          UpdatePolicy controls delayed replacement of outdated login pods when UpdateStrategy is delayedRollout.
+                          Omitted settings use the default notice without a maintenance schedule.
+                          Policy edits recalculate existing deadlines from each pod's original announcement time.
+                          A recalculated deadline may move earlier or later; the announcement time is preserved.
+                        properties:
+                          minNotice:
+                            default: 720h
+                            description: |-
+                              MinNotice is the minimum delay before an automatic replacement, expressed as a Go duration.
+                              An explicit zero disables the delay; omitted values default to 720h (30 days).
+                            type: string
+                            x-kubernetes-validations:
+                            - message: minNotice must not be negative
+                              rule: duration(self) >= duration('0s')
+                          schedule:
+                            description: |-
+                              Schedule optionally aligns replacement with the first maintenance time at or after the notice period.
+                              When omitted, the deadline is exactly MinNotice after announcement.
+                              A configured value must be a nonempty standard five-field cron expression.
+                              Cron defaults to UTC and accepts a CRON_TZ or TZ timezone prefix.
+                              Aliases and interval descriptors are not supported.
+                            minLength: 1
+                            type: string
+                        type: object
+                      updateStrategy:
+                        default: delayedRollout
+                        description: |-
+                          UpdateStrategy selects delayed operator-managed replacement (delayedRollout) or immediate
+                          StatefulSet rolling replacement (rollingUpdate). Omitted values default to delayedRollout.
+                        enum:
+                        - delayedRollout
+                        - rollingUpdate
+                        type: string
                       userIsolation:
                         description: UserIsolation defines per-user cgroup resource
                           isolation for SSH sessions on login nodes

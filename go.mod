@@ -22,6 +22,7 @@ require (
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/client_model v0.6.3
 	github.com/prometheus/common v0.71.0
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/sethvargo/go-password v0.4.0
 	github.com/stretchr/testify v1.12.1
 	github.com/zclconf/go-cty v1.19.0
@@ -110,7 +111,6 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
-	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/sethvargo/go-envconfig v1.4.3 // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect

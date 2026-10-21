@@ -50,6 +50,7 @@ import (
 	"nebius.ai/slurm-operator/internal/cli"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
+	"nebius.ai/slurm-operator/internal/controller/loginupdatecontroller"
 	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
 	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
@@ -139,6 +140,7 @@ func main() {
 		restConfigBurst           int
 		requeueAfterRollingUpdate time.Duration
 		idleSlurmAuditInterval    time.Duration
+		requeueAfterLoginUpdate   time.Duration
 
 		topologyDeferrableReconfigureInterval time.Duration
 		topologyDeferrableReconfigureBurst    int
@@ -170,6 +172,7 @@ func main() {
 	flag.StringVar(&logLevel, "log-level", "info", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.DurationVar(&requeueAfterRollingUpdate, "requeue-after-rolling-update", time.Minute, "The interval between rolling update reconciliations for each worker NodeSet")
+	flag.DurationVar(&requeueAfterLoginUpdate, "requeue-after-login-update", loginupdatecontroller.DefaultRequeueAfter, "The retry interval while login updates wait for StatefulSet revisions or pod readiness/replacement; must be positive")
 	flag.DurationVar(&idleSlurmAuditInterval, "rolling-update-idle-slurm-audit-interval", 15*time.Minute, "The interval between Slurm audits for idle worker NodeSets; must be positive and is checked on regular rolling update reconciliations")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.StringVar(&controllersFlag, "controllers", "", "A comma-separated list of controllers to enable or disable. Use '*' for all, and '-name' to disable. Overrides SLURM_OPERATOR_CONTROLLERS if set.")
@@ -180,6 +183,10 @@ func main() {
 	flag.Parse()
 	if float32(restConfigQPS) <= 0 || math.IsNaN(restConfigQPS) || math.IsInf(restConfigQPS, 0) || restConfigQPS > math.MaxFloat32 || restConfigBurst <= 0 {
 		fmt.Fprintln(os.Stderr, "REST config QPS and burst must be positive and finite")
+		os.Exit(1)
+	}
+	if requeueAfterLoginUpdate <= 0 {
+		fmt.Fprintln(os.Stderr, "Login update reconciliation interval must be positive")
 		os.Exit(1)
 	}
 	if topologyDeferrableReconfigureInterval < 0 || topologyDeferrableReconfigureBurst <= 0 {
@@ -202,7 +209,14 @@ func main() {
 		controllersSpec = controllersFlag
 		controllersSource = "flag"
 	}
-	availableControllers := []string{"cluster", "nodeconfigurator", "nodeset", "rollingupdate", "topology"}
+	availableControllers := []string{
+		"cluster",
+		loginupdatecontroller.ControllerName,
+		"nodeconfigurator",
+		"nodeset",
+		"rollingupdate",
+		"topology",
+	}
 	controllersSet, err := controllersenabled.New(
 		controllersSpec,
 		availableControllers,
@@ -301,6 +315,15 @@ func main() {
 		}
 	}
 	// endregion Reconciler/Cluster
+
+	if controllersSet.Enabled(loginupdatecontroller.ControllerName) {
+		if err = loginupdatecontroller.NewReconciler(
+			mgr.GetClient(), mgr.GetAPIReader(), mgr.GetScheme(),
+			mgr.GetEventRecorder(loginupdatecontroller.ControllerName), requeueAfterLoginUpdate,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create controller", "controller", loginupdatecontroller.ControllerName)
+		}
+	}
 
 	// region Reconciler/NodeConfigurator
 	if controllersSet.Enabled("nodeconfigurator") {

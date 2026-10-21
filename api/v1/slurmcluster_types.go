@@ -1179,6 +1179,22 @@ type SlurmNodeLogin struct {
 	// +kubebuilder:validation:Optional
 	UserIsolation *LoginUserIsolation `json:"userIsolation,omitempty"`
 
+	// UpdateStrategy selects delayed operator-managed replacement (delayedRollout) or immediate
+	// StatefulSet rolling replacement (rollingUpdate). Omitted values default to delayedRollout.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=delayedRollout;rollingUpdate
+	// +kubebuilder:default="delayedRollout"
+	UpdateStrategy consts.UpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// UpdatePolicy controls delayed replacement of outdated login pods when UpdateStrategy is delayedRollout.
+	// Omitted settings use the default notice without a maintenance schedule.
+	// Policy edits recalculate existing deadlines from each pod's original announcement time.
+	// A recalculated deadline may move earlier or later; the announcement time is preserved.
+	//
+	// +kubebuilder:validation:Optional
+	UpdatePolicy *LoginUpdatePolicy `json:"updatePolicy,omitempty"`
+
 	// Autoscaling defines CPU-based horizontal scaling for login pods
 	//
 	// +kubebuilder:validation:Optional
@@ -1189,6 +1205,28 @@ type SlurmNodeLogin struct {
 	//
 	// +kubebuilder:validation:Optional
 	Docker *LoginDocker `json:"docker,omitempty"`
+}
+
+// LoginUpdatePolicy defines when outdated login pods are replaced with the delayedRollout strategy.
+// Authorized early restart requests bypass the notice period and maintenance schedule.
+type LoginUpdatePolicy struct {
+	// MinNotice is the minimum delay before an automatic replacement, expressed as a Go duration.
+	// An explicit zero disables the delay; omitted values default to 720h (30 days).
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="720h"
+	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('0s')",message="minNotice must not be negative"
+	MinNotice *metav1.Duration `json:"minNotice,omitempty"`
+
+	// Schedule optionally aligns replacement with the first maintenance time at or after the notice period.
+	// When omitted, the deadline is exactly MinNotice after announcement.
+	// A configured value must be a nonempty standard five-field cron expression.
+	// Cron defaults to UTC and accepts a CRON_TZ or TZ timezone prefix.
+	// Aliases and interval descriptors are not supported.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:MinLength=1
+	Schedule *string `json:"schedule,omitempty"`
 }
 
 // LoginAutoscaling defines CPU-based horizontal scaling for login pods.
