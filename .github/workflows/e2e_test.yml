@@ -31,7 +31,6 @@ on:
           - KCS_B200
           - MDC_B200
           - KCS_CPU
-          - KCS_MIXED
       run_unstable_tests:
         description: "Run acceptance scenarios tagged @unstable"
         required: false
