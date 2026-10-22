@@ -70,6 +70,14 @@ const (
 	nativeKernelSettingsJobName      = "e2e-system-kernel-native"
 	enrootKernelSettingsJobName      = "e2e-system-kernel-enroot"
 	dockerKernelSettingsJobName      = "e2e-system-kernel-docker"
+	nativeNVIDIALibrariesJobName     = "e2e-system-nvidia-native"
+	enrootNVIDIALibrariesJobName     = "e2e-system-nvidia-enroot"
+	dockerNVIDIALibrariesJobName     = "e2e-system-nvidia-docker"
+
+	nvidiaLibraryKey = "NVIDIA_LIBRARY"
+	// Same threshold as MIN_REAL_LIBRARY_SIZE in nvidia_libraries.py: the jail
+	// keeps small placeholder files for driver libraries of unmounted capabilities.
+	nvidiaNonPlaceholderLibraryMinSize = 1024
 
 	systemSettingsDockerContainerPrefix = "e2e-system-settings-"
 )
@@ -81,7 +89,52 @@ const (
 	probeContainerNone probeContainer = iota
 	probeContainerEnroot
 	probeContainerDocker
+	// GPU containers ask for the required NVIDIA driver capabilities. The Enroot
+	// NVIDIA hook needs an image that requests driver injection, while Docker
+	// injects the driver for --gpus into any image, so it keeps the small one.
+	probeContainerEnrootGPU
+	probeContainerDockerGPU
 )
+
+func (c probeContainer) isDocker() bool {
+	return c == probeContainerDocker || c == probeContainerDockerGPU
+}
+
+// probeJobSpec describes a single-task system-settings job on the selected worker.
+type probeJobSpec struct {
+	name      string
+	probe     string
+	container probeContainer
+	// user submits the job as this user and makes the probe report the user its
+	// task runs as; empty submits as root.
+	user string
+	gpus int
+}
+
+// nvidiaCapabilityLibraries lists, per required NVIDIA driver capability, the
+// driver libraries whose presence shows that the capability was delivered to
+// the job. Presence does not prove the libraries load.
+var nvidiaCapabilityLibraries = []struct {
+	capability string
+	libraries  []string
+}{
+	{capability: "compute", libraries: []string{"libcuda.so.1"}},
+	{capability: "graphics", libraries: []string{"libEGL_nvidia.so.0", "libGLX_nvidia.so.0"}},
+	{capability: "utility", libraries: []string{"libnvidia-ml.so.1"}},
+	{capability: "video", libraries: []string{"libnvcuvid.so.1", "libnvidia-encode.so.1"}},
+}
+
+type nvidiaLibraryLookup struct {
+	capability string
+	library    string
+	path       string
+	size       int64
+}
+
+type nvidiaLibraryJobResult struct {
+	kind    string
+	lookups []nvidiaLibraryLookup
+}
 
 var resourceLimitOptions = []struct {
 	name   string
@@ -167,6 +220,8 @@ type SystemSettings struct {
 	publicLoginKernel        kernelSettingSnapshot
 
 	interactive []systemSettingsProbeResult
+
+	nvidiaLibraries []nvidiaLibraryJobResult
 }
 
 func NewSystemSettings(
@@ -226,6 +281,12 @@ func (s *SystemSettings) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^it exposes the required kernel settings$`, s.dockerJobExposesRequiredKernelSettings)
 	sc.Step(`^a healthy GPU worker is selected for system-settings checks$`, s.selectHealthyGPUWorker)
 	sc.Step(`^its Slurm container exposes the required NVIDIA driver capabilities$`, s.slurmContainerExposesRequiredNVIDIADriverCapabilities)
+	sc.Step(`^native and Enroot GPU jobs look up NVIDIA driver libraries for the required capabilities$`, s.submitNVIDIALibrariesJobs)
+	sc.Step(`^both NVIDIA library lookup jobs succeed$`, s.nvidiaLibrariesJobsSucceed)
+	sc.Step(`^both jobs find a non-placeholder NVIDIA driver library for every required capability$`, s.nvidiaLibrariesJobsFindNonPlaceholderLibraries)
+	sc.Step(`^a Docker GPU job looks up NVIDIA driver libraries for the required capabilities$`, s.submitDockerNVIDIALibrariesJob)
+	sc.Step(`^the Docker NVIDIA library lookup job succeeds$`, s.nvidiaLibrariesJobsSucceed)
+	sc.Step(`^it finds a non-placeholder NVIDIA driver library for every required capability$`, s.nvidiaLibrariesJobsFindNonPlaceholderLibraries)
 }
 
 func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
@@ -236,7 +297,7 @@ func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
 		if err := s.slurm.CancelJob(ctx, tracked.job.ID, systemSettingsCleanup); err != nil {
 			s.runtime.Logf("cleanup: cancel %s job %s: %v", tracked.kind, tracked.job.ID, err)
 		}
-		if tracked.container == probeContainerDocker && s.worker.Name != "" {
+		if tracked.container.isDocker() && s.worker.Name != "" {
 			// Cancelling the job kills the Docker client, not necessarily the container.
 			name := systemSettingsDockerContainerName(tracked.job.ID)
 			command := fmt.Sprintf("sudo docker rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(name))
@@ -276,6 +337,7 @@ func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
 	s.publicLoginKeyAuthorized = false
 	s.publicLoginKernel = nil
 	s.interactive = nil
+	s.nvidiaLibraries = nil
 }
 
 func (s *SystemSettings) selectHealthyWorker(ctx context.Context) error {
@@ -607,57 +669,56 @@ func (s *SystemSettings) resourceLimitsMatchRegularUserSlurmComputeProfile() err
 }
 
 func (s *SystemSettings) submitNativeResourceLimitsJob(ctx context.Context) error {
-	return s.submitProbeJob(ctx, nativeResourceLimitsJobName, pairedResourceLimitProbe(), probeContainerNone, "")
+	return s.submitProbeJob(ctx, probeJobSpec{name: nativeResourceLimitsJobName, probe: pairedResourceLimitProbe()})
 }
 
 func (s *SystemSettings) submitEnrootResourceLimitsJob(ctx context.Context) error {
-	return s.submitProbeJob(ctx, enrootResourceLimitsJobName, pairedResourceLimitProbe(), probeContainerEnroot, "")
+	return s.submitProbeJob(ctx, probeJobSpec{
+		name:      enrootResourceLimitsJobName,
+		probe:     pairedResourceLimitProbe(),
+		container: probeContainerEnroot,
+	})
 }
 
 func (s *SystemSettings) submitDockerResourceLimitsJob(ctx context.Context) error {
-	return s.submitProbeJob(ctx, dockerResourceLimitsJobName, pairedResourceLimitProbe(), probeContainerDocker, "")
+	return s.submitProbeJob(ctx, probeJobSpec{
+		name:      dockerResourceLimitsJobName,
+		probe:     pairedResourceLimitProbe(),
+		container: probeContainerDocker,
+	})
 }
 
 func (s *SystemSettings) submitRegularUserResourceLimitsJob(ctx context.Context) error {
-	return s.submitProbeJob(
-		ctx,
-		regularUserResourceLimitsJobName,
-		pairedResourceLimitProbe(),
-		probeContainerNone,
-		sshTestUserName,
-	)
+	return s.submitProbeJob(ctx, probeJobSpec{
+		name:  regularUserResourceLimitsJobName,
+		probe: pairedResourceLimitProbe(),
+		user:  sshTestUserName,
+	})
 }
 
-// submitProbeJob submits a single-task job on the selected worker that runs
-// probe in the given container. A non-empty user submits the job as that user
-// and makes the probe report the user its task runs as.
-func (s *SystemSettings) submitProbeJob(
-	ctx context.Context,
-	jobName string,
-	probe string,
-	container probeContainer,
-	user string,
-) error {
+func (s *SystemSettings) submitProbeJob(ctx context.Context, spec probeJobSpec) error {
 	if err := s.requireWorker(); err != nil {
 		return err
 	}
-	if user != "" {
+	probe := spec.probe
+	if spec.user != "" {
 		probe = jobUserProbe() + "; " + probe
 	}
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
-		JobName:      jobName,
+		JobName:      spec.name,
 		Nodes:        1,
 		Nodelist:     []string{s.worker.Name},
+		GPUsPerNode:  spec.gpus,
 		TasksPerNode: 1,
-		Wrap:         srunProbeCommand(probe, container),
-		RunAsUser:    user,
+		Wrap:         srunProbeCommand(probe, spec.container),
+		RunAsUser:    spec.user,
 	})
 	if err != nil {
 		return err
 	}
-	s.trackJob(job, jobName, container)
+	s.trackJob(job, spec.name, spec.container)
 	s.runtime.Logf("system settings: submitted job=%s id=%s worker=%s stdout=%s",
-		jobName, job.ID, s.worker.Name, job.StdoutPath)
+		spec.name, job.ID, s.worker.Name, job.StdoutPath)
 	return nil
 }
 
@@ -731,7 +792,11 @@ func (s *SystemSettings) submitKernelSettingsJobs(ctx context.Context) error {
 		{name: nativeKernelSettingsJobName, container: probeContainerNone},
 		{name: enrootKernelSettingsJobName, container: probeContainerEnroot},
 	} {
-		if err := s.submitProbeJob(ctx, jobSpec.name, kernelSettingsProbe(), jobSpec.container, ""); err != nil {
+		if err := s.submitProbeJob(ctx, probeJobSpec{
+			name:      jobSpec.name,
+			probe:     kernelSettingsProbe(),
+			container: jobSpec.container,
+		}); err != nil {
 			return err
 		}
 	}
@@ -739,7 +804,11 @@ func (s *SystemSettings) submitKernelSettingsJobs(ctx context.Context) error {
 }
 
 func (s *SystemSettings) submitDockerKernelSettingsJob(ctx context.Context) error {
-	return s.submitProbeJob(ctx, dockerKernelSettingsJobName, kernelSettingsProbe(), probeContainerDocker, "")
+	return s.submitProbeJob(ctx, probeJobSpec{
+		name:      dockerKernelSettingsJobName,
+		probe:     kernelSettingsProbe(),
+		container: probeContainerDocker,
+	})
 }
 
 func (s *SystemSettings) dockerKernelSettingsJobSucceeds(ctx context.Context) error {
@@ -812,6 +881,66 @@ func (s *SystemSettings) slurmContainerExposesRequiredNVIDIADriverCapabilities(c
 		return err
 	}
 	return validateNVIDIADriverCapabilities(value)
+}
+
+func (s *SystemSettings) submitNVIDIALibrariesJobs(ctx context.Context) error {
+	for _, jobSpec := range []struct {
+		name      string
+		container probeContainer
+	}{
+		{name: nativeNVIDIALibrariesJobName, container: probeContainerNone},
+		{name: enrootNVIDIALibrariesJobName, container: probeContainerEnrootGPU},
+	} {
+		if err := s.submitProbeJob(ctx, probeJobSpec{
+			name:      jobSpec.name,
+			probe:     nvidiaLibraryProbe(),
+			container: jobSpec.container,
+			gpus:      1,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *SystemSettings) submitDockerNVIDIALibrariesJob(ctx context.Context) error {
+	return s.submitProbeJob(ctx, probeJobSpec{
+		name:      dockerNVIDIALibrariesJobName,
+		probe:     nvidiaLibraryProbe(),
+		container: probeContainerDockerGPU,
+		gpus:      1,
+	})
+}
+
+// nvidiaLibrariesJobsSucceed waits for every NVIDIA library job submitted in
+// the scenario and parses its library lookups.
+func (s *SystemSettings) nvidiaLibrariesJobsSucceed(ctx context.Context) error {
+	if len(s.jobs) == 0 {
+		return fmt.Errorf("find submitted NVIDIA library jobs")
+	}
+	for _, tracked := range s.jobs {
+		output, err := s.completeJob(ctx, tracked.job)
+		if err != nil {
+			return err
+		}
+		lookups, err := parseNVIDIALibraryLookups(output)
+		if err != nil {
+			return fmt.Errorf("parse NVIDIA library lookups from %s job %s: %w", tracked.kind, tracked.job.ID, err)
+		}
+		s.nvidiaLibraries = append(s.nvidiaLibraries, nvidiaLibraryJobResult{kind: tracked.kind, lookups: lookups})
+	}
+	return nil
+}
+
+func (s *SystemSettings) nvidiaLibrariesJobsFindNonPlaceholderLibraries() error {
+	if len(s.nvidiaLibraries) == 0 {
+		return fmt.Errorf("find NVIDIA library lookups")
+	}
+	var validationErrors []error
+	for _, result := range s.nvidiaLibraries {
+		validationErrors = append(validationErrors, validateNVIDIALibraryLookups(result.kind+" job", result.lookups))
+	}
+	return errors.Join(validationErrors...)
 }
 
 func (s *SystemSettings) runLoginSSH(ctx context.Context, command string) (string, error) {
@@ -906,17 +1035,27 @@ func jobUserProbe() string {
 }
 
 func srunProbeCommand(probe string, container probeContainer, flags ...string) string {
+	capabilities := nvidiaDriverCapabilitiesName + "=" + strings.Join(requiredNVIDIADriverCapabilities(), ",")
 	var args []string
+	if container == probeContainerEnrootGPU {
+		// Pyxis passes the job environment to the Enroot NVIDIA hook.
+		args = append(args, capabilities)
+	}
 	args = append(args, "srun", "--nodes=1", "--ntasks=1")
 	args = append(args, flags...)
+	// The batch shell expands SLURM_JOB_ID, so cleanup can find a Docker container by job ID.
+	dockerName := systemSettingsDockerContainerPrefix + "${SLURM_JOB_ID}"
 	switch container {
 	case probeContainerEnroot:
 		args = append(args, "--container-image="+framework.ShellQuote(enrootLifecycleImage))
+	case probeContainerEnrootGPU:
+		args = append(args, "--container-image="+framework.ShellQuote(gpuSmokeEnrootImage))
 	case probeContainerDocker:
-		// The batch shell expands SLURM_JOB_ID, so cleanup can find the container by job ID.
+		args = append(args, "docker", "run", "--rm", "--name", dockerName, framework.ShellQuote(ubuntuDockerImage))
+	case probeContainerDockerGPU:
 		args = append(args,
-			"docker", "run", "--rm",
-			"--name", systemSettingsDockerContainerPrefix+"${SLURM_JOB_ID}",
+			"docker", "run", "--rm", "--name", dockerName,
+			"--gpus=all", "-e", capabilities,
 			framework.ShellQuote(ubuntuDockerImage),
 		)
 	}
@@ -1247,6 +1386,107 @@ func validateKernelSettings(source string, actual kernelSettingSnapshot) error {
 	return errors.Join(validationErrors...)
 }
 
+func requiredNVIDIADriverCapabilities() []string {
+	capabilities := make([]string, 0, len(nvidiaCapabilityLibraries))
+	for _, entry := range nvidiaCapabilityLibraries {
+		capabilities = append(capabilities, entry.capability)
+	}
+	return capabilities
+}
+
+// nvidiaLibraryProbe resolves each capability library by soname through the
+// dynamic linker cache and reports the resolved file size. It does not load
+// the libraries.
+func nvidiaLibraryProbe() string {
+	var entries []string
+	for _, entry := range nvidiaCapabilityLibraries {
+		for _, library := range entry.libraries {
+			entries = append(entries, entry.capability+":"+library)
+		}
+	}
+	return fmt.Sprintf(`for entry in %s; do
+capability="${entry%%%%:*}"
+library="${entry#*:}"
+path="$(ldconfig -p | awk -v library="$library" '$1 == library { print $NF; exit }')"
+size=0
+if [ -n "$path" ]; then size="$(stat -Lc %%s "$path" 2>/dev/null || echo 0)"; fi
+printf '%s=%%s %%s %%s %%s\n' "$capability" "$library" "${path:--}" "$size"
+done`, strings.Join(entries, " "), nvidiaLibraryKey)
+}
+
+func parseNVIDIALibraryLookups(output string) ([]nvidiaLibraryLookup, error) {
+	var lookups []nvidiaLibraryLookup
+	scanner := bufio.NewScanner(strings.NewReader(output))
+	for scanner.Scan() {
+		value, found := strings.CutPrefix(strings.TrimSpace(scanner.Text()), nvidiaLibraryKey+"=")
+		if !found {
+			continue
+		}
+		fields := strings.Fields(value)
+		if len(fields) != 4 {
+			return nil, fmt.Errorf("parse NVIDIA library lookup %q: want capability, library, path and size", value)
+		}
+		size, err := strconv.ParseInt(fields[3], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parse size in NVIDIA library lookup %q: %w", value, err)
+		}
+		path := fields[2]
+		if path == "-" {
+			path = ""
+		}
+		lookups = append(lookups, nvidiaLibraryLookup{
+			capability: fields[0],
+			library:    fields[1],
+			path:       path,
+			size:       size,
+		})
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan NVIDIA library output: %w", err)
+	}
+	if len(lookups) == 0 {
+		return nil, fmt.Errorf("find %s lines in output", nvidiaLibraryKey)
+	}
+	return lookups, nil
+}
+
+// validateNVIDIALibraryLookups requires every required capability to resolve
+// at least one of its libraries to a file larger than a placeholder. It checks
+// presence only: a corrupt library or one with missing dependencies still passes.
+func validateNVIDIALibraryLookups(source string, lookups []nvidiaLibraryLookup) error {
+	var validationErrors []error
+	for _, entry := range nvidiaCapabilityLibraries {
+		present := false
+		var observed []string
+		for _, lookup := range lookups {
+			if lookup.capability != entry.capability {
+				continue
+			}
+			if lookup.path == "" {
+				observed = append(observed, lookup.library+" not found")
+				continue
+			}
+			observed = append(observed, fmt.Sprintf("%s=%s (%d bytes)", lookup.library, lookup.path, lookup.size))
+			if lookup.size >= nvidiaNonPlaceholderLibraryMinSize {
+				present = true
+			}
+		}
+		if !present {
+			if len(observed) == 0 {
+				observed = append(observed, "no lookups")
+			}
+			validationErrors = append(validationErrors, fmt.Errorf(
+				"check %s NVIDIA %s capability: want a non-placeholder library of at least %d bytes, got %s",
+				source,
+				entry.capability,
+				nvidiaNonPlaceholderLibraryMinSize,
+				strings.Join(observed, ", "),
+			))
+		}
+	}
+	return errors.Join(validationErrors...)
+}
+
 func validateNVIDIADriverCapabilities(value string) error {
 	actual := make(map[string]struct{})
 	for _, capability := range strings.Split(value, ",") {
@@ -1256,7 +1496,7 @@ func validateNVIDIADriverCapabilities(value string) error {
 		}
 	}
 	var missing []string
-	for _, required := range []string{"compute", "graphics", "utility", "video"} {
+	for _, required := range requiredNVIDIADriverCapabilities() {
 		if _, found := actual[required]; !found {
 			missing = append(missing, required)
 		}

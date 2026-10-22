@@ -93,3 +93,17 @@ Feature: System settings
     Then both interactive jobs report their resource limits and kernel settings
     And both interactive jobs' resource limits match the Slurm compute profile
     And both interactive jobs expose the required kernel settings
+
+  @gpu @soperator_version_>=4.0.0
+  Scenario: GPU jobs see non-placeholder NVIDIA driver libraries for the required capabilities
+    Given a healthy GPU worker is selected for system-settings checks
+    When native and Enroot GPU jobs look up NVIDIA driver libraries for the required capabilities
+    Then both NVIDIA library lookup jobs succeed
+    And both jobs find a non-placeholder NVIDIA driver library for every required capability
+
+  @gpu @soperator_version_>=5.0.0
+  Scenario: Docker GPU jobs see non-placeholder NVIDIA driver libraries for the required capabilities
+    Given a healthy GPU worker is selected for system-settings checks
+    When a Docker GPU job looks up NVIDIA driver libraries for the required capabilities
+    Then the Docker NVIDIA library lookup job succeeds
+    And it finds a non-placeholder NVIDIA driver library for every required capability
