@@ -9,43 +9,6 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
-const jobSacctTimeout = 2 * time.Minute
-
-func waitForJobSucceeded(ctx context.Context, exec framework.Exec, slurm *framework.SlurmClient, job framework.SbatchJob, timeout time.Duration) error {
-	if err := framework.AnnotateWithJobLog(ctx, exec, slurm, job, slurm.WaitForJobGone(ctx, job.ID, timeout)); err != nil {
-		return err
-	}
-
-	waitCtx, cancel := context.WithTimeout(ctx, jobSacctTimeout)
-	defer cancel()
-
-	for {
-		if err := waitCtx.Err(); err != nil {
-			return framework.AnnotateWithJobLog(ctx, exec, slurm, job,
-				fmt.Errorf("wait for job %s completed successfully: %w", job.ID, err))
-		}
-
-		info, err := slurm.JobStatus(waitCtx, job.ID)
-		if err != nil {
-			return framework.AnnotateWithJobLog(ctx, exec, slurm, job, err)
-		}
-		if info.SacctFound {
-			if info.CompletedSuccessfully() {
-				return nil
-			}
-			if !framework.IsJobAliveState(info.SacctState) {
-				return framework.AnnotateWithJobLog(ctx, exec, slurm, job,
-					fmt.Errorf("job %s finished with state=%s exit_code=%s", job.ID, info.SacctState, info.SacctExit))
-			}
-		}
-
-		select {
-		case <-waitCtx.Done():
-		case <-time.After(framework.DefaultPollInterval):
-		}
-	}
-}
-
 func waitForExpectedPrologFailure(
 	ctx context.Context,
 	exec framework.Exec,

@@ -301,6 +301,15 @@ common Kubernetes, Slurm, and worker primitives:
 - `SbatchJob`, `SbatchOptions`, `ShellQuote`, `BashLC`, and `WorkerNames`.
 - `WaitForWithJobAlive` and `AnnotateWithJobLog` for polling while a Slurm job
   is still alive and attaching useful job logs to failures.
+- `WaitForJobSucceeded` for waiting for a batch job to leave the queue and
+  complete successfully in accounting. The caller supplies the execution
+  timeout; accounting has an additional two-minute grace period. Missing or
+  nonterminal accounting records remain pending, terminal failures fail
+  immediately, and errors include available accounting and job output.
+- `RunTargetedWorkerSmoke` for a bounded CPU (`hostname`) or GPU (`nvidia-smi -L`
+  with one GPU allocated) check on a selected worker. `WorkerInfo.HasGPU`
+  selects the command. `TargetedWorkerSmokeTimeout` is the four-minute total
+  budget, including the remote command's three-minute limit.
 - `WaitForInstanceRemoval` and `WaitForUsableReplacement` for checking that a
   worker's old Compute instance disappears and its Slurm node becomes usable
   on a different instance.

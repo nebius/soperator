@@ -391,7 +391,7 @@ func (s *EnrootContainers) theEnrootGPUSmokeJobSucceedsAndReportsVisibleGPUs(ctx
 		return fmt.Errorf("enroot GPU smoke job ID is empty")
 	}
 	job := s.job
-	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, job, enrootGPUSmokeTimeout); err != nil {
+	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, job, enrootGPUSmokeTimeout); err != nil {
 		return err
 	}
 	if err := assertJobStdoutReportsVisibleGPUs(ctx, s.runtime, job); err != nil {

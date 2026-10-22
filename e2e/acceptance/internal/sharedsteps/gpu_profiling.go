@@ -136,7 +136,7 @@ func (s *GPUProfiling) theNsightComputeProfilingJobSucceeds(ctx context.Context)
 	if s.job.IsZero() {
 		return fmt.Errorf("Nsight Compute job ID is empty")
 	}
-	return waitForJobSucceeded(ctx, s.runtime, s.slurm, s.job, gpuProfilingJobTimeout)
+	return framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, s.job, gpuProfilingJobTimeout)
 }
 
 func (s *GPUProfiling) theSoperatorchecksUserSubmitsAFullNodeNsightSystemsProfilingJob(ctx context.Context) error {
@@ -183,7 +183,7 @@ func (s *GPUProfiling) theNsightSystemsProfilingJobSucceedsAndProducesAReport(ct
 	if s.job.IsZero() {
 		return fmt.Errorf("Nsight Systems job ID is empty")
 	}
-	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, s.job, gpuProfilingJobTimeout); err != nil {
+	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, s.job, gpuProfilingJobTimeout); err != nil {
 		return err
 	}
 	if _, err := s.runtime.Worker(s.worker).RunWithDefaultRetry(ctx,

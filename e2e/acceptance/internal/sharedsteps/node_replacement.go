@@ -273,7 +273,7 @@ func nodeMaintenanceEventOwned(host corev1.Node) bool {
 }
 
 func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Context) error {
-	if err := runTargetedWorkerSmoke(ctx, s.runtime, s.replacementWorker); err != nil {
+	if err := framework.RunTargetedWorkerSmoke(ctx, s.runtime, s.replacementWorker); err != nil {
 		node, stateErr := s.slurm.NodeInfo(ctx, s.replacementWorker.Name)
 		if stateErr == nil {
 			s.runtime.Logf("Replacement worker state after failed final validation: name=%s state=%s reason=%s instance_id=%s",

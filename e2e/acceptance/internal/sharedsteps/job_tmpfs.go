@@ -298,7 +298,7 @@ func (s *JobTmpfs) finishJobs(ctx context.Context) error {
 	if err := s.step(ctx, s.jobs[0], "touch "+framework.ShellQuote("/tmp/"+s.marker+".finish")); err != nil {
 		return err
 	}
-	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, s.jobs[0], jobTmpfsTimeout); err != nil {
+	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, s.jobs[0], jobTmpfsTimeout); err != nil {
 		return err
 	}
 	if err := s.checkJob(ctx, s.jobs[1], s.status[1]); err != nil {
