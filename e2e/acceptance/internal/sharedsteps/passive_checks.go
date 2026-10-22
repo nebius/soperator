@@ -143,7 +143,7 @@ func (s *PassiveChecks) aCPUOnlySlurmJobRunsOnTheSelectedWorker(ctx context.Cont
 	if err != nil {
 		return err
 	}
-	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, job, passiveCPUJobTimeout); err != nil {
+	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, job, passiveCPUJobTimeout); err != nil {
 		return err
 	}
 	s.cpuHooksJob = job
@@ -337,7 +337,7 @@ func (s *PassiveChecks) aSmallGPUSlurmJobRunsOnTheSelectedGPUWorker(ctx context.
 	if err != nil {
 		return err
 	}
-	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, job, passiveGPUJobTimeout); err != nil {
+	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, job, passiveGPUJobTimeout); err != nil {
 		return err
 	}
 	s.gpuHooksJob = job
@@ -389,7 +389,7 @@ func (s *PassiveChecks) aSlurmJobChecksItsJobTmpfsDirectoryOnTheSelectedWorker(c
 	if err != nil {
 		return err
 	}
-	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, job, passiveCPUJobTimeout); err != nil {
+	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, job, passiveCPUJobTimeout); err != nil {
 		return err
 	}
 	stdout, err := readJobFile(ctx, s.runtime, job.StdoutPath)

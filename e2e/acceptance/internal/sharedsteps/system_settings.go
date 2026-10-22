@@ -422,7 +422,7 @@ func (s *SystemSettings) latestJob() (framework.SbatchJob, error) {
 }
 
 func (s *SystemSettings) completeJob(ctx context.Context, job framework.SbatchJob) (string, error) {
-	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, job, systemSettingsJobTimeout); err != nil {
+	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, job, systemSettingsJobTimeout); err != nil {
 		return "", err
 	}
 	output, err := readJobFile(ctx, s.runtime, job.StdoutPath)

@@ -544,7 +544,7 @@ func (s *WorkerRollingUpdate) finishRolloutJobs(ctx context.Context) error {
 		}
 	}
 	for _, target := range s.targets {
-		if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, target.job.job, workerRolloutJobFinishWait); err != nil {
+		if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, target.job.job, workerRolloutJobFinishWait); err != nil {
 			return err
 		}
 	}
@@ -555,10 +555,10 @@ func (s *WorkerRollingUpdate) runRolloutSmokeJobs(ctx context.Context) error {
 	if len(s.workers) == 0 {
 		return fmt.Errorf("run smoke jobs: no active workers were selected")
 	}
-	validationCtx, cancel := context.WithTimeout(ctx, time.Duration(len(s.workers))*(targetedWorkerSmokeTimeout+time.Minute))
+	validationCtx, cancel := context.WithTimeout(ctx, time.Duration(len(s.workers))*framework.TargetedWorkerSmokeTimeout)
 	defer cancel()
 	for _, worker := range s.workers {
-		if err := runTargetedWorkerSmoke(validationCtx, s.runtime, worker); err != nil {
+		if err := framework.RunTargetedWorkerSmoke(validationCtx, s.runtime, worker); err != nil {
 			return err
 		}
 	}

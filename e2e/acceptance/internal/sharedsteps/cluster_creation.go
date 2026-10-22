@@ -584,7 +584,7 @@ func (s *ClusterCreation) checkNodeSetSmokeJobs(ctx context.Context) error {
 		}
 		worker := workers[0]
 
-		if err := runTargetedWorkerSmoke(ctx, s.runtime, worker); err != nil {
+		if err := framework.RunTargetedWorkerSmoke(ctx, s.runtime, worker); err != nil {
 			problems = append(problems, fmt.Sprintf("%s worker %s smoke job failed: %v", nodeSet.Name, worker.Name, err))
 		}
 	}

@@ -71,7 +71,7 @@ func TestValidateWorkersOperationalTargetsEachWorkerThroughScopedRuntime(t *test
 				jail: framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
 					deadline, bounded := ctx.Deadline()
 					require.True(t, bounded, "each smoke job has a deadline")
-					assert.WithinDuration(t, time.Now().Add(targetedWorkerSmokeTimeout+time.Minute), deadline, time.Second)
+					assert.WithinDuration(t, time.Now().Add(framework.TargetedWorkerSmokeTimeout), deadline, time.Second)
 					calls = append(calls, "jail: "+command)
 					return "", nil
 				}),
@@ -110,38 +110,4 @@ func TestValidateWorkersOperationalPropagatesSmokeFailure(t *testing.T) {
 		[]framework.WorkerInfo{{Name: "worker-0"}})
 	assert.ErrorIs(t, err, smokeErr)
 	assert.ErrorContains(t, err, "validate worker worker-0 is operational")
-}
-
-func TestTargetedWorkerSmokeCommand(t *testing.T) {
-	tests := []struct {
-		name     string
-		worker   framework.WorkerInfo
-		contains []string
-		excludes string
-	}{
-		{
-			name:     "CPU",
-			worker:   framework.WorkerInfo{Name: "worker-cpu-0"},
-			contains: []string{"timeout 180", "srun -w 'worker-cpu-0'", "hostname"},
-			excludes: "--gpus-per-node",
-		},
-		{
-			name:     "GPU",
-			worker:   framework.WorkerInfo{Name: "worker-gpu-0", HasGPU: true},
-			contains: []string{"timeout 180", "srun -w 'worker-gpu-0'", "--gpus-per-node=1", "nvidia-smi -L"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			command, err := targetedWorkerSmokeCommand(tt.worker)
-			require.NoError(t, err)
-			for _, expected := range tt.contains {
-				assert.Contains(t, command, expected)
-			}
-			if tt.excludes != "" {
-				assert.NotContains(t, command, tt.excludes)
-			}
-		})
-	}
 }

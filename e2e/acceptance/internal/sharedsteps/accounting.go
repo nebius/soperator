@@ -308,7 +308,7 @@ func (s *Accounting) jobIsRecorded(ctx context.Context) error {
 	if s.job.IsZero() {
 		return fmt.Errorf("accounting smoke job was not submitted")
 	}
-	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, s.job, accountingSmokeTimeout); err != nil {
+	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, s.job, accountingSmokeTimeout); err != nil {
 		return err
 	}
 

@@ -513,7 +513,7 @@ func (s *DockerContainers) theDockerGPUSmokeJobSucceedsAndReportsVisibleGPUs(ctx
 	job := s.job
 	// A sacct-only wait would let us read Docker logs earlier, but it can hide
 	// Slurm cleanup time and transfer resource-release waits to later scenarios.
-	if err := waitForJobSucceeded(ctx, s.runtime, s.slurm, job, dockerGPUSmokeTimeout); err != nil {
+	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, job, dockerGPUSmokeTimeout); err != nil {
 		return err
 	}
 	logs, err := s.dockerContainerLogsByNamePrefix(ctx, s.connectionWorker)
