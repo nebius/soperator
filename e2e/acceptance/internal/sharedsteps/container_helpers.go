@@ -15,8 +15,8 @@ const (
 	enrootLifecycleImage = "docker://cr.nebius.cloud#soperator/ubuntu:noble"
 
 	// Cluster-supported GPU diagnostic image; includes nvidia-smi for container GPU visibility.
-	// https://github.com/nebius/ml-containers/pull/120
-	gpuSmokeImageRef    = "ml-containers/training_diag:13.0.3-ubuntu24.04-20261019110118"
+	// https://github.com/nebius/ml-containers/pull/121
+	gpuSmokeImageRef    = "ml-containers/training_diag:13.0.3-ubuntu24.04-20261021155223"
 	gpuSmokeDockerImage = "cr.nebius.cloud/" + gpuSmokeImageRef
 	gpuSmokeEnrootImage = "docker://cr.nebius.cloud#" + gpuSmokeImageRef
 )
