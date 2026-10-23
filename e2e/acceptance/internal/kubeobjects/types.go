@@ -70,17 +70,12 @@ type SlurmClusterAccounting struct {
 }
 
 type SlurmClusterLogin struct {
-	CustomInitContainers []corev1.Container             `json:"customInitContainers"`
-	Docker               SlurmClusterLoginDocker        `json:"docker"`
-	UserIsolation        SlurmClusterLoginUserIsolation `json:"userIsolation"`
-	Volumes              SlurmClusterLoginVolumes       `json:"volumes"`
+	CustomInitContainers []corev1.Container       `json:"customInitContainers"`
+	Docker               SlurmClusterLoginDocker  `json:"docker"`
+	Volumes              SlurmClusterLoginVolumes `json:"volumes"`
 }
 
 type SlurmClusterLoginDocker struct {
-	Enabled bool `json:"enabled"`
-}
-
-type SlurmClusterLoginUserIsolation struct {
 	Enabled bool `json:"enabled"`
 }
 
