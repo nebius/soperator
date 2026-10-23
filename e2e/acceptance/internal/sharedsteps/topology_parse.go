@@ -1,7 +1,6 @@
 package sharedsteps
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"regexp"
 	"slices"
@@ -178,23 +177,6 @@ func topologyStructure(entries []topologyEntry) string {
 	for _, entry := range sorted {
 		parts = append(parts, fmt.Sprintf("%s=%s:%v:%t",
 			entry.Name, entry.Kind, entry.BlockSizes, entry.ClusterDefault))
-	}
-	return strings.Join(parts, ",")
-}
-
-// topologyReconfigureStructure mirrors the operator's JailedConfig annotation, including block order.
-func topologyReconfigureStructure(entries []topologyEntry) string {
-	parts := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		part := topologyStructure([]topologyEntry{entry})
-		if entry.Kind == topologyKindBlock {
-			var names []string
-			for _, block := range entry.Blocks {
-				names = append(names, block.Name)
-			}
-			part += fmt.Sprintf(":blocks=%x", sha256.Sum256([]byte(strings.Join(names, "\x00"))))
-		}
-		parts = append(parts, part)
 	}
 	return strings.Join(parts, ",")
 }

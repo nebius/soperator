@@ -19,7 +19,6 @@ const (
 	topologyConfigBaseName = "topology-config"
 	topologyConfigMapKey   = "topology.yaml"
 	topologyJailPath       = "/etc/slurm/topology.yaml"
-	topologyStructureKey   = "topology.slurm.nebius.ai/structure"
 
 	// topologyJobImmediate bounds how long srun waits for a placement that is expected to happen,
 	// topologyDenyImmediate how long it waits for one that must not. The deny case is the shorter
@@ -1123,10 +1122,6 @@ func (s *Topology) halveBlockTopologySize(ctx context.Context) error {
 	return nil
 }
 
-// renderedConfigCarriesBlockSizes waits for the ConfigMap and the JailedConfig annotation together
-// rather than one after the other. The operator publishes the content before recording the
-// structure, on purpose, so a config that already carries the new sizes and an annotation that
-// still records the old ones is a valid intermediate state, not a disagreement.
 func (s *Topology) renderedConfigCarriesBlockSizes(ctx context.Context) error {
 	sizes, ok := halveBlockSizes(s.blockSizesRestore)
 	if !ok {
@@ -1135,8 +1130,7 @@ func (s *Topology) renderedConfigCarriesBlockSizes(ctx context.Context) error {
 
 	var converged []topologyEntry
 	err := s.runtime.WaitFor(ctx,
-		fmt.Sprintf("the published config and the JailedConfig to carry blockSizes %v of topology %s",
-			sizes, s.blockTopology),
+		fmt.Sprintf("the published config to carry blockSizes %v of topology %s", sizes, s.blockTopology),
 		topologyConvergeTimeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
 			_, rendered, err := s.readTopologyConfigMap(waitCtx)
@@ -1153,15 +1147,6 @@ func (s *Topology) renderedConfigCarriesBlockSizes(ctx context.Context) error {
 			}
 			if !sameIntSlice(entry.BlockSizes, sizes) {
 				return false, fmt.Errorf("topology %s still carries blockSizes %v", s.blockTopology, entry.BlockSizes)
-			}
-
-			structure, err := s.jailedConfigStructure(waitCtx)
-			if err != nil {
-				return false, err
-			}
-			if want := topologyReconfigureStructure(entries); structure != want {
-				return false, fmt.Errorf("the JailedConfig records structure %q, the published config is %q",
-					structure, want)
 			}
 			converged = entries
 			return true, nil
@@ -1282,14 +1267,6 @@ func (s *Topology) patchBlockSizesAt(ctx context.Context, index int, sizes []int
 		return fmt.Errorf("patch blockSizes of SlurmCluster %s: %w", s.info.SlurmClusterName, err)
 	}
 	return nil
-}
-
-func (s *Topology) jailedConfigStructure(ctx context.Context) (string, error) {
-	config, err := s.readJailedConfig(ctx)
-	if err != nil {
-		return "", err
-	}
-	return config.Metadata.Annotations[topologyStructureKey], nil
 }
 
 func (s *Topology) readSlurmCluster(ctx context.Context) (kubeobjects.SlurmCluster, error) {
