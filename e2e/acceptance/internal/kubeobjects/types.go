@@ -89,7 +89,9 @@ type SlurmClusterLoginVolumes struct {
 }
 
 type SlurmClusterPAMAdopt struct {
-	Enabled bool `json:"enabled"`
+	Enabled      bool     `json:"enabled"`
+	ExemptUsers  []string `json:"exemptUsers"`
+	ExemptGroups []string `json:"exemptGroups"`
 }
 
 type SlurmClusterNamespaceConfig struct {
@@ -174,6 +176,7 @@ type NodeSetSpec struct {
 	EphemeralNodes              *bool               `json:"ephemeralNodes"`
 	InitialNumberEphemeralNodes int32               `json:"initialNumberEphemeralNodes"`
 	GPU                         NodeSetGPUSpec      `json:"gpu"`
+	Docker                      NodeSetDockerSpec   `json:"docker"`
 	Slurmd                      NodeSetSlurmd       `json:"slurmd"`
 	UpdateStrategy              string              `json:"updateStrategy"`
 	MaxUnavailable              *intstr.IntOrString `json:"maxUnavailable"`
@@ -197,6 +200,10 @@ type NodeVolumeMount struct {
 
 type NodeSetGPUSpec struct {
 	Enabled bool `json:"enabled"`
+}
+
+type NodeSetDockerSpec struct {
+	Enabled *bool `json:"enabled"`
 }
 
 type NodeSetStatus struct {

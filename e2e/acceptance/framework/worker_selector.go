@@ -152,6 +152,22 @@ func (s *WorkerSelector) PickGPUWorkers(ctx context.Context, count int) ([]Worke
 	return snapshot.PickGPUWorkers(count)
 }
 
+func (s *WorkerSelector) PickDockerWorkers(ctx context.Context, count int) ([]WorkerInfo, error) {
+	snapshot, err := s.Snapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return snapshot.PickDockerWorkers(count)
+}
+
+func (s *WorkerSelector) PickDockerGPUWorkers(ctx context.Context, count int) ([]WorkerInfo, error) {
+	snapshot, err := s.Snapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return snapshot.PickDockerGPUWorkers(count)
+}
+
 func (s WorkerSnapshot) PickWorkers(count int) ([]WorkerInfo, error) {
 	return pickWorkers(s.Workers, desiredWorkerCount(s.NodeSets), count, "workers")
 }
@@ -162,6 +178,36 @@ func (s WorkerSnapshot) PickCPUWorkers(count int) ([]WorkerInfo, error) {
 
 func (s WorkerSnapshot) PickGPUWorkers(count int) ([]WorkerInfo, error) {
 	return pickWorkers(s.GPUWorkers, desiredGPUWorkerCount(s.NodeSets), count, "GPU workers")
+}
+
+// PickDockerWorkers picks workers from NodeSets with Docker enabled. Clusters
+// without such NodeSets report an InsufficientWorkersError, so callers can skip.
+func (s WorkerSnapshot) PickDockerWorkers(count int) ([]WorkerInfo, error) {
+	pool, configured := s.dockerWorkerPool(false)
+	return pickWorkers(pool, configured, count, "Docker workers")
+}
+
+// PickDockerGPUWorkers picks workers from GPU NodeSets with Docker enabled.
+func (s WorkerSnapshot) PickDockerGPUWorkers(count int) ([]WorkerInfo, error) {
+	pool, configured := s.dockerWorkerPool(true)
+	return pickWorkers(pool, configured, count, "Docker GPU workers")
+}
+
+// dockerWorkerPool returns the discovered workers of NodeSets with Docker
+// enabled, optionally only GPU ones, and how many workers they configure.
+func (s WorkerSnapshot) dockerWorkerPool(requireGPU bool) ([]WorkerInfo, int) {
+	var pool []WorkerInfo
+	var configured int
+	for _, nodeSet := range s.NodeSets {
+		if !nodeSet.DockerEnabled || (requireGPU && !nodeSet.HasGPU) {
+			continue
+		}
+		pool = append(pool, s.WorkersByNodeSet[nodeSet.Name]...)
+		if nodeSet.Replicas > 0 {
+			configured += nodeSet.Replicas
+		}
+	}
+	return pool, configured
 }
 
 func (s WorkerSnapshot) RequireAllWorkersUsable() error {

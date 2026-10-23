@@ -252,7 +252,7 @@ func (s *DockerContainers) runLoginDockerSSHCommand(ctx context.Context, remoteC
 }
 
 func (s *DockerContainers) theUserRunsADockerContainerOverSSHOnAWorkerNode(ctx context.Context) error {
-	workers, err := s.selector.PickWorkers(ctx, 1)
+	workers, err := s.selector.PickDockerWorkers(ctx, 1)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
@@ -295,7 +295,7 @@ func (s *DockerContainers) theDockerContainerSucceedsOverWorkerSSH() error {
 }
 
 func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers(ctx context.Context) error {
-	workers, err := s.selector.PickWorkers(ctx, 2)
+	workers, err := s.selector.PickDockerWorkers(ctx, 2)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
@@ -478,7 +478,7 @@ func (s *DockerContainers) dockerContainersFromTheJobAreNoLongerRunning(ctx cont
 func (s *DockerContainers) aDockerGPUSmokeJobIsSubmittedOnOneGPUWorker(ctx context.Context) error {
 	// Future option: omit --nodelist and discover the allocated worker after
 	// submission, letting Slurm avoid busy nodes before Docker log collection.
-	workers, err := s.selector.PickGPUWorkers(ctx, 1)
+	workers, err := s.selector.PickDockerGPUWorkers(ctx, 1)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}

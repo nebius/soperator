@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
+
+const internalSSHTimeout = 30 * time.Second
 
 type InternalSSH struct {
 	runtime      framework.Runtime
@@ -46,18 +49,7 @@ func (s *InternalSSH) aRegularUserAccountExistsOnTheLoginNode(ctx context.Contex
 }
 
 func (s *InternalSSH) theUserSSHsFromTheLoginNodeToAWorker(ctx context.Context) error {
-	worker := framework.ShellQuote(s.targetWorker.Name)
-	// Remove the worker key before each SSH attempt so retries don't depend on
-	// persisted known_hosts state from previous attempts.
-	cmd := fmt.Sprintf("su - %s -c %s",
-		framework.ShellQuote(sshTestUserName),
-		framework.ShellQuote(fmt.Sprintf(
-			"mkdir -p ~/.ssh && touch ~/.ssh/known_hosts && (ssh-keygen -R %s -f ~/.ssh/known_hosts >/dev/null 2>&1 || true) && timeout 30 ssh %s hostname </dev/null",
-			worker,
-			worker,
-		)),
-	)
-	out, err := s.runtime.Jail().RunWithDefaultRetry(ctx, cmd)
+	out, err := runInternalSSHAsTestUser(ctx, s.runtime, s.targetWorker.Name, internalSSHTimeout, "hostname")
 	if err != nil {
 		return fmt.Errorf("ssh from login to worker as %s: %w", sshTestUserName, err)
 	}

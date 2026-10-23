@@ -27,6 +27,9 @@ type NodeSetInfo struct {
 	Replicas      int
 	ReadyReplicas int
 	HasGPU        bool
+	// DockerEnabled reports whether the NodeSet workers run Docker. Without it,
+	// the jail replaces the docker CLI with a stub that always fails.
+	DockerEnabled bool
 	Phase         string
 	JailSubMounts []JailSubMountInfo
 }
@@ -40,6 +43,8 @@ type SlurmClusterInfo struct {
 	LoginUserIsolationEnabled bool
 	LoginJailSubMounts        []JailSubMountInfo
 	PAMSlurmAdoptEnabled      bool
+	PAMSlurmAdoptExemptUsers  []string
+	PAMSlurmAdoptExemptGroups []string
 	NamespaceConfigEnabled    bool
 	NamespaceConfigMapName    string
 	CustomSlurmConfig         *string
@@ -93,10 +98,17 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 		LoginUserIsolationEnabled: cluster.Spec.SlurmNodes.Login.UserIsolation.Enabled,
 		LoginJailSubMounts:        jailSubMountInfos(cluster.Spec.SlurmNodes.Login.Volumes.JailSubMounts),
 		PAMSlurmAdoptEnabled:      cluster.Spec.PAMSlurmAdopt.Enabled,
+		PAMSlurmAdoptExemptUsers:  cluster.Spec.PAMSlurmAdopt.ExemptUsers,
+		PAMSlurmAdoptExemptGroups: cluster.Spec.PAMSlurmAdopt.ExemptGroups,
 		NamespaceConfigEnabled:    namespaceConfigEnabled(cluster.Spec.NamespaceConfig),
 		NamespaceConfigMapName:    namespaceConfigMapName(cluster.Spec.NamespaceConfig),
 		CustomSlurmConfig:         cluster.Spec.CustomSlurmConfig,
 	}, nil
+}
+
+// nodeSetDockerEnabled treats an omitted setting as enabled, matching the operator default.
+func nodeSetDockerEnabled(docker kubeobjects.NodeSetDockerSpec) bool {
+	return docker.Enabled == nil || *docker.Enabled
 }
 
 // namespaceConfigEnabled treats an omitted setting as enabled, matching the SlurmCluster CRD default.
@@ -224,6 +236,7 @@ func (c *KubectlClient) NodeSets(ctx context.Context, clusterName string) ([]Nod
 			Replicas:      int(nodeSet.Spec.Replicas),
 			ReadyReplicas: int(nodeSet.Status.Replicas),
 			HasGPU:        nodeSet.Spec.GPU.Enabled,
+			DockerEnabled: nodeSetDockerEnabled(nodeSet.Spec.Docker),
 			Phase:         nodeSet.Status.Phase,
 			JailSubMounts: jailSubMountInfos(nodeSet.Spec.Slurmd.Volumes.JailSubMounts),
 		})

@@ -58,6 +58,92 @@ func TestWorkerSnapshotPickGPUWorkersSelectsFromGPUWorkers(t *testing.T) {
 	assert.Equal(t, []WorkerInfo{{Name: "gpu-0"}}, workers)
 }
 
+func TestWorkerSnapshotPickDockerWorkersSelectsOnlyDockerNodeSets(t *testing.T) {
+	snapshot, err := newWorkerSnapshot(
+		[]NodeSetInfo{
+			{Name: "docker", Replicas: 1, DockerEnabled: true},
+			{Name: "plain", Replicas: 1},
+		},
+		[]WorkerInfo{
+			{Name: "docker-0", NodeSetName: "docker", SlurmNode: SlurmNodeInfo{State: "IDLE"}},
+			{Name: "plain-0", NodeSetName: "plain", SlurmNode: SlurmNodeInfo{State: "IDLE"}},
+		},
+	)
+	require.NoError(t, err)
+
+	for range 10 {
+		workers, err := snapshot.PickDockerWorkers(1)
+		require.NoError(t, err)
+		require.Len(t, workers, 1)
+		assert.Equal(t, "docker-0", workers[0].Name)
+	}
+}
+
+func TestWorkerSnapshotPickDockerWorkersSkipsClusterWithoutDocker(t *testing.T) {
+	snapshot, err := newWorkerSnapshot(
+		[]NodeSetInfo{{Name: "plain", Replicas: 2}},
+		[]WorkerInfo{
+			{Name: "plain-0", NodeSetName: "plain", SlurmNode: SlurmNodeInfo{State: "IDLE"}},
+			{Name: "plain-1", NodeSetName: "plain", SlurmNode: SlurmNodeInfo{State: "IDLE"}},
+		},
+	)
+	require.NoError(t, err)
+
+	_, err = snapshot.PickDockerWorkers(1)
+	require.Error(t, err)
+	assert.True(t, IsInsufficientWorkers(err))
+	assert.ErrorContains(t, err, "found 0 Docker workers, need 1")
+	assert.ErrorIs(t, SkipIfInsufficientWorkers(nil, err), godog.ErrSkip)
+}
+
+func TestWorkerSnapshotPickDockerWorkersFailsWhenDockerWorkersAreUnusable(t *testing.T) {
+	snapshot, err := newWorkerSnapshot(
+		[]NodeSetInfo{
+			{Name: "docker", Replicas: 1, DockerEnabled: true},
+			{Name: "plain", Replicas: 1},
+		},
+		[]WorkerInfo{
+			{Name: "docker-0", NodeSetName: "docker", SlurmNode: SlurmNodeInfo{State: "DOWN", Reason: "Not responding"}},
+			{Name: "plain-0", NodeSetName: "plain", SlurmNode: SlurmNodeInfo{State: "IDLE"}},
+		},
+	)
+	require.NoError(t, err)
+
+	_, err = snapshot.PickDockerWorkers(1)
+	require.Error(t, err)
+	assert.False(t, IsInsufficientWorkers(err))
+	assert.ErrorContains(t, err, "found 0 usable Docker workers, need 1")
+	assert.ErrorContains(t, err, "docker-0 state=DOWN reason=Not responding")
+}
+
+func TestWorkerSnapshotPickDockerGPUWorkersRequiresDockerAndGPU(t *testing.T) {
+	snapshot, err := newWorkerSnapshot(
+		[]NodeSetInfo{
+			{Name: "docker-cpu", Replicas: 1, DockerEnabled: true},
+			{Name: "plain-gpu", Replicas: 1, HasGPU: true},
+			{Name: "docker-gpu", Replicas: 1, HasGPU: true, DockerEnabled: true},
+		},
+		[]WorkerInfo{
+			{Name: "docker-cpu-0", NodeSetName: "docker-cpu", SlurmNode: SlurmNodeInfo{State: "IDLE"}},
+			{Name: "plain-gpu-0", NodeSetName: "plain-gpu", HasGPU: true, SlurmNode: SlurmNodeInfo{State: "IDLE"}},
+			{Name: "docker-gpu-0", NodeSetName: "docker-gpu", HasGPU: true, SlurmNode: SlurmNodeInfo{State: "IDLE"}},
+		},
+	)
+	require.NoError(t, err)
+
+	for range 10 {
+		workers, err := snapshot.PickDockerGPUWorkers(1)
+		require.NoError(t, err)
+		require.Len(t, workers, 1)
+		assert.Equal(t, "docker-gpu-0", workers[0].Name)
+	}
+
+	snapshot.NodeSets[2].DockerEnabled = false
+	_, err = snapshot.PickDockerGPUWorkers(1)
+	require.Error(t, err)
+	assert.True(t, IsInsufficientWorkers(err))
+}
+
 func TestWorkerSnapshotPickWorkersRejectsInvalidCount(t *testing.T) {
 	_, err := (WorkerSnapshot{}).PickWorkers(0)
 	require.Error(t, err)
