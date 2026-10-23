@@ -10,6 +10,10 @@ spec:
   driftDetection:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .Values.certManager.postRenderers }}
+  postRenderers:
+    {{- tpl (toYaml .) $ | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: cert-manager
@@ -35,9 +39,33 @@ spec:
   {{- if .Values.certManager.overrideValues }}
     {{- toYaml .Values.certManager.overrideValues | nindent 4 }}
   {{- else }}
+  {{- $certManager := .Values.certManager.values | default dict }}
     enableCertificateOwnerRef: true
+    {{- with $certManager.nodeSelector }}
+    nodeSelector:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $certManager.affinity }}
+    affinity:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $certManager.resources }}
+    resources:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
     startupapicheck:
       enabled: true
+      {{- with $certManager.startupapicheck }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- with $certManager.webhook }}
+    webhook:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with $certManager.cainjector }}
+    cainjector:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
     crds:
       enabled: true
     global:

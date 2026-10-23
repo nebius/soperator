@@ -24,7 +24,8 @@ Login nodes can be exposed differently to users. The default option is to balanc
 the cluster via SSH, they're directed to a random node.
 
 Various Slurm and system configs that Soperator controls are represented via ConfigMaps. Secrets are used as well for
-storing Munge and SSH server keys.
+storing Munge and SSH server keys. See [`slurm-configuration.md`](slurm-configuration.md) for how Slurm configuration
+is rendered, delivered to the nodes and changed.
 
 While all containers have ephemeral filesystems (changes are lost after node restarts), we use Kubernetes Persistent
 Volumes to keep data around.
@@ -65,6 +66,25 @@ Soperator consists of the following components:
   recommended not to try to write them from scratch. Instead, *derive* your container images from these adding or changing
   things you want.
 
+## Controller Secret cache
+
+When installed using the Helm charts, the operator and `soperatorchecks` exclude Secrets of type
+`helm.sh/release.v1` from their API LIST/WATCH requests and caches by default. These Secrets contain
+Helm release history; application Secrets installed by Helm remain available to controllers.
+
+Set `SLURM_OPERATOR_IGNORED_SECRET_TYPES` on each manager to configure exclusions with a comma-separated
+list, for example `helm.sh/release.v1,example.com/archive`. Whitespace and empty entries are ignored.
+An unset or empty value disables filtering. Changes take effect when the manager restarts.
+
+For Helm installations, set `controllerManager.manager.env.slurmOperatorIgnoredSecretTypes` in
+the `soperator` chart and `checks.manager.env.slurmOperatorIgnoredSecretTypes` in the
+`soperatorchecks` chart. Both default to `"helm.sh/release.v1"`; set both to `""` to disable filtering.
+
+With `--log-level=debug`, each manager logs the ignored types and API field selector at startup,
+or logs that filtering is disabled. Individual excluded Secrets never reach the manager, so there
+are no per-Secret skip logs. Excluded types are unavailable through the cached client; only exclude
+types that controllers do not need.
+
 ## Helm charts
 - **slurm-cluster**. It allows you to create the custom resource representing a Slurm cluster. You can apply it many
   times if you need more than one Slurm cluster. The Slurm cluster is actually configured by values in this chart.
@@ -75,7 +95,7 @@ Soperator consists of the following components:
 - **soperator-activechecks**. This chart is optional. It is used to deploy Kubernetes resources of `kind: ActiveCheck`, which perform active jobs to monitor and validate the state of a Slurm cluster.
 - **soperator-crds**. It deploys the schema of the `SlurmCluster` custom resource, it should always be applied when
   you upgrade the version of Soperator in your cluster.
-- **soperator-dcgm-exporter**. This chart is optional. It is a custom Helm chart with `hpc-jobs-dir` where Slurm stores information about jobs.
+- **soperator-dcgm-exporter**. This chart is optional. It deploys the NVIDIA DCGM exporter with soperator's curated metric set and Slurm-aware relabelings (NVLink instance group and NodeSet labels).
 - **soperator-fluxcd**. This chart is optional. It is an umbrella chart with various components designed for convenient use in a cluster with soperator. It includes `kind: HelmRelease` and `kind: HelmRepository`. This approach was chosen because customizing components through Kustomize is difficult, and Helm dependencies lack flexibility in configuration. Therefore, this umbrella chart was created to deploy HelmReleases with properly configured dependencies.
 - **soperatorchecks**. This chart is optional. It is used to deploy additional controller that runs Slurm and Kubernetes jobs to actively check the state of the Slurm cluster.
 
@@ -100,9 +120,10 @@ restart them and get back to square one.
 
 For Linux gurus, this approach may sound a bit out there. Linux isn’t built to share its root filesystem. That’s true,
 which is why the filesystem isn’t entirely shared — some directories are local to each node. These include `/dev`,
-containing device drivers; `/tmp`, containing temporary files stored in RAM; `/proc`, containing information about
-running processes; `/run`, containing runtime variable data; and others. Some low-level libraries, device drivers, and
-system configs are also not shared, though they’re identical — propagated (bind-mounted) from each host’s environment.
+containing device drivers; `/proc`, containing information about running processes; `/run`, containing runtime variable
+data; and others. Slurm jobs additionally receive private tmpfs filesystems at `/mnt/memory`, `/tmp`, and `/dev/shm`,
+as described [below](#temporary-filesystems-for-jobs). Some low-level libraries, device drivers, and system configs
+are also not shared, though they’re identical — propagated (bind-mounted) from each host’s environment.
 
 Here’s a diagram that tries to explain this concept visually:
 <img src="images/directory_structure_diagram.svg" alt="Directory Structure Diagram" width="100%" height="auto"/>
@@ -131,12 +152,67 @@ As you can see, it's pretty short and doesn't do anything supernatural.
 
 This plugin isn’t bound to Soperator setup and could theoretically work in typical (non-Kubernetes) Slurm installations.
 
-We use a different approach to change the root directory for user-established SSH sessions to Login nodes. We simply use
-OpenSSH’s ChrootDirectory feature.
+SSH sessions on login and worker nodes enter the same jail through a PAM session module. The module creates a private
+mount namespace for each session and uses `pivot_root`, allowing tools such as Enroot to create their own namespaces
+inside the jail. Worker SSH adoption places eligible sessions in the job's cgroup; SSH sessions retain the worker's
+service-level temporary filesystems.
 
 The jail storage is initially populated at the moment of creating the cluster. It's done by the K8s job "populate-jail"
 that runs only once. It uses [images/populate_jail/](../images/populate_jail) container image. The content this job
 copies is the filesystem of another container image called [jail](../images/jail).
+
+
+### Temporary filesystems for jobs
+
+Soperator enables Slurm's [namespace/linux plugin](https://slurm.schedmd.com/namespace.html) with
+`NamespaceType=namespace/linux` and `PrologFlags=contain`. It requires cgroup v2 (`SlurmCluster.spec.cgroupVersion: v2`).
+The `namespaceConfig` setting in the `slurm-cluster` Helm chart maps to `SlurmCluster.spec.namespaceConfig`:
+
+| Configuration | Behavior |
+| --- | --- |
+| `enabled: true`, no `configMapRef` | Generate the default `namespace.yaml` |
+| `enabled: true`, `configMapRef.name` set | Use `namespace.yaml` from the referenced ConfigMap |
+| `enabled: false` | Omit `NamespaceType` and stop managing `namespace.yaml`, regardless of `configMapRef` |
+
+`enabled` defaults to `true`. Each enabled mode uses a dedicated JailedConfig to materialize the selected
+ConfigMap's `namespace.yaml` key at `/etc/slurm/namespace.yaml`. A custom ConfigMap must be in the same Kubernetes
+namespace as the SlurmCluster. For example:
+
+```yaml
+namespaceConfig:
+  enabled: true
+  configMapRef:
+    name: custom-slurm-namespace
+```
+
+The default YAML creates separate tmpfs mounts at `/mnt/jail/mnt/memory`, `/mnt/jail/dev/shm`, and `/mnt/jail/tmp`,
+using `tmpfs: true` and `mode=1777`. Job processes see these mounts at `/mnt/memory`, `/dev/shm`, and `/tmp` after
+entering the jail. Steps of the same job share their contents on each worker; other jobs and workers have separate
+filesystems. PAM and the SPANK jail plugin need no additional mount handling.
+
+Namespace anchors live under `/tmp/<job-id>/.ns` outside the jail. The existing worker-local `/tmp` is used with
+`auto_base_path: false`. With `shared: true`, host mounts propagated to the slurmd container (for example, `/run/nvidia`)
+still reach jobs, while job mounts do not propagate back. The generated YAML has constant size regardless of node count.
+
+Tmpfs pages allocated by job processes count toward their cgroup memory limit alongside process memory. The default
+configuration uses the kernel's tmpfs capacity ceiling and does not reserve RAM or increase the job's memory limit.
+Inspect `memory.current` and `memory.stat` (`shmem`); Slurm RSS statistics may omit tmpfs usage.
+When the job ends or is cancelled, Slurm releases namespace references, and the kernel frees tmpfs contents after the
+last references disappear. Use `/mnt/memory` directly and save durable results elsewhere.
+
+Service processes and SSH sessions retain the worker's shared directories. When namespaces are disabled, job tasks
+also use those directories. An already materialized `namespace.yaml` may remain in the jail after disabling, but Slurm
+does not use it without `NamespaceType`. Avoid custom `jailSubMounts` under the default job tmpfs paths, because the
+fresh mounts hide their contents from jobs; use another path or supply custom namespace configuration.
+
+`sbcast` resolves destinations outside the jail, so target `/mnt/jail/tmp/file` to make the file visible to tasks as
+`/tmp/file`; the same prefix applies to `/dev/shm` and `/mnt/memory`. Standard `srun --bcast` destinations do not get
+this mapping automatically.
+
+Docker's daemon runs outside job mount namespaces. Containers started with `docker run --ipc=host` use its worker-wide
+`/dev/shm`, and segments left by killed processes can outlive the job. The built-in `drop_posix_shmem.sh` prolog/epilog
+script remains enabled by default and cleans this shared filesystem around jobs that allocate all GPUs or all CPUs
+of the node. It does not provide per-job isolation for Docker on shared workers.
 
 
 ### GPU health checks
