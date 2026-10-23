@@ -245,7 +245,7 @@ func TestKubectlClientNodeSetsFiltersByClusterName(t *testing.T) {
 				},
 				{
 					"metadata": {"name": "worker-cpu", "namespace": "soperator"},
-					"spec": {"clusterName": "soperator", "replicas": 3, "gpu": {"enabled": false}},
+					"spec": {"clusterName": "soperator", "replicas": 3, "gpu": {"enabled": false}, "docker": {"enabled": false}},
 					"status": {"phase": "Ready", "replicas": 3}
 				},
 				{
@@ -274,6 +274,8 @@ func TestKubectlClientNodeSetsFiltersByClusterName(t *testing.T) {
 		Replicas:      2,
 		ReadyReplicas: 1,
 		HasGPU:        true,
+		// Docker is enabled unless the NodeSet disables it explicitly.
+		DockerEnabled: true,
 		Phase:         "Ready",
 		JailSubMounts: []JailSubMountInfo{
 			{Name: "local-data", MountPath: "/scratch", UsesVolumeClaimTemplate: true},

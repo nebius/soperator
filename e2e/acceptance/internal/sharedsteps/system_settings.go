@@ -280,6 +280,8 @@ func (s *SystemSettings) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the Docker kernel-settings job succeeds$`, s.dockerKernelSettingsJobSucceeds)
 	sc.Step(`^it exposes the required kernel settings$`, s.dockerJobExposesRequiredKernelSettings)
 	sc.Step(`^a healthy GPU worker is selected for system-settings checks$`, s.selectHealthyGPUWorker)
+	sc.Step(`^a healthy Docker-enabled worker is selected for system-settings checks$`, s.selectHealthyDockerWorker)
+	sc.Step(`^a healthy Docker-enabled GPU worker is selected for system-settings checks$`, s.selectHealthyDockerGPUWorker)
 	sc.Step(`^its Slurm container exposes the required NVIDIA driver capabilities$`, s.slurmContainerExposesRequiredNVIDIADriverCapabilities)
 	sc.Step(`^native and Enroot GPU jobs look up NVIDIA driver libraries for the required capabilities$`, s.submitNVIDIALibrariesJobs)
 	sc.Step(`^both NVIDIA library lookup jobs succeed$`, s.nvidiaLibrariesJobsSucceed)
@@ -357,6 +359,26 @@ func (s *SystemSettings) selectHealthyGPUWorker(ctx context.Context) error {
 	}
 	s.worker = workers[0]
 	s.runtime.Logf("system settings: selected GPU worker=%s", s.worker.Name)
+	return nil
+}
+
+func (s *SystemSettings) selectHealthyDockerWorker(ctx context.Context) error {
+	workers, err := s.selector.PickDockerWorkers(ctx, 1)
+	if err != nil {
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
+	}
+	s.worker = workers[0]
+	s.runtime.Logf("system settings: selected Docker worker=%s", s.worker.Name)
+	return nil
+}
+
+func (s *SystemSettings) selectHealthyDockerGPUWorker(ctx context.Context) error {
+	workers, err := s.selector.PickDockerGPUWorkers(ctx, 1)
+	if err != nil {
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
+	}
+	s.worker = workers[0]
+	s.runtime.Logf("system settings: selected Docker GPU worker=%s", s.worker.Name)
 	return nil
 }
 

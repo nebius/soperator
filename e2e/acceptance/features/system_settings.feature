@@ -57,14 +57,14 @@ Feature: System settings
 
   @soperator_version_>=5.0.0
   Scenario: Docker Slurm jobs expose the compute resource-limit profile
-    Given a healthy worker is selected for system-settings checks
+    Given a healthy Docker-enabled worker is selected for system-settings checks
     When a Docker Slurm job collects direct and nested Bash resource limits
     Then the Docker system-settings job succeeds
     And its direct and nested resource limits match the compute profile
 
   @soperator_version_>=5.0.0
   Scenario: Required kernel settings are visible in Docker Slurm jobs
-    Given a healthy worker is selected for system-settings checks
+    Given a healthy Docker-enabled worker is selected for system-settings checks
     When a Docker Slurm job collects kernel settings
     Then the Docker kernel-settings job succeeds
     And it exposes the required kernel settings
@@ -103,7 +103,7 @@ Feature: System settings
 
   @gpu @soperator_version_>=5.0.0
   Scenario: Docker GPU jobs see non-placeholder NVIDIA driver libraries for the required capabilities
-    Given a healthy GPU worker is selected for system-settings checks
+    Given a healthy Docker-enabled GPU worker is selected for system-settings checks
     When a Docker GPU job looks up NVIDIA driver libraries for the required capabilities
     Then the Docker NVIDIA library lookup job succeeds
     And it finds a non-placeholder NVIDIA driver library for every required capability

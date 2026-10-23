@@ -27,6 +27,9 @@ type NodeSetInfo struct {
 	Replicas      int
 	ReadyReplicas int
 	HasGPU        bool
+	// DockerEnabled reports whether the NodeSet workers run Docker. Without it,
+	// the jail replaces the docker CLI with a stub that always fails.
+	DockerEnabled bool
 	Phase         string
 	JailSubMounts []JailSubMountInfo
 }
@@ -101,6 +104,11 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 		NamespaceConfigMapName:    namespaceConfigMapName(cluster.Spec.NamespaceConfig),
 		CustomSlurmConfig:         cluster.Spec.CustomSlurmConfig,
 	}, nil
+}
+
+// nodeSetDockerEnabled treats an omitted setting as enabled, matching the operator default.
+func nodeSetDockerEnabled(docker kubeobjects.NodeSetDockerSpec) bool {
+	return docker.Enabled == nil || *docker.Enabled
 }
 
 // namespaceConfigEnabled treats an omitted setting as enabled, matching the SlurmCluster CRD default.
@@ -228,6 +236,7 @@ func (c *KubectlClient) NodeSets(ctx context.Context, clusterName string) ([]Nod
 			Replicas:      int(nodeSet.Spec.Replicas),
 			ReadyReplicas: int(nodeSet.Status.Replicas),
 			HasGPU:        nodeSet.Spec.GPU.Enabled,
+			DockerEnabled: nodeSetDockerEnabled(nodeSet.Spec.Docker),
 			Phase:         nodeSet.Status.Phase,
 			JailSubMounts: jailSubMountInfos(nodeSet.Spec.Slurmd.Volumes.JailSubMounts),
 		})
