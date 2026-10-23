@@ -1,171 +1,35 @@
-package topologyconfcontroller_test
+package topologyconfcontroller
 
 import (
 	"context"
-	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/tools/events"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/stretchr/testify/require"
-
 	"nebius.ai/slurm-operator/api/v1alpha1"
-	"nebius.ai/slurm-operator/internal/consts"
-	tc "nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 )
 
-func TestParseNodeTopologyLabels(t *testing.T) {
-	reconciler := &tc.WorkerTopologyReconciler{}
-	tests := []struct {
-		name        string
-		input       map[string]string
-		expected    map[string]tc.NodeTopologyLabels
-		expectError bool
-	}{
-		{
-			name: "Valid topology data",
-			input: map[string]string{
-				"node1": `{"tier-1":"sw0","tier-2":"spine0"}`,
-				"node2": `{"tier-1":"sw1","tier-2":"spine1","tier-3":"leaf0"}`,
-			},
-			expected: map[string]tc.NodeTopologyLabels{
-				"node1": {"tier-1": "sw0", "tier-2": "spine0"},
-				"node2": {"tier-1": "sw1", "tier-2": "spine1", "tier-3": "leaf0"},
-			},
-			expectError: false,
-		},
-		{
-			name: "Invalid JSON data",
-			input: map[string]string{
-				"node1": `{"tier-1":"sw0","tier-2":"spine0"`, // Missing closing brace
-			},
-			expected:    nil,
-			expectError: true,
-		},
-		{
-			name:        "Empty input data",
-			input:       map[string]string{},
-			expected:    map[string]tc.NodeTopologyLabels{},
-			expectError: false,
-		},
+func Test_loadTopologyConfig_Basic(t *testing.T) {
+	ctx := context.Background()
+	scheme := newTestScheme(t)
+
+	r := &WorkerTopologyReconciler{
+		client:              fake.NewClientBuilder().WithScheme(scheme).Build(),
+		scheme:              scheme,
+		reconfigureDeferral: testReconfigureDeferral,
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := reconciler.ParseNodeTopologyLabels(tt.input)
-
-			if tt.expectError {
-				require.Error(t, err, "Expected an error but got none")
-				require.Nil(t, result, "Result should be nil when an error occurs")
-			} else {
-				require.NoError(t, err, "Unexpected error occurred")
-				require.Equal(t, tt.expected, result, "Deserialized topology does not match expected result")
-			}
-		})
-	}
-}
-
-func TestCollectWorkerPods(t *testing.T) {
-	t.Parallel()
-
-	const (
-		namespace   = "test-ns"
-		clusterName = "cluster-a"
-	)
-
-	scheme := runtime.NewScheme()
-	utilruntime.Must(corev1.AddToScheme(scheme))
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-	nodeSetList := []v1alpha1.NodeSet{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "nodeset-a",
-				Namespace: namespace,
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "nodeset-b",
-				Namespace: namespace,
-			},
-		},
-	}
-
-	objects := []client.Object{
-		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-running-a1",
-				Namespace: namespace,
-				Labels: map[string]string{
-					consts.LabelNodeSetKey: "nodeset-a",
-				},
-			},
-			Status: corev1.PodStatus{Phase: corev1.PodRunning},
-		},
-		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-pending-a",
-				Namespace: namespace,
-				Labels: map[string]string{
-					consts.LabelNodeSetKey: "nodeset-a",
-				},
-			},
-			Status: corev1.PodStatus{Phase: corev1.PodPending},
-		},
-		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-running-b1",
-				Namespace: namespace,
-				Labels: map[string]string{
-					consts.LabelNodeSetKey: "nodeset-b",
-				},
-			},
-			Status: corev1.PodStatus{Phase: corev1.PodRunning},
-		},
-		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-running-other-cluster",
-				Namespace: namespace,
-				Labels: map[string]string{
-					consts.LabelNodeSetKey: "nodeset-other-cluster",
-				},
-			},
-			Status: corev1.PodStatus{Phase: corev1.PodRunning},
-		},
-		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-running-other-ns",
-				Namespace: "other-ns",
-				Labels: map[string]string{
-					consts.LabelNodeSetKey: "nodeset-a",
-				},
-			},
-			Status: corev1.PodStatus{Phase: corev1.PodRunning},
-		},
-	}
-
-	fakeClient := fake.NewClientBuilder().
-		WithScheme(scheme).
-		WithObjects(objects...).
-		Build()
-
-	reconciler := tc.NewWorkerTopologyReconciler(fakeClient, scheme, namespace, events.NewFakeRecorder(10), 0, 1)
-
-	pods, err := reconciler.CollectWorkerPods(context.Background(), nodeSetList, clusterName, namespace)
+	config, err := r.loadTopologyConfig(ctx, testCluster)
 	require.NoError(t, err)
+	assert.Equal(t, testTopologyConfigKey, config.key)
+	assert.Equal(t, testReconfigureDeferral, config.reconfigureDeferral)
+	assert.Nil(t, config.jailedConfig, "nothing published yet")
 
-	var names []string
-	for _, pod := range pods {
-		names = append(names, pod.Name)
-	}
-	slices.Sort(names)
-
-	assert.Equal(t, []string{"pod-pending-a", "pod-running-a1", "pod-running-b1"}, names)
+	r.client = fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(testJailedConfig(v1alpha1.UpdateActionReconfigure)).Build()
+	config, err = r.loadTopologyConfig(ctx, testCluster)
+	require.NoError(t, err)
+	require.NotNil(t, config.jailedConfig)
+	assert.True(t, hasReconfigureRequest(config.jailedConfig))
 }

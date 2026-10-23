@@ -139,18 +139,33 @@ PartitionName=main Nodes=ALL Default=YES State=UP
 
 `main` sets no `topologyRef`, so it uses the topology marked `clusterDefault`.
 
-Block topologies retain a flat list of blocks grouped by `tier-0`. Soperator orders these blocks
-by their InfiniBand paths, comparing the highest numbered tier first and continuing down to
-`tier-1`. Each block gets its own path, including when one NodeSet spans several racks. Node lists
-inside blocks keep their existing rendering.
+Slurm ranks nodes by the position of their leaf in `topology.yaml`: the leaf switch of a tree, or
+the block of a block topology. Two orderings follow from it. The node table, which is what
+`SLURM_JOB_NODELIST` and `scontrol show nodes` print, follows the cluster-default topology when
+`TopologyParam` carries `SwitchAsNodeRank` or `BlockAsNodeRank`. The task ranks of a step, behind
+`SLURM_NODEID`, follow the partition's topology. Slurm does not reconcile the two, so Soperator
+renders every topology from one shared leaf order: a tree's leaf switches and a block topology's
+blocks are both listed in it, and a topology covering a subset of the NodeSets lists its leaves in
+the same relative order. The two orderings then agree whichever plugin the cluster default and the
+partition use.
+
+Leaves are grouped by `tier-0`, so a leaf switch and a block carry the same name. Soperator orders
+them by fabric, then by their InfiniBand paths, comparing the highest numbered tier first and
+continuing down to `tier-1`. Each leaf gets its own path, including when one NodeSet spans several
+racks. In a tree, each switch is written right before the first of its leaves, so a consistently
+labelled fabric reads as a pre-order walk: the fabric root, its first spine, that spine's leaves,
+the next spine, and so on. Node lists inside leaves keep their existing rendering.
 
 Paths come from Kubernetes node labels, independently of which worker pods are currently scheduled.
 Nodes without usable labels are ignored; paths without `tier-1` still use their known higher tiers.
 Missing ancestors are filled from unambiguous switch relationships on other nodes. Tier numbers
 remain part of the comparison, so names from different tiers are never compared, and a missing tier
-sorts after a known one: a block whose lower tiers are unknown lands after the fully labelled blocks
-under the same switch. Equal paths and blocks without known paths use block-name order; blocks
-without known paths and the catch-all `unknown` block come last.
+sorts after a known one: a leaf whose lower tiers are unknown lands after the fully labelled leaves
+under the same switch. Equal paths and leaves without known paths use name order; leaves without
+known paths and then the catch-all `unknown` leaf come last within their fabric.
+
+A Kubernetes node without a `tier-0` label is the one case the plugins cannot agree on: a tree
+makes its lowest labelled tier a leaf switch, while a block topology files the node under `unknown`.
 
 If nodes within a block disagree, Soperator uses the path most of the block's nodes agree on, then
 the most complete one, then the one of the first Kubernetes node by name. Conflicts are reported as
@@ -167,14 +182,14 @@ topologies.
 Changes to the ordered list of block names request a Slurm reconfigure after the updated file is
 published. This includes blocks being added or removed, for example when workers are scheduled into
 a new rack or a rack is powered down. Slurm rejects a node registering into a block it has not
-loaded, so a new block needs a re-read. A change that only reorders or removes blocks is rate-limited,
-see [Rate limit for reordered and removed blocks](#rate-limit-for-reordered-and-removed-blocks).
+loaded, so a new block needs a re-read. A change that only reorders or removes blocks is deferred,
+see [Deferred reconfigures for reordered leaves and blocks](#deferred-reconfigures-for-reordered-leaves-and-blocks).
 Changes to node lists inside the same blocks do not request a reconfigure. The catch-all `unknown` block is rendered for every fabric in scope, without nodes
 when all of them are placed, so a single rescheduled worker does not add or remove a block.
 
-Upgrading the operator to a version with block ordering changes the structure fingerprint format
-and usually the block order in the file, so each cluster with a block topology gets one reconfigure
-after the upgrade. A rollback does the same.
+Upgrading the operator to a version with block ordering usually changes the block order in the
+file, so each cluster with a block topology gets one reconfigure after the upgrade. A rollback does
+the same.
 
 `features/topology_block.feature` checks the block order with two scenarios.
 
@@ -480,72 +495,61 @@ update action, and withdrawn only once a reconfigure has demonstrably run over t
 
 #### What counts as a structural change
 
-The operator reduces the rendered file to a structure fingerprint, keeping only what slurmctld can
-learn by re-reading it: for each entry, its name, its plugin, its `block_sizes`, its
-`cluster_default` flag and a SHA-256 hash of its ordered block names. For example:
+The operator compares the new file with the published one and sorts the difference by what
+slurmctld would have to re-read to learn it:
 
-```
-flat=flat:[]:true,tree-ib=tree:[]:false,block-nvl72=block:[18]:false:blocks=<hash>
-```
+| Reconfigures at once | Reconfigures after a quiet window | Needs no reconfigure |
+| --- | --- | --- |
+| a topology added or removed | leaf switches reordered, appearing or disappearing | a node moving between existing switches or blocks |
+| a topology renamed or `topo.type` changed | blocks reordered or disappearing | an inner tree switch appearing, disappearing or renamed |
+| `topo.blockSizes` changed | | the order inside a `children` list |
+| `clusterDefault` moved to another topology | | |
+| a block appearing | | |
 
-| Asks for a reconfigure | Does not |
-| --- | --- |
-| a topology added or removed | a node moving between existing switches or blocks |
-| a topology renamed | a tree switch appearing, disappearing or renamed |
-| `topo.type` changed | `nodeSetRefs` changed, unless the block list changes |
-| `topo.blockSizes` changed | a NodeSet scaled up or down, unless the block list changes |
-| `clusterDefault` moved to another topology | |
-| topologies reordered in the spec | |
-| blocks reordered inside a block topology | |
-| a block appearing, disappearing or renamed | |
+Node membership travels with the worker's own slurmd registration. The order of leaf switches and
+blocks decides task ranks, so slurmctld has to re-read it, but a stale order only worsens placement
+and a leaf or block that disappeared stays loaded but harmless, so such changes can wait. A new block
+cannot: a node registering into a block slurmctld has not loaded is set to `INVAL` and drained with
+reason `Failed to set topology`. Scaling a NodeSet or changing `nodeSetRefs` falls into whichever
+column the resulting file does.
 
-The right-hand column applies while the ordered list of block names stays the same. Node membership
-travels with the worker's own slurmd registration. Scaling a NodeSet or changing `nodeSetRefs`
-requests a reconfigure when it adds or empties a block.
+#### Confirming a reconfigure
 
-#### Two further gates
-
-A reconfigure also has to be worth doing. Each `JailedConfig` records the hash of what it last
-applied in `status.appliedHash`, so a reconciliation over identical content does not reconfigure the
-cluster again. A request over content that renders identically — a topology gaining an entry that
-reaches no node yet — is still honoured, because otherwise it would never be satisfied.
+Each `JailedConfig` records the hash of what it last applied in `status.appliedHash`, so a
+reconciliation over identical content does not reconfigure the cluster again. A request over content
+that renders identically — a topology gaining an entry that reaches no node yet — is still honoured,
+because raising it changes the JailedConfig generation.
 
 The operator publishes the new config before raising the request, so a request only ever stands over
-content already in the ConfigMap. Withdrawal is keyed on `status.appliedHash` moving past the value
-recorded when the request was raised, rather than on the JailedConfig generation: the request lives
-in the spec while the structure lives in an annotation, so a second structural change arriving while
-a request is outstanding leaves the generation untouched, and a confirmation earned over the previous
-content would otherwise read as confirming the new one.
+content already in the ConfigMap. The request is withdrawn once the `ReconfigurePerformed` condition
+names the current generation, or, for a request raised while another was still outstanding so the
+generation did not move, once `status.appliedHash` has moved past the value recorded when it was
+raised. The withdrawal happens before any further content is published: a request left in the spec
+would turn the next node movement into another reconfigure.
 
-#### Rate limit for reordered and removed blocks
+#### Deferred reconfigures for reordered leaves and blocks
 
-Structural changes are not equally urgent. A new block must reach slurmctld at once: a node
-registering into a block slurmctld has not loaded is set to `INVAL` and drained with reason
-`Failed to set topology`. A change that only reorders blocks or removes some of them can wait: a
-stale order only worsens placement, and a removed block stays loaded but harmless. Such changes are
-what powering racks down and up in waves produces, and on a large cluster each one would otherwise
-restart slurmd on every node.
+`scontrol reconfigure` resets slurmctld's internal timers, so two reconfigures closer together than
+the longest timeout in `slurm.conf` keep that timeout from ever expiring. Changes that only reorder
+leaf switches or blocks are what powering racks down and up in waves produces, and on a large
+cluster each one would otherwise restart slurmd on every node.
 
-So when the new file differs from the published one only in block order or in blocks that
-disappeared, the operator publishes it through a token bucket per cluster. Without a token, neither
-the ConfigMap nor the `JailedConfig` is touched, and the change is retried on the next
-reconciliation, about once a minute. A rack that comes back before a token is available finds its
-block still loaded and causes no reconfigure at all. Any other change, such as a new block, is
-published at once and carries the deferred order and removals along.
+Such a change is published at once, so the file in the jail is always current, but the request is
+held. It is raised once a cooldown has passed since the last reconfigure the operator caused and the
+order has stopped changing for a debounce, though never later than a cap after the first held
+change. Repeated reorders inside one window collapse into a single reconfigure, and a change that
+needs an immediate reconfigure settles the held one along the way.
 
-The ConfigMap is held back rather than published without a request because sconfigcontroller
-records any written content in `status.appliedHash`; a request raised later over the same content
-could then never be confirmed.
-
-The bucket is configured with operator flags:
+The deferral state lives in annotations on the topology `JailedConfig`, so an operator restart or a
+leader change loses nothing. It is configured with operator flags:
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
-| `--topology-deferrable-reconfigure-interval` | `11m` | Average interval between such reconfigures; `0` disables the limit |
-| `--topology-deferrable-reconfigure-burst` | `2` | Number of such reconfigures allowed back to back |
+| `--topology-reconfigure-cooldown` | `15m` | Least time between the previous reconfigure and a deferred one; `0` disables it |
+| `--topology-reconfigure-debounce` | `1m` | How long the order has to stay unchanged before the deferred reconfigure runs |
+| `--topology-reconfigure-debounce-cap` | `15m` | Most a deferred reconfigure waits for the order to settle; `0` disables the cap |
 
-Set them through `controllerManager.manager.args` in the `soperator` Helm chart. The bucket lives in
-operator memory, so a restart or a leader change refills it.
+Set them through `controllerManager.manager.args` in the `soperator` Helm chart.
 
 #### Watching it happen
 

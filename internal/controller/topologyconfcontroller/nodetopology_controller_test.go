@@ -1,4 +1,4 @@
-package topologyconfcontroller_test
+package topologyconfcontroller
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
-	tc "nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -39,7 +38,7 @@ func TestExtractTierLabels(t *testing.T) {
 	}
 
 	// Call the function
-	result := tc.ExtractTierLabels(k8sNodeLabels, consts.DefaultTopologyLabelPrefix)
+	result := ExtractTierLabels(k8sNodeLabels, consts.DefaultTopologyLabelPrefix)
 
 	// Validate the result
 	if !reflect.DeepEqual(result, expected) {
@@ -64,7 +63,7 @@ func TestCollectNodesWithAnyTier(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels},
 		}))
 	}
-	r := tc.NewNodeTopologyReconciler(fakeClient, scheme, "default", consts.DefaultTopologyLabelPrefix)
+	r := NewNodeTopologyReconciler(fakeClient, scheme, "default", consts.DefaultTopologyLabelPrefix)
 
 	cm, err := r.GetOrCreateTopologyLabelsConfigMap(ctx)
 	require.NoError(t, err)
@@ -93,11 +92,9 @@ func TestUpdateTopologyConfigMap(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	reconciler := &tc.NodeTopologyReconciler{
-		BaseReconciler: tc.BaseReconciler{
-			Client: fakeClient,
-			Scheme: scheme,
-		},
+	reconciler := &NodeTopologyReconciler{
+		client: fakeClient,
+		scheme: scheme,
 		Namespace: "default",
 	}
 
@@ -156,11 +153,9 @@ func TestRemoveTopologyConfigMap(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	reconciler := &tc.NodeTopologyReconciler{
-		BaseReconciler: tc.BaseReconciler{
-			Client: fakeClient,
-			Scheme: scheme,
-		},
+	reconciler := &NodeTopologyReconciler{
+		client: fakeClient,
+		scheme: scheme,
 		Namespace: "default",
 	}
 
@@ -186,7 +181,7 @@ func TestRemoveTopologyConfigMap(t *testing.T) {
 		assert.NoError(t, err)
 
 		err = reconciler.UpdateResourceDistribution(ctx, tt.nodeName, tierData, rd)
-		logger := log.FromContext(ctx).WithName(tc.NodeTopologyReconcilerName)
+		logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
 		assert.NoError(t, err)
 		t.Run(tt.name, func(t *testing.T) {
 			// Get the ResourceDistribution again for removal
