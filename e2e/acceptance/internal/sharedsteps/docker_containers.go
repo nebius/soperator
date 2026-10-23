@@ -75,9 +75,9 @@ func (s *DockerContainers) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a Docker SSH test user exists$`, s.aDockerSSHTestUserExists)
 	sc.Step(`^the user runs Docker lifecycle commands over SSH on the login node$`, s.theUserRunsDockerLifecycleCommandsOverSSHOnTheLoginNode)
 	sc.Step(`^Docker uses the login proxy, image storage, and the user's cgroup$`, s.dockerUsesTheLoginProxyImageStorageAndTheUsersCgroup)
-	sc.Step(`^the user runs a Docker container over SSH on a worker node$`, s.theUserRunsADockerContainerOverSSHOnAWorkerNode)
+	sc.Step(`^the user runs a Docker container over SSH on a (CPU|GPU) worker node$`, s.theUserRunsADockerContainerOverSSHOnAWorkerNode)
 	sc.Step(`^the Docker container succeeds over worker SSH$`, s.theDockerContainerSucceedsOverWorkerSSH)
-	sc.Step(`^a long-running Docker container job is submitted on two workers$`, s.aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers)
+	sc.Step(`^a long-running Docker container job is submitted on two (CPU|GPU) workers$`, s.aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers)
 	sc.Step(`^the Docker container job is running$`, s.theDockerContainerJobIsRunning)
 	sc.Step(`^Docker image and runtime storage is populated on a worker$`, s.dockerImageAndRuntimeStorageIsPopulatedOnAWorker)
 	sc.Step(`^a Docker container from the job uses the Slurm job cgroup$`, s.aDockerContainerFromTheJobUsesTheSlurmJobCgroup)
@@ -251,8 +251,8 @@ func (s *DockerContainers) runLoginDockerSSHCommand(ctx context.Context, remoteC
 	)
 }
 
-func (s *DockerContainers) theUserRunsADockerContainerOverSSHOnAWorkerNode(ctx context.Context) error {
-	workers, err := s.selector.PickWorkers(ctx, 1)
+func (s *DockerContainers) theUserRunsADockerContainerOverSSHOnAWorkerNode(ctx context.Context, workerType string) error {
+	workers, err := s.pickWorkers(ctx, workerType, 1)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
@@ -294,8 +294,8 @@ func (s *DockerContainers) theDockerContainerSucceedsOverWorkerSSH() error {
 	return nil
 }
 
-func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers(ctx context.Context) error {
-	workers, err := s.selector.PickWorkers(ctx, 2)
+func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers(ctx context.Context, workerType string) error {
+	workers, err := s.pickWorkers(ctx, workerType, 2)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
@@ -321,6 +321,14 @@ func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers
 	s.runtime.Logf("Docker containers: selected workers=%s job_id=%s stdout=%s stderr=%s",
 		strings.Join(framework.WorkerNames(s.workers), ","), job.ID, job.StdoutPath, job.StderrPath)
 	return nil
+}
+
+func (s *DockerContainers) pickWorkers(ctx context.Context, workerType string, count int) ([]framework.WorkerInfo, error) {
+	snapshot, err := s.selector.Snapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return snapshot.WithDocker().PickWorkersByType(workerType, count)
 }
 
 func (s *DockerContainers) theDockerContainerJobIsRunning(ctx context.Context) error {
@@ -478,7 +486,7 @@ func (s *DockerContainers) dockerContainersFromTheJobAreNoLongerRunning(ctx cont
 func (s *DockerContainers) aDockerGPUSmokeJobIsSubmittedOnOneGPUWorker(ctx context.Context) error {
 	// Future option: omit --nodelist and discover the allocated worker after
 	// submission, letting Slurm avoid busy nodes before Docker log collection.
-	workers, err := s.selector.PickGPUWorkers(ctx, 1)
+	workers, err := s.pickWorkers(ctx, "GPU", 1)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}

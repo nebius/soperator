@@ -467,9 +467,19 @@ pushd "${jaildir}"
 
         if [ "$SOPERATOR_DOCKER_ENABLED" = "true" ]; then
             log "[docker] Bind-mount dockerd stuff from container to the jail"
+            docker_config=/etc/docker/daemon.json
+            # CPU workers in GPU clusters see dummy NVML, which crashes NVIDIA runtime auto detection.
+            if [ "$NODESET_GPU_ENABLED" != "true" ]; then
+                # The source config can be a read-only ConfigMap mount; write a node-local copy.
+                docker_config=/run/soperator-docker-daemon.json
+                jq 'if .["default-runtime"] == "nvidia"
+                    then .["default-runtime"] = "runc"
+                    else .
+                    end' /etc/docker/daemon.json > "$docker_config"
+            fi
             mkdir -p etc/docker
             touch etc/docker/daemon.json
-            mount --bind "/etc/docker/daemon.json" "etc/docker/daemon.json"
+            mount --bind "$docker_config" "etc/docker/daemon.json"
         else
             log "[docker] Docker is disabled, masking docker binaries in the jail"
             docker_disabled_stub=/opt/soperator-docker-disabled.sh

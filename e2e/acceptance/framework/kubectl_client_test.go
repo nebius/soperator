@@ -264,6 +264,7 @@ func TestKubectlClientNodeSetsFiltersByClusterName(t *testing.T) {
 		Namespace:     "soperator",
 		Replicas:      3,
 		ReadyReplicas: 3,
+		DockerEnabled: true,
 		Phase:         "Ready",
 	}, nodeSets[0])
 	assert.Equal(t, NodeSetInfo{
@@ -272,12 +273,37 @@ func TestKubectlClientNodeSetsFiltersByClusterName(t *testing.T) {
 		Replicas:      2,
 		ReadyReplicas: 1,
 		HasGPU:        true,
+		DockerEnabled: true,
 		Phase:         "Ready",
 		JailSubMounts: []JailSubMountInfo{
 			{Name: "local-data", MountPath: "/scratch", UsesVolumeClaimTemplate: true},
 			{Name: "config", MountPath: "/etc/config", ReadOnly: true},
 		},
 	}, nodeSets[1])
+}
+
+func TestKubectlClientNodeSetsDockerEnabled(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		spec    string
+		enabled bool
+	}{
+		{name: "omitted Docker", spec: `{}`, enabled: true},
+		{name: "omitted enabled", spec: `{"docker":{}}`, enabled: true},
+		{name: "null enabled", spec: `{"docker":{"enabled":null}}`, enabled: true},
+		{name: "enabled", spec: `{"docker":{"enabled":true}}`, enabled: true},
+		{name: "disabled", spec: `{"docker":{"enabled":false}}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			exec := &kubectlClientTestExec{kubectl: map[string]string{
+				"get\x00nodesets\x00-n\x00soperator\x00-o\x00json": `{"items":[{"metadata":{"name":"worker"},"spec":` + test.spec + `}]}`,
+			}}
+			nodeSets, err := NewKubectlClient(exec).NodeSets(t.Context(), "soperator")
+			require.NoError(t, err)
+			require.Len(t, nodeSets, 1)
+			assert.Equal(t, test.enabled, nodeSets[0].DockerEnabled)
+		})
+	}
 }
 
 func TestKubectlClientNodeSetsKeepsLegacyMissingClusterName(t *testing.T) {

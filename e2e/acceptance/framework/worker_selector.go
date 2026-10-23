@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"slices"
 	"sort"
 	"strings"
 
@@ -162,6 +163,38 @@ func (s WorkerSnapshot) PickCPUWorkers(count int) ([]WorkerInfo, error) {
 
 func (s WorkerSnapshot) PickGPUWorkers(count int) ([]WorkerInfo, error) {
 	return pickWorkers(s.GPUWorkers, desiredGPUWorkerCount(s.NodeSets), count, "GPU workers")
+}
+
+// PickWorkersByType selects CPU or GPU workers, accepting either type case-insensitively.
+func (s WorkerSnapshot) PickWorkersByType(workerType string, count int) ([]WorkerInfo, error) {
+	switch strings.ToUpper(workerType) {
+	case "CPU":
+		return s.PickCPUWorkers(count)
+	case "GPU":
+		return s.PickGPUWorkers(count)
+	default:
+		return nil, fmt.Errorf("unsupported worker type %q", workerType)
+	}
+}
+
+// WithDocker returns a snapshot containing only Docker-enabled NodeSets and their workers.
+func (s WorkerSnapshot) WithDocker() WorkerSnapshot {
+	filtered := WorkerSnapshot{WorkersByNodeSet: make(map[string][]WorkerInfo)}
+	for _, nodeSet := range s.NodeSets {
+		if !nodeSet.DockerEnabled {
+			continue
+		}
+		filtered.NodeSets = append(filtered.NodeSets, nodeSet)
+		workers := s.WorkersByNodeSet[nodeSet.Name]
+		filtered.WorkersByNodeSet[nodeSet.Name] = slices.Clone(workers)
+		filtered.Workers = append(filtered.Workers, workers...)
+		if nodeSet.HasGPU {
+			filtered.GPUWorkers = append(filtered.GPUWorkers, workers...)
+		} else {
+			filtered.CPUWorkers = append(filtered.CPUWorkers, workers...)
+		}
+	}
+	return filtered
 }
 
 func (s WorkerSnapshot) RequireAllWorkersUsable() error {

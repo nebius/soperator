@@ -169,6 +169,7 @@ type NodeSetSpec struct {
 	EphemeralNodes              *bool               `json:"ephemeralNodes"`
 	InitialNumberEphemeralNodes int32               `json:"initialNumberEphemeralNodes"`
 	GPU                         NodeSetGPUSpec      `json:"gpu"`
+	Docker                      NodeSetDockerSpec   `json:"docker"`
 	Slurmd                      NodeSetSlurmd       `json:"slurmd"`
 	UpdateStrategy              string              `json:"updateStrategy"`
 	MaxUnavailable              *intstr.IntOrString `json:"maxUnavailable"`
@@ -192,6 +193,10 @@ type NodeVolumeMount struct {
 
 type NodeSetGPUSpec struct {
 	Enabled bool `json:"enabled"`
+}
+
+type NodeSetDockerSpec struct {
+	Enabled *bool `json:"enabled"`
 }
 
 type NodeSetStatus struct {

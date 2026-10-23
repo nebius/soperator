@@ -27,6 +27,7 @@ type NodeSetInfo struct {
 	Replicas      int
 	ReadyReplicas int
 	HasGPU        bool
+	DockerEnabled bool
 	Phase         string
 	JailSubMounts []JailSubMountInfo
 }
@@ -222,6 +223,7 @@ func (c *KubectlClient) NodeSets(ctx context.Context, clusterName string) ([]Nod
 			Replicas:      int(nodeSet.Spec.Replicas),
 			ReadyReplicas: int(nodeSet.Status.Replicas),
 			HasGPU:        nodeSet.Spec.GPU.Enabled,
+			DockerEnabled: nodeSet.Spec.Docker.Enabled == nil || *nodeSet.Spec.Docker.Enabled,
 			Phase:         nodeSet.Status.Phase,
 			JailSubMounts: jailSubMountInfos(nodeSet.Spec.Slurmd.Volumes.JailSubMounts),
 		})
