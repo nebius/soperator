@@ -472,7 +472,10 @@ pushd "${jaildir}"
             if [ "$NODESET_GPU_ENABLED" != "true" ]; then
                 # The source config can be a read-only ConfigMap mount; write a node-local copy.
                 docker_config=/run/soperator-docker-daemon.json
-                sed 's/"default-runtime":[[:space:]]*"nvidia"/"default-runtime": "runc"/' /etc/docker/daemon.json > "$docker_config"
+                jq 'if .["default-runtime"] == "nvidia"
+                    then .["default-runtime"] = "runc"
+                    else .
+                    end' /etc/docker/daemon.json > "$docker_config"
             fi
             mkdir -p etc/docker
             touch etc/docker/daemon.json
