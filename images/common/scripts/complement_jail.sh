@@ -467,6 +467,10 @@ pushd "${jaildir}"
 
         if [ "$SOPERATOR_DOCKER_ENABLED" = "true" ]; then
             log "[docker] Bind-mount dockerd stuff from container to the jail"
+            # CPU workers in GPU clusters see dummy NVML, which crashes NVIDIA runtime auto detection.
+            if [ "$NODESET_GPU_ENABLED" != "true" ]; then
+                sed -i 's/"default-runtime": "nvidia"/"default-runtime": "runc"/' /etc/docker/daemon.json
+            fi
             mkdir -p etc/docker
             touch etc/docker/daemon.json
             mount --bind "/etc/docker/daemon.json" "etc/docker/daemon.json"
