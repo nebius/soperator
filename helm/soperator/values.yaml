@@ -12,6 +12,7 @@ controllerManager:
       # - --topology-deferrable-reconfigure-burst=2
     controllersEnabled:
       cluster: true
+      loginupdate: true
       nodeconfigurator: true
       nodeset: true
       rollingupdate: true

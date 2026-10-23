@@ -7,6 +7,7 @@ const (
 type UpdateStrategy string
 
 const (
+	UpdateStrategyDelayedRollout          UpdateStrategy = "delayedRollout"
 	UpdateStrategyRollingUpdate           UpdateStrategy = "rollingUpdate"
 	UpdateStrategySlurmAwareRollingUpdate UpdateStrategy = "slurmAwareRollingUpdate"
 )

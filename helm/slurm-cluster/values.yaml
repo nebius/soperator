@@ -570,6 +570,14 @@ slurmNodes:
         #   endpoints: [jobs, nodes, partitions, scheduler]
         # endpoints: []
   login:
+    # delayedRollout delays replacement through updatePolicy; rollingUpdate replaces pods immediately.
+    updateStrategy: delayedRollout
+    # Applies to delayedRollout. Edits recalculate deadlines from each pod's original announcement.
+    # The new deadline can move earlier or later; the announcement time is preserved.
+    updatePolicy:
+      minNotice: "720h"
+      # Optional: align the deadline to a cron occurrence after minNotice.
+      # schedule: "0 0 1 * *"
     size: 2
     k8sNodeFilterName: "no-gpu"
     # Controls if the pod containers can use the host user namespace

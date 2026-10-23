@@ -30,6 +30,11 @@ func RenderStatefulSet(
 	login *values.SlurmLogin,
 	desiredReplicas *int32,
 ) (kruisev1b1.StatefulSet, error) {
+	updateStrategy, err := renderUpdateStrategy(login)
+	if err != nil {
+		return kruisev1b1.StatefulSet{}, err
+	}
+
 	labels := common.RenderLabels(consts.ComponentTypeLogin, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName)
 
@@ -70,15 +75,7 @@ func RenderStatefulSet(
 			PodManagementPolicy: consts.PodManagementPolicy,
 			ServiceName:         login.HeadlessService.Name,
 			Replicas:            desiredReplicas,
-			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
-				Type: appsv1.RollingUpdateStatefulSetStrategyType,
-				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
-					MaxUnavailable:  &login.StatefulSet.MaxUnavailable,
-					PodUpdatePolicy: kruisev1b1.RecreatePodUpdateStrategyType,
-					Partition:       ptr.To(int32(0)),
-					MinReadySeconds: ptr.To(int32(0)),
-				},
-			},
+			UpdateStrategy:      updateStrategy,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: matchLabels,
 			},
@@ -97,12 +94,13 @@ func RenderStatefulSet(
 					Annotations: renderPodAnnotations(),
 				},
 				Spec: corev1.PodSpec{
-					HostUsers:        login.HostUsers,
-					ImagePullSecrets: login.ContainerSshd.ImagePullSecrets,
-					Affinity:         nodeFilter.Affinity,
-					NodeSelector:     nodeFilter.NodeSelector,
-					Tolerations:      nodeFilter.Tolerations,
-					InitContainers:   initContainers,
+					ServiceAccountName: naming.BuildServiceAccountLoginName(clusterName),
+					HostUsers:          login.HostUsers,
+					ImagePullSecrets:   login.ContainerSshd.ImagePullSecrets,
+					Affinity:           nodeFilter.Affinity,
+					NodeSelector:       nodeFilter.NodeSelector,
+					Tolerations:        nodeFilter.Tolerations,
+					InitContainers:     initContainers,
 					Containers: []corev1.Container{
 						renderContainerSshd(
 							clusterWithGPU,
@@ -141,4 +139,23 @@ func renderPodAnnotations() map[string]string {
 	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNameSshd)
 	annotations["cluster-autoscaler.kubernetes.io/safe-to-evict"] = "false"
 	return annotations
+}
+
+func renderUpdateStrategy(login *values.SlurmLogin) (kruisev1b1.StatefulSetUpdateStrategy, error) {
+	switch login.UpdateStrategy {
+	case "", consts.UpdateStrategyDelayedRollout:
+		return kruisev1b1.StatefulSetUpdateStrategy{Type: appsv1.OnDeleteStatefulSetStrategyType}, nil
+	case consts.UpdateStrategyRollingUpdate:
+		return kruisev1b1.StatefulSetUpdateStrategy{
+			Type: appsv1.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
+				MaxUnavailable:  &login.StatefulSet.MaxUnavailable,
+				PodUpdatePolicy: kruisev1b1.RecreatePodUpdateStrategyType,
+				Partition:       ptr.To(int32(0)),
+				MinReadySeconds: ptr.To(int32(0)),
+			},
+		}, nil
+	default:
+		return kruisev1b1.StatefulSetUpdateStrategy{}, fmt.Errorf("unsupported login update strategy %q", login.UpdateStrategy)
+	}
 }
