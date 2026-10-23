@@ -13,7 +13,10 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]string) corev1.PodTemplateSpec {
+func renderPodTemplateSpec(
+	check *slurmv1alpha1.ActiveCheck,
+	labels, extraAnnotations map[string]string,
+) corev1.PodTemplateSpec {
 	var initContainers []corev1.Container
 	var annotations map[string]string
 
@@ -45,6 +48,7 @@ func renderPodTemplateSpec(check *slurmv1alpha1.ActiveCheck, labels map[string]s
 
 	annotations = common.RenderDefaultContainerAnnotation(check.Spec.Name)
 	annotations[consts.AnnotationActiveCheckName] = check.Name
+	common.MergeExtraAnnotations(annotations, extraAnnotations)
 
 	return corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{

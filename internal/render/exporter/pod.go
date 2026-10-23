@@ -1,10 +1,13 @@
 package exporter
 
 import (
+	"maps"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/utils"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -23,9 +26,13 @@ func renderPodTemplateSpec(
 		_ = err // Ignore not found error, use "empty" node filter.
 		nodeFilter = slurmv1.K8sNodeFilter{}
 	}
+	labels := maps.Clone(matchLabels)
+	common.MergeExtraLabels(labels, clusterValues.SlurmExporter.Labels)
+
 	result := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: matchLabels,
+			Labels:      labels,
+			Annotations: maps.Clone(clusterValues.SlurmExporter.Annotations),
 		},
 		Spec: corev1.PodSpec{
 			HostUsers:          clusterValues.SlurmExporter.HostUsers,

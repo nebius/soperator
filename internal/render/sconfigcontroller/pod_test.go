@@ -94,3 +94,41 @@ func Test_BasePodTemplateSpec_PriorityClass(t *testing.T) {
 		})
 	}
 }
+
+func Test_BasePodTemplateSpec_CustomLabelsAndAnnotations(t *testing.T) {
+	sConfigController := &values.SConfigController{
+		SlurmNode: slurmv1.SlurmNode{
+			Size:              1,
+			K8sNodeFilterName: "test-filter",
+		},
+		Labels:      map[string]string{"gcore.com/project-id": "123"},
+		Annotations: map[string]string{"gcore.com/note": "abc"},
+		Container: values.Container{
+			Name: "test-container",
+			NodeContainer: slurmv1.NodeContainer{
+				Image: "nginx:latest",
+			},
+		},
+		VolumeJail: slurmv1.NodeVolume{
+			VolumeSourceName: ptr.To("test-volume-source"),
+		},
+	}
+
+	nodeFilters := []slurmv1.K8sNodeFilter{{Name: "test-filter"}}
+	volumeSources := []slurmv1.VolumeSource{
+		{
+			Name:         "test-volume-source",
+			VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{}},
+		},
+	}
+	matchLabels := map[string]string{"key": "value"}
+
+	result, err := sconfigcontroller.BasePodTemplateSpec(
+		"test-namespace", "test-cluster", "http://slurm-api-server", sConfigController, nodeFilters, volumeSources, matchLabels,
+	)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "123", result.Labels["gcore.com/project-id"])
+	assert.Equal(t, "value", result.Labels["key"]) // matchLabels preserved
+	assert.Equal(t, "abc", result.Annotations["gcore.com/note"])
+}

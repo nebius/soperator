@@ -13,6 +13,10 @@ import (
 type SlurmREST struct {
 	slurmv1.SlurmNode
 
+	// Set from the cluster's ExtraLabels/ExtraAnnotations in BuildSlurmClusterFrom.
+	Labels      map[string]string
+	Annotations map[string]string
+
 	Enabled              bool
 	ThreadCount          *int32
 	MaxConnections       *int32

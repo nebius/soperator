@@ -34,6 +34,12 @@ func RenderStatefulSet(
 
 	labels[consts.LabelControllerType] = consts.LabelControllerTypeMain
 	matchLabels[consts.LabelControllerType] = consts.LabelControllerTypeMain
+	common.MergeExtraLabels(labels, controller.Labels)
+
+	annotations := map[string]string{
+		consts.AnnotationDefaultContainerName: consts.ContainerNameSlurmctld,
+	}
+	common.MergeExtraAnnotations(annotations, controller.Annotations)
 
 	nodeFilter := sliceutils.MustGetBy(
 		nodeFilters,
@@ -94,16 +100,16 @@ func RenderStatefulSet(
 				namespace,
 				clusterName,
 				pvcTemplateSpecs,
+				controller.Labels,
+				controller.Annotations,
 			),
 			VolumeClaimUpdateStrategy: kruisev1b1.VolumeClaimUpdateStrategy{
 				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-					Annotations: map[string]string{
-						consts.AnnotationDefaultContainerName: consts.ContainerNameSlurmctld,
-					},
+					Labels:      labels,
+					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
 					ReadinessGates: []corev1.PodReadinessGate{

@@ -2,7 +2,6 @@ package worker
 
 import (
 	"fmt"
-	"maps"
 	"slices"
 	"sort"
 
@@ -34,6 +33,7 @@ func RenderNodeSetStatefulSet(
 	labels := common.RenderLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	labels[consts.LabelNodeSetKey] = nodeSet.Name
 	labels[consts.LabelWorkerKey] = consts.LabelWorkerValue
+	common.MergeExtraLabels(labels, nodeSet.Labels)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeNodeSet, nodeSet.ParentalCluster.Name)
 	matchLabels[consts.LabelNodeSetKey] = nodeSet.Name
 
@@ -176,6 +176,8 @@ func RenderNodeSetStatefulSet(
 				nodeSet.ParentalCluster.Namespace,
 				nodeSet.ParentalCluster.Name,
 				pvcTemplateSpecs,
+				nodeSet.Labels,
+				nodeSet.Annotations,
 			),
 			VolumeClaimUpdateStrategy: volumeClaimUpdateStrategy,
 			Template: corev1.PodTemplateSpec{
@@ -223,7 +225,7 @@ func renderUpdateStrategies(nodeSet *values.SlurmNodeSet) (kruisev1b1.StatefulSe
 
 func renderNodeSetAnnotations(nodeSet *values.SlurmNodeSet) map[string]string {
 	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNameSlurmd)
-	maps.Copy(annotations, nodeSet.Annotations)
+	common.MergeExtraAnnotations(annotations, nodeSet.Annotations)
 	return annotations
 }
 

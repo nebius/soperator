@@ -88,6 +88,7 @@ func (r *DeploymentReconciler) patch(existing, desired client.Object) (client.Pa
 		dst.Spec.Replicas = src.Spec.Replicas
 		dst.Spec.Strategy = src.Spec.Strategy
 		dst.Spec.Selector = src.Spec.Selector
+		syncPodTemplateMetadata(dst, src, &dst.Spec.Template, &src.Spec.Template)
 		dst.Spec.Template.Spec = src.Spec.Template.Spec
 		return res
 	}
