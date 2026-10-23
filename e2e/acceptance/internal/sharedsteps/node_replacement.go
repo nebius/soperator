@@ -85,7 +85,7 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnWorkerNode(ctx context.
 	if err != nil {
 		return err
 	}
-	workers, err := pickWorkersByType(snapshot, workerType, 1)
+	workers, err := snapshot.PickWorkersByType(workerType, 1)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}

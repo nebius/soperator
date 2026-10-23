@@ -309,29 +309,43 @@ func (l *testLogger) Logf(format string, args ...any) {
 	l.logs = append(l.logs, fmt.Sprintf(format, args...))
 }
 
-func TestWorkerSnapshotForDocker(t *testing.T) {
+func TestWorkerSnapshotPickWorkersByType(t *testing.T) {
+	snapshot := dockerWorkerSnapshotForTest(t).WithDocker()
+	for workerType, wantGPU := range map[string]bool{"CPU": false, "cpu": false, "GPU": true, "gpu": true} {
+		t.Run(workerType, func(t *testing.T) {
+			workers, err := snapshot.PickWorkersByType(workerType, 2)
+			require.NoError(t, err)
+			require.Len(t, workers, 2)
+			for _, worker := range workers {
+				assert.Equal(t, wantGPU, worker.HasGPU)
+			}
+		})
+	}
+	_, err := snapshot.PickWorkersByType("TPU", 1)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `unsupported worker type "TPU"`)
+	assert.False(t, IsInsufficientWorkers(err))
+}
+
+func TestWorkerSnapshotWithDocker(t *testing.T) {
 	for _, workerType := range []string{"CPU", "GPU"} {
 		t.Run(workerType, func(t *testing.T) {
 			snapshot := dockerWorkerSnapshotForTest(t)
-			snapshot = snapshot.ForDocker()
-			pick := snapshot.PickCPUWorkers
-			if workerType == "GPU" {
-				pick = snapshot.PickGPUWorkers
-			}
-			workers, err := pick(2)
+			snapshot = snapshot.WithDocker()
+			workers, err := snapshot.PickWorkersByType(workerType, 2)
 			require.NoError(t, err)
 			for _, worker := range workers {
 				assert.Equal(t, workerType == "GPU", worker.HasGPU)
 				assert.NotContains(t, worker.NodeSetName, "disabled")
 			}
 			assert.Len(t, workers, 2)
-			_, err = pick(3)
+			_, err = snapshot.PickWorkersByType(workerType, 3)
 			assert.True(t, IsInsufficientWorkers(err))
 		})
 	}
 }
 
-func TestWorkerSnapshotForDockerSkipsUnconfiguredCapacity(t *testing.T) {
+func TestWorkerSnapshotWithDockerSkipsUnconfiguredCapacity(t *testing.T) {
 	for _, test := range []struct {
 		name    string
 		prepare func(*WorkerSnapshot)
@@ -350,16 +364,16 @@ func TestWorkerSnapshotForDockerSkipsUnconfiguredCapacity(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := dockerWorkerSnapshotForTest(t)
 			test.prepare(&snapshot)
-			_, err := snapshot.ForDocker().PickCPUWorkers(2)
+			_, err := snapshot.WithDocker().PickCPUWorkers(2)
 			require.Error(t, err)
 			assert.ErrorIs(t, SkipIfInsufficientWorkers(nil, err), godog.ErrSkip)
 		})
 	}
-	_, err := (WorkerSnapshot{}).ForDocker().PickGPUWorkers(1)
+	_, err := (WorkerSnapshot{}).WithDocker().PickGPUWorkers(1)
 	assert.ErrorIs(t, SkipIfInsufficientWorkers(nil, err), godog.ErrSkip)
 }
 
-func TestWorkerSnapshotForDockerFailsWhenConfiguredWorkersAreUnavailable(t *testing.T) {
+func TestWorkerSnapshotWithDockerFailsWhenConfiguredWorkersAreUnavailable(t *testing.T) {
 	for _, test := range []struct {
 		name    string
 		prepare func(*WorkerSnapshot)
@@ -374,11 +388,11 @@ func TestWorkerSnapshotForDockerFailsWhenConfiguredWorkersAreUnavailable(t *test
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := dockerWorkerSnapshotForTest(t)
 			test.prepare(&snapshot)
-			_, err := snapshot.ForDocker().PickGPUWorkers(2)
+			_, err := snapshot.WithDocker().PickGPUWorkers(2)
 			require.Error(t, err)
 			assert.False(t, IsInsufficientWorkers(err))
 			assert.ErrorContains(t, err, "found 1 usable GPU workers, need 2")
-			_, err = snapshot.ForDocker().PickCPUWorkers(2)
+			_, err = snapshot.WithDocker().PickCPUWorkers(2)
 			assert.NoError(t, err)
 		})
 	}
@@ -406,9 +420,9 @@ func dockerWorkerSnapshotForTest(t *testing.T) WorkerSnapshot {
 	return snapshot
 }
 
-func TestWorkerSnapshotForDockerPreservesIndexes(t *testing.T) {
+func TestWorkerSnapshotWithDockerPreservesIndexes(t *testing.T) {
 	original := dockerWorkerSnapshotForTest(t)
-	filtered := original.ForDocker()
+	filtered := original.WithDocker()
 	require.Len(t, filtered.NodeSets, 2)
 	require.Len(t, filtered.WorkersByNodeSet, 2)
 	assert.ElementsMatch(t, []string{"cpu-0", "cpu-1", "gpu-0", "gpu-1"}, WorkerNames(filtered.Workers))

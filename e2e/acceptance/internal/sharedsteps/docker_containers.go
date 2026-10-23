@@ -328,7 +328,7 @@ func (s *DockerContainers) pickWorkers(ctx context.Context, workerType string, c
 	if err != nil {
 		return nil, err
 	}
-	return pickWorkersByType(snapshot.ForDocker(), workerType, count)
+	return snapshot.WithDocker().PickWorkersByType(workerType, count)
 }
 
 func (s *DockerContainers) theDockerContainerJobIsRunning(ctx context.Context) error {

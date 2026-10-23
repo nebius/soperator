@@ -165,8 +165,20 @@ func (s WorkerSnapshot) PickGPUWorkers(count int) ([]WorkerInfo, error) {
 	return pickWorkers(s.GPUWorkers, desiredGPUWorkerCount(s.NodeSets), count, "GPU workers")
 }
 
-// ForDocker returns a snapshot containing only Docker-enabled NodeSets and their workers.
-func (s WorkerSnapshot) ForDocker() WorkerSnapshot {
+// PickWorkersByType selects CPU or GPU workers, accepting either type case-insensitively.
+func (s WorkerSnapshot) PickWorkersByType(workerType string, count int) ([]WorkerInfo, error) {
+	switch strings.ToUpper(workerType) {
+	case "CPU":
+		return s.PickCPUWorkers(count)
+	case "GPU":
+		return s.PickGPUWorkers(count)
+	default:
+		return nil, fmt.Errorf("unsupported worker type %q", workerType)
+	}
+}
+
+// WithDocker returns a snapshot containing only Docker-enabled NodeSets and their workers.
+func (s WorkerSnapshot) WithDocker() WorkerSnapshot {
 	filtered := WorkerSnapshot{WorkersByNodeSet: make(map[string][]WorkerInfo)}
 	for _, nodeSet := range s.NodeSets {
 		if !nodeSet.DockerEnabled {
