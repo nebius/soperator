@@ -124,20 +124,24 @@ func TestOverrideTestValuesLocalNVMe(t *testing.T) {
 	}{
 		{name: "omitted"},
 		{
-			name: "enabled with Terraform defaults",
+			name: "enabled with default mount",
 			settings: `        local_nvme:
           enabled: true
+          device_count: 6
+          device_capacity_gigabytes: 3840
 `,
-			wantJSON: `{"enabled":true}`,
+			wantJSON: `{"enabled":true,"device_count":6,"device_capacity_gigabytes":3840}`,
 		},
 		{
-			name: "custom mount and filesystem",
+			name: "shared release-4.1 config with custom mount",
 			settings: `        local_nvme:
           enabled: true
           mount_path: /scratch
-          filesystem_type: xfs
+          filesystem_type: ext4
+          device_count: 6
+          device_capacity_gigabytes: 3840
 `,
-			wantJSON: `{"enabled":true,"mount_path":"/scratch","filesystem_type":"xfs"}`,
+			wantJSON: `{"enabled":true,"mount_path":"/scratch","device_count":6,"device_capacity_gigabytes":3840}`,
 		},
 		{
 			name: "explicitly disabled",
