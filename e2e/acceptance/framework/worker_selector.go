@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"slices"
 	"sort"
 	"strings"
 
@@ -162,6 +163,26 @@ func (s WorkerSnapshot) PickCPUWorkers(count int) ([]WorkerInfo, error) {
 
 func (s WorkerSnapshot) PickGPUWorkers(count int) ([]WorkerInfo, error) {
 	return pickWorkers(s.GPUWorkers, desiredGPUWorkerCount(s.NodeSets), count, "GPU workers")
+}
+
+// ForDocker returns a snapshot containing only Docker-enabled NodeSets and their workers.
+func (s WorkerSnapshot) ForDocker() WorkerSnapshot {
+	filtered := WorkerSnapshot{WorkersByNodeSet: make(map[string][]WorkerInfo)}
+	for _, nodeSet := range s.NodeSets {
+		if !nodeSet.DockerEnabled {
+			continue
+		}
+		filtered.NodeSets = append(filtered.NodeSets, nodeSet)
+		workers := s.WorkersByNodeSet[nodeSet.Name]
+		filtered.WorkersByNodeSet[nodeSet.Name] = slices.Clone(workers)
+		filtered.Workers = append(filtered.Workers, workers...)
+		if nodeSet.HasGPU {
+			filtered.GPUWorkers = append(filtered.GPUWorkers, workers...)
+		} else {
+			filtered.CPUWorkers = append(filtered.CPUWorkers, workers...)
+		}
+	}
+	return filtered
 }
 
 func (s WorkerSnapshot) RequireAllWorkersUsable() error {

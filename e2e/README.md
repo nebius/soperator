@@ -296,6 +296,8 @@ common Kubernetes, Slurm, and worker primitives:
 - `WorkerSelector`, `WorkerSnapshot`, and `WorkerInfo` for retaining live Slurm
   state and configured NodeSet capacity, plus
   `PickWorkers`/`PickCPUWorkers`/`PickGPUWorkers` for selecting usable workers.
+- `WorkerSnapshot.ForDocker` for restricting all worker pools and configured
+  capacity to Docker-enabled NodeSets before applying the same selectors.
 - `SkipIfInsufficientWorkers` for mapping insufficient-worker selections to
   skipped Godog scenarios.
 - `SbatchJob`, `SbatchOptions`, `ShellQuote`, `BashLC`, and `WorkerNames`.

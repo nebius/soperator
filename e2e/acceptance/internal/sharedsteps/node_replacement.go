@@ -85,22 +85,11 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnWorkerNode(ctx context.
 	if err != nil {
 		return err
 	}
-	workers, err := s.anyWorkersByType(snapshot, workerType, 1)
+	workers, err := pickWorkersByType(snapshot, workerType, 1)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	return s.submitTestJobOnWorker(ctx, workers[0], snapshot)
-}
-
-func (s *NodeReplacement) anyWorkersByType(snapshot framework.WorkerSnapshot, workerType string, count int) ([]framework.WorkerInfo, error) {
-	switch strings.ToUpper(workerType) {
-	case "CPU":
-		return snapshot.PickCPUWorkers(count)
-	case "GPU":
-		return snapshot.PickGPUWorkers(count)
-	default:
-		return nil, fmt.Errorf("unsupported worker type %q", workerType)
-	}
 }
 
 func (s *NodeReplacement) submitTestJobOnWorker(ctx context.Context, worker framework.WorkerInfo, snapshot framework.WorkerSnapshot) error {

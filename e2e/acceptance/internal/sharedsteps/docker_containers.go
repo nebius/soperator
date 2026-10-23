@@ -328,31 +328,7 @@ func (s *DockerContainers) pickWorkers(ctx context.Context, workerType string, c
 	if err != nil {
 		return nil, err
 	}
-	return pickDockerWorkers(snapshot, workerType, count)
-}
-
-func pickDockerWorkers(snapshot framework.WorkerSnapshot, workerType string, count int) ([]framework.WorkerInfo, error) {
-	var eligible framework.WorkerSnapshot
-	for _, nodeSet := range snapshot.NodeSets {
-		if !nodeSet.DockerEnabled {
-			continue
-		}
-		eligible.NodeSets = append(eligible.NodeSets, nodeSet)
-		workers := snapshot.WorkersByNodeSet[nodeSet.Name]
-		if nodeSet.HasGPU {
-			eligible.GPUWorkers = append(eligible.GPUWorkers, workers...)
-		} else {
-			eligible.CPUWorkers = append(eligible.CPUWorkers, workers...)
-		}
-	}
-	switch workerType {
-	case "CPU":
-		return eligible.PickCPUWorkers(count)
-	case "GPU":
-		return eligible.PickGPUWorkers(count)
-	default:
-		return nil, fmt.Errorf("unsupported Docker worker type %q", workerType)
-	}
+	return pickWorkersByType(snapshot.ForDocker(), workerType, count)
 }
 
 func (s *DockerContainers) theDockerContainerJobIsRunning(ctx context.Context) error {
