@@ -1,9 +1,12 @@
 package e2e
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOverrideTestValuesNFS(t *testing.T) {
@@ -94,5 +97,90 @@ func TestOverrideTestValuesCreatesWorkerPartitions(t *testing.T) {
 		if create, ok := values["create_partition"].(bool); !ok || !create {
 			t.Errorf("slurm_nodeset_workers[%d].create_partition = %#v, want true", i, values["create_partition"])
 		}
+	}
+}
+
+func TestOverrideTestValuesLocalNVMe(t *testing.T) {
+	const configYAML = `profiles:
+  UK_B300:
+    nebius_project_id: project-123
+    nebius_region: uk-south1
+    nebius_tenant_id: tenant-456
+    nodesets:
+      - name: worker
+        platform: gpu-b300-sxm
+        preset: 8gpu-192vcpu-2768gb
+        size: 2
+        infiniband_fabric: uk-south1-a
+%s      - name: worker-cpu
+        platform: cpu-d3
+        preset: 32vcpu-128gb
+        size: 2
+`
+	for _, tc := range []struct {
+		name     string
+		settings string
+		wantJSON string
+	}{
+		{name: "omitted"},
+		{
+			name: "enabled with default mount",
+			settings: `        local_nvme:
+          enabled: true
+          device_count: 6
+          device_capacity_gigabytes: 3840
+`,
+			wantJSON: `{"enabled":true,"device_count":6,"device_capacity_gigabytes":3840}`,
+		},
+		{
+			name: "shared release-4.1 config with custom mount",
+			settings: `        local_nvme:
+          enabled: true
+          mount_path: /scratch
+          filesystem_type: ext4
+          device_count: 6
+          device_capacity_gigabytes: 3840
+`,
+			wantJSON: `{"enabled":true,"mount_path":"/scratch","device_count":6,"device_capacity_gigabytes":3840}`,
+		},
+		{
+			name: "explicitly disabled",
+			settings: `        local_nvme:
+          enabled: false
+`,
+			wantJSON: `{"enabled":false}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("E2E_CONFIG", fmt.Sprintf(configYAML, tc.settings))
+			config, err := LoadE2EConfig()
+			require.NoError(t, err)
+			profile := config.Profiles["UK_B300"]
+			raw, err := profile.YAML()
+			require.NoError(t, err)
+			profile, err = ParseProfile(raw)
+			require.NoError(t, err)
+			require.Equal(t, config.Profiles["UK_B300"], profile)
+
+			vars := overrideTestValues(map[string]interface{}{}, Config{Profile: profile})
+			data, err := json.Marshal(vars)
+			require.NoError(t, err)
+			var decoded struct {
+				Workers []map[string]json.RawMessage `json:"slurm_nodeset_workers"`
+			}
+			require.NoError(t, json.Unmarshal(data, &decoded))
+			require.Len(t, decoded.Workers, 2)
+			gpu, cpu := decoded.Workers[0], decoded.Workers[1]
+			assert.JSONEq(t, `"worker"`, string(gpu["name"]))
+			assert.JSONEq(t, `"worker-cpu"`, string(cpu["name"]))
+			if tc.wantJSON == "" {
+				assert.NotContains(t, gpu, "local_nvme")
+			} else {
+				assert.JSONEq(t, tc.wantJSON, string(gpu["local_nvme"]))
+			}
+			assert.NotContains(t, cpu, "local_nvme")
+			assert.JSONEq(t, `true`, string(gpu["create_partition"]))
+			assert.JSONEq(t, `true`, string(cpu["create_partition"]))
+		})
 	}
 }

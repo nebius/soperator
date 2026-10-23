@@ -13,12 +13,23 @@ import (
 
 // NodeSetDef describes a single worker nodeset in the e2e profile.
 type NodeSetDef struct {
-	Name             string `json:"name"`
-	Platform         string `json:"platform"`
-	Preset           string `json:"preset"`
-	Size             int    `json:"size"`
-	InfinibandFabric string `json:"infiniband_fabric"`
-	Preemptible      bool   `json:"preemptible"`
+	Name             string        `json:"name"`
+	Platform         string        `json:"platform"`
+	Preset           string        `json:"preset"`
+	Size             int           `json:"size"`
+	InfinibandFabric string        `json:"infiniband_fabric"`
+	Preemptible      bool          `json:"preemptible"`
+	LocalNVMe        *LocalNVMeDef `json:"local_nvme,omitempty"`
+}
+
+// LocalNVMeDef configures local NVMe storage for a worker nodeset.
+type LocalNVMeDef struct {
+	Enabled                 bool    `json:"enabled"`
+	MountPath               string  `json:"mount_path,omitempty"`
+	DeviceCount             int     `json:"device_count,omitempty"`
+	DeviceCapacityGigabytes float64 `json:"device_capacity_gigabytes,omitempty"`
+	// FilesystemType is retained for shared release-4.1 profiles; main uses MK8s-managed ext4.
+	FilesystemType string `json:"filesystem_type,omitempty"`
 }
 
 type CapacityStrategy string
@@ -33,7 +44,10 @@ const (
 // Which labels exist is entirely up to the config; none is special to this code.
 const LabelPrefix = "@"
 
-var labelRe = regexp.MustCompile(`^[a-z][a-z0-9._-]*$`)
+var (
+	labelRe              = regexp.MustCompile(`^[a-z][a-z0-9._-]*$`)
+	localNVMEMountPathRe = regexp.MustCompile(`^/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$`)
+)
 
 // NormalizeLabel maps the ways a label can be spelled onto its canonical form.
 // The leading "@" that marks a label in the profile input is accepted here too, so
@@ -103,6 +117,20 @@ func (p *Profile) Validate() error {
 		}
 		if ns.Size <= 0 {
 			return fmt.Errorf("nodeset[%d] %q: size must be positive, got %d", i, ns.Name, ns.Size)
+		}
+		if nvme := ns.LocalNVMe; nvme != nil {
+			if nvme.Enabled && nvme.MountPath != "" && !localNVMEMountPathRe.MatchString(nvme.MountPath) {
+				return fmt.Errorf("nodeset[%d] %q: local_nvme.mount_path must be an absolute path containing only letters, digits, '/', '.', '_', and '-'", i, ns.Name)
+			}
+			if nvme.FilesystemType != "" && nvme.FilesystemType != "ext4" {
+				return fmt.Errorf("nodeset[%d] %q: local_nvme.filesystem_type must be ext4 for MK8s-managed NVMe storage", i, ns.Name)
+			}
+			if nvme.Enabled && nvme.DeviceCount <= 0 {
+				return fmt.Errorf("nodeset[%d] %q: local_nvme.device_count must be positive when enabled", i, ns.Name)
+			}
+			if nvme.Enabled && nvme.DeviceCapacityGigabytes <= 0 {
+				return fmt.Errorf("nodeset[%d] %q: local_nvme.device_capacity_gigabytes must be positive when enabled", i, ns.Name)
+			}
 		}
 		if _, ok := seen[ns.Name]; ok {
 			return fmt.Errorf("nodeset[%d]: duplicate name %q", i, ns.Name)

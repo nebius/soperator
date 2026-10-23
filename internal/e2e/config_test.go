@@ -82,6 +82,66 @@ func TestValidate_NegativeSize(t *testing.T) {
 	assert.ErrorContains(t, p.Validate(), "size must be positive")
 }
 
+func TestValidate_LocalNVMe(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		nvme    *LocalNVMeDef
+		wantErr string
+	}{
+		{name: "omitted"},
+		{name: "disabled", nvme: &LocalNVMeDef{}},
+		{name: "default mount", nvme: &LocalNVMeDef{Enabled: true, DeviceCount: 6, DeviceCapacityGigabytes: 3840}},
+		{name: "custom mount", nvme: &LocalNVMeDef{Enabled: true, DeviceCount: 6, DeviceCapacityGigabytes: 3840, MountPath: "/scratch/cache-1"}},
+		{name: "shared ext4", nvme: &LocalNVMeDef{Enabled: true, DeviceCount: 6, DeviceCapacityGigabytes: 3840, FilesystemType: "ext4"}},
+		{
+			name:    "relative path",
+			nvme:    &LocalNVMeDef{Enabled: true, MountPath: "scratch"},
+			wantErr: "local_nvme.mount_path must be an absolute path",
+		},
+		{
+			name:    "path with spaces",
+			nvme:    &LocalNVMeDef{Enabled: true, MountPath: "/scratch with spaces"},
+			wantErr: "local_nvme.mount_path must be an absolute path",
+		},
+		{
+			name:    "unsupported filesystem",
+			nvme:    &LocalNVMeDef{Enabled: true, FilesystemType: "xfs"},
+			wantErr: "local_nvme.filesystem_type must be ext4",
+		},
+		{
+			name:    "missing device count",
+			nvme:    &LocalNVMeDef{Enabled: true, DeviceCapacityGigabytes: 3840},
+			wantErr: "local_nvme.device_count must be positive when enabled",
+		},
+		{
+			name:    "negative device count",
+			nvme:    &LocalNVMeDef{Enabled: true, DeviceCount: -1, DeviceCapacityGigabytes: 3840},
+			wantErr: "local_nvme.device_count must be positive when enabled",
+		},
+		{
+			name:    "missing device capacity",
+			nvme:    &LocalNVMeDef{Enabled: true, DeviceCount: 6},
+			wantErr: "local_nvme.device_capacity_gigabytes must be positive when enabled",
+		},
+		{
+			name:    "negative device capacity",
+			nvme:    &LocalNVMeDef{Enabled: true, DeviceCount: 6, DeviceCapacityGigabytes: -1},
+			wantErr: "local_nvme.device_capacity_gigabytes must be positive when enabled",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := validProfile()
+			p.NodeSets[0].LocalNVMe = tc.nvme
+			err := p.Validate()
+			if tc.wantErr != "" {
+				assert.ErrorContains(t, err, `nodeset[0] "worker-gpu": `+tc.wantErr)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func TestValidate_CapacityStrategyDefaultsToWarn(t *testing.T) {
 	p := validProfile()
 	require.NoError(t, p.Validate())

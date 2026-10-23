@@ -127,6 +127,21 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 				},
 			},
 		}
+		if nvme := ns.LocalNVMe; nvme != nil {
+			localNVMe := map[string]interface{}{
+				"enabled": nvme.Enabled,
+			}
+			if nvme.MountPath != "" {
+				localNVMe["mount_path"] = nvme.MountPath
+			}
+			if nvme.DeviceCount != 0 {
+				localNVMe["device_count"] = nvme.DeviceCount
+			}
+			if nvme.DeviceCapacityGigabytes != 0 {
+				localNVMe["device_capacity_gigabytes"] = nvme.DeviceCapacityGigabytes
+			}
+			entry["local_nvme"] = localNVMe
+		}
 		nodesetWorkers = append(nodesetWorkers, entry)
 	}
 	tfVars["slurm_nodeset_workers"] = nodesetWorkers
