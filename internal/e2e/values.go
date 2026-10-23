@@ -119,6 +119,9 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 				},
 			},
 		}
+		if ns.LocalNVMe != nil {
+			entry["local_nvme"] = ns.LocalNVMe
+		}
 		nodesetWorkers = append(nodesetWorkers, entry)
 	}
 	tfVars["slurm_nodeset_workers"] = nodesetWorkers

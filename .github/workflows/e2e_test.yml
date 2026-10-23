@@ -30,6 +30,7 @@ on:
           - MAN_H200
           - KCS_B200
           - MDC_B200
+          - UK_B300
           - KCS_CPU
       run_unstable_tests:
         description: "Run acceptance scenarios tagged @unstable"
