@@ -1,5 +1,7 @@
 package consts
 
+import "strings"
+
 const (
 	Slurm       = "slurm"
 	slurmPrefix = Slurm + "-"
@@ -38,12 +40,33 @@ var (
 
 // order of reasons is important, because we use it to determine if node is in maintenance
 var SlurmNodeReasonsList = []string{
-	SlurmNodeReasonKillTaskFailed,
 	SlurmNodeReasonNodeReplacement,
 	SlurmNodeReasonNodeReboot,
 	SlurmNodeReasonHC,
 	SlurmUserReasonHC,
 	SlurmHardwareReasonHC,
+	SlurmNodeReasonKillTaskFailed,
+}
+
+func MatchWellKnownSlurmNodeReason(rawReason string) (string, bool) {
+	trimmed := strings.TrimSpace(rawReason)
+	if trimmed == "" {
+		return "", false
+	}
+
+	for _, wellKnownReason := range SlurmNodeReasonsList {
+		if strings.HasPrefix(trimmed, wellKnownReason) {
+			return wellKnownReason, true
+		}
+	}
+
+	for _, wellKnownReason := range SlurmNodeReasonsList {
+		if strings.Contains(trimmed, wellKnownReason) {
+			return wellKnownReason, true
+		}
+	}
+
+	return "", false
 }
 
 const (
