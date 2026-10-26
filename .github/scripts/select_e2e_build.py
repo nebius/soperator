@@ -140,7 +140,7 @@ def git(*args):
 
 
 def main():
-    from e2e_pr_comment import render_waiting
+    from e2e_pr_comment import render_start, render_waiting
 
     github = GitHub(os.environ["GITHUB_REPOSITORY"])
     branch = os.environ["TARGET_BRANCH"]
@@ -148,15 +148,20 @@ def main():
     scheduled = os.environ.get("IS_SCHEDULED") == "true"
     commits = git("rev-list", "--first-parent", "--max-count=15", sha).splitlines() if scheduled else [sha]
 
-    def on_wait(run):
+    def update_comment(body):
         comment_id = os.environ.get("COMMENT_ID")
         if comment_id:
             try:
-                github.request(f"issues/comments/{comment_id}", payload={"body": render_waiting(os.environ, run)})
+                github.request(f"issues/comments/{comment_id}", payload={"body": body})
             except RuntimeError as error:
-                print(f"Update waiting comment: {error}", file=sys.stderr)
+                print(f"Update E2E progress comment: {error}", file=sys.stderr)
+
+    def on_wait(run):
+        update_comment(render_waiting(os.environ, run))
 
     selection = select_build(github, branch, commits, scheduled, on_wait=on_wait)
+    if selection.status == "ready" and os.environ.get("COMMENT_ID"):
+        update_comment(render_start(os.environ, selection.run))
     run = selection.run or {}
     outputs = dict(status=selection.status, reason=selection.reason,
                    run_id=run.get("id", ""), head_sha=run.get("head_sha", ""),

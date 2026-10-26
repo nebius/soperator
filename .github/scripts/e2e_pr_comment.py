@@ -60,23 +60,43 @@ def parameters(context, include_resolved_profile=False):
     return "\n".join(f"- {name}: {inline_code(value)}" for name, value in values)
 
 
-def render_start(context, build=None):
+def render_start(context, build=None, phase="preparing"):
+    titles = {
+        "preparing": "### ⏳ E2E preparing",
+        "waiting": "### ⏳ E2E waiting for build",
+        "running": "### 🏃 E2E running",
+    }
     sections = [
         marker(context),
-        "### ⏳ E2E waiting for build" if build else "### ⏳ E2E preparing",
+        titles[phase],
         "",
         "E2E was dispatched with:",
         "",
-        parameters(context),
+        parameters(context, include_resolved_profile=phase == "running"),
     ]
     if build:
-        sections.extend(["", f"Waiting up to one hour for [build {build['id']}]({build['html_url']}) at {inline_code(build['head_sha'])}."])
+        link = f"[build {build['id']}]({build['html_url']}) at {inline_code(build['head_sha'])}"
+        if phase == "waiting":
+            sections.extend(["", f"Waiting up to one hour for {link}."])
+        else:
+            sections.extend(["", f"Selected {link}."])
+            if phase == "preparing":
+                sections.extend(["", "Build is ready; waiting for an E2E profile and execution slot."])
     sections.extend(["", f"[Workflow run]({run_url(context)})", ""])
     return "\n".join(sections)
 
 
 def render_waiting(context, build):
-    return render_start(context, build)
+    return render_start(context, build, phase="waiting")
+
+
+def render_running(context):
+    build = {
+        "id": context["BUILD_RUN_ID"],
+        "html_url": context["BUILD_URL"],
+        "head_sha": context["BUILD_SHA"],
+    }
+    return render_start(context, build, phase="running")
 
 
 def find_job(jobs, name=None, prefix=None):
@@ -201,13 +221,14 @@ def render_final(context, jobs, acceptance_summary):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("phase", choices=("start", "final"))
+    parser.add_argument("phase", choices=("start", "running", "final"))
     parser.add_argument("--jobs")
     parser.add_argument("--acceptance-summary")
     args = parser.parse_args()
 
-    if args.phase == "start":
-        print(render_start(os.environ), end="")
+    if args.phase in ("start", "running"):
+        render = render_start if args.phase == "start" else render_running
+        print(render(os.environ), end="")
         return
 
     with open(args.jobs) as jobs_file:

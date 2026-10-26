@@ -1,9 +1,13 @@
 import io
 from contextlib import redirect_stdout
+import os
+from pathlib import Path
+import tempfile
 import unittest
 import zipfile
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+import select_e2e_build
 from select_e2e_build import GitHub, InvalidBuildMetadata, select_build
 
 
@@ -147,6 +151,14 @@ class BuildSelectionTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "no valid successful build"):
             self.select(FakeGitHub({"head": [build(conclusion="failure")]}), scheduled=True)
 
+    def test_periodic_pending_build_never_takes_manual_wait_or_skip_path(self):
+        github = FakeGitHub({"head": [build(status="in_progress", conclusion=None)]})
+        on_wait = Mock()
+        with self.assertRaisesRegex(RuntimeError, "no valid successful build"):
+            self.select(github, scheduled=True, on_wait=on_wait)
+        on_wait.assert_not_called()
+        self.assertEqual(0, self.clock.now)
+
     def test_api_errors_are_failures(self):
         github = FakeGitHub({})
         github.api = Mock(side_effect=RuntimeError("authentication failed"))
@@ -170,6 +182,37 @@ class VersionMetadataTest(unittest.TestCase):
                 else:
                     with self.assertRaises(InvalidBuildMetadata):
                         github.version(artifact())
+
+
+class ProgressCommentTest(unittest.TestCase):
+    def test_build_completion_replaces_waiting_comment_with_preparing(self):
+        github = FakeGitHub({})
+        github.request = Mock()
+
+        def complete_build(github, branch, commits, scheduled, on_wait):
+            on_wait(build(status="in_progress", conclusion=None))
+            return select_e2e_build.Selection("ready", run=build(), versions=VERSIONS)
+
+        with tempfile.TemporaryDirectory() as directory:
+            env = dict(
+                GITHUB_REPOSITORY="nebius/soperator", TARGET_BRANCH="feature", TARGET_SHA="head",
+                GITHUB_OUTPUT=str(Path(directory) / "outputs"),
+                GITHUB_STEP_SUMMARY=str(Path(directory) / "summary"),
+                COMMENT_ID="123", GITHUB_RUN_ID="456", GITHUB_SERVER_URL="https://github.com",
+                SOPERATOR_BRANCH="feature", SOPERATOR_BUILD_BRANCH="feature", TERRAFORM_BRANCH="main",
+                SOPERATOR_E2E_BRANCH="feature", REQUESTED_PROFILE="@auto-gpu",
+                RUN_UNSTABLE_TESTS="false", RUN_HEAVY="false",
+            )
+            with patch.dict(os.environ, env, clear=True), \
+                    patch.object(select_e2e_build, "GitHub", return_value=github), \
+                    patch.object(select_e2e_build, "select_build", side_effect=complete_build):
+                select_e2e_build.main()
+            comments = [call.kwargs["payload"]["body"] for call in github.request.call_args_list]
+            self.assertEqual(2, len(comments))
+            self.assertIn("E2E waiting for build", comments[0])
+            self.assertIn("E2E preparing", comments[1])
+            self.assertNotIn("E2E waiting for build", comments[1])
+            self.assertIn("status=ready", Path(env["GITHUB_OUTPUT"]).read_text())
 
 
 if __name__ == "__main__":

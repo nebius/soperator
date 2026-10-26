@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 import io
+import os
+from pathlib import Path
+import subprocess
+import sys
 import unittest
 
 from acceptance_summary import NS_PER_SEC, render_comment
-from e2e_pr_comment import render_final, render_start, render_waiting
+from e2e_pr_comment import render_final, render_running, render_start, render_waiting
 
 
 def cucumber_step(name, status, seconds=1, error_message="", line=4):
@@ -169,6 +173,31 @@ class AcceptanceCommentTest(unittest.TestCase):
 
 
 class E2EPRCommentTest(unittest.TestCase):
+    def test_ready_build_clears_waiting_status(self):
+        result = render_start(context(), {"id": 42, "head_sha": "abc123", "html_url": "https://github.com/build/42"})
+        self.assertIn("E2E preparing", result)
+        self.assertIn("Build is ready", result)
+        self.assertNotIn("E2E waiting for build", result)
+        self.assertNotIn("Waiting up to one hour", result)
+
+    def test_running_comment_shows_resolved_profile_and_build(self):
+        result = render_running(context(BUILD_RUN_ID="42", BUILD_SHA="abc123", BUILD_URL="https://github.com/build/42"))
+        self.assertIn("E2E running", result)
+        self.assertIn("Resolved profile: `KCS_B200`", result)
+        self.assertIn("[build 42](https://github.com/build/42)", result)
+        self.assertNotIn("Waiting up to one hour", result)
+
+    def test_running_cli_does_not_require_final_report_files(self):
+        env = dict(os.environ, **context(
+            BUILD_RUN_ID="42", BUILD_SHA="abc123", BUILD_URL="https://github.com/build/42",
+        ))
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).with_name("e2e_pr_comment.py")), "running"],
+            env=env, capture_output=True, text=True, check=True,
+        )
+        self.assertIn("E2E running", result.stdout)
+        self.assertIn("Resolved profile: `KCS_B200`", result.stdout)
+
     def test_waiting_comment_links_to_the_pinned_build(self):
         result = render_waiting(context(), {"id": 42, "head_sha": "abc123", "html_url": "https://github.com/build/42"})
         self.assertIn("E2E waiting for build", result)

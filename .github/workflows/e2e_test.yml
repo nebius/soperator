@@ -269,7 +269,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   e2e-test:
-    needs: [resolve-build, resolve-profile]
+    needs: [report-pr-start, resolve-build, resolve-profile]
     if: ${{ !cancelled() && needs.resolve-build.outputs.status == 'ready' && needs.resolve-profile.result == 'success' }}
     name: e2e-test (${{ needs.resolve-profile.outputs.profile_name }})
     outputs:
@@ -284,6 +284,11 @@ jobs:
     runs-on: ubuntu-latest
 
     environment: e2e
+
+    permissions:
+      contents: read
+      actions: write
+      pull-requests: write
 
     env:
       PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/soperator/installations/example"
@@ -307,6 +312,28 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+
+      - name: Report E2E running to PR
+        if: inputs.pr_number != '' && needs.report-pr-start.outputs.comment_id != ''
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMENT_ID: ${{ needs.report-pr-start.outputs.comment_id }}
+          SOPERATOR_BRANCH: ${{ github.ref_name }}
+          TERRAFORM_BRANCH: ${{ inputs.terraform_repo_ref || github.ref_name }}
+          SOPERATOR_E2E_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
+          REQUESTED_PROFILE: ${{ inputs.profile }}
+          RESOLVED_PROFILE: ${{ needs.resolve-profile.outputs.profile_name }}
+          BUILD_RUN_ID: ${{ needs.resolve-build.outputs.run_id }}
+          BUILD_URL: ${{ needs.resolve-build.outputs.html_url }}
+          BUILD_SHA: ${{ needs.resolve-build.outputs.head_sha }}
+        run: |
+          python3 .github/scripts/e2e_pr_comment.py running > /tmp/e2e-pr-running.md
+          payload=$(jq --null-input --rawfile body /tmp/e2e-pr-running.md '{body: $body}')
+          gh api --method PATCH \
+            "repos/$GITHUB_REPOSITORY/issues/comments/$COMMENT_ID" \
+            --input - <<<"$payload"
 
       - name: Install GO
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
