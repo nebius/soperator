@@ -44,7 +44,7 @@ permissions:
 
 jobs:
   resolve-profile:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: e2e
     # The selector waits here, outside the e2e-test concurrency group, until a
     # project frees up. Keep this above selector.timeout_minutes in E2E_CONFIG.
@@ -139,7 +139,7 @@ jobs:
       # different projects can run concurrently. Queued runs wait, never cancel in-progress ones.
       cancel-in-progress: false
       group: e2e-${{ needs.resolve-profile.outputs.nebius_project_id }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     environment: e2e
 
@@ -838,7 +838,7 @@ jobs:
       (needs.resolve-profile.result == 'failure' || needs.e2e-test.result == 'failure') &&
       (github.ref_name == 'main' || startsWith(github.ref_name, 'soperator-release-')) &&
       (inputs.terraform_repo_ref == '' || inputs.terraform_repo_ref == github.ref_name)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: e2e
     steps:
       - name: Send Slack notification

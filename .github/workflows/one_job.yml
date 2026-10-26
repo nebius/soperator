@@ -42,7 +42,7 @@ concurrency:
 jobs:
   authorize:
     name: Authorize
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: >-
       ${{
         github.event_name == 'pull_request_target'
@@ -55,7 +55,7 @@ jobs:
   changes:
     name: Detect Changes
     needs: [authorize]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       should_build: ${{ steps.filter.outputs.has_code_changes == 'true' || github.event_name != 'pull_request_target' }}
     steps:
@@ -770,7 +770,7 @@ jobs:
       - manifest-populate-jail
       - build-helm-charts
     if: needs.changes.outputs.should_build == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code
@@ -837,7 +837,7 @@ jobs:
 
   ci-success:
     name: CI Success
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - changes
       - pre-build
@@ -878,7 +878,7 @@ jobs:
       always() &&
       github.event_name == 'workflow_dispatch' &&
       (needs.ci-success.result == 'failure' || needs.ci-success.result == 'cancelled')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Send Slack notification
         env:
