@@ -9,6 +9,10 @@ spec:
   driftDetection:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .Values.slurmCluster.postRenderers }}
+  postRenderers:
+    {{- tpl (toYaml .) $ | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: helm-slurm-cluster
@@ -23,11 +27,11 @@ spec:
 {{- if .Values.slurmCluster.slurmClusterStorage.enabled }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster-storage
 {{- end }}
-{{- if .Values.securityProfilesOperator.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-security-profiles-operator
-{{- end }}
 {{- if .Values.nfsServer.enabled }}
   - name: {{ include "soperator-fluxcd.fullname" . }}-nfs-server
+{{- end }}
+{{- if .Values.tailscale.enabled }}
+  - name: {{ include "soperator-fluxcd.fullname" . }}-tailscale
 {{- end }}
 
   install:

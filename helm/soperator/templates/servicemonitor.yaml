@@ -26,8 +26,16 @@ spec:
     metricRelabelings:
       {{- toYaml .Values.serviceMonitor.metricRelabelings | nindent 6 }}
     {{- end }}
-    {{- if .Values.serviceMonitor.relabelings }}
     relabelings:
-      {{- toYaml .Values.serviceMonitor.relabelings | nindent 6 }}
-    {{- end }}
+      {{- /*
+      Static component label identifying the scraping process.
+      The job label is dropped on the public remote-write, and controller-runtime controller names
+      are not unique across soperator processes, so dashboards use component + controller instead.
+      */}}
+      - action: replace
+        targetLabel: component
+        replacement: soperator
+      {{- with .Values.serviceMonitor.relabelings }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
 {{ end }}

@@ -4,6 +4,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   name: {{ include "slurm-cluster-storage.volume.jail.mount" . }}
 spec:
+  {{- with .Values.storage.jail.updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       slurm: {{ include "slurm-cluster-storage.volume.jail.mount" . }}

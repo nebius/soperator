@@ -15,20 +15,4 @@ log_json "info" "ResumeFailProgram invoked" ",\"script\":\"$0\",\"nodes\":\"$1\"
 
 # Call power-manager to power the nodes back down
 # $1 contains the node list in Slurm format (e.g., "worker-[0-5,7]")
-/opt/soperator/bin/power-manager suspend -nodes "$1"
-exit_code=$?
-
-if [ $exit_code -ne 0 ]; then
-    log_json "error" "ResumeFailProgram suspend failed" ",\"exit_code\":${exit_code}"
-    exit $exit_code
-fi
-
-# Wait for nodes to be removed from activeNodes (verify the update was applied)
-/opt/soperator/bin/power-manager wait-removed -nodes "$1" -timeout 180s
-exit_code=$?
-
-if [ $exit_code -ne 0 ]; then
-    log_json "error" "ResumeFailProgram wait-removed failed" ",\"exit_code\":${exit_code}"
-fi
-
-exit $exit_code
+exec /opt/soperator/bin/power_action.sh suspend "$1"
