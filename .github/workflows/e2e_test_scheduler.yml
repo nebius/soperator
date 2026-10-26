@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   trigger-e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: e2e
 
     steps:
