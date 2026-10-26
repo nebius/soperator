@@ -81,7 +81,7 @@ jobs:
     name: Report E2E start to PR
     if: inputs.pr_number != ''
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: write
@@ -129,7 +129,7 @@ jobs:
   resolve-build:
     needs: report-pr-start
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 65
     permissions:
       contents: read
@@ -171,7 +171,7 @@ jobs:
   resolve-profile:
     needs: resolve-build
     if: ${{ !cancelled() && needs.resolve-build.outputs.status == 'ready' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: e2e
     # The selector waits here, outside the e2e-test concurrency group, until a
     # project frees up. Keep this above selector.timeout_minutes in E2E_CONFIG.
@@ -281,7 +281,7 @@ jobs:
       # different projects can run concurrently. Queued runs wait, never cancel in-progress ones.
       cancel-in-progress: false
       group: e2e-${{ needs.resolve-profile.outputs.nebius_project_id }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     environment: e2e
 
@@ -824,7 +824,7 @@ jobs:
     needs: [report-pr-start, resolve-build, resolve-profile, e2e-test]
     if: always() && inputs.pr_number != ''
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -900,7 +900,7 @@ jobs:
       (inputs.soperator_build_branch == '' || inputs.soperator_build_branch == github.ref_name) &&
       (inputs.terraform_repo_ref == '' || inputs.terraform_repo_ref == github.ref_name) &&
       (inputs.soperator_e2e_repo_branch == '' || inputs.soperator_e2e_repo_branch == 'main')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: e2e
     steps:
       - name: Send Slack notification
