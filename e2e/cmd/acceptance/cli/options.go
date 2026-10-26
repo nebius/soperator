@@ -16,13 +16,13 @@ import (
 const defaultSlurmClusterName = "soperator"
 
 type runOptions struct {
-	KubectlContext    string
-	SlurmClusterName  string
-	SoperatorVersion  string
-	RunUnstableTests  bool
-	RunEssentialTests bool
-	ScenarioPaths     []string
-	OutputDir         string
+	KubectlContext   string
+	SlurmClusterName string
+	SoperatorVersion string
+	RunUnstableTests bool
+	RunHeavyTests    bool
+	ScenarioPaths    []string
+	OutputDir        string
 }
 
 type collectOptions struct {
@@ -73,6 +73,10 @@ func runAcceptance(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("parse run args: %w", err)
 	}
+	opts.ScenarioPaths, err = acceptance.NormalizeScenarioPaths(opts.ScenarioPaths)
+	if err != nil {
+		return fmt.Errorf("normalize scenario paths: %w", err)
+	}
 
 	targetVersion, err := resolveTargetSoperatorVersion(ctx, opts.KubectlContext, opts.SoperatorVersion)
 	if err != nil {
@@ -115,9 +119,7 @@ func suiteFromOptions(opts runOptions, targetSoperatorVersion string) acceptance
 	if len(opts.ScenarioPaths) > 0 {
 		suite.Source.Paths = opts.ScenarioPaths
 	}
-	if opts.RunEssentialTests {
-		suite.Tags = "@essential"
-	}
+	suite.ExcludeHeavy = !opts.RunHeavyTests
 	if opts.RunUnstableTests {
 		suite.ExcludeUnstable = false
 	}
@@ -132,7 +134,7 @@ func parseRunOptions(args []string) (runOptions, error) {
 	fs.StringVar(&opts.SlurmClusterName, "slurm-cluster-name", opts.SlurmClusterName, "SlurmCluster resource name")
 	fs.StringVar(&opts.SoperatorVersion, "soperator-version", "", "target Soperator version; when omitted, Flux HelmRelease discovery is used")
 	fs.BoolVar(&opts.RunUnstableTests, "run-unstable", false, "run scenarios tagged @unstable")
-	fs.BoolVar(&opts.RunEssentialTests, "run-essential", false, "run only scenarios tagged @essential")
+	fs.BoolVar(&opts.RunHeavyTests, "run-heavy", false, "run scenarios tagged @heavy")
 	fs.Var((*scenarioPathFlag)(&opts.ScenarioPaths), "scenario", "feature file or exact Scenario line to run; may be repeated")
 	fs.StringVar(&opts.OutputDir, "output-dir", "", "directory for reports and per-scenario artifacts")
 	if err := fs.Parse(args); err != nil {

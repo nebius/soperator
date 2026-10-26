@@ -65,8 +65,9 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
   versions, for example `4.1.5-reb85d0e5`.
 - `--run-unstable`: optional, defaults to `false`; when false, scenarios tagged
   `@unstable` are excluded.
-- `--run-essential`: optional, defaults to `false`; when true, only scenarios
-  tagged `@essential` are run.
+- `--run-heavy`: optional, defaults to `false`; when false, scenarios tagged
+  `@heavy` are excluded. Enabling it includes heavy scenarios alongside ordinary
+  scenarios. Heavy and unstable controls are independent.
 - `--scenario`: optional. Runs all compatible scenarios in the provided feature
   file, or the single scenario at an exact `Scenario:` line, for example
   `features/internal_ssh.feature:3`. May be repeated.
@@ -101,7 +102,7 @@ empty to run all compatible scenarios subject to the tag filters below.
 Paths refer to features in the selected **E2E repo branch**.
 
 On a PR, use `/e2e [terraform-branch] --scenarios="<selectors>"` or
-`/e2e-essential [terraform-branch] --scenarios="<selectors>"`. Use the same
+`/e2e-full [terraform-branch] --scenarios="<selectors>"`. Use the same
 separators as the workflow input. Double quotes are optional for lists without
 whitespace; use double quotes when the list contains spaces:
 
@@ -112,16 +113,53 @@ whitespace; use double quotes when the list contains spaces:
 
 The Terraform branch defaults to `main`. Omit `--scenarios` or pass an empty
 list to keep the default scenario selection. The same tag filters apply.
-The PR branch must contain a workflow declaring the `scenarios` input, even
-when the list is empty.
+The PR branch must contain the updated workflow inputs (`run_heavy`,
+`scenarios`, and `soperator_build_sha`). PR commands pass the captured head SHA
+to pin the requested build commit.
 
-`--run-essential` composes with the other selectors. By default, unstable
-essential scenarios are still excluded; pass `--run-unstable` to include them.
-When combined with `--scenario`, the selected scenario must also carry the
-`@essential` tag.
+The default CLI, manual workflow, and `/e2e` exclude both `@heavy` and
+`@unstable`. `/e2e-full` enables heavy scenarios and still excludes unstable
+ones. Both PR commands support the optional Terraform branch and `--scenarios`;
+other flags are rejected. Periodic runs always include heavy scenarios and
+exclude unstable ones. Explicit scenario selectors still obey these filters.
 
-The selected-worker node replacement scenario is both essential and unstable,
-so it runs only when both `--run-essential` and `--run-unstable` are set.
+`@heavy` currently marks scenarios measured above ten minutes in
+[the reference run](https://github.com/nebius/soperator/actions/runs/39939143334).
+The tag is maintained in feature files; the runner does not classify durations
+dynamically. A scenario can carry both `@heavy` and `@unstable`.
+
+Scenario paths are aliases for embedded features. These select the same
+scenario without reading a feature file from disk:
+
+```text
+features/active_checks.feature:3
+e2e/acceptance/features/active_checks.feature:3
+./e2e/acceptance/features/active_checks.feature:3
+/checkout/soperator/e2e/acceptance/features/active_checks.feature:3
+```
+
+The aliases work in the binary's `--scenario`, PR comments' `--scenarios`,
+and the GitHub workflow's `scenarios` field. The optional line must identify
+the exact `Scenario:` or `Scenario Outline:` line. CLI arguments can be
+quoted; workflow and PR selector lists retain their comma, semicolon, and
+whitespace separators, so individual paths in those lists cannot contain spaces.
+
+## Build selection and notifications
+
+GitHub E2E resolves its build before selecting a profile or creating a cluster.
+For non-scheduled runs, including PR comments and manual UI runs, it selects
+the latest build for the target commit and pins that build run. A queued or
+running build is polled every 30 seconds for up to one hour. New commits or
+builds do not change the selection. A failed, cancelled, unavailable, timed-out,
+or unusable build skips E2E with a reason; it never falls back to an older build.
+API and authentication errors fail the workflow. PR comments show the waiting
+build and final result. An E2E skip leaves acceptance jobs skipped, although
+the overall workflow can finish successfully.
+
+Periodic runs retain the search for a successful build with valid, unexpired
+version metadata among the latest 15 first-parent commits. Only periodic runs
+(`is_scheduled=true`) using default refs send failure alerts to Slack.
+Direct manual runs and PR commands use `is_scheduled=false`.
 
 Note: The node replacement scenario uses the local `nebius` CLI to check
 instance removal.
@@ -168,6 +206,7 @@ suite := acceptance.SoperatorSuite("5.0.0")
 suite.Source.Paths = []string{"features/internal_ssh.feature:3"}
 suite.Tags = "~@custom_only"
 suite.ExcludeUnstable = false
+suite.ExcludeHeavy = true
 
 runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 	KubectlContext:         kubectlContext,
@@ -183,6 +222,9 @@ target cluster. `SlurmClusterName` defaults to `soperator` when omitted.
 `TargetSoperatorVersion` is normalized once and stored in static
 `framework.ClusterInfo`. The caller controls scenario selection through
 `SuiteConfig.Source.Paths` and Godog tag filtering through `SuiteConfig.Tags`.
+`SuiteConfig.ExcludeHeavy` and `ExcludeUnstable` independently exclude their
+respective tags. `SoperatorSuite` preserves heavy coverage for library callers;
+the standalone CLI explicitly excludes it unless `--run-heavy` is set.
 When `OutputDir` is set, each scenario receives matching runner and jail paths
 through `framework.ScenarioArtifacts(ctx)`. Product-specific steps can write
 their own files directly to those paths without registering a collector.
@@ -345,7 +387,8 @@ README, module manifests, and repository-level metadata as location-specific.
 GitHub Actions keeps two refs separate:
 
 1. Soperator/workflow ref: the Soperator repository ref used to run the E2E
-   code and select the latest successful Soperator build artifact to deploy.
+   code and select the Soperator build artifact to deploy according to the policy
+   above.
 2. Terraform repo ref: the `nebius-solution-library` ref used for cluster
    creation. It defaults to the Soperator/workflow ref, but can be overridden
    independently.

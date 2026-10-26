@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/fs"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -180,6 +181,33 @@ func prepareAxes(axes []Axis) ([]preparedAxis, error) {
 	}
 
 	return prepared, nil
+}
+
+// NormalizeFeatureLocations resolves aliases to known embedded feature paths.
+func NormalizeFeatureLocations(locations, featurePaths []string) ([]string, error) {
+	var normalized []string
+	for _, raw := range locations {
+		location, err := parseFeatureLocation(raw)
+		if err != nil {
+			return nil, err
+		}
+		cleaned := path.Clean(location.path)
+		var matches []string
+		for _, featurePath := range featurePaths {
+			if cleaned == featurePath || strings.HasSuffix(cleaned, "/"+featurePath) {
+				matches = append(matches, featurePath)
+			}
+		}
+		if len(matches) != 1 {
+			return nil, fmt.Errorf("feature path %q must identify exactly one embedded feature, got %d", raw, len(matches))
+		}
+		canonical := matches[0]
+		if location.line > 0 {
+			canonical = fmt.Sprintf("%s:%d", canonical, location.line)
+		}
+		normalized = append(normalized, canonical)
+	}
+	return normalized, nil
 }
 
 func parseFeatureLocation(rawPath string) (featureLocation, error) {

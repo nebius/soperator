@@ -18,6 +18,7 @@ type SuiteConfig struct {
 	Tags            string
 	StepRegistrars  []StepRegistrar
 	ExcludeUnstable bool
+	ExcludeHeavy    bool
 }
 
 // VersionAxis returns a scenario version axis for product-owned version tags.

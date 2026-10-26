@@ -18,7 +18,7 @@ Feature: System checks
 
   # TODO: Make soperatorchecks --not-ready-timeout configurable through Helm and
   # set a lower value for e2e clusters, then remove @unstable from this scenario.
-  @unstable @soperator_version_>=5.0.0
+  @heavy @unstable @soperator_version_>=5.0.0
   Scenario: Non-responding kubelet recreates a Kubernetes node and recovers the worker
     Given a healthy worker pod is selected
     When kubelet is stopped on the selected worker Kubernetes node

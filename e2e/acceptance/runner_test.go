@@ -57,6 +57,67 @@ func TestRunnerSuiteTagFilter(t *testing.T) {
 	}
 }
 
+func TestRunnerHeavyAndUnstableSelection(t *testing.T) {
+	for _, tt := range []struct {
+		name            string
+		excludeHeavy    bool
+		excludeUnstable bool
+		paths           []string
+		want            []string
+	}{
+		{name: "default", excludeHeavy: true, excludeUnstable: true, want: []string{"ordinary"}},
+		{name: "full and periodic", excludeUnstable: true, want: []string{"ordinary", "heavy"}},
+		{name: "unstable only", excludeHeavy: true, want: []string{"ordinary", "unstable"}},
+		{name: "all", want: []string{"ordinary", "heavy", "unstable", "both"}},
+		{name: "selector respects heavy exclusion", excludeHeavy: true, paths: []string{"features/selection.feature:6"}},
+		{name: "selector allows heavy when enabled", excludeUnstable: true, paths: []string{"features/selection.feature:6"}, want: []string{"heavy"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var ran []string
+			source := FeatureSource{
+				FS: fstest.MapFS{"features/selection.feature": {Data: []byte(`Feature: Selection
+  @soperator_version_>=5.0.0
+  Scenario: ordinary
+    Then the ordinary scenario runs
+  @heavy @soperator_version_>=5.0.0
+  Scenario: heavy
+    Then the heavy scenario runs
+  @unstable @soperator_version_>=5.0.0
+  Scenario: unstable
+    Then the unstable scenario runs
+  @heavy @unstable @soperator_version_>=5.0.0
+  Scenario: both
+    Then the both scenario runs
+  @soperator_version_>=6.0.0
+  Scenario: future
+    Then the future scenario runs
+`)}},
+				Paths: []string{"features/selection.feature"},
+			}
+			if len(tt.paths) > 0 {
+				source.Paths = tt.paths
+			}
+			runner, err := NewRunner(RunnerConfig{
+				KubectlContext: "dev-context", TargetSoperatorVersion: "5.0.0",
+				Suites: []SuiteConfig{{
+					Name: "selection", Source: source,
+					VersionAxes:  []ScenarioVersionAxis{SoperatorVersionAxis("5.0.0")},
+					ExcludeHeavy: tt.excludeHeavy, ExcludeUnstable: tt.excludeUnstable,
+					StepRegistrars: []StepRegistrar{func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, _ framework.Runtime) {
+						sc.Step(`^the (.+) scenario runs$`, func(name string) error {
+							ran = append(ran, name)
+							return nil
+						})
+					}},
+				}},
+			})
+			require.NoError(t, err)
+			require.NoError(t, runner.runConfiguredSuites(context.Background(), testClusterInfo(), nil, runner.suites))
+			assert.Equal(t, tt.want, ran)
+		})
+	}
+}
+
 func TestRunnerSuiteFeaturePaths(t *testing.T) {
 	source := testFeatureSource()
 

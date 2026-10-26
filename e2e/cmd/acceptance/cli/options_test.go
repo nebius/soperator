@@ -15,7 +15,7 @@ func TestParseRunOptionsDefaults(t *testing.T) {
 	assert.Equal(t, "dev-context", opts.KubectlContext)
 	assert.Equal(t, "soperator", opts.SlurmClusterName)
 	assert.False(t, opts.RunUnstableTests)
-	assert.False(t, opts.RunEssentialTests)
+	assert.False(t, opts.RunHeavyTests)
 	assert.Empty(t, opts.SoperatorVersion)
 	assert.Empty(t, opts.ScenarioPaths)
 	assert.Equal(t, "artifacts", opts.OutputDir)
@@ -27,7 +27,7 @@ func TestParseRunOptionsExplicitValues(t *testing.T) {
 		"--slurm-cluster-name", "custom",
 		"--soperator-version", "4.1.5-reb85d0e5",
 		"--run-unstable=true",
-		"--run-essential=true",
+		"--run-heavy=true",
 		"--scenario", "features/internal_ssh.feature:3",
 		"--scenario=features/observability.feature:3",
 		"--output-dir", "reports",
@@ -36,7 +36,7 @@ func TestParseRunOptionsExplicitValues(t *testing.T) {
 
 	assert.Equal(t, "custom", opts.SlurmClusterName)
 	assert.True(t, opts.RunUnstableTests)
-	assert.True(t, opts.RunEssentialTests)
+	assert.True(t, opts.RunHeavyTests)
 	assert.Equal(t, []string{"features/internal_ssh.feature:3", "features/observability.feature:3"}, opts.ScenarioPaths)
 	assert.Equal(t, "reports", opts.OutputDir)
 }
@@ -64,16 +64,15 @@ func TestParseCollectOptionsRequiresAtLeastOneArtifactSource(t *testing.T) {
 	assert.ErrorContains(t, err, "at least one of --kubectl-context or --nebius-project-id is required")
 }
 
-func TestSuiteFromOptionsSelectsEssentialScenarios(t *testing.T) {
-	suite := suiteFromOptions(runOptions{RunEssentialTests: true}, "5.0.0")
-	assert.Equal(t, "@essential", suite.Tags)
-	assert.True(t, suite.ExcludeUnstable)
-}
-
-func TestSuiteFromOptionsCanIncludeUnstableEssentialScenarios(t *testing.T) {
-	suite := suiteFromOptions(runOptions{RunEssentialTests: true, RunUnstableTests: true}, "5.0.0")
-	assert.Equal(t, "@essential", suite.Tags)
-	assert.False(t, suite.ExcludeUnstable)
+func TestSuiteFromOptionsFiltersHeavyAndUnstableIndependently(t *testing.T) {
+	for _, heavy := range []bool{false, true} {
+		for _, unstable := range []bool{false, true} {
+			suite := suiteFromOptions(runOptions{RunHeavyTests: heavy, RunUnstableTests: unstable}, "5.0.0")
+			assert.Empty(t, suite.Tags)
+			assert.Equal(t, !heavy, suite.ExcludeHeavy)
+			assert.Equal(t, !unstable, suite.ExcludeUnstable)
+		}
+	}
 }
 
 func TestParseRunOptionsRequiresCommonOptions(t *testing.T) {
@@ -102,4 +101,21 @@ func TestRunRequiresExplicitSubcommand(t *testing.T) {
 	err := Run(context.Background(), nil)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "subcommand is required")
+}
+
+func TestRunResolvesScenarioAliasesBeforeVersionFiltering(t *testing.T) {
+	for _, selector := range []string{
+		"features/worker_rolling_update.feature:14",
+		"e2e/acceptance/features/worker_rolling_update.feature:14",
+		"/checkout/soperator/e2e/acceptance/features/worker_rolling_update.feature:14",
+	} {
+		t.Run(selector, func(t *testing.T) {
+			err := Run(context.Background(), []string{
+				"run", "--kubectl-context", "unused-alias-test-context",
+				"--soperator-version", "4.1.14", "--output-dir", t.TempDir(),
+				"--scenario", selector, "--run-heavy",
+			})
+			require.ErrorContains(t, err, "no acceptance scenarios compatible with Soperator version 4.1.14")
+		})
+	}
 }

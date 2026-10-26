@@ -3,7 +3,7 @@ import io
 import unittest
 
 from acceptance_summary import NS_PER_SEC, render_comment
-from e2e_pr_comment import render_final, render_start
+from e2e_pr_comment import render_final, render_start, render_waiting
 
 
 def cucumber_step(name, status, seconds=1, error_message="", line=4):
@@ -39,7 +39,7 @@ def context(**overrides):
         "REQUESTED_PROFILE": "@auto-gpu",
         "RESOLVED_PROFILE": "KCS_B200",
         "RUN_UNSTABLE_TESTS": "false",
-        "RUN_ESSENTIAL_TESTS": "true",
+        "RUN_HEAVY": "true",
         "RESOLVE_RESULT": "success",
         "E2E_RESULT": "success",
         "ACCEPTANCE_OUTCOME": "success",
@@ -169,16 +169,40 @@ class AcceptanceCommentTest(unittest.TestCase):
 
 
 class E2EPRCommentTest(unittest.TestCase):
+    def test_waiting_comment_links_to_the_pinned_build(self):
+        result = render_waiting(context(), {"id": 42, "head_sha": "abc123", "html_url": "https://github.com/build/42"})
+        self.assertIn("E2E waiting for build", result)
+        self.assertIn("[build 42](https://github.com/build/42)", result)
+        self.assertIn("`abc123`", result)
+
+    def test_build_skip_is_not_reported_as_failure(self):
+        result = render_final(context(
+            BUILD_RESULT="success", BUILD_STATUS="skipped", BUILD_REASON="The selected build concluded with failure.",
+            BUILD_URL="https://github.com/build/42", BUILD_SHA="abc123",
+            RESOLVE_RESULT="skipped", E2E_RESULT="skipped",
+        ), {"jobs": []}, "")
+        self.assertIn("E2E skipped", result)
+        self.assertIn("selected build concluded with failure", result)
+        self.assertIn("Acceptance tests: not run", result)
+        self.assertNotIn("Failure before acceptance", result)
+
+    def test_build_api_failure_is_reported_before_profile_selection(self):
+        jobs = {"jobs": [{"name": "resolve-build", "steps": [
+            {"name": "Select build", "number": 2, "conclusion": "failure"}]}]}
+        result = render_final(context(BUILD_RESULT="failure", RESOLVE_RESULT="skipped", E2E_RESULT="skipped"), jobs, "")
+        self.assertIn("E2E failed", result)
+        self.assertIn("Failed step: `Select build`", result)
+
     def test_initial_comment_has_exact_run_and_parameters(self):
         result = render_start(context())
 
-        self.assertIn("### ⏳ E2E running", result)
+        self.assertIn("### ⏳ E2E preparing", result)
         self.assertIn("- Soperator workflow branch: `feature`", result)
         self.assertIn(
             "- Soperator build branch: `soperator-release-4.1`",
             result,
         )
-        self.assertIn("- Essential tests only: `true`", result)
+        self.assertIn("- Heavy tests: `true`", result)
         self.assertIn(
             "[Workflow run](https://github.com/nebius/soperator/actions/runs/12345)",
             result,
