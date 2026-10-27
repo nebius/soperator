@@ -159,7 +159,7 @@ func (s *Topology) CleanupAndReset(ctx context.Context) {
 
 		sizes := s.blockSizesRestore
 		s.blockSizesRestore = nil
-		reportCleanupErrorf(ctx, s.runtime, "cleanup: restoring blockSizes %v of topology %s", sizes, s.blockTopology)
+		s.runtime.Logf("Cleanup: restoring blockSizes %v of topology %s", sizes, s.blockTopology)
 		// The wait covers slurmctld too, not just the published file: leaving the cluster running
 		// the test sizes would fail the next run before it changed anything.
 		if err := s.patchBlockSizes(cleanupCtx, s.blockTopology, sizes); err != nil {
