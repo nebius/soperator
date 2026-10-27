@@ -123,7 +123,7 @@ slurmCluster:
             ephemeralStorage: 100Mi
         customInitContainers:
           - name: ensure-jail-virtiofs
-            image: cr.nebius.cloud/soperator/busybox
+            image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
             volumeMounts: [{name: jail, mountPath: /volume-mount}]
             command: ["grep", " /volume-mount virtiofs ", "/proc/mounts"]
       controller:
