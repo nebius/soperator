@@ -207,6 +207,7 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 			ExcludeHeavy:           suite.ExcludeHeavy,
 			Concurrency:            suite.Concurrency,
 			RequirePreviousSuccess: suite.RequirePreviousSuccess,
+			HeavyFirst:             suite.HeavyFirst,
 		})
 	}
 	return out, nil
@@ -224,6 +225,13 @@ func (r *Runner) suiteFeaturePaths(info *framework.ClusterInfo, suite SuiteConfi
 			versionfilter.FeatureSource{FS: suite.Source.FS, Paths: suite.Source.Paths},
 			axes...,
 		)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if suite.HeavyFirst && len(paths) > 0 {
+		var err error
+		paths, err = heavyScenariosFirst(suite.Source, paths)
 		if err != nil {
 			return nil, err
 		}

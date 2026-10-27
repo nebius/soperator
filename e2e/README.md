@@ -94,6 +94,11 @@ heavy, unstable and scenario-path filters. Exact scenario selectors refer to the
 If the sequential suite fails, the concurrent suite is not started against a
 potentially degraded shared baseline.
 
+Always keep `@heavy` scenarios first in the parallel suite's launch queue.
+`ConcurrentSuites` applies this ordering automatically, preserving the original
+order within heavy and ordinary scenarios. Worker reservations still determine
+when each scenario can obtain its workers; sequential-suite ordering is unchanged.
+
 Worker selection waits for active workers' Pods and Kubernetes hosts to be Ready
 and reserves an entire worker set atomically. Waiting requests
 are considered in arrival order, but a request that cannot fit does not block

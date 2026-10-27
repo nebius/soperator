@@ -21,6 +21,7 @@ type SuiteConfig struct {
 	ExcludeHeavy           bool
 	Concurrency            int
 	RequirePreviousSuccess bool
+	HeavyFirst             bool
 }
 
 // ConcurrentSuites runs @sequential scenarios first, then all remaining scenarios
@@ -28,7 +29,10 @@ type SuiteConfig struct {
 func ConcurrentSuites(suite SuiteConfig, concurrency int) []SuiteConfig {
 	serial, parallel := suite, suite
 	serial.Concurrency = 1
+	serial.HeavyFirst = false
 	parallel.Concurrency = concurrency
+	// Always queue heavy scenarios first so their runtime can overlap shorter checks.
+	parallel.HeavyFirst = true
 	parallel.RequirePreviousSuccess = true
 	parallel.Name += "-parallel"
 	serial.Tags = combineTags(suite.Tags, "@sequential")
