@@ -136,11 +136,27 @@ The shared feature suite has four tag forms that affect execution:
   standalone runner executes these first, one at a time, then runs all unmarked
   scenarios concurrently (four by default). Do not use `@parallel`.
 
-Review concurrency for every new or changed scenario. Reserve the complete worker
-set through the shared selector before recording baselines or starting workloads,
-wait for busy or unhealthy configured workers, and retain leases through cleanup.
-Host-wide faults must own every worker on the affected host. Shared identities,
-files, jobs and artifacts must be isolated or have narrowly synchronized setup.
+Design every scenario to pass on its own and in any order. Create or verify its
+prerequisites instead of depending on accounts, files or configuration left by
+another scenario. Track jobs by ID and use scenario-specific paths, SSH identities
+and artifact directories. Scope assertions and cleanup to owned resources: other
+scenarios may legitimately drain or replace unreserved workers, and cancelling jobs
+by a shared user or name can stop their work. Synchronize unavoidable shared setup,
+such as first-time user creation, across the complete read-modify-write operation.
+
+Before recording baselines or starting work, identify every worker the scenario
+affects, including workers used by indirectly launched jobs. Acquire the complete
+set atomically through `WorkerSelector.Acquire` or its `Pick...Workers` wrappers;
+custom selectors must call `Reserve` before using their selection. An idle worker
+found through a snapshot is not necessarily unreserved. Let acquisition wait for
+busy or unhealthy configured workers rather than skipping them or holding a subset
+while waiting for more. Pin every job to the reserved workers, use
+`RequireReservedHost` before host-wide faults, and retain reservations until owned
+jobs stop and required cleanup and recovery are verified. Report unsafe cleanup
+failures through `reportCleanupErrorf` so the finalizer can quarantine the workers.
+Worker reservations do not protect shared login Pods, cluster configuration or
+shared files; isolate or narrowly synchronize those resources, or use the
+documented `@sequential` exclusion below.
 
 Use `@sequential` when a concrete conflict remains: shared configuration or jail
 package mutation, shared login/system restarts, cluster-wide health assertions,
