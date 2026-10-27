@@ -139,7 +139,7 @@ func parseRunOptions(args []string) (runOptions, error) {
 	fs.StringVar(&opts.SoperatorVersion, "soperator-version", "", "target Soperator version; when omitted, Flux HelmRelease discovery is used")
 	fs.BoolVar(&opts.RunUnstableTests, "run-unstable", false, "run scenarios tagged @unstable")
 	fs.BoolVar(&opts.RunHeavyTests, "run-heavy", false, "run scenarios tagged @heavy")
-	fs.IntVar(&opts.Parallelism, "parallelism", 8, "maximum concurrent worker-local scenarios; 1 runs both suites sequentially")
+	fs.IntVar(&opts.Parallelism, "parallelism", 4, "maximum concurrent worker-local scenarios; 1 runs both suites sequentially")
 	fs.DurationVar(&opts.WorkerAcquireTimeout, "worker-acquire-timeout", 90*time.Minute, "maximum wait for available workers, separate from job timeouts")
 	fs.Var((*scenarioPathFlag)(&opts.ScenarioPaths), "scenario", "feature file or exact Scenario line to run; may be repeated")
 	fs.StringVar(&opts.OutputDir, "output-dir", "", "directory for reports and per-scenario artifacts")

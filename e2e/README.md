@@ -68,7 +68,7 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
 - `--run-heavy`: optional, defaults to `false`; when false, scenarios tagged
   `@heavy` are excluded. Enabling it includes heavy scenarios alongside ordinary
   scenarios. Heavy and unstable controls are independent.
-- `--parallelism`: maximum concurrent worker-local scenarios, defaults to `8`.
+- `--parallelism`: maximum concurrent worker-local scenarios, defaults to `4`.
   Set to `1` for sequential execution with the same selection and reservation rules.
 - `--worker-acquire-timeout`: maximum wait for free, healthy workers, defaults
   to `90m`. This includes contention and recovery and is separate from job timeouts.

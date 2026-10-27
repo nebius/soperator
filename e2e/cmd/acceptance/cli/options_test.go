@@ -19,7 +19,7 @@ func TestParseRunOptionsDefaults(t *testing.T) {
 	assert.Empty(t, opts.SoperatorVersion)
 	assert.Empty(t, opts.ScenarioPaths)
 	assert.Equal(t, "artifacts", opts.OutputDir)
-	assert.Equal(t, 8, opts.Parallelism)
+	assert.Equal(t, 4, opts.Parallelism)
 }
 
 func TestParseRunOptionsRejectsInvalidConcurrencySettings(t *testing.T) {
