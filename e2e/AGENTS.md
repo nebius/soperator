@@ -67,7 +67,8 @@ Gather enough information to answer:
   each unmet prerequisite should the scenario skip or fail?
 - Which action should the scenario perform, and what observations prove that it
   worked?
-- Will the scenario take more than ten minutes and need the heavy tag?
+- Is the scenario long (typically four minutes or more), and should it stay in
+  default manual runs or use the heavy tag?
 - What cluster state will the scenario mutate? For each persistent mutation,
   could the resulting state affect later scenarios or a rerun in any way, harm
   cluster health, consume resources, or incur cost? Which mutations therefore
@@ -107,9 +108,13 @@ again.
   same thing. Prefer a new precise step to broadening an existing one until its
   behavior becomes surprising.
 - Decide whether a scenario is heavy during design, before implementation.
-  `@heavy` marks scenarios measured or expected to take more than ten minutes.
-  Heavy scenarios are excluded from default CLI and PR runs, included by
-  `--run-heavy` or `/e2e-full`, and always included in periodic runs.
+  `@heavy` usually marks long scenarios (about four minutes or more), but this
+  is a guideline: very important coverage may stay untagged in default manual
+  runs. Heavy scenarios are excluded from manual CLI, GitHub UI, and PR runs
+  by default, included by `--run-heavy`, workflow input `run_heavy=true`, or
+  `/e2e-full`, and always included in periodic runs. If a long scenario's
+  importance is unclear, explicitly ask the user whether to add `@heavy` and
+  explain its default manual exclusion, manual opt-in, and periodic inclusion.
   Classify heavy independently of unstable and version constraints. Update
   the expectations in `acceptance/features_test.go` when changing membership.
 - Decide skip versus failure explicitly for every prerequisite. Return

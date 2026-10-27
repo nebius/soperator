@@ -50,6 +50,13 @@ func TestSharedHeavyScenarios(t *testing.T) {
 		}
 	}
 	assert.ElementsMatch(t, []string{
+		"GPU ActiveCheck succeeds on all GPU workers",
+		"Docker containers can access GPUs",
+		"NVIDIA bug report is collected from a worker",
+		"Enroot containers can access GPUs",
+		"Login pods scale up without automatic pod scale-down",
+		"Manage jail dry-run detects drift without modifying the jail",
+		"A worker template update preserves running jobs",
 		"A maintenance event replaces the selected worker node",
 		"A maintenance event replaces a CPU worker node when CPU and GPU workers exist",
 		"An MK8s node group update preserves running jobs",

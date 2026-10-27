@@ -18,7 +18,7 @@ Feature: Soperator utilities
     When slurm_task_info runs as the prolog of a one-GPU task
     Then task info reports the selected node, rank, CPU, GPU, and CUDA device
 
-  @gpu @soperator_version_>=4.0.0
+  @heavy @gpu @soperator_version_>=4.0.0
   Scenario: NVIDIA bug report is collected from a worker
     Given a GPU worker is selected for Soperator utility checks
     When worker_nvidia_bug_report downloads a report by instance ID

@@ -48,7 +48,7 @@ Feature: Docker containers
       | CPU         |
       | GPU         |
 
-  @gpu @soperator_version_>=5.0.0
+  @heavy @gpu @soperator_version_>=5.0.0
   Scenario: Docker containers can access GPUs
     Given a Docker GPU smoke job is submitted on one GPU worker
     Then the Docker GPU smoke job succeeds and reports visible GPUs

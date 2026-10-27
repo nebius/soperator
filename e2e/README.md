@@ -123,10 +123,12 @@ ones. Both PR commands support the optional Terraform branch and `--scenarios`;
 other flags are rejected. Periodic runs always include heavy scenarios and
 exclude unstable ones. Explicit scenario selectors still obey these filters.
 
-`@heavy` currently marks scenarios measured above ten minutes in
-[the reference run](https://github.com/nebius/soperator/actions/runs/39939143334).
-The tag is maintained in feature files; the runner does not classify durations
-dynamically. A scenario can carry both `@heavy` and `@unstable`.
+`@heavy` usually marks long scenarios (about four minutes or more), based on
+observed durations such as
+[the MDC_B200 run](https://github.com/nebius/soperator/actions/runs/40326945727).
+Very important coverage may remain untagged so it stays in default manual runs.
+Membership is maintained in feature files; the runner does not classify
+durations dynamically. A scenario can carry both `@heavy` and `@unstable`.
 
 Scenario paths are aliases for embedded features. These select the same
 scenario without reading a feature file from disk:
