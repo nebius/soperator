@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,7 +28,6 @@ const (
 
 var (
 	ncclPlatformLine  = regexp.MustCompile(`^Detected platform: (H100|H200|B200|B300|GB300)$`)
-	ncclCorrectLine   = regexp.MustCompile(`^#\s*Out of bounds values\s*:\s*0\s+OK\s*$`)
 	ncclBandwidthLine = regexp.MustCompile(
 		`^#\s*Avg bus bandwidth\s*:\s*(\S+)\s*$`,
 	)
@@ -74,7 +72,7 @@ func (s *NCCL) selectIdleGPUWorkers(ctx context.Context) error {
 		return fmt.Errorf("inspect workers for NCCL validation: %w", err)
 	}
 
-	workers, err := pickIdleGPUWorkers(snapshot)
+	workers, err := pickIdleGPUWorkers(snapshot, ncclWorkerCount)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
@@ -111,46 +109,6 @@ func (s *NCCL) validateNCCLResult() error {
 	}
 	s.runtime.Logf("NCCL: platform=%s avg_bus_bandwidth=%g", result.Platform, result.AvgBandwidth)
 	return nil
-}
-
-func pickIdleGPUWorkers(snapshot framework.WorkerSnapshot) ([]framework.WorkerInfo, error) {
-	var configured int
-	for _, nodeSet := range snapshot.NodeSets {
-		if nodeSet.HasGPU && nodeSet.Replicas > 0 {
-			configured += nodeSet.Replicas
-		}
-	}
-	if configured < ncclWorkerCount {
-		return nil, &framework.InsufficientWorkersError{
-			Label: "GPU workers",
-			Found: configured,
-			Need:  ncclWorkerCount,
-		}
-	}
-
-	var idle []framework.WorkerInfo
-	var unavailable []string
-	for _, worker := range snapshot.GPUWorkers {
-		if worker.SlurmNode.IsReadyForImmediateWork() && worker.SlurmNode.HasStateFlag("IDLE") {
-			idle = append(idle, worker)
-			continue
-		}
-		unavailable = append(unavailable, fmt.Sprintf("%s state=%s reason=%s",
-			worker.Name, worker.SlurmNode.State, worker.SlurmNode.Reason))
-	}
-	if len(idle) < ncclWorkerCount {
-		if missing := configured - len(snapshot.GPUWorkers); missing > 0 {
-			unavailable = append(unavailable, fmt.Sprintf("%d configured GPU workers missing from Slurm", missing))
-		}
-		sort.Strings(unavailable)
-		return nil, fmt.Errorf("found %d idle GPU workers, need %d (%d configured, %d discovered): %s",
-			len(idle), ncclWorkerCount, configured, len(snapshot.GPUWorkers), strings.Join(unavailable, "; "))
-	}
-
-	sort.Slice(idle, func(i, j int) bool {
-		return idle[i].Name < idle[j].Name
-	})
-	return idle[:ncclWorkerCount], nil
 }
 
 func ncclTestCommand(workers []framework.WorkerInfo) string {
