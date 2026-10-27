@@ -1,6 +1,7 @@
 Feature: Slurm tree-topology scheduling
 
-  @gpu @tree_topology @soperator_version_>=5.0.0
+  # Sequential: Selects cross-leaf and same-leaf worker pairs outside the reservation pool.
+  @gpu @tree_topology @soperator_version_>=5.0.0 @sequential
   Scenario: A switch limit rejects a cross-leaf allocation
     Given the cluster is configured with a tree topology spanning multiple leaf switches
     And the operator published the topology config

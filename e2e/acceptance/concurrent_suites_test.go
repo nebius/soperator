@@ -57,7 +57,7 @@ func TestConcurrentSuitesRunEachSelectedScenarioExactlyOnce(t *testing.T) {
 			}
 		}
 	}
-	for _, path := range []string{"features/node_replacement.feature:3", "features/docker_containers.feature:36"} {
+	for _, path := range []string{"features/node_replacement.feature:3", "features/docker_containers.feature:38"} {
 		suite := SoperatorSuite("5.0.0")
 		suite.Source.Paths = []string{path}
 		suite.ExcludeUnstable = false
@@ -76,7 +76,7 @@ func TestConcurrentSuitesKeepGlobalAssertionsSerial(t *testing.T) {
 	suites := ConcurrentSuites(SoperatorSuite("5.0.0"), 8)
 	suites[0].ExcludeUnstable = false
 	serial := selectedScenarios(t, suites[0], "5.0.0")
-	for _, name := range []string{"The provisioned cluster is ready", "A custom Slurm setting", "A worker template update", "A maintenance event replaces a CPU worker", "Manage jail dry-run", "Restarting a worker keeps shared Slurm"} {
+	for _, name := range []string{"The provisioned cluster is ready", "A custom Slurm setting", "A worker template update"} {
 		found := false
 		for key := range serial {
 			found = found || strings.Contains(key, name)
@@ -89,7 +89,7 @@ func TestConcurrentSuiteDoesNotStartAfterSerialFailure(t *testing.T) {
 	var parallelRan atomic.Bool
 	suite := SuiteConfig{
 		Name:   "baseline",
-		Source: FeatureSource{FS: fstest.MapFS{"baseline.feature": &fstest.MapFile{Data: []byte("Feature: baseline\n  Scenario: serial\n    Given the baseline fails\n  @parallel\n  Scenario: parallel\n    Given the parallel check runs\n")}}, Paths: []string{"baseline.feature"}},
+		Source: FeatureSource{FS: fstest.MapFS{"baseline.feature": &fstest.MapFile{Data: []byte("Feature: baseline\n  @sequential\n  Scenario: serial\n    Given the baseline fails\n  Scenario: parallel\n    Given the parallel check runs\n")}}, Paths: []string{"baseline.feature"}},
 		StepRegistrars: []StepRegistrar{func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, _ framework.Runtime) {
 			sc.Step(`^the baseline fails$`, func() error { return fmt.Errorf("baseline unhealthy") })
 			sc.Step(`^the parallel check runs$`, func() { parallelRan.Store(true) })
@@ -106,13 +106,13 @@ func TestConcurrentSuitesPreserveHookAndStepSkips(t *testing.T) {
 	var skipCalls, passCalls, cleanupCalls atomic.Int32
 	var feature strings.Builder
 	feature.WriteString("Feature: skips\n")
-	for _, tags := range []string{"", "@parallel"} {
+	for _, tags := range []string{"@sequential", ""} {
 		fmt.Fprintf(&feature, "  %s @skip\n  Scenario: tagged %s\n    Given a skipped continuation runs\n", tags, tags)
 		for _, kind := range []string{"direct", "wrapped"} {
 			fmt.Fprintf(&feature, "  %s\n  Scenario: %s %s\n    Given a %s skip is returned\n    Then a skipped continuation runs\n", tags, kind, tags, kind)
 		}
 	}
-	feature.WriteString("  @parallel\n  Scenario: parallel continues\n    Given a passing check runs\n")
+	feature.WriteString("  Scenario: parallel continues\n    Given a passing check runs\n")
 	suite := SuiteConfig{
 		Name:   "skips",
 		Source: FeatureSource{FS: fstest.MapFS{"skips.feature": {Data: []byte(feature.String())}}, Paths: []string{"skips.feature"}},
@@ -144,7 +144,7 @@ func TestConcurrentSuitesDoNotHideCleanupFailureBehindSkip(t *testing.T) {
 	var parallelRan atomic.Bool
 	suite := SuiteConfig{
 		Name:   "skip-cleanup",
-		Source: FeatureSource{FS: fstest.MapFS{"skip.feature": {Data: []byte("Feature: cleanup\n  Scenario: skipped with cleanup failure\n    Given a skipped check leaves a cleanup failure\n  @parallel\n  Scenario: parallel\n    Given the parallel check runs\n")}}, Paths: []string{"skip.feature"}},
+		Source: FeatureSource{FS: fstest.MapFS{"skip.feature": {Data: []byte("Feature: cleanup\n  @sequential\n  Scenario: skipped with cleanup failure\n    Given a skipped check leaves a cleanup failure\n  Scenario: parallel\n    Given the parallel check runs\n")}}, Paths: []string{"skip.feature"}},
 		StepRegistrars: []StepRegistrar{func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, _ framework.Runtime) {
 			sc.Step(`^a skipped check leaves a cleanup failure$`, func(ctx context.Context) error {
 				framework.RecordWorkerCleanupError(ctx, fmt.Errorf("restore worker baseline"))
@@ -162,9 +162,9 @@ func TestConcurrentSuitesDoNotHideCleanupFailureBehindSkip(t *testing.T) {
 
 func TestGodogRunsSerialSuiteBeforeEightConcurrentScenarios(t *testing.T) {
 	var feature strings.Builder
-	feature.WriteString("Feature: scheduling\n  Scenario: serial\n    Given a scheduled check runs\n")
+	feature.WriteString("Feature: scheduling\n  @sequential\n  Scenario: serial\n    Given a scheduled check runs\n")
 	for i := range 8 {
-		fmt.Fprintf(&feature, "  @parallel\n  Scenario: parallel %d\n    Given a scheduled check runs\n", i)
+		fmt.Fprintf(&feature, "  Scenario: parallel %d\n    Given a scheduled check runs\n", i)
 	}
 	var active atomic.Int32
 	var serialFinished atomic.Bool

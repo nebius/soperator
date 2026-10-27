@@ -57,6 +57,7 @@ func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a replacement node joins the cluster$`, s.aReplacementNodeJoinsTheCluster)
 	sc.Step(`^the replacement node passes GPU validation$`, s.theReplacementNodePassesGPUValidation)
 	sc.Step(`^all pre-existing worker nodes are operational$`, s.allPreExistingWorkerNodesAreOperational)
+	sc.Step(`^the replacement CPU worker is operational$`, s.theReplacementCPUWorkerIsOperational)
 }
 
 func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
@@ -275,6 +276,10 @@ func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Cont
 
 func (s *NodeReplacement) allPreExistingWorkerNodesAreOperational(ctx context.Context) error {
 	return validateWorkersOperational(ctx, s.runtime, s.slurm, s.preExistingWorkers)
+}
+
+func (s *NodeReplacement) theReplacementCPUWorkerIsOperational(ctx context.Context) error {
+	return framework.RunTargetedWorkerSmoke(ctx, s.runtime, s.replacementWorker)
 }
 
 func (s *NodeReplacement) cancelJob(ctx context.Context, maintenanceJobID string) error {

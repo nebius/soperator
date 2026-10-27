@@ -30,6 +30,56 @@ func TestSharedFeaturesParseWithGherkin(t *testing.T) {
 	}
 }
 
+func TestSharedSequentialScenariosHaveSpecificReasons(t *testing.T) {
+	var sequential []string
+	for _, featurePath := range FeaturePaths() {
+		content, err := fs.ReadFile(acceptanceFeatures, featurePath)
+		require.NoError(t, err)
+		doc, err := gherkin.ParseGherkinDocument(strings.NewReader(string(content)), (&messages.Incrementing{}).NewId)
+		require.NoError(t, err)
+		for _, tag := range doc.Feature.Tags {
+			assert.NotContains(t, []string{"@parallel", "@sequential"}, tag.Name, "concurrency decisions must be scenario-level: %s", featurePath)
+		}
+		lines := strings.Split(string(content), "\n")
+		for _, child := range doc.Feature.Children {
+			if child.Scenario == nil {
+				continue
+			}
+			for _, tag := range child.Scenario.Tags {
+				assert.NotEqual(t, "@parallel", tag.Name, "scenarios are concurrent by default: %s", featurePath)
+				if tag.Name != "@sequential" {
+					continue
+				}
+				sequential = append(sequential, child.Scenario.Name)
+				require.Greater(t, int(tag.Location.Line), 1)
+				reason := strings.TrimSpace(lines[tag.Location.Line-2])
+				assert.True(t, strings.HasPrefix(reason, "# Sequential: ") && len(strings.TrimPrefix(reason, "# Sequential: ")) > 20,
+					"explain the concrete conflict immediately above @sequential: %s:%d", featurePath, tag.Location.Line)
+			}
+		}
+	}
+	assert.ElementsMatch(t, []string{
+		"The provisioned cluster is ready for acceptance tests",
+		"Docker containers can run over login SSH",
+		"Docker containers can run over SSH on <worker_type> workers",
+		"Enroot containers can run over SSH",
+		"Login pods scale up without automatic pod scale-down",
+		"A static NodeSet can transition to ephemeral mode and back",
+		"Installing and uninstalling cowsay preserves GPU tooling",
+		"Installing and uninstalling nvitop preserves GPU tooling",
+		"A custom Slurm setting is applied and restored",
+		"Tailscale login sidecars wait for authentication and persist their state",
+		"Partitions and workers use their configured topologies",
+		"Every configured topology can schedule a job",
+		"A job assigns task ranks in rendered block order",
+		"Blocks are sorted according to IB topology labels",
+		"A block topology schedules jobs after its base size changes",
+		"scontrol topology and SLURM_TOPOLOGY_ADDR agree across workers",
+		"A switch limit rejects a cross-leaf allocation",
+		"A worker template update preserves running jobs",
+	}, sequential)
+}
+
 func TestSharedHeavyScenarios(t *testing.T) {
 	var heavy []string
 	for _, path := range FeaturePaths() {

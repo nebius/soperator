@@ -1,5 +1,5 @@
 Feature: Node replacement
-  @heavy @gpu @unstable @soperator_version_>=5.0.0 @parallel
+  @heavy @gpu @unstable @soperator_version_>=5.0.0
   Scenario: A maintenance event replaces the selected worker node
     Given a test job is submitted and running on a GPU worker node
     When a maintenance event is triggered for that node
@@ -17,4 +17,4 @@ Feature: Node replacement
     When the test job is cancelled
     Then the old instance is removed
     And a replacement node joins the cluster
-    And all pre-existing worker nodes are operational
+    And the replacement CPU worker is operational

@@ -22,6 +22,8 @@ func ensureSSHTestUser(ctx context.Context, runtime framework.Runtime, userName 
 		quotedUserName,
 		quotedUserName,
 	)
+	// Hold the lock through key and group setup, not just the passwd entry creation.
+	command = "flock --wait 60 /tmp/soperator-e2e-createuser.lock bash -ec " + framework.ShellQuote(command)
 	if _, err := runtime.Jail().Run(ctx, command); err != nil {
 		return fmt.Errorf("create SSH test user %s: %w", userName, err)
 	}
@@ -221,6 +223,9 @@ func runInternalSSHAsTestUser(
 		quotedHost,
 		framework.ShellQuote(remoteCommand),
 	)
+	// Default SSH also writes known_hosts; serialize it with the preceding removal.
+	sshCommand = fmt.Sprintf("mkdir -p ~/.ssh && flock --wait %.0f ~/.ssh/.soperator-e2e-known-hosts.lock bash -ec %s",
+		timeout.Seconds(), framework.ShellQuote(sshCommand))
 	command := fmt.Sprintf(
 		"su - %s -c %s",
 		framework.ShellQuote(sshTestUserName),

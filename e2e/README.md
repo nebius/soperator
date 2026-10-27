@@ -86,11 +86,11 @@ when configured workers do not recover within the acquisition timeout. Scenarios
 workers also fail on partial degradation. CPU, GPU, and topology tags in feature
 files are descriptive only; no current runner or workflow consumes them.
 
-The CLI runs two suites in order: `soperator` contains unmarked scenarios and
-executes sequentially; `soperator-parallel` contains reviewed `@parallel`
-scenarios and uses native Godog concurrency. Both retain the same version,
-heavy, unstable and scenario-path filters. The marker is appended to existing
-tag lines so exact scenario selectors keep their line numbers.
+The CLI runs two suites in order: `soperator` contains `@sequential` scenarios
+and executes them one at a time; `soperator-parallel` contains all other scenarios
+and uses native Godog concurrency (four by default). Both retain the same version,
+heavy, unstable and scenario-path filters. Exact scenario selectors refer to the
+`Scenario:` or `Scenario Outline:` line in the selected checkout.
 If the sequential suite fails, the concurrent suite is not started against a
 potentially degraded shared baseline.
 
@@ -99,10 +99,20 @@ and reserves an entire worker set atomically. Waiting requests
 are considered in arrival order, but a request that cannot fit does not block
 an independent request. Generic allocations prefer CPU workers. Leases last
 through cleanup; failed cleanup or recovery quarantines the affected workers
-for the rest of the run. Shared configuration, SSH identity changes, cluster-wide
-assertions and system DaemonSet restarts remain in the sequential suite. A
+for the rest of the run. Shared configuration mutation, unsafe shared SSH identity
+changes, cluster-wide assertions and system DaemonSet restarts require `@sequential`
+unless their conflicts have been isolated. A
 scenario must acquire its complete set once; incremental lock upgrades are
 rejected. Host-wide faults require ownership of every worker on that host.
+
+For every new or changed scenario, review worker ownership, shared files and
+identities, job placement, cleanup, and cluster-wide assertions. Default concurrency
+is safe only when its full footprint is isolated. Read-only shared checks and
+multi-worker jobs can run concurrently when those conditions hold. Every
+`@sequential` tag must be scenario-level and have a `# Sequential: ...` comment
+immediately above its tag line explaining the concrete conflicting resource or
+assertion. Keep that reason current and remove the exclusion when it is resolved.
+See [AGENTS.md](AGENTS.md) for examples and the full review policy.
 
 For focused manual runs on a dev cluster, pass the scenario location:
 
@@ -251,13 +261,16 @@ respective tags. `SoperatorSuite` preserves heavy coverage for library callers;
 the standalone CLI explicitly excludes it unless `--run-heavy` is set.
 
 Library callers keep sequential behavior unless they set `SuiteConfig.Concurrency`.
-To reuse the same safe split, pass `acceptance.ConcurrentSuites(suite, 8)` as
+To reuse the same split, pass `acceptance.ConcurrentSuites(suite, 4)` as
 `RunnerConfig.Suites`. This also works with Managed-owned feature sources and
 step registrars. Set `RunnerConfig.WorkerAcquireTimeout` to override the default
 90-minute acquisition budget. Select workers through `WorkerSelector.Acquire`
 or its `Pick...Workers` wrappers; custom selectors can call `Reserve` before
 recording worker baselines. The runner supplies scenario ownership through the
 context and finalizes it after all registered cleanup hooks.
+Custom feature sources must review every unmarked scenario before opting in:
+only `@sequential` scenarios are excluded from concurrency. Existing callers
+that do not opt in remain sequential.
 When `OutputDir` is set, each scenario receives matching runner and jail paths
 through `framework.ScenarioArtifacts(ctx)`. Product-specific steps can write
 their own files directly to those paths without registering a collector.

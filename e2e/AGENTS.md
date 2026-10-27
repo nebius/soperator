@@ -132,10 +132,35 @@ The shared feature suite has four tag forms that affect execution:
 - exactly one scenario-level `@soperator_version_...` constraint;
 - optional `@heavy`;
 - optional `@unstable`.
-- optional `@parallel`, for reviewed worker-local scenarios. The standalone
-  runner executes unmarked scenarios sequentially before this concurrent suite.
-  Reserve every worker through the shared selector before use. Shared mutations
-  and cluster-wide assertions must remain unmarked. Keep leases through cleanup.
+- optional `@sequential`, for scenarios that require exclusive execution. The
+  standalone runner executes these first, one at a time, then runs all unmarked
+  scenarios concurrently (four by default). Do not use `@parallel`.
+
+Review concurrency for every new or changed scenario. Reserve the complete worker
+set through the shared selector before recording baselines or starting workloads,
+wait for busy or unhealthy configured workers, and retain leases through cleanup.
+Host-wide faults must own every worker on the affected host. Shared identities,
+files, jobs and artifacts must be isolated or have narrowly synchronized setup.
+
+Use `@sequential` when a concrete conflict remains: shared configuration or jail
+package mutation, shared login/system restarts, cluster-wide health assertions,
+or custom worker selection outside the reservation pool. A shared read, multiple
+workers, GPU usage, or a long runtime alone is not a reason to serialize a scenario.
+Never add the tag just to hide a failure or incomplete concurrency review.
+
+Every `@sequential` tag must be scenario-level and have a `# Sequential: ...`
+comment immediately above its tag line. Name the conflicting resource or assertion
+and explain why worker reservations do not currently isolate it. For example:
+
+```gherkin
+  # Sequential: Changes shared Slurm configuration used by every worker job.
+  @soperator_version_>=5.0.0 @sequential
+  Scenario: A custom Slurm setting is applied and restored
+```
+
+Keep the comment accurate when implementation changes; remove the tag and comment
+when the conflict is resolved. Outline examples share the scenario's decision.
+Run the feature-policy and concurrent-suite tests after changing membership.
 
 CPU, GPU, topology, and other descriptive tags are allowed, but no current
 runner or workflow consumes them. Ask whether the user wants these tags and

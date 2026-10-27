@@ -1,5 +1,6 @@
 Feature: Enroot containers
-  @soperator_version_>=5.0.0
+  # Sequential: Login and worker examples recreate and remove the same SSH identity.
+  @soperator_version_>=5.0.0 @sequential
   Scenario Outline: Enroot containers can run over SSH
     Given an Enroot SSH test user exists
     When the user imports an Enroot image over SSH on a <node> node
@@ -11,7 +12,7 @@ Feature: Enroot containers
       | login  |
       | worker |
 
-  @soperator_version_>=4.0.0 @parallel
+  @soperator_version_>=4.0.0
   Scenario: Enroot and Pyxis cache images and clean up runtime state
     Given a long-running Enroot container job is submitted on two workers
     When the Enroot container job is running
@@ -24,7 +25,7 @@ Feature: Enroot containers
     When the repeated Enroot container job is cancelled
     Then Enroot runtime state is cleaned up
 
-  @heavy @gpu @soperator_version_>=5.0.0 @parallel
+  @heavy @gpu @soperator_version_>=5.0.0
   Scenario: Enroot containers can access GPUs
     Given an Enroot GPU smoke job is submitted on one GPU worker
     Then the Enroot GPU smoke job succeeds and reports visible GPUs

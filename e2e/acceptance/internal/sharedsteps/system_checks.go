@@ -279,6 +279,9 @@ func (s *SystemChecks) kubeletIsStoppedOnTheSelectedWorkerKubernetesNode(ctx con
 	if !kubeobjects.NodeReady(k8sNode) {
 		return fmt.Errorf("selected Kubernetes node %s is not Ready", k8sNode.Name)
 	}
+	if err := framework.RequireReservedHost(ctx, s.kubectl, k8sNode.Name); err != nil {
+		return err
+	}
 	s.kubeletWorker = s.worker
 	s.kubeletWorkerPodName = pod.Name
 	s.kubeletK8sNodeName = k8sNode.Name

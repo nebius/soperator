@@ -1,5 +1,5 @@
 Feature: Job tmpfs volumes
-  @soperator_version_>=5.0.0 @parallel
+  @soperator_version_>=5.0.0
   Scenario: Concurrent jobs have isolated and accounted temporary memory
     Given generated job tmpfs is enabled
     And two tmpfs probe jobs run on the same worker

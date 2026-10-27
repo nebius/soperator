@@ -7,7 +7,7 @@ Feature: System checks
     Then the restarted worker pod is ready
     And the shared libslurm symlinks remained continuously readable
 
-  @soperator_version_>=4.0.0 @parallel
+  @soperator_version_>=4.0.0
   Scenario: Worker pod ephemeral storage pressure drains and recovers a Slurm node
     Given a healthy worker pod is selected
     When pod-local ephemeral storage is filled above the warning threshold

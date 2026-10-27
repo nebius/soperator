@@ -23,16 +23,16 @@ type SuiteConfig struct {
 	RequirePreviousSuccess bool
 }
 
-// ConcurrentSuites separates reviewed worker-local scenarios from exclusive ones.
-// The two suites execute sequentially; only @parallel scenarios run concurrently.
+// ConcurrentSuites runs @sequential scenarios first, then all remaining scenarios
+// with native Godog concurrency. Worker workloads must reserve their complete set.
 func ConcurrentSuites(suite SuiteConfig, concurrency int) []SuiteConfig {
 	serial, parallel := suite, suite
 	serial.Concurrency = 1
 	parallel.Concurrency = concurrency
 	parallel.RequirePreviousSuccess = true
 	parallel.Name += "-parallel"
-	serial.Tags = combineTags(suite.Tags, "~@parallel")
-	parallel.Tags = combineTags(suite.Tags, "@parallel")
+	serial.Tags = combineTags(suite.Tags, "@sequential")
+	parallel.Tags = combineTags(suite.Tags, "~@sequential")
 	return []SuiteConfig{serial, parallel}
 }
 

@@ -1,12 +1,14 @@
 Feature: Docker containers
-  @soperator_version_>=5.0.0
+  # Sequential: Shares a fixed SSH key with worker SSH examples; their setup and cleanup replace the same credentials.
+  @soperator_version_>=5.0.0 @sequential
   Scenario: Docker containers can run over login SSH
     Given login Docker is enabled
     And a Docker SSH test user exists
     When the user runs Docker lifecycle commands over SSH on the login node
     Then Docker uses the login proxy, image storage, and the user's cgroup
 
-  @soperator_version_>=5.0.0
+  # Sequential: CPU and GPU examples share a fixed SSH key; concurrent cleanup can remove another example's credentials.
+  @soperator_version_>=5.0.0 @sequential
   Scenario Outline: Docker containers can run over SSH on <worker_type> workers
     Given a Docker SSH test user exists
     When the user runs a Docker container over SSH on a <worker_type> worker node
@@ -17,7 +19,7 @@ Feature: Docker containers
       | CPU         |
       | GPU         |
 
-  @soperator_version_>=4.0.0,<5.0.0 @parallel
+  @soperator_version_>=4.0.0,<5.0.0
   Scenario Outline: Docker container lifecycle on <worker_type> workers uses local storage
     Given a long-running Docker container job is submitted on two <worker_type> workers
     When the Docker container job is running
@@ -32,7 +34,7 @@ Feature: Docker containers
       | CPU         |
       | GPU         |
 
-  @soperator_version_>=5.0.0 @parallel
+  @soperator_version_>=5.0.0
   Scenario Outline: Docker container lifecycle on <worker_type> workers uses local storage and the Slurm job cgroup
     Given a long-running Docker container job is submitted on two <worker_type> workers
     When the Docker container job is running
@@ -48,7 +50,7 @@ Feature: Docker containers
       | CPU         |
       | GPU         |
 
-  @heavy @gpu @soperator_version_>=5.0.0 @parallel
+  @heavy @gpu @soperator_version_>=5.0.0
   Scenario: Docker containers can access GPUs
     Given a Docker GPU smoke job is submitted on one GPU worker
     Then the Docker GPU smoke job succeeds and reports visible GPUs
