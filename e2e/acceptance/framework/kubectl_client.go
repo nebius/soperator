@@ -33,16 +33,18 @@ type NodeSetInfo struct {
 }
 
 type SlurmClusterInfo struct {
-	Name                   string
-	Namespace              string
-	AccountingEnabled      bool
-	LoginDockerEnabled     bool
-	LoginTailscaleEnabled  bool
-	LoginJailSubMounts     []JailSubMountInfo
-	PAMSlurmAdoptEnabled   bool
-	NamespaceConfigEnabled bool
-	NamespaceConfigMapName string
-	CustomSlurmConfig      *string
+	Name                      string
+	Namespace                 string
+	AccountingEnabled         bool
+	LoginDockerEnabled        bool
+	LoginTailscaleEnabled     bool
+	LoginJailSubMounts        []JailSubMountInfo
+	PAMSlurmAdoptEnabled      bool
+	PAMSlurmAdoptExemptUsers  []string
+	PAMSlurmAdoptExemptGroups []string
+	NamespaceConfigEnabled    bool
+	NamespaceConfigMapName    string
+	CustomSlurmConfig         *string
 }
 
 type JailSubMountInfo struct {
@@ -85,16 +87,18 @@ func (c *KubectlClient) SlurmCluster(ctx context.Context, name string) (SlurmClu
 	}
 
 	return SlurmClusterInfo{
-		Name:                   cluster.Metadata.Name,
-		Namespace:              cluster.Metadata.Namespace,
-		AccountingEnabled:      cluster.Spec.SlurmNodes.Accounting.Enabled,
-		LoginDockerEnabled:     cluster.Spec.SlurmNodes.Login.Docker.Enabled,
-		LoginTailscaleEnabled:  tailscaleEnabled,
-		LoginJailSubMounts:     jailSubMountInfos(cluster.Spec.SlurmNodes.Login.Volumes.JailSubMounts),
-		PAMSlurmAdoptEnabled:   cluster.Spec.PAMSlurmAdopt.Enabled,
-		NamespaceConfigEnabled: namespaceConfigEnabled(cluster.Spec.NamespaceConfig),
-		NamespaceConfigMapName: namespaceConfigMapName(cluster.Spec.NamespaceConfig),
-		CustomSlurmConfig:      cluster.Spec.CustomSlurmConfig,
+		Name:                      cluster.Metadata.Name,
+		Namespace:                 cluster.Metadata.Namespace,
+		AccountingEnabled:         cluster.Spec.SlurmNodes.Accounting.Enabled,
+		LoginDockerEnabled:        cluster.Spec.SlurmNodes.Login.Docker.Enabled,
+		LoginTailscaleEnabled:     tailscaleEnabled,
+		LoginJailSubMounts:        jailSubMountInfos(cluster.Spec.SlurmNodes.Login.Volumes.JailSubMounts),
+		PAMSlurmAdoptEnabled:      cluster.Spec.PAMSlurmAdopt.Enabled,
+		PAMSlurmAdoptExemptUsers:  cluster.Spec.PAMSlurmAdopt.ExemptUsers,
+		PAMSlurmAdoptExemptGroups: cluster.Spec.PAMSlurmAdopt.ExemptGroups,
+		NamespaceConfigEnabled:    namespaceConfigEnabled(cluster.Spec.NamespaceConfig),
+		NamespaceConfigMapName:    namespaceConfigMapName(cluster.Spec.NamespaceConfig),
+		CustomSlurmConfig:         cluster.Spec.CustomSlurmConfig,
 	}, nil
 }
 

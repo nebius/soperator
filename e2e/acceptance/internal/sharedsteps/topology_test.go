@@ -189,7 +189,6 @@ func TestParseTopologyEntriesReadsTopoconfTheSameWay(t *testing.T) {
 		"block-nvl72=block:[2]:false,flat=flat:[]:true,tree-ib=tree:[]:false",
 		topologyStructure(rendered))
 	assert.Equal(t, topologyStructure(rendered), topologyStructure(loaded))
-	assert.Equal(t, topologyReconfigureStructure(rendered), topologyReconfigureStructure(loaded))
 }
 
 // slurmctld prints the cluster default first in topoconf whatever the file order was, so a GPU
@@ -208,19 +207,6 @@ func TestTopologyStructureIgnoresEntryOrder(t *testing.T) {
 
 	loaded[1].ClusterDefault = true
 	assert.NotEqual(t, topologyStructure(rendered), topologyStructure(loaded), "a settings difference is still reported")
-}
-
-func TestTopologyReconfigureStructureIncludesBlockOrder(t *testing.T) {
-	before := []topologyEntry{{Name: "blocks", Kind: topologyKindBlock, Blocks: []topologyUnit{
-		{Name: "b1", Nodes: "worker-0"}, {Name: "b2", Nodes: "worker-1"},
-	}}}
-	after := []topologyEntry{{Name: "blocks", Kind: topologyKindBlock, Blocks: []topologyUnit{
-		{Name: "b2", Nodes: "worker-1"}, {Name: "b1", Nodes: "worker-0"},
-	}}}
-	assert.Equal(t, topologyStructure(before), topologyStructure(after), "settings comparisons allow an in-flight reorder")
-	assert.NotEqual(t, topologyReconfigureStructure(before), topologyReconfigureStructure(after))
-	after[0].Blocks = []topologyUnit{{Name: "b1", Nodes: "worker-[0-3]"}, {Name: "b2", Nodes: "worker-4"}}
-	assert.Equal(t, topologyReconfigureStructure(before), topologyReconfigureStructure(after))
 }
 
 func TestValidateNoWorkersUnderUnknown(t *testing.T) {

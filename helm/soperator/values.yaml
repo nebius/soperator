@@ -7,9 +7,10 @@ controllerManager:
       - --leader-elect
       - --rest-config-qps=30
       - --rest-config-burst=50
-      # Rate limit for Slurm reconfigures caused by topology changes that only reorder or remove blocks
-      # - --topology-deferrable-reconfigure-interval=11m
-      # - --topology-deferrable-reconfigure-burst=2
+      # Deferral of Slurm reconfigures caused by topology changes that only reorder leaf switches or blocks
+      # - --topology-reconfigure-cooldown=15m
+      # - --topology-reconfigure-debounce=1m
+      # - --topology-reconfigure-debounce-cap=15m
     controllersEnabled:
       cluster: true
       nodeconfigurator: true

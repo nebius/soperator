@@ -24,6 +24,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	fakes "nebius.ai/slurm-operator/internal/controller/sconfigcontroller/fake"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
+	"nebius.ai/slurm-operator/internal/utils/jailedpayload"
 )
 
 const (
@@ -196,7 +197,7 @@ func markApplied(t *testing.T, g *aggregatedGroup, name, data, path string) {
 	jc := &slurmv1alpha1.JailedConfig{}
 	require.NoError(t, g.client.Get(context.Background(),
 		types.NamespacedName{Name: name, Namespace: testNamespace}, jc))
-	jc.Status.AppliedHash = payloadHash(map[string]JailedFile{
+	jc.Status.AppliedHash = jailedpayload.Hash(map[string]jailedpayload.File{
 		path: {Data: []byte(data), Mode: slurmv1alpha1.DefaultMode},
 	})
 	meta.SetStatusCondition(&jc.Status.Conditions, metav1.Condition{

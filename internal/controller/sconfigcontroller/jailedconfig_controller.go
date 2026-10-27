@@ -18,14 +18,10 @@ package sconfigcontroller
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
-	"sort"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,6 +47,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/logfield"
 	"nebius.ai/slurm-operator/internal/slurmapi"
+	"nebius.ai/slurm-operator/internal/utils/jailedpayload"
 )
 
 // ControllerName is the controller-runtime name of the JailedConfig reconciler.
@@ -94,82 +90,6 @@ type realClock struct{}
 var _ Clock = realClock{}
 
 func (_ realClock) After(duration time.Duration) <-chan time.Time { return time.After(duration) }
-
-// mostly copy-pasted from k8s ConfigMap volumes
-// See https://github.com/kubernetes/kubernetes/blob/b266ac2c3e42c2c4843f81e20213d2b2f43e450a/pkg/volume/configmap/configmap.go/
-
-type JailedFile struct {
-	Data []byte
-	Mode int32
-}
-
-func makePayload(mappings []corev1.KeyToPath, configMap *corev1.ConfigMap, defaultMode *int32) (map[string]JailedFile, error) {
-	if defaultMode == nil {
-		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
-	}
-
-	payload := make(map[string]JailedFile, len(configMap.Data)+len(configMap.BinaryData))
-	var jailedFile JailedFile
-
-	if len(mappings) == 0 {
-		for name, data := range configMap.Data {
-			jailedFile.Data = []byte(data)
-			jailedFile.Mode = *defaultMode
-			payload[name] = jailedFile
-		}
-		for name, data := range configMap.BinaryData {
-			jailedFile.Data = data
-			jailedFile.Mode = *defaultMode
-			payload[name] = jailedFile
-		}
-	} else {
-		for _, ktp := range mappings {
-			if stringData, ok := configMap.Data[ktp.Key]; ok {
-				jailedFile.Data = []byte(stringData)
-			} else if binaryData, ok := configMap.BinaryData[ktp.Key]; ok {
-				jailedFile.Data = binaryData
-			} else {
-				return nil, fmt.Errorf("JailedConfig items references non-existent config key: %s", ktp.Key)
-			}
-
-			if ktp.Mode != nil {
-				jailedFile.Mode = *ktp.Mode
-			} else {
-				jailedFile.Mode = *defaultMode
-			}
-			payload[ktp.Path] = jailedFile
-		}
-	}
-
-	return payload, nil
-}
-
-// validatePayloadPath should validate path from spec PoV. So, relative paths are a spec issue, but
-// path traversals and symlinks are implementation limitations, and permissions are just current state
-func validatePayloadPath(path string) error {
-	if !filepath.IsAbs(path) {
-		return fmt.Errorf("must be absolute")
-	}
-	return nil
-}
-
-// payloadHash fingerprints what would be written to the jail for a JailedConfig. It covers the
-// rendered payload rather than the ConfigMap alone, so changes to spec.Items or defaultMode count
-// as changes too.
-func payloadHash(payload map[string]JailedFile) string {
-	paths := make([]string, 0, len(payload))
-	for path := range payload {
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
-
-	hash := sha256.New()
-	for _, path := range paths {
-		fmt.Fprintf(hash, "%s\x00%d\x00%d\x00", path, payload[path].Mode, len(payload[path].Data))
-		hash.Write(payload[path].Data)
-	}
-	return hex.EncodeToString(hash.Sum(nil))
-}
 
 // setAppliedHash records the payload as applied. It runs only once the files are written and, when
 // the config asked for them, its update actions have completed, so a failure is retried instead of
@@ -274,20 +194,9 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 		return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
 	}
 
-	defaultMode := jailedConfig.Spec.DefaultMode
-	if defaultMode == nil {
-		defaultMode = ptr.To(slurmv1alpha1.DefaultMode)
-	}
-
-	jailPayload, err := makePayload(jailedConfig.Spec.Items, configMap, defaultMode)
+	jailPayload, err := jailedpayload.Make(&jailedConfig.Spec, configMap)
 	if err != nil {
 		return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("making JailedConfig payload: %w", err))
-	}
-
-	for path := range jailPayload {
-		if err := validatePayloadPath(path); err != nil {
-			return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("invalid config path %q: %w", path, err))
-		}
 	}
 
 	logger.V(1).Info("Going to write files", logfield.JailedConfigFilesCount, len(jailPayload))
@@ -326,7 +235,7 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 
 	logger.V(1).Info("Finished syncing caches for written files")
 
-	hash := payloadHash(jailPayload)
+	hash := jailedpayload.Hash(jailPayload)
 
 	if len(jailedConfig.Spec.UpdateActions) == 0 {
 		logger.V(1).Info("No update actions specified, skipping further processing")
@@ -480,24 +389,13 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 			return ctrl.Result{}, fmt.Errorf("getting ConfigMap %s for %s/%s: %w", jailedConfig.Spec.ConfigMap.Name, jailedConfig.Namespace, jailedConfig.Name, err)
 		}
 
-		defaultMode := jailedConfig.Spec.DefaultMode
-		if defaultMode == nil {
-			defaultMode = ptr.To(slurmv1alpha1.DefaultMode)
-		}
-
-		jailPayload, err := makePayload(jailedConfig.Spec.Items, configMap, defaultMode)
+		jailPayload, err := jailedpayload.Make(&jailedConfig.Spec, configMap)
 		if err != nil {
 			return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("making JailedConfig payload for %s/%s: %w", jailedConfig.Namespace, jailedConfig.Name, err))
 		}
 
-		for path := range jailPayload {
-			if err := validatePayloadPath(path); err != nil {
-				return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("invalid config path %q in %s/%s: %w", path, jailedConfig.Namespace, jailedConfig.Name, err))
-			}
-		}
-
 		totalFilesCount += len(jailPayload)
-		writtenHashes[jailedConfig.Name] = payloadHash(jailPayload)
+		writtenHashes[jailedConfig.Name] = jailedpayload.Hash(jailPayload)
 
 		for path, payload := range jailPayload {
 			err = filesBatch.Replace(path, payload.Data, os.FileMode(payload.Mode))
