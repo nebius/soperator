@@ -52,7 +52,7 @@ def parameters(context, include_resolved_profile=False):
     values.extend(
         [
             ("Unstable tests", context["RUN_UNSTABLE_TESTS"]),
-            ("Essential tests only", context["RUN_ESSENTIAL_TESTS"]),
+            ("Heavy tests", context["RUN_HEAVY"]),
         ]
     )
     if context.get("SCENARIOS", "").strip():
@@ -60,20 +60,43 @@ def parameters(context, include_resolved_profile=False):
     return "\n".join(f"- {name}: {inline_code(value)}" for name, value in values)
 
 
-def render_start(context):
-    return "\n".join(
-        [
-            marker(context),
-            "### ⏳ E2E running",
-            "",
-            "E2E was dispatched with:",
-            "",
-            parameters(context),
-            "",
-            f"[Workflow run]({run_url(context)})",
-            "",
-        ]
-    )
+def render_start(context, build=None, phase="preparing"):
+    titles = {
+        "preparing": "### ⏳ E2E preparing",
+        "waiting": "### ⏳ E2E waiting for build",
+        "running": "### 🏃 E2E running",
+    }
+    sections = [
+        marker(context),
+        titles[phase],
+        "",
+        "E2E was dispatched with:",
+        "",
+        parameters(context, include_resolved_profile=phase == "running"),
+    ]
+    if build:
+        link = f"[build {build['id']}]({build['html_url']}) at {inline_code(build['head_sha'])}"
+        if phase == "waiting":
+            sections.extend(["", f"Waiting up to one hour for {link}."])
+        else:
+            sections.extend(["", f"Selected {link}."])
+            if phase == "preparing":
+                sections.extend(["", "Build is ready; waiting for an E2E profile and execution slot."])
+    sections.extend(["", f"[Workflow run]({run_url(context)})", ""])
+    return "\n".join(sections)
+
+
+def render_waiting(context, build):
+    return render_start(context, build, phase="waiting")
+
+
+def render_running(context):
+    build = {
+        "id": context["BUILD_RUN_ID"],
+        "html_url": context["BUILD_URL"],
+        "head_sha": context["BUILD_SHA"],
+    }
+    return render_start(context, build, phase="running")
 
 
 def find_job(jobs, name=None, prefix=None):
@@ -109,11 +132,13 @@ def acceptance_step_number(job):
 
 
 def result_header(context):
-    results = (context["RESOLVE_RESULT"], context["E2E_RESULT"])
-    if results == ("success", "success"):
-        return "### ✅ E2E passed"
+    results = (context.get("BUILD_RESULT", "success"), context["RESOLVE_RESULT"], context["E2E_RESULT"])
     if "cancelled" in results:
         return "### ⏹️ E2E cancelled"
+    if context.get("BUILD_STATUS") == "skipped":
+        return "### ⏭️ E2E skipped"
+    if results == ("success", "success", "success"):
+        return "### ✅ E2E passed"
     return "### ❌ E2E failed"
 
 
@@ -130,13 +155,16 @@ def acceptance_result(context, summary):
 
 
 def render_final(context, jobs, acceptance_summary):
+    build_job = find_job(jobs, name="resolve-build")
     resolve_job = find_job(jobs, name="resolve-profile")
     e2e_job = find_job(jobs, prefix="e2e-test (")
     acceptance_number = acceptance_step_number(e2e_job)
 
     before_failure = None
     after_failure = None
-    if context["RESOLVE_RESULT"] != "success":
+    if context.get("BUILD_RESULT", "success") != "success":
+        before_failure = first_unsuccessful_step(build_job) or "resolve-build"
+    elif context["RESOLVE_RESULT"] != "success":
         before_failure = first_unsuccessful_step(resolve_job) or "resolve-profile"
     elif acceptance_number is None:
         before_failure = first_unsuccessful_step(e2e_job) or "e2e-test"
@@ -153,7 +181,12 @@ def render_final(context, jobs, acceptance_summary):
         parameters(context, include_resolved_profile=True),
     ]
 
-    if before_failure:
+    if context.get("BUILD_URL"):
+        sections.extend(["", f"[Selected build]({context['BUILD_URL']}) at {inline_code(context.get('BUILD_SHA', ''))}"])
+
+    if context.get("BUILD_STATUS") == "skipped":
+        sections.extend(["", context["BUILD_REASON"], "", "Acceptance tests: not run"])
+    elif before_failure:
         sections.extend(
             [
                 "",
@@ -188,13 +221,14 @@ def render_final(context, jobs, acceptance_summary):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("phase", choices=("start", "final"))
+    parser.add_argument("phase", choices=("start", "running", "final"))
     parser.add_argument("--jobs")
     parser.add_argument("--acceptance-summary")
     args = parser.parse_args()
 
-    if args.phase == "start":
-        print(render_start(os.environ), end="")
+    if args.phase in ("start", "running"):
+        render = render_start if args.phase == "start" else render_running
+        print(render(os.environ), end="")
         return
 
     with open(args.jobs) as jobs_file:

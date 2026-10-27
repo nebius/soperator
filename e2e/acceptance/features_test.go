@@ -30,6 +30,34 @@ func TestSharedFeaturesParseWithGherkin(t *testing.T) {
 	}
 }
 
+func TestSharedHeavyScenarios(t *testing.T) {
+	var heavy []string
+	for _, path := range FeaturePaths() {
+		content, err := fs.ReadFile(acceptanceFeatures, path)
+		require.NoError(t, err)
+		assert.NotContains(t, string(content), "@essential")
+		doc, err := gherkin.ParseGherkinDocument(strings.NewReader(string(content)), (&messages.Incrementing{}).NewId)
+		require.NoError(t, err)
+		for _, child := range doc.Feature.Children {
+			if child.Scenario == nil {
+				continue
+			}
+			for _, tag := range child.Scenario.Tags {
+				if tag.Name == "@heavy" {
+					heavy = append(heavy, child.Scenario.Name)
+				}
+			}
+		}
+	}
+	assert.ElementsMatch(t, []string{
+		"A maintenance event replaces the selected worker node",
+		"A maintenance event replaces a CPU worker node when CPU and GPU workers exist",
+		"An MK8s node group update preserves running jobs",
+		"A worker update preserves maintenance drains before and during handoff",
+		"Non-responding kubelet recreates a Kubernetes node and recovers the worker",
+	}, heavy)
+}
+
 func TestSharedFeaturesHaveValidVersionTags(t *testing.T) {
 	suite := SoperatorSuite("5.0.0")
 	runner, err := NewRunner(RunnerConfig{

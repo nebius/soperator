@@ -1,5 +1,5 @@
 Feature: Node replacement
-  @essential @gpu @unstable @soperator_version_>=5.0.0
+  @heavy @gpu @unstable @soperator_version_>=5.0.0
   Scenario: A maintenance event replaces the selected worker node
     Given a test job is submitted and running on a GPU worker node
     When a maintenance event is triggered for that node
@@ -9,7 +9,7 @@ Feature: Node replacement
     And a replacement node joins the cluster
     And the replacement node passes GPU validation
 
-  @cpu @gpu @unstable @soperator_version_>=5.0.0
+  @heavy @cpu @gpu @unstable @soperator_version_>=5.0.0
   Scenario: A maintenance event replaces a CPU worker node when CPU and GPU workers exist
     Given a test job is submitted and running on a CPU worker node
     When a maintenance event is triggered for that node

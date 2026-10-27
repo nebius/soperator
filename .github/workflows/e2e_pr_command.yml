@@ -56,9 +56,9 @@ jobs:
             exit 1
           }
 
-          usage='Usage: `/e2e [terraform-branch] [--scenarios="<selectors>"]` or `/e2e-essential [terraform-branch] [--scenarios="<selectors>"]`. Separate selectors with commas, semicolons, or whitespace. Double quotes are optional for lists without whitespace. Example: `/e2e --scenarios="features/internal_ssh.feature:3, features/observability.feature"`.'
+          usage='Usage: `/e2e [terraform-branch] [--scenarios="<selectors>"]` or `/e2e-full [terraform-branch] [--scenarios="<selectors>"]`. Separate selectors with commas, semicolons, or whitespace. Double quotes are optional for lists without whitespace. Example: `/e2e --scenarios="features/internal_ssh.feature:3, features/observability.feature"`.'
           comment_body="${COMMENT_BODY//[[:space:]]/ }"
-          request_pattern="^/(e2e-essential|e2e)([[:blank:]]+([^[:space:]\"-][^[:space:]\"]*))?([[:blank:]]+--scenarios=(\"([^\"]*)\"|([^[:space:]\"']*)))?[[:blank:]]*$"
+          request_pattern="^/(e2e-full|e2e)([[:blank:]]+([^[:space:]\"-][^[:space:]\"]*))?([[:blank:]]+--scenarios=(\"([^\"]*)\"|([^[:space:]\"']*)))?[[:blank:]]*$"
           if [[ "$comment_body" =~ $request_pattern ]]; then
             e2e_command="${BASH_REMATCH[1]}"
             terraform_ref="${BASH_REMATCH[3]:-main}"
@@ -67,9 +67,9 @@ jobs:
             fail_with_comment "$usage"
           fi
 
-          run_essential_tests=false
-          if [[ "$e2e_command" == "e2e-essential" ]]; then
-            run_essential_tests=true
+          run_heavy=false
+          if [[ "$e2e_command" == "e2e-full" ]]; then
+            run_heavy=true
           fi
 
           if ! git check-ref-format --branch "$terraform_ref" >/dev/null 2>&1; then
@@ -78,6 +78,7 @@ jobs:
 
           pr=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER")
           pr_state=$(jq -r '.state' <<<"$pr")
+          head_sha=$(jq -r '.head.sha' <<<"$pr")
           head_ref=$(jq -r '.head.ref' <<<"$pr")
           head_repo=$(jq -r '.head.repo.full_name' <<<"$pr")
 
@@ -97,8 +98,9 @@ jobs:
 
           {
             echo "head_ref=$head_ref"
+            echo "head_sha=$head_sha"
             echo "terraform_ref=$terraform_ref"
-            echo "run_essential_tests=$run_essential_tests"
+            echo "run_heavy=$run_heavy"
             echo "scenarios=$scenarios"
           } >> "$GITHUB_OUTPUT"
 
@@ -106,8 +108,9 @@ jobs:
         shell: bash
         env:
           HEAD_REF: ${{ steps.request.outputs.head_ref }}
+          HEAD_SHA: ${{ steps.request.outputs.head_sha }}
           TERRAFORM_REF: ${{ steps.request.outputs.terraform_ref }}
-          RUN_ESSENTIAL_TESTS: ${{ steps.request.outputs.run_essential_tests }}
+          RUN_HEAVY: ${{ steps.request.outputs.run_heavy }}
           SCENARIOS: ${{ steps.request.outputs.scenarios }}
         run: |
           if ! gh workflow run e2e_test.yml \
@@ -115,9 +118,10 @@ jobs:
             --ref "$HEAD_REF" \
             -f "terraform_repo_ref=$TERRAFORM_REF" \
             -f "soperator_e2e_repo_branch=$HEAD_REF" \
+            -f "soperator_build_sha=$HEAD_SHA" \
             -f profile=@auto-gpu \
             -f run_unstable_tests=false \
-            -f "run_essential_tests=$RUN_ESSENTIAL_TESTS" \
+            -f "run_heavy=$RUN_HEAVY" \
             -f "scenarios=$SCENARIOS" \
             -f is_scheduled=false \
             -f "pr_number=$PR_NUMBER"; then

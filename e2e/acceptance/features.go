@@ -3,10 +3,22 @@ package acceptance
 import (
 	"embed"
 	"io/fs"
+
+	"github.com/nebius/soperator/e2e/acceptance/internal/versionfilter"
 )
 
 //go:embed features/*.feature
 var acceptanceFeatures embed.FS
+
+// NormalizeScenarioPaths resolves feature-relative, repository-relative, and absolute
+// path aliases to embedded shared scenarios, preserving optional scenario lines.
+func NormalizeScenarioPaths(paths []string) ([]string, error) {
+	features, err := fs.Glob(acceptanceFeatures, "features/*.feature")
+	if err != nil {
+		return nil, err
+	}
+	return versionfilter.NormalizeFeatureLocations(paths, features)
+}
 
 // FeatureSource describes the feature files Godog should run.
 type FeatureSource struct {

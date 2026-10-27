@@ -20,6 +20,11 @@ on:
         required: false
         default: ""
         type: string
+      soperator_build_sha:
+        description: "Build commit override (defaults to the selected build branch head)"
+        required: false
+        default: ""
+        type: string
       soperator_e2e_repo_branch:
         description: "E2E repo branch"
         required: false
@@ -47,8 +52,8 @@ on:
         required: false
         default: "false"
         type: string
-      run_essential_tests:
-        description: "Run only acceptance scenarios tagged @essential"
+      run_heavy:
+        description: "Include acceptance scenarios tagged @heavy"
         required: false
         default: "false"
         type: string
@@ -66,6 +71,10 @@ on:
 permissions:
   contents: read
   actions: write
+
+env:
+  RUN_UNSTABLE_TESTS: ${{ inputs.is_scheduled != 'true' && inputs.run_unstable_tests || 'false' }}
+  RUN_HEAVY: ${{ inputs.is_scheduled == 'true' && 'true' || inputs.run_heavy || 'false' }}
 
 jobs:
   report-pr-start:
@@ -94,8 +103,6 @@ jobs:
           TERRAFORM_BRANCH: ${{ inputs.terraform_repo_ref || github.ref_name }}
           SOPERATOR_E2E_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
           REQUESTED_PROFILE: ${{ inputs.profile }}
-          RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
-          RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
           SCENARIOS: ${{ inputs.scenarios }}
         run: |
           marker="<!-- soperator-e2e-run:${GITHUB_RUN_ID} -->"
@@ -119,7 +126,51 @@ jobs:
 
           echo "comment_id=$(jq -r '.id' <<<"$response")" >> "$GITHUB_OUTPUT"
 
+  resolve-build:
+    needs: report-pr-start
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    outputs:
+      status: ${{ steps.select.outputs.status }}
+      reason: ${{ steps.select.outputs.reason }}
+      run_id: ${{ steps.select.outputs.run_id }}
+      head_sha: ${{ steps.select.outputs.head_sha }}
+      created_at: ${{ steps.select.outputs.created_at }}
+      html_url: ${{ steps.select.outputs.html_url }}
+      soperator_version: ${{ steps.select.outputs.soperator_version }}
+      soperator_unstable: ${{ steps.select.outputs.soperator_unstable }}
+      nfs_version: ${{ steps.select.outputs.nfs_version }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      IS_SCHEDULED: ${{ inputs.is_scheduled }}
+      TARGET_BRANCH: ${{ inputs.soperator_build_branch || github.ref_name }}
+      TARGET_SHA: ${{ inputs.soperator_build_sha || ((inputs.soperator_build_branch == '' || inputs.soperator_build_branch == github.ref_name) && github.sha) || '' }}
+      COMMENT_ID: ${{ needs.report-pr-start.outputs.comment_id }}
+      SOPERATOR_BRANCH: ${{ github.ref_name }}
+      SOPERATOR_BUILD_BRANCH: ${{ inputs.soperator_build_branch || github.ref_name }}
+      TERRAFORM_BRANCH: ${{ inputs.terraform_repo_ref || github.ref_name }}
+      SOPERATOR_E2E_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
+      REQUESTED_PROFILE: ${{ inputs.profile }}
+      SCENARIOS: ${{ inputs.scenarios }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Select build
+        id: select
+        shell: bash
+        run: python3 .github/scripts/select_e2e_build.py
+
   resolve-profile:
+    needs: resolve-build
+    if: ${{ !cancelled() && needs.resolve-build.outputs.status == 'ready' }}
     runs-on: ubuntu-24.04
     environment: e2e
     # The selector waits here, outside the e2e-test concurrency group, until a
@@ -218,7 +269,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   e2e-test:
-    needs: resolve-profile
+    needs: [report-pr-start, resolve-build, resolve-profile]
+    if: ${{ !cancelled() && needs.resolve-build.outputs.status == 'ready' && needs.resolve-profile.result == 'success' }}
     name: e2e-test (${{ needs.resolve-profile.outputs.profile_name }})
     outputs:
       acceptance_outcome: ${{ steps.acceptance.outcome }}
@@ -233,6 +285,11 @@ jobs:
 
     environment: e2e
 
+    permissions:
+      contents: read
+      actions: write
+      pull-requests: write
+
     env:
       PATH_TO_INSTALLATION: "${{ github.workspace }}/terraform-repo/soperator/installations/example"
       TERRAFORM_REPO: "nebius/nebius-solutions-library"
@@ -243,9 +300,10 @@ jobs:
       O11Y_ACCESS_TOKEN: ${{ secrets.E2E_O11Y_ACCESS_TOKEN }}
       PROFILE_NAME: ${{ needs.resolve-profile.outputs.profile_name }}
       E2E_PROFILE_YAML: ${{ needs.resolve-profile.outputs.profile_yaml }}
-      RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
-      RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
       SCENARIOS: ${{ inputs.scenarios }}
+      SOPERATOR_VERSION: ${{ needs.resolve-build.outputs.soperator_version }}
+      SOPERATOR_UNSTABLE: ${{ needs.resolve-build.outputs.soperator_unstable }}
+      NFS_VERSION: ${{ needs.resolve-build.outputs.nfs_version }}
       SLURM_CLUSTER_NAME: "soperator"
       E2E_ARTIFACTS_DIR: "${{ github.workspace }}/e2e-artifacts"
 
@@ -254,6 +312,28 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+
+      - name: Report E2E running to PR
+        if: inputs.pr_number != '' && needs.report-pr-start.outputs.comment_id != ''
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMENT_ID: ${{ needs.report-pr-start.outputs.comment_id }}
+          SOPERATOR_BRANCH: ${{ github.ref_name }}
+          TERRAFORM_BRANCH: ${{ inputs.terraform_repo_ref || github.ref_name }}
+          SOPERATOR_E2E_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
+          REQUESTED_PROFILE: ${{ inputs.profile }}
+          RESOLVED_PROFILE: ${{ needs.resolve-profile.outputs.profile_name }}
+          BUILD_RUN_ID: ${{ needs.resolve-build.outputs.run_id }}
+          BUILD_URL: ${{ needs.resolve-build.outputs.html_url }}
+          BUILD_SHA: ${{ needs.resolve-build.outputs.head_sha }}
+        run: |
+          python3 .github/scripts/e2e_pr_comment.py running > /tmp/e2e-pr-running.md
+          payload=$(jq --null-input --rawfile body /tmp/e2e-pr-running.md '{body: $body}')
+          gh api --method PATCH \
+            "repos/$GITHUB_REPOSITORY/issues/comments/$COMMENT_ID" \
+            --input - <<<"$payload"
 
       - name: Install GO
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -368,145 +448,6 @@ jobs:
           which python
           python --version
 
-      - name: Find latest valid build run on target branch
-        id: find_build
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPOSITORY: ${{ github.repository }}
-          TARGET_BRANCH: ${{ env.SOPERATOR_BUILD_BRANCH }}
-        run: |
-          readonly CANDIDATE_LIMIT=15
-          readonly EMPTY_RESPONSE_RETRY_LIMIT=3
-          readonly RETRY_BACKOFF_SECONDS=5
-
-          echo "Looking for a valid successful build run on branch: $TARGET_BRANCH"
-
-          target_ref="refs/remotes/origin/$TARGET_BRANCH"
-          if ! target_sha=$(git show-ref --verify --hash "$target_ref"); then
-            echo "::error::Soperator build branch not found: $TARGET_BRANCH"
-            exit 1
-          fi
-
-          selected_run=""
-          artifact_expires_at=""
-          while IFS= read -r candidate_sha; do
-            echo "Checking build runs for commit: $candidate_sha"
-
-            runs=""
-            for ((attempt = 1; attempt <= EMPTY_RESPONSE_RETRY_LIMIT; attempt++)); do
-              runs=$(.github/workflows/scripts/retry.sh gh api \
-                -H "Cache-Control: no-cache" \
-                -X GET \
-                "/repos/$REPOSITORY/actions/workflows/one_job.yml/runs" \
-                -F head_sha="$candidate_sha" \
-                -F per_page=100)
-
-              if jq -e '.workflow_runs | length > 0' >/dev/null <<<"$runs"; then
-                break
-              fi
-
-              if (( attempt < EMPTY_RESPONSE_RETRY_LIMIT )); then
-                echo "No build runs returned for $candidate_sha; retrying ($attempt/$EMPTY_RESPONSE_RETRY_LIMIT)"
-                sleep $((RETRY_BACKOFF_SECONDS * attempt))
-              fi
-            done
-
-            if ! jq -e '.workflow_runs | length > 0' >/dev/null <<<"$runs"; then
-              echo "Skipping commit $candidate_sha: no build runs returned after $EMPTY_RESPONSE_RETRY_LIMIT attempts"
-              continue
-            fi
-
-            while IFS= read -r candidate; do
-              run_id=$(jq -r '.id' <<<"$candidate")
-              artifacts=$(.github/workflows/scripts/retry.sh gh api \
-                -H "Cache-Control: no-cache" \
-                -X GET \
-                "/repos/$REPOSITORY/actions/runs/$run_id/artifacts" \
-                -F per_page=100)
-
-              artifact=$(jq -c '
-                [.artifacts[]
-                  | select(
-                      .name == "version"
-                      and .expired == false
-                      and .expires_at != null
-                      and (.expires_at | fromdateiso8601) > now
-                    )
-                ]
-                | sort_by(.expires_at)
-                | last // empty
-              ' <<<"$artifacts")
-
-              if [[ -z "$artifact" ]]; then
-                echo "Skipping build $run_id: no non-expired version artifact"
-                continue
-              fi
-
-              selected_run="$candidate"
-              artifact_expires_at=$(jq -r '.expires_at' <<<"$artifact")
-              break
-            done < <(jq -c --arg branch "$TARGET_BRANCH" --arg sha "$candidate_sha" '
-              [.workflow_runs[]
-                | select(
-                    .head_sha == $sha
-                    and .head_branch == $branch
-                    and .status == "completed"
-                    and .conclusion == "success"
-                  )
-              ]
-              | sort_by([.created_at, .id])
-              | reverse[]
-            ' <<<"$runs")
-
-            if [[ -z "$selected_run" ]]; then
-              echo "Skipping commit $candidate_sha: no completed successful build with a valid version artifact"
-              continue
-            fi
-
-            break
-          done < <(git rev-list --first-parent --max-count="$CANDIDATE_LIMIT" "$target_sha")
-
-          if [[ -z "$selected_run" ]]; then
-            echo "::error::No valid successful build with a non-expired version artifact found among the latest $CANDIDATE_LIMIT commits on branch $TARGET_BRANCH"
-            exit 1
-          fi
-
-          run_id=$(jq -r '.id' <<<"$selected_run")
-          head_sha=$(jq -r '.head_sha' <<<"$selected_run")
-          created_at=$(jq -r '.created_at' <<<"$selected_run")
-          html_url=$(jq -r '.html_url' <<<"$selected_run")
-
-          echo "Found build: $run_id (created $created_at, version artifact expires $artifact_expires_at)"
-
-          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
-          echo "created_at=$created_at" >> "$GITHUB_OUTPUT"
-          echo "html_url=$html_url" >> "$GITHUB_OUTPUT"
-
-      - name: Download artifact with version
-        shell: bash
-        run: |
-          gh run download ${{ steps.find_build.outputs.run_id }} -n version
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Read version
-        shell: bash
-        run: |
-          SOPERATOR_VERSION=$(sed -n '1p' version.txt)
-          SOPERATOR_UNSTABLE=$(sed -n '2p' version.txt)
-          NFS_VERSION=$(sed -n '3p' version.txt)
-
-          if [[ -z "$NFS_VERSION" ]]; then
-            echo "::error::Build metadata lacks NFS version; rebuild with the updated workflow."
-            exit 1
-          fi
-
-          echo "SOPERATOR_VERSION=$SOPERATOR_VERSION" >> $GITHUB_ENV
-          echo "SOPERATOR_UNSTABLE=$SOPERATOR_UNSTABLE" >> $GITHUB_ENV
-          echo "NFS_VERSION=$NFS_VERSION" >> $GITHUB_ENV
-
       - name: Initialize E2E artifacts
         shell: bash
         env:
@@ -531,6 +472,8 @@ jobs:
             --arg nebius_region "$NEBIUS_REGION" \
             --arg soperator_version "$SOPERATOR_VERSION" \
             --arg soperator_build_branch "$SOPERATOR_BUILD_BRANCH" \
+            --arg build_run_id "${{ needs.resolve-build.outputs.run_id }}" \
+            --arg build_sha "${{ needs.resolve-build.outputs.head_sha }}" \
             --arg terraform_ref "$TERRAFORM_REPO_REF" \
             --arg acceptance_ref "$SOPERATOR_E2E_REPO_BRANCH" \
             '{
@@ -545,6 +488,8 @@ jobs:
               nebius_region: $nebius_region,
               soperator_version: $soperator_version,
               soperator_build_branch: $soperator_build_branch,
+              build_run_id: $build_run_id,
+              build_sha: $build_sha,
               terraform_ref: $terraform_ref,
               acceptance_ref: $acceptance_ref
             }' > "$E2E_ARTIFACTS_DIR/metadata/run.json"
@@ -672,8 +617,8 @@ jobs:
           if [[ "$RUN_UNSTABLE_TESTS" == "true" ]]; then
             args+=(--run-unstable)
           fi
-          if [[ "$RUN_ESSENTIAL_TESTS" == "true" ]]; then
-            args+=(--run-essential)
+          if [[ "$RUN_HEAVY" == "true" ]]; then
+            args+=(--run-heavy)
           fi
           while read -r -a scenario_paths; do
             for scenario in "${scenario_paths[@]}"; do
@@ -796,10 +741,10 @@ jobs:
         run: |
           set -x
 
-          head_sha="${{ steps.find_build.outputs.head_sha }}"
-          created_at="${{ steps.find_build.outputs.created_at }}"
-          html_url="${{ steps.find_build.outputs.html_url }}"
-          run_id="${{ steps.find_build.outputs.run_id }}"
+          head_sha="${{ needs.resolve-build.outputs.head_sha }}"
+          created_at="${{ needs.resolve-build.outputs.created_at }}"
+          html_url="${{ needs.resolve-build.outputs.html_url }}"
+          run_id="${{ needs.resolve-build.outputs.run_id }}"
           repo_url="https://github.com/${{ github.repository }}"
           terraform_repo_url="https://github.com/${{ env.TERRAFORM_REPO }}"
           terraform_repo_dir="${{ github.workspace }}/terraform-repo"
@@ -876,7 +821,7 @@ jobs:
 
   report-pr-result:
     name: Report E2E result to PR
-    needs: [report-pr-start, resolve-profile, e2e-test]
+    needs: [report-pr-start, resolve-build, resolve-profile, e2e-test]
     if: always() && inputs.pr_number != ''
     continue-on-error: true
     runs-on: ubuntu-24.04
@@ -900,9 +845,12 @@ jobs:
           SOPERATOR_E2E_BRANCH: ${{ inputs.soperator_e2e_repo_branch || 'main' }}
           REQUESTED_PROFILE: ${{ inputs.profile }}
           RESOLVED_PROFILE: ${{ needs.resolve-profile.outputs.profile_name }}
-          RUN_UNSTABLE_TESTS: ${{ inputs.run_unstable_tests || 'false' }}
-          RUN_ESSENTIAL_TESTS: ${{ inputs.run_essential_tests || 'false' }}
           SCENARIOS: ${{ inputs.scenarios }}
+          BUILD_RESULT: ${{ needs.resolve-build.result }}
+          BUILD_STATUS: ${{ needs.resolve-build.outputs.status }}
+          BUILD_REASON: ${{ needs.resolve-build.outputs.reason }}
+          BUILD_URL: ${{ needs.resolve-build.outputs.html_url }}
+          BUILD_SHA: ${{ needs.resolve-build.outputs.head_sha }}
           RESOLVE_RESULT: ${{ needs.resolve-profile.result }}
           E2E_RESULT: ${{ needs.e2e-test.result }}
           ACCEPTANCE_OUTCOME: ${{ needs.e2e-test.outputs.acceptance_outcome }}
@@ -940,13 +888,14 @@ jobs:
 
   notify-failure:
     name: Notify Slack on E2E failure
-    needs: [resolve-profile, e2e-test]
+    needs: [resolve-build, resolve-profile, e2e-test]
     # Only fire when the run targeted the default build, terraform, and
     # Soperator E2E branches. Custom branches are usually experiments and
     # shouldn't page e2e owners on failure.
     if: |
       always() &&
-      (needs.resolve-profile.result == 'failure' || needs.e2e-test.result == 'failure') &&
+      inputs.is_scheduled == 'true' &&
+      (needs.resolve-build.result == 'failure' || needs.resolve-profile.result == 'failure' || needs.e2e-test.result == 'failure') &&
       (github.ref_name == 'main' || startsWith(github.ref_name, 'soperator-release-')) &&
       (inputs.soperator_build_branch == '' || inputs.soperator_build_branch == github.ref_name) &&
       (inputs.terraform_repo_ref == '' || inputs.terraform_repo_ref == github.ref_name) &&

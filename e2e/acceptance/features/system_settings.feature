@@ -11,7 +11,7 @@ Feature: System settings
     When root collects direct and nested Bash resource limits over SSH to the worker
     Then direct and nested worker SSH resource limits match the compute profile
 
-  @essential @soperator_version_>=5.0.0
+  @soperator_version_>=5.0.0
   Scenario: Native Slurm jobs expose the compute resource-limit profile
     Given a healthy worker is selected for system-settings checks
     When a native Slurm job collects direct and nested Bash resource limits
@@ -25,7 +25,7 @@ Feature: System settings
     Then the Enroot system-settings job succeeds
     And its direct and nested resource limits match the Slurm compute profile
 
-  @essential @soperator_version_>=4.0.0
+  @soperator_version_>=4.0.0
   Scenario: Required kernel settings are visible in SSH sessions and Slurm jobs
     Given a healthy worker is selected for system-settings checks
     When kernel settings are collected from login and worker SSH sessions
@@ -34,7 +34,7 @@ Feature: System settings
     Then both kernel-settings jobs succeed
     And both jobs expose the required kernel settings
 
-  @essential @gpu @soperator_version_>=4.0.0
+  @gpu @soperator_version_>=4.0.0
   Scenario: GPU workers expose the required NVIDIA driver capabilities
     Given a healthy GPU worker is selected for system-settings checks
     Then its Slurm container exposes the required NVIDIA driver capabilities

@@ -67,7 +67,7 @@ Gather enough information to answer:
   each unmet prerequisite should the scenario skip or fail?
 - Which action should the scenario perform, and what observations prove that it
   worked?
-- Should the scenario be part of the essential suite?
+- Will the scenario take more than ten minutes and need the heavy tag?
 - What cluster state will the scenario mutate? For each persistent mutation,
   could the resulting state affect later scenarios or a rerun in any way, harm
   cluster health, consume resources, or incur cost? Which mutations therefore
@@ -80,7 +80,7 @@ inventing them.
 Before editing code, propose a scenario design for user approval. Include:
 
 - the intended `.feature` changes, preferably with draft Gherkin;
-- the version, essential, unstable, and descriptive tag decisions;
+- the version, heavy, unstable, and descriptive tag decisions;
 - the skip-versus-fail decisions and prerequisite checks;
 - any non-obvious reuse or refactoring decision that materially affects the
   implementation, including alternatives when the best choice is uncertain;
@@ -106,10 +106,12 @@ again.
 - Reuse an existing step only when its wording and semantics mean exactly the
   same thing. Prefer a new precise step to broadening an existing one until its
   behavior becomes surprising.
-- Decide whether a scenario is essential during design, before implementation.
-  `@essential` is for release-critical baseline coverage, not merely useful or
-  important coverage. Adding or removing it requires updating the expectations
-  in `acceptance/features_test.go`.
+- Decide whether a scenario is heavy during design, before implementation.
+  `@heavy` marks scenarios measured or expected to take more than ten minutes.
+  Heavy scenarios are excluded from default CLI and PR runs, included by
+  `--run-heavy` or `/e2e-full`, and always included in periodic runs.
+  Classify heavy independently of unstable and version constraints. Update
+  the expectations in `acceptance/features_test.go` when changing membership.
 - Decide skip versus failure explicitly for every prerequisite. Return
   `godog.ErrSkip` only when a valid target cluster does not provide an optional
   prerequisite, such as GPU capacity or a particular topology. Fail when the
@@ -123,7 +125,7 @@ again.
 The shared feature suite has three tag forms that affect execution:
 
 - exactly one scenario-level `@soperator_version_...` constraint;
-- optional `@essential`;
+- optional `@heavy`;
 - optional `@unstable`.
 
 CPU, GPU, topology, and other descriptive tags are allowed, but no current
