@@ -85,6 +85,26 @@ func TestConcurrentSuitesKeepGlobalAssertionsSerial(t *testing.T) {
 	}
 }
 
+func TestHealthCheckReplacementIsConcurrentAndRequiresHeavyOptIn(t *testing.T) {
+	for _, heavy := range []bool{false, true} {
+		suite := SoperatorSuite("5.0.0")
+		suite.ExcludeHeavy = !heavy
+		for index, split := range ConcurrentSuites(suite, 4) {
+			count := 0
+			for key, selected := range selectedScenarios(t, split, "5.0.0") {
+				if strings.Contains(key, "A failed GPU health check replaces the worker node") {
+					count += selected
+				}
+			}
+			want := 0
+			if heavy && index == 1 {
+				want = 1
+			}
+			assert.Equal(t, want, count)
+		}
+	}
+}
+
 func TestConcurrentSuiteDoesNotStartAfterSerialFailure(t *testing.T) {
 	var parallelRan atomic.Bool
 	suite := SuiteConfig{
