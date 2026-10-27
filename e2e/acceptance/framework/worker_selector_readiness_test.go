@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cucumber/godog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -160,4 +161,31 @@ func TestWorkerSelectorWaitsForHostRecoveryWithinSharedAcquisition(t *testing.T)
 			}
 		})
 	}
+}
+
+func TestWorkerSelectorReservationSkipsOnlyUnconfiguredCapacity(t *testing.T) {
+	for _, needs := range []WorkerRequirements{{Kind: "GPU", Count: 1}, {Count: 3}} {
+		runtime := workerReadinessFixture()
+		pool := NewWorkerPool()
+		ctx := WithWorkerReservation(t.Context(), pool, t.Name())
+		selector := NewWorkerSelector(NewKubectlClient(runtime), NewSlurmClient(runtime), "soperator")
+		_, err := selector.Acquire(ctx, needs)
+		require.Error(t, err)
+		assert.ErrorIs(t, SkipIfInsufficientWorkers(nil, err), godog.ErrSkip)
+		require.NoError(t, FinishWorkerReservation(ctx, runtime))
+		assert.Empty(t, pool.owners)
+		assert.Empty(t, pool.waiting)
+	}
+
+	runtime := workerReadinessFixture()
+	runtime.hosts = func() string { return workerHostsFixture("False") }
+	pool := NewWorkerPool()
+	ctx := WithWorkerReservation(t.Context(), pool, t.Name())
+	ctx = WithWorkerAcquireTimeout(ctx, 10*time.Millisecond)
+	selector := NewWorkerSelector(NewKubectlClient(runtime), NewSlurmClient(runtime), "soperator")
+	_, err := selector.Acquire(ctx, WorkerRequirements{Count: 1, Names: []string{"worker-0"}})
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.NotErrorIs(t, SkipIfInsufficientWorkers(nil, err), godog.ErrSkip)
+	assert.Empty(t, pool.owners)
+	assert.Empty(t, pool.waiting)
 }

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -248,10 +249,17 @@ func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runt
 		teamCityReporter = reports.NewTeamCityReporter(os.Stdout)
 	}
 	tags := r.suiteTagFilter(suite)
+	var cleanupMu sync.Mutex
+	var cleanupFailures []error
+	recordCleanupFailure := func(err error) {
+		cleanupMu.Lock()
+		defer cleanupMu.Unlock()
+		cleanupFailures = append(cleanupFailures, err)
+	}
 	godogSuite := godog.TestSuite{
 		Name: suite.Name,
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
-			r.initializeSuiteScenario(sc, info, runtime, suite, artifactsManager, teamCityReporter)
+			r.initializeSuiteScenario(sc, info, runtime, suite, artifactsManager, teamCityReporter, recordCleanupFailure)
 		},
 		Options: &godog.Options{
 			Concurrency:    suite.Concurrency,
@@ -269,9 +277,9 @@ func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runt
 	status := godogSuite.Run()
 	log.Printf("acceptance: suite %s finished duration=%s", suite.Name, time.Since(suiteStart).Round(time.Millisecond))
 	if status != 0 {
-		return fmt.Errorf("suite %q: godog exited with status %d", suite.Name, status)
+		cleanupFailures = append(cleanupFailures, fmt.Errorf("suite %q: godog exited with status %d", suite.Name, status))
 	}
-	return nil
+	return errors.Join(cleanupFailures...)
 }
 
 func (r *Runner) initializeSuiteScenario(
@@ -281,6 +289,7 @@ func (r *Runner) initializeSuiteScenario(
 	suite SuiteConfig,
 	artifactsManager *framework.ArtifactsManager,
 	teamCityReporter *reports.TeamCityReporter,
+	recordCleanupFailure func(error),
 ) {
 	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
 		ctx = framework.WithWorkerAcquireTimeout(ctx, r.workerAcquireTimeout)
@@ -294,8 +303,15 @@ func (r *Runner) initializeSuiteScenario(
 	for _, register := range suite.StepRegistrars {
 		register(sc, info, runtime)
 	}
-	sc.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
-		return ctx, framework.FinishWorkerReservation(ctx, runtime)
+	sc.After(func(ctx context.Context, scenario *godog.Scenario, _ error) (context.Context, error) {
+		err := framework.FinishWorkerReservation(ctx, runtime)
+		if err != nil {
+			// Godog treats a joined ErrSkip and cleanup error as a skip. Preserve
+			// cleanup failures independently so they still fail the suite.
+			recordCleanupFailure(fmt.Errorf("scenario %q cleanup: %w", scenario.Name, err))
+			recordTeamCityScenarioFailure(ctx, err)
+		}
+		return ctx, err
 	})
 	registerTimingHooks(sc)
 	if teamCityReporter != nil {

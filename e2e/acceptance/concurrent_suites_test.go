@@ -102,6 +102,64 @@ func TestConcurrentSuiteDoesNotStartAfterSerialFailure(t *testing.T) {
 	assert.False(t, parallelRan.Load())
 }
 
+func TestConcurrentSuitesPreserveHookAndStepSkips(t *testing.T) {
+	var skipCalls, passCalls, cleanupCalls atomic.Int32
+	var feature strings.Builder
+	feature.WriteString("Feature: skips\n")
+	for _, tags := range []string{"", "@parallel"} {
+		fmt.Fprintf(&feature, "  %s @skip\n  Scenario: tagged %s\n    Given a skipped continuation runs\n", tags, tags)
+		for _, kind := range []string{"direct", "wrapped"} {
+			fmt.Fprintf(&feature, "  %s\n  Scenario: %s %s\n    Given a %s skip is returned\n    Then a skipped continuation runs\n", tags, kind, tags, kind)
+		}
+	}
+	feature.WriteString("  @parallel\n  Scenario: parallel continues\n    Given a passing check runs\n")
+	suite := SuiteConfig{
+		Name:   "skips",
+		Source: FeatureSource{FS: fstest.MapFS{"skips.feature": {Data: []byte(feature.String())}}, Paths: []string{"skips.feature"}},
+		StepRegistrars: []StepRegistrar{func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, _ framework.Runtime) {
+			sc.Step(`^a (direct|wrapped) skip is returned$`, func(kind string) error {
+				skipCalls.Add(1)
+				if kind == "wrapped" {
+					return fmt.Errorf("optional prerequisite absent: %w", godog.ErrSkip)
+				}
+				return godog.ErrSkip
+			})
+			sc.Step(`^a skipped continuation runs$`, func() error { return fmt.Errorf("execute a skipped step") })
+			sc.Step(`^a passing check runs$`, func() { passCalls.Add(1) })
+			sc.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
+				cleanupCalls.Add(1)
+				return ctx, nil
+			})
+		}},
+	}
+	runner, err := NewRunner(RunnerConfig{KubectlContext: "unused", TargetSoperatorVersion: "5.0.0", OutputDir: t.TempDir(), Suites: ConcurrentSuites(suite, 8)})
+	require.NoError(t, err)
+	require.NoError(t, runner.runConfiguredSuites(t.Context(), testClusterInfo(), nil, runner.suites))
+	assert.EqualValues(t, 4, skipCalls.Load())
+	assert.EqualValues(t, 1, passCalls.Load(), "serial skips must allow the parallel suite to start")
+	assert.EqualValues(t, 7, cleanupCalls.Load(), "cleanup must run for skipped scenarios")
+}
+
+func TestConcurrentSuitesDoNotHideCleanupFailureBehindSkip(t *testing.T) {
+	var parallelRan atomic.Bool
+	suite := SuiteConfig{
+		Name:   "skip-cleanup",
+		Source: FeatureSource{FS: fstest.MapFS{"skip.feature": {Data: []byte("Feature: cleanup\n  Scenario: skipped with cleanup failure\n    Given a skipped check leaves a cleanup failure\n  @parallel\n  Scenario: parallel\n    Given the parallel check runs\n")}}, Paths: []string{"skip.feature"}},
+		StepRegistrars: []StepRegistrar{func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, _ framework.Runtime) {
+			sc.Step(`^a skipped check leaves a cleanup failure$`, func(ctx context.Context) error {
+				framework.RecordWorkerCleanupError(ctx, fmt.Errorf("restore worker baseline"))
+				return godog.ErrSkip
+			})
+			sc.Step(`^the parallel check runs$`, func() { parallelRan.Store(true) })
+		}},
+	}
+	runner, err := NewRunner(RunnerConfig{KubectlContext: "unused", TargetSoperatorVersion: "5.0.0", Suites: ConcurrentSuites(suite, 8)})
+	require.NoError(t, err)
+	err = runner.runConfiguredSuites(t.Context(), testClusterInfo(), nil, runner.suites)
+	require.ErrorContains(t, err, "restore worker baseline")
+	assert.False(t, parallelRan.Load())
+}
+
 func TestGodogRunsSerialSuiteBeforeEightConcurrentScenarios(t *testing.T) {
 	var feature strings.Builder
 	feature.WriteString("Feature: scheduling\n  Scenario: serial\n    Given a scheduled check runs\n")
