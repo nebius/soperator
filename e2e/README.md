@@ -175,8 +175,10 @@ bin/acceptance collect-artifacts \
   --output-dir e2e-artifacts/snapshots/before-destroy
 ```
 
-The common snapshot contains Kubernetes, Soperator, redacted FluxCD, Slurm,
-and jail diagnostics. Add `--nebius-project-id <project-id>` to include Managed
+The common snapshot contains Kubernetes, Soperator, FluxCD, Slurm,
+and jail diagnostics. FluxCD saves ConfigMap values referenced by HelmRelease
+`spec.valuesFrom` in `values-from/configmaps.json`.
+Add `--nebius-project-id <project-id>` to include Managed
 Kubernetes clusters and node groups. When that optional flag is omitted, the
 `mk8s` collector creates no files and does not invoke the Nebius CLI.
 If Terraform fails before a Kubernetes context is available, omit
