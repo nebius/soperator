@@ -127,7 +127,7 @@ func (s *WorkerRollingUpdate) CleanupAndReset(ctx context.Context) {
 	if s.mk8s.requestedMaxPods != nil {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*workerMK8sTimeout)
 		if err := s.cleanupMK8sGroup(cleanupCtx); err != nil {
-			reportCleanupError(ctx, s.runtime, "Cleanup: restore MK8s node group %s: %v", s.mk8s.groupID, err)
+			reportCleanupErrorf(ctx, s.runtime, "Cleanup: restore MK8s node group %s: %v", s.mk8s.groupID, err)
 		}
 		cancel()
 	}
@@ -178,7 +178,7 @@ func (s *WorkerRollingUpdate) cleanupSystemDaemonSets(ctx context.Context) {
 			return true, nil
 		})
 	if err != nil {
-		reportCleanupError(ctx, s.runtime, "Cleanup: wait for restarted Soperator system DaemonSets %v to become healthy: %v", s.restartedDaemonSets, err)
+		reportCleanupErrorf(ctx, s.runtime, "Cleanup: wait for restarted Soperator system DaemonSets %v to become healthy: %v", s.restartedDaemonSets, err)
 	}
 }
 
@@ -206,7 +206,7 @@ func (s *WorkerRollingUpdate) waitForWorkerRolloutJobGone(ctx context.Context, j
 			})
 	}
 	if err != nil {
-		reportCleanupError(ctx, s.runtime, "Cleanup: wait for rollout job ID=%s name=%s to leave the queue: %v", job.ID, job.JobName, err)
+		reportCleanupErrorf(ctx, s.runtime, "Cleanup: wait for rollout job ID=%s name=%s to leave the queue: %v", job.ID, job.JobName, err)
 	}
 }
 
@@ -283,7 +283,7 @@ func (s *WorkerRollingUpdate) cleanupRollout(ctx context.Context) {
 			return true, nil
 		})
 	if err != nil {
-		reportCleanupError(ctx, s.runtime, "Cleanup: wait for NodeSet %s/%s and MK8s group %s to reach a healthy baseline (retaining accepted changes): %v",
+		reportCleanupErrorf(ctx, s.runtime, "Cleanup: wait for NodeSet %s/%s and MK8s group %s to reach a healthy baseline (retaining accepted changes): %v",
 			s.nodeSet.Metadata.Namespace, s.nodeSet.Metadata.Name, s.mk8s.groupID, err)
 	}
 }
@@ -296,17 +296,17 @@ func (s *WorkerRollingUpdate) cleanupWorkerRolloutJob(ctx context.Context, owned
 	defer cancel()
 	if !owned.job.IsZero() {
 		if err := s.slurm.CancelJob(cleanupCtx, owned.job.ID, 0); err != nil {
-			reportCleanupError(ctx, s.runtime, "Cleanup: cancel rolling update job %s: %v", owned.job.ID, err)
+			reportCleanupErrorf(ctx, s.runtime, "Cleanup: cancel rolling update job %s: %v", owned.job.ID, err)
 		}
 	} else if owned.job.JobName != "" {
 		// Submission may succeed even if its response (and therefore job ID) is lost.
 		if _, err := s.runtime.Controller().Run(cleanupCtx, "scancel --name="+framework.ShellQuote(owned.job.JobName)); err != nil {
-			reportCleanupError(ctx, s.runtime, "Cleanup: cancel rollout job named %s: %v", owned.job.JobName, err)
+			reportCleanupErrorf(ctx, s.runtime, "Cleanup: cancel rollout job named %s: %v", owned.job.JobName, err)
 		}
 	}
 	if owned.releasePath != "" {
 		if _, err := s.runtime.Jail().Run(cleanupCtx, "rm -f -- "+framework.ShellQuote(owned.releasePath)); err != nil {
-			reportCleanupError(ctx, s.runtime, "Cleanup: remove rollout gate %s: %v", owned.releasePath, err)
+			reportCleanupErrorf(ctx, s.runtime, "Cleanup: remove rollout gate %s: %v", owned.releasePath, err)
 		}
 	}
 }
@@ -856,7 +856,7 @@ func (s *WorkerRollingUpdate) cleanupEphemeralWorkerHold(ctx context.Context) {
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), workerRolloutCleanupTimeout)
 	defer cancel()
 	if err := s.releaseEphemeralWorkers(cleanupCtx); err != nil {
-		reportCleanupError(ctx, s.runtime, "Cleanup: restore automatic suspension for ephemeral workers %s: %v; check SuspendExcNodes and remove only these scenario additions", strings.Join(s.power.added, ","), err)
+		reportCleanupErrorf(ctx, s.runtime, "Cleanup: restore automatic suspension for ephemeral workers %s: %v; check SuspendExcNodes and remove only these scenario additions", strings.Join(s.power.added, ","), err)
 	}
 }
 

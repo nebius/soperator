@@ -69,12 +69,12 @@ func (s *SoperatorUtils) RegisterSteps(sc *godog.ScenarioContext) {
 func (s *SoperatorUtils) CleanupAndReset(ctx context.Context) {
 	if s.reportAttempted && s.worker.Name != "" {
 		if _, err := s.runtime.Worker(s.worker).Run(ctx, fmt.Sprintf("rm -f %s", framework.ShellQuote(soperatorUtilsRemoteReportPath))); err != nil {
-			reportCleanupError(ctx, s.runtime, "cleanup: remove NVIDIA bug report from worker %s: %v", s.worker.Name, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: remove NVIDIA bug report from worker %s: %v", s.worker.Name, err)
 		}
 	}
 	if s.reportPath != "" && !s.preserveReport {
 		if _, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("rm -f %s", framework.ShellQuote(s.reportPath))); err != nil {
-			reportCleanupError(ctx, s.runtime, "cleanup: remove downloaded NVIDIA bug report %s: %v", s.reportPath, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: remove downloaded NVIDIA bug report %s: %v", s.reportPath, err)
 		}
 	}
 

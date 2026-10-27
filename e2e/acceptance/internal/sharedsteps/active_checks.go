@@ -85,14 +85,14 @@ func (s *ActiveChecks) CleanupAndReset(ctx context.Context) {
 	if s.gpuCheckK8sJobName != "" {
 		var job k8sJobStatus
 		if err := s.kubectl.GetJSON(ctx, &job, "get", "job", "-n", framework.SoperatorNamespace, s.gpuCheckK8sJobName, "-o", "json"); err != nil {
-			reportCleanupError(ctx, s.runtime, "cleanup: inspect GPU ActiveCheck Job %s: %v", s.gpuCheckK8sJobName, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: inspect GPU ActiveCheck Job %s: %v", s.gpuCheckK8sJobName, err)
 		} else if job.Status.Succeeded == 0 {
 			if _, err := s.runtime.Kubectl().Run(ctx, "delete", "job", "-n", framework.SoperatorNamespace, s.gpuCheckK8sJobName, "--ignore-not-found=true", "--wait=true", "--timeout=60s"); err != nil {
-				reportCleanupError(ctx, s.runtime, "cleanup: stop GPU ActiveCheck Job %s: %v", s.gpuCheckK8sJobName, err)
+				reportCleanupErrorf(ctx, s.runtime, "cleanup: stop GPU ActiveCheck Job %s: %v", s.gpuCheckK8sJobName, err)
 			}
 			for _, id := range s.gpuCheckJobIDs {
 				if err := s.slurm.CancelJob(ctx, id, 0); err != nil {
-					reportCleanupError(ctx, s.runtime, "cleanup: cancel GPU ActiveCheck Slurm job %s: %v", id, err)
+					reportCleanupErrorf(ctx, s.runtime, "cleanup: cancel GPU ActiveCheck Slurm job %s: %v", id, err)
 				}
 			}
 		}
@@ -104,19 +104,19 @@ func (s *ActiveChecks) CleanupAndReset(ctx context.Context) {
 			framework.ShellQuote(manageJailStateDryRunFile),
 		)
 		if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
-			reportCleanupError(ctx, s.runtime, "cleanup: remove marker from managed jail file %s: %v", manageJailStateDryRunFile, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: remove marker from managed jail file %s: %v", manageJailStateDryRunFile, err)
 		}
 	}
 	if s.dryRunJobName != "" {
 		var job k8sJobStatus
 		if err := s.kubectl.GetJSON(ctx, &job, "get", "job", "-n", framework.SoperatorNamespace, s.dryRunJobName, "-o", "json"); err != nil {
-			reportCleanupError(ctx, s.runtime, "cleanup: get manage-jail-state dry-run Job %s: %v", s.dryRunJobName, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: get manage-jail-state dry-run Job %s: %v", s.dryRunJobName, err)
 		} else if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
 			if _, err := s.runtime.Kubectl().Run(ctx,
 				"delete", "job", "-n", framework.SoperatorNamespace, s.dryRunJobName,
 				"--ignore-not-found=true", "--wait=false",
 			); err != nil {
-				reportCleanupError(ctx, s.runtime, "cleanup: stop manage-jail-state dry-run Job %s: %v", s.dryRunJobName, err)
+				reportCleanupErrorf(ctx, s.runtime, "cleanup: stop manage-jail-state dry-run Job %s: %v", s.dryRunJobName, err)
 			}
 		}
 	}

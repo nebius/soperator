@@ -113,17 +113,17 @@ func (s *SystemChecks) CleanupAndReset(ctx context.Context) {
 	s.removeLibslurmProbeFiles(ctx)
 	if s.kubeletDebugPodName != "" {
 		if _, err := s.runtime.Kubectl().Run(ctx, "delete", "pod", "-n", framework.SoperatorNamespace, s.kubeletDebugPodName, "--ignore-not-found"); err != nil {
-			reportCleanupError(ctx, s.runtime, "cleanup: delete kubelet debug pod %s: %v", s.kubeletDebugPodName, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: delete kubelet debug pod %s: %v", s.kubeletDebugPodName, err)
 		}
 	}
 	if s.workerPod.Name != "" {
 		if _, err := s.runtime.WorkerPod(s.workerPodInfo).Run(ctx, fmt.Sprintf("rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(systemEphemeralFillPath))); err != nil {
-			reportCleanupError(ctx, s.runtime, "cleanup: remove ephemeral fill file from %s: %v", s.workerPod.Name, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: remove ephemeral fill file from %s: %v", s.workerPod.Name, err)
 		}
 	}
 	if s.worker.Name != "" {
 		if err := s.slurm.ResumeNodeIfDrainedByReason(ctx, s.worker.Name, systemEphemeralReason); err != nil {
-			reportCleanupError(ctx, s.runtime, "cleanup: resume %s after pod_ephemeral_storage: %v", s.worker.Name, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: resume %s after pod_ephemeral_storage: %v", s.worker.Name, err)
 		}
 	}
 	s.worker = framework.WorkerInfo{}
@@ -582,7 +582,7 @@ func (s *SystemChecks) stopLibslurmProbe(ctx context.Context) {
 			s.libslurmProbeFinished = &result
 		case <-time.After(libslurmProbeStopTimeout):
 			if s.runtime != nil {
-				reportCleanupError(ctx, s.runtime, "cleanup: timed out waiting for libslurm probe to stop")
+				reportCleanupErrorf(ctx, s.runtime, "cleanup: timed out waiting for libslurm probe to stop")
 			}
 		}
 	}
@@ -599,7 +599,7 @@ func (s *SystemChecks) removeLibslurmProbeFiles(ctx context.Context) {
 		return
 	}
 	if _, err := s.runtime.Jail().Run(ctx, "rm -f "+strings.Join(paths, " ")); err != nil {
-		reportCleanupError(ctx, s.runtime, "cleanup: remove libslurm probe files: %v", err)
+		reportCleanupErrorf(ctx, s.runtime, "cleanup: remove libslurm probe files: %v", err)
 	}
 }
 

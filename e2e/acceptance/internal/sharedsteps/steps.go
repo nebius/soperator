@@ -74,7 +74,7 @@ func cleanupStepFamily(ctx context.Context, family scenarioScopedStepFamily) (er
 	return nil
 }
 
-func reportCleanupError(ctx context.Context, runtime framework.Runtime, format string, args ...any) {
+func reportCleanupErrorf(ctx context.Context, runtime framework.Runtime, format string, args ...any) {
 	framework.RecordWorkerCleanupError(ctx, fmt.Errorf("scenario cleanup: %s", fmt.Sprintf(format, args...)))
 	runtime.Logf(format, args...)
 }

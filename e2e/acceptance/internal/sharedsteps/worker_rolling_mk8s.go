@@ -658,7 +658,7 @@ func (s *WorkerRollingUpdate) mk8sGroupAndHostsReady(ctx context.Context, minimu
 		return fmt.Errorf("MK8s group %s has %d Kubernetes hosts, expected %d", s.mk8s.groupID, count, group.Status.Target)
 	}
 	if operationErr != nil {
-		reportCleanupError(ctx, s.runtime, "Cleanup: MK8s operation %s ended unsuccessfully, but group %s and its hosts have recovered: %v", s.mk8s.operationID, s.mk8s.groupID, operationErr)
+		reportCleanupErrorf(ctx, s.runtime, "Cleanup: MK8s operation %s ended unsuccessfully, but group %s and its hosts have recovered: %v", s.mk8s.operationID, s.mk8s.groupID, operationErr)
 		s.mk8s.operationID = ""
 	}
 	return nil

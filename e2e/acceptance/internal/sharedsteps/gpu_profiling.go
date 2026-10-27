@@ -51,7 +51,7 @@ func (s *GPUProfiling) RegisterSteps(sc *godog.ScenarioContext) {
 func (s *GPUProfiling) CleanupAndReset(ctx context.Context) {
 	if !s.job.IsZero() {
 		if err := s.slurm.CancelJob(ctx, s.job.ID, gpuProfilingCleanup); err != nil {
-			reportCleanupError(ctx, s.runtime, "cleanup: cancel GPU profiling job %s: %v", s.job.ID, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: cancel GPU profiling job %s: %v", s.job.ID, err)
 		}
 	}
 

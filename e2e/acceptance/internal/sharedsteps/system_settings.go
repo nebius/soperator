@@ -162,7 +162,7 @@ func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
 			continue
 		}
 		if err := s.slurm.CancelJob(ctx, tracked.job.ID, systemSettingsCleanup); err != nil {
-			reportCleanupError(ctx, s.runtime, "cleanup: cancel %s job %s: %v", tracked.kind, tracked.job.ID, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: cancel %s job %s: %v", tracked.kind, tracked.job.ID, err)
 		}
 	}
 
