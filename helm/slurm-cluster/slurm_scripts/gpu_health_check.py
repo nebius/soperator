@@ -77,6 +77,29 @@ def get_hc_result(proc: subprocess.CompletedProcess) -> HealthCheckerResult:
         return res
 
 
+# Node-local marker that makes the health-checker report a failed check.
+# It is written by acceptance tests to exercise node replacement without touching the
+# host, and it never affects the health-checker runs of the platform itself.
+INJECT_ERROR_MARKER = "/opt/soperator-outputs/local/health_checker_inject_error"
+INJECT_ERROR_RESOLUTIONS = ("Unknown", "Redeploy", "RedeployProfile")
+
+
+def inject_error_args(marker_path: str = INJECT_ERROR_MARKER) -> list[str]:
+    try:
+        with open(marker_path, encoding="utf-8") as marker:
+            resolution = marker.read().strip()
+    except FileNotFoundError:
+        return []
+    except OSError as e:
+        print(f"Ignoring unreadable inject-error marker {marker_path}: {e}")
+        return []
+    if resolution not in INJECT_ERROR_RESOLUTIONS:
+        print(f"Ignoring inject-error marker {marker_path} with unsupported resolution {resolution!r}")
+        return []
+    print(f"Injecting a failed health-checker check with resolution {resolution} because {marker_path} exists")
+    return ["--inject-error", resolution]
+
+
 def ensure_output_dir(path_str: str) -> None:
     path = pathlib.Path(path_str)
 
@@ -119,7 +142,7 @@ try:
         "-f", "json-partial",
         "--tests-stdout-path", output_dir,
         "--log-level", "info",
-    ]
+    ] + inject_error_args()
     proc = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,

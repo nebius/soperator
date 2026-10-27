@@ -105,6 +105,20 @@ undrain script must confirm that the node has recovered, not merely avoid failin
 because the node is busy must not be reused as an undrain condition. When a check is renamed or replaced,
 its successor keeps the old `reason_base`, otherwise nodes drained before the upgrade stay drained forever.
 
+## Simulating a failed GPU health check
+
+`gpu_health_check` passes `--inject-error <resolution>` to the health-checker while the node-local file
+`/opt/soperator-outputs/local/health_checker_inject_error` exists and contains `Unknown`, `Redeploy` or
+`RedeployProfile`. The health-checker then reports a failed `inject_error` check with that resolution, the
+check drains the node with `[node_problem] gpu_health_check: inject_error.inject_error: ...`, and node
+replacement proceeds as for a real failure. Any other content is ignored with a message in the check log.
+
+The marker only affects the health-checker runs started by Soperator inside the jail. The platform runs its
+own health-checker on the host and never sees the file, so nothing is reported to platform monitoring. Do
+not write Xid messages to the kernel log to simulate failures: they reach the platform through the
+observability agent and the serial console and trigger host healing. The acceptance suite uses the marker
+in its node replacement scenario; the file disappears together with the replaced node.
+
 ## Config fields
 
 Check names are nouns without the word `check`: `nvidia_libraries`, not `check_nvidia_libraries`. A check
