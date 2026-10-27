@@ -91,11 +91,6 @@ func (s *NCCLDebug) CleanupAndReset(ctx context.Context) {
 				}
 			}
 		}
-		if run.directory != "" {
-			if _, err := s.runtime.Jail().Run(ctx, "rm -rf -- "+framework.ShellQuote(run.directory)); err != nil {
-				s.runtime.Logf("Cleanup: remove NCCL debug coordination directory %s: %v", run.directory, err)
-			}
-		}
 	}
 	s.worker = framework.WorkerInfo{}
 	s.pod = framework.WorkerPodInfo{}
