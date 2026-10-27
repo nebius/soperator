@@ -11,8 +11,11 @@ import (
 const (
 	containerLifecycleCommand = "echo ready; sleep 3600"
 
-	// Mirrored Ubuntu has /bin/bash required by the Slurm task prolog under Pyxis.
-	enrootLifecycleImage = "docker://cr.nebius.cloud#soperator/ubuntu:noble"
+	// Mirrored Ubuntu has /bin/bash required by the Slurm task prolog under Pyxis
+	// and by Bash-based probes in Docker containers.
+	ubuntuImageRef       = "soperator/ubuntu:noble"
+	enrootLifecycleImage = "docker://cr.nebius.cloud#" + ubuntuImageRef
+	ubuntuDockerImage    = "cr.nebius.cloud/" + ubuntuImageRef
 
 	// Cluster-supported GPU diagnostic image; includes nvidia-smi for container GPU visibility.
 	// https://github.com/nebius/ml-containers/pull/121
