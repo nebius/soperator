@@ -7,8 +7,10 @@ import (
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -139,6 +141,7 @@ func newLoginTestReconciler(t *testing.T) (*SlurmClusterReconciler, *slurmv1.Slu
 	const namespace, clusterName = "test-ns", "test-cluster"
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, rbacv1.AddToScheme(scheme))
 	require.NoError(t, autoscalingv2.AddToScheme(scheme))
 	require.NoError(t, kruisev1b1.AddToScheme(scheme))
 	require.NoError(t, slurmv1.AddToScheme(scheme))
@@ -169,4 +172,103 @@ func newLoginTestReconciler(t *testing.T) (*SlurmClusterReconciler, *slurmv1.Slu
 		},
 	}
 	return NewSlurmClusterReconciler(fakeClient, scheme, nil), cluster, clusterValues
+}
+
+func TestReconcileLoginControlledUpdates(t *testing.T) {
+	r, cluster, clusterValues := newLoginTestReconciler(t)
+	ctx := context.Background()
+	current, err := renderlogin.RenderStatefulSet(
+		clusterValues.Namespace, clusterValues.Name, clusterValues.ClusterWithGPU,
+		clusterValues.NodeFilters, &clusterValues.Secrets, clusterValues.VolumeSources,
+		&clusterValues.NodeLogin, ptr.To(int32(5)),
+	)
+	require.NoError(t, err)
+	current.Spec.UpdateStrategy = kruisev1b1.StatefulSetUpdateStrategy{
+		Type: appsv1.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
+			PodUpdatePolicy: kruisev1b1.RecreatePodUpdateStrategyType,
+		},
+	}
+	current.Spec.Template.Spec.ServiceAccountName = ""
+	require.NoError(t, r.Create(ctx, &current))
+
+	require.NoError(t, r.ReconcileLogin(ctx, cluster, clusterValues))
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(&current), &current))
+	require.Equal(t, appsv1.OnDeleteStatefulSetStrategyType, current.Spec.UpdateStrategy.Type)
+	require.Nil(t, current.Spec.UpdateStrategy.RollingUpdate)
+	require.EqualValues(t, 5, *current.Spec.Replicas)
+
+	account := &corev1.ServiceAccount{}
+	require.NoError(t, r.Get(ctx, types.NamespacedName{
+		Namespace: clusterValues.Namespace, Name: current.Spec.Template.Spec.ServiceAccountName,
+	}, account))
+	require.True(t, metav1.IsControlledBy(account, cluster))
+
+	binding := &rbacv1.RoleBinding{}
+	require.NoError(t, r.Get(ctx, types.NamespacedName{
+		Namespace: clusterValues.Namespace, Name: naming.BuildRoleBindingLoginName(cluster.Name),
+	}, binding))
+	require.Equal(t, account.Name, binding.Subjects[0].Name)
+	require.True(t, metav1.IsControlledBy(binding, cluster))
+
+	role := &rbacv1.Role{}
+	require.NoError(t, r.Get(ctx, types.NamespacedName{
+		Namespace: clusterValues.Namespace, Name: binding.RoleRef.Name,
+	}, role))
+	require.True(t, metav1.IsControlledBy(role, cluster))
+	require.Len(t, role.Rules, 1)
+	require.Len(t, role.Rules[0].ResourceNames, int(clusterValues.NodeLogin.Autoscaling.MaxReplicas))
+
+	clusterValues.NodeLogin.Autoscaling.MaxReplicas = 8
+	require.NoError(t, r.ReconcileLogin(ctx, cluster, clusterValues))
+	require.NoError(t, r.Get(ctx, client.ObjectKeyFromObject(role), role))
+	require.Len(t, role.Rules[0].ResourceNames, 8)
+}
+
+func TestReconcileLoginInitialUpdateStrategy(t *testing.T) {
+	tests := []struct {
+		name     string
+		strategy consts.UpdateStrategy
+		expected appsv1.StatefulSetUpdateStrategyType
+	}{
+		{"omitted", "", appsv1.OnDeleteStatefulSetStrategyType},
+		{"delayed rollout", consts.UpdateStrategyDelayedRollout, appsv1.OnDeleteStatefulSetStrategyType},
+		{"automatic rolling updates", consts.UpdateStrategyRollingUpdate, appsv1.RollingUpdateStatefulSetStrategyType},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, cluster, clusterValues := newLoginTestReconciler(t)
+			clusterValues.NodeLogin.UpdateStrategy = tt.strategy
+			reconcileLoginAndCheckReplicas(t, r, cluster, clusterValues, 2, true)
+			current := &kruisev1b1.StatefulSet{}
+			require.NoError(t, r.Get(t.Context(), client.ObjectKey{Namespace: cluster.Namespace, Name: clusterValues.NodeLogin.StatefulSet.Name}, current))
+			require.Equal(t, tt.expected, current.Spec.UpdateStrategy.Type)
+		})
+	}
+}
+
+func TestReconcileLoginSwitchesUpdateStrategyPreservingAutoscaling(t *testing.T) {
+	r, cluster, clusterValues := newLoginTestReconciler(t)
+	reconcileLoginAndCheckReplicas(t, r, cluster, clusterValues, 2, true)
+	current := &kruisev1b1.StatefulSet{}
+	key := client.ObjectKey{Namespace: cluster.Namespace, Name: clusterValues.NodeLogin.StatefulSet.Name}
+	require.NoError(t, r.Get(t.Context(), key, current))
+	current.Spec.Replicas = ptr.To(int32(5))
+	require.NoError(t, r.Update(t.Context(), current))
+	originalTemplate := current.Spec.Template.DeepCopy()
+	for _, strategy := range []consts.UpdateStrategy{consts.UpdateStrategyRollingUpdate, consts.UpdateStrategyDelayedRollout} {
+		clusterValues.NodeLogin.UpdateStrategy = strategy
+		reconcileLoginAndCheckReplicas(t, r, cluster, clusterValues, 5, true)
+		require.NoError(t, r.Get(t.Context(), key, current))
+		require.Equal(t, originalTemplate.Spec, current.Spec.Template.Spec)
+		require.Equal(t, originalTemplate.Labels, current.Spec.Template.Labels)
+		if strategy == consts.UpdateStrategyRollingUpdate {
+			require.Equal(t, appsv1.RollingUpdateStatefulSetStrategyType, current.Spec.UpdateStrategy.Type)
+			require.NotNil(t, current.Spec.UpdateStrategy.RollingUpdate)
+			require.Equal(t, kruisev1b1.RecreatePodUpdateStrategyType, current.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy)
+		} else {
+			require.Equal(t, appsv1.OnDeleteStatefulSetStrategyType, current.Spec.UpdateStrategy.Type)
+			require.Nil(t, current.Spec.UpdateStrategy.RollingUpdate)
+		}
+	}
 }

@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+
+import argparse
+import base64
+import json
+import os
+import ssl
+import sys
+from dataclasses import dataclass
+from http.client import HTTPException
+from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+
+SERVICE_ACCOUNT_DIR = Path("/var/run/secrets/kubernetes.io/serviceaccount")
+COMPONENT_LABEL = "app.kubernetes.io/component"
+REQUESTED_ANNOTATION = "slurm.nebius.ai/login-update-requested"
+ANNOUNCED_ANNOTATION = "slurm.nebius.ai/login-update-announced-at"
+SCHEDULED_ANNOTATION = "slurm.nebius.ai/login-update-scheduled-at"
+REQUEST_TIMEOUT_SECONDS = 10
+WARNING = (
+    "WARNING: This requests an early restart of this entire login pod. "
+    "It terminates every user's SSH connections, tmux sessions, and other processes "
+    "on this host, including your connection."
+)
+
+
+@dataclass(frozen=True)
+class PodIdentity:
+    name: str
+    namespace: str
+    uid: str
+
+
+@dataclass(frozen=True)
+class LoginPod:
+    identity: PodIdentity
+    resource_version: str
+    annotations: dict
+    deleting: bool
+
+    def require_scheduled_update(self):
+        if not all(self.annotations.get(key) for key in (ANNOUNCED_ANNOTATION, SCHEDULED_ANNOTATION)):
+            raise ValueError("this pod has no announced login update schedule")
+        if self.deleting:
+            raise ValueError("this pod is already terminating")
+
+
+def service_account_identity(token):
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        kubernetes = json.loads(base64.urlsafe_b64decode(payload))["kubernetes.io"]
+        pod = kubernetes["pod"]
+        return PodIdentity(pod["name"], kubernetes["namespace"], pod["uid"])
+    except (IndexError, KeyError, TypeError, ValueError) as error:
+        raise ValueError("read bound pod identity from service account token") from error
+
+
+def read_service_account_file(directory, name):
+    return (directory / name).read_text().strip()
+
+
+def parse_login_pod(data, expected_identity):
+    metadata = data["metadata"]
+    if metadata["uid"] != expected_identity.uid:
+        raise ValueError("live Pod does not match this host's bound Pod UID")
+    if metadata.get("labels", {}).get(COMPONENT_LABEL) != "login":
+        raise ValueError("this host is not a Slurm login pod")
+    return LoginPod(expected_identity, metadata["resourceVersion"], metadata.get("annotations") or {}, bool(metadata.get("deletionTimestamp")))
+
+
+class KubernetesAPI:
+    def __init__(self, identity, directory):
+        self.identity = identity
+        self.directory = directory
+        self.pod_url = (
+            "https://kubernetes.default.svc/api/v1/namespaces/"
+            f"{identity.namespace}/pods/{identity.name}"
+        )
+        self.ssl_context = ssl.create_default_context(cafile=str(directory / "ca.crt"))
+
+    def get_pod(self):
+        return parse_login_pod(json.loads(self._request("GET")), self.identity)
+
+    def request_restart(self, pod):
+        requested_path = "/metadata/annotations/" + REQUESTED_ANNOTATION.replace("/", "~1")
+        self._request("PATCH", payload=[
+            {"op": "test", "path": "/metadata/uid", "value": pod.identity.uid},
+            {"op": "test", "path": "/metadata/resourceVersion", "value": pod.resource_version},
+            {"op": "add", "path": requested_path, "value": pod.identity.uid},
+        ], content_type="application/json-patch+json")
+
+    def _request(self, method, payload=None, content_type=None):
+        token = read_service_account_file(self.directory, "token")
+        headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
+        data = None
+        if payload is not None:
+            data = json.dumps(payload, separators=(",", ":")).encode()
+        if content_type is not None:
+            headers["Content-Type"] = content_type
+        request = Request(self.pod_url, data=data, headers=headers, method=method)
+        with urlopen(request, context=self.ssl_context, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+            return response.read()
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="View this login pod and confirm an early restart interactively by default.")
+    actions = parser.add_mutually_exclusive_group()
+    actions.add_argument("--status", action="store_true", help="show the current update schedule without requesting a restart")
+    actions.add_argument("--yes", action="store_true", help="skip confirmation and request the restart, acknowledging disruption to all users")
+    args = parser.parse_args(argv)
+    if os.geteuid() != 0:
+        print("Run this command as root or with sudo on the login host.", file=sys.stderr)
+        return 1
+    try:
+        directory = SERVICE_ACCOUNT_DIR
+        identity = service_account_identity(read_service_account_file(directory, "token"))
+        api = KubernetesAPI(identity, directory)
+        pod = api.get_pod()
+        print(f"Login pod: {identity.namespace}/{identity.name}")
+        print(f"Update announced: {pod.annotations.get(ANNOUNCED_ANNOTATION, 'none')}")
+        print(f"Scheduled restart: {pod.annotations.get(SCHEDULED_ANNOTATION, 'none')}")
+        early_restart_requested = pod.annotations.get(REQUESTED_ANNOTATION) == identity.uid
+        if args.status:
+            print(f"Early restart requested: {'yes' if early_restart_requested else 'no'}")
+            return 0
+        if early_restart_requested:
+            print("An early restart is already requested for this pod.")
+            return 0
+        pod.require_scheduled_update()
+        print(WARNING, flush=True)
+        if not args.yes:
+            if not sys.stdin.isatty():
+                print("Interactive confirmation requires a terminal; use --yes to request a restart or --status to inspect it.", file=sys.stderr)
+                return 1
+            try:
+                confirmed = input(f"Restart login host {identity.name}? Type yes/no: ")
+            except (EOFError, KeyboardInterrupt):
+                print("\nRestart cancelled.")
+                return 0
+            if confirmed.strip().lower() != "yes":
+                print("Restart cancelled.")
+                return 0
+        api.request_restart(pod)
+        print("Restart requested. The operator may terminate this host and your connection shortly.", flush=True)
+        return 0
+    except HTTPError as error:
+        if error.code in (409, 422):
+            print("Pod metadata changed; inspect --status and retry the request.", file=sys.stderr)
+        else:
+            print(f"Kubernetes API request failed (HTTP {error.code}).", file=sys.stderr)
+        return 1
+    except (HTTPException, OSError, ValueError) as error:
+        print(f"Login restart request failed: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
