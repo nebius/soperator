@@ -1,5 +1,5 @@
 Feature: Slurm-aware worker rolling updates
-  @soperator_version_>=5.0.0
+  @heavy @soperator_version_>=5.0.0
   Scenario: A worker template update preserves running jobs
     Given test jobs are running on two workers of a NodeSet with slurmAwareRollingUpdate strategy and maxUnavailable at least 2
     When the Soperator system DaemonSets are restarted

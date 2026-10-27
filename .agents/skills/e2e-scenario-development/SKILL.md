@@ -15,3 +15,10 @@ later investigation materially changes the approved design, explain the change
 and obtain approval again.
 
 Use `e2e/README.md` for runner usage.
+
+Decide `@heavy` membership during scenario design. Heavy scenarios are excluded
+from manual runs by default and are usually long (about four minutes or more),
+but very important coverage may remain untagged. If a long scenario's importance
+is unclear, explicitly ask whether to add `@heavy`, explaining that it excludes
+the scenario from manual runs by default while periodic runs still include it.
+Follow the tag policy in `e2e/AGENTS.md` for opt-in controls and inventory updates.

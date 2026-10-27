@@ -1,5 +1,5 @@
 Feature: Active checks
-  @gpu @soperator_version_>=5.0.0
+  @heavy @gpu @soperator_version_>=5.0.0
   Scenario: GPU ActiveCheck succeeds on all GPU workers
     Given healthy GPU workers are available for active checks
     When the GPU ActiveCheck is triggered
@@ -8,7 +8,7 @@ Feature: Active checks
     And GPU ActiveCheck Slurm jobs complete on all GPU workers
     And the GPU ActiveCheck status is Complete
 
-  @soperator_version_>=5.0.0
+  @heavy @soperator_version_>=5.0.0
   Scenario: Manage jail dry-run detects drift without modifying the jail
     Given the manage-jail-state dry-run ActiveCheck is configured
     And harmless drift is introduced into a managed jail file
