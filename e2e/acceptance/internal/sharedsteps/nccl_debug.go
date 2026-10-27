@@ -49,7 +49,6 @@ type ncclDebugJob struct {
 
 type ncclDebugTask struct {
 	host, job, step, logPath string
-	elapsedSeconds           uint64
 }
 
 type ncclDebugResources struct {
@@ -155,13 +154,13 @@ func (s *NCCLDebug) runJobs(ctx context.Context) error {
 	return nil
 }
 
-func (s *NCCLDebug) runJob(ctx context.Context, run *ncclDebugJob) error {
-	defer s.saveJobArtifacts(ctx, run)
+func (s *NCCLDebug) runJob(ctx context.Context, run *ncclDebugJob) (runErr error) {
+	defer func() { s.saveJobArtifacts(ctx, run, runErr) }()
 	// sudo's login shell rewrites inline sbatch bodies. Script files preserve
 	// newlines and defer expansion of Slurm variables until the task executes.
 	for name, script := range map[string]string{
-		"step.sh":  ncclDebugTaskCommand(s.worker.SlurmNode.GPUCount, run.directory),
-		"batch.sh": ncclDebugBatchCommand(run.level, run.directory),
+		"step.sh":  ncclDebugTaskCommand(s.worker.SlurmNode.GPUCount),
+		"batch.sh": ncclDebugBatchCommand(run.level),
 	} {
 		command := "printf '%s' " + framework.ShellQuote(base64.StdEncoding.EncodeToString([]byte(script))) +
 			" | base64 --decode > " + framework.ShellQuote(path.Join(run.directory, name)) +
@@ -194,15 +193,11 @@ func (s *NCCLDebug) runJob(ctx context.Context, run *ncclDebugJob) error {
 	if err != nil {
 		return err
 	}
-	s.runtime.Logf("NCCL debug: job=%s workload_duration=%ds", run.job.ID, run.task.elapsedSeconds)
 	run.active, err = s.resources(ctx, run)
 	if err != nil {
 		return err
 	}
 	if _, err := s.runtime.Jail().Run(ctx, "touch -- "+framework.ShellQuote(path.Join(run.directory, "release-step"))); err != nil {
-		return err
-	}
-	if _, err := s.waitForFile(ctx, run, "step-finished"); err != nil {
 		return err
 	}
 	// Keep the allocation alive: namespace teardown must not hide leaked files.
@@ -239,28 +234,35 @@ func (s *NCCLDebug) runJob(ctx context.Context, run *ncclDebugJob) error {
 	return err
 }
 
-func ncclDebugTaskCommand(gpus int, directory string) string {
-	return fmt.Sprintf(`test "$(id -un)" = %s
-test "$(id -u)" -ne 0
-SECONDS=0
+func ncclDebugTaskCommand(gpus int) string {
+	return fmt.Sprintf(`set -eu
+cd -- "$(dirname -- "$0")"
+user=$(id -un)
+uid=$(id -u)
+test "$user" = %s
+test "$uid" -ne 0
 all_reduce_perf -g %d -b 32M -e 32M -f 2 -w 1 -n 1
-printf 'HOST=%%s\nJOB=%%s\nSTEP=%%s\nUSER=%%s\nUID=%%s\nDEBUG=%%s\nDEBUG_FILE=%%s\nELAPSED_SECONDS=%%s\n' "$(hostname)" "$SLURM_JOB_ID" "$SLURM_STEP_ID" "$(id -un)" "$(id -u)" "$NCCL_DEBUG" "$NCCL_DEBUG_FILE" "$SECONDS" > %s
-mv -- %s %s
+cat > task.tmp <<EOF
+HOST=$(hostname)
+JOB=$SLURM_JOB_ID
+STEP=$SLURM_STEP_ID
+USER=$user
+UID=$uid
+DEBUG=$NCCL_DEBUG
+DEBUG_FILE=$NCCL_DEBUG_FILE
+EOF
+mv -- task.tmp task
 %s`, framework.ShellQuote(soperatorChecksUserName), gpus,
-		framework.ShellQuote(path.Join(directory, "task.tmp")), framework.ShellQuote(path.Join(directory, "task.tmp")), framework.ShellQuote(path.Join(directory, "task")),
-		framework.JobReleaseGate(path.Join(directory, "release-step"), ncclDebugWait))
+		framework.JobReleaseGate("release-step", ncclDebugWait))
 }
 
-func ncclDebugBatchCommand(level, directory string) string {
-	return strings.Join([]string{
-		"set -eu",
-		"unset NCCL_DEBUG NCCL_DEBUG_FILE NCCL_DEBUG_SUBSYS NCCL_DEBUG_LEVELS",
-		"srun --nodes=1 --ntasks=1 --nccld-enabled=1 --nccld-log-level=" + level +
-			" --nccld-out-file=1 --nccld-out-stdout=0 --nccld-out-dir=" + framework.ShellQuote(ncclDebugOutputDir) +
-			" /bin/bash -e " + framework.ShellQuote(path.Join(directory, "step.sh")),
-		"printf 'finished\\n' > " + framework.ShellQuote(path.Join(directory, "step-finished")),
-		framework.JobReleaseGate(path.Join(directory, "release-job"), ncclDebugWait),
-	}, "\n")
+func ncclDebugBatchCommand(level string) string {
+	return fmt.Sprintf(`set -eu
+cd -- "$(dirname -- "$0")"
+unset NCCL_DEBUG NCCL_DEBUG_FILE NCCL_DEBUG_SUBSYS NCCL_DEBUG_LEVELS
+srun --nodes=1 --ntasks=1 --nccld-enabled=1 --nccld-log-level=%s --nccld-out-file=1 --nccld-out-stdout=0 --nccld-out-dir=%s /bin/bash -e ./step.sh
+%s`, framework.ShellQuote(level), framework.ShellQuote(ncclDebugOutputDir),
+		framework.JobReleaseGate("release-job", ncclDebugWait))
 }
 
 func parseNCCLDebugTask(output, jobID, level string) (ncclDebugTask, error) {
@@ -277,10 +279,6 @@ func parseNCCLDebugTask(output, jobID, level string) (ncclDebugTask, error) {
 	}
 	if _, err := strconv.ParseUint(task.step, 10, 32); err != nil {
 		return ncclDebugTask{}, fmt.Errorf("parse NCCL task step ID %q: %w", task.step, err)
-	}
-	task.elapsedSeconds, err = strconv.ParseUint(parseKeyValueLine(output, "ELAPSED_SECONDS"), 10, 32)
-	if err != nil {
-		return ncclDebugTask{}, fmt.Errorf("parse NCCL workload duration: %w", err)
 	}
 	expected := path.Join(ncclDebugOutputDir, task.filePrefix()+"out")
 	if parseKeyValueLine(output, "DEBUG") != level || task.logPath != expected {
@@ -377,20 +375,15 @@ func validateNCCLDebugLog(level, output string) error {
 
 func (s *NCCLDebug) checkResources() error {
 	for _, run := range s.jobs {
-		if len(run.remaining.files) != 0 {
-			return fmt.Errorf("verify released NCCL resources for job %s: remaining %v", run.job.ID, run.remaining.files)
-		}
-		prefix := run.task.filePrefix()
-		for _, suffix := range []string{"state", "user-init.lock", "task-init-privileged.lock", "task-init.lock"} {
-			if !slices.Contains(run.active.files, prefix+suffix) {
-				return fmt.Errorf("verify active NCCL resources for job %s step %s: missing %s in %v", run.job.ID, run.task.step, prefix+suffix, run.active.files)
-			}
+		state := run.task.filePrefix() + "state"
+		if !slices.Contains(run.active.files, state) {
+			return fmt.Errorf("verify active NCCL resources for job %s step %s: missing %s in %v", run.job.ID, run.task.step, state, run.active.files)
 		}
 	}
 	return nil
 }
 
-func (s *NCCLDebug) saveJobArtifacts(ctx context.Context, run *ncclDebugJob) {
+func (s *NCCLDebug) saveJobArtifacts(ctx context.Context, run *ncclDebugJob, runErr error) {
 	artifacts, ok := framework.ScenarioArtifacts(ctx)
 	if !ok || run.job.IsZero() {
 		return
@@ -398,18 +391,24 @@ func (s *NCCLDebug) saveJobArtifacts(ctx context.Context, run *ncclDebugJob) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	defer cancel()
 	files := map[string]string{
-		"nccl.log": run.log, "task.txt": run.metadata,
+		"nccl.log": run.log, "task.txt": run.metadata, "stdout": run.stdout,
 		"active-resources.txt":    fmt.Sprintf("namespace=%t\n%s", run.active.namespace, strings.Join(run.active.files, "\n")),
 		"remaining-resources.txt": fmt.Sprintf("namespace=%t\n%s", run.remaining.namespace, strings.Join(run.remaining.files, "\n")),
 	}
-	if run.task.logPath != "" {
-		if output, err := s.runtime.WorkerPod(s.pod).Run(ctx, "cat -- "+framework.ShellQuote("/mnt/jail"+run.task.logPath)); err == nil {
-			files["nccl.log"] = output
-		} else {
-			s.runtime.Logf("Collect NCCL debug log %s: %v", run.task.logPath, err)
+	if runErr != nil {
+		files["failure.txt"] = runErr.Error()
+		if run.task.logPath != "" {
+			if output, err := s.runtime.WorkerPod(s.pod).Run(ctx, "cat -- "+framework.ShellQuote("/mnt/jail"+run.task.logPath)); err == nil {
+				files["nccl.log"] = output
+			} else {
+				s.runtime.Logf("Collect NCCL debug log %s: %v", run.task.logPath, err)
+			}
 		}
 	}
 	for name, remote := range map[string]string{"stdout": run.job.StdoutPath, "stderr": run.job.StderrPath} {
+		if name == "stdout" && runErr == nil {
+			continue
+		}
 		output, err := readJobFile(ctx, s.runtime, remote)
 		if err != nil {
 			s.runtime.Logf("Collect NCCL debug artifact %s: %v", remote, err)

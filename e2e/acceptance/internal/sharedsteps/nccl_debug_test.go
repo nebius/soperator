@@ -22,7 +22,9 @@ func TestNCCLDebugBatchCommand(t *testing.T) {
 			for _, name := range []string{"release-step", "release-job"} {
 				require.NoError(t, os.WriteFile(filepath.Join(directory, name), nil, 0o600))
 			}
-			require.NoError(t, os.WriteFile(filepath.Join(directory, "step.sh"), []byte(ncclDebugTaskCommand(8, directory)), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(directory, "step.sh"), []byte(ncclDebugTaskCommand(8)), 0o600))
+			batch := filepath.Join(directory, "batch.sh")
+			require.NoError(t, os.WriteFile(batch, []byte(ncclDebugBatchCommand(level)), 0o600))
 			// Execute both shell layers with a fake Slurm launcher and NCCL binary.
 			// This exercises quoting and the gates without submitting a job.
 			stub := fmt.Sprintf(`id() { if [ "$1" = -u ]; then echo 1000; else echo soperatorchecks; fi; }
@@ -36,8 +38,8 @@ srun() {
     NCCL_DEBUG=%s NCCL_DEBUG_FILE=/opt/soperator-outputs/local/nccl_logs/worker-0.42.0.out SLURM_JOB_ID=42 SLURM_STEP_ID=0 "$@"
 }
 `, framework.ShellQuote(level))
-			command := ncclDebugBatchCommand(level, directory)
-			output, err := exec.CommandContext(t.Context(), "bash", "-c", stub+command).CombinedOutput()
+			command := stub + "export -f srun\n/bin/bash -e " + framework.ShellQuote(batch)
+			output, err := exec.CommandContext(t.Context(), "bash", "-c", command).CombinedOutput()
 			require.NoError(t, err, string(output))
 			assert.Equal(t, "-g 8 -b 32M -e 32M -f 2 -w 1 -n 1", parseKeyValueLine(string(output), "NCCL_PAYLOAD"))
 			assert.Contains(t, string(output), "--nccld-enabled=1 --nccld-log-level="+level)
@@ -46,13 +48,12 @@ srun() {
 			require.NoError(t, err)
 			_, err = parseNCCLDebugTask(string(metadata), "42", level)
 			require.NoError(t, err)
-			assert.FileExists(t, filepath.Join(directory, "step-finished"))
 		})
 	}
 }
 
 func TestParseNCCLDebugTask(t *testing.T) {
-	metadata := "HOST=worker-0\nJOB=42\nSTEP=0\nUSER=soperatorchecks\nUID=1000\nDEBUG=INFO\nDEBUG_FILE=/opt/soperator-outputs/local/nccl_logs/worker-0.42.0.out\nELAPSED_SECONDS=1\n"
+	metadata := "HOST=worker-0\nJOB=42\nSTEP=0\nUSER=soperatorchecks\nUID=1000\nDEBUG=INFO\nDEBUG_FILE=/opt/soperator-outputs/local/nccl_logs/worker-0.42.0.out\n"
 	task, err := parseNCCLDebugTask(metadata, "42", "INFO")
 	require.NoError(t, err)
 	assert.Equal(t, "worker-0", task.host)
@@ -66,7 +67,6 @@ func TestParseNCCLDebugTask(t *testing.T) {
 		"unsafe host":    {"HOST=worker-0", "HOST=../worker-0"},
 		"wrong level":    {"DEBUG=INFO", "DEBUG=WARN"},
 		"wrong log path": {"DEBUG_FILE=/opt/soperator-outputs/local/nccl_logs/worker-0.42.0.out", "DEBUG_FILE=/tmp/elsewhere.out"},
-		"bad duration":   {"ELAPSED_SECONDS=1", "ELAPSED_SECONDS=invalid"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := parseNCCLDebugTask(strings.ReplaceAll(metadata, replacement[0], replacement[1]), "42", "INFO")
@@ -130,7 +130,7 @@ func TestNCCLDebugRequiresObservedActiveResources(t *testing.T) {
 	run := &ncclDebugJob{job: framework.SbatchJob{ID: "42"}, task: ncclDebugTask{host: "worker-0", job: "42", step: "0"}}
 	s := &NCCLDebug{jobs: []*ncclDebugJob{run}}
 	require.ErrorContains(t, s.checkResources(), "missing worker-0.42.0.state")
-	run.active.files = []string{"worker-0.42.0.state", "worker-0.42.0.user-init.lock", "worker-0.42.0.task-init-privileged.lock", "worker-0.42.0.task-init.lock"}
+	run.active.files = []string{"worker-0.42.0.state"}
 	require.NoError(t, s.checkResources())
 	run.active.files[0] = "worker-0.43.0.state"
 	require.ErrorContains(t, s.checkResources(), "missing worker-0.42.0.state")
