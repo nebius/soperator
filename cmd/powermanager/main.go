@@ -18,8 +18,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -29,12 +31,15 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/flowcontrol"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -57,8 +62,11 @@ const (
 )
 
 var (
-	scheme = runtime.NewScheme()
-	log    = ctrl.Log.WithName("power-manager")
+	scheme          = runtime.NewScheme()
+	log             = ctrl.Log.WithName("power-manager")
+	restConfigQPS   = 5.0
+	restConfigBurst = 10
+	waitForReady    bool
 )
 
 func init() {
@@ -75,6 +83,9 @@ type NodeRef struct {
 func main() {
 	ctrl.SetLogger(zap.New(zap.UseDevMode(false)))
 
+	flag.Float64Var(&restConfigQPS, "rest-config-qps", 5, "Kubernetes API requests per second per process")
+	flag.IntVar(&restConfigBurst, "rest-config-burst", 10, "Kubernetes API request burst per process")
+	flag.BoolVar(&waitForReady, "wait", false, "Wait for NodeSet PowerStateReady after applying the action")
 	namespace := flag.String("namespace", "", "Kubernetes namespace (auto-detected from ServiceAccount if not specified)")
 	nodes := flag.String("nodes", "", "Node list from Slurm (e.g., 'worker-[0-5],gpu-[2-4]') (required)")
 	timeout := flag.Duration("timeout", 30*time.Second, "Timeout for operations")
@@ -84,8 +95,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Commands:\n")
 		fmt.Fprintf(os.Stderr, "  resume        Resume (power on) nodes - called by Slurm's ResumeProgram\n")
 		fmt.Fprintf(os.Stderr, "  suspend       Suspend (power off) nodes - called by Slurm's SuspendProgram\n")
-		fmt.Fprintf(os.Stderr, "  wait-added    Wait for nodes to appear in activeNodes - verify resume completed\n")
-		fmt.Fprintf(os.Stderr, "  wait-removed  Wait for nodes to be removed from activeNodes - verify suspend completed\n")
+		fmt.Fprintf(os.Stderr, "  wait-added    Wait for ordinals to appear in activeNodes\n")
+		fmt.Fprintf(os.Stderr, "  wait-removed  Wait for ordinals to disappear from activeNodes\n")
 		fmt.Fprintf(os.Stderr, "\nOptions:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
@@ -115,6 +126,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if float32(restConfigQPS) <= 0 || math.IsNaN(restConfigQPS) || math.IsInf(restConfigQPS, 0) || restConfigQPS > math.MaxFloat32 || restConfigBurst <= 0 {
+		log.Error(fmt.Errorf("rate limits must be positive"), "Invalid rate limits")
+		os.Exit(1)
+	}
 	if *nodes == "" {
 		log.Error(fmt.Errorf("--nodes is required"), "Missing required flag")
 		os.Exit(1)
@@ -201,6 +216,7 @@ func runPowerAction(ctx context.Context, namespace, nodes string, timeout time.D
 		nodeSetMap[ns.Name] = ns
 	}
 
+	targets := make(map[string]*slurmv1alpha1.NodeSetPowerState)
 	for nodeSetName, ordinals := range nodesByNodeSet {
 		nodeSet, exists := nodeSetMap[nodeSetName]
 		if !exists {
@@ -213,21 +229,27 @@ func runPowerAction(ctx context.Context, namespace, nodes string, timeout time.D
 			continue
 		}
 
-		if err := updateNodeSetPowerState(ctx, client, namespace, nodeSetName, ordinals, resume); err != nil {
+		powerState, err := updateNodeSetPowerState(ctx, client, namespace, nodeSetName, ordinals, resume)
+		if err != nil {
 			log.Error(err, "Failed to update NodeSetPowerState", "nodeSet", nodeSetName)
 			return err
 		}
 
+		targets[nodeSetName] = powerState
 		log.Info("Updated NodeSetPowerState", "nodeSet", nodeSetName, "action", action, "ordinals", ordinals)
 	}
 
+	if waitForReady {
+		if err := waitForPowerStates(ctx, client, namespace, nodesByNodeSet, targets, resume); err != nil {
+			return err
+		}
+	}
 	log.Info("Power action completed successfully", "action", action)
 	return nil
 }
 
-// waitForNodes waits for specified nodes to appear in or be removed from activeNodes of their NodeSetPowerState CRs.
-// If waitForAdded is true, it waits for nodes to appear (used by ResumeProgram).
-// If waitForAdded is false, it waits for nodes to be removed (used by SuspendProgram).
+// waitForNodes waits for future activeNodes membership changes.
+// Slurm scripts use --wait on the action itself to retain its original UID and generation.
 func waitForNodes(ctx context.Context, namespace, nodes string, timeout time.Duration, waitForAdded bool) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -237,7 +259,7 @@ func waitForNodes(ctx context.Context, namespace, nodes string, timeout time.Dur
 		action = "be removed from"
 	}
 
-	log.Info("Waiting for nodes", "action", action, "nodes", nodes, "namespace", namespace, "timeout", timeout)
+	log.Info("Waiting for applied power state pods", "action", action, "nodes", nodes, "namespace", namespace, "timeout", timeout)
 
 	client, err := createClient()
 	if err != nil {
@@ -251,82 +273,65 @@ func waitForNodes(ctx context.Context, namespace, nodes string, timeout time.Dur
 
 	nodesByNodeSet := groupNodesByNodeSet(nodeRefs)
 
-	pollInterval := 2 * time.Second
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("timeout waiting for nodes to %s activeNodes", action)
-		case <-ticker.C:
-			allDone := true
-			for nodeSetName, ordinals := range nodesByNodeSet {
-				done, err := checkNodesStatus(ctx, client, namespace, nodeSetName, ordinals, waitForAdded)
-				if err != nil {
-					log.V(1).Info("Error checking activeNodes, will retry", "nodeSet", nodeSetName, "error", err)
-					allDone = false
-					continue
-				}
-				if !done {
-					log.V(1).Info("Nodes not yet in expected state", "nodeSet", nodeSetName, "ordinals", ordinals, "waitForAdded", waitForAdded)
-					allDone = false
-				}
+	group, ctx := errgroup.WithContext(ctx)
+	for name, ordinals := range nodesByNodeSet {
+		group.Go(func() error {
+			isEphemeral, err := nodeSetIsEphemeral(ctx, client, namespace, name)
+			if err != nil {
+				return err
 			}
-			if allDone {
-				log.Info("All nodes in expected state", "waitForAdded", waitForAdded)
+			if !isEphemeral {
 				return nil
 			}
-		}
+			return watchActiveNodes(ctx, client, namespace, name, ordinals, waitForAdded)
+		})
 	}
+	return group.Wait()
 }
 
-// checkNodesStatus checks if all specified ordinals are in or not in the NodeSetPowerState's activeNodes.
-// If checkAdded is true, returns true only if ALL ordinals are in activeNodes.
-// If checkAdded is false, returns true only if NONE of the ordinals are in activeNodes.
-func checkNodesStatus(ctx context.Context, client ctrlclient.Client, namespace, nodeSetName string, ordinals []int32, checkAdded bool) (bool, error) {
-	powerState := &slurmv1alpha1.NodeSetPowerState{}
-	if err := client.Get(ctx, ctrlclient.ObjectKey{
+// nodeSetIsEphemeral reports whether power actions apply to the NodeSet. A NodeSet that is gone
+// counts as non-ephemeral: nothing will update its NodeSetPowerState either.
+func nodeSetIsEphemeral(ctx context.Context, client ctrlclient.Client, namespace, nodeSetName string) (bool, error) {
+	nodeSet := &slurmv1alpha1.NodeSet{}
+	key := ctrlclient.ObjectKey{
 		Namespace: namespace,
 		Name:      nodeSetName,
-	}, powerState); err != nil {
-		return false, fmt.Errorf("failed to get NodeSetPowerState: %w", err)
 	}
-
-	activeSet := make(map[int32]bool, len(powerState.Spec.ActiveNodes))
-	for _, ordinal := range powerState.Spec.ActiveNodes {
-		activeSet[ordinal] = true
-	}
-
-	if checkAdded {
-		// All ordinals must be present
-		for _, ordinal := range ordinals {
-			if !activeSet[ordinal] {
-				return false, nil
-			}
-		}
-		return true, nil
-	}
-
-	// All ordinals must be absent
-	for _, ordinal := range ordinals {
-		if activeSet[ordinal] {
+	backoff := wait.Backoff{Steps: 8, Duration: 100 * time.Millisecond, Factor: 2, Jitter: 0.2, Cap: 5 * time.Second}
+	err := backoff.DelayFunc().Until(ctx, true, true, func(context.Context) (bool, error) {
+		err := client.Get(ctx, key, nodeSet)
+		if isRetryableAPIError(err) {
 			return false, nil
 		}
+		return err == nil, err
+	})
+	if err != nil {
+		if ctrlclient.IgnoreNotFound(err) == nil {
+			return false, nil
+		}
+		return false, fmt.Errorf("get NodeSet: %w", err)
 	}
-	return true, nil
+
+	return nodeSet.Spec.EphemeralNodes != nil && *nodeSet.Spec.EphemeralNodes, nil
 }
 
 // createClient creates a Kubernetes client.
 // It first tries to use in-cluster configuration (when running inside a pod),
 // and falls back to kubeconfig (for local development/testing).
-func createClient() (ctrlclient.Client, error) {
+func createClient() (ctrlclient.WithWatch, error) {
 	config, err := getKubeConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubernetes config: %w", err)
 	}
 
-	return ctrlclient.New(config, ctrlclient.Options{Scheme: scheme})
+	setClientRateLimits(config, float32(restConfigQPS), restConfigBurst)
+	return ctrlclient.NewWithWatch(config, ctrlclient.Options{Scheme: scheme})
+}
+
+func setClientRateLimits(config *rest.Config, qps float32, burst int) {
+	config.QPS = qps
+	config.Burst = burst
+	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(qps, burst)
 }
 
 // getKubeConfig returns a Kubernetes REST config.
@@ -535,30 +540,26 @@ func groupNodesByNodeSet(refs []NodeRef) map[string][]int32 {
 }
 
 // updateNodeSetPowerState updates the NodeSetPowerState CR for the given NodeSet.
-// It uses retry.RetryOnConflict to safely handle concurrent resume/suspend calls.
-func updateNodeSetPowerState(ctx context.Context, client ctrlclient.Client, namespace, nodeSetName string, ordinals []int32, resume bool) error {
+// Conflicts are retried from fresh state; initial CR creation belongs to the NodeSet controller.
+func updateNodeSetPowerState(ctx context.Context, client ctrlclient.Client, namespace, nodeSetName string, ordinals []int32, resume bool) (*slurmv1alpha1.NodeSetPowerState, error) {
 	powerStateKey := ctrlclient.ObjectKey{
 		Namespace: namespace,
 		Name:      nodeSetName,
 	}
 
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	var result *slurmv1alpha1.NodeSetPowerState
+	missing := false
+	attempt := func() error {
 		powerState := &slurmv1alpha1.NodeSetPowerState{}
 		err := client.Get(ctx, powerStateKey, powerState)
+		missing = apierrors.IsNotFound(err)
 		if err != nil {
 			if ctrlclient.IgnoreNotFound(err) != nil {
 				return fmt.Errorf("failed to get NodeSetPowerState: %w", err)
 			}
-			powerState = &slurmv1alpha1.NodeSetPowerState{}
-			powerState.Name = nodeSetName
-			powerState.Namespace = namespace
-			powerState.Spec.NodeSetRef = nodeSetName
-			powerState.Spec.ActiveNodes = []int32{}
-
-			if err := client.Create(ctx, powerState); err != nil {
-				return fmt.Errorf("failed to create NodeSetPowerState: %w", err)
-			}
-			return nil
+			// Let the NodeSet controller create the CR so initial ordinals and ownership
+			// remain consistent, including static-to-ephemeral transitions.
+			return err
 		}
 
 		currentActiveSet := make(map[int32]bool, len(powerState.Spec.ActiveNodes))
@@ -566,16 +567,23 @@ func updateNodeSetPowerState(ctx context.Context, client ctrlclient.Client, name
 			currentActiveSet[ord] = true
 		}
 
+		changed := false
 		if resume {
 			for _, ord := range ordinals {
+				changed = changed || !currentActiveSet[ord]
 				currentActiveSet[ord] = true
 			}
 		} else {
 			for _, ord := range ordinals {
+				changed = changed || currentActiveSet[ord]
 				delete(currentActiveSet, ord)
 			}
 		}
 
+		if !changed {
+			result = powerState
+			return nil
+		}
 		newActiveNodes := make([]int32, 0, len(currentActiveSet))
 		for ord := range currentActiveSet {
 			newActiveNodes = append(newActiveNodes, ord)
@@ -586,6 +594,33 @@ func updateNodeSetPowerState(ctx context.Context, client ctrlclient.Client, name
 
 		powerState.Spec.ActiveNodes = newActiveNodes
 
-		return client.Update(ctx, powerState)
+		if err := client.Update(ctx, powerState); err != nil {
+			return err
+		}
+		result = powerState
+		return nil
+	}
+	err := retryPowerStateUpdate(ctx, wait.Backoff{Steps: 8, Duration: 100 * time.Millisecond, Factor: 2, Jitter: 0.2, Cap: 5 * time.Second}, attempt)
+	if err != nil && ctx.Err() != nil && missing {
+		return nil, fmt.Errorf("wait for operator to create NodeSetPowerState %s/%s: %w", namespace, nodeSetName, ctx.Err())
+	}
+	return result, err
+}
+
+func retryPowerStateUpdate(ctx context.Context, backoff wait.Backoff, attempt func() error) error {
+	// Steps limits delay growth, not attempts: CR creation can take the whole action budget.
+	return backoff.DelayFunc().Until(ctx, true, true, func(context.Context) (bool, error) {
+		err := attempt()
+		if apierrors.IsConflict(err) || apierrors.IsNotFound(err) || isRetryableAPIError(err) {
+			return false, nil
+		}
+		return err == nil, err
 	})
+}
+
+func isRetryableAPIError(err error) bool {
+	var status apierrors.APIStatus
+	var networkError net.Error
+	return errors.As(err, &status) && (status.Status().Code >= 500 || status.Status().Code == 429) ||
+		errors.As(err, &networkError) && networkError.Timeout()
 }

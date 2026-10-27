@@ -19,11 +19,12 @@ type SlurmREST struct {
 	ContainerREST        Container
 	CustomInitContainers []corev1.Container
 	Service              Service
+	Deployment           Deployment
 	VolumeJail           slurmv1.NodeVolume
 	Maintenance          *consts.MaintenanceMode
 }
 
-func buildRestFrom(clusterName string, maintenance *consts.MaintenanceMode, rest *slurmv1.SlurmRest) SlurmREST {
+func buildRestFrom(clusterName, namePrefix string, maintenance *consts.MaintenanceMode, rest *slurmv1.SlurmRest) SlurmREST {
 	containerREST := buildContainerFrom(
 		rest.SlurmRestNode,
 		consts.ContainerNameREST,
@@ -40,6 +41,7 @@ func buildRestFrom(clusterName string, maintenance *consts.MaintenanceMode, rest
 		ContainerREST:        containerREST,
 		CustomInitContainers: rest.CustomInitContainers,
 		Service:              buildServiceFrom(naming.BuildServiceName(consts.ComponentTypeREST, clusterName)),
+		Deployment:           buildDeploymentFrom(naming.BuildDeploymentName(consts.ComponentTypeREST, namePrefix)),
 		Maintenance:          maintenance,
 		VolumeJail: slurmv1.NodeVolume{
 			VolumeSourceName: ptr.To(consts.VolumeNameJail),

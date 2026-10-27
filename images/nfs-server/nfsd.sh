@@ -9,6 +9,7 @@ set -euo pipefail
 GRACE_TIME="${GRACE_TIME:-10}"
 LEASE_TIME="${LEASE_TIME:-10}"
 THREADS="${THREADS:-8}"
+MAX_CONNECTIONS="${MAX_CONNECTIONS:-8192}"
 
 # Logging function
 log() {
@@ -103,6 +104,17 @@ start_nfsd() {
         --grace-time "$GRACE_TIME" \
         --lease-time "$LEASE_TIME" \
         "$THREADS"
+
+    # rpc.nfsd mounts the nfsd control filesystem. Newer kernels omit max_connections.
+    local max_connections_file="/proc/fs/nfsd/max_connections"
+    if [[ -e "$max_connections_file" ]]; then
+        log "Setting NFS maximum connections to $MAX_CONNECTIONS"
+        # nfsd accepts only one write per open. Bash printf on musl can split
+        # the value and newline; BusyBox echo writes them in one buffer.
+        /bin/busybox echo "$MAX_CONNECTIONS" > "$max_connections_file"
+    else
+        log "Kernel does not expose NFS max_connections; skipping connection limit configuration"
+    fi
 
     log "NFS daemon started successfully"
 }

@@ -84,7 +84,7 @@ tests:
                       sizeLimit: "1Gi"
                 containers:
                   - name: "custom-sidecar"
-                    image: "cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e"
+                    image: "busybox:1.36"
     asserts:
       - hasDocuments:
           count: 1
