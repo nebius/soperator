@@ -144,14 +144,6 @@ func (s *SystemChecks) aHealthyWorkerPodIsSelected(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return s.runtime.WaitFor(ctx, "selected worker pod and host ready", systemWorkerRestartTimeout, framework.DefaultPollInterval,
-		func(waitCtx context.Context) (bool, error) {
-			err := s.selectHealthyWorkerPod(waitCtx, workers)
-			return err == nil, err
-		})
-}
-
-func (s *SystemChecks) selectHealthyWorkerPod(ctx context.Context, workers []framework.WorkerInfo) error {
 	var problems []string
 	for _, worker := range workers {
 		node, err := s.slurm.NodeInfo(ctx, worker.Name)
@@ -183,7 +175,7 @@ func (s *SystemChecks) selectHealthyWorkerPod(ctx context.Context, workers []fra
 			problems = append(problems, fmt.Sprintf("%s: %v", worker.Name, err))
 			continue
 		}
-		if !k8sNodeReady(k8sNode) {
+		if !kubeobjects.NodeReady(k8sNode) {
 			problems = append(problems, fmt.Sprintf("%s: Kubernetes node %s is not Ready", worker.Name, k8sNode.Name))
 			continue
 		}
@@ -284,7 +276,7 @@ func (s *SystemChecks) kubeletIsStoppedOnTheSelectedWorkerKubernetesNode(ctx con
 	if err != nil {
 		return err
 	}
-	if !k8sNodeReady(k8sNode) {
+	if !kubeobjects.NodeReady(k8sNode) {
 		return fmt.Errorf("selected Kubernetes node %s is not Ready", k8sNode.Name)
 	}
 	s.kubeletWorker = s.worker
@@ -323,7 +315,7 @@ func (s *SystemChecks) theSelectedWorkerKubernetesNodeIsRecreated(ctx context.Co
 		if !found {
 			return false, nil
 		}
-		return string(node.UID) != s.kubeletK8sNodeUID && k8sNodeReady(node), nil
+		return string(node.UID) != s.kubeletK8sNodeUID && kubeobjects.NodeReady(node), nil
 	})
 }
 

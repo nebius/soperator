@@ -261,7 +261,7 @@ func (s *WorkerRollingUpdate) cleanupRollout(ctx context.Context) {
 			}
 			for _, pod := range pods {
 				host, found := hosts[pod.Spec.NodeName]
-				if !found || host.DeletionTimestamp != nil || host.Spec.Unschedulable || !k8sNodeReady(host) {
+				if !found || host.DeletionTimestamp != nil || host.Spec.Unschedulable || !kubeobjects.NodeReady(host) {
 					return false, fmt.Errorf("worker %s host %s not ready and schedulable", pod.Name, pod.Spec.NodeName)
 				}
 			}

@@ -94,7 +94,8 @@ tag lines so exact scenario selectors keep their line numbers.
 If the sequential suite fails, the concurrent suite is not started against a
 potentially degraded shared baseline.
 
-Worker selection reserves an entire worker set atomically. Waiting requests
+Worker selection waits for active workers' Pods and Kubernetes hosts to be Ready
+and reserves an entire worker set atomically. Waiting requests
 are considered in arrival order, but a request that cannot fit does not block
 an independent request. Generic allocations prefer CPU workers. Leases last
 through cleanup; failed cleanup or recovery quarantines the affected workers

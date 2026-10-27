@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+	corev1 "k8s.io/api/core/v1"
+
+	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
 
 type WorkerSelector struct {
@@ -211,8 +214,16 @@ func (s *WorkerSelector) Acquire(ctx context.Context, needs WorkerRequirements) 
 			if err != nil {
 				return nil, err
 			}
+			var nodes corev1.NodeList
+			if err := s.kubectl.GetJSON(ctx, &nodes, "get", "nodes", "-o", "json"); err != nil {
+				return nil, fmt.Errorf("list worker Kubernetes hosts: %w", err)
+			}
+			hostReady := make(map[string]bool, len(nodes.Items))
+			for _, node := range nodes.Items {
+				hostReady[node.Name] = kubeobjects.NodeReady(node)
+			}
 			for _, pod := range pods {
-				ready[pod.SlurmNodeName] = pod.Ready
+				ready[pod.SlurmNodeName] = pod.Ready && hostReady[pod.KubernetesNodeName]
 			}
 		}
 		for _, worker := range snapshot.Workers {
@@ -224,7 +235,7 @@ func (s *WorkerSelector) Acquire(ctx context.Context, needs WorkerRequirements) 
 				continue
 			}
 			if workerReservation(ctx) != nil && worker.SlurmNode.IsReadyForImmediateWork() && !ready[worker.Name] {
-				worker.unavailableReason = "worker pod is not Ready"
+				worker.unavailableReason = "worker pod or Kubernetes host is not Ready"
 			}
 			candidates = append(candidates, worker)
 		}

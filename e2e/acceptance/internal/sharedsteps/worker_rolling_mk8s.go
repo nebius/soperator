@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
+	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
 
 const (
@@ -267,7 +268,7 @@ func workerMK8sHosts(workers map[string]workerPodSnapshot, nodes []corev1.Node) 
 		if node.Labels[workerMK8sGroupLabel] != groupID {
 			continue
 		}
-		if node.UID == "" || node.Spec.Unschedulable || node.DeletionTimestamp != nil || !k8sNodeReady(node) {
+		if node.UID == "" || node.Spec.Unschedulable || node.DeletionTimestamp != nil || !kubeobjects.NodeReady(node) {
 			return "", nil, fmt.Errorf("MK8s host %s is not ready and schedulable", node.Name)
 		}
 		hosts[node.Name] = node.UID
@@ -650,7 +651,7 @@ func (s *WorkerRollingUpdate) mk8sGroupAndHostsReady(ctx context.Context, minimu
 			continue
 		}
 		count++
-		if host.DeletionTimestamp != nil || host.Spec.Unschedulable || !k8sNodeReady(host) {
+		if host.DeletionTimestamp != nil || host.Spec.Unschedulable || !kubeobjects.NodeReady(host) {
 			return fmt.Errorf("MK8s group %s host %s not ready and schedulable", s.mk8s.groupID, host.Name)
 		}
 	}
