@@ -43,7 +43,7 @@ controllerManager:
       topologyLabelPrefix: "topology.nebius.com"
     image:
       repository: cr.nebius.cloud/soperator/slurm-operator
-      tag: 4.1.16
+      tag: 4.1.15
     imagePullPolicy: Always
     resources:
       limits:
