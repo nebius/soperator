@@ -100,7 +100,7 @@ func (s *Accounting) CleanupAndReset(ctx context.Context) {
 		cleanupCtx, cancel := context.WithTimeout(ctx, accountingCleanupTimeout)
 		defer cancel()
 		if err := s.slurm.CancelJob(cleanupCtx, s.job.ID, accountingCleanupTimeout); err != nil {
-			s.runtime.Logf("cleanup: cancel accounting job %s: %v", s.job.ID, err)
+			reportCleanupError(ctx, s.runtime, "cleanup: cancel accounting job %s: %v", s.job.ID, err)
 		}
 	}
 	s.clusterName = ""

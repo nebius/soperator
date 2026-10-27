@@ -17,7 +17,7 @@ Feature: Docker containers
       | CPU         |
       | GPU         |
 
-  @soperator_version_>=4.0.0,<5.0.0
+  @soperator_version_>=4.0.0,<5.0.0 @parallel
   Scenario Outline: Docker container lifecycle on <worker_type> workers uses local storage
     Given a long-running Docker container job is submitted on two <worker_type> workers
     When the Docker container job is running
@@ -32,7 +32,7 @@ Feature: Docker containers
       | CPU         |
       | GPU         |
 
-  @soperator_version_>=5.0.0
+  @soperator_version_>=5.0.0 @parallel
   Scenario Outline: Docker container lifecycle on <worker_type> workers uses local storage and the Slurm job cgroup
     Given a long-running Docker container job is submitted on two <worker_type> workers
     When the Docker container job is running
@@ -48,7 +48,7 @@ Feature: Docker containers
       | CPU         |
       | GPU         |
 
-  @heavy @gpu @soperator_version_>=5.0.0
+  @heavy @gpu @soperator_version_>=5.0.0 @parallel
   Scenario: Docker containers can access GPUs
     Given a Docker GPU smoke job is submitted on one GPU worker
     Then the Docker GPU smoke job succeeds and reports visible GPUs

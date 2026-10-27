@@ -35,6 +35,8 @@ type Runner struct {
 	targetSoperatorVersion string
 	outputDir              string
 	runtime                framework.Runtime
+	workerPool             *framework.WorkerPool
+	workerAcquireTimeout   time.Duration
 }
 
 // RunnerConfig configures an acceptance suite run.
@@ -44,10 +46,14 @@ type RunnerConfig struct {
 	TargetSoperatorVersion string
 	OutputDir              string
 	Suites                 []SuiteConfig
+	WorkerAcquireTimeout   time.Duration
 }
 
 // NewRunner constructs an acceptance runner.
 func NewRunner(config RunnerConfig) (*Runner, error) {
+	if config.WorkerAcquireTimeout < 0 {
+		return nil, fmt.Errorf("worker acquisition timeout must not be negative")
+	}
 	kubectlContext := strings.TrimSpace(config.KubectlContext)
 	if kubectlContext == "" {
 		return nil, fmt.Errorf("kubectl context is required")
@@ -81,6 +87,8 @@ func NewRunner(config RunnerConfig) (*Runner, error) {
 		targetSoperatorVersion: normalizedTargetVersion,
 		outputDir:              strings.TrimSpace(config.OutputDir),
 		runtime:                runtime,
+		workerPool:             framework.NewWorkerPool(),
+		workerAcquireTimeout:   config.WorkerAcquireTimeout,
 	}, nil
 }
 
@@ -95,9 +103,14 @@ func (r *Runner) Run(ctx context.Context) error {
 }
 
 func (r *Runner) runConfiguredSuites(ctx context.Context, info *framework.ClusterInfo, runtime framework.Runtime, suites []SuiteConfig) error {
+	r.workerPool = framework.NewWorkerPool()
 	selectedSuites := 0
 	var failures []error
 	for _, suite := range suites {
+		if suite.RequirePreviousSuccess && len(failures) != 0 {
+			failures = append(failures, fmt.Errorf("skip suite %q: an earlier suite failed", suite.Name))
+			continue
+		}
 		features, err := r.suiteFeaturePaths(info, suite)
 		if err != nil {
 			failures = append(failures, fmt.Errorf("select suite %q scenarios: %w", suite.Name, err))
@@ -145,6 +158,9 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 	out := make([]SuiteConfig, 0, len(suites))
 	seen := make(map[string]struct{}, len(suites))
 	for _, suite := range suites {
+		if suite.Concurrency < 0 {
+			return nil, fmt.Errorf("suite %q concurrency must not be negative", suite.Name)
+		}
 		name := strings.TrimSpace(suite.Name)
 		if name == "" {
 			return nil, fmt.Errorf("suite name is required")
@@ -183,11 +199,13 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 				FS:    suite.Source.FS,
 				Paths: paths,
 			},
-			VersionAxes:     slices.Clone(suite.VersionAxes),
-			Tags:            strings.TrimSpace(suite.Tags),
-			StepRegistrars:  registrars,
-			ExcludeUnstable: suite.ExcludeUnstable,
-			ExcludeHeavy:    suite.ExcludeHeavy,
+			VersionAxes:            slices.Clone(suite.VersionAxes),
+			Tags:                   strings.TrimSpace(suite.Tags),
+			StepRegistrars:         registrars,
+			ExcludeUnstable:        suite.ExcludeUnstable,
+			ExcludeHeavy:           suite.ExcludeHeavy,
+			Concurrency:            suite.Concurrency,
+			RequirePreviousSuccess: suite.RequirePreviousSuccess,
 		})
 	}
 	return out, nil
@@ -236,6 +254,7 @@ func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runt
 			r.initializeSuiteScenario(sc, info, runtime, suite, artifactsManager, teamCityReporter)
 		},
 		Options: &godog.Options{
+			Concurrency:    suite.Concurrency,
 			Format:         format,
 			FS:             suite.Source.FS,
 			Paths:          features,
@@ -263,15 +282,22 @@ func (r *Runner) initializeSuiteScenario(
 	artifactsManager *framework.ArtifactsManager,
 	teamCityReporter *reports.TeamCityReporter,
 ) {
+	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
+		ctx = framework.WithWorkerAcquireTimeout(ctx, r.workerAcquireTimeout)
+		return framework.WithWorkerReservation(ctx, r.workerPool, suite.Name+"/"+scenario.Id+"/"+scenario.Name), nil
+	})
 	if teamCityReporter != nil {
 		registerTeamCityStateHook(sc, suite.Name)
 	}
 	registerScenarioArtifacts(sc, suite.Name, runtime, artifactsManager)
-	registerTimingHooks(sc)
 	registerSkipHook(sc)
 	for _, register := range suite.StepRegistrars {
 		register(sc, info, runtime)
 	}
+	sc.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
+		return ctx, framework.FinishWorkerReservation(ctx, runtime)
+	})
+	registerTimingHooks(sc)
 	if teamCityReporter != nil {
 		registerTeamCityResultHooks(sc, teamCityReporter)
 	}

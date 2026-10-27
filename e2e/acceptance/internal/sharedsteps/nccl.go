@@ -69,12 +69,7 @@ func (s *NCCL) CleanupAndReset(context.Context) {
 }
 
 func (s *NCCL) selectIdleGPUWorkers(ctx context.Context) error {
-	snapshot, err := s.selector.Snapshot(ctx)
-	if err != nil {
-		return fmt.Errorf("inspect workers for NCCL validation: %w", err)
-	}
-
-	workers, err := pickIdleGPUWorkers(snapshot)
+	workers, err := s.selector.Acquire(ctx, framework.WorkerRequirements{Kind: "GPU", Count: ncclWorkerCount, Idle: true})
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}

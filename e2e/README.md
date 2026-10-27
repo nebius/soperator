@@ -68,6 +68,10 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
 - `--run-heavy`: optional, defaults to `false`; when false, scenarios tagged
   `@heavy` are excluded. Enabling it includes heavy scenarios alongside ordinary
   scenarios. Heavy and unstable controls are independent.
+- `--parallelism`: maximum concurrent worker-local scenarios, defaults to `8`.
+  Set to `1` for sequential execution with the same selection and reservation rules.
+- `--worker-acquire-timeout`: maximum wait for free, healthy workers, defaults
+  to `90m`. This includes contention and recovery and is separate from job timeouts.
 - `--scenario`: optional. Runs all compatible scenarios in the provided feature
   file, or the single scenario at an exact `Scenario:` line, for example
   `features/internal_ssh.feature:3`. May be repeated.
@@ -78,9 +82,26 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
 
 Steps that need a specific worker kind query live Slurm and NodeSet state at
 scenario time. They skip when the required capacity is not configured, but fail
-when it is configured and too few workers are usable. Scenarios that cover all
+when configured workers do not recover within the acquisition timeout. Scenarios that cover all
 workers also fail on partial degradation. CPU, GPU, and topology tags in feature
 files are descriptive only; no current runner or workflow consumes them.
+
+The CLI runs two suites in order: `soperator` contains unmarked scenarios and
+executes sequentially; `soperator-parallel` contains reviewed `@parallel`
+scenarios and uses native Godog concurrency. Both retain the same version,
+heavy, unstable and scenario-path filters. The marker is appended to existing
+tag lines so exact scenario selectors keep their line numbers.
+If the sequential suite fails, the concurrent suite is not started against a
+potentially degraded shared baseline.
+
+Worker selection reserves an entire worker set atomically. Waiting requests
+are considered in arrival order, but a request that cannot fit does not block
+an independent request. Generic allocations prefer CPU workers. Leases last
+through cleanup; failed cleanup or recovery quarantines the affected workers
+for the rest of the run. Shared configuration, SSH identity changes, cluster-wide
+assertions and system DaemonSet restarts remain in the sequential suite. A
+scenario must acquire its complete set once; incremental lock upgrades are
+rejected. Host-wide faults require ownership of every worker on that host.
 
 For focused manual runs on a dev cluster, pass the scenario location:
 
@@ -227,6 +248,15 @@ target cluster. `SlurmClusterName` defaults to `soperator` when omitted.
 `SuiteConfig.ExcludeHeavy` and `ExcludeUnstable` independently exclude their
 respective tags. `SoperatorSuite` preserves heavy coverage for library callers;
 the standalone CLI explicitly excludes it unless `--run-heavy` is set.
+
+Library callers keep sequential behavior unless they set `SuiteConfig.Concurrency`.
+To reuse the same safe split, pass `acceptance.ConcurrentSuites(suite, 8)` as
+`RunnerConfig.Suites`. This also works with Managed-owned feature sources and
+step registrars. Set `RunnerConfig.WorkerAcquireTimeout` to override the default
+90-minute acquisition budget. Select workers through `WorkerSelector.Acquire`
+or its `Pick...Workers` wrappers; custom selectors can call `Reserve` before
+recording worker baselines. The runner supplies scenario ownership through the
+context and finalizes it after all registered cleanup hooks.
 When `OutputDir` is set, each scenario receives matching runner and jail paths
 through `framework.ScenarioArtifacts(ctx)`. Product-specific steps can write
 their own files directly to those paths without registering a collector.

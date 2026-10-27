@@ -19,6 +19,14 @@ func TestParseRunOptionsDefaults(t *testing.T) {
 	assert.Empty(t, opts.SoperatorVersion)
 	assert.Empty(t, opts.ScenarioPaths)
 	assert.Equal(t, "artifacts", opts.OutputDir)
+	assert.Equal(t, 8, opts.Parallelism)
+}
+
+func TestParseRunOptionsRejectsInvalidConcurrencySettings(t *testing.T) {
+	for _, option := range []string{"--parallelism=0", "--parallelism=-1", "--worker-acquire-timeout=0s", "--worker-acquire-timeout=-1s"} {
+		_, err := parseRunOptions([]string{"--kubectl-context", "unused", "--output-dir", "out", option})
+		require.ErrorContains(t, err, "must be positive")
+	}
 }
 
 func TestParseRunOptionsExplicitValues(t *testing.T) {

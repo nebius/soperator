@@ -102,7 +102,7 @@ func (s *JobTmpfs) CleanupAndReset(ctx context.Context) {
 	defer cancel()
 	for _, job := range s.jobs {
 		if err := s.slurm.CancelJob(cleanupCtx, job.ID, time.Minute); err != nil {
-			s.runtime.Logf("Cleanup: cancel tmpfs probe job %s: %v", job.ID, err)
+			reportCleanupError(ctx, s.runtime, "Cleanup: cancel tmpfs probe job %s: %v", job.ID, err)
 		}
 	}
 	s.pod = framework.WorkerPodInfo{}

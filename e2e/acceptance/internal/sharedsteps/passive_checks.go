@@ -545,18 +545,18 @@ func (s *PassiveChecks) cleanupAndResetAllocMem(ctx context.Context) {
 	if s.allocMemScenarioActive {
 		if !s.allocMemJob.IsZero() {
 			if err := s.slurm.CancelJob(ctx, s.allocMemJob.ID, passiveAllocMemJobTimeout); err != nil {
-				s.runtime.Logf("cleanup: cancel alloc_mem_used trigger job %s: %v", s.allocMemJob.ID, err)
+				reportCleanupError(ctx, s.runtime, "cleanup: cancel alloc_mem_used trigger job %s: %v", s.allocMemJob.ID, err)
 			}
 		}
 		if err := s.removeMemoryPressure(ctx); err != nil {
-			s.runtime.Logf("cleanup: remove alloc_mem_used memory pressure: %v", err)
+			reportCleanupError(ctx, s.runtime, "cleanup: remove alloc_mem_used memory pressure: %v", err)
 		}
 		if s.worker.Name != "" {
 			if err := runManualHCProgram(ctx, s.runtime, s.worker); err != nil {
-				s.runtime.Logf("cleanup: run hc_program on %s: %v", s.worker.Name, err)
+				reportCleanupError(ctx, s.runtime, "cleanup: run hc_program on %s: %v", s.worker.Name, err)
 			}
 			if err := s.slurm.ResumeNodeIfDrainedByReason(ctx, s.worker.Name, passiveAllocMemReason); err != nil {
-				s.runtime.Logf("cleanup: resume %s after alloc_mem_used: %v", s.worker.Name, err)
+				reportCleanupError(ctx, s.runtime, "cleanup: resume %s after alloc_mem_used: %v", s.worker.Name, err)
 			}
 		}
 	}
@@ -568,18 +568,18 @@ func (s *PassiveChecks) cleanupAndResetAllocGPU(ctx context.Context) {
 	if s.allocGPUScenarioActive {
 		if !s.allocGPUJob.IsZero() {
 			if err := s.slurm.CancelJob(ctx, s.allocGPUJob.ID, passiveAllocGPUJobTimeout); err != nil {
-				s.runtime.Logf("cleanup: cancel alloc_gpus_busy trigger job %s: %v", s.allocGPUJob.ID, err)
+				reportCleanupError(ctx, s.runtime, "cleanup: cancel alloc_gpus_busy trigger job %s: %v", s.allocGPUJob.ID, err)
 			}
 		}
 		if err := s.stopUnmanagedGPUWorkload(ctx); err != nil {
-			s.runtime.Logf("cleanup: stop unmanaged GPU workload: %v", err)
+			reportCleanupError(ctx, s.runtime, "cleanup: stop unmanaged GPU workload: %v", err)
 		}
 		if s.gpuWorker.Name != "" {
 			if err := runManualHCProgram(ctx, s.runtime, s.gpuWorker); err != nil {
-				s.runtime.Logf("cleanup: run hc_program on %s: %v", s.gpuWorker.Name, err)
+				reportCleanupError(ctx, s.runtime, "cleanup: run hc_program on %s: %v", s.gpuWorker.Name, err)
 			}
 			if err := s.slurm.ResumeNodeIfDrainedByReason(ctx, s.gpuWorker.Name, passiveAllocGPUReason); err != nil {
-				s.runtime.Logf("cleanup: resume %s after alloc_gpus_busy: %v", s.gpuWorker.Name, err)
+				reportCleanupError(ctx, s.runtime, "cleanup: resume %s after alloc_gpus_busy: %v", s.gpuWorker.Name, err)
 			}
 		}
 	}
@@ -595,7 +595,7 @@ func (s *PassiveChecks) cleanupAndResetTmpfs(ctx context.Context) {
 			"/mnt/jail/mnt/memory/job_" + s.tmpfsJobID,
 		} {
 			if _, err := s.runtime.Worker(s.worker).Run(ctx, fmt.Sprintf("rm -rf %s >/dev/null 2>&1 || true", framework.ShellQuote(target))); err != nil {
-				s.runtime.Logf("cleanup: remove job tmpfs %s on %s: %v", target, s.worker.Name, err)
+				reportCleanupError(ctx, s.runtime, "cleanup: remove job tmpfs %s on %s: %v", target, s.worker.Name, err)
 			}
 		}
 	}

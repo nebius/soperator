@@ -12,13 +12,35 @@ type ScenarioVersionAxis struct {
 
 // SuiteConfig describes one independently executed Godog suite.
 type SuiteConfig struct {
-	Name            string
-	Source          FeatureSource
-	VersionAxes     []ScenarioVersionAxis
-	Tags            string
-	StepRegistrars  []StepRegistrar
-	ExcludeUnstable bool
-	ExcludeHeavy    bool
+	Name                   string
+	Source                 FeatureSource
+	VersionAxes            []ScenarioVersionAxis
+	Tags                   string
+	StepRegistrars         []StepRegistrar
+	ExcludeUnstable        bool
+	ExcludeHeavy           bool
+	Concurrency            int
+	RequirePreviousSuccess bool
+}
+
+// ConcurrentSuites separates reviewed worker-local scenarios from exclusive ones.
+// The two suites execute sequentially; only @parallel scenarios run concurrently.
+func ConcurrentSuites(suite SuiteConfig, concurrency int) []SuiteConfig {
+	serial, parallel := suite, suite
+	serial.Concurrency = 1
+	parallel.Concurrency = concurrency
+	parallel.RequirePreviousSuccess = true
+	parallel.Name += "-parallel"
+	serial.Tags = combineTags(suite.Tags, "~@parallel")
+	parallel.Tags = combineTags(suite.Tags, "@parallel")
+	return []SuiteConfig{serial, parallel}
+}
+
+func combineTags(left, right string) string {
+	if left == "" {
+		return right
+	}
+	return "(" + left + ") && (" + right + ")"
 }
 
 // VersionAxis returns a scenario version axis for product-owned version tags.

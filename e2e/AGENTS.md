@@ -127,11 +127,15 @@ again.
 
 ## Tags and versioned behavior
 
-The shared feature suite has three tag forms that affect execution:
+The shared feature suite has four tag forms that affect execution:
 
 - exactly one scenario-level `@soperator_version_...` constraint;
 - optional `@heavy`;
 - optional `@unstable`.
+- optional `@parallel`, for reviewed worker-local scenarios. The standalone
+  runner executes unmarked scenarios sequentially before this concurrent suite.
+  Reserve every worker through the shared selector before use. Shared mutations
+  and cluster-wide assertions must remain unmarked. Keep leases through cleanup.
 
 CPU, GPU, topology, and other descriptive tags are allowed, but no current
 runner or workflow consumes them. Ask whether the user wants these tags and

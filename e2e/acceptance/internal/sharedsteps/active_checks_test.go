@@ -1,11 +1,59 @@
 package sharedsteps
 
 import (
+	"context"
+	"strings"
 	"testing"
 
+	"github.com/nebius/soperator/e2e/acceptance/framework"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type activeCleanupRuntime struct {
+	framework.Runtime
+	succeeded bool
+	calls     []string
+}
+
+func (r *activeCleanupRuntime) Kubectl() framework.ArgsScope {
+	return framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
+		r.calls = append(r.calls, strings.Join(args, " "))
+		if args[0] == "get" {
+			if r.succeeded {
+				return `{"status":{"succeeded":1}}`, nil
+			}
+			return `{"status":{"failed":1}}`, nil
+		}
+		return "", nil
+	})
+}
+
+func (r *activeCleanupRuntime) Jail() framework.CommandScope {
+	return framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+		r.calls = append(r.calls, command)
+		return "", nil
+	})
+}
+
+func TestGPUActiveCheckCleanupStopsFailedProducerAndOwnedSlurmJobs(t *testing.T) {
+	for _, succeeded := range []bool{false, true} {
+		runtime := &activeCleanupRuntime{succeeded: succeeded}
+		steps := NewActiveChecks(nil, runtime, framework.NewSlurmClient(runtime), framework.NewKubectlClient(runtime), nil)
+		steps.gpuCheckK8sJobName = "owned-gpu-check"
+		steps.gpuCheckJobIDs = []string{"123"}
+		steps.CleanupAndReset(t.Context())
+		if succeeded {
+			assert.Len(t, runtime.calls, 1)
+		} else {
+			require.Len(t, runtime.calls, 3)
+			assert.Contains(t, runtime.calls[1], "delete job -n soperator owned-gpu-check")
+			assert.Equal(t, "scancel '123'", runtime.calls[2])
+		}
+		assert.Empty(t, steps.gpuCheckK8sJobName)
+		assert.Empty(t, steps.gpuCheckJobIDs)
+	}
+}
 
 func TestParseAnsibleDryRunJSONL(t *testing.T) {
 	t.Parallel()

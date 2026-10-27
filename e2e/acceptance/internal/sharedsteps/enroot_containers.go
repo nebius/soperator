@@ -88,7 +88,7 @@ func (s *EnrootContainers) RegisterSteps(sc *godog.ScenarioContext) {
 
 func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
 	if cleanupErr := s.cancelCurrentJob(ctx); cleanupErr != nil {
-		s.runtime.Logf("cleanup: cancel enroot job: %v", cleanupErr)
+		reportCleanupError(ctx, s.runtime, "cleanup: cancel enroot job: %v", cleanupErr)
 	}
 	s.workers = nil
 	s.connectionWorker = framework.WorkerInfo{}
@@ -101,7 +101,7 @@ func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
 	s.enrootDataPath = ""
 	if s.sshEnrootImagePath != "" {
 		if cleanupErr := s.removeEnrootSSHImage(ctx); cleanupErr != nil {
-			s.runtime.Logf("cleanup: remove imported Enroot SSH image: %v", cleanupErr)
+			reportCleanupError(ctx, s.runtime, "cleanup: remove imported Enroot SSH image: %v", cleanupErr)
 		}
 	}
 	if s.sshIdentitySet {
@@ -112,7 +112,7 @@ func (s *EnrootContainers) CleanupAndReset(ctx context.Context) {
 			enrootSSHKeyName,
 			enrootSSHKeyComment,
 		); cleanupErr != nil {
-			s.runtime.Logf("cleanup: remove Enroot SSH test identity: %v", cleanupErr)
+			reportCleanupError(ctx, s.runtime, "cleanup: remove Enroot SSH test identity: %v", cleanupErr)
 		}
 	}
 	s.sshEnrootOutput = ""

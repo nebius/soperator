@@ -1,5 +1,5 @@
 Feature: Active checks
-  @heavy @gpu @soperator_version_>=5.0.0
+  @heavy @gpu @soperator_version_>=5.0.0 @parallel
   Scenario: GPU ActiveCheck succeeds on all GPU workers
     Given healthy GPU workers are available for active checks
     When the GPU ActiveCheck is triggered

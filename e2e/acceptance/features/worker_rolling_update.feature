@@ -10,7 +10,7 @@ Feature: Slurm-aware worker rolling updates
     Then all active workers of the NodeSet are idle
     And the updated NodeSet accepts smoke jobs
 
-  @heavy @soperator_version_>=5.0.0
+  @heavy @soperator_version_>=5.0.0 @parallel
   Scenario: An MK8s node group update preserves running jobs
     Given test jobs are running on two workers of a NodeSet with slurmAwareRollingUpdate strategy and maxUnavailable at least 2
     When the MK8s node group specification is changed to replace its nodes
@@ -22,7 +22,7 @@ Feature: Slurm-aware worker rolling updates
     When the original MK8s node group specification is restored
     Then the updated NodeSet accepts smoke jobs
 
-  @heavy @soperator_version_>=5.0.0
+  @heavy @soperator_version_>=5.0.0 @parallel
   Scenario: A worker update preserves maintenance drains before and during handoff
     Given test jobs are running on two workers of a NodeSet with slurmAwareRollingUpdate strategy and maxUnavailable at least 2
     # TODO: Configure --requeue-after-slurm-nodes in the Helm chart for E2E clusters

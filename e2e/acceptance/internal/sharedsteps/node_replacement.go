@@ -64,12 +64,12 @@ func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
 	defer cancel()
 	if !s.maintenanceJob.IsZero() {
 		if cancelErr := s.cancelJob(cleanupCtx, s.maintenanceJob.ID); cancelErr != nil {
-			s.runtime.Logf("Cleanup: cancel maintenance job: %v", cancelErr)
+			reportCleanupError(ctx, s.runtime, "Cleanup: cancel maintenance job: %v", cancelErr)
 		}
 	}
 	if s.maintenanceRequested {
 		if err := s.finishMaintenance(cleanupCtx); err != nil {
-			s.runtime.Logf("Cleanup: finish maintenance for worker %s, original host %s/%s, instance %s: %v",
+			reportCleanupError(ctx, s.runtime, "Cleanup: finish maintenance for worker %s, original host %s/%s, instance %s: %v",
 				s.original.WorkerName, s.original.NodeName, s.original.NodeUID, s.original.InstanceID, err)
 		}
 	}
@@ -85,7 +85,7 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnWorkerNode(ctx context.
 	if err != nil {
 		return err
 	}
-	workers, err := snapshot.PickWorkersByType(workerType, 1)
+	workers, err := s.selector.Acquire(ctx, framework.WorkerRequirements{Kind: workerType, Count: 1})
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
