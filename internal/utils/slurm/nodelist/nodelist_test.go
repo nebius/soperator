@@ -12,7 +12,7 @@ import (
 
 func TestNewNodeList(t *testing.T) {
 	list := nodelist.NewNodeList([]string{"worker-3", "worker-1", "worker-2", "worker-cpu-0", "login", "worker-1"})
-	assert.Equal(t, nodelist.NodeList("login,worker-[1-3],worker-cpu-0"), list)
+	assert.Equal(t, nodelist.NodeList("worker-[1-3],worker-cpu-0,login"), list)
 	assert.Equal(t, nodelist.NodeList(""), nodelist.NewNodeList(nil))
 }
 
@@ -73,18 +73,18 @@ func TestNormalize(t *testing.T) {
 		{list: "", want: ""},
 		{list: "worker-[7-8,0-1],worker-3", want: "worker-[0-1,3,7-8]"},
 		{list: "worker-1,worker-[0-2],worker-1", want: "worker-[0-2]"},
-		{list: "rack10-[0-1],rack2-[0-1],login", want: "login,rack2-[0-1],rack10-[0-1]"},
+		{list: "login,rack2-[0-1],rack10-[0-1]", want: "rack10-[0-1],rack2-[0-1],login"},
 		{list: "rack[1-2]-gpu-[0-1]", want: "rack1-gpu-[0-1],rack2-gpu-[0-1]"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.list, func(t *testing.T) {
-			got, err := nodelist.NodeList(tt.list).Normalize()
+			got, err := nodelist.Normalize(tt.list)
 			require.NoError(t, err)
 			assert.Equal(t, nodelist.NodeList(tt.want), got)
 		})
 	}
 
-	_, err := nodelist.NodeList("worker-[0-").Normalize()
+	_, err := nodelist.Normalize("worker-[0-")
 	assert.ErrorContains(t, err, `normalize node list: parse node list "worker-[0-"`)
 }
 

@@ -24,6 +24,7 @@ import (
 	"nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller/topology"
+	"nebius.ai/slurm-operator/internal/utils/jailedpayload"
 )
 
 const testNamespace = "soperator"
@@ -388,9 +389,12 @@ func testClusterObjects(t *testing.T) []client.Object {
 	}
 }
 
-func confirmReconfigure(t *testing.T, c client.Client) {
+// confirmReconfigure stands in for sconfigcontroller having reconfigured over the file with the
+// given payload hash.
+func confirmReconfigure(t *testing.T, c client.Client, appliedHash string) {
 	t.Helper()
 	jailedConfig := getJailedConfig(t, c)
+	jailedConfig.Status.AppliedHash = appliedHash
 	meta.SetStatusCondition(&jailedConfig.Status.Conditions, metav1.Condition{
 		Type: string(v1alpha1.ReconfigurePerformed), Status: metav1.ConditionTrue, Reason: "Success",
 		ObservedGeneration: jailedConfig.Generation,
@@ -450,7 +454,7 @@ func TestReconcilePublishesNewTopologyWithReconfigureRequest(t *testing.T) {
 func TestReconcilePublishesNodeMovesWithoutReconfigure(t *testing.T) {
 	r, c, recorder := newTestReconciler(t, testClusterObjects(t)...)
 	reconcileTestCluster(t, r)
-	confirmReconfigure(t, c)
+	confirmReconfigure(t, c, publishedPayloadHash(t, c))
 	drainEvents(recorder)
 
 	// worker-1 is scheduled on node-a, under the leaf switch already in the tree.
@@ -473,7 +477,7 @@ func TestReconcilePublishesNodeMovesWithoutReconfigure(t *testing.T) {
 func TestReconcileDefersReconfigureForANewLeafSwitch(t *testing.T) {
 	r, c, recorder := newTestReconciler(t, testClusterObjects(t)...)
 	reconcileTestCluster(t, r)
-	confirmReconfigure(t, c)
+	confirmReconfigure(t, c, publishedPayloadHash(t, c))
 	drainEvents(recorder)
 
 	// worker-1 is scheduled on node-b, under a leaf switch new to the tree.
@@ -498,5 +502,23 @@ func TestReconcileDefersReconfigureForANewLeafSwitch(t *testing.T) {
 	// Idle passes keep waiting without booking again.
 	reconcileTestCluster(t, r)
 	assert.Empty(t, getJailedConfig(t, c).Spec.UpdateActions)
+	assert.Empty(t, drainEvents(recorder))
+}
+
+func TestReconcileKeepsTheRequestUntilTheReconfigureReadThePublishedFile(t *testing.T) {
+	r, c, recorder := newTestReconciler(t, testClusterObjects(t)...)
+	reconcileTestCluster(t, r)
+	drainEvents(recorder)
+
+	// sconfigcontroller reconfigured over the file it read before the publish.
+	confirmReconfigure(t, c, jailedpayload.Hash(map[string]jailedpayload.File{}))
+	reconcileTestCluster(t, r)
+	assert.Equal(t, []v1alpha1.UpdateAction{v1alpha1.UpdateActionReconfigure}, getJailedConfig(t, c).Spec.UpdateActions,
+		"the request stands")
+	assert.Empty(t, drainEvents(recorder))
+
+	confirmReconfigure(t, c, publishedPayloadHash(t, c))
+	reconcileTestCluster(t, r)
+	assert.Empty(t, getJailedConfig(t, c).Spec.UpdateActions, "the request is withdrawn")
 	assert.Empty(t, drainEvents(recorder))
 }

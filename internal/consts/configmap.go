@@ -36,11 +36,6 @@ const (
 	ConfigMapKeyPAMSlurmAdoptGroups     = pamSlurmAdoptGroupsConfFile
 	ConfigMapKeySoperatorcheckSbatch    = "sbatch.sh"
 
-	// AnnotationTopologyStructure records the topology structure the JailedConfig was last rendered
-	// for: which topologies exist, their plugins and block sizes. A change means slurmctld has to
-	// re-read the config, which node membership changes do not.
-	AnnotationTopologyStructure = "topology.slurm.nebius.ai/structure"
-
 	ConfigMapNameTopologyNodeLabels = "topology-node-labels"
 	ConfigMapNameTopologyConfig     = "topology-config"
 

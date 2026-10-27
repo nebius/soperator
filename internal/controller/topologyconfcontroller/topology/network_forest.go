@@ -191,8 +191,9 @@ func (b *forestBuilder) build() (networkForest, error) {
 		}
 	}
 
-	// No path names a fabric root: a top segment hangs on the root of the smallest fabric among
-	// the nodes beneath it. Parents are always at a higher tier, so the climb ends.
+	// No path names a fabric root: a top segment hangs on the root of the fabric of the nodes
+	// beneath it, and nodes of two fabrics beneath one segment contradict each other. Parents are
+	// always at a higher tier, so the climb ends.
 	fabricOfRoot := make(map[string]string)
 	for name, s := range b.vertices {
 		root := name
@@ -200,9 +201,12 @@ func (b *forestBuilder) build() (networkForest, error) {
 			root = parent.Name
 		}
 		for _, n := range s.nodes {
-			if current, ok := fabricOfRoot[root]; !ok || n.fabric < current {
-				fabricOfRoot[root] = n.fabric
+			if current, ok := fabricOfRoot[root]; ok && current != n.fabric {
+				return networkForest{}, ConflictingPathsError{
+					msg: fmt.Sprintf("segment %q is shared by fabrics %q and %q", root, min(current, n.fabric), max(current, n.fabric)),
+				}
 			}
+			fabricOfRoot[root] = n.fabric
 		}
 	}
 

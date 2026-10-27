@@ -47,6 +47,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	fakes "nebius.ai/slurm-operator/internal/controller/sconfigcontroller/fake"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
+	"nebius.ai/slurm-operator/internal/utils/jailedpayload"
 )
 
 func newTestJailedConfigController(
@@ -362,7 +363,7 @@ func TestJailedConfigReconciler_Empty(t *testing.T) {
 	)
 	require.NotNil(t, condition)
 	require.Equal(t, string(slurmv1alpha1.ReasonMissingAction), condition.Reason)
-	require.Equal(t, payloadHash(map[string]JailedFile{}), jailedConfig.Status.AppliedHash)
+	require.Equal(t, jailedpayload.Hash(map[string]jailedpayload.File{}), jailedConfig.Status.AppliedHash)
 }
 
 func TestJailedConfigReconciler_SingleData(t *testing.T) {

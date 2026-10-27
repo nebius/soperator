@@ -37,7 +37,7 @@ import (
 
 const WorkerTopologyReconcilerName = "workertopology"
 
-var defaultInterval = 1 * time.Minute
+const defaultInterval = 1 * time.Minute
 
 // Reasons and actions of the K8s events recorded on the SlurmCluster.
 const (
@@ -264,11 +264,11 @@ func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if err := config.requestReconfigure(ctx, logger); err != nil {
 			return ctrl.Result{}, fmt.Errorf("request reconfigure: %w", err)
 		}
-		r.truncEventRecorder.Eventf(slurmCluster, nil, corev1.EventTypeNormal, reasonReconfigureRequested, actionReconfigure,
-			"Requested a Slurm reconfigure: the topology structure changed")
 		if err := config.publishTopology(ctx, desiredSlurmTopology); err != nil {
 			return ctrl.Result{}, fmt.Errorf("publish topology config: %w", err)
 		}
+		r.truncEventRecorder.Eventf(slurmCluster, nil, corev1.EventTypeNormal, reasonReconfigureRequested, actionReconfigure,
+			"Requested a Slurm reconfigure: the topology structure changed")
 		return ctrl.Result{RequeueAfter: defaultInterval}, nil
 
 	// There are changes in the topology that affect job performance

@@ -90,31 +90,16 @@ func Test_validateSegmentName_ValidAndInvalid(t *testing.T) {
 	}
 
 	for name, want := range map[string]string{
-		"":                                 "name is empty",
-		"a b":                              `name contains ' ', which Slurm's hostlist syntax reserves`,
-		"a\tb":                             `name contains '\t', which Slurm's hostlist syntax reserves`,
-		"a\nb":                             `name contains '\n', which Slurm's hostlist syntax reserves`,
-		"a,b":                              `name contains ',', which Slurm's hostlist syntax reserves`,
-		"a[b":                              `name contains '[', which Slurm's hostlist syntax reserves`,
-		"a]b":                              `name contains ']', which Slurm's hostlist syntax reserves`,
-		"a{b":                              `name contains '{', which Slurm's hostlist syntax reserves`,
-		"a}b":                              `name contains '}', which Slurm's hostlist syntax reserves`,
-		"sw1234567890123456789":            "name ends with 19 digits, more than the 18 Slurm parses safely as a number",
-		"6f84b74219aa22869602735141708147": "name ends with 20 digits, more than the 18 Slurm parses safely as a number",
+		"":     "name is empty",
+		"a b":  `name contains ' ', which Slurm's hostlist syntax reserves`,
+		"a\tb": `name contains '\t', which Slurm's hostlist syntax reserves`,
+		"a\nb": `name contains '\n', which Slurm's hostlist syntax reserves`,
+		"a,b":  `name contains ',', which Slurm's hostlist syntax reserves`,
+		"a[b":  `name contains '[', which Slurm's hostlist syntax reserves`,
+		"a]b":  `name contains ']', which Slurm's hostlist syntax reserves`,
+		"a{b":  `name contains '{', which Slurm's hostlist syntax reserves`,
+		"a}b":  `name contains '}', which Slurm's hostlist syntax reserves`,
 	} {
 		assert.EqualError(t, validateSegmentName(name), want, name)
-	}
-}
-
-func Test_trailingDigitCount_Basic(t *testing.T) {
-	for in, want := range map[string]int{
-		"":                                 0,
-		"abc":                              0,
-		"abc1":                             1,
-		"1a2b3":                            1,
-		"12345":                            5,
-		"6f84b74219aa22869602735141708147": 20,
-	} {
-		assert.Equal(t, want, trailingDigitCount(in), in)
 	}
 }

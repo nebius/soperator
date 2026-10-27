@@ -6,9 +6,6 @@ import (
 	"strings"
 )
 
-// Merge collapses entity names into a Slurm hostlist expression. Entities that end in a dash and
-// digits are grouped by their prefix and rendered as ranges; the rest pass through verbatim. Entries
-// are ordered naturally by their prefix or name, see NaturalCompare.
 func Merge(entities []string) string {
 	if len(entities) == 0 {
 		return ""
@@ -31,32 +28,21 @@ func Merge(entities []string) string {
 		entitiesByPrefix[prefix] = append(entitiesByPrefix[prefix], entity)
 	}
 
-	parts := make([]keyedPart, 0, len(prefixes)+len(passthrough))
+	slices.Sort(prefixes)
+
+	parts := make([]string, 0, len(prefixes)+len(passthrough))
 	for _, prefix := range prefixes {
-		parts = append(parts, keyedPart{key: prefix, text: MergePrefixed(entitiesByPrefix[prefix], prefix)})
+		parts = append(parts, MergePrefixed(entitiesByPrefix[prefix], prefix))
 	}
+
+	passthroughEntities := make([]string, 0, len(passthrough))
 	for entity := range passthrough {
-		parts = append(parts, keyedPart{key: entity, text: entity})
+		passthroughEntities = append(passthroughEntities, entity)
 	}
+	slices.Sort(passthroughEntities)
+	parts = append(parts, passthroughEntities...)
 
-	return joinNaturally(parts)
-}
-
-// keyedPart is one rendered entry of a hostlist with the text it is ordered by.
-type keyedPart struct {
-	key  string
-	text string
-}
-
-func joinNaturally(parts []keyedPart) string {
-	slices.SortFunc(parts, func(a, b keyedPart) int {
-		return NaturalCompare(a.key, b.key)
-	})
-	texts := make([]string, 0, len(parts))
-	for _, part := range parts {
-		texts = append(texts, part.text)
-	}
-	return strings.Join(texts, ",")
+	return strings.Join(parts, ",")
 }
 
 func MergePrefixed(entities []string, prefix string) string {
@@ -133,15 +119,17 @@ func MergePrefixed(entities []string, prefix string) string {
 		return 0
 	})
 
-	// Groups share the prefix and are already ordered among themselves, so they keep their place
-	// relative to each other by sorting on the prefix alone: SortFunc is stable.
-	parts := make([]keyedPart, 0, len(groups)+len(passthrough))
+	parts := make([]string, 0, len(groups)+len(passthrough))
 	for _, group := range groups {
-		parts = append(parts, keyedPart{key: prefix, text: renderSuffixGroup(prefix, group)})
-	}
-	for entity := range passthrough {
-		parts = append(parts, keyedPart{key: entity, text: entity})
+		parts = append(parts, renderSuffixGroup(prefix, group))
 	}
 
-	return joinNaturally(parts)
+	passthroughEntities := make([]string, 0, len(passthrough))
+	for entity := range passthrough {
+		passthroughEntities = append(passthroughEntities, entity)
+	}
+	slices.Sort(passthroughEntities)
+	parts = append(parts, passthroughEntities...)
+
+	return strings.Join(parts, ",")
 }

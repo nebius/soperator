@@ -67,19 +67,14 @@ func formatSegments(segments []NetworkPathSegment) string {
 	return strings.Join(parts, "/")
 }
 
-// maxSafeTrailingDigits bounds the trailing decimal run of a switch or block name. Slurm parses
-// that run with strtoul and never checks for overflow: 19 digits always fit a uint64, 20 may not,
-// and one digit of margin is kept.
-const maxSafeTrailingDigits = 18
-
 // hostlistReservedChars have a meaning in Slurm's hostlist syntax: separators, range brackets and
 // function braces.
 const hostlistReservedChars = " \t\n,[]{}"
 
 // validateSegmentName reports why a name cannot be a switch or block name. Slurm reads those names
 // and the "Switches=" lists referencing them through its hostlist parser: a reserved character
-// splits the name and an overflowing trailing number is saturated, so the child reference no
-// longer matches and slurmctld dies with "has invalid child".
+// splits the name, so the child reference no longer matches and slurmctld dies with "has invalid
+// child".
 func validateSegmentName(name string) error {
 	if name == "" {
 		return fmt.Errorf("name is empty")
@@ -87,21 +82,5 @@ func validateSegmentName(name string) error {
 	if i := strings.IndexAny(name, hostlistReservedChars); i >= 0 {
 		return fmt.Errorf("name contains %q, which Slurm's hostlist syntax reserves", name[i])
 	}
-	if digits := trailingDigitCount(name); digits > maxSafeTrailingDigits {
-		return fmt.Errorf("name ends with %d digits, more than the %d Slurm parses safely as a number",
-			digits, maxSafeTrailingDigits)
-	}
 	return nil
-}
-
-// trailingDigitCount returns the length of the trailing contiguous run of ASCII decimal digits.
-func trailingDigitCount(name string) int {
-	count := 0
-	for i := len(name) - 1; i >= 0; i-- {
-		if name[i] < '0' || name[i] > '9' {
-			break
-		}
-		count++
-	}
-	return count
 }

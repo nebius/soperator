@@ -38,9 +38,10 @@ A node's position is read from labels `<prefix>/tier-N` on the Kubernetes node, 
 the switch closest to the node, the leaf switch of an HGX node or the NVLink domain of an NVL72
 rack, and higher tiers are spines and cores. The prefix defaults to `topology.nebius.com` and is set
 by `controllerManager.manager.env.topologyLabelPrefix` in the `soperator` chart. Slurm reads the
-values through its hostlist parser, so a label must not contain spaces, commas, brackets or braces,
-and must not end in more than 18 digits. Tiers must be contiguous. A node with missing labels sits
-under its fabric's `unknown` switch or block; one with invalid labels does the same and is reported.
+values through its hostlist parser, so a label must not contain spaces, commas, brackets or braces;
+a value ending in more than 18 digits gets a `_` terminator so Slurm does not parse it as a number.
+Tiers must be contiguous. A node with missing labels sits under its fabric's `unknown` switch or
+block; one with invalid labels does the same and is reported.
 
 ### Fabrics
 
@@ -183,9 +184,10 @@ Each topology is a pre-order walk of the part of that forest its NodeSets occupy
 tree and a block topology over the same NodeSets list leaves and blocks in the same order, and why
 a topology over fewer NodeSets keeps the cluster-wide order.
 
-Labels that contradict each other, a switch with two parents or at two tiers, stop the build rather
-than being voted on. A topology whose refs reach no node is published as a placeholder with a
-single empty switch or block, since an empty list makes slurmctld exit.
+Labels that contradict each other, a switch with two parents, at two tiers or shared by two
+fabrics, stop the build rather than being voted on. A topology whose refs reach no node is
+published as a placeholder with a single empty switch or block, since an empty list makes
+slurmctld exit.
 
 ## How Slurm learns about changes
 
@@ -210,10 +212,10 @@ with the node order; re-reading for every pod move would restart slurmd everywhe
 ### Structural changes reconfigure at once
 
 The operator puts a `Reconfigure` action on the JailedConfig, sconfigcontroller runs the reconfigure
-and waits for every slurmd to restart, and the request is withdrawn once `ReconfigurePerformed`
-names the current generation. The request is raised before the content is published, so a failed
-publish cannot lose it, and it is withdrawn before anything else is published, so a stale request
-cannot turn a node move into another reconfigure.
+and waits for every slurmd to restart, and the request is withdrawn once `ReconfigurePerformed` and
+the applied hash confirm a reconfigure over the published file rather than an older one. The request
+is raised before the content is published, so a failed publish cannot lose it, and it is withdrawn
+before anything else is published, so a stale request cannot turn a node move into another one.
 
 ### Reordered changes are deferred
 

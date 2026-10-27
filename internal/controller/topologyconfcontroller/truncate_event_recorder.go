@@ -1,6 +1,7 @@
 package topologyconfcontroller
 
 import (
+	"fmt"
 	"unicode/utf8"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,11 +27,12 @@ func NewTruncateEventRecorder(baseRecorder events.EventRecorder) *TruncateEventR
 }
 
 func (r *TruncateEventRecorder) Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
-	note = truncateString(note, eventLimitNote)
+	// Format the note before truncating it.
+	note = truncateString(fmt.Sprintf(note, args...), eventLimitNote)
 	action = truncateString(action, eventLimitAction)
 	reason = truncateString(reason, eventLimitReason)
 
-	r.baseRecorder.Eventf(regarding, related, eventtype, reason, action, note, args...)
+	r.baseRecorder.Eventf(regarding, related, eventtype, reason, action, "%s", note)
 }
 
 func truncateString(str string, limitBytes int) string {

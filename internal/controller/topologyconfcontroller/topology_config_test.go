@@ -21,6 +21,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller/deferral"
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller/topology"
+	"nebius.ai/slurm-operator/internal/utils/jailedpayload"
 )
 
 var testReconfigureDeferral = deferral.Policy{
@@ -66,6 +67,7 @@ func testJailedConfig(actions ...v1alpha1.UpdateAction) *v1alpha1.JailedConfig {
 		ObjectMeta: metav1.ObjectMeta{Name: testTopologyConfigKey.Name, Namespace: testTopologyConfigKey.Namespace},
 		Spec: v1alpha1.JailedConfigSpec{
 			ConfigMap:     v1alpha1.ConfigMapReference{Name: testTopologyConfigKey.Name},
+			Items:         []corev1.KeyToPath{{Key: consts.ConfigMapKeyTopologyYAML, Path: "/etc/slurm/topology.yaml"}},
 			UpdateActions: actions,
 		},
 	}
@@ -87,6 +89,16 @@ func getJailedConfig(t *testing.T, c client.Client) *v1alpha1.JailedConfig {
 	jailedConfig := &v1alpha1.JailedConfig{}
 	require.NoError(t, c.Get(context.Background(), testTopologyConfigKey, jailedConfig))
 	return jailedConfig
+}
+
+// publishedPayloadHash is the hash sconfigcontroller reports once it has applied the published file.
+func publishedPayloadHash(t *testing.T, c client.Client) string {
+	t.Helper()
+	configMap := &corev1.ConfigMap{}
+	require.NoError(t, c.Get(context.Background(), testTopologyConfigKey, configMap))
+	payload, err := jailedpayload.Make(&getJailedConfig(t, c).Spec, configMap)
+	require.NoError(t, err)
+	return jailedpayload.Hash(payload)
 }
 
 func Test_newTopologyConfig_Basic(t *testing.T) {
@@ -113,7 +125,7 @@ func Test_topologyConfig_current_Basic(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, current, "no JailedConfig")
 
-	config, _ = newTestTopologyConfig(t, testJailedConfig())
+	config, c := newTestTopologyConfig(t, testJailedConfig())
 	current, err = config.currentTopology(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, current, "no ConfigMap")
@@ -123,6 +135,7 @@ func Test_topologyConfig_current_Basic(t *testing.T) {
 	current, err = config.currentTopology(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, *topo, current)
+	assert.Equal(t, publishedPayloadHash(t, c), config.publishedHash)
 }
 
 func Test_topologyConfig_publish_Basic(t *testing.T) {
@@ -160,12 +173,15 @@ func Test_topologyConfig_requestReconfigure_Basic(t *testing.T) {
 	require.NotNil(t, config.jailedConfig)
 	assert.Equal(t, created.ResourceVersion, config.jailedConfig.ResourceVersion, "the written object is remembered")
 
-	created.Status.AppliedHash = "h1"
-	require.NoError(t, c.Status().Update(ctx, created))
+	created.Labels["team"] = "ml"
+	require.NoError(t, c.Update(ctx, created))
 	require.NoError(t, config.requestReconfigure(ctx, logr.Discard()))
 	updated := getJailedConfig(t, c)
-	assert.Equal(t, "h1", updated.Annotations[annotationAppliedHash], "the applied hash is pinned")
 	assert.Equal(t, []v1alpha1.UpdateAction{v1alpha1.UpdateActionReconfigure}, updated.Spec.UpdateActions)
+	assert.Equal(t, "ml", updated.Labels["team"], "foreign labels are kept")
+	assert.Equal(t, "slurm", updated.Labels[consts.LabelInstanceKey])
+	assert.True(t, timeAnnotation(updated, annotationLastReconfigure).After(timeAnnotation(created, annotationLastReconfigure)),
+		"the anchor moves on every raise")
 }
 
 func Test_topologyConfig_withdrawConfirmedReconfigure_Basic(t *testing.T) {
@@ -185,17 +201,31 @@ func Test_topologyConfig_withdrawConfirmedReconfigure_Basic(t *testing.T) {
 		assert.Equal(t, before, getJailedConfig(t, c).ResourceVersion, "nothing written")
 	})
 
-	t.Run("confirmed request", func(t *testing.T) {
+	confirmedConfig := func(t *testing.T, appliedHash string) (*topologyConfig, client.Client) {
+		t.Helper()
 		jailedConfig := testJailedConfig(v1alpha1.UpdateActionReconfigure)
 		jailedConfig.Generation = 3
 		config, c := newTestTopologyConfig(t, jailedConfig)
 		jailedConfig = getJailedConfig(t, c)
+		jailedConfig.Status.AppliedHash = appliedHash
 		meta.SetStatusCondition(&jailedConfig.Status.Conditions, metav1.Condition{
 			Type: string(v1alpha1.ReconfigurePerformed), Status: metav1.ConditionTrue, Reason: "Success", ObservedGeneration: 3,
 		})
 		require.NoError(t, c.Status().Update(ctx, jailedConfig))
 		config.jailedConfig = getJailedConfig(t, c)
+		config.publishedHash = "h1"
+		return config, c
+	}
 
+	t.Run("request confirmed over an older file", func(t *testing.T) {
+		config, c := confirmedConfig(t, "h0")
+		before := getJailedConfig(t, c).ResourceVersion
+		require.NoError(t, config.withdrawConfirmedReconfigure(ctx, logr.Discard()))
+		assert.Equal(t, before, getJailedConfig(t, c).ResourceVersion, "nothing written")
+	})
+
+	t.Run("confirmed request", func(t *testing.T) {
+		config, c := confirmedConfig(t, "h1")
 		require.NoError(t, config.withdrawConfirmedReconfigure(ctx, logr.Discard()))
 		withdrawn := getJailedConfig(t, c)
 		assert.Empty(t, withdrawn.Spec.UpdateActions)
@@ -204,31 +234,23 @@ func Test_topologyConfig_withdrawConfirmedReconfigure_Basic(t *testing.T) {
 	})
 }
 
-func Test_topologyConfig_update_KeepsUnconfirmedRequest(t *testing.T) {
-	ctx := context.Background()
-	config, c := newTestTopologyConfig(t, testJailedConfig(v1alpha1.UpdateActionReconfigure))
-	require.NoError(t, config.update(ctx, logr.Discard(), false))
-	assert.Equal(t, []v1alpha1.UpdateAction{v1alpha1.UpdateActionReconfigure}, getJailedConfig(t, c).Spec.UpdateActions)
-}
-
-func Test_reconfigureConfirmed_Basic(t *testing.T) {
-	jailedConfig := func(generation, observed int64, condition metav1.ConditionStatus, applied, pinned string) *v1alpha1.JailedConfig {
+func Test_topologyConfig_reconfigureConfirmed_Basic(t *testing.T) {
+	config := func(generation, observed int64, condition metav1.ConditionStatus, applied string) *topologyConfig {
 		jc := testJailedConfig(v1alpha1.UpdateActionReconfigure)
 		jc.Generation = generation
-		jc.Annotations = map[string]string{annotationAppliedHash: pinned}
 		jc.Status.AppliedHash = applied
 		if condition != "" {
 			jc.Status.Conditions = []metav1.Condition{{
 				Type: string(v1alpha1.ReconfigurePerformed), Status: condition, ObservedGeneration: observed,
 			}}
 		}
-		return jc
+		return &topologyConfig{jailedConfig: jc, publishedHash: "h1"}
 	}
-	assert.False(t, reconfigureConfirmed(jailedConfig(2, 2, "", "h2", "h1")), "no condition")
-	assert.False(t, reconfigureConfirmed(jailedConfig(2, 2, metav1.ConditionFalse, "h2", "h1")), "condition false")
-	assert.True(t, reconfigureConfirmed(jailedConfig(2, 2, metav1.ConditionTrue, "h1", "h1")), "current generation")
-	assert.True(t, reconfigureConfirmed(jailedConfig(2, 1, metav1.ConditionTrue, "h2", "h1")), "hash moved past the pin")
-	assert.False(t, reconfigureConfirmed(jailedConfig(2, 1, metav1.ConditionTrue, "h1", "h1")), "earlier generation, same hash")
+	assert.False(t, config(2, 2, "", "h1").reconfigureConfirmed(), "no condition")
+	assert.False(t, config(2, 2, metav1.ConditionFalse, "h1").reconfigureConfirmed(), "condition false")
+	assert.True(t, config(2, 2, metav1.ConditionTrue, "h1").reconfigureConfirmed(), "current generation over the published file")
+	assert.False(t, config(2, 1, metav1.ConditionTrue, "h1").reconfigureConfirmed(), "earlier generation")
+	assert.False(t, config(2, 2, metav1.ConditionTrue, "h0").reconfigureConfirmed(), "current generation over an older file")
 }
 
 func Test_topologyConfig_deferReconfigure_Basic(t *testing.T) {
@@ -253,6 +275,9 @@ func Test_topologyConfig_deferReconfigure_Basic(t *testing.T) {
 	wait, err = config.deferReconfigure(ctx, t0.Add(testReconfigureDeferral.DebounceCap))
 	require.NoError(t, err)
 	assert.Zero(t, wait, "the cap is reached")
+	booked = getJailedConfig(t, c)
+	assert.Equal(t, t0.Add(testReconfigureDeferral.DebounceCap), timeAnnotation(booked, annotationDeferredLastChange),
+		"a due request is booked too")
 }
 
 func Test_topologyConfig_deferReconfigure_Cooldown(t *testing.T) {
@@ -265,6 +290,24 @@ func Test_topologyConfig_deferReconfigure_Cooldown(t *testing.T) {
 	wait, err := config.deferReconfigure(ctx, t0.Add(time.Minute))
 	require.NoError(t, err)
 	assert.Equal(t, testReconfigureDeferral.Cooldown-time.Minute, wait)
+}
+
+// A reorder booked in the same second as the reconfigure that preceded it, the withdrawal and the
+// booking happening in one pass, must still read as pending.
+func Test_topologyConfig_deferReconfigure_BookedRightAfterReconfigure(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 10, 23, 12, 0, 0, 250000000, time.UTC)
+	jailedConfig := testJailedConfig()
+	jailedConfig.Annotations = map[string]string{annotationLastReconfigure: now.Format(time.RFC3339Nano)}
+	config, c := newTestTopologyConfig(t, jailedConfig)
+
+	wait, err := config.deferReconfigure(ctx, now.Add(time.Nanosecond))
+	require.NoError(t, err)
+	assert.Positive(t, wait)
+
+	config.jailedConfig = getJailedConfig(t, c)
+	pending, _ := config.pendingDeferredReconfigure(now.Add(20 * time.Minute))
+	assert.True(t, pending)
 }
 
 func Test_topologyConfig_deferReconfigure_NothingPublished(t *testing.T) {

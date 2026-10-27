@@ -24,6 +24,7 @@ import (
 	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller/topology"
 	"nebius.ai/slurm-operator/internal/render/common"
 	renderutils "nebius.ai/slurm-operator/internal/render/utils"
+	"nebius.ai/slurm-operator/internal/utils/jailedpayload"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
 )
 
@@ -32,7 +33,6 @@ import (
 // requested or confirmed. A pending request not newer than that was settled by it: content
 // published under a standing request is reconfigured before the request can be confirmed.
 const (
-	annotationAppliedHash        = "topology.slurm.nebius.ai/applied-hash"
 	annotationDeferredSince      = "topology.slurm.nebius.ai/deferred-since"
 	annotationDeferredLastChange = "topology.slurm.nebius.ai/deferred-last-change"
 	annotationLastReconfigure    = "topology.slurm.nebius.ai/last-reconfigure"
@@ -47,6 +47,7 @@ type topologyConfig struct {
 	owner               *slurmv1.SlurmCluster
 	reconfigureDeferral deferral.Policy
 	jailedConfig        *v1alpha1.JailedConfig
+	publishedHash       string
 }
 
 func newTopologyConfig(c client.Client, scheme *runtime.Scheme, cluster *slurmv1.SlurmCluster, reconfigureDeferral deferral.Policy) *topologyConfig {
@@ -81,6 +82,12 @@ func (c *topologyConfig) currentTopology(ctx context.Context) (topology.MultiTop
 	if !ok {
 		return nil, nil
 	}
+	payload, err := jailedpayload.Make(&c.jailedConfig.Spec, configMap)
+	if err != nil {
+		return nil, fmt.Errorf("render payload of JailedConfig %q: %w", c.key.Name, err)
+	}
+	c.publishedHash = jailedpayload.Hash(payload)
+
 	var current topology.MultiTopology
 	if err := yaml.Unmarshal([]byte(content), &current); err != nil {
 		return nil, fmt.Errorf("parse %s of ConfigMap %q: %w", consts.ConfigMapKeyTopologyYAML, configMapKey.Name, err)
@@ -126,17 +133,17 @@ func (c *topologyConfig) requestReconfigure(ctx context.Context, logger logr.Log
 // withdrawConfirmedReconfigure clears a confirmed request before new content is published: left
 // in the spec, it would make sconfigcontroller reconfigure again on the content change.
 func (c *topologyConfig) withdrawConfirmedReconfigure(ctx context.Context, logger logr.Logger) error {
-	if c.jailedConfig == nil || !hasReconfigureRequest(c.jailedConfig) || !reconfigureConfirmed(c.jailedConfig) {
+	if c.jailedConfig == nil || !hasReconfigureRequest(c.jailedConfig) || !c.reconfigureConfirmed() {
 		return nil
 	}
 	return c.update(ctx, logger, false)
 }
 
-// update creates or updates the JailedConfig, raising a reconfigure request when asked, keeping an
-// unconfirmed one and withdrawing a confirmed one otherwise, and remembers the written object.
+// update creates or updates the JailedConfig, raising a reconfigure request or withdrawing the
+// standing one, and remembers the written object.
 func (c *topologyConfig) update(ctx context.Context, logger logr.Logger, reconfigure bool) error {
 	logger = logger.WithValues("JailedConfig", c.key.Name)
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := time.Now().UTC().Format(time.RFC3339Nano)
 
 	desired := &v1alpha1.JailedConfig{
 		ObjectMeta: metav1.ObjectMeta{
@@ -178,25 +185,23 @@ func (c *topologyConfig) update(ctx context.Context, logger logr.Logger, reconfi
 		return fmt.Errorf("get JailedConfig %q: %w", c.key.Name, err)
 	}
 
-	switch {
-	case reconfigure:
+	if reconfigure {
 		logger.Info("Requesting a Slurm reconfigure")
 		desired.Spec.UpdateActions = []v1alpha1.UpdateAction{v1alpha1.UpdateActionReconfigure}
-		desired.Annotations = map[string]string{
-			annotationAppliedHash:     existing.Status.AppliedHash,
-			annotationLastReconfigure: now,
-		}
-	case hasReconfigureRequest(existing) && !reconfigureConfirmed(existing):
-		desired.Spec.UpdateActions = existing.Spec.UpdateActions
-	case hasReconfigureRequest(existing):
+	} else if hasReconfigureRequest(existing) {
 		logger.Info("Slurm reconfigure confirmed, withdrawing the request")
-		desired.Annotations = map[string]string{annotationLastReconfigure: now}
 	}
+	// Stamp on a repeated request too: it settles a deferred booking the standing request covers,
+	// and the withdrawal that follows the actual reconfigure stamps a later time anyway.
+	desired.Annotations = map[string]string{annotationLastReconfigure: now}
 
 	if err := controllerutil.SetControllerReference(c.owner, existing, c.scheme); err != nil {
 		return fmt.Errorf("set owner of JailedConfig %q: %w", c.key.Name, err)
 	}
-	existing.Labels = desired.Labels
+	if existing.Labels == nil {
+		existing.Labels = map[string]string{}
+	}
+	maps.Copy(existing.Labels, desired.Labels)
 	if existing.Annotations == nil {
 		existing.Annotations = map[string]string{}
 	}
@@ -210,7 +215,8 @@ func (c *topologyConfig) update(ctx context.Context, logger logr.Logger, reconfi
 }
 
 // deferReconfigure books a deferred reconfigure request for a change arriving now and returns how
-// long it still has to wait, zero when it may run now.
+// long it still has to wait, zero when it may run now. A due request is booked too, so a raise that
+// fails after the publish is retried as a pending booking.
 func (c *topologyConfig) deferReconfigure(ctx context.Context, now time.Time) (time.Duration, error) {
 	if c.jailedConfig == nil {
 		return 0, nil
@@ -225,20 +231,16 @@ func (c *topologyConfig) deferReconfigure(ctx context.Context, now time.Time) (t
 	}
 
 	fireAt := c.reconfigureDeferral.FireTime(lastRun, request)
-	if !now.Before(fireAt) {
-		return 0, nil
-	}
-
 	patch := client.MergeFrom(c.jailedConfig.DeepCopy())
 	if c.jailedConfig.Annotations == nil {
 		c.jailedConfig.Annotations = map[string]string{}
 	}
-	c.jailedConfig.Annotations[annotationDeferredSince] = request.Since.UTC().Format(time.RFC3339)
-	c.jailedConfig.Annotations[annotationDeferredLastChange] = request.LastChange.UTC().Format(time.RFC3339)
+	c.jailedConfig.Annotations[annotationDeferredSince] = request.Since.UTC().Format(time.RFC3339Nano)
+	c.jailedConfig.Annotations[annotationDeferredLastChange] = request.LastChange.UTC().Format(time.RFC3339Nano)
 	if err := c.client.Patch(ctx, c.jailedConfig, patch); err != nil {
 		return 0, fmt.Errorf("record deferred reconfigure on JailedConfig %q: %w", c.key.Name, err)
 	}
-	return fireAt.Sub(now), nil
+	return max(fireAt.Sub(now), 0), nil
 }
 
 // pendingDeferredReconfigure tells whether a deferred reconfigure request is pending and how long
@@ -266,23 +268,21 @@ func (c *topologyConfig) pendingDeferredReconfigure(now time.Time) (pending bool
 
 // timeAnnotation is the RFC3339 time in the annotation, zero when absent or unparsable.
 func timeAnnotation(jailedConfig *v1alpha1.JailedConfig, key string) time.Time {
-	t, err := time.Parse(time.RFC3339, jailedConfig.Annotations[key])
+	t, err := time.Parse(time.RFC3339Nano, jailedConfig.Annotations[key])
 	if err != nil {
 		return time.Time{}
 	}
 	return t
 }
 
-// reconfigureConfirmed reports whether a reconfigure ran for the request: the ReconfigurePerformed
-// condition is true for the current generation, or, for a request raised over a standing one
-// without changing the generation, the applied hash moved past the one recorded with the request.
-func reconfigureConfirmed(jailedConfig *v1alpha1.JailedConfig) bool {
-	condition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(v1alpha1.ReconfigurePerformed))
-	if condition == nil || condition.Status != metav1.ConditionTrue {
-		return false
-	}
-	return condition.ObservedGeneration == jailedConfig.Generation ||
-		jailedConfig.Status.AppliedHash != jailedConfig.Annotations[annotationAppliedHash]
+// reconfigureConfirmed reports whether a reconfigure ran over the published content: the
+// ReconfigurePerformed condition is true for the current generation and the applied hash is the
+// published file's.
+func (c *topologyConfig) reconfigureConfirmed() bool {
+	condition := meta.FindStatusCondition(c.jailedConfig.Status.Conditions, string(v1alpha1.ReconfigurePerformed))
+	return condition != nil && condition.Status == metav1.ConditionTrue &&
+		condition.ObservedGeneration == c.jailedConfig.Generation &&
+		c.jailedConfig.Status.AppliedHash == c.publishedHash
 }
 
 func hasReconfigureRequest(jailedConfig *v1alpha1.JailedConfig) bool {

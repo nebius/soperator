@@ -20,17 +20,18 @@ type NodeList string
 const maxBracketSets = 2
 
 // NewNodeList collapses node names into the canonical nodelist expression. Names are deduplicated,
-// grouped by prefix into ranges, and entries are ordered naturally ("rack2" before "rack10"), so
-// two equal sets always render to the same expression.
+// grouped by prefix into ranges ordered by prefix, and names without a numeric suffix follow them,
+// so two equal sets always render to the same expression.
 func NewNodeList(nodeNames []string) NodeList {
 	return NodeList(slurmpattern.Merge(nodeNames))
 }
 
 // Normalize rewrites the expression into the canonical form NewNodeList produces: the same nodes,
-// deduplicated, with ranges collapsed and entries ordered naturally. It fails on an expression
-// that does not parse.
-func (l NodeList) Normalize() (NodeList, error) {
-	nodeNames, err := l.NodeNames()
+// deduplicated, with ranges collapsed and entries ordered as NewNodeList orders them. It fails on
+// an expression that does not parse.
+func Normalize(expression string) (NodeList, error) {
+	nodelist := NodeList(expression)
+	nodeNames, err := nodelist.NodeNames()
 	if err != nil {
 		return "", fmt.Errorf("normalize node list: %w", err)
 	}

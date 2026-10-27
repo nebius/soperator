@@ -212,17 +212,12 @@ func Test_newNetworkForest_RootOrder(t *testing.T) {
 }
 
 func Test_newNetworkForest_SharedTopSegment(t *testing.T) {
-	forest, err := newNetworkForest([]NodeSet{
+	_, err := newNetworkForest([]NodeSet{
 		mustNodeSet("worker", 1, "gpucluster-2a9e", rackPaths("worker", 1, path("t0-77c1e0", "t2-e2d6c5"))),
 		mustNodeSet("worker-rack0", 1, "gpucluster-1f0c", rackPaths("worker-rack0", 1, path("t0-a3f0b9", "t2-e2d6c5"))),
 	})
-	require.NoError(t, err)
-	assert.Equal(t, []string{
-		"gpucluster-1f0c/t2-e2d6c5/t0-77c1e0=worker-0",
-		"gpucluster-1f0c/t2-e2d6c5/t0-a3f0b9=worker-rack0-0",
-		"gpucluster-1f0c/gpucluster-1f0c.unknown=",
-		"gpucluster-2a9e/gpucluster-2a9e.unknown=",
-	}, leafPaths(forest))
+	assert.EqualError(t, err, `segment "t2-e2d6c5" is shared by fabrics "gpucluster-1f0c" and "gpucluster-2a9e"`)
+	assert.ErrorAs(t, err, &ConflictingPathsError{})
 }
 
 func Test_newNetworkForest_PathCompletion(t *testing.T) {
@@ -328,21 +323,6 @@ func Test_networkForest_cutOutNodeSets_UnknownNames(t *testing.T) {
 	forest := forestToCutOut(t)
 	assert.Empty(t, forest.cutOutNodeSets([]string{"login"}).roots)
 	assert.Empty(t, forest.cutOutNodeSets(nil).roots)
-}
-
-func Test_networkForest_cutOutNodeSets_SharedTopSegment(t *testing.T) {
-	// Fabrics are expected to be disjoint. When two share a top segment, the nodes of the fabric
-	// with the larger name sit under the other fabric's root and must still be in scope.
-	forest, err := newNetworkForest([]NodeSet{
-		mustNodeSet("worker", 1, "gpucluster-2a9e", rackPaths("worker", 1, path("t0-77c1e0", "t2-e2d6c5"))),
-		mustNodeSet("worker-rack0", 2, "gpucluster-1f0c", rackPaths("worker-rack0", 2, path("t0-a3f0b9", "t2-e2d6c5"), 1)),
-	})
-	require.NoError(t, err)
-	assert.Equal(t, []string{
-		"gpucluster-1f0c/t2-e2d6c5/t0-77c1e0=worker-0",
-		"gpucluster-1f0c/gpucluster-1f0c.unknown=",
-		"gpucluster-2a9e/gpucluster-2a9e.unknown=",
-	}, leafPaths(forest.cutOutNodeSets([]string{"worker"})))
 }
 
 func Test_networkForest_cutOutNodeSets_Immutable(t *testing.T) {

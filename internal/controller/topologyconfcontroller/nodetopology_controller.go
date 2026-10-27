@@ -186,16 +186,47 @@ func (r *NodeTopologyReconciler) extractTierData(node *corev1.Node, nodeName str
 	return tierData, nil
 }
 
+// ExtractTierLabels picks the tier labels of a Kubernetes node, keyed by their suffix. The values
+// are the switch and block names everything downstream, topology.yaml and the worker registration,
+// reads, so a name Slurm cannot parse safely is fixed here once for all readers.
 func ExtractTierLabels(k8sNodeLabels map[string]string, topologyLabelPrefix string) map[string]string {
 	tierLabels := make(map[string]string)
 
 	for key, value := range k8sNodeLabels {
 		if strings.Contains(key, topologyLabelPrefix+"/tier-") {
 			tierKey := key[strings.LastIndex(key, "/")+1:]
-			tierLabels[tierKey] = value
+			tierLabels[tierKey] = slurmSafeName(value)
 		}
 	}
 	return tierLabels
+}
+
+// maxSafeTrailingDigits bounds the trailing decimal run of a switch or block name. Slurm parses
+// that run with strtoul and never checks for overflow: 19 digits always fit a uint64, 20 may not,
+// and one digit of margin is kept.
+const maxSafeTrailingDigits = 18
+
+// slurmNameTerminator is appended to names with a longer run. "_" never appears in hex fabric IDs
+// and has no meaning in Slurm's hostlist syntax, so the name is stored verbatim.
+const slurmNameTerminator = "_"
+
+func slurmSafeName(name string) string {
+	if trailingDigitCount(name) <= maxSafeTrailingDigits {
+		return name
+	}
+	return name + slurmNameTerminator
+}
+
+// trailingDigitCount returns the length of the trailing contiguous run of ASCII decimal digits.
+func trailingDigitCount(name string) int {
+	count := 0
+	for i := len(name) - 1; i >= 0; i-- {
+		if name[i] < '0' || name[i] > '9' {
+			break
+		}
+		count++
+	}
+	return count
 }
 
 // getConfigMapDataFromResourceDistribution extracts the ConfigMap data from the ResourceDistribution

@@ -27,6 +27,7 @@ func TestExtractTierLabels(t *testing.T) {
 		consts.DefaultTopologyLabelPrefix + "/tier-1": "leaf00",
 		consts.DefaultTopologyLabelPrefix + "/other":  "value",
 		consts.DefaultTopologyLabelPrefix + "/tier-2": "spine00",
+		consts.DefaultTopologyLabelPrefix + "/tier-3": "6f84b74219aa22869602735141708147",
 		"unrelated.label": "unrelatedValue",
 	}
 
@@ -35,6 +36,7 @@ func TestExtractTierLabels(t *testing.T) {
 		"tier-0": "nvl0",
 		"tier-1": "leaf00",
 		"tier-2": "spine00",
+		"tier-3": "6f84b74219aa22869602735141708147_",
 	}
 
 	// Call the function
@@ -43,6 +45,31 @@ func TestExtractTierLabels(t *testing.T) {
 	// Validate the result
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("ExtractTierLabels() = %v, want %v", result, expected)
+	}
+}
+
+func Test_slurmSafeName_Basic(t *testing.T) {
+	for in, want := range map[string]string{
+		"":                                 "",
+		"t0-3f9c0a":                        "t0-3f9c0a",
+		"sw123456789012345678":             "sw123456789012345678",
+		"sw1234567890123456789":            "sw1234567890123456789_",
+		"6f84b74219aa22869602735141708147": "6f84b74219aa22869602735141708147_",
+	} {
+		assert.Equal(t, want, slurmSafeName(in), in)
+	}
+}
+
+func Test_trailingDigitCount_Basic(t *testing.T) {
+	for in, want := range map[string]int{
+		"":                                 0,
+		"abc":                              0,
+		"abc1":                             1,
+		"1a2b3":                            1,
+		"12345":                            5,
+		"6f84b74219aa22869602735141708147": 20,
+	} {
+		assert.Equal(t, want, trailingDigitCount(in), in)
 	}
 }
 
