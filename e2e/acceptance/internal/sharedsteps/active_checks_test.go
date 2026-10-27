@@ -2,6 +2,7 @@ package sharedsteps
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -13,20 +14,36 @@ import (
 type activeCleanupRuntime struct {
 	framework.Runtime
 	succeeded bool
+	missing   bool
+	queryErr  error
 	calls     []string
 }
 
+type activeCleanupArgsScope struct{ framework.ArgsScope }
+
+func (s activeCleanupArgsScope) RunWithDefaultRetry(ctx context.Context, args ...string) (string, error) {
+	return s.Run(ctx, args...)
+}
+
+func (*activeCleanupRuntime) Logf(string, ...any) {}
+
 func (r *activeCleanupRuntime) Kubectl() framework.ArgsScope {
-	return framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
+	return activeCleanupArgsScope{framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
 		r.calls = append(r.calls, strings.Join(args, " "))
 		if args[0] == "get" {
+			if r.queryErr != nil {
+				return "", r.queryErr
+			}
+			if r.missing {
+				return "", fmt.Errorf("Error from server (NotFound): jobs.batch %q not found", args[4])
+			}
 			if r.succeeded {
 				return `{"status":{"succeeded":1}}`, nil
 			}
 			return `{"status":{"failed":1}}`, nil
 		}
 		return "", nil
-	})
+	})}
 }
 
 func (r *activeCleanupRuntime) Jail() framework.CommandScope {
@@ -52,6 +69,37 @@ func TestGPUActiveCheckCleanupStopsFailedProducerAndOwnedSlurmJobs(t *testing.T)
 		}
 		assert.Empty(t, steps.gpuCheckK8sJobName)
 		assert.Empty(t, steps.gpuCheckJobIDs)
+	}
+}
+
+func TestActiveCheckCleanupAcceptsAlreadyDeletedJobs(t *testing.T) {
+	for _, gpu := range []bool{false, true} {
+		runtime := &activeCleanupRuntime{missing: true}
+		steps := NewActiveChecks(nil, runtime, framework.NewSlurmClient(runtime), framework.NewKubectlClient(runtime), nil)
+		if gpu {
+			steps.gpuCheckK8sJobName = "owned-gpu-check"
+		} else {
+			steps.dryRunJobName = "owned-dry-run"
+		}
+		ctx := framework.WithWorkerReservation(t.Context(), framework.NewWorkerPool(), t.Name())
+		steps.CleanupAndReset(ctx)
+		require.NoError(t, framework.FinishWorkerReservation(ctx, runtime))
+		assert.Len(t, runtime.calls, 1)
+	}
+}
+
+func TestActiveCheckCleanupReportsInspectionErrors(t *testing.T) {
+	for _, gpu := range []bool{false, true} {
+		runtime := &activeCleanupRuntime{queryErr: fmt.Errorf("inspect Job: forbidden")}
+		steps := NewActiveChecks(nil, runtime, framework.NewSlurmClient(runtime), framework.NewKubectlClient(runtime), nil)
+		if gpu {
+			steps.gpuCheckK8sJobName = "owned-gpu-check"
+		} else {
+			steps.dryRunJobName = "owned-dry-run"
+		}
+		ctx := framework.WithWorkerReservation(t.Context(), framework.NewWorkerPool(), t.Name())
+		steps.CleanupAndReset(ctx)
+		require.ErrorContains(t, framework.FinishWorkerReservation(ctx, runtime), "forbidden")
 	}
 }
 
