@@ -181,7 +181,7 @@ func (s *JobTmpfs) startJobs(ctx context.Context) error {
 			return fmt.Errorf("verify job memory accounting cgroup: got %q, expected %q", status.Cgroup, cgroup)
 		}
 		output, err := s.runtime.WorkerPod(s.pod).Run(ctx,
-			"stat -Lc '%i' "+framework.ShellQuote(s.namespacePath(job)+"/.ns/mnt"))
+			"stat -Lc '%i' "+framework.ShellQuote(jobNamespacePath(job.ID)+"/.ns/mnt"))
 		if err != nil {
 			return fmt.Errorf("verify running job %s namespace anchor: %w", job.ID, err)
 		}
@@ -213,10 +213,6 @@ func jobTmpfsJobCgroup(taskCgroup, jobID string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("find job %s cgroup in %q", jobID, taskCgroup)
-}
-
-func (s *JobTmpfs) namespacePath(job framework.SbatchJob) string {
-	return path.Join("/tmp", job.ID)
 }
 
 func (s *JobTmpfs) step(ctx context.Context, job framework.SbatchJob, command string) error {
@@ -322,7 +318,7 @@ for entry in itertools.chain(proc.glob("[0-9]*/ns/mnt"), proc.glob("[0-9]*/fd/*"
         pass
 print("remaining=" + repr(remaining) if remaining else "clean")
 `
-		command := "python3 -c " + framework.ShellQuote(probe) + " " + framework.ShellQuote(s.namespacePath(job)) +
+		command := "python3 -c " + framework.ShellQuote(probe) + " " + framework.ShellQuote(jobNamespacePath(job.ID)) +
 			" " + framework.ShellQuote(s.status[i].Cgroup) + " " + strconv.FormatUint(s.status[i].NamespaceInode, 10)
 		err := s.runtime.WaitFor(ctx, "job namespace and cgroup removed", jobTmpfsTimeout, framework.DefaultPollInterval,
 			func(waitCtx context.Context) (bool, error) {
