@@ -3,7 +3,7 @@ fullnameOverride: ""
 image:
   repository: cr.nebius.cloud/soperator/nfs-server
   pullPolicy: IfNotPresent
-  tag: "1.2.2"
+  tag: "1.2.3"
 imagePullSecrets: []
 # NFS Server Configuration
 nfs:
@@ -19,6 +19,8 @@ nfs:
   graceTime: 10
   leaseTime: 10
   threads: 8
+  # Connection limit on kernels that expose /proc/fs/nfsd/max_connections; 0 uses the kernel default.
+  maxConnections: 8192
   # Replicas must be 0 or 1, we can't have more than one NFS server instance
   replicas: 1
 # Storage configuration for the backing volume
@@ -41,7 +43,7 @@ storageClass:
   volumeBindingMode: Immediate
   allowVolumeExpansion: true
   mountOptions:
-    - nconnect=16
+    - nconnect=8
     - vers=4.2
     - hard
     - rsize=1048576

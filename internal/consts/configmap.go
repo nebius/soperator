@@ -10,30 +10,34 @@ const (
 	ConfigMapNameSSHDConfigsWorker = sshConfigsWorker
 	ConfigMapNameSshRootPublicKeys = sshRootKeys
 	ConfigMapNameSecurityLimits    = securityLimits
+	ConfigMapNameUserIsolation     = userIsolation
 	ConfigMapNameSysctl            = sysctl
-	ConfigMapNameSupervisord       = supervisord
+	ConfigMapNamePAMSlurmAdopt     = pamSlurmAdopt
 
-	ConfigMapKeySlurmConfig             = "slurm.conf"
-	ConfigMapKeyRESTConfig              = "slurm_rest.conf"
-	ConfigMapKeyCustomSlurmConfig       = "custom_slurm.conf"
-	ConfigMapKeyCGroupConfig            = "cgroup.conf"
-	ConfigMapKeySpankConfig             = "plugstack.conf"
-	ConfigMapKeyGresConfig              = "gres.conf"
-	ConfigMapKeyMPIConfig               = "mpi.conf"
-	ConfigMapKeySlurmdbdConfig          = "slurmdbd.conf"
-	ConfigMapKeyTopologyConfig          = "topology.conf"
-	ConfigMapKeyActiveCheckPrologScript = "activecheck-prolog.sh"
+	ConfigMapKeySlurmConfig         = "slurm.conf"
+	ConfigMapKeySlurmBaseConfig     = "slurm_base.conf.noedit"
+	ConfigMapKeyRESTConfig          = "slurm_rest.conf"
+	ConfigMapKeySlurmK8sExtraConfig = "slurm_k8s_extra.conf.noedit"
+	ConfigMapKeyCGroupConfig        = "cgroup.conf"
+	ConfigMapKeySpankConfig         = "plugstack.conf"
+	ConfigMapKeyGresConfig          = "gres.conf"
+	ConfigMapKeyMPIConfig           = "mpi.conf"
+	ConfigMapKeyNamespaceConfig     = "namespace.yaml"
+	ConfigMapKeySlurmdbdConfig      = "slurmdbd.conf"
+	ConfigMapKeyTopologyYAML        = "topology.yaml"
 
 	ConfigMapKeySshdConfig              = SshdName + "_config"
 	ConfigMapKeySshRootPublicKeysConfig = authorizedKeys
 	ConfigMapKeySecurityLimits          = securityLimitsConfFile
+	ConfigMapKeyUserIsolation           = userIsolationConfFile
 	ConfigMapKeySysctl                  = sysctlConfFile
-	ConfigMapKeySupervisord             = supervisordConfFile
+	ConfigMapKeyPAMSlurmAdopt           = pamSlurmAdoptConfFile
+	ConfigMapKeyPAMSlurmAdoptUsers      = pamSlurmAdoptUsersConfFile
+	ConfigMapKeyPAMSlurmAdoptGroups     = pamSlurmAdoptGroupsConfFile
 	ConfigMapKeySoperatorcheckSbatch    = "sbatch.sh"
 
-	ConfigMapNameTopologyNodeLabels      = "topology-node-labels"
-	ConfigMapNameTopologyConfig          = "topology-config"
-	ConfigMapNameActiveCheckPrologScript = "activecheck-prolog"
+	ConfigMapNameTopologyNodeLabels = "topology-node-labels"
+	ConfigMapNameTopologyConfig     = "topology-config"
 
 	// ResourceDistribution names
 	ResourceDistributionNameTopology = "topology-soperator"

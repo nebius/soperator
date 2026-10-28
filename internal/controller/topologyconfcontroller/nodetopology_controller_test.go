@@ -1,4 +1,4 @@
-package topologyconfcontroller_test
+package topologyconfcontroller
 
 import (
 	"context"
@@ -8,12 +8,14 @@ import (
 
 	kruisev1alpha1 "github.com/openkruise/kruise-api/apps/v1alpha1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
-	tc "nebius.ai/slurm-operator/internal/controller/topologyconfcontroller"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -25,6 +27,7 @@ func TestExtractTierLabels(t *testing.T) {
 		consts.DefaultTopologyLabelPrefix + "/tier-1": "leaf00",
 		consts.DefaultTopologyLabelPrefix + "/other":  "value",
 		consts.DefaultTopologyLabelPrefix + "/tier-2": "spine00",
+		consts.DefaultTopologyLabelPrefix + "/tier-3": "6f84b74219aa22869602735141708147",
 		"unrelated.label": "unrelatedValue",
 	}
 
@@ -33,15 +36,79 @@ func TestExtractTierLabels(t *testing.T) {
 		"tier-0": "nvl0",
 		"tier-1": "leaf00",
 		"tier-2": "spine00",
+		"tier-3": "6f84b74219aa22869602735141708147_",
 	}
 
 	// Call the function
-	result := tc.ExtractTierLabels(k8sNodeLabels, consts.DefaultTopologyLabelPrefix)
+	result := ExtractTierLabels(k8sNodeLabels, consts.DefaultTopologyLabelPrefix)
 
 	// Validate the result
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("ExtractTierLabels() = %v, want %v", result, expected)
 	}
+}
+
+func Test_slurmSafeName_Basic(t *testing.T) {
+	for in, want := range map[string]string{
+		"":                                 "",
+		"t0-3f9c0a":                        "t0-3f9c0a",
+		"sw123456789012345678":             "sw123456789012345678",
+		"sw1234567890123456789":            "sw1234567890123456789_",
+		"6f84b74219aa22869602735141708147": "6f84b74219aa22869602735141708147_",
+	} {
+		assert.Equal(t, want, slurmSafeName(in), in)
+	}
+}
+
+func Test_trailingDigitCount_Basic(t *testing.T) {
+	for in, want := range map[string]int{
+		"":                                 0,
+		"abc":                              0,
+		"abc1":                             1,
+		"1a2b3":                            1,
+		"12345":                            5,
+		"6f84b74219aa22869602735141708147": 20,
+	} {
+		assert.Equal(t, want, trailingDigitCount(in), in)
+	}
+}
+
+func TestCollectNodesWithAnyTier(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kruisev1alpha1.AddToScheme(scheme))
+	require.NoError(t, slurmv1.AddToScheme(scheme))
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	for name, labels := range map[string]map[string]string{
+		"node0": {consts.DefaultTopologyLabelPrefix + "/tier-0": "nvl0"},
+		"node2": {consts.DefaultTopologyLabelPrefix + "/tier-2": "spine2"},
+		"other": {"kubernetes.io/hostname": "other"},
+	} {
+		require.NoError(t, fakeClient.Create(ctx, &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels},
+		}))
+	}
+	r := NewNodeTopologyReconciler(fakeClient, scheme, "default", consts.DefaultTopologyLabelPrefix)
+
+	cm, err := r.GetOrCreateTopologyLabelsConfigMap(ctx)
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{
+		"node0": `{"tier-0":"nvl0"}`,
+		"node2": `{"tier-2":"spine2"}`,
+	}, cm.Data)
+
+	node := &corev1.Node{}
+	require.NoError(t, fakeClient.Get(ctx, types.NamespacedName{Name: "node2"}, node))
+	node.Labels[consts.DefaultTopologyLabelPrefix+"/tier-2"] = "spine3"
+	require.NoError(t, fakeClient.Update(ctx, node))
+	_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: node.Name}})
+	require.NoError(t, err)
+
+	cm, err = r.GetOrCreateTopologyLabelsConfigMap(ctx)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"tier-2":"spine3"}`, cm.Data["node2"])
 }
 
 func TestUpdateTopologyConfigMap(t *testing.T) {
@@ -52,14 +119,10 @@ func TestUpdateTopologyConfigMap(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	reconciler := &tc.NodeTopologyReconciler{
-		BaseReconciler: tc.BaseReconciler{
-			Client: fakeClient,
-			Scheme: scheme,
-		},
+	reconciler := &NodeTopologyReconciler{
+		client:    fakeClient,
+		scheme:    scheme,
 		Namespace: "default",
-		// Use the same fakeClient as APIReader for tests
-		APIReader: fakeClient,
 	}
 
 	ctx := context.TODO()
@@ -117,14 +180,10 @@ func TestRemoveTopologyConfigMap(t *testing.T) {
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 
-	reconciler := &tc.NodeTopologyReconciler{
-		BaseReconciler: tc.BaseReconciler{
-			Client: fakeClient,
-			Scheme: scheme,
-		},
+	reconciler := &NodeTopologyReconciler{
+		client:    fakeClient,
+		scheme:    scheme,
 		Namespace: "default",
-		// Use the same fakeClient as APIReader for tests
-		APIReader: fakeClient,
 	}
 
 	ctx := context.TODO()
@@ -149,7 +208,7 @@ func TestRemoveTopologyConfigMap(t *testing.T) {
 		assert.NoError(t, err)
 
 		err = reconciler.UpdateResourceDistribution(ctx, tt.nodeName, tierData, rd)
-		logger := log.FromContext(ctx).WithName(tc.NodeTopologyReconcilerName)
+		logger := log.FromContext(ctx).WithName(NodeTopologyReconcilerName)
 		assert.NoError(t, err)
 		t.Run(tt.name, func(t *testing.T) {
 			// Get the ResourceDistribution again for removal

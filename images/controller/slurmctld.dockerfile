@@ -55,10 +55,11 @@ COPY --from=powermanager_builder /build/power-manager /opt/soperator/bin/power-m
 RUN chmod 755 /opt/soperator/bin/power-manager
 
 # Copy power management scripts for Slurm ResumeProgram/ResumeFailProgram/SuspendProgram
+COPY images/controller/power_action.sh /opt/soperator/bin/power_action.sh
 COPY images/controller/power_resume.sh /opt/soperator/bin/power_resume.sh
 COPY images/controller/power_resume_fail.sh /opt/soperator/bin/power_resume_fail.sh
 COPY images/controller/power_suspend.sh /opt/soperator/bin/power_suspend.sh
-RUN chmod 755 /opt/soperator/bin/power_resume.sh /opt/soperator/bin/power_resume_fail.sh /opt/soperator/bin/power_suspend.sh
+RUN chmod 755 /opt/soperator/bin/power_action.sh /opt/soperator/bin/power_resume.sh /opt/soperator/bin/power_resume_fail.sh /opt/soperator/bin/power_suspend.sh
 
 # Copy & run the entrypoint script
 COPY images/controller/slurmctld_entrypoint.sh /opt/bin/slurm/
