@@ -23,6 +23,9 @@ const (
 
 	// soperatorchecks replaces the node for any check that drains with a reason with this prefix.
 	nodeReplacementHealthCheckReason = "[node_problem]"
+	// healthCheckInjectErrorReasonPart is the health-checker check name reported for --inject-error,
+	// see docs/passive-checks.md. It separates the simulated failure from a real [node_problem] drain.
+	healthCheckInjectErrorReasonPart = "inject_error"
 
 	// gpu_health_check passes --inject-error to the health-checker while this node-local marker exists,
 	// so only the Soperator run of the health-checker fails and nothing reaches platform monitoring of the host.
@@ -297,7 +300,7 @@ func (s *NodeReplacement) aGPUHealthCheckFailureIsSimulatedOnThatNode(ctx contex
 	// Mark before running: cleanup must inspect the node even when the command ran
 	// but its result never came back.
 	s.faultInjected = true
-	if _, err := s.runtime.Worker(s.replacementWorker).Run(ctx, healthCheckInjectErrorCommand()); err != nil {
+	if _, err := s.runtime.Worker(s.replacementWorker).RunWithDefaultRetry(ctx, healthCheckInjectErrorCommand()); err != nil {
 		return fmt.Errorf("simulate GPU health check failure on %s: %w", s.replacementWorker.Name, err)
 	}
 	s.runtime.Logf("Node replacement: wrote %s with %s on %s", healthCheckInjectErrorMarker, healthCheckInjectErrorResolution, s.replacementWorker.Name)
@@ -311,14 +314,17 @@ func healthCheckInjectErrorCommand() string {
 		framework.ShellQuote(healthCheckInjectErrorMarker))
 }
 
-// The marker lives on the original node's disk, so it disappears with the node;
-// removing it only matters when the replacement never happened.
+// The marker lives on the original node's disk, so it disappears with the node.
+// Removing it matters when the node was never replaced: a leftover marker fails
+// every later GPU prolog on that node, so the removal is retried before giving up.
 func (s *NodeReplacement) removeHealthCheckInjectErrorMarker(ctx context.Context) {
 	if s.replacementWorker.Name == "" {
 		return
 	}
-	if _, err := s.runtime.Worker(s.replacementWorker).Run(ctx, fmt.Sprintf("rm -f %s", framework.ShellQuote(healthCheckInjectErrorMarker))); err != nil {
-		s.runtime.Logf("Cleanup: remove %s from %s: %v", healthCheckInjectErrorMarker, s.replacementWorker.Name, err)
+	command := fmt.Sprintf("rm -f %s", framework.ShellQuote(healthCheckInjectErrorMarker))
+	if _, err := s.runtime.Worker(s.replacementWorker).RunWithDefaultRetry(ctx, command); err != nil {
+		s.runtime.Logf("Cleanup: remove %s from %s: %v; if the node was not replaced, delete the marker by hand or GPU jobs on it will keep failing the prolog check",
+			healthCheckInjectErrorMarker, s.replacementWorker.Name, err)
 	}
 }
 
@@ -333,16 +339,31 @@ func (s *NodeReplacement) theNodeIsDrainedWithANodeProblemReason(ctx context.Con
 		return err
 	}
 	s.runtime.Logf("Node replacement: waiting up to %s for Slurm's periodic health check to drain %s", timeout, workerName)
-	err = s.slurm.WaitForNodeReasonContains(ctx, workerName, nodeReplacementHealthCheckReason, timeout)
+	err = s.runtime.WaitFor(ctx, "simulated health check drain", timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+		node, err := s.slurm.NodeInfo(waitCtx, workerName)
+		if err != nil {
+			return false, err
+		}
+		return node.HasStateFlag("DRAIN") && healthCheckDrainReasonMatches(node.Reason), nil
+	})
 	node, stateErr := s.slurm.NodeInfo(ctx, workerName)
 	if stateErr == nil {
 		s.runtime.Logf("Worker state after waiting for the health check drain: name=%s state=%s reason=%s instance_id=%s",
 			node.Name, node.State, node.Reason, node.InstanceID)
 	}
 	if err != nil {
-		return fmt.Errorf("wait for %s to be drained with a node problem reason: %w", workerName, err)
+		return fmt.Errorf("wait for %s to be drained with a node problem reason from the simulated health check failure: %w", workerName, err)
 	}
 	return nil
+}
+
+// healthCheckDrainReasonMatches accepts a drain caused by the simulated failure only: the
+// [node_problem] prefix is what makes soperator replace the node, and the inject_error check
+// name proves the marker, not a real failure, drained it. The check name, resolution text and
+// the [prolog]/[hc_program] context are left out: they may change or vary with cluster activity.
+func healthCheckDrainReasonMatches(reason string) bool {
+	return strings.HasPrefix(reason, nodeReplacementHealthCheckReason) &&
+		strings.Contains(reason, healthCheckInjectErrorReasonPart)
 }
 
 // healthCheckDrainTimeout derives the drain wait from the effective HealthCheckInterval.
