@@ -63,7 +63,7 @@ This section explains the main building blocks of the Active Checks framework, f
 
 - **Slurm Nodes Controller**
   Watches Slurm nodes and drained workers.
-    - Sets the unhealthy flag for nodes drained with health-check reason prefixes when node replacement is enabled.
+    - Sets `HardwareIssuesSuspected` on the Kubernetes nodes of workers drained with health-check reason prefixes when node replacement is enabled; the platform then replaces the node.
 
 - **Image Storage**
   Stores container images that provide the environments needed for running checks.
@@ -274,12 +274,12 @@ Active Checks are primarily managed by three controllers. Together they implemen
 
 **Purpose**
 - Watches Slurm nodes, focusing on drained workers.
-- Sets the unhealthy flag on the corresponding Kubernetes nodes for workers drained with health-check reason prefixes to mark them for replacement.
+- Sets `HardwareIssuesSuspected` on the corresponding Kubernetes nodes for workers drained with health-check reason prefixes, so that the platform reports the host with Compute `SetUnhealthy` and replaces the node. Soperator keeps the node cordoned until then and does not delete it itself.
 
 **High-level flow**
 1. Periodically list Slurm nodes and filter **drained** nodes with well-known health check reasons.
 2. For `[node_problem]` health check failures:
-    - Mark the node unhealthy **when node replacement is enabled**; otherwise no-op.
+    - Set `HardwareIssuesSuspected` **when node replacement is enabled**; otherwise no-op.
 
 ## Roadmap & Limitations
 
