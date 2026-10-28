@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: mount-jail-submount-filestore
-          image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+          image: cr.nebius.cloud/soperator/busybox
           command:
             - /bin/sh
             - -c
