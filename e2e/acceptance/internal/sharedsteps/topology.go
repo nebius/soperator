@@ -158,15 +158,15 @@ func (s *Topology) CleanupAndReset(ctx context.Context) {
 
 		sizes := s.blockSizesRestore
 		s.blockSizesRestore = nil
-		s.runtime.Logf("cleanup: restoring blockSizes %v of topology %s", sizes, s.blockTopology)
+		s.runtime.Logf("Cleanup: restoring blockSizes %v of topology %s", sizes, s.blockTopology)
 		// The wait covers slurmctld too, not just the published file: leaving the cluster running
 		// the test sizes would fail the next run before it changed anything.
 		if err := s.patchBlockSizes(cleanupCtx, s.blockTopology, sizes); err != nil {
-			s.runtime.Logf("cleanup: restore blockSizes of topology %s: %v", s.blockTopology, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: restore blockSizes of topology %s: %v", s.blockTopology, err)
 		} else if err := s.waitForRenderedBlockSizes(cleanupCtx, s.blockTopology, sizes); err != nil {
-			s.runtime.Logf("cleanup: wait for restored blockSizes of topology %s: %v", s.blockTopology, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: wait for restored blockSizes of topology %s: %v", s.blockTopology, err)
 		} else if err := s.waitForSlurmBaseBlockSize(cleanupCtx, s.blockTopology, sizes[0]); err != nil {
-			s.runtime.Logf("cleanup: wait for slurmctld to pick the restored blockSizes of topology %s up: %v",
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: wait for slurmctld to pick the restored blockSizes of topology %s up: %v",
 				s.blockTopology, err)
 		}
 	}

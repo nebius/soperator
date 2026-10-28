@@ -2,6 +2,7 @@ package sharedsteps
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cucumber/godog"
 
@@ -55,12 +56,26 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 
 func registerScenarioScoped(sc *godog.ScenarioContext, family scenarioScopedStepFamily) {
 	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
-		family.CleanupAndReset(context.Background())
-		return ctx, nil
+		return ctx, cleanupStepFamily(ctx, family)
 	})
 	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
-		family.CleanupAndReset(context.Background())
-		return ctx, nil
+		return ctx, cleanupStepFamily(ctx, family)
 	})
 	family.RegisterSteps(sc)
+}
+
+func cleanupStepFamily(ctx context.Context, family scenarioScopedStepFamily) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("clean up %T: %v", family, recovered)
+			framework.RecordWorkerCleanupError(ctx, err)
+		}
+	}()
+	family.CleanupAndReset(context.WithoutCancel(ctx))
+	return nil
+}
+
+func reportCleanupErrorf(ctx context.Context, runtime framework.Runtime, format string, args ...any) {
+	framework.RecordWorkerCleanupError(ctx, fmt.Errorf("scenario cleanup: %s", fmt.Sprintf(format, args...)))
+	runtime.Logf(format, args...)
 }

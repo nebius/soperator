@@ -127,11 +127,66 @@ again.
 
 ## Tags and versioned behavior
 
-The shared feature suite has three tag forms that affect execution:
+The shared feature suite has four tag forms that affect execution:
 
 - exactly one scenario-level `@soperator_version_...` constraint;
 - optional `@heavy`;
 - optional `@unstable`.
+- optional `@sequential`, for scenarios that require exclusive execution. The
+  standalone runner executes these first, one at a time, then runs all unmarked
+  scenarios concurrently (four by default). Do not use `@parallel`.
+
+By default, queue `@heavy` scenarios first in the parallel suite so long checks can
+overlap shorter ones. `ConcurrentSuites` enforces this automatically while keeping
+the original order within each group and leaving the sequential suite unchanged.
+Worker reservations still control resource availability; launch order must never
+be a scenario prerequisite.
+Explicit `--heavy-first=false` and `--random-seed` overrides are available for
+benchmarking and independence checks. Random ordering applies only to the
+parallel suite and records a seed; do not change scenario safety tags or worker
+reservations to support an ordering experiment.
+
+Design every scenario to pass on its own and in any order. Create or verify its
+prerequisites instead of depending on accounts, files or configuration left by
+another scenario. Track jobs by ID and use scenario-specific paths, SSH identities
+and artifact directories. Scope assertions and cleanup to owned resources: other
+scenarios may legitimately drain or replace unreserved workers, and cancelling jobs
+by a shared user or name can stop their work. Synchronize unavoidable shared setup,
+such as first-time user creation, across the complete read-modify-write operation.
+
+Before recording baselines or starting work, identify every worker the scenario
+affects, including workers used by indirectly launched jobs. Acquire the complete
+set atomically through `WorkerSelector.Acquire` or its `Pick...Workers` wrappers;
+custom selectors must call `Reserve` before using their selection. An idle worker
+found through a snapshot is not necessarily unreserved. Let acquisition wait for
+busy or unhealthy configured workers rather than skipping them or holding a subset
+while waiting for more. Pin every job to the reserved workers, use
+`RequireReservedHost` before host-wide faults, and retain reservations until owned
+jobs stop and required cleanup and recovery are verified. Report unsafe cleanup
+failures through `reportCleanupErrorf` so the finalizer can quarantine the workers.
+Worker reservations do not protect shared login Pods, cluster configuration or
+shared files; isolate or narrowly synchronize those resources, or use the
+documented `@sequential` exclusion below.
+
+Use `@sequential` when a concrete conflict remains: shared configuration or jail
+package mutation, shared login/system restarts, cluster-wide health assertions,
+or custom worker selection outside the reservation pool. A shared read, multiple
+workers, GPU usage, or a long runtime alone is not a reason to serialize a scenario.
+Never add the tag just to hide a failure or incomplete concurrency review.
+
+Every `@sequential` tag must be scenario-level and have a `# Sequential: ...`
+comment immediately above its tag line. Name the conflicting resource or assertion
+and explain why worker reservations do not currently isolate it. For example:
+
+```gherkin
+  # Sequential: Changes shared Slurm configuration used by every worker job.
+  @soperator_version_>=5.0.0 @sequential
+  Scenario: A custom Slurm setting is applied and restored
+```
+
+Keep the comment accurate when implementation changes; remove the tag and comment
+when the conflict is resolved. Outline examples share the scenario's decision.
+Run the feature-policy and concurrent-suite tests after changing membership.
 
 CPU, GPU, topology, and other descriptive tags are allowed, but no current
 runner or workflow consumes them. Ask whether the user wants these tags and

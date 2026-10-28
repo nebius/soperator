@@ -82,6 +82,23 @@ func (s *ActiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *ActiveChecks) CleanupAndReset(ctx context.Context) {
+	if s.gpuCheckK8sJobName != "" {
+		var job k8sJobStatus
+		if err := s.kubectl.GetJSON(ctx, &job, "get", "job", "-n", framework.SoperatorNamespace, s.gpuCheckK8sJobName, "-o", "json"); err != nil {
+			if !isKubectlNotFound(err) {
+				reportCleanupErrorf(ctx, s.runtime, "cleanup: inspect GPU ActiveCheck Job %s: %v", s.gpuCheckK8sJobName, err)
+			}
+		} else if job.Status.Succeeded == 0 {
+			if _, err := s.runtime.Kubectl().Run(ctx, "delete", "job", "-n", framework.SoperatorNamespace, s.gpuCheckK8sJobName, "--ignore-not-found=true", "--wait=true", "--timeout=60s"); err != nil {
+				reportCleanupErrorf(ctx, s.runtime, "cleanup: stop GPU ActiveCheck Job %s: %v", s.gpuCheckK8sJobName, err)
+			}
+			for _, id := range s.gpuCheckJobIDs {
+				if err := s.slurm.CancelJob(ctx, id, 0); err != nil {
+					reportCleanupErrorf(ctx, s.runtime, "cleanup: cancel GPU ActiveCheck Slurm job %s: %v", id, err)
+				}
+			}
+		}
+	}
 	if s.dryRunMarker != "" {
 		expression := fmt.Sprintf(`\|^%s$|d`, s.dryRunMarker)
 		command := fmt.Sprintf("sed -i -- %s %s",
@@ -89,19 +106,21 @@ func (s *ActiveChecks) CleanupAndReset(ctx context.Context) {
 			framework.ShellQuote(manageJailStateDryRunFile),
 		)
 		if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
-			s.runtime.Logf("cleanup: remove marker from managed jail file %s: %v", manageJailStateDryRunFile, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: remove marker from managed jail file %s: %v", manageJailStateDryRunFile, err)
 		}
 	}
 	if s.dryRunJobName != "" {
 		var job k8sJobStatus
 		if err := s.kubectl.GetJSON(ctx, &job, "get", "job", "-n", framework.SoperatorNamespace, s.dryRunJobName, "-o", "json"); err != nil {
-			s.runtime.Logf("cleanup: get manage-jail-state dry-run Job %s: %v", s.dryRunJobName, err)
+			if !isKubectlNotFound(err) {
+				reportCleanupErrorf(ctx, s.runtime, "cleanup: get manage-jail-state dry-run Job %s: %v", s.dryRunJobName, err)
+			}
 		} else if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
 			if _, err := s.runtime.Kubectl().Run(ctx,
 				"delete", "job", "-n", framework.SoperatorNamespace, s.dryRunJobName,
 				"--ignore-not-found=true", "--wait=false",
 			); err != nil {
-				s.runtime.Logf("cleanup: stop manage-jail-state dry-run Job %s: %v", s.dryRunJobName, err)
+				reportCleanupErrorf(ctx, s.runtime, "cleanup: stop manage-jail-state dry-run Job %s: %v", s.dryRunJobName, err)
 			}
 		}
 	}
@@ -290,6 +309,21 @@ func (s *ActiveChecks) healthyGPUWorkersAreAvailableForActiveChecks(ctx context.
 	if err != nil {
 		return err
 	}
+	count := 0
+	for _, nodeSet := range snapshot.NodeSets {
+		if nodeSet.HasGPU && nodeSet.Replicas > 0 {
+			count += nodeSet.Replicas
+		}
+	}
+	if count > 0 {
+		if err := s.selector.Reserve(ctx, framework.WorkerRequirements{Kind: "GPU", Count: count}); err != nil {
+			return err
+		}
+		snapshot, err = s.selector.Snapshot(ctx)
+		if err != nil {
+			return err
+		}
+	}
 	if err := snapshot.RequireGPUWorkersUsable(); framework.IsInsufficientWorkers(err) {
 		s.runtime.Logf("acceptance: no GPU workers configured for GPU ActiveCheck validation, skipping scenario")
 		return godog.ErrSkip
@@ -305,12 +339,15 @@ func (s *ActiveChecks) theGPUActiveCheckIsTriggered(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	s.gpuCheckK8sJobName = jobName
 	jobIDs, err := s.waitForK8sJobSlurmJobIDs(ctx, jobName, activeK8sJobTimeout)
 	if err != nil {
 		return err
 	}
-	s.gpuCheckK8sJobName = jobName
 	s.gpuCheckJobIDs = jobIDs
+	for _, id := range jobIDs {
+		framework.TrackReservedJob(ctx, id)
+	}
 	return nil
 }
 

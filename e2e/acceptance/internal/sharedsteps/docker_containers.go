@@ -96,7 +96,7 @@ func (s *DockerContainers) CleanupAndReset(ctx context.Context) {
 			framework.ShellQuote(s.loginSSHContainerName),
 		)
 		if _, cleanupErr := s.runtime.Jail().Run(ctx, cleanupCommand); cleanupErr != nil {
-			s.runtime.Logf("cleanup: remove login Docker container: %v", cleanupErr)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: remove login Docker container: %v", cleanupErr)
 		}
 	}
 	if s.dockerSSHIdentitySet {
@@ -107,16 +107,16 @@ func (s *DockerContainers) CleanupAndReset(ctx context.Context) {
 			dockerSSHKeyName,
 			dockerSSHKeyComment,
 		); cleanupErr != nil {
-			s.runtime.Logf("cleanup: remove Docker SSH identity: %v", cleanupErr)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: remove Docker SSH identity: %v", cleanupErr)
 		}
 	}
 	if cleanupErr := s.requestCurrentJobCancellation(ctx); cleanupErr != nil {
-		s.runtime.Logf("cleanup: cancel Docker job: %v", cleanupErr)
+		reportCleanupErrorf(ctx, s.runtime, "cleanup: cancel Docker job: %v", cleanupErr)
 	}
 	s.stopContainersByNamePrefix(ctx)
 	s.removeContainersByNamePrefix(ctx)
 	if cleanupErr := s.waitForCurrentJobGone(ctx); cleanupErr != nil {
-		s.runtime.Logf("cleanup: wait for Docker job to finish: %v", cleanupErr)
+		reportCleanupErrorf(ctx, s.runtime, "cleanup: wait for Docker job to finish: %v", cleanupErr)
 	}
 	s.workers = nil
 	s.job = framework.SbatchJob{}
@@ -324,11 +324,7 @@ func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers
 }
 
 func (s *DockerContainers) pickWorkers(ctx context.Context, workerType string, count int) ([]framework.WorkerInfo, error) {
-	snapshot, err := s.selector.Snapshot(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return snapshot.WithDocker().PickWorkersByType(workerType, count)
+	return s.selector.Acquire(ctx, framework.WorkerRequirements{Kind: workerType, Count: count, Docker: true})
 }
 
 func (s *DockerContainers) theDockerContainerJobIsRunning(ctx context.Context) error {

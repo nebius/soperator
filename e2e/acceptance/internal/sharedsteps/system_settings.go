@@ -291,14 +291,14 @@ func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
 			continue
 		}
 		if err := s.slurm.CancelJob(ctx, tracked.job.ID, systemSettingsCleanup); err != nil {
-			s.runtime.Logf("cleanup: cancel %s job %s: %v", tracked.kind, tracked.job.ID, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: cancel %s job %s: %v", tracked.kind, tracked.job.ID, err)
 		}
 		if tracked.container.isDocker() && s.worker.Name != "" {
 			// Cancelling the job kills the Docker client, not necessarily the container.
 			name := systemSettingsDockerContainerName(tracked.job.ID)
 			command := fmt.Sprintf("sudo docker rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(name))
 			if _, err := s.runtime.Worker(s.worker).Run(ctx, command); err != nil {
-				s.runtime.Logf("cleanup: remove Docker container %s on worker %s: %v", name, s.worker.Name, err)
+				reportCleanupErrorf(ctx, s.runtime, "cleanup: remove Docker container %s on worker %s: %v", name, s.worker.Name, err)
 			}
 		}
 	}
@@ -350,11 +350,7 @@ func (s *SystemSettings) selectHealthyGPUWorker(ctx context.Context) error {
 }
 
 func (s *SystemSettings) selectHealthyDockerWorker(ctx context.Context) error {
-	snapshot, err := s.selector.Snapshot(ctx)
-	if err != nil {
-		return err
-	}
-	workers, err := snapshot.WithDocker().PickWorkers(1)
+	workers, err := s.selector.Acquire(ctx, framework.WorkerRequirements{Count: 1, Docker: true})
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
@@ -364,11 +360,7 @@ func (s *SystemSettings) selectHealthyDockerWorker(ctx context.Context) error {
 }
 
 func (s *SystemSettings) selectHealthyDockerGPUWorker(ctx context.Context) error {
-	snapshot, err := s.selector.Snapshot(ctx)
-	if err != nil {
-		return err
-	}
-	workers, err := snapshot.WithDocker().PickGPUWorkers(1)
+	workers, err := s.selector.Acquire(ctx, framework.WorkerRequirements{Kind: "GPU", Count: 1, Docker: true})
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}

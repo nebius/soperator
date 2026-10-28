@@ -55,10 +55,10 @@ func (s *NodeSetEphemeralModeTransition) CleanupAndReset(ctx context.Context) {
 		cleanupCtx, cancel := context.WithTimeout(ctx, nodeSetEphemeralModeCleanupTimeout)
 		defer cancel()
 		if err := s.patchNodeSetMode(cleanupCtx, false, s.initialNodeSet.Spec.InitialNumberEphemeralNodes); err != nil {
-			s.runtime.Logf("cleanup: restore static NodeSet %s/%s: %v",
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: restore static NodeSet %s/%s: %v",
 				s.initialNodeSet.Metadata.Namespace, s.initialNodeSet.Metadata.Name, err)
 		} else if err := s.checkStaticModeRestored(cleanupCtx); err != nil {
-			s.runtime.Logf("cleanup: wait for static NodeSet %s/%s: %v",
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: wait for static NodeSet %s/%s: %v",
 				s.initialNodeSet.Metadata.Namespace, s.initialNodeSet.Metadata.Name, err)
 		}
 	}

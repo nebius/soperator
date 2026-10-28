@@ -2,6 +2,7 @@ package acceptance
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"regexp"
@@ -31,6 +32,9 @@ func TestTeamCityHooksReportParallelScenarioResults(t *testing.T) {
   Scenario: fails
     Then the step fails
     And the step passes
+
+  Scenario: skip with failed cleanup
+    Then the step skips
 `)},
 	}
 	suite := godog.TestSuite{
@@ -41,6 +45,15 @@ func TestTeamCityHooksReportParallelScenarioResults(t *testing.T) {
 			registerSkipHook(sc)
 			sc.Step(`^the step passes$`, func() error { return nil })
 			sc.Step(`^the step fails$`, func() error { return errors.New("controlled failure") })
+			sc.Step(`^the step skips$`, func() error { return godog.ErrSkip })
+			sc.After(func(ctx context.Context, scenario *godog.Scenario, _ error) (context.Context, error) {
+				if scenario.Name == "skip with failed cleanup" {
+					err := errors.New("cleanup failure")
+					recordTeamCityScenarioFailure(ctx, err)
+					return ctx, err
+				}
+				return ctx, nil
+			})
 			registerTeamCityResultHooks(sc, reporter)
 		},
 		Options: &godog.Options{
@@ -55,19 +68,20 @@ func TestTeamCityHooksReportParallelScenarioResults(t *testing.T) {
 
 	assert.Equal(t, 1, suite.Run())
 	report := output.String()
-	assert.Equal(t, 3, strings.Count(report, "##teamcity[testStarted"))
-	assert.Equal(t, 3, strings.Count(report, "##teamcity[testFinished"))
-	assert.Equal(t, 1, strings.Count(report, "##teamcity[testFailed"))
+	assert.Equal(t, 4, strings.Count(report, "##teamcity[testStarted"))
+	assert.Equal(t, 4, strings.Count(report, "##teamcity[testFinished"))
+	assert.Equal(t, 2, strings.Count(report, "##teamcity[testFailed"))
 	assert.Equal(t, 1, strings.Count(report, "##teamcity[testIgnored"))
 	assert.Contains(t, report, "name='reporting: features/teamcity.feature: passes'")
 	assert.Contains(t, report, "name='reporting: features/teamcity.feature: skips'")
 	assert.Contains(t, report, "name='reporting: features/teamcity.feature: fails'")
 	assert.Contains(t, report, "testStarted name='reporting: features/teamcity.feature: skips'")
 	assert.Contains(t, report, "message='controlled failure'")
+	assert.Contains(t, report, "testFailed name='reporting: features/teamcity.feature: skip with failed cleanup' message='cleanup failure'")
 	assert.Contains(t, report, "message='scenario skipped at step: the step passes'")
 
 	durations := regexp.MustCompile(`##teamcity\[testFinished [^\n]+ duration='[0-9]+'`).FindAllString(report, -1)
-	assert.Len(t, durations, 3)
+	assert.Len(t, durations, 4)
 	assert.NotContains(t, report, "testIgnored name='reporting: features/teamcity.feature: fails'")
 	assert.Contains(t, report, "testFinished name='reporting: features/teamcity.feature: skips'")
 }

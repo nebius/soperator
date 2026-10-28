@@ -1082,7 +1082,9 @@ func TestWorkerMK8sScenarioRejectsFailedOperationsBeforeCleanup(t *testing.T) {
 			require.NotNil(t, steps.mk8s.requestedMaxPods, "retain ownership so cleanup can recover after the scenario fails")
 			assert.NotContains(t, strings.Join(runtime.logs, "\n"), "ended unsuccessfully")
 
-			require.NoError(t, steps.cleanupMK8sGroup(t.Context()))
+			cleanupCtx := framework.WithWorkerReservation(t.Context(), framework.NewWorkerPool(), t.Name())
+			require.NoError(t, steps.cleanupMK8sGroup(cleanupCtx))
+			require.NoError(t, framework.FinishWorkerReservation(cleanupCtx, runtime))
 			assert.Equal(t, 3, updates)
 			assert.Equal(t, mk8sInteger(110), maxPods)
 			assert.Equal(t, mk8sInteger(1), budget)

@@ -1,12 +1,14 @@
 Feature: Docker containers
-  @soperator_version_>=5.0.0
+  # Sequential: Shares a fixed SSH key with worker SSH examples; their setup and cleanup replace the same credentials.
+  @soperator_version_>=5.0.0 @sequential
   Scenario: Docker containers can run over login SSH
     Given login Docker is enabled
     And a Docker SSH test user exists
     When the user runs Docker lifecycle commands over SSH on the login node
     Then Docker uses the login proxy, image storage, and the user's cgroup
 
-  @soperator_version_>=5.0.0
+  # Sequential: CPU and GPU examples share a fixed SSH key; concurrent cleanup can remove another example's credentials.
+  @soperator_version_>=5.0.0 @sequential
   Scenario Outline: Docker containers can run over SSH on <worker_type> workers
     Given a Docker SSH test user exists
     When the user runs a Docker container over SSH on a <worker_type> worker node

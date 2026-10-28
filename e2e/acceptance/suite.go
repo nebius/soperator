@@ -12,13 +12,41 @@ type ScenarioVersionAxis struct {
 
 // SuiteConfig describes one independently executed Godog suite.
 type SuiteConfig struct {
-	Name            string
-	Source          FeatureSource
-	VersionAxes     []ScenarioVersionAxis
-	Tags            string
-	StepRegistrars  []StepRegistrar
-	ExcludeUnstable bool
-	ExcludeHeavy    bool
+	Name                   string
+	Source                 FeatureSource
+	VersionAxes            []ScenarioVersionAxis
+	Tags                   string
+	StepRegistrars         []StepRegistrar
+	ExcludeUnstable        bool
+	ExcludeHeavy           bool
+	Concurrency            int
+	RequirePreviousSuccess bool
+	HeavyFirst             bool
+	RandomSeed             int64
+}
+
+// ConcurrentSuites runs @sequential scenarios first, then all remaining scenarios
+// with native Godog concurrency. Worker workloads must reserve their complete set.
+func ConcurrentSuites(suite SuiteConfig, concurrency int) []SuiteConfig {
+	serial, parallel := suite, suite
+	serial.Concurrency = 1
+	serial.HeavyFirst = false
+	serial.RandomSeed = 0
+	parallel.Concurrency = concurrency
+	// Default to heavy scenarios first so their runtime can overlap shorter checks.
+	parallel.HeavyFirst = parallel.RandomSeed == 0
+	parallel.RequirePreviousSuccess = true
+	parallel.Name += "-parallel"
+	serial.Tags = combineTags(suite.Tags, "@sequential")
+	parallel.Tags = combineTags(suite.Tags, "~@sequential")
+	return []SuiteConfig{serial, parallel}
+}
+
+func combineTags(left, right string) string {
+	if left == "" {
+		return right
+	}
+	return "(" + left + ") && (" + right + ")"
 }
 
 // VersionAxis returns a scenario version axis for product-owned version tags.

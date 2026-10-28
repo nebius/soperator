@@ -61,6 +61,20 @@ func (j SbatchJob) IsZero() bool {
 // directory exists, submits it from the jail, and returns an SbatchJob with
 // the parsed job id and the resolved stdout / stderr paths.
 func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (SbatchJob, error) {
+	if reservation := workerReservation(ctx); reservation != nil && len(reservation.workers) != 0 {
+		if len(opts.Nodelist) == 0 {
+			return SbatchJob{}, fmt.Errorf("submit reserved job: an explicit nodelist is required")
+		}
+		owned := make(map[string]bool, len(reservation.workers))
+		for _, worker := range reservation.workers {
+			owned[worker.Name] = true
+		}
+		for _, name := range opts.Nodelist {
+			if !owned[name] {
+				return SbatchJob{}, fmt.Errorf("submit reserved job: worker %s is outside the scenario reservation", name)
+			}
+		}
+	}
 	jobName := strings.TrimSpace(opts.JobName)
 	if jobName == "" {
 		return SbatchJob{}, fmt.Errorf("sbatch: job name is required")
@@ -126,6 +140,7 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	if err != nil {
 		return SbatchJob{}, fmt.Errorf("parse sbatch job id for %q: %w", jobName, err)
 	}
+	TrackReservedJob(ctx, jobID)
 	return SbatchJob{
 		ID:         jobID,
 		JobName:    jobName,

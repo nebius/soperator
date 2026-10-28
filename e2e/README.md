@@ -68,6 +68,15 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
 - `--run-heavy`: optional, defaults to `false`; when false, scenarios tagged
   `@heavy` are excluded. Enabling it includes heavy scenarios alongside ordinary
   scenarios. Heavy and unstable controls are independent.
+- `--parallelism`: maximum concurrent worker-local scenarios, defaults to `4`.
+  Set to `1` for sequential execution with the same selection and reservation rules.
+- `--heavy-first`: queue heavy scenarios first in the parallel suite, defaults
+  to `true`. Set to `false` to compare with the original feature-list order.
+- `--random-seed`: positive seed for randomized parallel-suite launch order and
+  outline examples, defaults to `0` (disabled). Requires `--heavy-first=false`.
+  The runner logs the seed and selected launch queue so an ordering can be reused.
+- `--worker-acquire-timeout`: maximum wait for free, healthy workers, defaults
+  to `90m`. This includes contention and recovery and is separate from job timeouts.
 - `--scenario`: optional. Runs all compatible scenarios in the provided feature
   file, or the single scenario at an exact `Scenario:` line, for example
   `features/internal_ssh.feature:3`. May be repeated.
@@ -78,9 +87,46 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
 
 Steps that need a specific worker kind query live Slurm and NodeSet state at
 scenario time. They skip when the required capacity is not configured, but fail
-when it is configured and too few workers are usable. Scenarios that cover all
+when configured workers do not recover within the acquisition timeout. Scenarios that cover all
 workers also fail on partial degradation. CPU, GPU, and topology tags in feature
 files are descriptive only; no current runner or workflow consumes them.
+
+The CLI runs two suites in order: `soperator` contains `@sequential` scenarios
+and executes them one at a time; `soperator-parallel` contains all other scenarios
+and uses native Godog concurrency (four by default). Both retain the same version,
+heavy, unstable and scenario-path filters. Exact scenario selectors refer to the
+`Scenario:` or `Scenario Outline:` line in the selected checkout.
+If the sequential suite fails, the concurrent suite is not started against a
+potentially degraded shared baseline.
+
+By default, keep `@heavy` scenarios first in the parallel suite's launch queue.
+`ConcurrentSuites` applies this ordering automatically, preserving the original
+order within heavy and ordinary scenarios. Worker reservations still determine
+when each scenario can obtain its workers; sequential-suite ordering is unchanged.
+Explicit ordering overrides support comparisons of the original order,
+heavy-first order and seeded random order. None changes the scenario selection
+or worker-reservation rules. `SuiteConfig.RandomSeed` provides the same seeded
+ordering for library callers; use either it or `SuiteConfig.HeavyFirst`.
+
+Worker selection waits for active workers' Pods and Kubernetes hosts to be Ready
+and reserves an entire worker set atomically. Waiting requests
+are considered in arrival order, but a request that cannot fit does not block
+an independent request. Generic allocations prefer CPU workers. Leases last
+through cleanup; failed cleanup or recovery quarantines the affected workers
+for the rest of the run. Shared configuration mutation, unsafe shared SSH identity
+changes, cluster-wide assertions and system DaemonSet restarts require `@sequential`
+unless their conflicts have been isolated. A
+scenario must acquire its complete set once; incremental lock upgrades are
+rejected. Host-wide faults require ownership of every worker on that host.
+
+For every new or changed scenario, review worker ownership, shared files and
+identities, job placement, cleanup, and cluster-wide assertions. Default concurrency
+is safe only when its full footprint is isolated. Read-only shared checks and
+multi-worker jobs can run concurrently when those conditions hold. Every
+`@sequential` tag must be scenario-level and have a `# Sequential: ...` comment
+immediately above its tag line explaining the concrete conflicting resource or
+assertion. Keep that reason current and remove the exclusion when it is resolved.
+See [AGENTS.md](AGENTS.md) for examples and the full review policy.
 
 For focused manual runs on a dev cluster, pass the scenario location:
 
@@ -227,6 +273,18 @@ target cluster. `SlurmClusterName` defaults to `soperator` when omitted.
 `SuiteConfig.ExcludeHeavy` and `ExcludeUnstable` independently exclude their
 respective tags. `SoperatorSuite` preserves heavy coverage for library callers;
 the standalone CLI explicitly excludes it unless `--run-heavy` is set.
+
+Library callers keep sequential behavior unless they set `SuiteConfig.Concurrency`.
+To reuse the same split, pass `acceptance.ConcurrentSuites(suite, 4)` as
+`RunnerConfig.Suites`. This also works with Managed-owned feature sources and
+step registrars. Set `RunnerConfig.WorkerAcquireTimeout` to override the default
+90-minute acquisition budget. Select workers through `WorkerSelector.Acquire`
+or its `Pick...Workers` wrappers; custom selectors can call `Reserve` before
+recording worker baselines. The runner supplies scenario ownership through the
+context and finalizes it after all registered cleanup hooks.
+Custom feature sources must review every unmarked scenario before opting in:
+only `@sequential` scenarios are excluded from concurrency. Existing callers
+that do not opt in remain sequential.
 When `OutputDir` is set, each scenario receives matching runner and jail paths
 through `framework.ScenarioArtifacts(ctx)`. Product-specific steps can write
 their own files directly to those paths without registering a collector.

@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/nebius/soperator/e2e/acceptance"
 	"github.com/nebius/soperator/e2e/acceptance/artifacts"
@@ -16,13 +17,17 @@ import (
 const defaultSlurmClusterName = "soperator"
 
 type runOptions struct {
-	KubectlContext   string
-	SlurmClusterName string
-	SoperatorVersion string
-	RunUnstableTests bool
-	RunHeavyTests    bool
-	ScenarioPaths    []string
-	OutputDir        string
+	KubectlContext       string
+	SlurmClusterName     string
+	SoperatorVersion     string
+	RunUnstableTests     bool
+	RunHeavyTests        bool
+	ScenarioPaths        []string
+	OutputDir            string
+	Parallelism          int
+	HeavyFirst           bool
+	RandomSeed           int64
+	WorkerAcquireTimeout time.Duration
 }
 
 type collectOptions struct {
@@ -82,12 +87,16 @@ func runAcceptance(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	suites := acceptance.ConcurrentSuites(suiteFromOptions(opts, targetVersion), opts.Parallelism)
+	suites[1].HeavyFirst = opts.HeavyFirst
+	suites[1].RandomSeed = opts.RandomSeed
 	runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 		KubectlContext:         opts.KubectlContext,
 		SlurmClusterName:       opts.SlurmClusterName,
 		TargetSoperatorVersion: targetVersion,
 		OutputDir:              opts.OutputDir,
-		Suites:                 []acceptance.SuiteConfig{suiteFromOptions(opts, targetVersion)},
+		Suites:                 suites,
+		WorkerAcquireTimeout:   opts.WorkerAcquireTimeout,
 	})
 	if err != nil {
 		return err
@@ -135,6 +144,10 @@ func parseRunOptions(args []string) (runOptions, error) {
 	fs.StringVar(&opts.SoperatorVersion, "soperator-version", "", "target Soperator version; when omitted, Flux HelmRelease discovery is used")
 	fs.BoolVar(&opts.RunUnstableTests, "run-unstable", false, "run scenarios tagged @unstable")
 	fs.BoolVar(&opts.RunHeavyTests, "run-heavy", false, "run scenarios tagged @heavy")
+	fs.IntVar(&opts.Parallelism, "parallelism", 4, "maximum concurrent worker-local scenarios; 1 runs both suites sequentially")
+	fs.BoolVar(&opts.HeavyFirst, "heavy-first", true, "queue heavy scenarios first in the parallel suite")
+	fs.Int64Var(&opts.RandomSeed, "random-seed", 0, "seed for random parallel-suite ordering; requires --heavy-first=false; 0 preserves the selected order")
+	fs.DurationVar(&opts.WorkerAcquireTimeout, "worker-acquire-timeout", 90*time.Minute, "maximum wait for available workers, separate from job timeouts")
 	fs.Var((*scenarioPathFlag)(&opts.ScenarioPaths), "scenario", "feature file or exact Scenario line to run; may be repeated")
 	fs.StringVar(&opts.OutputDir, "output-dir", "", "directory for reports and per-scenario artifacts")
 	if err := fs.Parse(args); err != nil {
@@ -144,6 +157,15 @@ func parseRunOptions(args []string) (runOptions, error) {
 		return runOptions{}, fmt.Errorf("unexpected run arguments: %s", strings.Join(fs.Args(), " "))
 	}
 	trimRunOptions(&opts)
+	if opts.Parallelism < 1 || opts.WorkerAcquireTimeout <= 0 {
+		return runOptions{}, fmt.Errorf("--parallelism and --worker-acquire-timeout must be positive")
+	}
+	if opts.RandomSeed < 0 {
+		return runOptions{}, fmt.Errorf("--random-seed must not be negative")
+	}
+	if opts.RandomSeed != 0 && opts.HeavyFirst {
+		return runOptions{}, fmt.Errorf("--random-seed requires --heavy-first=false")
+	}
 	if err := validateCommonOptions(opts.KubectlContext, opts.OutputDir); err != nil {
 		return runOptions{}, err
 	}

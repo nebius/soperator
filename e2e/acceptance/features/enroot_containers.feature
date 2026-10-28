@@ -1,5 +1,6 @@
 Feature: Enroot containers
-  @soperator_version_>=5.0.0
+  # Sequential: Login and worker examples recreate and remove the same SSH identity.
+  @soperator_version_>=5.0.0 @sequential
   Scenario Outline: Enroot containers can run over SSH
     Given an Enroot SSH test user exists
     When the user imports an Enroot image over SSH on a <node> node

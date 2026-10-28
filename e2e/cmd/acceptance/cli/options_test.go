@@ -19,6 +19,29 @@ func TestParseRunOptionsDefaults(t *testing.T) {
 	assert.Empty(t, opts.SoperatorVersion)
 	assert.Empty(t, opts.ScenarioPaths)
 	assert.Equal(t, "artifacts", opts.OutputDir)
+	assert.Equal(t, 4, opts.Parallelism)
+	assert.True(t, opts.HeavyFirst)
+	assert.Zero(t, opts.RandomSeed)
+}
+
+func TestParseRunOptionsRejectsInvalidConcurrencySettings(t *testing.T) {
+	for _, option := range []string{"--parallelism=0", "--parallelism=-1", "--worker-acquire-timeout=0s", "--worker-acquire-timeout=-1s"} {
+		_, err := parseRunOptions([]string{"--kubectl-context", "unused", "--output-dir", "out", option})
+		require.ErrorContains(t, err, "must be positive")
+	}
+}
+
+func TestParseRunOptionsRejectsInvalidOrderingSettings(t *testing.T) {
+	for _, tc := range []struct {
+		option string
+		error  string
+	}{
+		{option: "--random-seed=-1", error: "must not be negative"},
+		{option: "--random-seed=104729", error: "requires --heavy-first=false"},
+	} {
+		_, err := parseRunOptions([]string{"--kubectl-context", "unused", "--output-dir", "out", tc.option})
+		require.ErrorContains(t, err, tc.error)
+	}
 }
 
 func TestParseRunOptionsExplicitValues(t *testing.T) {
@@ -28,6 +51,9 @@ func TestParseRunOptionsExplicitValues(t *testing.T) {
 		"--soperator-version", "4.1.5-reb85d0e5",
 		"--run-unstable=true",
 		"--run-heavy=true",
+		"--parallelism=8",
+		"--heavy-first=false",
+		"--random-seed=104729",
 		"--scenario", "features/internal_ssh.feature:3",
 		"--scenario=features/observability.feature:3",
 		"--output-dir", "reports",
@@ -37,6 +63,9 @@ func TestParseRunOptionsExplicitValues(t *testing.T) {
 	assert.Equal(t, "custom", opts.SlurmClusterName)
 	assert.True(t, opts.RunUnstableTests)
 	assert.True(t, opts.RunHeavyTests)
+	assert.Equal(t, 8, opts.Parallelism)
+	assert.False(t, opts.HeavyFirst)
+	assert.EqualValues(t, 104729, opts.RandomSeed)
 	assert.Equal(t, []string{"features/internal_ssh.feature:3", "features/observability.feature:3"}, opts.ScenarioPaths)
 	assert.Equal(t, "reports", opts.OutputDir)
 }
@@ -105,9 +134,9 @@ func TestRunRequiresExplicitSubcommand(t *testing.T) {
 
 func TestRunResolvesScenarioAliasesBeforeVersionFiltering(t *testing.T) {
 	for _, selector := range []string{
-		"features/worker_rolling_update.feature:14",
-		"e2e/acceptance/features/worker_rolling_update.feature:14",
-		"/checkout/soperator/e2e/acceptance/features/worker_rolling_update.feature:14",
+		"features/worker_rolling_update.feature:15",
+		"e2e/acceptance/features/worker_rolling_update.feature:15",
+		"/checkout/soperator/e2e/acceptance/features/worker_rolling_update.feature:15",
 	} {
 		t.Run(selector, func(t *testing.T) {
 			err := Run(context.Background(), []string{

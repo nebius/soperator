@@ -38,6 +38,13 @@ func registerTeamCityStateHook(sc *godog.ScenarioContext, suiteName string) {
 	})
 }
 
+func recordTeamCityScenarioFailure(ctx context.Context, err error) {
+	if state, ok := ctx.Value(teamCityScenarioStateKey{}).(*teamCityScenarioState); ok {
+		state.result = teamCityScenarioFailed
+		state.message = err.Error()
+	}
+}
+
 func registerTeamCityResultHooks(sc *godog.ScenarioContext, reporter *reports.TeamCityReporter) {
 	sc.StepContext().After(func(ctx context.Context, step *godog.Step, status godog.StepResultStatus, err error) (context.Context, error) {
 		state, ok := ctx.Value(teamCityScenarioStateKey{}).(*teamCityScenarioState)

@@ -77,13 +77,13 @@ func (s *LoginAutoscaling) CleanupAndReset(ctx context.Context) {
 	defer cancel()
 
 	if err := s.removeLoginCPUPressure(cleanupCtx); err != nil {
-		s.runtime.Logf("cleanup: remove login CPU pressure: %v", err)
+		reportCleanupErrorf(ctx, s.runtime, "cleanup: remove login CPU pressure: %v", err)
 	}
 	if s.initialConfigCaptured {
 		if err := s.restoreInitialLoginConfig(cleanupCtx); err != nil {
-			s.runtime.Logf("cleanup: restore initial login configuration: %v", err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: restore initial login configuration: %v", err)
 		} else if err := s.waitForInitialLoginConfig(cleanupCtx); err != nil {
-			s.runtime.Logf("cleanup: wait for initial login configuration: %v", err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: wait for initial login configuration: %v", err)
 		}
 	}
 

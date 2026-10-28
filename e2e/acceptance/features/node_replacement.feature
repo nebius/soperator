@@ -17,7 +17,7 @@ Feature: Node replacement
     When the test job is cancelled
     Then the old instance is removed
     And a replacement node joins the cluster
-    And all pre-existing worker nodes are operational
+    And the replacement CPU worker is operational
 
   @heavy @gpu @soperator_version_>=5.0.0
   Scenario: A failed GPU health check replaces the worker node
