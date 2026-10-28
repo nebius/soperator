@@ -1,0 +1,440 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True)
+class PlatformDefinition:
+  name: str
+  gres_type_prefix: str
+  environment: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class DetectedPlatform:
+  name: str
+  gres_type: str
+  gpus_per_node: int
+  cpus_per_task: int
+  environment: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class GPUNode:
+  name: str
+  gres_type: str
+  gpu_count: int
+  cpu_count: int
+
+
+PLATFORM_DEFINITIONS = (
+  PlatformDefinition(
+    name="H100",
+    gres_type_prefix="nvidia_h100",
+  ),
+  PlatformDefinition(
+    name="H200",
+    gres_type_prefix="nvidia_h200",
+  ),
+  PlatformDefinition(
+    name="B200",
+    gres_type_prefix="nvidia_b200",
+  ),
+  PlatformDefinition(
+    name="B300",
+    gres_type_prefix="nvidia_b300",
+  ),
+  PlatformDefinition(
+    name="GB300",
+    gres_type_prefix="nvidia_gb300",
+    environment={
+      "OMPI_MCA_coll_hcoll_enable": "0",
+      "OMPI_MCA_coll_ucc_enable": "0",
+    },
+  ),
+)
+
+MESSAGE_SIZE_RE = re.compile(r"^[1-9][0-9]*(?:[KMG])?$", re.IGNORECASE)
+TIME_LIMIT_RE = re.compile(r"^(?:[0-9]+-)?[0-9]{1,2}:[0-9]{2}(?::[0-9]{2})?$")
+GPU_GRES_RE = re.compile(r"(?:^|,)gpu:([^,:()]+):([0-9]+)(?=$|[,(])")
+GPU_GRES_ENTRY_RE = re.compile(r"(?:^|,)gpu(?=:|,|$)")
+
+
+class ScontrolError(RuntimeError):
+  pass
+
+
+def positive_int(value: str) -> int:
+  number = int(value)
+  if number <= 0:
+    raise argparse.ArgumentTypeError("must be greater than zero")
+  return number
+
+
+def message_size(value: str) -> str:
+  if not MESSAGE_SIZE_RE.fullmatch(value):
+    raise argparse.ArgumentTypeError(
+      "must be a positive integer optionally followed by K, M, or G"
+    )
+  return value
+
+
+def message_step_factor(value: str) -> str:
+  try:
+    factor = float(value)
+  except ValueError as error:
+    raise argparse.ArgumentTypeError("must be a number greater than one") from error
+  if factor <= 1:
+    raise argparse.ArgumentTypeError("must be greater than one")
+  return value
+
+
+def time_limit(value: str) -> str:
+  if not TIME_LIMIT_RE.fullmatch(value):
+    raise argparse.ArgumentTypeError(
+      "must use Slurm's minutes:seconds, hours:minutes:seconds, or days-hours:minutes:seconds format"
+    )
+  return value
+
+
+def node_list(value: str) -> str:
+  value = value.strip()
+  if not value:
+    raise argparse.ArgumentTypeError("must be a Slurm hostlist expression")
+  return value
+
+
+def parse_args(argv=None):
+  parser = argparse.ArgumentParser(
+    prog="soperator-nccl-test",
+    description="Run a multi-node NCCL all-reduce test on a Soperator cluster.",
+  )
+  parser.add_argument(
+    "--nodes",
+    type=positive_int,
+    required=True,
+    help="number of worker nodes to use",
+  )
+  parser.add_argument(
+    "--partition",
+    help="Slurm partition; omitted by default so Slurm uses the user's default",
+  )
+  parser.add_argument(
+    "--nodelist",
+    type=node_list,
+    help="Slurm hostlist expression identifying worker nodes to use",
+  )
+  parser.add_argument(
+    "--immediate",
+    type=positive_int,
+    help="seconds Slurm may wait for resources before failing",
+  )
+  parser.add_argument(
+    "--segment",
+    type=positive_int,
+    help="Slurm segment size; supported only on GB300",
+  )
+  parser.add_argument(
+    "--min-message-size",
+    type=message_size,
+    default="512M",
+    help="minimum NCCL message size (default: 512M)",
+  )
+  parser.add_argument(
+    "--max-message-size",
+    type=message_size,
+    default="16G",
+    help="maximum NCCL message size (default: 16G)",
+  )
+  parser.add_argument(
+    "--message-step-factor",
+    type=message_step_factor,
+    default="2",
+    help="NCCL message-size multiplication factor (default: 2)",
+  )
+  parser.add_argument(
+    "--time-limit",
+    type=time_limit,
+    default="30:00",
+    help="Slurm time limit (default: 30:00)",
+  )
+  return parser.parse_args(argv)
+
+
+def partition_argument(partition: str | None) -> list[str]:
+  if partition is None:
+    return []
+  return [f"--partition={partition}"]
+
+
+def placement_arguments(args) -> list[str]:
+  arguments = []
+  if args.nodelist is not None:
+    arguments.append(f"--nodelist={args.nodelist}")
+  if args.immediate is not None:
+    arguments.append(f"--immediate={args.immediate}")
+  return arguments
+
+
+def run_scontrol(arguments: list[str]) -> str:
+  command = ["scontrol", *arguments]
+  try:
+    result = subprocess.run(command, text=True, capture_output=True, check=False)
+  except FileNotFoundError:
+    raise ScontrolError("scontrol is not installed or not available in PATH") from None
+
+  if result.returncode != 0:
+    details = (result.stderr or result.stdout).strip()
+    message = f"{' '.join(command)} exited with code {result.returncode}"
+    if details:
+      message += f": {details}"
+    raise ScontrolError(message)
+  return result.stdout
+
+
+def run_scontrol_json(arguments: list[str]) -> dict:
+  output = run_scontrol([*arguments, "--json"])
+  try:
+    document = json.loads(output)
+  except json.JSONDecodeError as error:
+    raise ScontrolError(f"parse scontrol JSON output: {error}") from error
+  if document.get("errors"):
+    raise ScontrolError(f"scontrol returned errors: {document['errors']}")
+  return document
+
+
+def resolve_partition(partition_name: str | None) -> tuple[str, str]:
+  if partition_name is None:
+    partitions = run_scontrol_json(["show", "partitions"]).get("partitions", [])
+    partitions = [
+      partition for partition in partitions if "DEFAULT" in partition.get("flags", [])
+    ]
+    if len(partitions) != 1:
+      raise ValueError(
+        f"expected one default Slurm partition, found {len(partitions)}; set --partition"
+      )
+  else:
+    partitions = run_scontrol_json(
+      ["show", "partition", partition_name]
+    ).get("partitions", [])
+    if len(partitions) != 1:
+      raise ValueError(f"Slurm partition {partition_name!r} was not found")
+
+  partition = partitions[0]
+  configured_nodes = partition.get("nodes", {}).get("configured", "")
+  if not configured_nodes:
+    raise ValueError(f"Slurm partition {partition['name']!r} contains no nodes")
+  return partition["name"], configured_nodes
+
+
+def expand_hostlist(hostlist: str) -> tuple[str, ...]:
+  output = run_scontrol(["show", "hostnames", hostlist])
+  nodes = tuple(line.strip() for line in output.splitlines() if line.strip())
+  if not nodes:
+    raise ValueError(f"Slurm hostlist {hostlist!r} contains no nodes")
+  if len(nodes) != len(set(nodes)):
+    raise ValueError(f"Slurm hostlist {hostlist!r} contains duplicate nodes")
+  return nodes
+
+
+def load_nodes(hostlist: str, expected_nodes: tuple[str, ...]) -> list[dict]:
+  nodes = run_scontrol_json(["show", "nodes", hostlist]).get("nodes", [])
+  nodes_by_name = {node.get("name"): node for node in nodes}
+  missing = [name for name in expected_nodes if name not in nodes_by_name]
+  if missing:
+    raise ValueError(f"nodes are missing from Slurm: {', '.join(missing)}")
+  return [nodes_by_name[name] for name in expected_nodes]
+
+
+def parse_gpu_node(node: dict) -> GPUNode | None:
+  name = node.get("name", "unknown")
+  gres = node.get("gres") or ""
+  matches = GPU_GRES_RE.findall(gres)
+  if not matches:
+    if GPU_GRES_ENTRY_RE.search(gres):
+      raise ValueError(f"node {name} has an untyped or invalid GPU GRES: {gres}")
+    return None
+
+  gres_types = {gres_type for gres_type, _ in matches}
+  if len(gres_types) != 1:
+    raise ValueError(f"node {name} has multiple GPU GRES types: {gres}")
+  gpu_count = sum(int(count) for _, count in matches)
+  if gpu_count <= 0:
+    raise ValueError(f"node {name} has no configured GPUs: {gres}")
+
+  cpu_count = node.get("cpus")
+  if not isinstance(cpu_count, int) or cpu_count <= 0:
+    raise ValueError(f"node {name} has an invalid CPU count: {cpu_count!r}")
+  return GPUNode(name, next(iter(gres_types)), gpu_count, cpu_count)
+
+
+def platform_definition(gres_type: str) -> PlatformDefinition:
+  matches = [
+    definition
+    for definition in PLATFORM_DEFINITIONS
+    if gres_type == definition.gres_type_prefix
+    or gres_type.startswith(definition.gres_type_prefix + "_")
+  ]
+  if len(matches) != 1:
+    raise ValueError(f"unsupported GPU GRES type: {gres_type}")
+  return matches[0]
+
+
+def detect_platform(args) -> DetectedPlatform:
+  partition_name, partition_nodes = resolve_partition(args.partition)
+  hostlist = args.nodelist or partition_nodes
+  node_names = expand_hostlist(hostlist)
+  if args.nodelist is not None and len(node_names) != args.nodes:
+    raise ValueError(
+      f"--nodelist contains {len(node_names)} node(s), expected {args.nodes}"
+    )
+
+  nodes = load_nodes(hostlist, node_names)
+  outside_partition = [
+    node["name"]
+    for node in nodes
+    if partition_name not in node.get("partitions", [])
+  ]
+  if outside_partition:
+    raise ValueError(
+      f"nodes are not in partition {partition_name!r}: {', '.join(outside_partition)}"
+    )
+
+  gpu_nodes = []
+  for node in nodes:
+    gpu_node = parse_gpu_node(node)
+    if gpu_node is not None:
+      gpu_nodes.append(gpu_node)
+    elif args.nodelist is not None:
+      raise ValueError(f"node {node['name']} has no GPU GRES")
+
+  if len(gpu_nodes) < args.nodes:
+    raise ValueError(
+      f"partition {partition_name!r} contains {len(gpu_nodes)} GPU node(s), "
+      f"but --nodes requires {args.nodes}"
+    )
+
+  nodes_by_gres_type = {}
+  for node in gpu_nodes:
+    nodes_by_gres_type.setdefault(node.gres_type, []).append(node.name)
+  if len(nodes_by_gres_type) != 1:
+    details = "; ".join(
+      f"{gres_type}: {','.join(names)}"
+      for gres_type, names in sorted(nodes_by_gres_type.items())
+    )
+    raise ValueError(
+      f"nodes in the target partition have different GPU GRES types ({details}); "
+      "consider setting --partition or --nodelist"
+    )
+
+  resource_shapes = {(node.gpu_count, node.cpu_count) for node in gpu_nodes}
+  if len(resource_shapes) != 1:
+    details = "; ".join(
+      f"{node.name}: {node.gpu_count} GPU(s), {node.cpu_count} CPU(s)"
+      for node in gpu_nodes
+    )
+    raise ValueError(f"GPU nodes have different resource configurations: {details}")
+
+  gres_type = next(iter(nodes_by_gres_type))
+  gpu_count, cpu_count = next(iter(resource_shapes))
+  if cpu_count % gpu_count != 0:
+    raise ValueError(
+      f"cannot distribute {cpu_count} CPUs evenly across {gpu_count} GPUs per node"
+    )
+  definition = platform_definition(gres_type)
+  return DetectedPlatform(
+    name=definition.name,
+    gres_type=gres_type,
+    gpus_per_node=gpu_count,
+    cpus_per_task=cpu_count // gpu_count,
+    environment=definition.environment,
+  )
+
+
+def validate_platform_args(args, profile: DetectedPlatform) -> None:
+  if args.segment is not None and profile.name != "GB300":
+    raise ValueError("--segment is supported only on GB300")
+
+
+def build_nccl_command(args, profile: DetectedPlatform) -> list[str]:
+  command = [
+    "srun",
+    "--job-name=nccl_all_reduce",
+    f"--time={args.time_limit}",
+    f"--nodes={args.nodes}",
+    f"--gpus-per-node={profile.gres_type}:{profile.gpus_per_node}",
+    f"--ntasks-per-node={profile.gpus_per_node}",
+    f"--cpus-per-task={profile.cpus_per_task}",
+    "--mem=0",
+    *partition_argument(args.partition),
+    *placement_arguments(args),
+  ]
+  if args.segment is not None:
+    command.append(f"--segment={args.segment}")
+  command.extend(
+    [
+      "--mpi=pmix",
+      "all_reduce_perf_mpi",
+      "-b",
+      args.min_message_size,
+      "-e",
+      args.max_message_size,
+      "-f",
+      args.message_step_factor,
+      "-g",
+      "1",
+    ]
+  )
+  return command
+
+
+def build_environment(profile: DetectedPlatform) -> dict[str, str]:
+  environment = os.environ.copy()
+  environment.update(
+    {
+      "NCCL_IB_QPS_PER_CONNECTION": "2",
+      "NCCL_NVLS_ENABLE": "1",
+      "NCCL_BUFFSIZE": "8388608",
+    }
+  )
+  environment.update(profile.environment)
+  return environment
+
+
+def main(argv=None) -> int:
+  args = parse_args(argv)
+  try:
+    profile = detect_platform(args)
+    validate_platform_args(args, profile)
+  except ValueError as error:
+    print(str(error), file=sys.stderr)
+    return 2
+  except ScontrolError as error:
+    print(str(error), file=sys.stderr)
+    return 1
+
+  print(f"Detected platform: {profile.name}", flush=True)
+  print(
+    f"Running NCCL all-reduce on {args.nodes} node(s), "
+    f"{profile.gpus_per_node} GPU(s) per node...",
+    flush=True,
+  )
+
+  command = build_nccl_command(args, profile)
+  try:
+    return subprocess.run(command, env=build_environment(profile), check=False).returncode
+  except FileNotFoundError:
+    print("srun is not installed or not available in PATH", file=sys.stderr)
+    return 1
+  except KeyboardInterrupt:
+    return 130
+
+
+if __name__ == "__main__":
+  sys.exit(main())

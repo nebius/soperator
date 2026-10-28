@@ -10,7 +10,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
@@ -18,7 +17,9 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// RenderStatefulSet renders new [kruisev1b1.StatefulSet] containing Slurm login pods
+// RenderStatefulSet renders a new [kruisev1b1.StatefulSet] containing Slurm login pods.
+// A nil desiredReplicas value means that replicas are managed externally and must
+// be preserved by the Advanced StatefulSet reconciler.
 func RenderStatefulSet(
 	namespace,
 	clusterName string,
@@ -27,6 +28,7 @@ func RenderStatefulSet(
 	secrets *slurmv1.Secrets,
 	volumeSources []slurmv1.VolumeSource,
 	login *values.SlurmLogin,
+	desiredReplicas *int32,
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeLogin, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName)
@@ -36,21 +38,15 @@ func RenderStatefulSet(
 		login.K8sNodeFilterName,
 		func(f slurmv1.K8sNodeFilter) string { return f.Name },
 	)
+	dockerImageStorageMount, err := resolveDockerImageStorageMount(login)
+	if err != nil {
+		return kruisev1b1.StatefulSet{}, fmt.Errorf("resolving login Docker configuration: %w", err)
+	}
 
 	volumes, pvcTemplateSpecs, err := renderVolumesAndClaimTemplateSpecs(
 		clusterName, secrets, volumeSources, login)
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering volumes and claim template specs: %w", err)
-	}
-
-	replicas := &login.StatefulSet.Replicas
-	if check.IsMaintenanceActive(login.Maintenance) {
-		replicas = ptr.To(consts.ZeroReplicas)
-	}
-
-	sshAppArmorProfile := login.ContainerSshd.AppArmorProfile
-	if login.UseDefaultAppArmorProfile {
-		sshAppArmorProfile = fmt.Sprintf("%s/%s", "localhost", naming.BuildAppArmorProfileName(clusterName, namespace))
 	}
 
 	initContainers := append(
@@ -64,7 +60,7 @@ func RenderStatefulSet(
 		))
 	}
 
-	return kruisev1b1.StatefulSet{
+	res := kruisev1b1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      login.StatefulSet.Name,
 			Namespace: namespace,
@@ -73,7 +69,7 @@ func RenderStatefulSet(
 		Spec: kruisev1b1.StatefulSetSpec{
 			PodManagementPolicy: consts.PodManagementPolicy,
 			ServiceName:         login.HeadlessService.Name,
-			Replicas:            replicas,
+			Replicas:            desiredReplicas,
 			UpdateStrategy: kruisev1b1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &kruisev1b1.RollingUpdateStatefulSetStrategy{
@@ -98,14 +94,15 @@ func RenderStatefulSet(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
-					Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNameSshd),
+					Annotations: renderPodAnnotations(),
 				},
 				Spec: corev1.PodSpec{
-					HostUsers:      login.HostUsers,
-					Affinity:       nodeFilter.Affinity,
-					NodeSelector:   nodeFilter.NodeSelector,
-					Tolerations:    nodeFilter.Tolerations,
-					InitContainers: initContainers,
+					HostUsers:        login.HostUsers,
+					ImagePullSecrets: login.ContainerSshd.ImagePullSecrets,
+					Affinity:         nodeFilter.Affinity,
+					NodeSelector:     nodeFilter.NodeSelector,
+					Tolerations:      nodeFilter.Tolerations,
+					InitContainers:   initContainers,
 					Containers: []corev1.Container{
 						renderContainerSshd(
 							clusterWithGPU,
@@ -113,7 +110,10 @@ func RenderStatefulSet(
 							login.JailSubMounts,
 							login.CustomVolumeMounts,
 							login.ContainerSSSD,
-							sshAppArmorProfile,
+							login.UserIsolation,
+							login.DockerEnabled,
+							dockerImageStorageMount,
+							login.ContainerSshd.AppArmorProfile,
 						),
 					},
 					Volumes:   volumes,
@@ -132,5 +132,13 @@ func RenderStatefulSet(
 				},
 			},
 		},
-	}, nil
+	}
+
+	return res, nil
+}
+
+func renderPodAnnotations() map[string]string {
+	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNameSshd)
+	annotations["cluster-autoscaler.kubernetes.io/safe-to-evict"] = "false"
+	return annotations
 }

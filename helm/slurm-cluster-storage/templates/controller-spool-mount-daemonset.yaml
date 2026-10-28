@@ -1,9 +1,14 @@
+{{- if .Values.volume.controllerSpool.enabled }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   namespace: {{ .Release.Namespace }}
   name: {{ include "slurm-cluster-storage.volume.controller-spool.mount" . }}
 spec:
+  {{- with .Values.storage.controllerSpool.updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       slurm: {{ include "slurm-cluster-storage.volume.controller-spool.mount" . }}
@@ -14,7 +19,7 @@ spec:
     spec:
       containers:
         - name: mount-controller-spool-filestore
-          image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+          image: cr.nebius.cloud/soperator/busybox
           command:
             - /bin/sh
             - -c
@@ -43,3 +48,4 @@ spec:
 {{ .Values.storage.controllerSpool.matchExpressions | toYaml | indent 18 }}
       tolerations:
 {{ .Values.storage.controllerSpool.tolerations | toYaml | indent 8 }}
+{{- end }}

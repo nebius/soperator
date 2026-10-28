@@ -3,7 +3,8 @@ customContainer:
   enabled: false
   env: []
   image:
-    repository: "cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e"
+    repository: "cr.nebius.cloud/soperator/busybox"
+    tag: "latest"
     pullPolicy: IfNotPresent
   command:
     - /bin/sh
@@ -27,7 +28,7 @@ rebooter:
   env: []
   image:
     repository: "cr.nebius.cloud/soperator/rebooter"
-    tag: "4.1.16"
+    tag: "5.0.0"
     pullPolicy: IfNotPresent
   nodeSelector: {}
   resources: {}
@@ -35,11 +36,21 @@ rebooter:
   readinessProbe: {}
   tolerations: []
   affinity: {}
+  # Set to the chart's own class name to let the rebooter preempt the unprioritised infrastructure
+  # Deployments competing for a node's spare CPU. Leave empty to run at priority 0.
   priorityClassName: ""
+  # The rebooter is a DaemonSet on every node, so its value sits below every Slurm pod class
+  # (the lowest is slurm-login at 100002) and above the unprioritised Deployments at 0.
+  priorityClass:
+    create: true
+    # Defaults to "<release>-rebooter".
+    name: ""
+    value: 100000
+    description: "Priority class for the soperator rebooter DaemonSet. Above unprioritised infrastructure Deployments, below every Slurm pod."
   serviceAccountName: ""
 initContainers:
   - name: node-sysctl-params
-    image: "cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e"
+    image: "cr.nebius.cloud/soperator/busybox"
     securityContext:
       privileged: true
       runAsUser: 0

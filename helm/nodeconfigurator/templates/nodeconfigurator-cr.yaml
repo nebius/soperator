@@ -17,9 +17,7 @@ spec:
     {{- end }}
     image:
       repository: {{ .Values.customContainer.image.repository | quote }}
-      {{- with .Values.customContainer.image.tag }}
-      tag: {{ . | quote }}
-      {{- end }}
+      tag: {{ .Values.customContainer.image.tag | quote }}
       pullPolicy: {{ .Values.customContainer.image.pullPolicy | quote }}
     {{- if .Values.customContainer.nodeSelector }}
     nodeSelector:

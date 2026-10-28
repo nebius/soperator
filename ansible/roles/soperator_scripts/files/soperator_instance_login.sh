@@ -3,18 +3,26 @@
 set -e # Exit immediately if any command returns a non-zero error code
 
 usage() {
-    echo "Run an interactive login shell on the instance associated with a specific worker node." >&2
+    echo "Run an interactive login shell or execute a command on the instance associated with a specific worker node." >&2
     echo "" >&2
-    echo "usage: ${0} [-w worker_name] [-i instance_id] [-h]" >&2
-    echo "       (either -w or -i must be set)"
+    echo "usage: ${0} [-w worker_name] [-i instance_id] [-c command] [-h]" >&2
+    echo "       (either -w or -i must be set)" >&2
+    echo "" >&2
+    echo "examples:" >&2
+    echo "  - get a shell on the instance under worker-0:" >&2
+    echo "      ${0} -w worker-0" >&2
+    echo "  - collect RDMA stats from 128 workers:" >&2
+    echo "    scontrol show hostnames worker-[0-127] \\" >&2
+    echo "      | parallel -j 20 --linebuffer \"${0} -w {} -c 'hostname; rdma stat -j' > /tmp/{}-rdma-stat.out\"" >&2
     exit 1
 }
 
-while getopts w:i:h flag
+while getopts w:i:c:h flag
 do
     case "${flag}" in
         w) worker_name=${OPTARG};;
         i) instance_id=${OPTARG};;
+        c) cmd=${OPTARG};;
         h) usage;;
         *) usage;;
     esac
@@ -32,4 +40,8 @@ if [ -z "$worker_name" ] && [ -n "$instance_id" ]; then
     fi
 fi
 
-ssh -t "${worker_name}" sudo chroot /run/nvidia/driver nsenter -t 1 -m -u -i -n systemd-run --pty /bin/bash -l
+if [ -z "$cmd" ]; then
+    ssh -t "${worker_name}" sudo chroot /run/nvidia/driver nsenter -t 1 -m -u -i -n systemd-run --pty /bin/bash -l
+else
+    ssh "${worker_name}" "sudo chroot /run/nvidia/driver nsenter -t 1 -m -u -i -n bash -c $(printf %q "$cmd")"
+fi

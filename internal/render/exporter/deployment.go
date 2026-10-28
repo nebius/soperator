@@ -48,7 +48,7 @@ func RenderDeploymentExporter(clusterValues *values.SlurmCluster) (*appsv1.Deplo
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      DeploymentName,
+			Name:      clusterValues.SlurmExporter.Deployment.Name,
 			Namespace: clusterValues.Namespace,
 			Labels:    labels,
 		},
@@ -75,7 +75,7 @@ func renderMinimalNoopContainer() (corev1.Container, error) {
 		return corev1.Container{}, err
 	}
 
-	const minimalMultiArchImage = "cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e"
+	const minimalMultiArchImage = "cr.nebius.cloud/soperator/busybox:latest"
 
 	return corev1.Container{
 		Name:            consts.ContainerNameMunge,

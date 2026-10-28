@@ -4,6 +4,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   name: {{ include "slurm-cluster-storage.volume.jail.mount" . }}
 spec:
+  {{- with .Values.storage.jail.updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       slurm: {{ include "slurm-cluster-storage.volume.jail.mount" . }}
@@ -22,7 +26,7 @@ spec:
 {{- if eq (include "slurm-cluster-storage.volume.jail.type" .) "filestore" }}
           image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
 {{- else }}
-          image: cr.nebius.cloud/ml-containers/neubuntu:noble-20261028110508
+          image: cr.nebius.cloud/ml-containers/neubuntu:noble-20261021155244
 {{- end }}
           command:
             - /bin/sh

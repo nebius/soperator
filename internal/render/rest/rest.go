@@ -10,7 +10,6 @@ import (
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/check"
 	"nebius.ai/slurm-operator/internal/consts"
-	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -50,7 +49,7 @@ func RenderDeploymentREST(
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.BuildDeploymentName(consts.ComponentTypeREST),
+			Name:      valuesREST.Deployment.Name,
 			Namespace: namespace,
 			Labels:    labels,
 		},

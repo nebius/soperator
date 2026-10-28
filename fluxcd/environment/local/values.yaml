@@ -10,7 +10,7 @@ ns:
 soperator:
   enabled: true
   namespace: soperator-system
-  version: "4.1.16"
+  version: "5.0.0"
   interval: 5m
   timeout: 5m
   releaseName: soperator-controller
@@ -57,7 +57,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.1.16
+  version: 5.0.0
   namespace: soperator
   releaseName: soperator
   overrideValues:
@@ -99,8 +99,6 @@ slurmCluster:
         hostPath:
           path: /var/run/nebius/slurm
           type: DirectoryOrCreate
-    slurmConfig:
-      topologyPlugin: ""
     populateJail:
       k8sNodeFilterName: kind
     periodicChecks:
@@ -123,7 +121,7 @@ slurmCluster:
             ephemeralStorage: 100Mi
         customInitContainers:
           - name: ensure-jail-virtiofs
-            image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+            image: cr.nebius.cloud/soperator/busybox
             volumeMounts: [{name: jail, mountPath: /volume-mount}]
             command: ["grep", " /volume-mount virtiofs ", "/proc/mounts"]
       controller:
@@ -214,10 +212,11 @@ slurmCluster:
                 - soperator-dev-worker
 nodesets:
   enabled: true
+  clusterName: soperator
   overrideValues:
     priorityClasses: []
     nodesets:
-      - name: worker
+      - name: soperator-worker
         replicas: 1
         slurmd:
           resources:
@@ -276,10 +275,10 @@ backup:
 # NFS Server - disabled for local dev
 nfsServer:
   enabled: false
-  version: 1.2.2
+  version: 1.2.3
   overrideValues:
     image:
-      tag: 1.2.2
+      tag: 1.2.3
 # Notifier - disabled for local dev
 notifier:
   enabled: false

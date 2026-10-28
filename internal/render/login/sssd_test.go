@@ -63,6 +63,7 @@ func TestRenderStatefulSet_SSSD(t *testing.T) {
 		CustomInitContainers: []corev1.Container{},
 	}
 
+	desiredReplicas := login.StatefulSet.Replicas
 	result, err := RenderStatefulSet(
 		"test-ns",
 		"test-cluster",
@@ -71,6 +72,7 @@ func TestRenderStatefulSet_SSSD(t *testing.T) {
 		&slurmv1.Secrets{},
 		[]slurmv1.VolumeSource{{Name: "test-volume", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
 		login,
+		&desiredReplicas,
 	)
 	assert.NoError(t, err)
 

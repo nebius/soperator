@@ -1,4 +1,4 @@
 ---
 
 docker_engine_docker_ce_version: 5:29.9.2-1~ubuntu.24.04~noble
-docker_engine_containerd_io_version: 2.4.2-3~ubuntu.24.04~noble
+docker_engine_containerd_io_version: 2.3.6-1~ubuntu.24.04~noble
