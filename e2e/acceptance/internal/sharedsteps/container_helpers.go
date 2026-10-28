@@ -17,11 +17,11 @@ const (
 	enrootLifecycleImage = "docker://cr.nebius.cloud#" + ubuntuImageRef
 	ubuntuDockerImage    = "cr.nebius.cloud/" + ubuntuImageRef
 
-	// Cluster-supported GPU diagnostic image; includes nvidia-smi for container GPU visibility.
+	// Cluster-supported GPU diagnostic image (multi-GB); includes nvidia-smi for
+	// container GPU visibility. Only the Enroot GPU smoke uses it, to cover a
+	// realistic CUDA image. Other GPU container checks use the small Ubuntu image.
 	// https://github.com/nebius/ml-containers/pull/121
-	gpuSmokeImageRef    = "ml-containers/training_diag:13.0.3-ubuntu24.04-20261021155223"
-	gpuSmokeDockerImage = "cr.nebius.cloud/" + gpuSmokeImageRef
-	gpuSmokeEnrootImage = "docker://cr.nebius.cloud#" + gpuSmokeImageRef
+	gpuSmokeEnrootImage = "docker://cr.nebius.cloud#ml-containers/training_diag:13.0.3-ubuntu24.04-20261021155223"
 )
 
 func assertJobStdoutReportsVisibleGPUs(ctx context.Context, exec framework.Exec, job framework.SbatchJob) error {
