@@ -293,7 +293,7 @@ observability:
       namespaces: []
       image:
         repository: cr.nebius.cloud/soperator-proxy-docker-io/alpine/curl
-        tag: "8.22.0"
+        tag: "8.19.0"
         pullPolicy: IfNotPresent
       imdsBaseUrl: http://169.254.169.254
       hostNetwork: true
