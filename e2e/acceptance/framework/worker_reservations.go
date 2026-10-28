@@ -262,7 +262,8 @@ func FinishWorkerReservation(ctx context.Context, runtime Runtime) (result error
 					return false, fmt.Errorf("worker %s state=%s reason=%s", worker.Name, node.State, node.Reason)
 				}
 				if node.IsReadyForImmediateWork() {
-					if !node.HasStateFlag("IDLE") {
+					// External utilities can return while Slurm is still running the job epilog.
+					if !node.HasStateFlag("IDLE") || node.HasStateFlag("COMPLETING") {
 						return false, fmt.Errorf("worker %s is still occupied: state=%s", worker.Name, node.State)
 					}
 					pod, err := kubectl.WorkerPodForSlurmNode(waitCtx, worker.Name)

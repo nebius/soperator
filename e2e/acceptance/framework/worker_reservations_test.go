@@ -203,6 +203,9 @@ type reservationHealthRuntime struct {
 	ready      bool
 	queueReads int
 	cancelled  []string
+	nodeStates []string
+	nodeReads  int
+	onNodeRead func()
 }
 
 func (r *reservationHealthRuntime) Controller() CommandScope {
@@ -210,7 +213,15 @@ func (r *reservationHealthRuntime) Controller() CommandScope {
 		if err := ctx.Err(); err != nil {
 			return "", err
 		}
-		return "NodeName=gpu0 State=IDLE", nil
+		state := "IDLE"
+		if len(r.nodeStates) != 0 {
+			state = r.nodeStates[min(r.nodeReads, len(r.nodeStates)-1)]
+		}
+		r.nodeReads++
+		if r.onNodeRead != nil {
+			r.onNodeRead()
+		}
+		return "NodeName=gpu0 State=" + state, nil
 	})
 }
 
@@ -280,4 +291,25 @@ func TestFinishReservationChecksRecoveryAndCancelsOnlyOwnedJobs(t *testing.T) {
 			assert.Contains(t, pool.quarantine, "gpu0")
 		}
 	}
+}
+
+func TestFinishReservationWaitsForUntrackedJobEpilog(t *testing.T) {
+	pool := NewWorkerPool()
+	ctx := WithWorkerReservation(t.Context(), pool, "external utility")
+	reservation := workerReservation(ctx)
+	_, err := reservation.acquire(ctx, 1, fixedWorkers(reservationWorkers("gpu0")))
+	require.NoError(t, err)
+
+	runtime := &reservationHealthRuntime{
+		ready:      true,
+		nodeStates: []string{"IDLE+CLOUD+COMPLETING", "IDLE+CLOUD"},
+		onNodeRead: func() {
+			assert.Same(t, reservation, pool.owners["gpu0"], "retain ownership until the utility's epilog finishes")
+		},
+	}
+	require.NoError(t, FinishWorkerReservation(ctx, runtime))
+	assert.Equal(t, 2, runtime.nodeReads)
+	assert.Empty(t, runtime.cancelled)
+	assert.Empty(t, pool.owners)
+	assert.Empty(t, pool.quarantine)
 }
