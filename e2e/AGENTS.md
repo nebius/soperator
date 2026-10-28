@@ -127,6 +127,16 @@ again.
 
 ## Tags and versioned behavior
 
+The E2E workflow checks out the acceptance code from `main` for every tested
+branch, including `soperator-release-*`, unless a run overrides
+`soperator_e2e_repo_branch`. Treat `main` as the only home of `e2e/`: land
+scenario and framework changes there and do not backport them to release
+branches. If the current checkout is a release branch and the task is to add
+or change a scenario, say so and propose a branch from `main` instead. The
+suite from `main` runs against every supported release, so version-specific
+behavior is expressed with `@soperator_version_...` tags and runtime checks,
+never with per-branch copies of the code.
+
 The shared feature suite has three tag forms that affect execution:
 
 - exactly one scenario-level `@soperator_version_...` constraint;
