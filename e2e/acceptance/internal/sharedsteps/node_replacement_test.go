@@ -33,13 +33,20 @@ func (r healthCheckReplacementRuntime) Worker(worker framework.WorkerInfo) frame
 	if r.workerName != "" && worker.Name != r.workerName {
 		panic("command targets a worker outside the selected reservation")
 	}
-	return r.worker
+	return healthCheckCommandScope{r.worker}
 }
 func (r healthCheckReplacementRuntime) Local() framework.ArgsScope { return r.local }
 func (r healthCheckReplacementRuntime) WaitFor(ctx context.Context, _ string, _, _ time.Duration, condition func(context.Context) (bool, error)) error {
 	return r.wait(ctx, condition)
 }
 func (r healthCheckReplacementRuntime) Logf(string, ...any) {}
+
+// Cleanup state tests do not need real SSH retry delays.
+type healthCheckCommandScope struct{ framework.CommandScope }
+
+func (s healthCheckCommandScope) RunWithDefaultRetry(ctx context.Context, command string) (string, error) {
+	return s.Run(ctx, command)
+}
 
 func TestHealthCheckInjectErrorCommandWritesResolutionToNodeLocalMarker(t *testing.T) {
 	assert.Equal(t,
@@ -251,6 +258,21 @@ func TestHealthCheckCleanupFailureQuarantinesWorkerAfterCancellation(t *testing.
 	other := framework.WithWorkerReservation(t.Context(), pool, "next scenario")
 	_, err = selector.Acquire(other, framework.WorkerRequirements{Names: []string{"worker-0"}, Count: 1})
 	require.ErrorContains(t, err, "quarantined=")
+}
+
+func TestHealthCheckDrainReasonMatchesOnlyTheSimulatedFailure(t *testing.T) {
+	assert.True(t, healthCheckDrainReasonMatches(
+		"[node_problem] gpu_health_check: inject_error.inject_error: Injecting error with resolution RedeployProfile [hc_program] [root@2026-10-27T17:13:00]"))
+	assert.True(t, healthCheckDrainReasonMatches(
+		"[node_problem] gpu_health_check: inject_error.inject_error: Injecting error with resolution RedeployProfile [prolog]"),
+		"a GPU job landing on the node drains it from the prolog with the same marker")
+	assert.False(t, healthCheckDrainReasonMatches(
+		"[node_problem] gpu_health_check: nvidia_smi.recovery_action: GPU ID 00000000:B3:00.0: Gpu recovery action: Reset [prolog]"),
+		"a real health check failure must not pass as the simulated one")
+	assert.False(t, healthCheckDrainReasonMatches("[node_problem] boot_disk_full: usage above threshold [hc_program]"))
+	assert.False(t, healthCheckDrainReasonMatches("[software_problem] inject_error [hc_program]"),
+		"only a [node_problem] drain leads to node replacement")
+	assert.False(t, healthCheckDrainReasonMatches(""))
 }
 
 func TestHealthCheckDrainTimeoutFollowsHealthCheckInterval(t *testing.T) {
