@@ -577,12 +577,13 @@ FLUX			?= $(LOCALBIN)/flux
 KUSTOMIZE_VERSION			?= v5.5.0
 CONTROLLER_TOOLS_VERSION	?= v0.19.0
 ENVTEST_VERSION				?= release-0.17
-GOLANGCI_LINT_VERSION		?= v2.12.2  # Should be in sync with the github CI step.
+# Should be in sync with the GitHub CI step.
+GOLANGCI_LINT_VERSION		?= v2.14.0
 HELMIFY_VERSION				?= 0.4.13
 HELM_VERSION				?= v3.18.3
 HELM_UNITTEST_VERSION		?= 0.8.2
 YQ_VERSION					?= 4.44.3
-MOCKERY_VERSION				?= 2.53.5
+MOCKERY_VERSION				?= 2.53.8
 KIND_VERSION				?= v0.30.0
 FLUX_VERSION				?= 2.7.3
 
@@ -617,12 +618,12 @@ $(ENVTEST): $(LOCALBIN)
 	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.22
 
 .PHONY: golangci-lint
-golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
-$(GOLANGCI_LINT): $(LOCALBIN)
-	@[ -f $(GOLANGCI_LINT) ] || { \
-	set -e ;\
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell dirname $(GOLANGCI_LINT)) $(GOLANGCI_LINT_VERSION) ;\
-	}
+golangci-lint: | $(LOCALBIN) ## Download golangci-lint locally if necessary.
+	@current_version="$$( $(GOLANGCI_LINT) version --short 2>/dev/null || true )"; \
+	if [ "v$$current_version" != "$(GOLANGCI_LINT_VERSION)" ]; then \
+		echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION) (found: $${current_version:-none})"; \
+		curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(shell dirname $(GOLANGCI_LINT)) $(GOLANGCI_LINT_VERSION); \
+	fi
 
 .PHONY: helmify
 helmify: | $(LOCALBIN) ## Download helmify locally if necessary.

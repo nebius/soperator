@@ -1,6 +1,6 @@
 module nebius.ai/slurm-operator
 
-go 1.25.1
+go 1.27.3
 
 require (
 	github.com/SlinkyProject/slurm-client v0.3.1-20250801102150-043094ce1e4e
