@@ -261,9 +261,6 @@ func (s *NodeReplacement) waitForReplacement(ctx context.Context, timeout time.D
 func (s *NodeReplacement) waitForReplacementCondition(ctx context.Context, description string, timeout, interval time.Duration, condition func(context.Context) (bool, error)) error {
 	var fatal error
 	err := s.runtime.WaitFor(ctx, description, timeout, interval, func(waitCtx context.Context) (bool, error) {
-		if fatal != nil {
-			return true, nil
-		}
 		done, err := condition(waitCtx)
 		var invariant rolloutInvariantError
 		if errors.As(err, &invariant) {
