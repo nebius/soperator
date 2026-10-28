@@ -60,6 +60,8 @@ func TestSharedHeavyScenarios(t *testing.T) {
 		"A maintenance event replaces the selected worker node",
 		"A maintenance event replaces a CPU worker node when CPU and GPU workers exist",
 		"A failed GPU health check replaces the worker node",
+		"A maintenance event replaces a GPU worker already draining after a health check failure",
+		"A maintenance event replaces a GPU worker fully drained after a health check failure",
 		"An MK8s node group update preserves running jobs",
 		"A worker update preserves maintenance drains before and during handoff",
 		"Non-responding kubelet recreates a Kubernetes node and recovers the worker",

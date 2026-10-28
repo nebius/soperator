@@ -72,6 +72,8 @@ type workerRolloutPrerequisiteError struct{ error }
 
 type rolloutInvariantError struct{ error }
 
+func (e rolloutInvariantError) Unwrap() error { return e.error }
+
 // Exclusions protect the selected active workers without running extra jobs that
 // would block their handoff. Only additions owned by this scenario are removed.
 type workerRolloutPower struct {

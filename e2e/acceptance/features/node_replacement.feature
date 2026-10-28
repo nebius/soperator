@@ -28,3 +28,27 @@ Feature: Node replacement
     Then the old instance is removed
     And a replacement node joins the cluster
     And the replacement node passes GPU validation
+
+  @heavy @gpu @soperator_version_>=5.0.0
+  Scenario: A maintenance event replaces a GPU worker already draining after a health check failure
+    Given a test job is submitted and running on an idle GPU worker node
+    When a GPU health check failure is simulated on that node
+    Then the node is draining with a node problem reason while the test job is running
+    When a maintenance event is triggered while that node is draining
+    Then the node is draining with a maintenance reason while the test job is running
+    When the test job is cancelled
+    Then the old instance is removed
+    And a replacement node joins the cluster
+    And the replacement node passes GPU validation
+
+  @heavy @gpu @soperator_version_>=5.0.0
+  Scenario: A maintenance event replaces a GPU worker fully drained after a health check failure
+    Given a test job is submitted and running on an idle GPU worker node
+    When a GPU health check failure is simulated on that node
+    Then the node is draining with a node problem reason while the test job is running
+    When the test job is cancelled
+    And a maintenance event is triggered after that node has fully drained
+    Then the node is drained with a maintenance reason
+    And the old instance is removed
+    And a replacement node joins the cluster
+    And the replacement node passes GPU validation
