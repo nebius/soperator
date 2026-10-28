@@ -27,23 +27,23 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 }
 
 // GetDiag provides a mock function with given fields: ctx
-func (_m *MockClient) GetDiag(ctx context.Context) (*slurmapi.Diag, error) {
+func (_m *MockClient) GetDiag(ctx context.Context) (*v0041.V0041OpenapiDiagResp, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetDiag")
 	}
 
-	var r0 *slurmapi.Diag
+	var r0 *v0041.V0041OpenapiDiagResp
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*slurmapi.Diag, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (*v0041.V0041OpenapiDiagResp, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) *slurmapi.Diag); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) *v0041.V0041OpenapiDiagResp); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*slurmapi.Diag)
+			r0 = ret.Get(0).(*v0041.V0041OpenapiDiagResp)
 		}
 	}
 
@@ -74,12 +74,12 @@ func (_c *MockClient_GetDiag_Call) Run(run func(ctx context.Context)) *MockClien
 	return _c
 }
 
-func (_c *MockClient_GetDiag_Call) Return(_a0 *slurmapi.Diag, _a1 error) *MockClient_GetDiag_Call {
+func (_c *MockClient_GetDiag_Call) Return(_a0 *v0041.V0041OpenapiDiagResp, _a1 error) *MockClient_GetDiag_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClient_GetDiag_Call) RunAndReturn(run func(context.Context) (*slurmapi.Diag, error)) *MockClient_GetDiag_Call {
+func (_c *MockClient_GetDiag_Call) RunAndReturn(run func(context.Context) (*v0041.V0041OpenapiDiagResp, error)) *MockClient_GetDiag_Call {
 	_c.Call.Return(run)
 	return _c
 }

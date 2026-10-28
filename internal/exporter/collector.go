@@ -642,7 +642,7 @@ func jobAllocatedResources(logger logr.Logger, job slurmapi.Job) (cpu float64, c
 	return cpu, cpuOK, mem, memOK
 }
 
-func (c *MetricsCollector) slurmRPCMetrics(diag *slurmapi.Diag) iter.Seq[prometheus.Metric] {
+func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0041OpenapiDiagResp) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
 		if diag == nil {
 			return

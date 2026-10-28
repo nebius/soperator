@@ -26,7 +26,7 @@ import (
 )
 
 // Helper function to setup mocks and collect state for tests
-func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *fake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *slurmapi.Diag) {
+func setupCollectorWithMockedData(t *testing.T, collector *MetricsCollector, mockClient *fake.MockClient, nodes []slurmapi.Node, jobs []slurmapi.Job, diag *api.V0041OpenapiDiagResp) {
 	mockClient.EXPECT().ListNodes(mock.Anything).Return(nodes, nil).Once()
 	mockClient.EXPECT().ListJobs(mock.Anything).Return(jobs, nil).Once()
 	mockClient.EXPECT().GetDiag(mock.Anything).Return(diag, nil).Once()
@@ -153,8 +153,8 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 
 		// Mock GetDiag response with realistic data
 		serverThreadCount := int32(1)
-		testDiag := &slurmapi.Diag{
-			Statistics: slurmapi.Statistics{
+		testDiag := &api.V0041OpenapiDiagResp{
+			Statistics: api.V0041StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}
@@ -313,8 +313,8 @@ func TestMetricsCollector_NodeFails(t *testing.T) {
 		}
 
 		serverThreadCount := int32(1)
-		testDiag := &slurmapi.Diag{
-			Statistics: slurmapi.Statistics{
+		testDiag := &api.V0041OpenapiDiagResp{
+			Statistics: api.V0041StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}
@@ -431,7 +431,7 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 
 		// Mock realistic RPC diagnostics data based on production output
 		serverThreadCount := int32(1)
-		rpcsByMessageType := []slurmapi.RPCByType{
+		rpcsByMessageType := api.V0041StatsMsgRpcsByType{
 			{
 				MessageType: "REQUEST_NODE_INFO",
 				Count:       576,
@@ -448,7 +448,7 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 				TotalTime:   14239,
 			},
 		}
-		rpcsByUser := []slurmapi.RPCByUser{
+		rpcsByUser := api.V0041StatsMsgRpcsByUser{
 			{
 				User:      "root",
 				UserId:    0,
@@ -463,8 +463,8 @@ func TestMetricsCollector_RPCMetrics_Success(t *testing.T) {
 			},
 		}
 
-		testDiag := &slurmapi.Diag{
-			Statistics: slurmapi.Statistics{
+		testDiag := &api.V0041OpenapiDiagResp{
+			Statistics: api.V0041StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 				RpcsByMessageType: &rpcsByMessageType,
 				RpcsByUser:        &rpcsByUser,
@@ -522,7 +522,7 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 		collector := NewMetricsCollector(mockClient)
 
 		serverThreadCount := int32(0)
-		rpcsByMessageType := []slurmapi.RPCByType{
+		rpcsByMessageType := api.V0041StatsMsgRpcsByType{
 			{
 				MessageType: "ZERO_COUNT",
 				Count:       0,
@@ -539,7 +539,7 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 				TotalTime:   1,
 			},
 		}
-		rpcsByUser := []slurmapi.RPCByUser{
+		rpcsByUser := api.V0041StatsMsgRpcsByUser{
 			{
 				User:      "zero_user",
 				UserId:    999,
@@ -554,8 +554,8 @@ func TestMetricsCollector_RPCMetrics_EdgeCases(t *testing.T) {
 			},
 		}
 
-		testDiag := &slurmapi.Diag{
-			Statistics: slurmapi.Statistics{
+		testDiag := &api.V0041OpenapiDiagResp{
+			Statistics: api.V0041StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 				RpcsByMessageType: &rpcsByMessageType,
 				RpcsByUser:        &rpcsByUser,
@@ -678,8 +678,8 @@ func TestMetricsCollector_GetDiag_NilFields(t *testing.T) {
 		collector := NewMetricsCollector(mockClient)
 
 		// Mock GetDiag response with nil fields
-		testDiag := &slurmapi.Diag{
-			Statistics: slurmapi.Statistics{
+		testDiag := &api.V0041OpenapiDiagResp{
+			Statistics: api.V0041StatsMsg{
 				ServerThreadCount: nil, // Should not emit metric
 				RpcsByMessageType: nil, // Should not emit metrics
 				RpcsByUser:        nil, // Should not emit metrics
@@ -804,8 +804,8 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 
 		// Mock GetDiag response
 		serverThreadCount := int32(1)
-		testDiag := &slurmapi.Diag{
-			Statistics: slurmapi.Statistics{
+		testDiag := &api.V0041OpenapiDiagResp{
+			Statistics: api.V0041StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}
@@ -974,8 +974,8 @@ func TestMetricsCollector_WithMonitoringMetrics(t *testing.T) {
 		}
 
 		serverThreadCount := int32(1)
-		testDiag := &slurmapi.Diag{
-			Statistics: slurmapi.Statistics{
+		testDiag := &api.V0041OpenapiDiagResp{
+			Statistics: api.V0041StatsMsg{
 				ServerThreadCount: &serverThreadCount,
 			},
 		}
