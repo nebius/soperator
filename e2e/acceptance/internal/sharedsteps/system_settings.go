@@ -59,6 +59,7 @@ const (
 
 	slurmdContainerName              = "slurmd"
 	nvidiaDriverCapabilitiesName     = "NVIDIA_DRIVER_CAPABILITIES"
+	nvidiaVisibleDevicesName         = "NVIDIA_VISIBLE_DEVICES"
 	nativeResourceLimitsJobName      = "e2e-system-limits-native"
 	enrootResourceLimitsJobName      = "e2e-system-limits-enroot"
 	dockerResourceLimitsJobName      = "e2e-system-limits-docker"
@@ -86,9 +87,11 @@ const (
 	probeContainerNone probeContainer = iota
 	probeContainerEnroot
 	probeContainerDocker
-	// GPU containers ask for the required NVIDIA driver capabilities. The Enroot
-	// NVIDIA hook needs an image that requests driver injection, while Docker
-	// injects the driver for --gpus into any image, so it keeps the small one.
+	// GPU containers ask for the required NVIDIA driver capabilities and use the
+	// small Ubuntu image. The Enroot NVIDIA hook injects the driver only when
+	// NVIDIA_VISIBLE_DEVICES is set, so the job sets it instead of relying on a
+	// multi-GB CUDA image whose cold import can exceed the job timeout. Docker
+	// injects the driver for --gpus into any image.
 	probeContainerEnrootGPU
 	probeContainerDockerGPU
 )
@@ -1014,17 +1017,15 @@ func srunProbeCommand(probe string, container probeContainer, flags ...string) s
 	var args []string
 	if container == probeContainerEnrootGPU {
 		// Pyxis passes the job environment to the Enroot NVIDIA hook.
-		args = append(args, capabilities)
+		args = append(args, nvidiaVisibleDevicesName+"=all", capabilities)
 	}
 	args = append(args, "srun", "--nodes=1", "--ntasks=1")
 	args = append(args, flags...)
 	// The batch shell expands SLURM_JOB_ID, so cleanup can find a Docker container by job ID.
 	dockerName := systemSettingsDockerContainerPrefix + "${SLURM_JOB_ID}"
 	switch container {
-	case probeContainerEnroot:
+	case probeContainerEnroot, probeContainerEnrootGPU:
 		args = append(args, "--container-image="+framework.ShellQuote(enrootLifecycleImage))
-	case probeContainerEnrootGPU:
-		args = append(args, "--container-image="+framework.ShellQuote(gpuSmokeEnrootImage))
 	case probeContainerDocker:
 		args = append(args, "docker", "run", "--rm", "--name", dockerName, framework.ShellQuote(ubuntuDockerImage))
 	case probeContainerDockerGPU:

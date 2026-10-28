@@ -494,7 +494,7 @@ func (s *DockerContainers) aDockerGPUSmokeJobIsSubmittedOnOneGPUWorker(ctx conte
 	s.connectionWorker = workers[0]
 
 	wrap := fmt.Sprintf("srun docker run --name e2e-docker-gpu-${SLURM_JOB_ID}-${SLURM_NODEID} --gpus=all -e NVIDIA_DRIVER_CAPABILITIES=utility %s nvidia-smi -L",
-		framework.ShellQuote(gpuSmokeDockerImage),
+		framework.ShellQuote(ubuntuDockerImage),
 	)
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      "e2e-docker-gpu-smoke",
