@@ -12466,6 +12466,15 @@ spec:
                         description: SSSDLdapCAConfigMapRefName is the name of the
                           ConfigMap containing LDAP CA certificates for the sssd sidecar.
                         type: string
+                      terminationGracePeriodSeconds:
+                        default: 120
+                        description: |-
+                          TerminationGracePeriodSeconds is the time allowed for the controller pod to shut down,
+                          including saving slurmctld state, before Kubernetes forcibly terminates it.
+                          Zero requests immediate termination.
+                        format: int64
+                        minimum: 0
+                        type: integer
                       volumes:
                         description: Volumes represents the volume configurations
                           for the controller node

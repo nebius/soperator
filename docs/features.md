@@ -104,6 +104,33 @@ recreates it.
 Our operator improves this further, continuously bringing the entire cluster to the desired state.
 
 
+### Controller Shutdown Timeout
+
+Set `spec.slurmNodes.controller.terminationGracePeriodSeconds` in the SlurmCluster CR
+to allow more time for slurmctld to save its state during shutdown. The default is
+120 seconds. The grace period applies to the entire controller pod, including sidecars.
+Values must be non-negative; zero requests immediate termination.
+
+```yaml
+spec:
+  slurmNodes:
+    controller:
+      terminationGracePeriodSeconds: 240
+```
+
+
+For the `slurm-cluster` Helm chart, set `slurmNodes.controller.terminationGracePeriodSeconds`.
+To override it through the umbrella ConfigMap's `values.yaml`, use:
+
+```yaml
+slurmCluster:
+  overrideValues:
+    slurmNodes:
+      controller:
+        terminationGracePeriodSeconds: 240
+```
+
+
 ### Configurable Health Probes
 Liveness and readiness probes for managed Slurm components can be customized directly in the CRDs and Helm values.
 This is useful for slower startup environments, constrained clusters, or custom health-check handlers.

@@ -1090,6 +1090,15 @@ type SlurmNodeController struct {
 	// +kubebuilder:validation:Optional
 	HostUsers *bool `json:"hostUsers,omitempty"`
 
+	// TerminationGracePeriodSeconds is the time allowed for the controller pod to shut down,
+	// including saving slurmctld state, before Kubernetes forcibly terminates it.
+	// Zero requests immediate termination.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=120
+	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
+
 	// Slurmctld represents the Slurm control daemon configuration
 	//
 	// +kubebuilder:validation:Required
