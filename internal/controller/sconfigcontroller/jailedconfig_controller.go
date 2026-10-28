@@ -643,7 +643,12 @@ func checkApiErrors(responseErrors *v0041.V0041OpenapiErrors) error {
 	if len(*responseErrors) > 0 {
 		errs := make([]error, 0)
 		for _, err := range *responseErrors {
-			errs = append(errs, fmt.Errorf("API error %d %s, source %s", err.ErrorNumber, *err.Error, *err.Source))
+			errs = append(errs, fmt.Errorf(
+				"API error %d %s, source %s",
+				ptr.Deref(err.ErrorNumber, 0),
+				ptr.Deref(err.Error, "unknown"),
+				ptr.Deref(err.Source, "unknown"),
+			))
 		}
 		return errors.Join(errs...)
 	}
