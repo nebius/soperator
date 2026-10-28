@@ -3,8 +3,7 @@ customContainer:
   enabled: false
   env: []
   image:
-    repository: "cr.nebius.cloud/soperator/busybox"
-    tag: "latest"
+    repository: "cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e"
     pullPolicy: IfNotPresent
   command:
     - /bin/sh
@@ -50,7 +49,7 @@ rebooter:
   serviceAccountName: ""
 initContainers:
   - name: node-sysctl-params
-    image: "cr.nebius.cloud/soperator/busybox"
+    image: "cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e"
     securityContext:
       privileged: true
       runAsUser: 0
