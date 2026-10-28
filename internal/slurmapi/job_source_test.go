@@ -31,13 +31,13 @@ type sdkStub struct {
 func (s *sdkStub) SlurmV0044GetJobs(_ context.Context, params *api.SlurmV0044GetJobsParams, _ ...api.RequestEditorFn) (*http.Response, error) {
 	s.controllerCalls++
 	s.lastControllerParams = params
-	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"jobs": []}`))}, nil
+	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"jobs": []}`))}, nil
 }
 
 func (s *sdkStub) SlurmdbV0044GetJobs(_ context.Context, params *api.SlurmdbV0044GetJobsParams, _ ...api.RequestEditorFn) (*http.Response, error) {
 	s.accountingCalls++
 	s.lastAccountingParams = params
-	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"jobs": []}`))}, nil
+	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"jobs": []}`))}, nil
 }
 
 func newTestClient(stub *sdkStub) *client {

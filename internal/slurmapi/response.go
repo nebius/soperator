@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	api "github.com/SlinkyProject/slurm-client/api/v0044"
 )
@@ -17,6 +18,9 @@ func decodeResponse[T any](resp *http.Response) (*T, error) {
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("status=%d %s", resp.StatusCode, summarizeSlurmRESTBody(body))
+	}
+	if !strings.Contains(resp.Header.Get("Content-Type"), "json") {
+		return nil, fmt.Errorf("decode Slurm response: unexpected content type %q", resp.Header.Get("Content-Type"))
 	}
 	var envelope struct {
 		Errors api.V0044OpenapiErrors `json:"errors"`

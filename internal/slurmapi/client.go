@@ -169,20 +169,20 @@ func (c *client) setHeaders(ctx context.Context, req *http.Request) error {
 }
 
 func (c *client) ListNodes(ctx context.Context) ([]Node, error) {
-	getNodesResp, err := c.rawClient.SlurmV0044GetNodes(ctx, &api.SlurmV0044GetNodesParams{})
+	getNodesResp, err := c.SlurmV0044GetNodesWithResponse(ctx, &api.SlurmV0044GetNodesParams{})
 	if err != nil {
 		return nil, fmt.Errorf("list nodes: %w", err)
 	}
-	response, err := decodeResponse[struct {
-		Nodes []nodeInfo `json:"nodes"`
-	}](getNodesResp)
-	if err != nil {
-		return nil, fmt.Errorf("list nodes: %w", err)
+	if getNodesResp.JSON200 == nil {
+		return nil, fmt.Errorf("json200 field is nil")
+	}
+	if getNodesResp.JSON200.Errors != nil && len(*getNodesResp.JSON200.Errors) != 0 {
+		return nil, fmt.Errorf("list nodes responded with errors: %v", *getNodesResp.JSON200.Errors)
 	}
 
-	nodes := make([]Node, 0, len(response.Nodes))
-	for _, n := range response.Nodes {
-		node, err := NodeFromAPI(n.apiNode())
+	nodes := make([]Node, 0, len(getNodesResp.JSON200.Nodes))
+	for _, n := range getNodesResp.JSON200.Nodes {
+		node, err := NodeFromAPI(n)
 		if err != nil {
 			return nil, fmt.Errorf("convert node from api response: %w", err)
 		}
@@ -194,22 +194,22 @@ func (c *client) ListNodes(ctx context.Context) ([]Node, error) {
 }
 
 func (c *client) GetNode(ctx context.Context, nodeName string) (Node, error) {
-	getNodesResp, err := c.rawClient.SlurmV0044GetNode(ctx, nodeName, &api.SlurmV0044GetNodeParams{})
+	getNodesResp, err := c.SlurmV0044GetNodeWithResponse(ctx, nodeName, &api.SlurmV0044GetNodeParams{})
 	if err != nil {
 		return Node{}, fmt.Errorf("get node %s: %w", nodeName, err)
 	}
-	response, err := decodeResponse[struct {
-		Nodes []nodeInfo `json:"nodes"`
-	}](getNodesResp)
-	if err != nil {
-		return Node{}, fmt.Errorf("get node %s: %w", nodeName, err)
+	if getNodesResp.JSON200 == nil {
+		return Node{}, fmt.Errorf("json200 field is nil, node name %s", nodeName)
+	}
+	if getNodesResp.JSON200.Errors != nil && len(*getNodesResp.JSON200.Errors) != 0 {
+		return Node{}, fmt.Errorf("get node %s responded with errors: %v", nodeName, *getNodesResp.JSON200.Errors)
 	}
 
-	if nodeLength := len(response.Nodes); nodeLength != 1 {
+	if nodeLength := len(getNodesResp.JSON200.Nodes); nodeLength != 1 {
 		return Node{}, fmt.Errorf("expected only one node in response for get %s request, got %d", nodeName, nodeLength)
 	}
 
-	node, err := NodeFromAPI(response.Nodes[0].apiNode())
+	node, err := NodeFromAPI(getNodesResp.JSON200.Nodes[0])
 	if err != nil {
 		return Node{}, fmt.Errorf("convert node from api response: %w", err)
 	}
@@ -240,7 +240,7 @@ func (c *client) GetJobsByIDFromAccounting(ctx context.Context, jobID string) ([
 
 	jobs := make([]Job, 0, len(apiJobs))
 	for _, j := range apiJobs {
-		job, err := jobFromAccountingAPI(j)
+		job, err := JobFromAccountingAPI(j.V0044Job)
 		if err != nil {
 			return nil, fmt.Errorf("convert job from accounting api response: %w", err)
 		}
@@ -280,7 +280,7 @@ func (c *client) listControllerJobs(ctx context.Context) ([]Job, error) {
 
 	jobs := make([]Job, 0, len(apiJobs))
 	for _, j := range apiJobs {
-		job, err := jobFromControllerAPI(j)
+		job, err := JobFromAPI(j.V0044JobInfo)
 		if err != nil {
 			return nil, fmt.Errorf("convert job from controller api response: %w", err)
 		}
@@ -336,11 +336,11 @@ func (c *client) listAccountingJobs(ctx context.Context, params ListJobsParams) 
 
 	jobs := make([]Job, 0, len(apiJobs))
 	for _, j := range apiJobs {
-		if isStaleAccountingPending(j, staleCutoff) {
+		if isStaleAccountingPending(j.V0044Job, staleCutoff) {
 			droppedStale++
 			continue
 		}
-		job, err := jobFromAccountingAPI(j)
+		job, err := JobFromAccountingAPI(j.V0044Job)
 		if err != nil {
 			return nil, fmt.Errorf("convert job from accounting api response: %w", err)
 		}

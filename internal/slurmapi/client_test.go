@@ -38,18 +38,18 @@ func TestClient_GetDiag_LargeScheduleCycleSum(t *testing.T) {
 	require.NotNil(t, diag)
 
 	require.NotNil(t, diag.Statistics.ScheduleCycleSum)
-	assert.Equal(t, uint64(6_442_450_944), *diag.Statistics.ScheduleCycleSum)
+	assert.Equal(t, int64(6_442_450_944), *diag.Statistics.ScheduleCycleSum)
 
 	require.NotNil(t, diag.Statistics.ServerThreadCount)
 	assert.Equal(t, int32(3), *diag.Statistics.ServerThreadCount)
 
 	require.NotNil(t, diag.Statistics.RpcsByMessageType)
 	require.Len(t, *diag.Statistics.RpcsByMessageType, 2)
-	assert.Equal(t, uint64(6_871_947_674), (*diag.Statistics.RpcsByMessageType)[0].TotalTime)
+	assert.Equal(t, int64(6_871_947_674), (*diag.Statistics.RpcsByMessageType)[0].TotalTime)
 
 	require.NotNil(t, diag.Statistics.RpcsByUser)
 	require.Len(t, *diag.Statistics.RpcsByUser, 1)
-	assert.Equal(t, uint64(7_384_185_912), (*diag.Statistics.RpcsByUser)[0].TotalTime)
+	assert.Equal(t, int64(7_384_185_912), (*diag.Statistics.RpcsByUser)[0].TotalTime)
 }
 
 func TestClient_RequestTimeout(t *testing.T) {

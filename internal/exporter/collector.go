@@ -738,7 +738,7 @@ func (c *MetricsCollector) slurmJobMetrics(
 		for _, job := range slurmJobs {
 			userID := ""
 			if job.UserID != nil {
-				userID = strconv.FormatInt(*job.UserID, 10)
+				userID = strconv.Itoa(int(*job.UserID))
 			}
 
 			var finishedTime string
@@ -910,7 +910,7 @@ func (c *MetricsCollector) slurmRPCMetrics(diag *slurmapi.Diag) iter.Seq[prometh
 		if stats.RpcsByUser != nil {
 			for _, userRpc := range *stats.RpcsByUser {
 				user := userRpc.User
-				userID := strconv.FormatUint(uint64(userRpc.UserId), 10)
+				userID := strconv.Itoa(int(userRpc.UserId))
 
 				if userRpc.Count > 0 {
 					if !yield(prometheus.MustNewConstMetric(c.rpcUserCallsTotal, prometheus.CounterValue, float64(userRpc.Count), user, userID)) {

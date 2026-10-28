@@ -374,7 +374,7 @@ func TestMetricsCollector_Collect_Success(t *testing.T) {
 		}
 
 		arrayTaskID := int32(42)
-		userID := int64(1000)
+		userID := int32(1000)
 
 		// Define timestamps for the test job
 		submitTime := metav1.NewTime(time.Unix(1722697200, 0)) // 2024-08-03 10:00:00 UTC
@@ -910,7 +910,7 @@ func TestMetricsCollector_JobMetrics_FinishedTime(t *testing.T) {
 		startTime := metav1.NewTime(now.Add(-31 * time.Second))  // 31 seconds ago
 		endTime := metav1.NewTime(now)                           // now (for completed jobs)
 		zeroTime := metav1.NewTime(time.Unix(0, 0))              // Unix epoch (should be treated as empty)
-		userID := int64(1000)
+		userID := int32(1000)
 
 		testJobs := []slurmapi.Job{
 			{

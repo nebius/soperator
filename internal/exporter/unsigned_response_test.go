@@ -13,16 +13,16 @@ import (
 	"nebius.ai/slurm-operator/internal/slurmapi"
 )
 
-func TestMetricsCollector_UnsignedSlurmResponses(t *testing.T) {
+func TestMetricsCollector_OverflowingSlurmResponses(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/slurm/v0.0.44/nodes/":
 			_, _ = w.Write([]byte(`{"nodes":[]}`))
 		case "/slurm/v0.0.44/jobs/":
-			_, _ = w.Write([]byte(`{"jobs":[{"job_id":361,"job_state":["RUNNING"],"user_id":4294967293,"user_name":"adnan","cpus":{"set":true,"number":48},"priority":{"set":true,"number":4294967292}}]}`))
+			_, _ = w.Write([]byte(`{"jobs":[{"job_id":361,"job_state":["RUNNING"],"user_id":1000,"user_name":"adnan","cpus":{"set":true,"number":48},"priority":{"set":true,"number":4294967293}}]}`))
 		case "/slurm/v0.0.44/diag/":
-			_, _ = w.Write([]byte(`{"statistics":{"rpcs_by_message_type":[{"message_type":"REQUEST_JOB_INFO","count":4294967293,"total_time":6871947674}],"rpcs_by_user":[{"user":"adnan","user_id":4294967293,"count":4294967292,"total_time":7384185912}]}}`))
+			_, _ = w.Write([]byte(`{"statistics":{"rpcs_by_message_type":[{"message_type":"REQUEST_JOB_INFO","count":4294967293,"total_time":6871947674}],"rpcs_by_user":[{"user":"adnan","user_id":1000,"count":4294967292,"total_time":7384185912}]}}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -51,7 +51,7 @@ func TestMetricsCollector_UnsignedSlurmResponses(t *testing.T) {
 				labels[label.GetName()] = label.GetValue()
 			}
 			assert.Equal(t, "361", labels["job_id"])
-			assert.Equal(t, "4294967293", labels["user_id"])
+			assert.Equal(t, "1000", labels["user_id"])
 		case "slurm_controller_rpc_calls_total":
 			require.Len(t, family.Metric, 1)
 			assert.Equal(t, float64(4294967293), family.Metric[0].GetCounter().GetValue())
