@@ -136,11 +136,15 @@ The shared feature suite has four tag forms that affect execution:
   standalone runner executes these first, one at a time, then runs all unmarked
   scenarios concurrently (four by default). Do not use `@parallel`.
 
-Always queue `@heavy` scenarios first in the parallel suite so long checks can
+By default, queue `@heavy` scenarios first in the parallel suite so long checks can
 overlap shorter ones. `ConcurrentSuites` enforces this automatically while keeping
 the original order within each group and leaving the sequential suite unchanged.
 Worker reservations still control resource availability; launch order must never
 be a scenario prerequisite.
+Explicit `--heavy-first=false` and `--random-seed` overrides are available for
+benchmarking and independence checks. Random ordering applies only to the
+parallel suite and records a seed; do not change scenario safety tags or worker
+reservations to support an ordering experiment.
 
 Design every scenario to pass on its own and in any order. Create or verify its
 prerequisites instead of depending on accounts, files or configuration left by

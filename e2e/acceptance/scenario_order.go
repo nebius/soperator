@@ -2,16 +2,17 @@ package acceptance
 
 import (
 	"fmt"
+	"math/rand"
 	"slices"
 	"strings"
 
 	"github.com/cucumber/godog"
 )
 
-func heavyScenariosFirst(source FeatureSource, paths []string) ([]string, error) {
+func orderScenarioPaths(source FeatureSource, paths []string, heavyFirst bool, randomSeed int64) ([]string, error) {
 	features, err := (godog.TestSuite{Options: &godog.Options{FS: source.FS, Paths: paths}}).RetrieveFeatures()
 	if err != nil {
-		return nil, fmt.Errorf("order heavy scenarios: %w", err)
+		return nil, fmt.Errorf("order scenarios: %w", err)
 	}
 	type selection struct {
 		path  string
@@ -37,15 +38,23 @@ func heavyScenariosFirst(source FeatureSource, paths []string) ([]string, error)
 			}
 		}
 	}
-	slices.SortStableFunc(scenarios, func(a, b selection) int {
-		if a.heavy == b.heavy {
-			return 0
-		}
-		if a.heavy {
-			return -1
-		}
-		return 1
-	})
+	if randomSeed != 0 {
+		// Godog shuffles pickles within each feature; exact scenario selectors
+		// also need their launch queue shuffled to randomize across features.
+		rand.New(rand.NewSource(randomSeed)).Shuffle(len(scenarios), func(i, j int) {
+			scenarios[i], scenarios[j] = scenarios[j], scenarios[i]
+		})
+	} else if heavyFirst {
+		slices.SortStableFunc(scenarios, func(a, b selection) int {
+			if a.heavy == b.heavy {
+				return 0
+			}
+			if a.heavy {
+				return -1
+			}
+			return 1
+		})
+	}
 	var ordered []string
 	for _, scenario := range scenarios {
 		ordered = append(ordered, scenario.path)

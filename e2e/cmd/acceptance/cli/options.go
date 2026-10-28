@@ -25,6 +25,8 @@ type runOptions struct {
 	ScenarioPaths        []string
 	OutputDir            string
 	Parallelism          int
+	HeavyFirst           bool
+	RandomSeed           int64
 	WorkerAcquireTimeout time.Duration
 }
 
@@ -85,12 +87,15 @@ func runAcceptance(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	suites := acceptance.ConcurrentSuites(suiteFromOptions(opts, targetVersion), opts.Parallelism)
+	suites[1].HeavyFirst = opts.HeavyFirst
+	suites[1].RandomSeed = opts.RandomSeed
 	runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 		KubectlContext:         opts.KubectlContext,
 		SlurmClusterName:       opts.SlurmClusterName,
 		TargetSoperatorVersion: targetVersion,
 		OutputDir:              opts.OutputDir,
-		Suites:                 acceptance.ConcurrentSuites(suiteFromOptions(opts, targetVersion), opts.Parallelism),
+		Suites:                 suites,
 		WorkerAcquireTimeout:   opts.WorkerAcquireTimeout,
 	})
 	if err != nil {
@@ -140,6 +145,8 @@ func parseRunOptions(args []string) (runOptions, error) {
 	fs.BoolVar(&opts.RunUnstableTests, "run-unstable", false, "run scenarios tagged @unstable")
 	fs.BoolVar(&opts.RunHeavyTests, "run-heavy", false, "run scenarios tagged @heavy")
 	fs.IntVar(&opts.Parallelism, "parallelism", 4, "maximum concurrent worker-local scenarios; 1 runs both suites sequentially")
+	fs.BoolVar(&opts.HeavyFirst, "heavy-first", true, "queue heavy scenarios first in the parallel suite")
+	fs.Int64Var(&opts.RandomSeed, "random-seed", 0, "seed for random parallel-suite ordering; requires --heavy-first=false; 0 preserves the selected order")
 	fs.DurationVar(&opts.WorkerAcquireTimeout, "worker-acquire-timeout", 90*time.Minute, "maximum wait for available workers, separate from job timeouts")
 	fs.Var((*scenarioPathFlag)(&opts.ScenarioPaths), "scenario", "feature file or exact Scenario line to run; may be repeated")
 	fs.StringVar(&opts.OutputDir, "output-dir", "", "directory for reports and per-scenario artifacts")
@@ -152,6 +159,12 @@ func parseRunOptions(args []string) (runOptions, error) {
 	trimRunOptions(&opts)
 	if opts.Parallelism < 1 || opts.WorkerAcquireTimeout <= 0 {
 		return runOptions{}, fmt.Errorf("--parallelism and --worker-acquire-timeout must be positive")
+	}
+	if opts.RandomSeed < 0 {
+		return runOptions{}, fmt.Errorf("--random-seed must not be negative")
+	}
+	if opts.RandomSeed != 0 && opts.HeavyFirst {
+		return runOptions{}, fmt.Errorf("--random-seed requires --heavy-first=false")
 	}
 	if err := validateCommonOptions(opts.KubectlContext, opts.OutputDir); err != nil {
 		return runOptions{}, err

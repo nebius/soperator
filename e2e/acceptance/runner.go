@@ -162,6 +162,12 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 		if suite.Concurrency < 0 {
 			return nil, fmt.Errorf("suite %q concurrency must not be negative", suite.Name)
 		}
+		if suite.RandomSeed < 0 {
+			return nil, fmt.Errorf("suite %q random seed must not be negative", suite.Name)
+		}
+		if suite.RandomSeed != 0 && suite.HeavyFirst {
+			return nil, fmt.Errorf("suite %q must choose either heavy-first or random ordering", suite.Name)
+		}
 		name := strings.TrimSpace(suite.Name)
 		if name == "" {
 			return nil, fmt.Errorf("suite name is required")
@@ -208,6 +214,7 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 			Concurrency:            suite.Concurrency,
 			RequirePreviousSuccess: suite.RequirePreviousSuccess,
 			HeavyFirst:             suite.HeavyFirst,
+			RandomSeed:             suite.RandomSeed,
 		})
 	}
 	return out, nil
@@ -229,14 +236,15 @@ func (r *Runner) suiteFeaturePaths(info *framework.ClusterInfo, suite SuiteConfi
 			return nil, err
 		}
 	}
-	if suite.HeavyFirst && len(paths) > 0 {
+	if (suite.HeavyFirst || suite.RandomSeed != 0) && len(paths) > 0 {
 		var err error
-		paths, err = heavyScenariosFirst(suite.Source, paths)
+		paths, err = orderScenarioPaths(suite.Source, paths, suite.HeavyFirst, suite.RandomSeed)
 		if err != nil {
 			return nil, err
 		}
 	}
 	log.Printf("acceptance: target Soperator version=%s", info.TargetSoperatorVersion)
+	log.Printf("acceptance: suite %s concurrency=%d heavy_first=%t random_seed=%d", suite.Name, suite.Concurrency, suite.HeavyFirst, suite.RandomSeed)
 	log.Printf("acceptance: suite %s running scenarios: %s", suite.Name, strings.Join(paths, ", "))
 	return paths, nil
 }
@@ -271,6 +279,7 @@ func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runt
 		},
 		Options: &godog.Options{
 			Concurrency:    suite.Concurrency,
+			Randomize:      suite.RandomSeed,
 			Format:         format,
 			FS:             suite.Source.FS,
 			Paths:          features,
