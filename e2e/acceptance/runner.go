@@ -133,6 +133,10 @@ func (r *Runner) suiteTagFilter(suite SuiteConfig) string {
 		log.Printf("acceptance: suite %s excluding @heavy scenarios", suite.Name)
 		filters = append(filters, "~@heavy")
 	}
+	if suite.ExcludeManual {
+		log.Printf("acceptance: suite %s excluding @manual scenarios", suite.Name)
+		filters = append(filters, "~@manual")
+	}
 
 	return strings.Join(filters, " && ")
 }
@@ -188,6 +192,7 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 			StepRegistrars:  registrars,
 			ExcludeUnstable: suite.ExcludeUnstable,
 			ExcludeHeavy:    suite.ExcludeHeavy,
+			ExcludeManual:   suite.ExcludeManual,
 		})
 	}
 	return out, nil

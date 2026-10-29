@@ -2,6 +2,7 @@ package values
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -10,9 +11,10 @@ import (
 
 // SlurmController contains the data needed to deploy and reconcile the Slurm Controllers
 type SlurmController struct {
-	K8sNodeFilterName    string
-	CustomInitContainers []corev1.Container
-	HostUsers            *bool
+	K8sNodeFilterName             string
+	CustomInitContainers          []corev1.Container
+	HostUsers                     *bool
+	TerminationGracePeriodSeconds int64
 
 	ContainerSlurmctld Container
 	ContainerMunge     Container
@@ -55,9 +57,10 @@ func buildSlurmControllerFrom(clusterName, namePrefix string, maintenance *const
 	}
 
 	res := SlurmController{
-		K8sNodeFilterName:    controller.K8sNodeFilterName,
-		CustomInitContainers: controller.CustomInitContainers,
-		HostUsers:            controller.HostUsers,
+		K8sNodeFilterName:             controller.K8sNodeFilterName,
+		CustomInitContainers:          controller.CustomInitContainers,
+		HostUsers:                     controller.HostUsers,
+		TerminationGracePeriodSeconds: ptr.Deref(controller.TerminationGracePeriodSeconds, 120),
 		ContainerSlurmctld: buildContainerFrom(
 			controller.Slurmctld,
 			consts.ContainerNameSlurmctld,

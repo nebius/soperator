@@ -520,7 +520,7 @@ func (c *MetricsCollector) refreshJobs(ctx context.Context, sequence uint64) (er
 	return nil
 }
 
-func (c *MetricsCollector) getDiag(ctx context.Context) (*api.V0044OpenapiDiagResp, error) {
+func (c *MetricsCollector) getDiag(ctx context.Context) (*slurmapi.Diag, error) {
 	logger := log.FromContext(ctx).WithName(ControllerName)
 
 	diagStart := time.Now()
@@ -875,7 +875,7 @@ func jobAllocatedResources(logger logr.Logger, job slurmapi.Job) (cpu float64, c
 	return cpu, cpuOK, mem, memOK
 }
 
-func (c *MetricsCollector) slurmRPCMetrics(diag *api.V0044OpenapiDiagResp) iter.Seq[prometheus.Metric] {
+func (c *MetricsCollector) slurmRPCMetrics(diag *slurmapi.Diag) iter.Seq[prometheus.Metric] {
 	return func(yield func(prometheus.Metric) bool) {
 		if diag == nil {
 			return
