@@ -10,7 +10,7 @@ ns:
 soperator:
   enabled: true
   namespace: soperator-system
-  version: "4.1.16"
+  version: "4.1.17"
   interval: 5m
   timeout: 5m
   releaseName: soperator-controller
@@ -57,7 +57,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 4.1.16
+  version: 4.1.17
   namespace: soperator
   releaseName: soperator
   overrideValues:
