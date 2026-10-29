@@ -824,7 +824,7 @@ images:
   slurmd: "cr.nebius.cloud/soperator/worker_slurmd:5.0.0-slurm26.05.4-nebius-1"
   sshd: "cr.nebius.cloud/soperator/login_sshd:5.0.0-slurm26.05.4-nebius-1"
   munge: "cr.nebius.cloud/soperator/munge:5.0.0-slurm26.05.4-nebius-1"
-  sssd: "cr.nebius.cloud/soperator/sssd:2.9.4-1-63"
+  sssd: "cr.nebius.cloud/soperator/sssd:2.9.4-1-68"
   populateJail: ""
   populateJailRepository: "cr.nebius.cloud/soperator/populate_jail"
   populateJailTag: "5.0.0-slurm26.05.4-nebius-1"
