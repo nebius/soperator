@@ -466,6 +466,9 @@ slurmNodes:
       #     memory: "64Mi"
   controller:
     k8sNodeFilterName: "no-gpu"
+    # Grace period for the controller pod to save Slurm state and stop, in seconds.
+    # Set to 0 for immediate termination.
+    terminationGracePeriodSeconds: 120
     priorityClass: ""
     # Controls if the pod containers can use the host user namespace
     # hostUsers: false

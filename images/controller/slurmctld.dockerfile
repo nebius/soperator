@@ -45,11 +45,6 @@ RUN rm -rf /home
 # Expose the port used for accessing slurmctld
 EXPOSE 6817
 
-# Create dir and file for multilog hack
-RUN mkdir -p /var/log/slurm/multilog && \
-    touch /var/log/slurm/multilog/current && \
-    ln -s /var/log/slurm/multilog/current /var/log/slurm/slurmctld.log
-
 # Copy power-manager binary for ephemeral node power management
 COPY --from=powermanager_builder /build/power-manager /opt/soperator/bin/power-manager
 RUN chmod 755 /opt/soperator/bin/power-manager
