@@ -155,8 +155,9 @@ by a shared user or name can stop their work. Synchronize unavoidable shared set
 such as first-time user creation, across the complete read-modify-write operation.
 
 Before recording baselines or starting work, identify every worker the scenario
-affects, including workers used by indirectly launched jobs. Acquire the complete
-set atomically through `WorkerSelector.Acquire` or its `Pick...Workers` wrappers;
+affects, including workers used by indirectly launched jobs. Even a short smoke job
+such as `hostname` allocates a worker and runs job cleanup. Acquire the complete set
+atomically through `WorkerSelector.Acquire` or its `Pick...Workers` wrappers;
 custom selectors must call `Reserve` before using their selection. An idle worker
 found through a snapshot is not necessarily unreserved. Let acquisition wait for
 busy or unhealthy configured workers rather than skipping them or holding a subset

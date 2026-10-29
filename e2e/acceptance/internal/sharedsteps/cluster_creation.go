@@ -27,6 +27,8 @@ type ClusterCreation struct {
 	runtime  framework.Runtime
 	kubectl  *framework.KubectlClient
 	selector *framework.WorkerSelector
+
+	smokeWorker framework.WorkerInfo
 }
 
 func NewClusterCreation(info *framework.ClusterInfo, runtime framework.Runtime, kubectl *framework.KubectlClient, selector *framework.WorkerSelector) *ClusterCreation {
@@ -51,7 +53,9 @@ func (s *ClusterCreation) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^user-configured node-local jail submounts have mode 777$`, s.checkNodeLocalJailSubmountPermissions)
 }
 
-func (s *ClusterCreation) CleanupAndReset(ctx context.Context) {}
+func (s *ClusterCreation) CleanupAndReset(context.Context) {
+	s.smokeWorker = framework.WorkerInfo{}
+}
 
 func (s *ClusterCreation) checkNodeLocalJailSubmountPermissions(ctx context.Context) error {
 	pods, err := s.kubectl.WorkerPods(ctx)
@@ -541,23 +545,35 @@ func (s *ClusterCreation) checkWelcomeOutput(ctx context.Context) error {
 }
 
 func (s *ClusterCreation) checkMainSmokeJob(ctx context.Context) error {
-	output, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("timeout %.0f srun -N 1 hostname", clusterCreationSmokeJobTimeout.Seconds()))
-	if err != nil {
-		return fmt.Errorf("run srun on default partition: %w", err)
-	}
-	if strings.TrimSpace(output) == "" {
-		return fmt.Errorf("default partition smoke job returned empty output")
-	}
-	return nil
+	return s.checkPartitionSmokeJob(ctx, "")
 }
 
 func (s *ClusterCreation) checkHiddenSmokeJob(ctx context.Context) error {
-	output, err := s.runtime.Jail().Run(ctx, fmt.Sprintf("timeout %.0f srun -p hidden -N 1 hostname", clusterCreationSmokeJobTimeout.Seconds()))
+	return s.checkPartitionSmokeJob(ctx, "hidden")
+}
+
+func (s *ClusterCreation) checkPartitionSmokeJob(ctx context.Context, partition string) error {
+	if s.smokeWorker.Name == "" {
+		workers, err := s.selector.PickWorkers(ctx, 1)
+		if err != nil {
+			return fmt.Errorf("select partition smoke worker: %w", err)
+		}
+		s.smokeWorker = workers[0]
+	}
+	partitionFlag := ""
+	label := "default"
+	if partition != "" {
+		partitionFlag = "-p " + framework.ShellQuote(partition) + " "
+		label = partition
+	}
+	command := fmt.Sprintf("timeout %.0f srun %s-N 1 --nodelist=%s hostname",
+		clusterCreationSmokeJobTimeout.Seconds(), partitionFlag, framework.ShellQuote(s.smokeWorker.Name))
+	output, err := s.runtime.Jail().Run(ctx, command)
 	if err != nil {
-		return fmt.Errorf("run srun on hidden partition: %w", err)
+		return fmt.Errorf("run srun on %s partition: %w", label, err)
 	}
 	if strings.TrimSpace(output) == "" {
-		return fmt.Errorf("hidden partition smoke job returned empty output")
+		return fmt.Errorf("%s partition smoke job returned empty output", label)
 	}
 	return nil
 }

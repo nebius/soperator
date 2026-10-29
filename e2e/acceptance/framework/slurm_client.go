@@ -61,7 +61,10 @@ func (j SbatchJob) IsZero() bool {
 // directory exists, submits it from the jail, and returns an SbatchJob with
 // the parsed job id and the resolved stdout / stderr paths.
 func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (SbatchJob, error) {
-	if reservation := workerReservation(ctx); reservation != nil && len(reservation.workers) != 0 {
+	if reservation := workerReservation(ctx); reservation != nil {
+		if len(reservation.workers) == 0 {
+			return SbatchJob{}, fmt.Errorf("submit reserved job: reserve workers before submitting a job")
+		}
 		if len(opts.Nodelist) == 0 {
 			return SbatchJob{}, fmt.Errorf("submit reserved job: an explicit nodelist is required")
 		}

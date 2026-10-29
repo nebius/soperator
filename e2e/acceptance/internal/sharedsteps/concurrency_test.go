@@ -23,6 +23,78 @@ type concurrentSelectionRuntime struct {
 	debug bool
 }
 
+type partitionSmokeRuntime struct {
+	*concurrentSelectionRuntime
+	jail framework.CommandScope
+}
+
+func (r *partitionSmokeRuntime) Jail() framework.CommandScope { return r.jail }
+
+func TestPartitionSmokeJobsReserveTheirWorkerUntilScenarioCleanup(t *testing.T) {
+	for _, partition := range []string{"default", "hidden"} {
+		t.Run(partition, func(t *testing.T) {
+			runtime := &partitionSmokeRuntime{concurrentSelectionRuntime: concurrentSelectionFixture()}
+			kubectl, slurm := framework.NewKubectlClient(runtime), framework.NewSlurmClient(runtime)
+			selector := framework.NewWorkerSelector(kubectl, slurm, "soperator")
+			pool := framework.NewWorkerPool()
+			restarting := framework.WithWorkerReservation(t.Context(), pool, "restarting worker")
+			_, err := selector.Acquire(restarting, framework.WorkerRequirements{Names: []string{"worker-0"}, Count: 1})
+			require.NoError(t, err)
+			defer func() { require.NoError(t, framework.FinishWorkerReservation(restarting, runtime)) }()
+
+			var command string
+			runtime.jail = framework.NewCommandScope(func(_ context.Context, value string) (string, error) {
+				command = value
+				return "worker-1\n", nil
+			})
+			ctx := framework.WithWorkerReservation(t.Context(), pool, "partition smoke")
+			steps := NewClusterCreation(&framework.ClusterInfo{}, runtime, kubectl, selector)
+			if partition == "default" {
+				require.NoError(t, steps.checkMainSmokeJob(ctx))
+				assert.NotContains(t, command, " -p ", "the default partition must still be selected by Slurm")
+			} else {
+				require.NoError(t, steps.checkHiddenSmokeJob(ctx))
+				assert.Contains(t, command, " -p 'hidden' ")
+			}
+			assert.Contains(t, command, "--nodelist='worker-1'", "the smoke job must avoid the other scenario's worker")
+
+			steps.CleanupAndReset(ctx)
+			other := framework.WithWorkerReservation(t.Context(), pool, "next scenario")
+			bounded, cancel := context.WithTimeout(other, 20*time.Millisecond)
+			defer cancel()
+			_, err = selector.Acquire(bounded, framework.WorkerRequirements{Names: []string{"worker-1"}, Count: 1})
+			require.ErrorIs(t, err, context.DeadlineExceeded, "the reservation must survive step-family cleanup")
+
+			require.NoError(t, framework.FinishWorkerReservation(ctx, runtime))
+			workers, err := selector.Acquire(other, framework.WorkerRequirements{Names: []string{"worker-1"}, Count: 1})
+			require.NoError(t, err)
+			assert.Equal(t, "worker-1", workers[0].Name)
+			require.NoError(t, framework.FinishWorkerReservation(other, runtime))
+		})
+	}
+}
+
+func TestReadinessSmokeJobsReuseTheirScenarioWorker(t *testing.T) {
+	runtime := &partitionSmokeRuntime{concurrentSelectionRuntime: concurrentSelectionFixture()}
+	var commands []string
+	runtime.jail = framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+		commands = append(commands, command)
+		return "worker-0\n", nil
+	})
+	kubectl, slurm := framework.NewKubectlClient(runtime), framework.NewSlurmClient(runtime)
+	selector := framework.NewWorkerSelector(kubectl, slurm, "soperator")
+	ctx := framework.WithWorkerReservation(t.Context(), framework.NewWorkerPool(), t.Name())
+	steps := NewClusterCreation(&framework.ClusterInfo{}, runtime, kubectl, selector)
+	require.NoError(t, steps.checkMainSmokeJob(ctx))
+	require.NoError(t, steps.checkHiddenSmokeJob(ctx))
+	require.Len(t, commands, 2)
+	for _, command := range commands {
+		assert.Contains(t, command, "--nodelist='worker-0'")
+	}
+	require.NoError(t, framework.FinishWorkerReservation(ctx, runtime))
+	steps.CleanupAndReset(ctx)
+}
+
 func (r *concurrentSelectionRuntime) Kubectl() framework.ArgsScope {
 	return framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
 		var object any

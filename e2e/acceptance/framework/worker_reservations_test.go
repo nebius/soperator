@@ -163,6 +163,16 @@ func TestCleanupFailureQuarantinesReservationAndPreservesContext(t *testing.T) {
 	assert.Empty(t, pool.owners)
 }
 
+func TestReservedBatchJobsRequireWorkerAcquisition(t *testing.T) {
+	runtime := &submitBatchRuntime{}
+	ctx := WithWorkerReservation(t.Context(), NewWorkerPool(), "missing acquisition")
+	_, err := NewSlurmClient(runtime).SubmitBatch(ctx, SbatchOptions{
+		JobName: "unreserved", Wrap: "true", Nodelist: []string{"gpu0"},
+	})
+	require.ErrorContains(t, err, "reserve workers before submitting a job")
+	assert.Empty(t, runtime.jailCommand, "reject the submission before it reaches Slurm")
+}
+
 func TestReservedBatchJobsCannotEscapeTheirWorkers(t *testing.T) {
 	ctx := WithWorkerReservation(t.Context(), NewWorkerPool(), "pinned")
 	r := workerReservation(ctx)
