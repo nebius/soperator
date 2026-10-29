@@ -32,6 +32,10 @@ func RenderStatefulSet(
 ) (kruisev1b1.StatefulSet, error) {
 	labels := common.RenderLabels(consts.ComponentTypeLogin, clusterName)
 	matchLabels := common.RenderMatchLabels(consts.ComponentTypeLogin, clusterName)
+	common.MergeExtraLabels(labels, login.Labels)
+
+	annotations := renderPodAnnotations()
+	common.MergeExtraAnnotations(annotations, login.Annotations)
 
 	nodeFilter := utils.MustGetBy(
 		nodeFilters,
@@ -87,6 +91,8 @@ func RenderStatefulSet(
 				namespace,
 				clusterName,
 				pvcTemplateSpecs,
+				login.Labels,
+				login.Annotations,
 			),
 			VolumeClaimUpdateStrategy: kruisev1b1.VolumeClaimUpdateStrategy{
 				Type: kruisev1b1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
@@ -94,7 +100,7 @@ func RenderStatefulSet(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
-					Annotations: renderPodAnnotations(),
+					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
 					HostUsers:        login.HostUsers,

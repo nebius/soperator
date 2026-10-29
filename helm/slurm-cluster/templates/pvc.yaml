@@ -5,6 +5,14 @@ kind: PersistentVolumeClaim
 metadata:
   namespace: {{ $.Release.Namespace }}
   name: {{ required "Claim name must be provided." $volume.persistentVolumeClaim.claimName | quote }}
+  {{- with ($.Values.extraLabels | default dict) }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with ($.Values.extraAnnotations | default dict) }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   accessModes:
     - ReadWriteMany

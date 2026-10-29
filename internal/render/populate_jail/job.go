@@ -21,6 +21,10 @@ func RenderPopulateJailJob(
 	populateJail *values.PopulateJail,
 ) batchv1.Job {
 	labels := common.RenderLabels(consts.ComponentTypePopulateJail, clusterName)
+	common.MergeExtraLabels(labels, populateJail.Labels)
+
+	annotations := common.RenderDefaultContainerAnnotation(consts.ContainerNamePopulateJail)
+	common.MergeExtraAnnotations(annotations, populateJail.Annotations)
 
 	nodeFilter := utils.MustGetBy(
 		nodeFilters,
@@ -50,7 +54,7 @@ func RenderPopulateJailJob(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      labels,
-					Annotations: common.RenderDefaultContainerAnnotation(consts.ContainerNamePopulateJail),
+					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
 					HostUsers:         populateJail.HostUsers,

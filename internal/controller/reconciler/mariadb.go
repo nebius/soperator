@@ -105,6 +105,7 @@ func (r *MariaDbReconciler) patch(existing, desired client.Object) (client.Patch
 		dst.Spec.Storage.VolumeClaimTemplate = src.Spec.Storage.VolumeClaimTemplate
 		dst.Spec.Storage.Size = src.Spec.Storage.Size
 		dst.Spec.MyCnf = src.Spec.MyCnf
+		dst.Spec.PodTemplate.PodMetadata = src.Spec.PodTemplate.PodMetadata.DeepCopy()
 
 		return res
 	}
