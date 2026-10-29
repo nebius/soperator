@@ -70,7 +70,9 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
   scenarios. Heavy and unstable controls are independent.
 - `--scenario`: optional. Runs all compatible scenarios in the provided feature
   file, or the single scenario at an exact `Scenario:` line, for example
-  `features/internal_ssh.feature:3`. May be repeated.
+  `features/internal_ssh.feature:3`. May be repeated. Scenarios tagged
+  `@manual` run only when selected this way; without selectors they are
+  excluded regardless of the other flags.
 - `--output-dir`: required. The runner writes Cucumber and JUnit reports plus
   per-scenario artifacts into this directory. Under TeamCity, scenarios are
   also reported directly through native test service messages and JUnit files
@@ -122,6 +124,10 @@ The default CLI, manual workflow, and `/e2e` exclude both `@heavy` and
 ones. Both PR commands support the optional Terraform branch and `--scenarios`;
 other flags are rejected. Periodic runs always include heavy scenarios and
 exclude unstable ones. Explicit scenario selectors still obey these filters.
+`@manual` scenarios are excluded from every run that has no selectors, including
+periodic ones, and run only when a selector names their feature file or line.
+The heavy and unstable filters still apply to them, so a `@manual @heavy`
+scenario is run with a selector plus `--run-heavy` (or `/e2e-full`).
 
 `@heavy` usually marks long scenarios (about four minutes or more), based on
 observed durations such as
@@ -211,6 +217,7 @@ suite.Source.Paths = []string{"features/internal_ssh.feature:3"}
 suite.Tags = "~@custom_only"
 suite.ExcludeUnstable = false
 suite.ExcludeHeavy = true
+suite.ExcludeManual = false
 
 runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 	KubectlContext:         kubectlContext,
@@ -226,9 +233,12 @@ target cluster. `SlurmClusterName` defaults to `soperator` when omitted.
 `TargetSoperatorVersion` is normalized once and stored in static
 `framework.ClusterInfo`. The caller controls scenario selection through
 `SuiteConfig.Source.Paths` and Godog tag filtering through `SuiteConfig.Tags`.
-`SuiteConfig.ExcludeHeavy` and `ExcludeUnstable` independently exclude their
-respective tags. `SoperatorSuite` preserves heavy coverage for library callers;
-the standalone CLI explicitly excludes it unless `--run-heavy` is set.
+`SuiteConfig.ExcludeHeavy`, `ExcludeUnstable` and `ExcludeManual` independently
+exclude their respective tags. `SoperatorSuite` preserves heavy coverage for
+library callers; the standalone CLI explicitly excludes it unless `--run-heavy`
+is set. `SoperatorSuite` excludes `@manual` scenarios; a caller that selects
+them through `Source.Paths` clears `ExcludeManual`, as the CLI does for
+`--scenario`.
 When `OutputDir` is set, each scenario receives matching runner and jail paths
 through `framework.ScenarioArtifacts(ctx)`. Product-specific steps can write
 their own files directly to those paths without registering a collector.
