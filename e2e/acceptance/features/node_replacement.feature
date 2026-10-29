@@ -33,7 +33,11 @@ Feature: Node replacement
     And a replacement node joins the cluster
     And the replacement node passes GPU validation
 
-  @heavy @gpu @soperator_version_>=5.0.0
+  # @manual: the health-check failure can report a real bare-metal host through Compute SetUnhealthy
+  # and occupy the tenant's unhealthy-node slot. Run explicitly with --run-heavy.
+  # Drop the tag once Mk8s honours nebius.com/skip-set-unhealthy for HardwareIssuesSuspected
+  # and the e2e worker node groups carry that label.
+  @manual @heavy @gpu @soperator_version_>=5.0.0
   Scenario: A maintenance event replaces a GPU worker already draining after a health check failure
     Given a test job is submitted and running on an idle GPU worker node
     When a GPU health check failure is simulated on that node
@@ -45,7 +49,11 @@ Feature: Node replacement
     And a replacement node joins the cluster
     And the replacement node passes GPU validation
 
-  @heavy @gpu @soperator_version_>=5.0.0
+  # @manual: the health-check failure can report a real bare-metal host through Compute SetUnhealthy
+  # and occupy the tenant's unhealthy-node slot. Run explicitly with --run-heavy.
+  # Drop the tag once Mk8s honours nebius.com/skip-set-unhealthy for HardwareIssuesSuspected
+  # and the e2e worker node groups carry that label.
+  @manual @heavy @gpu @soperator_version_>=5.0.0
   Scenario: A maintenance event replaces a GPU worker fully drained after a health check failure
     Given a test job is submitted and running on an idle GPU worker node
     When a GPU health check failure is simulated on that node
