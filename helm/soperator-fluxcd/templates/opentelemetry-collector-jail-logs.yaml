@@ -98,7 +98,7 @@ spec:
     image:
       pullPolicy: IfNotPresent
       repository: cr.nebius.cloud/observability/nebius-o11y-agent
-      tag: 2.0.10
+      tag: 2.0.19
 
     # One collector per worker node: each instance reads (and deletes) only the log files
     # written to its own node's boot disk, so worker count no longer affects any shared storage.

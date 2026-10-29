@@ -267,7 +267,7 @@ spec:
     image:
       pullPolicy: IfNotPresent
       repository: cr.nebius.cloud/observability/nebius-o11y-agent
-      tag: {{ $values.nebiusO11yAgentVersion | default "2.0.10" }}
+      tag: {{ $values.nebiusO11yAgentVersion | default "2.0.19" }}
 
     {{- if eq $mode "shared" }}
     mode: deployment
