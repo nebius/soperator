@@ -229,6 +229,45 @@ func TestStaleRollingUpdateDrain(t *testing.T) {
 	}
 }
 
+func TestHasUnhealthyDrain(t *testing.T) {
+	tests := []struct {
+		name string
+		node slurmapi.Node
+		want bool
+	}{
+		{
+			name: "user problem prefix with Kill task failed diagnostic is not unhealthy",
+			node: slurmapi.Node{
+				States: nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN),
+				Reason: &slurmapi.NodeReason{Reason: "[user_problem] proseware check: Kill task failed"},
+			},
+			want: false,
+		},
+		{
+			name: "Kill task failed prefix with user problem tail is unhealthy",
+			node: slurmapi.Node{
+				States: nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN),
+				Reason: &slurmapi.NodeReason{Reason: "Kill task failed: job 42 [user_problem]"},
+			},
+			want: true,
+		},
+		{
+			name: "node problem prefix with Kill task failed diagnostic is unhealthy",
+			node: slurmapi.Node{
+				States: nodeStates(api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN),
+				Reason: &slurmapi.NodeReason{Reason: "[node_problem] proseware check: Kill task failed"},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, hasUnhealthyDrain(&tt.node))
+		})
+	}
+}
+
 func TestProcessRollingUpdateDeletesCrashLoopingWorkerInit(t *testing.T) {
 	for _, registered := range []bool{false, true} {
 		t.Run(fmt.Sprintf("registered=%t", registered), func(t *testing.T) {
