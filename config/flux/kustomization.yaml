@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - install.yaml
+
+# Rebuilt for the eMudhra CA fix: https://github.com/fluxcd/flux2/discussions/6142
+images:
+  - name: ghcr.io/fluxcd/source-controller
+    newName: cr.nebius.cloud/soperator-proxy-ghcr-io/fluxcd/source-controller
+    newTag: v1.9.6-456fa323
+    digest: sha256:23bab3d00a4ec6d81f04d978480c8fc3496a58e402b95c6083731defec372549
+  - name: ghcr.io/fluxcd/kustomize-controller
+    newName: cr.nebius.cloud/soperator-proxy-ghcr-io/fluxcd/kustomize-controller
+    newTag: v1.9.6-3974b6d7
+    digest: sha256:6988157f7289fca21292884724579fc2a58c759dba4dd608571dd9be79db8b10
+  - name: ghcr.io/fluxcd/helm-controller
+    newName: cr.nebius.cloud/soperator-proxy-ghcr-io/fluxcd/helm-controller
+    newTag: v1.6.5-27add72a
+    digest: sha256:c8e171c931dd23f47e266d5fe6699a58bf7d89f387bbb612a2f92203a752c477
+  - name: ghcr.io/fluxcd/notification-controller
+    newName: cr.nebius.cloud/soperator-proxy-ghcr-io/fluxcd/notification-controller
+    newTag: v1.9.4-a1dff359
+    digest: sha256:4e592e60e40922bd79dbbc7e1cc23ba88494fb337c2ce379e6e77b9357855622
