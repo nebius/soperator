@@ -183,6 +183,7 @@ func (s *SystemChecks) aHealthyWorkerPodIsSelected(ctx context.Context) error {
 		}
 
 		s.worker = worker
+		s.worker.SlurmNode = node
 		s.workerPodInfo = podInfo
 		s.workerPod = pod
 		s.runtime.Logf("system checks: selected worker=%s pod=%s k8s_node=%s",
@@ -471,6 +472,9 @@ func (s *SystemChecks) theSelectedWorkerPodIsRestarted(ctx context.Context) erro
 	if s.workerPod.Name == "" || s.workerPod.UID == "" {
 		return fmt.Errorf("worker pod is not selected")
 	}
+	if s.worker.SlurmNode.SlurmdStartTime.IsZero() {
+		return fmt.Errorf("read SlurmdStartTime before restarting worker %s", s.worker.Name)
+	}
 	if err := s.ensureLibslurmProbeRunning(); err != nil {
 		return err
 	}
@@ -501,8 +505,12 @@ func (s *SystemChecks) theRestartedWorkerPodIsReady(ctx context.Context) error {
 			return err
 		}
 		pod, found, err := s.workerPodByNameOnce(waitCtx, s.workerPod.Name)
+		var node framework.SlurmNodeInfo
 		if err == nil && found && string(pod.UID) != s.restartedWorkerPodUID && pod.Status.Phase == corev1.PodRunning && kubeobjects.PodReady(pod) {
-			return nil
+			node, err = s.slurm.NodeInfoOnce(waitCtx, s.worker.Name)
+			if err == nil && node.IsReadyForImmediateWork() && node.SlurmdStartTime.After(s.worker.SlurmNode.SlurmdStartTime) {
+				return nil
+			}
 		}
 
 		select {
@@ -510,8 +518,8 @@ func (s *SystemChecks) theRestartedWorkerPodIsReady(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("wait for worker pod %s restarted and ready: %w", s.workerPod.Name, err)
 			}
-			return fmt.Errorf("wait for worker pod %s restarted and ready: timed out after %s (found=%t phase=%s ready=%t)",
-				s.workerPod.Name, systemWorkerRestartTimeout, found, pod.Status.Phase, kubeobjects.PodReady(pod))
+			return fmt.Errorf("wait for worker pod %s restarted and ready: timed out after %s (found=%t phase=%s ready=%t SlurmState=%s SlurmdStartTime=%s)",
+				s.workerPod.Name, systemWorkerRestartTimeout, found, pod.Status.Phase, kubeobjects.PodReady(pod), node.State, node.SlurmdStartTime.Format(time.RFC3339))
 		case <-ticker.C:
 		}
 	}
