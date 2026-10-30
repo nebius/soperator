@@ -28,9 +28,30 @@ func (s *NodeReplacement) aMaintenanceEventIsTriggeredWhileThatNodeIsDraining(ct
 	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.maintenanceJob, err)
 }
 
-func (s *NodeReplacement) theNodeIsDrainingWithAMaintenanceReasonWhileTheTestJobIsRunning(ctx context.Context) error {
-	err := s.waitForMaintenanceDrain(ctx, s.assertTestJobRunningOnOriginalWorker)
+func (s *NodeReplacement) theNodeRemainsDrainedWhileTheTestJobIsRunning(ctx context.Context) error {
+	node, err := s.runningTestJobNode(ctx)
+	if err == nil && !node.HasStateFlag("DRAIN") {
+		err = fmt.Errorf("worker %s is no longer drained: state=%s reason=%q instance=%s", node.Name, node.State, node.Reason, node.InstanceID)
+	}
 	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.maintenanceJob, err)
+}
+
+// Let maintenance take over an injected health drain before releasing the allocation.
+func (s *NodeReplacement) ensureMaintenanceForCleanup(ctx context.Context) error {
+	host, present, err := s.kubectl.NodeIfPresent(ctx, s.original.NodeName)
+	if err != nil {
+		return err
+	}
+	if !present || host.UID != s.original.NodeUID || host.DeletionTimestamp != nil {
+		return nil
+	}
+	// maintenanceRequested records an attempted patch, including a rejected one.
+	if !nodeMaintenanceEventOwned(host) {
+		if err := s.aMaintenanceEventIsTriggeredForThatNode(ctx); err != nil {
+			return err
+		}
+	}
+	return s.waitForMaintenanceDrain(ctx, nil)
 }
 
 func (s *NodeReplacement) aMaintenanceEventIsTriggeredAfterThatNodeHasFullyDrained(ctx context.Context) error {

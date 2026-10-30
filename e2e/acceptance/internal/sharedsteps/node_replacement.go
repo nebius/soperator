@@ -63,6 +63,7 @@ type NodeReplacement struct {
 	original             framework.WorkerReplacementSnapshot
 	maintenanceJob       framework.SbatchJob
 	maintenanceRequested bool
+	maintenanceRecovery  bool
 	faultInjected        bool
 	preExistingWorkers   []framework.WorkerInfo
 }
@@ -85,7 +86,7 @@ func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the node is drained with a node problem reason$`, s.theNodeIsDrainedWithANodeProblemReason)
 	sc.Step(`^the node is draining with a node problem reason while the test job is running$`, s.theNodeIsDrainingWithANodeProblemReasonWhileTheTestJobIsRunning)
 	sc.Step(`^a maintenance event is triggered while that node is draining$`, s.aMaintenanceEventIsTriggeredWhileThatNodeIsDraining)
-	sc.Step(`^the node is draining with a maintenance reason while the test job is running$`, s.theNodeIsDrainingWithAMaintenanceReasonWhileTheTestJobIsRunning)
+	sc.Step(`^the node remains drained while the test job is running$`, s.theNodeRemainsDrainedWhileTheTestJobIsRunning)
 	sc.Step(`^a maintenance event is triggered after that node has fully drained$`, s.aMaintenanceEventIsTriggeredAfterThatNodeHasFullyDrained)
 	sc.Step(`^the test job is cancelled$`, s.theTestJobIsCancelled)
 	sc.Step(`^the old instance is removed$`, s.theOldInstanceIsRemoved)
@@ -98,6 +99,11 @@ func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
 func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), nodeReplacementRemoveTimeout+nodeReplacementReadyTimeout+time.Minute)
 	defer cancel()
+	if s.maintenanceRecovery && s.faultInjected {
+		if err := s.ensureMaintenanceForCleanup(cleanupCtx); err != nil {
+			s.runtime.Logf("Cleanup: request maintenance before cancelling job %s on worker %s: %v", s.maintenanceJob.ID, s.original.WorkerName, err)
+		}
+	}
 	if !s.maintenanceJob.IsZero() {
 		if cancelErr := s.cancelJob(cleanupCtx, s.maintenanceJob.ID); cancelErr != nil {
 			s.runtime.Logf("Cleanup: cancel maintenance job: %v", cancelErr)
@@ -120,6 +126,7 @@ func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
 	s.original = framework.WorkerReplacementSnapshot{}
 	s.maintenanceJob = framework.SbatchJob{}
 	s.maintenanceRequested = false
+	s.maintenanceRecovery = false
 	s.faultInjected = false
 	s.preExistingWorkers = nil
 }
@@ -137,6 +144,7 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnWorkerNode(ctx context.
 }
 
 func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAnIdleGPUWorkerNode(ctx context.Context) error {
+	s.maintenanceRecovery = true
 	snapshot, err := s.selector.Snapshot(ctx)
 	if err != nil {
 		return err

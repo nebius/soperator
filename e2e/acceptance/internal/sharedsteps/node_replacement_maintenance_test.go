@@ -32,7 +32,13 @@ func (r *healthMaintenanceRuntime) Kubectl() framework.ArgsScope {
 			r.calls = append(r.calls, "kubectl "+strings.Join(args, " "))
 			return "", r.patchErr
 		}
-		return r.maintenanceTestRuntime.Kubectl().Run(ctx, args...)
+		out, err := r.maintenanceTestRuntime.Kubectl().Run(ctx, args...)
+		if args[0] == "patch" && err == nil {
+			host := r.hosts[args[2]]
+			host.Status.Conditions = []corev1.NodeCondition{{Type: nodeReplacementMaintenanceCondition, Status: corev1.ConditionTrue, Reason: "AcceptanceTest"}}
+			r.hosts[host.Name] = host
+		}
+		return out, err
 	})
 }
 
@@ -130,14 +136,24 @@ func TestHealthMaintenanceUsesExistingTriggersWhileJobKeepsRunning(t *testing.T)
 	steps, runtime := healthMaintenanceSteps(t)
 	require.NoError(t, steps.theNodeIsDrainingWithANodeProblemReasonWhileTheTestJobIsRunning(t.Context()))
 	require.NoError(t, steps.aMaintenanceEventIsTriggeredWhileThatNodeIsDraining(t.Context()))
-	require.NoError(t, steps.theNodeIsDrainingWithAMaintenanceReasonWhileTheTestJobIsRunning(t.Context()))
+	require.NoError(t, steps.theNodeRemainsDrainedWhileTheTestJobIsRunning(t.Context()))
 
 	assert.Equal(t, "RUNNING", runtime.jobState)
 	assert.Equal(t, 1, maintenancePatchCount(runtime))
 	assert.True(t, steps.maintenanceRequested)
 	assert.Contains(t, runtime.nodes["worker-0"], "State=MIXED+DRAIN")
-	assert.Contains(t, runtime.nodes["worker-0"], nodeReplacementDrainReason)
 	assert.Equal(t, steps.original.PodUID, runtime.pods["worker-0"].UID)
+}
+
+func TestHealthMaintenanceRecoveryAcceptsEitherDrainReason(t *testing.T) {
+	for _, reason := range []string{simulatedHealthDrainReason, nodeReplacementDrainReason} {
+		t.Run(reason, func(t *testing.T) {
+			steps, runtime := healthMaintenanceSteps(t)
+			runtime.nodes["worker-0"] = strings.Replace(runtime.nodes["worker-0"], simulatedHealthDrainReason, reason, 1)
+
+			require.NoError(t, steps.theNodeRemainsDrainedWhileTheTestJobIsRunning(t.Context()))
+		})
+	}
 }
 
 func TestHealthMaintenanceRechecksJobImmediatelyBeforeInjection(t *testing.T) {
@@ -164,7 +180,7 @@ func TestHealthMaintenanceRetriesTransientOriginalHostRead(t *testing.T) {
 }
 
 func TestHealthMaintenanceRejectsJobLossAndRestartsWithoutRetryingThem(t *testing.T) {
-	for _, wait := range []string{"health", "maintenance"} {
+	for _, wait := range []string{"health", "drained"} {
 		for _, test := range []struct {
 			name, state, restarts string
 		}{
@@ -187,13 +203,15 @@ func TestHealthMaintenanceRejectsJobLossAndRestartsWithoutRetryingThem(t *testin
 				var err error
 				if wait == "health" {
 					err = steps.theNodeIsDrainingWithANodeProblemReasonWhileTheTestJobIsRunning(t.Context())
+					assert.Equal(t, 2, runtime.iteration)
 				} else {
-					err = steps.theNodeIsDrainingWithAMaintenanceReasonWhileTheTestJobIsRunning(t.Context())
+					runtime.jobState, runtime.restarts = test.state, test.restarts
+					err = steps.theNodeRemainsDrainedWhileTheTestJobIsRunning(t.Context())
+					assert.Zero(t, runtime.iteration)
 				}
 				var invariant rolloutInvariantError
 				require.ErrorAs(t, err, &invariant)
 				assert.ErrorContains(t, err, "test job 6 is not running without restarts")
-				assert.Equal(t, 2, runtime.iteration)
 				assert.Zero(t, maintenancePatchCount(runtime))
 			})
 		}
@@ -341,6 +359,83 @@ func TestHealthMaintenanceCleanupHandlesBothOwnedTriggersAfterCancellation(t *te
 	assert.Zero(t, steps.original)
 	assert.True(t, steps.maintenanceJob.IsZero())
 	assert.Zero(t, maintenancePatchCount(runtime), "cleanup uses existing completion behavior without injecting another event")
+}
+
+func TestHealthMaintenanceCleanupTakesOverBeforeCancellingTheJob(t *testing.T) {
+	for _, test := range []struct {
+		name                string
+		requested, accepted bool
+		maintenanceRecovery bool
+		wantPatches         int
+	}{
+		{"not requested", false, false, true, 1},
+		{"rejected patch", true, false, true, 1},
+		{"accepted patch with lost response", true, true, true, 0},
+		{"health-only scenario", false, false, false, 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			steps, runtime := healthMaintenanceSteps(t)
+			steps.faultInjected, steps.maintenanceRecovery = true, test.maintenanceRecovery
+			steps.maintenanceRequested = test.requested
+			if test.accepted {
+				host := runtime.hosts[steps.original.NodeName]
+				host.Status.Conditions = []corev1.NodeCondition{{Type: nodeReplacementMaintenanceCondition, Status: corev1.ConditionTrue, Reason: "AcceptanceTest"}}
+				runtime.hosts[host.Name] = host
+			}
+			baseCommand := runtime.command
+			runtime.command = func(command string) (string, error) {
+				if strings.HasPrefix(command, "scancel ") && test.maintenanceRecovery {
+					assert.Contains(t, runtime.nodes["worker-0"], nodeReplacementDrainReason)
+					assert.True(t, nodeMaintenanceEventOwned(runtime.hosts[steps.original.NodeName]))
+				}
+				return baseCommand(command)
+			}
+			runtime.observe = func(base *maintenanceTestRuntime) {
+				switch base.waitLabels[len(base.waitLabels)-1] {
+				case "node drain reason":
+					assert.Equal(t, "RUNNING", runtime.jobState)
+					base.nodes["worker-0"] = strings.Replace(base.nodes["worker-0"], simulatedHealthDrainReason, nodeReplacementDrainReason, 1)
+				case "replacement worker ready on a new host":
+					delete(base.hosts, steps.original.NodeName)
+					pod := base.pods[steps.original.PodName]
+					pod.UID, pod.Spec.NodeName = "replacement-pod-uid", "replacement-host"
+					base.pods[pod.Name] = pod
+					base.nodes["worker-0"] = "NodeName=worker-0 State=IDLE InstanceId=replacement-instance"
+				}
+			}
+			runtime.local = func(...string) (string, error) { return "", errors.New("instance not found") }
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			steps.CleanupAndReset(ctx)
+			steps.CleanupAndReset(ctx)
+
+			assert.Equal(t, test.wantPatches, maintenancePatchCount(runtime))
+			assert.Equal(t, "", runtime.jobState)
+			assert.Equal(t, test.maintenanceRecovery, strings.Contains(strings.Join(runtime.waitLabels, "\n"), "node drain reason"))
+			assert.False(t, steps.maintenanceRecovery)
+			assert.True(t, steps.maintenanceJob.IsZero())
+		})
+	}
+}
+
+func TestHealthMaintenanceCleanupDoesNotScheduleMaintenanceOnAChangedHost(t *testing.T) {
+	for _, present := range []bool{false, true} {
+		t.Run(fmt.Sprint("original host present: ", present), func(t *testing.T) {
+			steps, runtime := healthMaintenanceSteps(t)
+			if present {
+				host := runtime.hosts[steps.original.NodeName]
+				host.UID = "replacement-host-uid"
+				runtime.hosts[host.Name] = host
+			} else {
+				delete(runtime.hosts, steps.original.NodeName)
+			}
+
+			require.NoError(t, steps.ensureMaintenanceForCleanup(t.Context()))
+			assert.Zero(t, maintenancePatchCount(runtime))
+			assert.Empty(t, runtime.waitLabels)
+		})
+	}
 }
 
 func TestNodeReplacementHoldJobCoversBothDrainWaits(t *testing.T) {
