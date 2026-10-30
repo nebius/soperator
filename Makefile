@@ -519,6 +519,7 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 .PHONY: deploy-flux
 # Match the bootstrap chart: Flux waits for each child release independently of the parent.
 deploy-flux: install-flux kustomize yq ## Deploy soperator via Flux CD to kind cluster (for local development)
+	@test "$(FLUX_VERSION)" = "2.9.6" || { echo "Update config/flux image overrides before using another Flux version." >&2; exit 1; }
 	@echo "Step 1: Installing Flux CD..."
 	@echo "Checking cluster connectivity..."
 	@if ! $(KUBECTL_CTX) cluster-info > /dev/null 2>&1; then \
@@ -526,12 +527,14 @@ deploy-flux: install-flux kustomize yq ## Deploy soperator via Flux CD to kind c
 		exit 1; \
 	fi
 	@echo "✅ Cluster is accessible"
-	@if ! $(FLUX) check --context $(KIND_CONTEXT) > /dev/null 2>&1; then \
-		echo "Installing Flux components..."; \
-		$(FLUX) install --context $(KIND_CONTEXT); \
-	else \
-		echo "✅ Flux already installed"; \
-	fi
+	@flux_work_dir="$$(mktemp -d)"; \
+	trap 'rm -rf -- "$$flux_work_dir"' EXIT; \
+	cp config/flux/kustomization.yaml "$$flux_work_dir/kustomization.yaml"; \
+	$(FLUX) install --export > "$$flux_work_dir/install.yaml"; \
+	if $(KUBECTL_CTX) get crd kustomizations.kustomize.toolkit.fluxcd.io >/dev/null 2>&1; then \
+		$(FLUX) migrate --context $(KIND_CONTEXT); \
+	fi; \
+	$(KUBECTL_CTX) apply -k "$$flux_work_dir"
 	@echo ""
 	@echo "Step 2: Determining OCI registry based on version..."
 	@if echo "$(OPERATOR_IMAGE_TAG)" | grep -q -- "-"; then \
@@ -608,7 +611,7 @@ HELM_UNITTEST_VERSION		?= 1.1.2
 YQ_VERSION					?= 4.53.6
 MOCKERY_VERSION				?= 2.53.8
 KIND_VERSION				?= v0.33.0
-FLUX_VERSION				?= 2.9.5
+FLUX_VERSION				?= 2.9.6
 
 # Read the embedded module version: CLI version output can be unset by go install.
 define install-go-tool
