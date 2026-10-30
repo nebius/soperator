@@ -29,6 +29,11 @@ const (
 	healthCheckInjectErrorMarker     = "/opt/soperator-outputs/local/health_checker_inject_error"
 	healthCheckInjectErrorResolution = "RedeployProfile"
 
+	// The Mk8s remediation controller records this event on a node right before it marks the
+	// machine for replacement, and only while the node still exists. A node deleted by Soperator
+	// never gets it, so the event proves that the platform performed the replacement.
+	platformNodeDeletingEventReason = "NodeDeleting"
+
 	// These timeouts intentionally leave slack for slower replacement flows; tune
 	// them together with the CI step budget when this scenario evolves. Compute
 	// has been observed to drop a deleted Kubernetes node's instance more than
@@ -75,6 +80,7 @@ func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the node is drained with a node problem reason$`, s.theNodeIsDrainedWithANodeProblemReason)
 	sc.Step(`^the test job is cancelled$`, s.theTestJobIsCancelled)
 	sc.Step(`^the old instance is removed$`, s.theOldInstanceIsRemoved)
+	sc.Step(`^the platform reported deleting the old node$`, s.thePlatformReportedDeletingTheOldNode)
 	sc.Step(`^a replacement node joins the cluster$`, s.aReplacementNodeJoinsTheCluster)
 	sc.Step(`^the replacement node passes GPU validation$`, s.theReplacementNodePassesGPUValidation)
 	sc.Step(`^all pre-existing worker nodes are operational$`, s.allPreExistingWorkerNodesAreOperational)
@@ -228,6 +234,42 @@ func (s *NodeReplacement) theTestJobIsCancelled(ctx context.Context) error {
 
 func (s *NodeReplacement) theOldInstanceIsRemoved(ctx context.Context) error {
 	return framework.WaitForInstanceRemoval(ctx, s.runtime, s.original.InstanceID, nodeReplacementRemoveTimeout, 30*time.Second)
+}
+
+// Runs after the old instance is gone, so the event is either already recorded or never will be.
+func (s *NodeReplacement) thePlatformReportedDeletingTheOldNode(ctx context.Context) error {
+	if s.original.NodeName == "" || s.original.NodeUID == "" {
+		return fmt.Errorf("original node is not captured")
+	}
+	events, err := s.kubectl.NodeEvents(ctx, s.original.NodeName, s.original.NodeUID)
+	if err != nil {
+		return err
+	}
+	if hasEventReason(events, platformNodeDeletingEventReason) {
+		return nil
+	}
+	return fmt.Errorf("the platform did not report deleting node %s (UID %s): expected an event with reason %s, observed events: %s",
+		s.original.NodeName, s.original.NodeUID, platformNodeDeletingEventReason, describeEvents(events))
+}
+
+func hasEventReason(events []corev1.Event, reason string) bool {
+	for _, event := range events {
+		if event.Reason == reason {
+			return true
+		}
+	}
+	return false
+}
+
+func describeEvents(events []corev1.Event) string {
+	if len(events) == 0 {
+		return "none"
+	}
+	parts := make([]string, 0, len(events))
+	for _, event := range events {
+		parts = append(parts, fmt.Sprintf("%s/%s from %s: %s", event.Type, event.Reason, event.Source.Component, event.Message))
+	}
+	return strings.Join(parts, "; ")
 }
 
 func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) error {
