@@ -29,6 +29,76 @@ func (r healthCheckReplacementRuntime) Worker(framework.WorkerInfo) framework.Co
 }
 func (r healthCheckReplacementRuntime) Logf(string, ...any) {}
 
+func nodeEventsJSON(t *testing.T, events ...corev1.Event) string {
+	t.Helper()
+	raw, err := json.Marshal(corev1.EventList{Items: events})
+	require.NoError(t, err)
+	return string(raw)
+}
+
+func TestPlatformReportedDeletingTheOldNodeFindsRemediatorEvent(t *testing.T) {
+	var args [][]string
+	runtime := healthCheckReplacementRuntime{kubectl: framework.NewArgsScope(func(_ context.Context, a ...string) (string, error) {
+		args = append(args, a)
+		return nodeEventsJSON(t,
+			corev1.Event{Reason: "NodeRemediationInProgress", Source: corev1.EventSource{Component: "nebiusmachinehealthcheck-controller"}},
+			corev1.Event{Reason: "NodeDeleting", Message: "Deleting node", Source: corev1.EventSource{Component: "remediation-controller"}},
+		), nil
+	})}
+	steps := NodeReplacement{
+		runtime:  runtime,
+		kubectl:  framework.NewKubectlClient(runtime),
+		original: framework.WorkerReplacementSnapshot{NodeName: "computeinstance-old", NodeUID: "uid-old"},
+	}
+
+	require.NoError(t, steps.thePlatformReportedDeletingTheOldNode(t.Context()))
+
+	require.Len(t, args, 1)
+	assert.Equal(t, []string{"get", "events", "-n", "default",
+		"--field-selector", "involvedObject.kind=Node,involvedObject.name=computeinstance-old,involvedObject.uid=uid-old",
+		"-o", "json"}, args[0])
+}
+
+func TestPlatformReportedDeletingTheOldNodeListsObservedEventsOnFailure(t *testing.T) {
+	runtime := healthCheckReplacementRuntime{kubectl: framework.NewArgsScope(func(context.Context, ...string) (string, error) {
+		return nodeEventsJSON(t,
+			corev1.Event{Type: "Normal", Reason: "NodeRemediationInProgress", Message: "Remediation is in progress",
+				Source: corev1.EventSource{Component: "nebiusmachinehealthcheck-controller"}},
+		), nil
+	})}
+	steps := NodeReplacement{
+		runtime:  runtime,
+		kubectl:  framework.NewKubectlClient(runtime),
+		original: framework.WorkerReplacementSnapshot{NodeName: "computeinstance-old", NodeUID: "uid-old"},
+	}
+
+	err := steps.thePlatformReportedDeletingTheOldNode(t.Context())
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "did not report deleting node computeinstance-old (UID uid-old)")
+	assert.ErrorContains(t, err, "Normal/NodeRemediationInProgress from nebiusmachinehealthcheck-controller: Remediation is in progress")
+}
+
+func TestPlatformReportedDeletingTheOldNodeReportsNoEvents(t *testing.T) {
+	runtime := healthCheckReplacementRuntime{kubectl: framework.NewArgsScope(func(context.Context, ...string) (string, error) {
+		return nodeEventsJSON(t), nil
+	})}
+	steps := NodeReplacement{
+		runtime:  runtime,
+		kubectl:  framework.NewKubectlClient(runtime),
+		original: framework.WorkerReplacementSnapshot{NodeName: "computeinstance-old", NodeUID: "uid-old"},
+	}
+
+	err := steps.thePlatformReportedDeletingTheOldNode(t.Context())
+
+	assert.ErrorContains(t, err, "observed events: none")
+}
+
+func TestPlatformReportedDeletingTheOldNodeRequiresCapturedNode(t *testing.T) {
+	steps := NodeReplacement{}
+	assert.ErrorContains(t, steps.thePlatformReportedDeletingTheOldNode(t.Context()), "original node is not captured")
+}
+
 func TestHealthCheckInjectErrorCommandWritesResolutionToNodeLocalMarker(t *testing.T) {
 	assert.Equal(t,
 		`mkdir -p '/opt/soperator-outputs/local' && printf '%s\n' 'RedeployProfile' > '/opt/soperator-outputs/local/health_checker_inject_error'`,
