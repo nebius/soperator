@@ -79,12 +79,23 @@ The prefix decides what the automation does with the node:
 
 | Prefix | Who reacts | Effect |
 |---|---|---|
-| `[node_problem]` | soperatorchecks, updatecontroller | Node is marked unhealthy and replaced when node replacement is enabled. The worker rollout waits for the replacement. |
+| `[node_problem]` | soperatorchecks, updatecontroller | When node replacement is enabled, soperatorchecks cordons the Kubernetes node and sets `HardwareIssuesSuspected` on it; the platform reports the host with Compute `SetUnhealthy` and replaces the node. The worker rollout waits for the replacement. |
 | `[hardware_problem]` | soperatorchecks, updatecontroller | Same as `[node_problem]`. Nothing in soperator sets it; it is reserved for tooling outside the operator. |
 | `[user_problem]` | nobody | Node stays drained. The worker rollout proceeds. Use it when the fix is on the user or support side, for example leftover processes or a full disk. |
 | `[software_problem]` | nobody | Node stays drained. The worker rollout proceeds. Use it when the node itself is fine but something on it is broken and a pod restart or a support action fixes it, for example empty driver libraries in the jail. |
 
 Matching is by substring, so the details must not contain another prefix or `Kill task failed`.
+
+The condition message carries the Slurm drain reason and, when a check wrote one, the node comment. The
+platform forwards it to Compute `SetUnhealthy` as the description of the failure, so it is what the GPU team
+sees for the reported host.
+
+Soperator never deletes a node with `HardwareIssuesSuspected` itself. The platform calls `SetUnhealthy`
+with unlimited retries and replaces the node only after the call succeeds, so the failed host is recorded
+and the replacement does not land on it. Until then, for example while the tenant's limit of unhealthy node
+reports is exhausted, the node stays cordoned and its Slurm node stays drained with the health check reason.
+A `NebiusMaintenanceScheduled` condition is handled separately: there soperator drains the Slurm node and
+deletes the Kubernetes node itself once the drain completes.
 
 Keep the details short and predictable. The whole reason ends up as the `reason` label of the
 `slurm_node_info` and `slurm_node_fails_total` metrics of the Slurm exporter, so every distinct value is a

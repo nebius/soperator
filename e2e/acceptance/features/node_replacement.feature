@@ -30,5 +30,6 @@ Feature: Node replacement
     Then the node is drained with a node problem reason
     When the test job is cancelled
     Then the old instance is removed
+    And the platform reported deleting the old node
     And a replacement node joins the cluster
     And the replacement node passes GPU validation
