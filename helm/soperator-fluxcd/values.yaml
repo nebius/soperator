@@ -231,7 +231,7 @@ observability:
     crds:
       interval: 5m
       timeout: 5m
-      version: 0.10.1
+      version: 0.0.3
       install:
         crds: CreateReplace
         remediation:
@@ -244,18 +244,18 @@ observability:
       driftDetection:
         mode: warn
     interval: 5m
-    timeout: 30m
-    version: 0.80.*
+    timeout: 5m
+    version: 0.39.*
     namespace: monitoring-system
     releaseName: metrics
     install:
       crds: Skip
       remediation:
-        retries: 6
+        retries: 3
     upgrade:
       crds: Skip
       remediation:
-        retries: 6
+        retries: 3
         remediateLastFailure: true
     # Source of the o11y remote-write bearer token, consumed per `observability.publicEndpointTokenKind`:
     #   secret   - vmagent references the token via remoteWrite[].bearerTokenSecret (operator-managed),
@@ -292,9 +292,6 @@ observability:
         pollIntervalSeconds: 300
         resources: {}
     values:
-      grafana:
-        image:
-          tag: "13.1.4"
       dashboardNamespaces:
         - soperator
         - soperator-system
@@ -302,8 +299,6 @@ observability:
         - monitoring-system
         - logs-system
       grafanaIni:
-        feature_toggles:
-          dashboardNewLayouts: false
         auth:
           disable_login_form: true
         auth.basic:
@@ -321,7 +316,7 @@ observability:
           externalLabels: {}
           remoteWriteSettings: {}
           remoteWrite:
-            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8428/api/v1/write
+            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8429/api/v1/write
           resources:
             requests:
               memory: 10Gi

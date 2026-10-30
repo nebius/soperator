@@ -496,9 +496,7 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
 .PHONY: deploy-flux
-# Match the bootstrap chart: each child release tracks its own readiness.
-deploy-flux: install-flux kustomize yq ## Deploy soperator via Flux CD to kind cluster (for local development)
-	@test "$(FLUX_VERSION)" = "2.9.6" || { echo "Update config/flux image overrides before using another Flux version." >&2; exit 1; }
+deploy-flux: install-flux kustomize ## Deploy soperator via Flux CD to kind cluster (for local development)
 	@echo "Step 1: Installing Flux CD..."
 	@echo "Checking cluster connectivity..."
 	@if ! $(KUBECTL_CTX) cluster-info > /dev/null 2>&1; then \
@@ -506,14 +504,12 @@ deploy-flux: install-flux kustomize yq ## Deploy soperator via Flux CD to kind c
 		exit 1; \
 	fi
 	@echo "✅ Cluster is accessible"
-	@flux_work_dir="$$(mktemp -d)"; \
-	trap 'rm -rf -- "$$flux_work_dir"' EXIT; \
-	cp config/flux/kustomization.yaml "$$flux_work_dir/kustomization.yaml"; \
-	$(FLUX) install --export > "$$flux_work_dir/install.yaml"; \
-	if $(KUBECTL_CTX) get crd kustomizations.kustomize.toolkit.fluxcd.io >/dev/null 2>&1; then \
-		$(FLUX) migrate --context $(KIND_CONTEXT); \
-	fi; \
-	$(KUBECTL_CTX) apply -k "$$flux_work_dir"
+	@if ! $(FLUX) check --context $(KIND_CONTEXT) > /dev/null 2>&1; then \
+		echo "Installing Flux components..."; \
+		$(FLUX) install --context $(KIND_CONTEXT); \
+	else \
+		echo "✅ Flux already installed"; \
+	fi
 	@echo ""
 	@echo "Step 2: Determining OCI registry based on version..."
 	@if echo "$(OPERATOR_IMAGE_TAG)" | grep -q -- "-"; then \
@@ -527,7 +523,6 @@ deploy-flux: install-flux kustomize yq ## Deploy soperator via Flux CD to kind c
 	echo ""; \
 	echo "Step 3: Deploying Flux configuration for local environment..."; \
 	$(KUSTOMIZE) build fluxcd/environment/local | \
-		$(YQ) '(select(.kind == "HelmRelease" and .metadata.name == "soperator-fluxcd") | .spec) |= (.install.disableWait = true | .upgrade.disableWait = true)' - | \
 		sed "s|url: oci://cr.nebius.cloud/soperator.*|url: $$OCI_REPO|g" | \
 		$(KUBECTL_CTX) apply -f -; \
 	echo ""; \
@@ -590,7 +585,7 @@ HELM_UNITTEST_VERSION		?= 0.8.2
 YQ_VERSION					?= 4.44.3
 MOCKERY_VERSION				?= 2.53.8
 KIND_VERSION				?= v0.30.0
-FLUX_VERSION				?= 2.9.6
+FLUX_VERSION				?= 2.7.3
 
 # Read the embedded module version: CLI version output can be unset by go install.
 define install-go-tool
@@ -656,7 +651,8 @@ $(KIND): $(LOCALBIN)
 	fi
 
 .PHONY: install-flux
-install-flux: | $(LOCALBIN) ## Download flux CLI locally if necessary.
+install-flux: $(FLUX) ## Download flux CLI locally if necessary.
+$(FLUX): $(LOCALBIN)
 	@if test -x $(LOCALBIN)/flux && ! $(LOCALBIN)/flux version --client | grep -q $(FLUX_VERSION); then \
 		echo "$(LOCALBIN)/flux version is not expected $(FLUX_VERSION). Removing it before installing."; \
 		rm -rf $(LOCALBIN)/flux; \
@@ -706,7 +702,7 @@ install-unittest:
 
 KIND_CLUSTER_NAME	?= soperator-dev
 KIND_NODES			?= 2
-KIND_K8S_VERSION	?= v1.36.4
+KIND_K8S_VERSION	?= v1.31.0
 KIND_CONTEXT		?= kind-$(KIND_CLUSTER_NAME)
 KUBECTL_CTX			= $(KUBECTL) --context $(KIND_CONTEXT)
 
