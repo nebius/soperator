@@ -4,76 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
-
-func (s *NodeReplacement) aGPUHealthCheckFailureIsSimulatedWhileTheTestJobIsRunning(ctx context.Context) error {
-	s.recoverHealthCheckBeforeCancel = true
-	if err := s.assertTestJobRunningOnOriginalWorker(ctx); err != nil {
-		return err
-	}
-	return s.aGPUHealthCheckFailureIsSimulatedOnThatNode(ctx)
-}
-
-// Keep the allocation until the simulated health drain is cleared or maintenance owns the drain.
-// Cancelling first would let soperatorchecks report HardwareIssuesSuspected on the idle worker.
-func (s *NodeReplacement) prepareHealthMaintenanceCleanup(ctx context.Context) error {
-	host, present, err := s.kubectl.NodeIfPresent(ctx, s.original.NodeName)
-	if err != nil {
-		return err
-	}
-	if !present || host.UID != s.original.NodeUID || host.DeletionTimestamp != nil {
-		return nil
-	}
-	if s.maintenanceRequested && nodeMaintenanceEventOwned(host) {
-		return s.waitForMaintenanceDrain(ctx, nil)
-	}
-	if _, err := s.originalWorkerNode(ctx); err != nil {
-		return err
-	}
-	if err := s.removeHealthCheckInjectErrorMarker(ctx); err != nil {
-		return err
-	}
-	if err := s.waitForReplacementCondition(ctx, "simulated health-check drain cleared before job cancellation", nodeReplacementJobTimeout, framework.DefaultPollInterval,
-		func(waitCtx context.Context) (bool, error) {
-			// A runner that already read the marker can still reapply the drain after it is removed.
-			active, err := s.runtime.WorkerPod(framework.WorkerPodInfo{PodName: s.original.PodName}).Run(waitCtx,
-				"python3 -c "+framework.ShellQuote(`from pathlib import Path
-for process in Path("/proc").glob("[0-9]*/cmdline"):
-    try:
-        args = process.read_bytes().split(b"\0")
-    except (FileNotFoundError, ProcessLookupError):
-        continue
-    if b"/opt/slurm_scripts/check_runner.py" in args:
-        print(process.parent.name)`))
-			if err != nil {
-				return false, fmt.Errorf("inspect health-check runners on %s: %w", s.original.PodName, err)
-			}
-			if strings.TrimSpace(active) != "" {
-				return false, fmt.Errorf("health-check runners on %s are still finishing: %s", s.original.PodName, strings.TrimSpace(active))
-			}
-			node, err := s.originalWorkerNode(waitCtx)
-			if err != nil {
-				return false, err
-			}
-			if !node.HasStateFlag("DRAIN") {
-				return true, nil
-			}
-			if !healthCheckDrainReasonMatches(node.Reason) {
-				return false, rolloutInvariant("worker %s is drained for another reason; refusing to resume it: state=%s reason=%q", node.Name, node.State, node.Reason)
-			}
-			return false, s.slurm.ResumeNodeIfDrainedByReason(waitCtx, node.Name, healthCheckInjectErrorReasonPart)
-		}); err != nil {
-		return err
-	}
-	s.faultInjected = false
-	return nil
-}
 
 func (s *NodeReplacement) theNodeIsDrainingWithANodeProblemReasonWhileTheTestJobIsRunning(ctx context.Context) error {
 	err := s.waitForHealthCheckDrain(ctx, s.assertTestJobRunningOnOriginalWorker)

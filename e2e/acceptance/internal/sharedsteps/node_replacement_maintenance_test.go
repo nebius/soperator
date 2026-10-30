@@ -20,19 +20,10 @@ const simulatedHealthDrainReason = "[node_problem] gpu_health_check: inject_erro
 
 type healthMaintenanceRuntime struct {
 	*maintenanceTestRuntime
-	jobState        string
-	restarts        string
-	patchErr        error
-	workerCommands  []string
-	workerErr       error
-	checkRunnerPIDs string
-	logs            []string
-}
-
-type healthMaintenanceCommandScope struct{ framework.CommandScope }
-
-func (s healthMaintenanceCommandScope) RunWithDefaultRetry(ctx context.Context, command string) (string, error) {
-	return s.Run(ctx, command)
+	jobState       string
+	restarts       string
+	patchErr       error
+	workerCommands []string
 }
 
 func (r *healthMaintenanceRuntime) Kubectl() framework.ArgsScope {
@@ -46,25 +37,13 @@ func (r *healthMaintenanceRuntime) Kubectl() framework.ArgsScope {
 }
 
 func (r *healthMaintenanceRuntime) Worker(framework.WorkerInfo) framework.CommandScope {
-	return healthMaintenanceCommandScope{framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
 		if err := ctx.Err(); err != nil {
 			return "", err
 		}
 		r.workerCommands = append(r.workerCommands, command)
-		r.calls = append(r.calls, "worker "+command)
-		return "", r.workerErr
-	})}
-}
-
-func (r *healthMaintenanceRuntime) WorkerPod(framework.WorkerPodInfo) framework.CommandScope {
-	return framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
-		r.calls = append(r.calls, "worker pod "+command)
-		return r.checkRunnerPIDs, nil
+		return "", nil
 	})
-}
-
-func (r *healthMaintenanceRuntime) Logf(format string, args ...any) {
-	r.logs = append(r.logs, fmt.Sprintf(format, args...))
 }
 
 func healthMaintenanceSteps(t *testing.T) (*NodeReplacement, *healthMaintenanceRuntime) {
@@ -97,9 +76,6 @@ func healthMaintenanceSteps(t *testing.T) (*NodeReplacement, *healthMaintenanceR
 		case strings.HasPrefix(command, "scancel "):
 			runtime.jobState = ""
 			return "", nil
-		case command == "scontrol update nodename='worker-0' state=resume":
-			setHealthMaintenanceNode(runtime, "MIXED", 1, 128)
-			return "", nil
 		case strings.Contains(command, "sbatch "):
 			return "6", nil
 		case strings.HasPrefix(command, "tail -n "):
@@ -125,142 +101,6 @@ func maintenancePatchCount(runtime *healthMaintenanceRuntime) int {
 		}
 	}
 	return count
-}
-
-func TestHealthMaintenanceInjectionArmsRecoveryBeforeLostResponse(t *testing.T) {
-	steps, runtime := healthMaintenanceSteps(t)
-	runtime.workerErr = errors.New("injection response lost")
-
-	err := steps.aGPUHealthCheckFailureIsSimulatedWhileTheTestJobIsRunning(t.Context())
-
-	require.ErrorContains(t, err, "injection response lost")
-	assert.True(t, steps.recoverHealthCheckBeforeCancel)
-	assert.True(t, steps.faultInjected)
-}
-
-func TestHealthMaintenanceCleanupClearsInjectedDrainBeforeCancellation(t *testing.T) {
-	steps, runtime := healthMaintenanceSteps(t)
-	require.NoError(t, steps.aGPUHealthCheckFailureIsSimulatedWhileTheTestJobIsRunning(t.Context()))
-	baseCommand := runtime.command
-	runtime.command = func(command string) (string, error) {
-		if strings.HasPrefix(command, "scancel ") {
-			assert.False(t, framework.ParseSlurmNodeInfo("worker-0", runtime.nodes["worker-0"]).HasStateFlag("DRAIN"))
-			assert.Contains(t, runtime.workerCommands, "rm -f '/opt/soperator-outputs/local/health_checker_inject_error'")
-		}
-		return baseCommand(command)
-	}
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	steps.CleanupAndReset(ctx)
-	steps.CleanupAndReset(ctx)
-
-	assert.Equal(t, "", runtime.jobState)
-	assert.Contains(t, runtime.calls, "scontrol update nodename='worker-0' state=resume")
-	assert.Zero(t, maintenancePatchCount(runtime), "an aborted scenario restores its worker without injecting maintenance")
-	assert.Equal(t, []string{"simulated health-check drain cleared before job cancellation"}, runtime.waitLabels)
-	assert.False(t, steps.recoverHealthCheckBeforeCancel)
-	assert.False(t, steps.faultInjected)
-	assert.True(t, steps.maintenanceJob.IsZero())
-	assert.NotContains(t, strings.Join(runtime.logs, "\n"), "Cleanup:")
-}
-
-func TestHealthMaintenanceCleanupWaitsForInFlightChecksBeforeResuming(t *testing.T) {
-	steps, runtime := healthMaintenanceSteps(t)
-	require.NoError(t, steps.aGPUHealthCheckFailureIsSimulatedWhileTheTestJobIsRunning(t.Context()))
-	runtime.checkRunnerPIDs = "123\n"
-	runtime.observe = func(base *maintenanceTestRuntime) {
-		assert.Equal(t, "RUNNING", runtime.jobState)
-		if base.iteration == 2 {
-			assert.NotContains(t, runtime.calls, "scontrol update nodename='worker-0' state=resume")
-			runtime.checkRunnerPIDs = ""
-		}
-	}
-
-	steps.CleanupAndReset(t.Context())
-
-	assert.Equal(t, "", runtime.jobState)
-	assert.Contains(t, runtime.calls, "scontrol update nodename='worker-0' state=resume")
-	assert.NotContains(t, strings.Join(runtime.logs, "\n"), "Cleanup:")
-}
-
-func TestHealthMaintenanceCleanupKeepsJobAllocatedWhenRecoveryIsUnsafe(t *testing.T) {
-	for _, test := range []struct {
-		name   string
-		change func(*NodeReplacement, *healthMaintenanceRuntime)
-	}{
-		{"marker removal fails", func(_ *NodeReplacement, r *healthMaintenanceRuntime) { r.workerErr = errors.New("worker unavailable") }},
-		{"health check still running", func(_ *NodeReplacement, r *healthMaintenanceRuntime) { r.checkRunnerPIDs = "123" }},
-		{"unrelated drain", func(_ *NodeReplacement, r *healthMaintenanceRuntime) {
-			r.nodes["worker-0"] = strings.Replace(r.nodes["worker-0"], simulatedHealthDrainReason, "[node_problem] real GPU failure", 1)
-		}},
-		{"pod changed", func(s *NodeReplacement, r *healthMaintenanceRuntime) {
-			pod := r.pods[s.original.PodName]
-			pod.UID = "new-pod-uid"
-			r.pods[pod.Name] = pod
-		}},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			steps, runtime := healthMaintenanceSteps(t)
-			require.NoError(t, steps.aGPUHealthCheckFailureIsSimulatedWhileTheTestJobIsRunning(t.Context()))
-			test.change(steps, runtime)
-
-			steps.CleanupAndReset(t.Context())
-
-			assert.Equal(t, "RUNNING", runtime.jobState)
-			assert.NotContains(t, runtime.calls, "scancel '6'")
-			assert.NotContains(t, runtime.calls, "scontrol update nodename='worker-0' state=resume")
-			assert.Zero(t, maintenancePatchCount(runtime))
-			assert.Contains(t, strings.Join(runtime.logs, "\n"), "keep job 6 allocated")
-			assert.False(t, steps.recoverHealthCheckBeforeCancel)
-			assert.False(t, steps.faultInjected)
-		})
-	}
-}
-
-func TestHealthMaintenanceCleanupRecoversWhenMaintenancePatchWasRejected(t *testing.T) {
-	steps, runtime := healthMaintenanceSteps(t)
-	require.NoError(t, steps.aGPUHealthCheckFailureIsSimulatedWhileTheTestJobIsRunning(t.Context()))
-	runtime.patchErr = errors.New("maintenance patch rejected")
-	require.Error(t, steps.aMaintenanceEventIsTriggeredWhileThatNodeIsDraining(t.Context()))
-
-	steps.CleanupAndReset(t.Context())
-
-	assert.Equal(t, "", runtime.jobState)
-	assert.Contains(t, runtime.calls, "scontrol update nodename='worker-0' state=resume")
-	assert.Equal(t, 1, maintenancePatchCount(runtime))
-	assert.NotContains(t, strings.Join(runtime.logs, "\n"), "Cleanup:")
-}
-
-func TestHealthMaintenanceCleanupCompletesAnAcceptedMaintenanceEvent(t *testing.T) {
-	steps, runtime := healthMaintenanceSteps(t)
-	require.NoError(t, steps.aGPUHealthCheckFailureIsSimulatedWhileTheTestJobIsRunning(t.Context()))
-	steps.maintenanceRequested = true
-	host := runtime.hosts[steps.original.NodeName]
-	host.Status.Conditions = []corev1.NodeCondition{{Type: nodeReplacementMaintenanceCondition, Status: corev1.ConditionTrue, Reason: "AcceptanceTest"}}
-	runtime.hosts[host.Name] = host
-	runtime.observe = func(base *maintenanceTestRuntime) {
-		switch base.waitLabels[len(base.waitLabels)-1] {
-		case "node drain reason":
-			assert.Equal(t, "RUNNING", runtime.jobState)
-			if base.iteration == 2 {
-				base.nodes["worker-0"] = strings.Replace(base.nodes["worker-0"], simulatedHealthDrainReason, nodeReplacementDrainReason, 1)
-			}
-		case "replacement worker ready on a new host":
-			delete(base.hosts, steps.original.NodeName)
-			pod := base.pods[steps.original.PodName]
-			pod.UID, pod.Spec.NodeName = "replacement-pod-uid", "replacement-host"
-			base.pods[pod.Name] = pod
-			base.nodes["worker-0"] = "NodeName=worker-0 State=IDLE InstanceId=replacement-instance"
-		}
-	}
-	runtime.local = func(...string) (string, error) { return "", errors.New("instance not found") }
-
-	steps.CleanupAndReset(t.Context())
-
-	assert.Equal(t, "", runtime.jobState)
-	assert.NotContains(t, runtime.calls, "scontrol update nodename='worker-0' state=resume")
-	assert.Equal(t, []string{"node drain reason", "replacement worker ready on a new host", "replacement worker ready on a new host"}, runtime.waitLabels)
-	assert.NotContains(t, strings.Join(runtime.logs, "\n"), "Cleanup:")
 }
 
 func TestNodeReplacementFullyDrained(t *testing.T) {
