@@ -33,14 +33,17 @@ var _ = Describe("Local Kind Cluster with FluxCD", func() {
 			Expect(output).To(ContainSubstring("kind-soperator-dev"))
 		})
 
-		It("should have all nodes ready", func() {
-			cmd := exec.Command("kubectl", "get", "nodes", "-o", "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}")
-			output, err := testenv.Run(cmd)
-			Expect(err).NotTo(HaveOccurred())
-			statuses := strings.Fields(output)
-			for _, status := range statuses {
-				Expect(status).To(Equal("True"))
-			}
+		It("should have all nodes ready", func(ctx SpecContext) {
+			Eventually(ctx, func(g Gomega) {
+				cmd := exec.CommandContext(ctx, "kubectl", "get", "nodes", "-o", "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}")
+				output, err := testenv.Run(cmd)
+				g.Expect(err).NotTo(HaveOccurred())
+				statuses := strings.Fields(output)
+				g.Expect(statuses).NotTo(BeEmpty(), "No node readiness conditions returned")
+				for _, status := range statuses {
+					g.Expect(status).To(Equal("True"))
+				}
+			}, 2*time.Minute, 5*time.Second).Should(Succeed())
 		})
 	})
 
