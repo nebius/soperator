@@ -527,6 +527,7 @@ deploy-flux: install-flux kustomize yq ## Deploy soperator via Flux CD to kind c
 		exit 1; \
 	fi
 	@echo "✅ Cluster is accessible"
+	@$(KUBECTL_CTX) wait --for=condition=Ready nodes --all --timeout=2m
 	@flux_work_dir="$$(mktemp -d)"; \
 	trap 'rm -rf -- "$$flux_work_dir"' EXIT; \
 	cp config/flux/kustomization.yaml "$$flux_work_dir/kustomization.yaml"; \
@@ -534,7 +535,10 @@ deploy-flux: install-flux kustomize yq ## Deploy soperator via Flux CD to kind c
 	if $(KUBECTL_CTX) get crd kustomizations.kustomize.toolkit.fluxcd.io >/dev/null 2>&1; then \
 		$(FLUX) migrate --context $(KIND_CONTEXT); \
 	fi; \
-	$(KUBECTL_CTX) apply -k "$$flux_work_dir"
+	$(KUBECTL_CTX) apply -k "$$flux_work_dir"; \
+	$(KUBECTL_CTX) rollout status --namespace flux-system \
+		deployment/source-controller deployment/kustomize-controller \
+		deployment/helm-controller deployment/notification-controller --timeout=2m
 	@echo ""
 	@echo "Step 2: Determining OCI registry based on version..."
 	@if echo "$(OPERATOR_IMAGE_TAG)" | grep -q -- "-"; then \
