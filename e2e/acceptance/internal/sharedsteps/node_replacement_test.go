@@ -66,7 +66,7 @@ func TestSimulateHealthCheckFailureKeepsOwnershipOnFailure(t *testing.T) {
 	assert.True(t, steps.faultInjected, "cleanup must still inspect the node after a lost response")
 }
 
-func TestRemoveHealthCheckInjectErrorMarkerIsBestEffort(t *testing.T) {
+func TestRemoveHealthCheckInjectErrorMarkerReportsFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	var commands []string
@@ -78,8 +78,9 @@ func TestRemoveHealthCheckInjectErrorMarkerIsBestEffort(t *testing.T) {
 	})}
 	steps := NodeReplacement{runtime: runtime, replacementWorker: framework.WorkerInfo{Name: "worker-1"}}
 
-	steps.removeHealthCheckInjectErrorMarker(ctx)
+	err := steps.removeHealthCheckInjectErrorMarker(ctx)
 
+	assert.ErrorContains(t, err, "remove /opt/soperator-outputs/local/health_checker_inject_error from worker-1")
 	assert.Equal(t, []string{"rm -f '/opt/soperator-outputs/local/health_checker_inject_error'"}, commands)
 }
 

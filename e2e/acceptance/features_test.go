@@ -80,7 +80,6 @@ func TestSharedHeavyScenarios(t *testing.T) {
 func TestSharedManualScenarios(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"A failed GPU health check replaces the worker node",
-		"A maintenance event replaces a GPU worker already draining after a health check failure",
 		"A maintenance event replaces a GPU worker fully drained after a health check failure",
 	}, sharedScenariosTagged(t, "@manual"))
 }
