@@ -33,3 +33,34 @@ Feature: Node replacement
     And the platform reported deleting the old node
     And a replacement node joins the cluster
     And the replacement node passes GPU validation
+
+  # @manual: the health-check failure can report a real bare-metal host through Compute SetUnhealthy
+  # and occupy the tenant's unhealthy-node slot. Run explicitly with --run-heavy.
+  # Drop the tag once Mk8s honours nebius.com/skip-set-unhealthy for HardwareIssuesSuspected
+  # and the e2e worker node groups carry that label.
+  @manual @heavy @gpu @soperator_version_>=5.0.0
+  Scenario: A GPU worker recovers when maintenance arrives during health-check draining
+    Given a test job is submitted and running on an idle GPU worker node
+    When a GPU health check failure is simulated on that node
+    Then the node is draining with a node problem reason while the test job is running
+    When a maintenance event is triggered while that node is draining
+    Then the node remains drained while the test job is running
+    When the test job is cancelled
+    Then the old instance is removed
+    And a replacement node joins the cluster
+    And the replacement node passes GPU validation
+
+  # @manual: the health-check failure can report a real bare-metal host through Compute SetUnhealthy
+  # and occupy the tenant's unhealthy-node slot. Run explicitly with --run-heavy.
+  # Drop the tag once Mk8s honours nebius.com/skip-set-unhealthy for HardwareIssuesSuspected
+  # and the e2e worker node groups carry that label.
+  @manual @heavy @gpu @soperator_version_>=5.0.0
+  Scenario: A GPU worker recovers when maintenance arrives after health-check draining
+    Given a test job is submitted and running on an idle GPU worker node
+    When a GPU health check failure is simulated on that node
+    Then the node is draining with a node problem reason while the test job is running
+    When the test job is cancelled
+    And a maintenance event is triggered after that node has fully drained
+    Then the old instance is removed
+    And a replacement node joins the cluster
+    And the replacement node passes GPU validation
