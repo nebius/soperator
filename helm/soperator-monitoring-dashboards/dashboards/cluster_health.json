@@ -611,6 +611,301 @@
         "x": 0,
         "y": 7
       },
+      "id": 104,
+      "panels": [],
+      "title": "Component Restarts",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Cumulative restart count of each Slurm Controller main container (`slurmctld`), matching the Container Restarts panel in the Slurm Controller dashboard. Each step up marks a container restart; flat means none. Each pod is shown separately. A replacement pod starts a fresh counter.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
+      "id": 105,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "max by (cluster, namespace, pod, uid, container) (kube_pod_container_status_restarts_total{cluster=~\"$cluster\", namespace=\"soperator\", container=\"slurmctld\"})",
+          "legendFormat": "{{pod}} / {{cluster}}",
+          "range": true,
+          "refId": "A",
+          "instant": false
+        }
+      ],
+      "title": "Controller Container Restarts",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Cumulative restart count of each Slurm Accounting main container (`accounting`), matching the Container Restarts panel in the Slurm Controller dashboard. Each step up marks a container restart; flat means none. Each pod is shown separately. A replacement pod starts a fresh counter.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 8
+      },
+      "id": 106,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "max by (cluster, namespace, pod, uid, container) (kube_pod_container_status_restarts_total{cluster=~\"$cluster\", namespace=\"soperator\", container=\"accounting\"})",
+          "legendFormat": "{{pod}} / {{cluster}}",
+          "range": true,
+          "refId": "A",
+          "instant": false
+        }
+      ],
+      "title": "Accounting Container Restarts",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Cumulative restart count of each Slurm REST main container (`slurmrestd`), matching the Container Restarts panel in the Slurm Controller dashboard. Each step up marks a container restart; flat means none. Each pod is shown separately. A replacement pod starts a fresh counter.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "id": 107,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.6.14+security-04",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "max by (cluster, namespace, pod, uid, container) (kube_pod_container_status_restarts_total{cluster=~\"$cluster\", namespace=\"soperator\", container=\"slurmrestd\"})",
+          "legendFormat": "{{pod}} / {{cluster}}",
+          "range": true,
+          "refId": "A",
+          "instant": false
+        }
+      ],
+      "title": "REST Container Restarts",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
       "id": 11,
       "panels": [],
       "title": "Quick Stats",
@@ -645,7 +940,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 8
+        "y": 14
       },
       "id": 5,
       "options": {
@@ -716,7 +1011,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 8
+        "y": 14
       },
       "id": 16,
       "options": {
@@ -788,7 +1083,7 @@
         "h": 3,
         "w": 4,
         "x": 8,
-        "y": 8
+        "y": 14
       },
       "id": 13,
       "options": {
@@ -856,7 +1151,7 @@
         "h": 3,
         "w": 4,
         "x": 12,
-        "y": 8
+        "y": 14
       },
       "id": 26,
       "options": {
@@ -921,7 +1216,7 @@
         "h": 3,
         "w": 4,
         "x": 16,
-        "y": 8
+        "y": 14
       },
       "id": 21,
       "options": {
@@ -988,7 +1283,7 @@
         "h": 3,
         "w": 4,
         "x": 20,
-        "y": 8
+        "y": 14
       },
       "id": 29,
       "options": {
@@ -1059,7 +1354,7 @@
         "h": 3,
         "w": 4,
         "x": 0,
-        "y": 11
+        "y": 17
       },
       "id": 6,
       "options": {
@@ -1130,7 +1425,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 11
+        "y": 17
       },
       "id": 17,
       "options": {
@@ -1201,7 +1496,7 @@
         "h": 3,
         "w": 4,
         "x": 8,
-        "y": 11
+        "y": 17
       },
       "id": 97,
       "options": {
@@ -1273,7 +1568,7 @@
         "h": 3,
         "w": 4,
         "x": 12,
-        "y": 11
+        "y": 17
       },
       "id": 27,
       "options": {
@@ -1347,7 +1642,7 @@
         "h": 3,
         "w": 4,
         "x": 16,
-        "y": 11
+        "y": 17
       },
       "id": 23,
       "options": {
@@ -1421,7 +1716,7 @@
         "h": 3,
         "w": 4,
         "x": 20,
-        "y": 11
+        "y": 17
       },
       "id": 30,
       "options": {
@@ -1492,7 +1787,7 @@
         "h": 3,
         "w": 4,
         "x": 4,
-        "y": 14
+        "y": 20
       },
       "id": 98,
       "options": {
@@ -1556,7 +1851,7 @@
         "h": 3,
         "w": 4,
         "x": 8,
-        "y": 14
+        "y": 20
       },
       "id": 96,
       "options": {
@@ -1620,7 +1915,7 @@
         "h": 3,
         "w": 4,
         "x": 16,
-        "y": 14
+        "y": 20
       },
       "id": 22,
       "options": {
@@ -1670,7 +1965,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 23
       },
       "id": 12,
       "panels": [],
@@ -1740,7 +2035,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 18
+        "y": 24
       },
       "id": 8,
       "options": {
@@ -1837,7 +2132,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 24
       },
       "id": 24,
       "options": {
@@ -1995,7 +2290,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 25
+        "y": 31
       },
       "id": 15,
       "options": {
@@ -2123,7 +2418,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 25
+        "y": 31
       },
       "id": 78,
       "interval": "30s",
@@ -2278,7 +2573,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 32
+        "y": 38
       },
       "id": 99,
       "options": {
@@ -2348,7 +2643,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 45
       },
       "id": 79,
       "panels": [
@@ -2527,7 +2822,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 143
+            "y": 149
           },
           "id": 82,
           "options": {
@@ -3075,7 +3370,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 151
+            "y": 157
           },
           "id": 103,
           "options": {
@@ -3289,7 +3584,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 143
+            "y": 149
           },
           "id": 83,
           "options": {
@@ -3457,7 +3752,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 236
+            "y": 242
           },
           "id": 31,
           "options": {
@@ -3635,7 +3930,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 236
+            "y": 242
           },
           "id": 73,
           "options": {
@@ -3882,7 +4177,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 244
+            "y": 250
           },
           "id": 84,
           "options": {
@@ -4147,7 +4442,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 46
       },
       "id": 80,
       "panels": [
@@ -4428,7 +4723,7 @@
             "h": 12,
             "w": 24,
             "x": 0,
-            "y": 144
+            "y": 150
           },
           "id": 92,
           "options": {
@@ -4748,7 +5043,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 156
+            "y": 162
           },
           "id": 19,
           "options": {
@@ -4901,7 +5196,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 156
+            "y": 162
           },
           "id": 10,
           "options": {
@@ -5082,7 +5377,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 163
+            "y": 169
           },
           "id": 74,
           "options": {
@@ -5191,7 +5486,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 163
+            "y": 169
           },
           "id": 77,
           "options": {
@@ -5281,7 +5576,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 170
+            "y": 176
           },
           "id": 72,
           "options": {
@@ -5481,7 +5776,7 @@
             "h": 22,
             "w": 12,
             "x": 12,
-            "y": 171
+            "y": 177
           },
           "id": 90,
           "options": {
@@ -5587,7 +5882,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 177
+            "y": 183
           },
           "id": 87,
           "options": {
@@ -5694,7 +5989,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 185
+            "y": 191
           },
           "id": 88,
           "options": {
@@ -5958,7 +6253,7 @@
             "h": 12,
             "w": 24,
             "x": 0,
-            "y": 193
+            "y": 199
           },
           "id": 91,
           "options": {
@@ -6220,7 +6515,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 47
       },
       "id": 93,
       "panels": [
@@ -6289,7 +6584,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 145
+            "y": 151
           },
           "id": 85,
           "options": {
@@ -6395,7 +6690,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 145
+            "y": 151
           },
           "id": 86,
           "options": {
@@ -6498,7 +6793,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 153
+            "y": 159
           },
           "id": 94,
           "options": {
@@ -6631,7 +6926,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 153
+            "y": 159
           },
           "id": 75,
           "options": {
@@ -6724,7 +7019,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 161
+            "y": 167
           },
           "id": 95,
           "options": {
