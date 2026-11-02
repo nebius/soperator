@@ -12,6 +12,7 @@ import (
 
 	"github.com/nebius/soperator/e2e/acceptance"
 	"github.com/nebius/soperator/e2e/acceptance/artifacts"
+	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
 const defaultSlurmClusterName = "soperator"
@@ -147,7 +148,7 @@ func parseRunOptions(args []string) (runOptions, error) {
 	fs.IntVar(&opts.Parallelism, "parallelism", 4, "maximum concurrent worker-local scenarios; 1 runs both suites sequentially")
 	fs.BoolVar(&opts.HeavyFirst, "heavy-first", true, "queue heavy scenarios first in the parallel suite")
 	fs.Int64Var(&opts.RandomSeed, "random-seed", 0, "seed for random parallel-suite ordering; requires --heavy-first=false; 0 preserves the selected order")
-	fs.DurationVar(&opts.WorkerAcquireTimeout, "worker-acquire-timeout", 90*time.Minute, "maximum wait for available workers, separate from job timeouts")
+	fs.DurationVar(&opts.WorkerAcquireTimeout, "worker-acquire-timeout", framework.DefaultWorkerAcquireTimeout, "maximum wait for available workers, separate from job timeouts")
 	fs.Var((*scenarioPathFlag)(&opts.ScenarioPaths), "scenario", "feature file or exact Scenario line to run; may be repeated")
 	fs.StringVar(&opts.OutputDir, "output-dir", "", "directory for reports and per-scenario artifacts")
 	if err := fs.Parse(args); err != nil {

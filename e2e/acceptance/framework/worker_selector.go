@@ -261,6 +261,9 @@ func (s *WorkerSelector) Acquire(ctx context.Context, needs WorkerRequirements) 
 
 type workerAcquireTimeoutKey struct{}
 
+// DefaultWorkerAcquireTimeout allows queued scenarios to wait through heavy worker disruptions.
+const DefaultWorkerAcquireTimeout = 2 * time.Hour
+
 // Reserve acquires a known set for custom selectors before recording baselines.
 // Direct callers outside runner scenarios keep their existing selection behavior.
 func (s *WorkerSelector) Reserve(ctx context.Context, needs WorkerRequirements) error {
@@ -280,7 +283,7 @@ func WorkerAcquireTimeout(ctx context.Context) time.Duration {
 	if timeout, ok := ctx.Value(workerAcquireTimeoutKey{}).(time.Duration); ok && timeout > 0 {
 		return timeout
 	}
-	return 90 * time.Minute
+	return DefaultWorkerAcquireTimeout
 }
 
 func (s WorkerSnapshot) PickWorkers(count int) ([]WorkerInfo, error) {

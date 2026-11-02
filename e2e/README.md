@@ -76,7 +76,7 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
   outline examples, defaults to `0` (disabled). Requires `--heavy-first=false`.
   The runner logs the seed and selected launch queue so an ordering can be reused.
 - `--worker-acquire-timeout`: maximum wait for free, healthy workers, defaults
-  to `90m`. This includes contention and recovery and is separate from job timeouts.
+  to `2h`. This includes contention and recovery and is separate from job timeouts.
 - `--scenario`: optional. Runs all compatible scenarios in the provided feature
   file, or the single scenario at an exact `Scenario:` line, for example
   `features/internal_ssh.feature:3`. May be repeated.
@@ -278,7 +278,7 @@ Library callers keep sequential behavior unless they set `SuiteConfig.Concurrenc
 To reuse the same split, pass `acceptance.ConcurrentSuites(suite, 4)` as
 `RunnerConfig.Suites`. This also works with Managed-owned feature sources and
 step registrars. Set `RunnerConfig.WorkerAcquireTimeout` to override the default
-90-minute acquisition budget. Select workers through `WorkerSelector.Acquire`
+two-hour acquisition budget. Select workers through `WorkerSelector.Acquire`
 or its `Pick...Workers` wrappers; custom selectors can call `Reserve` before
 recording worker baselines. The runner supplies scenario ownership through the
 context and finalizes it after all registered cleanup hooks.

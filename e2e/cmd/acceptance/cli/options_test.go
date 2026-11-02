@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,7 @@ func TestParseRunOptionsDefaults(t *testing.T) {
 	assert.Equal(t, 4, opts.Parallelism)
 	assert.True(t, opts.HeavyFirst)
 	assert.Zero(t, opts.RandomSeed)
+	assert.Equal(t, 2*time.Hour, opts.WorkerAcquireTimeout)
 }
 
 func TestParseRunOptionsRejectsInvalidConcurrencySettings(t *testing.T) {
@@ -52,6 +54,7 @@ func TestParseRunOptionsExplicitValues(t *testing.T) {
 		"--run-unstable=true",
 		"--run-heavy=true",
 		"--parallelism=8",
+		"--worker-acquire-timeout=45m",
 		"--heavy-first=false",
 		"--random-seed=104729",
 		"--scenario", "features/internal_ssh.feature:3",
@@ -64,6 +67,7 @@ func TestParseRunOptionsExplicitValues(t *testing.T) {
 	assert.True(t, opts.RunUnstableTests)
 	assert.True(t, opts.RunHeavyTests)
 	assert.Equal(t, 8, opts.Parallelism)
+	assert.Equal(t, 45*time.Minute, opts.WorkerAcquireTimeout)
 	assert.False(t, opts.HeavyFirst)
 	assert.EqualValues(t, 104729, opts.RandomSeed)
 	assert.Equal(t, []string{"features/internal_ssh.feature:3", "features/observability.feature:3"}, opts.ScenarioPaths)
