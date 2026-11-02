@@ -1,4 +1,4 @@
-suite: test Grafana plugins
+suite: test Grafana configuration
 templates:
   - templates/vm-stack.yaml
 
@@ -11,3 +11,9 @@ tests:
       - equal:
           path: spec.values.grafana.plugins[1]
           value: victoriametrics-logs-datasource
+
+  - it: should enable Basic Auth for Grafana provisioning sidecars
+    asserts:
+      - equal:
+          path: spec.values.grafana["grafana.ini"]["auth.basic"].enabled
+          value: true
