@@ -19,6 +19,7 @@ func TestPublicRunnerAPIIsImportable(t *testing.T) {
 	suite := acceptance.SoperatorSuite("5.0.0")
 	suite.Tags = "~@custom_only"
 	assert.False(t, suite.ExcludeHeavy, "library callers retain heavy coverage by default")
+	assert.True(t, suite.ExcludeManual, "library callers must name @manual scenarios explicitly")
 
 	runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 		KubectlContext:         "dev-context",

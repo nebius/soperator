@@ -85,22 +85,31 @@ func TestConcurrentSuitesKeepGlobalAssertionsSerial(t *testing.T) {
 	}
 }
 
-func TestHealthCheckReplacementIsConcurrentAndRequiresHeavyOptIn(t *testing.T) {
-	for _, heavy := range []bool{false, true} {
-		suite := SoperatorSuite("5.0.0")
-		suite.ExcludeHeavy = !heavy
-		for index, split := range ConcurrentSuites(suite, 4) {
-			count := 0
-			for key, selected := range selectedScenarios(t, split, "5.0.0") {
-				if strings.Contains(key, "A failed GPU health check replaces the worker node") {
-					count += selected
+func TestHealthReplacementScenariosRequireManualHeavyOptInAndRunSerially(t *testing.T) {
+	for _, manual := range []bool{false, true} {
+		for _, heavy := range []bool{false, true} {
+			suite := SoperatorSuite("5.0.0")
+			suite.ExcludeManual, suite.ExcludeHeavy = !manual, !heavy
+			for index, split := range ConcurrentSuites(suite, 8) {
+				selected := selectedScenarios(t, split, "5.0.0")
+				for _, name := range []string{
+					"A failed GPU health check replaces the worker node",
+					"A GPU worker recovers when maintenance arrives during health-check draining",
+					"A GPU worker recovers when maintenance arrives after health-check draining",
+				} {
+					var count int
+					for key, occurrences := range selected {
+						if strings.Contains(key, name) {
+							count += occurrences
+						}
+					}
+					var want int
+					if manual && heavy && index == 0 {
+						want = 1
+					}
+					assert.Equal(t, want, count, "%s manual=%t heavy=%t suite=%s", name, manual, heavy, split.Name)
 				}
 			}
-			want := 0
-			if heavy && index == 1 {
-				want = 1
-			}
-			assert.Equal(t, want, count)
 		}
 	}
 }

@@ -29,6 +29,8 @@ func (c *fluxCDCollector) Collect(ctx context.Context, destination string) error
 	if err := collectArgs(ctx, destination, "helmreleases.yaml", c.kubectl,
 		"get", "helmreleases", "-n", fluxNamespace, "-o", "yaml"); err != nil {
 		failures = append(failures, err)
+	} else if err := c.collectValuesConfigMaps(ctx, destination); err != nil {
+		failures = append(failures, err)
 	}
 
 	for _, resource := range []string{"kustomizations", "gitrepositories", "ocirepositories", "helmrepositories"} {

@@ -12,13 +12,15 @@ type ScenarioVersionAxis struct {
 
 // SuiteConfig describes one independently executed Godog suite.
 type SuiteConfig struct {
-	Name                   string
-	Source                 FeatureSource
-	VersionAxes            []ScenarioVersionAxis
-	Tags                   string
-	StepRegistrars         []StepRegistrar
-	ExcludeUnstable        bool
-	ExcludeHeavy           bool
+	Name            string
+	Source          FeatureSource
+	VersionAxes     []ScenarioVersionAxis
+	Tags            string
+	StepRegistrars  []StepRegistrar
+	ExcludeUnstable bool
+	ExcludeHeavy    bool
+	// ExcludeManual drops scenarios tagged @manual unless explicitly selected.
+	ExcludeManual          bool
 	Concurrency            int
 	RequirePreviousSuccess bool
 }
@@ -72,5 +74,6 @@ func SoperatorSuite(targetSoperatorVersion string) SuiteConfig {
 		VersionAxes:     []ScenarioVersionAxis{SoperatorVersionAxis(targetSoperatorVersion)},
 		StepRegistrars:  []StepRegistrar{SharedStepRegistrar()},
 		ExcludeUnstable: true,
+		ExcludeManual:   true,
 	}
 }

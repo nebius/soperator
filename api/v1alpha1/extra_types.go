@@ -28,8 +28,12 @@ type Image struct {
 	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
 }
 
-// GetURI combines image repository and tag into one string.
+// GetURI returns the repository unchanged when it already contains a complete image reference.
 func (i Image) GetURI() string {
+	if i.Tag == "" {
+		return i.Repository
+	}
+
 	return fmt.Sprintf("%s:%s", i.Repository, i.Tag)
 }
 

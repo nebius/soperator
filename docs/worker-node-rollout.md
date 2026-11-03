@@ -154,8 +154,9 @@ The recognized node failure reasons are `Kill task failed`, `[compute_maintenanc
 same precedence as the maintenance controller. A `[user_problem]` drain, a `[software_problem]` drain (for example
 broken NVIDIA driver libraries in the jail) or a manual drain can remain in place while the worker is updated.
 
-The maintenance controller owns node replacement or reboot. Other workers can continue updating within the
-available budget while this worker waits.
+The maintenance controller owns node replacement or reboot. For a health check failure it cordons the node
+and the platform replaces it after Compute `SetUnhealthy` succeeds. Other workers can continue updating within
+the available budget while this worker waits.
 
 ## A health failure appears while jobs are finishing
 

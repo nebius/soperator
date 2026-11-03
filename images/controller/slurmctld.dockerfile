@@ -2,7 +2,7 @@
 
 ARG SLURM_VERSION
 
-FROM cr.nebius.cloud/soperator-proxy-docker-io/library/golang:1.27.1 AS go-base
+FROM cr.nebius.cloud/soperator-proxy-docker-io/library/golang:1.27.3 AS go-base
 
 WORKDIR /build
 
@@ -30,8 +30,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=$GOOS CGO_ENABLED=$CGO_ENABLED GO_LDFLAGS=$GO_LDFLAGS \
     go build -v -o power-manager ./cmd/powermanager
 
-# https://github.com/nebius/ml-containers/pull/121
-FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20261021154700 AS controller_slurmctld
+# https://github.com/nebius/ml-containers/pull/124
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20261028110527 AS controller_slurmctld
 
 COPY ansible/sssd.yml /opt/ansible/sssd.yml
 COPY ansible/roles/sssd /opt/ansible/roles/sssd
@@ -44,11 +44,6 @@ RUN rm -rf /home
 
 # Expose the port used for accessing slurmctld
 EXPOSE 6817
-
-# Create dir and file for multilog hack
-RUN mkdir -p /var/log/slurm/multilog && \
-    touch /var/log/slurm/multilog/current && \
-    ln -s /var/log/slurm/multilog/current /var/log/slurm/slurmctld.log
 
 # Copy power-manager binary for ephemeral node power management
 COPY --from=powermanager_builder /build/power-manager /opt/soperator/bin/power-manager

@@ -127,11 +127,22 @@ again.
 
 ## Tags and versioned behavior
 
-The shared feature suite has four tag forms that affect execution:
+The E2E workflow checks out the acceptance code from `main` for every tested
+branch, including `soperator-release-*`, unless a run overrides
+`soperator_e2e_repo_branch`. Treat `main` as the only home of `e2e/`: land
+scenario and framework changes there and do not backport them to release
+branches. If the current checkout is a release branch and the task is to add
+or change a scenario, say so and propose a branch from `main` instead. The
+suite from `main` runs against every supported release, so version-specific
+behavior is expressed with `@soperator_version_...` tags and runtime checks,
+never with per-branch copies of the code.
+
+The shared feature suite has five tag forms that affect execution:
 
 - exactly one scenario-level `@soperator_version_...` constraint;
 - optional `@heavy`;
-- optional `@unstable`.
+- optional `@unstable`;
+- optional `@manual`;
 - optional `@sequential`, for scenarios that require exclusive execution. The
   standalone runner executes these first, one at a time, then runs all unmarked
   scenarios concurrently (eight by default). Do not use `@parallel`.
@@ -164,7 +175,7 @@ shared files; isolate or narrowly synchronize those resources, or use the
 documented `@sequential` exclusion below.
 
 Use `@sequential` when a concrete conflict remains: shared configuration or jail
-package mutation, shared login/system restarts, cluster-wide health assertions,
+package mutation, shared login/system restarts, shared provider quotas, cluster-wide health assertions,
 or custom worker selection outside the reservation pool. A shared read, multiple
 workers, GPU usage, or a long runtime alone is not a reason to serialize a scenario.
 Never add the tag just to hide a failure or incomplete concurrency review.
@@ -216,6 +227,22 @@ normally be a ticket queued to stabilize every unstable scenario. Add a `TODO`
 next to the tag in the feature file that explains the current problem, links or
 names the ticket when available, and states what must happen before the tag can
 be removed.
+
+Use `@manual` for a scenario that must never start on its own: it runs only
+when a `--scenario` selector (or the workflow `scenarios` input) names its
+feature file or line, and is excluded from every other run, periodic ones
+included. Typical reasons are side effects outside the test cluster, such as
+reporting a real bare-metal host to Compute, or consuming a shared quota.
+Manual selection does not provide mutual exclusion. If the side effect also
+conflicts with other selected scenarios, use `@sequential` with its own reason.
+`@manual` is not a substitute for `@unstable`: a flaky scenario stays
+`@unstable`. Keep `@heavy` on a long manual scenario so the duration
+classification stays correct once `@manual` is removed; running it then needs
+`--run-heavy`, `run_heavy=true` or `/e2e-full` in addition to the selector,
+exactly as for any other heavy scenario. Add a comment
+next to the tag that explains the side effect and states what must happen
+before the tag can be removed, and update `TestSharedManualScenarios` in
+`acceptance/features_test.go`.
 
 ## Step implementation
 

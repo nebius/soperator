@@ -214,6 +214,12 @@ func (c *K8SNodesController) processDrainCondition(ctx context.Context, k8sNode 
 		return nil
 	}
 	if maintenanceCondition.Status != corev1.ConditionTrue {
+		if check.IsConditionTrue(hardwareIssuesCondition) {
+			// Deleting the node here would make the platform skip Compute SetUnhealthy,
+			// so the host would never be reported and the replacement could land on it again.
+			logger.Info("hardware issues suspected, keeping node drained until the platform replaces it")
+			return nil
+		}
 		logger.Info("setting SlurmNodeDrain: false")
 		return setK8SNodeCondition(ctx, c.Client, k8sNode.Name, newNodeCondition(
 			consts.SlurmNodeDrain,

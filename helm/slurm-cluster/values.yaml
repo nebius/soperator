@@ -466,6 +466,9 @@ slurmNodes:
       #     memory: "64Mi"
   controller:
     k8sNodeFilterName: "no-gpu"
+    # Grace period for the controller pod to save Slurm state and stop, in seconds.
+    # Set to 0 for immediate termination.
+    terminationGracePeriodSeconds: 120
     priorityClass: ""
     # Controls if the pod containers can use the host user namespace
     # hostUsers: false
@@ -821,7 +824,7 @@ images:
   slurmd: "cr.nebius.cloud/soperator/worker_slurmd:5.0.0-slurm26.05.4-nebius-1"
   sshd: "cr.nebius.cloud/soperator/login_sshd:5.0.0-slurm26.05.4-nebius-1"
   munge: "cr.nebius.cloud/soperator/munge:5.0.0-slurm26.05.4-nebius-1"
-  sssd: "cr.nebius.cloud/soperator/sssd:2.9.4-1-63"
+  sssd: "cr.nebius.cloud/soperator/sssd:2.9.4-1-68"
   populateJail: ""
   populateJailRepository: "cr.nebius.cloud/soperator/populate_jail"
   populateJailTag: "5.0.0-slurm26.05.4-nebius-1"

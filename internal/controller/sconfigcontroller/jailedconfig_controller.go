@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -720,7 +721,12 @@ func checkApiErrors(responseErrors *v0044.V0044OpenapiErrors) error {
 	if len(*responseErrors) > 0 {
 		errs := make([]error, 0)
 		for _, err := range *responseErrors {
-			errs = append(errs, fmt.Errorf("API error %d %s, source %s", err.ErrorNumber, *err.Error, *err.Source))
+			errs = append(errs, fmt.Errorf(
+				"API error %d %s, source %s",
+				ptr.Deref(err.ErrorNumber, 0),
+				ptr.Deref(err.Error, "unknown"),
+				ptr.Deref(err.Source, "unknown"),
+			))
 		}
 		return errors.Join(errs...)
 	}

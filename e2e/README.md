@@ -74,7 +74,9 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
   to `2h`. This includes contention and recovery and is separate from job timeouts.
 - `--scenario`: optional. Runs all compatible scenarios in the provided feature
   file, or the single scenario at an exact `Scenario:` line, for example
-  `features/internal_ssh.feature:3`. May be repeated.
+  `features/internal_ssh.feature:3`. May be repeated. Scenarios tagged
+  `@manual` run only when selected this way; without selectors they are
+  excluded regardless of the other flags.
 - `--output-dir`: required. The runner writes Cucumber and JUnit reports plus
   per-scenario artifacts into this directory. Under TeamCity, scenarios are
   also reported directly through native test service messages and JUnit files
@@ -89,7 +91,7 @@ files are descriptive only; no current runner or workflow consumes them.
 The CLI runs two suites in order: `soperator` contains `@sequential` scenarios
 and executes them one at a time; `soperator-parallel` contains all other scenarios
 and uses native Godog concurrency (eight by default). Both retain the same version,
-heavy, unstable and scenario-path filters. Exact scenario selectors refer to the
+heavy, unstable, manual and scenario-path filters. Exact scenario selectors refer to the
 `Scenario:` or `Scenario Outline:` line in the selected checkout.
 If the sequential suite fails, the concurrent suite is not started against a
 potentially degraded shared baseline.
@@ -104,7 +106,7 @@ are considered in arrival order, but a request that cannot fit does not block
 an independent request. Generic allocations prefer CPU workers. Leases last
 through cleanup; failed cleanup or recovery quarantines the affected workers
 for the rest of the run. Shared configuration mutation, unsafe shared SSH identity
-changes, cluster-wide assertions and system DaemonSet restarts require `@sequential`
+changes, shared provider quotas, cluster-wide assertions and system DaemonSet restarts require `@sequential`
 unless their conflicts have been isolated. A
 scenario must acquire its complete set once; incremental lock upgrades are
 rejected. Host-wide faults require ownership of every worker on that host.
@@ -158,6 +160,10 @@ The default CLI, manual workflow, and `/e2e` exclude both `@heavy` and
 ones. Both PR commands support the optional Terraform branch and `--scenarios`;
 other flags are rejected. Periodic runs always include heavy scenarios and
 exclude unstable ones. Explicit scenario selectors still obey these filters.
+`@manual` scenarios are excluded from every run that has no selectors, including
+periodic ones, and run only when a selector names their feature file or line.
+The heavy and unstable filters still apply to them, so a `@manual @heavy`
+scenario is run with a selector plus `--run-heavy` (or `/e2e-full`).
 
 `@heavy` usually marks long scenarios (about four minutes or more), based on
 observed durations such as
@@ -211,8 +217,10 @@ bin/acceptance collect-artifacts \
   --output-dir e2e-artifacts/snapshots/before-destroy
 ```
 
-The common snapshot contains Kubernetes, Soperator, redacted FluxCD, Slurm,
-and jail diagnostics. Add `--nebius-project-id <project-id>` to include Managed
+The common snapshot contains Kubernetes, Soperator, FluxCD, Slurm,
+and jail diagnostics. FluxCD saves ConfigMap values referenced by HelmRelease
+`spec.valuesFrom` in `values-from/configmaps.json`.
+Add `--nebius-project-id <project-id>` to include Managed
 Kubernetes clusters and node groups. When that optional flag is omitted, the
 `mk8s` collector creates no files and does not invoke the Nebius CLI.
 If Terraform fails before a Kubernetes context is available, omit
@@ -245,6 +253,7 @@ suite.Source.Paths = []string{"features/internal_ssh.feature:3"}
 suite.Tags = "~@custom_only"
 suite.ExcludeUnstable = false
 suite.ExcludeHeavy = true
+suite.ExcludeManual = false
 
 runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 	KubectlContext:         kubectlContext,
@@ -260,9 +269,12 @@ target cluster. `SlurmClusterName` defaults to `soperator` when omitted.
 `TargetSoperatorVersion` is normalized once and stored in static
 `framework.ClusterInfo`. The caller controls scenario selection through
 `SuiteConfig.Source.Paths` and Godog tag filtering through `SuiteConfig.Tags`.
-`SuiteConfig.ExcludeHeavy` and `ExcludeUnstable` independently exclude their
-respective tags. `SoperatorSuite` preserves heavy coverage for library callers;
-the standalone CLI explicitly excludes it unless `--run-heavy` is set.
+`SuiteConfig.ExcludeHeavy`, `ExcludeUnstable` and `ExcludeManual` independently
+exclude their respective tags. `SoperatorSuite` preserves heavy coverage for
+library callers; the standalone CLI explicitly excludes it unless `--run-heavy`
+is set. `SoperatorSuite` excludes `@manual` scenarios; a caller that selects
+them through `Source.Paths` clears `ExcludeManual`, as the CLI does for
+`--scenario`.
 
 Library callers keep sequential behavior unless they set `SuiteConfig.Concurrency`.
 To reuse the same split, pass `acceptance.ConcurrentSuites(suite, 8)` as

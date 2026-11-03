@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -269,7 +270,10 @@ func TestSlurmNodesController_processSetUnhealthy_waitsForFullyDrainedSlurmNode(
 	}
 }
 
-func TestSlurmNodesController_Reconcile_downDrainedWorkerEntersMaintenance(t *testing.T) {
+// The platform replaces a node with HardwareIssuesSuspected only after Compute SetUnhealthy succeeds,
+// so soperator must not turn that condition into its own maintenance: no node replacement drain
+// overriding the health check reason and no SoperatorChecksNodeMaintenance that deletes the node.
+func TestSlurmNodesController_Reconcile_downDrainedWorkerStaysOutOfMaintenance(t *testing.T) {
 	ctx := context.Background()
 	controller, k8sClient, slurmClusterName, k8sNode, slurmNode := newSlurmNodesControllerForUnhealthyTest(
 		t, ctx, slurmapi.Node{States: map[api.V0044NodeState]struct{}{
@@ -278,21 +282,14 @@ func TestSlurmNodesController_Reconcile_downDrainedWorkerEntersMaintenance(t *te
 		}},
 	)
 	slurmNode.Reason.Reason = slurmNode.Reason.OriginalReason
-	maintenanceNode := slurmNode
-	maintenanceNode.Reason = &slurmapi.NodeReason{
-		Reason:    consts.SlurmNodeReasonNodeReplacement,
-		ChangedAt: slurmNode.Reason.ChangedAt.Add(time.Minute),
-	}
+	// findDegradedNodes rewrites the listed reason in place, so each listing gets its own copy.
+	secondListing := slurmNode
+	secondListing.Reason = ptr.To(*slurmNode.Reason)
 	apiClient, found := controller.slurmAPIClients.GetClient(slurmClusterName)
 	require.True(t, found)
 	slurmClient := apiClient.(*slurmapifake.MockClient)
 	slurmClient.On("ListNodes", ctx).Return([]slurmapi.Node{slurmNode}, nil).Once()
-	slurmClient.On("ListNodes", ctx).Return([]slurmapi.Node{maintenanceNode}, nil).Once()
-	slurmClient.On("GetNode", ctx, slurmNode.Name).Return(maintenanceNode, nil).Once()
-	slurmClient.On("SlurmV0044PostNodeWithResponse", ctx, slurmNode.Name, api.V0044UpdateNodeMsg{
-		Reason: ptr.To(consts.SlurmNodeReasonNodeReplacement),
-		State:  ptr.To([]api.V0044UpdateNodeMsgState{api.V0044UpdateNodeMsgStateDRAIN}),
-	}).Return(&api.SlurmV0044PostNodeResponse{JSON200: &api.V0044OpenapiResp{}}, nil).Once()
+	slurmClient.On("ListNodes", ctx).Return([]slurmapi.Node{secondListing}, nil).Once()
 
 	req := ctrl.Request{NamespacedName: slurmClusterName}
 	_, err := controller.Reconcile(ctx, req)
@@ -302,15 +299,120 @@ func TestSlurmNodesController_Reconcile_downDrainedWorkerEntersMaintenance(t *te
 	_, err = controller.Reconcile(ctx, req)
 	require.NoError(t, err)
 
-	var maintained corev1.Node
-	require.NoError(t, k8sClient.Get(ctx, ctrlclient.ObjectKey{Name: k8sNode.Name}, &maintained))
-	for _, conditionType := range []corev1.NodeConditionType{
-		consts.HardwareIssuesSuspected,
-		consts.SoperatorChecksK8SNodeMaintenance,
-	} {
-		require.True(t, slices.ContainsFunc(maintained.Status.Conditions, func(condition corev1.NodeCondition) bool {
-			return condition.Type == conditionType && condition.Status == corev1.ConditionTrue
-		}), "missing condition %s", conditionType)
+	var updated corev1.Node
+	require.NoError(t, k8sClient.Get(ctx, ctrlclient.ObjectKey{Name: k8sNode.Name}, &updated))
+	require.True(t, hasHardwareIssuesSuspected(t, ctx, k8sClient, k8sNode.Name))
+	require.False(t, slices.ContainsFunc(updated.Status.Conditions, func(condition corev1.NodeCondition) bool {
+		return condition.Type == consts.SoperatorChecksK8SNodeMaintenance
+	}), "hardware issues must not enter soperator maintenance")
+	slurmClient.AssertNotCalled(t, "SlurmV0044PostNodeWithResponse", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestHardwareIssuesMessage(t *testing.T) {
+	tests := []struct {
+		name string
+		node slurmapi.Node
+		want string
+	}{
+		{
+			name: "drain reason and comment",
+			node: slurmapi.Node{
+				Comment: "GPU 3: Xid 79",
+				Reason:  ptr.To(slurmapi.NodeReason{Reason: "[node_problem]", OriginalReason: "[node_problem] gpu_health_check: failed [hc_program]"}),
+			},
+			want: "[node_problem] gpu_health_check: failed [hc_program]; GPU 3: Xid 79",
+		},
+		{
+			name: "drain reason without comment",
+			node: slurmapi.Node{Reason: ptr.To(slurmapi.NodeReason{OriginalReason: "[node_problem] gpu_health_check: failed"})},
+			want: "[node_problem] gpu_health_check: failed",
+		},
+		{
+			name: "well-known reason when the original is missing",
+			node: slurmapi.Node{Reason: ptr.To(slurmapi.NodeReason{Reason: "[hardware_problem]"})},
+			want: "[hardware_problem]",
+		},
+		{
+			name: "comment only",
+			node: slurmapi.Node{Comment: "gpu health check failed", Reason: ptr.To(slurmapi.NodeReason{})},
+			want: "gpu health check failed",
+		},
+		{
+			name: "nothing known falls back to the generic message",
+			node: slurmapi.Node{Comment: "  "},
+			want: string(consts.MessageHardwareIssuesSuspected),
+		},
+		{
+			name: "long reason is capped",
+			node: slurmapi.Node{Reason: ptr.To(slurmapi.NodeReason{OriginalReason: strings.Repeat("x", MaxMessageLength+10)})},
+			want: strings.Repeat("x", MaxMessageLength),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, string(hardwareIssuesMessage(tt.node)))
+		})
+	}
+}
+
+func TestSlurmNodesController_processMaintenance(t *testing.T) {
+	tests := []struct {
+		name        string
+		conditions  []corev1.NodeCondition
+		expectDrain bool
+	}{
+		{
+			name:        "no conditions undrains",
+			expectDrain: false,
+		},
+		{
+			name: "maintenance scheduled drains",
+			conditions: []corev1.NodeCondition{
+				{Type: consts.DefaultMaintenanceConditionType, Status: corev1.ConditionTrue},
+			},
+			expectDrain: true,
+		},
+		{
+			name: "maintenance finished undrains",
+			conditions: []corev1.NodeCondition{
+				{Type: consts.DefaultMaintenanceConditionType, Status: corev1.ConditionFalse},
+			},
+			expectDrain: false,
+		},
+		{
+			name: "hardware issues alone are not maintenance",
+			conditions: []corev1.NodeCondition{
+				{Type: consts.HardwareIssuesSuspected, Status: corev1.ConditionTrue},
+			},
+			expectDrain: false,
+		},
+		{
+			name: "hardware issues with maintenance scheduled drains",
+			conditions: []corev1.NodeCondition{
+				{Type: consts.HardwareIssuesSuspected, Status: corev1.ConditionTrue},
+				{Type: consts.DefaultMaintenanceConditionType, Status: corev1.ConditionTrue},
+			},
+			expectDrain: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			controller := &SlurmNodesController{MaintenanceConditionType: consts.DefaultMaintenanceConditionType}
+			k8sNode := &corev1.Node{Status: corev1.NodeStatus{Conditions: tt.conditions}}
+
+			var drained, undrained bool
+			err := controller.processMaintenance(
+				context.Background(),
+				k8sNode,
+				func() error { drained = true; return nil },
+				func() error { undrained = true; return nil },
+			)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectDrain, drained, "drainFn called")
+			require.Equal(t, !tt.expectDrain, undrained, "undrainFn called")
+		})
 	}
 }
 
@@ -433,7 +535,7 @@ func TestSlurmNodesController_processSetUnhealthy_setsHardwareConditionWhenAssig
 	require.Equal(t, consts.HardwareIssuesSuspected, updatedNode.Status.Conditions[0].Type)
 	require.Equal(t, corev1.ConditionTrue, updatedNode.Status.Conditions[0].Status)
 	require.Equal(t, string(consts.ReasonGPUHealthCheckFailed), updatedNode.Status.Conditions[0].Reason)
-	require.Equal(t, "gpu health check failed", updatedNode.Status.Conditions[0].Message)
+	require.Equal(t, "[node_problem] gpu health check failed: failed; gpu health check failed", updatedNode.Status.Conditions[0].Message)
 }
 
 func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodFallsBackToSetUnhealthy(t *testing.T) {

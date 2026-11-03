@@ -65,7 +65,7 @@ installations that intentionally provide the token file from the host.
 
 #### 2. OpenTelemetry Collector - System Logs
 - Purpose: Collects system logs from nodes
-- Deployment: DaemonSet (disabled by default)
+- Deployment: DaemonSet; host log collection is controlled by `observability.opentelemetry.logs.values.nodeLogs.enabled`
 - Log Sources: Node system logs
 - When to Enable: For debugging node-level issues
 

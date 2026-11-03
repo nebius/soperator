@@ -1260,6 +1260,11 @@ func (in *SlurmNodeController) DeepCopyInto(out *SlurmNodeController) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.TerminationGracePeriodSeconds != nil {
+		in, out := &in.TerminationGracePeriodSeconds, &out.TerminationGracePeriodSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	in.Slurmctld.DeepCopyInto(&out.Slurmctld)
 	in.Munge.DeepCopyInto(&out.Munge)
 	in.SidecarSSSD.DeepCopyInto(&out.SidecarSSSD)

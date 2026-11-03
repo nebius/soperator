@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
@@ -207,6 +209,24 @@ func (c *KubectlClient) NodeIfPresent(ctx context.Context, name string) (corev1.
 		return corev1.Node{}, false, fmt.Errorf("identify Kubernetes host %s: observed name=%s UID=%s", name, node.Name, node.UID)
 	}
 	return node, true, nil
+}
+
+// NodeEvents lists the events recorded for one Kubernetes node identity.
+// Events outlive the node for the API server's event retention period,
+// so a caller can inspect what happened to a node that has already been deleted.
+// The UID keeps a replacement with the same name out.
+func (c *KubectlClient) NodeEvents(ctx context.Context, name string, uid types.UID) ([]corev1.Event, error) {
+	name = strings.TrimSpace(name)
+	if name == "" || uid == "" {
+		return nil, fmt.Errorf("Kubernetes node name and UID are required to list node events")
+	}
+	var list corev1.EventList
+	if err := c.GetJSON(ctx, &list, "get", "events", "-n", metav1.NamespaceDefault,
+		"--field-selector", fmt.Sprintf("involvedObject.kind=Node,involvedObject.name=%s,involvedObject.uid=%s", name, uid),
+		"-o", "json"); err != nil {
+		return nil, fmt.Errorf("list events of Kubernetes node %s: %w", name, err)
+	}
+	return list.Items, nil
 }
 
 func (c *KubectlClient) NodeSets(ctx context.Context, clusterName string) ([]NodeSetInfo, error) {

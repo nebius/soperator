@@ -293,7 +293,7 @@ observability:
       namespaces: []
       image:
         repository: cr.nebius.cloud/soperator-proxy-docker-io/alpine/curl
-        tag: "8.19.0"
+        tag: "8.22.0"
         pullPolicy: IfNotPresent
       imdsBaseUrl: http://169.254.169.254
       hostNetwork: true
@@ -369,6 +369,9 @@ observability:
               memory: 512Mi
         nodeLogs:
           enabled: true
+          # Supplementary host group IDs for reading node logs; adm is 4 on Ubuntu.
+          supplementalGroups:
+            - 4
           resources:
             requests:
               memory: 200Mi
@@ -529,7 +532,7 @@ observability:
         auth:
           disable_login_form: true
         auth.basic:
-          enabled: false
+          enabled: true
         auth.anonymous:
           enabled: true
           org_name: Main Org.

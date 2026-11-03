@@ -48,6 +48,131 @@ func (s healthCheckCommandScope) RunWithDefaultRetry(ctx context.Context, comman
 	return s.Run(ctx, command)
 }
 
+func nodeEventsJSON(t *testing.T, events ...corev1.Event) string {
+	t.Helper()
+	raw, err := json.Marshal(corev1.EventList{Items: events})
+	require.NoError(t, err)
+	return string(raw)
+}
+
+func TestPlatformReportedDeletingTheOldNodeFindsRemediatorEvent(t *testing.T) {
+	var args [][]string
+	runtime := healthCheckReplacementRuntime{kubectl: framework.NewArgsScope(func(_ context.Context, a ...string) (string, error) {
+		args = append(args, a)
+		return nodeEventsJSON(t,
+			corev1.Event{Reason: "NodeRemediationInProgress", Source: corev1.EventSource{Component: "nebiusmachinehealthcheck-controller"}},
+			corev1.Event{Reason: "NodeDeleting", Message: "Deleting node", Source: corev1.EventSource{Component: "remediation-controller"}},
+		), nil
+	})}
+	steps := NodeReplacement{
+		runtime:  runtime,
+		kubectl:  framework.NewKubectlClient(runtime),
+		original: framework.WorkerReplacementSnapshot{NodeName: "computeinstance-old", NodeUID: "uid-old"},
+	}
+
+	require.NoError(t, steps.thePlatformReportedDeletingTheOldNode(t.Context()))
+
+	require.Len(t, args, 1)
+	assert.Equal(t, []string{"get", "events", "-n", "default",
+		"--field-selector", "involvedObject.kind=Node,involvedObject.name=computeinstance-old,involvedObject.uid=uid-old",
+		"-o", "json"}, args[0])
+}
+
+func TestPlatformReportedDeletingTheOldNodeListsObservedEventsOnFailure(t *testing.T) {
+	runtime := healthCheckReplacementRuntime{kubectl: framework.NewArgsScope(func(context.Context, ...string) (string, error) {
+		return nodeEventsJSON(t,
+			corev1.Event{Type: "Normal", Reason: "NodeRemediationInProgress", Message: "Remediation is in progress",
+				Source: corev1.EventSource{Component: "nebiusmachinehealthcheck-controller"}},
+		), nil
+	})}
+	steps := NodeReplacement{
+		runtime:  runtime,
+		kubectl:  framework.NewKubectlClient(runtime),
+		original: framework.WorkerReplacementSnapshot{NodeName: "computeinstance-old", NodeUID: "uid-old"},
+	}
+
+	err := steps.thePlatformReportedDeletingTheOldNode(t.Context())
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "did not report deleting node computeinstance-old (UID uid-old)")
+	assert.ErrorContains(t, err, "Normal/NodeRemediationInProgress from nebiusmachinehealthcheck-controller: Remediation is in progress")
+}
+
+func TestPlatformReportedDeletingTheOldNodeReportsNoEvents(t *testing.T) {
+	runtime := healthCheckReplacementRuntime{kubectl: framework.NewArgsScope(func(context.Context, ...string) (string, error) {
+		return nodeEventsJSON(t), nil
+	})}
+	steps := NodeReplacement{
+		runtime:  runtime,
+		kubectl:  framework.NewKubectlClient(runtime),
+		original: framework.WorkerReplacementSnapshot{NodeName: "computeinstance-old", NodeUID: "uid-old"},
+	}
+
+	err := steps.thePlatformReportedDeletingTheOldNode(t.Context())
+
+	assert.ErrorContains(t, err, "observed events: none")
+}
+
+func TestPlatformReportedDeletingTheOldNodeRequiresCapturedNode(t *testing.T) {
+	steps := NodeReplacement{}
+	assert.ErrorContains(t, steps.thePlatformReportedDeletingTheOldNode(t.Context()), "original node is not captured")
+}
+
+func TestHealthMaintenanceSelectionReservesAnIdleWorkerBeforeRecordingItsHost(t *testing.T) {
+	base := concurrentSelectionFixture()
+	for i := range base.pods {
+		base.pods[i].Namespace = "soperator"
+	}
+	submitErr := errors.New("stop before submitting the test job")
+	var submitted string
+	runtime := healthCheckReplacementRuntime{
+		Runtime: &partitionSmokeRuntime{concurrentSelectionRuntime: base, jail: framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+			submitted = command
+			return "", submitErr
+		})},
+		kubectl: framework.NewArgsScope(func(ctx context.Context, args ...string) (string, error) {
+			if args[0] == "get" && args[1] == "pod" {
+				for _, pod := range base.pods {
+					if pod.Name == args[2] {
+						output, err := json.Marshal(pod)
+						return string(output), err
+					}
+				}
+			}
+			return base.Kubectl().Run(ctx, args...)
+		}),
+		controller: framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+			output, err := base.Controller().Run(ctx, command)
+			for i := range 2 {
+				name := fmt.Sprintf("worker-%d", i)
+				output = strings.ReplaceAll(output, "NodeName="+name+" ", "NodeName="+name+" InstanceId="+name+"-instance ")
+			}
+			return output, err
+		}),
+		wait: func(ctx context.Context, condition func(context.Context) (bool, error)) error {
+			return base.WaitFor(ctx, "reserved worker healthy", 0, 0, condition)
+		},
+	}
+	kubectl, slurm := framework.NewKubectlClient(runtime), framework.NewSlurmClient(runtime)
+	selector := framework.NewWorkerSelector(kubectl, slurm, "soperator")
+	pool := framework.NewWorkerPool()
+	other := framework.WithWorkerReservation(t.Context(), pool, "other scenario")
+	held, err := selector.PickGPUWorkers(other, 1)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, framework.FinishWorkerReservation(other, runtime)) }()
+	ctx := framework.WithWorkerReservation(t.Context(), pool, t.Name())
+	defer func() { require.NoError(t, framework.FinishWorkerReservation(ctx, runtime)) }()
+	steps := NewNodeReplacement(runtime, slurm, selector)
+
+	err = steps.aTestJobIsSubmittedAndRunningOnAnIdleGPUWorkerNode(ctx)
+
+	require.ErrorIs(t, err, submitErr)
+	assert.NotEqual(t, held[0].Name, steps.replacementWorker.Name)
+	assert.Equal(t, "worker-1", steps.original.WorkerName)
+	assert.Contains(t, submitted, "--nodelist='worker-1'")
+	assert.True(t, steps.maintenanceRecovery)
+}
+
 func TestHealthCheckInjectErrorCommandWritesResolutionToNodeLocalMarker(t *testing.T) {
 	assert.Equal(t,
 		`mkdir -p '/opt/soperator-outputs/local' && printf '%s\n' 'RedeployProfile' > '/opt/soperator-outputs/local/health_checker_inject_error'`,

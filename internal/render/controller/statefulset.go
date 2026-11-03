@@ -120,7 +120,7 @@ func RenderStatefulSet(
 					Containers:                    []corev1.Container{slurmctldContainer},
 					Volumes:                       volumes,
 					RestartPolicy:                 corev1.RestartPolicyAlways,
-					TerminationGracePeriodSeconds: ptr.To(common.DefaultPodTerminationGracePeriodSeconds),
+					TerminationGracePeriodSeconds: ptr.To(controller.TerminationGracePeriodSeconds),
 					SecurityContext:               &corev1.PodSecurityContext{},
 					SchedulerName:                 corev1.DefaultSchedulerName,
 					DNSPolicy:                     corev1.DNSClusterFirst,

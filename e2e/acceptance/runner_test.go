@@ -22,12 +22,15 @@ func TestRunnerSuiteTagFilter(t *testing.T) {
 		name            string
 		tags            string
 		excludeUnstable bool
+		excludeHeavy    bool
+		excludeManual   bool
 		want            string
 	}{
 		{
 			name:            "default shared filters exclude unstable",
 			excludeUnstable: true,
-			want:            "~@unstable",
+			excludeManual:   true,
+			want:            "~@unstable && ~@manual",
 		},
 		{
 			name: "no filters when filters are disabled",
@@ -37,7 +40,22 @@ func TestRunnerSuiteTagFilter(t *testing.T) {
 			name:            "custom suite tags are combined with option-driven filters",
 			tags:            "@smoke && ~@slow",
 			excludeUnstable: true,
-			want:            "@smoke && ~@slow && ~@unstable",
+			excludeManual:   true,
+			want:            "@smoke && ~@slow && ~@unstable && ~@manual",
+		},
+		{
+			name:            "manual exclusion joins the other filters",
+			excludeUnstable: true,
+			excludeHeavy:    true,
+			excludeManual:   true,
+			want:            "~@unstable && ~@heavy && ~@manual",
+		},
+		{
+			name:            "enabling manual scenarios keeps the other exclusions",
+			tags:            "@smoke",
+			excludeUnstable: true,
+			excludeHeavy:    true,
+			want:            "@smoke && ~@unstable && ~@heavy",
 		},
 	}
 
@@ -46,6 +64,8 @@ func TestRunnerSuiteTagFilter(t *testing.T) {
 			suite := testSampleSuite()
 			suite.Tags = tt.tags
 			suite.ExcludeUnstable = tt.excludeUnstable
+			suite.ExcludeHeavy = tt.excludeHeavy
+			suite.ExcludeManual = tt.excludeManual
 			runner, err := NewRunner(RunnerConfig{
 				KubectlContext:         "dev-context",
 				TargetSoperatorVersion: testTargetSoperatorVersion,
@@ -62,15 +82,21 @@ func TestRunnerHeavyAndUnstableSelection(t *testing.T) {
 		name            string
 		excludeHeavy    bool
 		excludeUnstable bool
+		excludeManual   bool
 		paths           []string
 		want            []string
 	}{
-		{name: "default", excludeHeavy: true, excludeUnstable: true, want: []string{"ordinary"}},
-		{name: "full and periodic", excludeUnstable: true, want: []string{"ordinary", "heavy"}},
-		{name: "unstable only", excludeHeavy: true, want: []string{"ordinary", "unstable"}},
-		{name: "all", want: []string{"ordinary", "heavy", "unstable", "both"}},
-		{name: "selector respects heavy exclusion", excludeHeavy: true, paths: []string{"features/selection.feature:6"}},
-		{name: "selector allows heavy when enabled", excludeUnstable: true, paths: []string{"features/selection.feature:6"}, want: []string{"heavy"}},
+		{name: "default", excludeHeavy: true, excludeUnstable: true, excludeManual: true, want: []string{"ordinary"}},
+		{name: "full and periodic", excludeUnstable: true, excludeManual: true, want: []string{"ordinary", "heavy"}},
+		{name: "unstable only", excludeHeavy: true, excludeManual: true, want: []string{"ordinary", "unstable"}},
+		{name: "all", want: []string{"ordinary", "heavy", "unstable", "both", "manual", "manual heavy"}},
+		{name: "selector respects heavy exclusion", excludeHeavy: true, excludeManual: true, paths: []string{"features/selection.feature:6"}},
+		{name: "selector allows heavy when enabled", excludeUnstable: true, excludeManual: true, paths: []string{"features/selection.feature:6"}, want: []string{"heavy"}},
+		{name: "selector respects manual exclusion", excludeHeavy: true, excludeUnstable: true, excludeManual: true, paths: []string{"features/selection.feature:15"}},
+		{name: "selector runs manual when allowed", excludeHeavy: true, excludeUnstable: true, paths: []string{"features/selection.feature:15"}, want: []string{"manual"}},
+		{name: "selector respects heavy exclusion on a manual heavy scenario", excludeHeavy: true, excludeUnstable: true, paths: []string{"features/selection.feature:18"}},
+		{name: "selector runs manual heavy with heavy opt-in", excludeUnstable: true, paths: []string{"features/selection.feature:18"}, want: []string{"manual heavy"}},
+		{name: "feature selector runs manual when allowed", excludeHeavy: true, excludeUnstable: true, want: []string{"ordinary", "manual"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var ran []string
@@ -88,6 +114,12 @@ func TestRunnerHeavyAndUnstableSelection(t *testing.T) {
   @heavy @unstable @soperator_version_>=5.0.0
   Scenario: both
     Then the both scenario runs
+  @manual @soperator_version_>=5.0.0
+  Scenario: manual
+    Then the manual scenario runs
+  @manual @heavy @soperator_version_>=5.0.0
+  Scenario: manual heavy
+    Then the manual heavy scenario runs
   @soperator_version_>=6.0.0
   Scenario: future
     Then the future scenario runs
@@ -102,7 +134,7 @@ func TestRunnerHeavyAndUnstableSelection(t *testing.T) {
 				Suites: []SuiteConfig{{
 					Name: "selection", Source: source,
 					VersionAxes:  []ScenarioVersionAxis{SoperatorVersionAxis("5.0.0")},
-					ExcludeHeavy: tt.excludeHeavy, ExcludeUnstable: tt.excludeUnstable,
+					ExcludeHeavy: tt.excludeHeavy, ExcludeUnstable: tt.excludeUnstable, ExcludeManual: tt.excludeManual,
 					StepRegistrars: []StepRegistrar{func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, _ framework.Runtime) {
 						sc.Step(`^the (.+) scenario runs$`, func(name string) error {
 							ran = append(ran, name)

@@ -258,7 +258,7 @@ func (c *SlurmNodesController) processSetUnhealthy(
 		consts.HardwareIssuesSuspected,
 		corev1.ConditionTrue,
 		consts.ReasonGPUHealthCheckFailed,
-		consts.MessageConditionType(slurmNode.Comment),
+		hardwareIssuesMessage(slurmNode),
 	)
 
 	if err := setK8SNodeCondition(ctx, c.Client, k8sNode.Name, cond); err != nil {
@@ -266,6 +266,31 @@ func (c *SlurmNodesController) processSetUnhealthy(
 	}
 
 	return nil
+}
+
+// hardwareIssuesMessage builds the HardwareIssuesSuspected message.
+// The platform forwards it to Compute SetUnhealthy as the required description, so it must never be empty:
+// the drain reason names the failed check, the node comment adds detail when a check wrote one.
+func hardwareIssuesMessage(slurmNode slurmapi.Node) consts.MessageConditionType {
+	var parts []string
+	if slurmNode.Reason != nil {
+		if reason := strings.TrimSpace(slurmNode.Reason.OriginalReason); reason != "" {
+			parts = append(parts, reason)
+		} else if reason := strings.TrimSpace(slurmNode.Reason.Reason); reason != "" {
+			parts = append(parts, reason)
+		}
+	}
+	if comment := strings.TrimSpace(slurmNode.Comment); comment != "" {
+		parts = append(parts, comment)
+	}
+	if len(parts) == 0 {
+		return consts.MessageHardwareIssuesSuspected
+	}
+	message := strings.Join(parts, "; ")
+	if len(message) > MaxMessageLength {
+		message = message[:MaxMessageLength]
+	}
+	return consts.MessageConditionType(message)
 }
 
 func (c *SlurmNodesController) getSlurmNodeAssignmentTime(
@@ -574,17 +599,13 @@ func (c *SlurmNodesController) processMaintenance(
 		undrainFn = func() error { return nil }
 	}
 
-	var (
-		maintenanceCondition corev1.NodeCondition
-	)
+	// HardwareIssuesSuspected is deliberately not a maintenance condition: the platform replaces such
+	// nodes itself after Compute SetUnhealthy succeeds, so soperator must keep the K8s node alive.
+	var maintenanceCondition corev1.NodeCondition
 	for _, cond := range k8sNode.Status.Conditions {
 		if cond.Type == c.MaintenanceConditionType {
 			maintenanceCondition = cond
-			continue
-		}
-		if cond.Type == consts.HardwareIssuesSuspected {
-			maintenanceCondition = cond
-			continue
+			break
 		}
 	}
 

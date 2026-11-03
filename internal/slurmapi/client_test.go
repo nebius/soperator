@@ -17,7 +17,7 @@ import (
 // schedule_cycle_sum grows monotonically (microseconds of cumulative scheduler cycle time) and
 // exceeds int32 after ~35.8 min and uint32 after ~71.6 min on a busy controller; older bindings
 // declared it as int32 and the whole diag unmarshal failed. The fixture value is above 2^32, so
-// a regression to any 32-bit type fails this test through the real generated JSON decode path,
+// a regression to any 32-bit type fails this test through the real HTTP JSON decode path,
 // which mockery-based tests bypass.
 func TestClient_GetDiag_LargeScheduleCycleSum(t *testing.T) {
 	payload, err := os.ReadFile("testdata/sdiag_rest.json")
