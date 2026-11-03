@@ -179,7 +179,8 @@ type NodeSetSpec struct {
 }
 
 type NodeSetSlurmd struct {
-	Volumes NodeSetVolumes `json:"volumes"`
+	Resources corev1.ResourceList `json:"resources"`
+	Volumes   NodeSetVolumes      `json:"volumes"`
 }
 
 type NodeSetVolumes struct {
@@ -187,10 +188,11 @@ type NodeSetVolumes struct {
 }
 
 type NodeVolumeMount struct {
-	Name                    string           `json:"name"`
-	MountPath               string           `json:"mountPath"`
-	ReadOnly                bool             `json:"readOnly"`
-	VolumeClaimTemplateSpec *json.RawMessage `json:"volumeClaimTemplateSpec"`
+	Name                    string               `json:"name"`
+	MountPath               string               `json:"mountPath"`
+	ReadOnly                bool                 `json:"readOnly"`
+	VolumeSource            *corev1.VolumeSource `json:"volumeSource"`
+	VolumeClaimTemplateSpec *json.RawMessage     `json:"volumeClaimTemplateSpec"`
 }
 
 type NodeSetGPUSpec struct {

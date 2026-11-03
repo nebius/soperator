@@ -139,13 +139,7 @@ func (s *Accounting) acceptanceTestUserExists(ctx context.Context) error {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	s.worker = workers[0]
-	if err := ensureSSHTestUser(ctx, s.runtime, sshTestUserName); err != nil {
-		return err
-	}
-	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, sshTestUserName, s.worker); err != nil {
-		return err
-	}
-	return waitForSSHTestUserOnController(ctx, s.runtime, sshTestUserName)
+	return prepareSSHTestUser(ctx, s.runtime, sshTestUserName, s.worker)
 }
 
 func (s *Accounting) createTestAccountAndAssociation(ctx context.Context) error {

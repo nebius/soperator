@@ -107,9 +107,9 @@ func (s *ClusterCreation) checkNodeLocalJailSubmountPermissions(ctx context.Cont
 }
 
 func nodeLocalJailSubmountPaths(mounts []framework.JailSubMountInfo, hasLocalNVMe bool) ([]string, error) {
-	requiredByName := map[string]bool{"local-data": true}
+	requiredByName := map[string]bool{framework.LocalDataVolumeName: true}
 	if hasLocalNVMe {
-		requiredByName["local-nvme"] = true
+		requiredByName[framework.LocalNVMeVolumeName] = true
 	}
 
 	var paths []string
@@ -130,8 +130,8 @@ func nodeLocalJailSubmountPaths(mounts []framework.JailSubMountInfo, hasLocalNVM
 		paths = append(paths, mountPath)
 		delete(requiredByName, mount.Name)
 	}
-	if hasLocalNVMe && requiredByName["local-nvme"] {
-		return nil, fmt.Errorf("worker pod has local-nvme volume but NodeSet has no local-nvme jail submount")
+	if hasLocalNVMe && requiredByName[framework.LocalNVMeVolumeName] {
+		return nil, fmt.Errorf("worker pod has %s volume but NodeSet has no %[1]s jail submount", framework.LocalNVMeVolumeName)
 	}
 	sort.Strings(paths)
 	return paths, nil
@@ -150,15 +150,7 @@ check_mode() {
 
 for path in %s; do
     check_mode "$path"
-done`, strings.Join(quotedShellWords(paths), " "))
-}
-
-func quotedShellWords(values []string) []string {
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		out = append(out, framework.ShellQuote(value))
-	}
-	return out
+done`, framework.ShellJoin(paths...))
 }
 
 func (s *ClusterCreation) checkPodsReady(ctx context.Context) error {

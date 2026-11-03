@@ -277,9 +277,47 @@ func TestKubectlClientNodeSetsFiltersByClusterName(t *testing.T) {
 		Phase:         "Ready",
 		JailSubMounts: []JailSubMountInfo{
 			{Name: "local-data", MountPath: "/scratch", UsesVolumeClaimTemplate: true},
-			{Name: "config", MountPath: "/etc/config", ReadOnly: true},
+			{Name: "config", MountPath: "/etc/config", ReadOnly: true, VolumeSource: &corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "config"}},
+			}},
 		},
 	}, nodeSets[1])
+}
+
+func TestKubectlClientNodeSetsLocalNVMe(t *testing.T) {
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00nodesets\x00-n\x00soperator\x00-o\x00json": `{
+			"items": [{
+				"metadata": {"name": "worker", "namespace": "soperator"},
+				"spec": {
+					"clusterName": "soperator",
+					"replicas": 2,
+					"slurmd": {
+						"resources": {"cpu": "100", "ephemeral-storage": "11263Gi"},
+						"volumes": {"jailSubMounts": [
+							{"name": "local-nvme", "mountPath": "/scratch", "volumeSource": {"emptyDir": {"sizeLimit": "11263Gi"}}}
+						]}
+					}
+				},
+				"status": {"phase": "Ready", "replicas": 2}
+			}]
+		}`,
+	}}
+
+	nodeSets, err := NewKubectlClient(exec).NodeSets(t.Context(), "soperator")
+	require.NoError(t, err)
+	require.Len(t, nodeSets, 1)
+
+	ephemeral := nodeSets[0].SlurmdResources[corev1.ResourceEphemeralStorage]
+	assert.Equal(t, "11263Gi", ephemeral.String())
+	require.Len(t, nodeSets[0].JailSubMounts, 1)
+	mount := nodeSets[0].JailSubMounts[0]
+	assert.Equal(t, LocalNVMeVolumeName, mount.Name)
+	assert.False(t, mount.UsesVolumeClaimTemplate)
+	require.NotNil(t, mount.VolumeSource)
+	require.NotNil(t, mount.VolumeSource.EmptyDir)
+	require.NotNil(t, mount.VolumeSource.EmptyDir.SizeLimit)
+	assert.Equal(t, "11263Gi", mount.VolumeSource.EmptyDir.SizeLimit.String())
 }
 
 func TestKubectlClientNodeSetsDockerEnabled(t *testing.T) {
