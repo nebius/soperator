@@ -300,6 +300,9 @@ spec:
               - sourceLabels:
                 - __meta_kubernetes_node_name
                 targetLabel: instance
+              - sourceLabels:
+                - __metrics_path__
+                targetLabel: metrics_path
               - replacement: kubelet
                 targetLabel: job
               scheme: https

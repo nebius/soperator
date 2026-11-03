@@ -26,7 +26,7 @@
           "uid": "${datasource}"
         },
         "enable": false,
-        "expr": "group by (node, pod) (\n  changes(\n      sum without (uid, pod_ip)(\n          kube_pod_info{cluster=~\"$cluster\", pod=~\"worker-.*\", node!=\"\"}\n      )\n  ) > 0\n  and on (pod) \n  sum by (pod)(\n      kube_pod_info{cluster=~\"$cluster\", pod=~\"worker-.*\", node!=\"\"}\n  )\n)",
+        "expr": "group by (node, pod) (\n  changes(\n      sum without (uid, pod_ip)(\n          kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\", node!=\"\"}\n      )\n  ) > 0\n  and on (pod) \n  sum by (pod)(\n      kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\", node!=\"\"}\n  )\n)",
         "filter": {
           "exclude": true,
           "ids": [324]
@@ -187,7 +187,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_SM_CLOCK{cluster=~\"$cluster\", Hostname=~\"$node\"}*1000000)",
+          "expr": "avg(DCGM_FI_DEV_SM_CLOCK{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"}*1000000)",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -265,7 +265,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(DCGM_FI_DEV_MEM_CLOCK{cluster=~\"$cluster\", Hostname=~\"$node\"}*1000000)",
+          "expr": "avg(DCGM_FI_DEV_MEM_CLOCK{cluster=~\"$cluster\", Hostname=~\"$node\", exported_pod=~\"$worker\"}*1000000)",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -15087,7 +15087,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(kube_pod_info{cluster=~\"$cluster\"},pod)",
+        "definition": "label_values(slurm_node_info{cluster=~\"$cluster\"}, node_name)",
         "description": "Select one worker to check it's detailed stats in panels.",
         "includeAll": false,
         "label": "Worker",
@@ -15095,11 +15095,11 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(kube_pod_info{cluster=~\"$cluster\"},pod)",
+          "query": "label_values(slurm_node_info{cluster=~\"$cluster\"}, node_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
-        "refresh": 1,
-        "regex": "^worker.*",
+        "refresh": 2,
+        "regex": "",
         "type": "query"
       },
       {
@@ -15114,7 +15114,6 @@
         "definition": "label_values(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"},node)",
         "hide": 2,
         "includeAll": true,
-        "allValue": ".*",
         "label": "node",
         "multi": true,
         "name": "node",
@@ -15159,7 +15158,6 @@
         "definition": "label_values(node_uname_info{cluster=~\"$cluster\", nodename=~\"$node\"},instance)",
         "hide": 2,
         "includeAll": true,
-        "allValue": ".*",
         "multi": true,
         "name": "ip",
         "options": [],
@@ -15168,7 +15166,7 @@
           "query": "label_values(node_uname_info{cluster=~\"$cluster\", nodename=~\"$node\"},instance)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "type": "query"
       }
@@ -15182,5 +15180,6 @@
   "timezone": "browser",
   "title": "Workers Detailed Stats",
   "version": 2,
-  "weekStart": ""
+  "weekStart": "",
+  "uid": "soperator_workers_detailed_stats"
 }

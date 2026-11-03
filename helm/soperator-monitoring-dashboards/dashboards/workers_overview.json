@@ -25,7 +25,7 @@
           "uid": "${datasource}"
         },
         "enable": false,
-        "expr": "group by (node, pod) (\n  changes(\n      sum without (uid, pod_ip)(\n          kube_pod_info{cluster=~\"$cluster\", pod=~\"worker-.*\", node!=\"\"}\n      )\n  ) > 0\n  and on (pod) \n  sum by (pod)(\n      kube_pod_info{cluster=~\"$cluster\", pod=~\"worker-.*\", node!=\"\"}\n  )\n)",
+        "expr": "group by (node, pod) (\n  changes(\n      sum without (uid, pod_ip)(\n          kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\", node!=\"\"}\n      )\n  ) > 0\n  and on (pod) \n  sum by (pod)(\n      kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\", node!=\"\"}\n  )\n)",
         "filter": {
           "exclude": true,
           "ids": [328]
@@ -161,7 +161,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg (\n  1 - rate(node_cpu_seconds_total{cluster=~\"$cluster\", mode=\"idle\"}[1m])\n) * 100",
+          "expr": "avg (\n  1 - rate(node_cpu_seconds_total{cluster=~\"$cluster\", mode=\"idle\", instance=~\"$ip\"}[1m])\n) * 100",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -3053,7 +3053,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "avg(1 - rate(node_cpu_seconds_total{cluster=~\"$cluster\", mode=\"idle\", instance=~\"$ip\"}[$__rate_interval])) by (instance)\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"worker.*\"}, \"node\", \"nodename\")",
+              "expr": "avg(1 - rate(node_cpu_seconds_total{cluster=~\"$cluster\", mode=\"idle\", instance=~\"$ip\"}[$__rate_interval])) by (instance)\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"}, \"node\", \"nodename\")",
               "instant": false,
               "legendFormat": "{{pod}}",
               "range": true,
@@ -3150,7 +3150,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "(\n    node_memory_MemTotal_bytes{cluster=~\"$cluster\"} - \n    node_memory_MemFree_bytes{cluster=~\"$cluster\"} - \n    node_memory_Buffers_bytes{cluster=~\"$cluster\"} - \n    node_memory_Cached_bytes{cluster=~\"$cluster\"}\n)\n/\nnode_memory_MemTotal_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"worker.*\"}, \"node\", \"nodename\")",
+              "expr": "(\n    node_memory_MemTotal_bytes{cluster=~\"$cluster\"} - \n    node_memory_MemFree_bytes{cluster=~\"$cluster\"} - \n    node_memory_Buffers_bytes{cluster=~\"$cluster\"} - \n    node_memory_Cached_bytes{cluster=~\"$cluster\"}\n)\n/\nnode_memory_MemTotal_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"}, \"node\", \"nodename\")",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -3269,7 +3269,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(node_disk_read_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval]))\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"worker.*\"}, \"node\", \"nodename\")",
+              "expr": "sum by (instance) (rate(node_disk_read_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval]))\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"}, \"node\", \"nodename\")",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -3284,7 +3284,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(node_disk_written_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval]))\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"worker.*\"}, \"node\", \"nodename\")",
+              "expr": "sum by (instance) (rate(node_disk_written_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval]))\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"}, \"node\", \"nodename\")",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -3385,7 +3385,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "(\n  sum by (instance, device) (node_filesystem_size_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}) - \n  sum by (instance, device) (node_filesystem_avail_bytes{cluster=~\"$cluster\", instance=~\"$ip\"})\n) / \nsum by (instance, device) (node_filesystem_size_bytes{cluster=~\"$cluster\", instance=~\"$ip\",device!~\"none|shm|tmpfs|cloud-metadata|accounting|.*vda15\"})\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"worker.*\"}, \"node\", \"nodename\")",
+              "expr": "(\n  sum by (instance, device) (node_filesystem_size_bytes{cluster=~\"$cluster\", instance=~\"$ip\"}) - \n  sum by (instance, device) (node_filesystem_avail_bytes{cluster=~\"$cluster\", instance=~\"$ip\"})\n) / \nsum by (instance, device) (node_filesystem_size_bytes{cluster=~\"$cluster\", instance=~\"$ip\",device!~\"none|shm|tmpfs|cloud-metadata|accounting|.*vda15\"})\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"}, \"node\", \"nodename\")",
               "hide": false,
               "instant": false,
               "legendFormat": "{{device}} {{pod}}",
@@ -3488,7 +3488,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "avg by (instance, device) (\n  1 - \n  (\n    node_filesystem_files_free{cluster=~\"$cluster\", instance=~\"$ip\",device!~'none|shm|tmpfs|cloud-metadata|accounting|.*vda15'}\n    /\n    node_filesystem_files{cluster=~\"$cluster\", instance=~\"$ip\",device!~'none|shm|tmpfs|cloud-metadata|accounting|.*vda15'}\n  )\n)\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"worker.*\"}, \"node\", \"nodename\")",
+              "expr": "avg by (instance, device) (\n  1 - \n  (\n    node_filesystem_files_free{cluster=~\"$cluster\", instance=~\"$ip\",device!~'none|shm|tmpfs|cloud-metadata|accounting|.*vda15'}\n    /\n    node_filesystem_files{cluster=~\"$cluster\", instance=~\"$ip\",device!~'none|shm|tmpfs|cloud-metadata|accounting|.*vda15'}\n  )\n)\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"}, \"node\", \"nodename\")",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -3634,7 +3634,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(node_network_transmit_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\",device=~\"eth.*\"}[$__interval]))\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"worker.*\"}, \"node\", \"nodename\")",
+              "expr": "sum by (instance) (rate(node_network_transmit_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\",device=~\"eth.*\"}[$__interval]))\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"}, \"node\", \"nodename\")",
               "format": "time_series",
               "hide": false,
               "interval": ".5m",
@@ -3649,7 +3649,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(node_network_receive_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\",device=~\"eth.*\"}[$__interval]))\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"worker.*\"}, \"node\", \"nodename\")",
+              "expr": "sum by (instance) (rate(node_network_receive_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\",device=~\"eth.*\"}[$__interval]))\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"}, \"node\", \"nodename\")",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -3785,7 +3785,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(node_infiniband_port_data_transmitted_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval]))\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"worker.*\"}, \"node\", \"nodename\")",
+              "expr": "sum by (instance) (rate(node_infiniband_port_data_transmitted_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval]))\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"}, \"node\", \"nodename\")",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -3800,7 +3800,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (rate(node_infiniband_port_data_received_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval]))\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"worker.*\"}, \"node\", \"nodename\")",
+              "expr": "sum by (instance) (rate(node_infiniband_port_data_received_bytes_total{cluster=~\"$cluster\", instance=~\"$ip\"}[$__interval]))\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"}, \"node\", \"nodename\")",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -4134,7 +4134,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (instance) (\n  rate({cluster=~\"$cluster\", __name__=~\"node_infiniband_.*(error|downed|discards|dropped).*\", instance=~\"$ip\"}[$__interval])\n)\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"worker.*\"}, \"node\", \"nodename\")",
+              "expr": "sum by (instance) (\n  rate({cluster=~\"$cluster\", __name__=~\"node_infiniband_.*(error|downed|discards|dropped).*\", instance=~\"$ip\"}[$__interval])\n)\n* on(instance) group_left(nodename) node_uname_info{cluster=~\"$cluster\"}\n* on(nodename) group_left(pod) label_move(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"}, \"node\", \"nodename\")",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -4235,7 +4235,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum by (error) (\n    rate(\n        label_copy(\n            {cluster=~\"$cluster\", __name__=~\"node_infiniband_.*(error|downed|discards|dropped).*\", instance=~\".*\"},\n            \"__name__\",\n            \"error\",\n        )[$__interval]\n    )\n)\n",
+              "expr": "sum by (error) (\n    rate(\n        label_copy(\n            {cluster=~\"$cluster\", __name__=~\"node_infiniband_.*(error|downed|discards|dropped).*\", instance=~\"$ip\"},\n            \"__name__\",\n            \"error\",\n        )[$__interval]\n    )\n)\n",
               "hide": false,
               "instant": false,
               "legendFormat": "__auto",
@@ -4343,7 +4343,6 @@
         "type": "query"
       },
       {
-        "allValue": ".*",
         "allowCustomValue": false,
         "current": {
           "text": ["worker-rack0-0"],
@@ -4353,7 +4352,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(slurm_node_info{cluster=~\"$cluster\", node_name=~\"$rack-.*\"}, node_name)",
+        "definition": "label_values(slurm_node_info{cluster=~\"$cluster\", nodeset_name=~\"$rack\"}, node_name)",
         "description": "Select as many workers as you need to check their aggregate and separate stats in panels.",
         "includeAll": true,
         "label": "Workers",
@@ -4362,7 +4361,7 @@
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(slurm_node_info{cluster=~\"$cluster\", node_name=~\"$rack-.*\"}, node_name)",
+          "query": "label_values(slurm_node_info{cluster=~\"$cluster\", nodeset_name=~\"$rack\"}, node_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -4382,7 +4381,6 @@
         "definition": "label_values(kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\"},node)",
         "hide": 2,
         "includeAll": true,
-        "allValue": ".*",
         "label": "instance",
         "multi": true,
         "name": "hostname",
@@ -4409,7 +4407,6 @@
         "definition": "label_values(node_uname_info{cluster=~\"$cluster\", container=\"node-exporter\", nodename=~\"$hostname\"},instance)",
         "hide": 2,
         "includeAll": true,
-        "allValue": ".*",
         "label": "ip",
         "multi": true,
         "name": "ip",
@@ -4419,7 +4416,7 @@
           "query": "label_values(node_uname_info{cluster=~\"$cluster\", container=\"node-exporter\", nodename=~\"$hostname\"},instance)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "type": "query"
       }
