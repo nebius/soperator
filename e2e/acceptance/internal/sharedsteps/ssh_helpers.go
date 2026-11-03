@@ -15,6 +15,29 @@ const (
 	sshTestUserPropagationTimeout = time.Minute
 )
 
+// runAsLoginUser wraps command in a login shell of userName, run from the jail as root.
+func runAsLoginUser(userName, command string) string {
+	return fmt.Sprintf("su - %s -c %s", framework.ShellQuote(userName), framework.ShellQuote(command))
+}
+
+// prepareSSHTestUser creates userName when missing and waits until the account is resolvable where jobs need it.
+// slurmctld must resolve the user before it accepts a job submitted as them,
+// and each worker must resolve it before the job starts there.
+func prepareSSHTestUser(ctx context.Context, runtime framework.Runtime, userName string, workers ...framework.WorkerInfo) error {
+	if err := ensureSSHTestUser(ctx, runtime, userName); err != nil {
+		return err
+	}
+	if err := waitForSSHTestUserOnController(ctx, runtime, userName); err != nil {
+		return err
+	}
+	for _, worker := range workers {
+		if err := waitForSSHTestUserOnWorker(ctx, runtime, userName, worker); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ensureSSHTestUser(ctx context.Context, runtime framework.Runtime, userName string) error {
 	quotedUserName := framework.ShellQuote(userName)
 	command := fmt.Sprintf(
@@ -164,11 +187,7 @@ ssh-keygen -q -t ecdsa -N '' -C %s -f "${key}"
 cat "${key}.pub" >> "${authorized_keys}"
 chmod 0600 "${authorized_keys}"
 `, keyName, keyComment, framework.ShellQuote(keyComment))
-	command := fmt.Sprintf(
-		"su - %s -c %s",
-		framework.ShellQuote(userName),
-		framework.ShellQuote(framework.BashLC(setupIdentity)),
-	)
+	command := runAsLoginUser(userName, framework.BashLC(setupIdentity))
 	if _, err := runtime.Jail().Run(ctx, command); err != nil {
 		return fmt.Errorf("prepare SSH identity for %s: %w", userName, err)
 	}
@@ -192,10 +211,9 @@ if [ -f "${authorized_keys}" ]; then
 fi
 `, keyName, keyComment)
 	command := fmt.Sprintf(
-		"if id %s >/dev/null 2>&1; then su - %s -c %s; fi",
+		"if id %s >/dev/null 2>&1; then %s; fi",
 		framework.ShellQuote(userName),
-		framework.ShellQuote(userName),
-		framework.ShellQuote(framework.BashLC(cleanupIdentity)),
+		runAsLoginUser(userName, framework.BashLC(cleanupIdentity)),
 	)
 	_, err := runtime.Jail().Run(ctx, command)
 	return err
@@ -221,13 +239,8 @@ func runInternalSSHAsTestUser(
 		quotedHost,
 		framework.ShellQuote(remoteCommand),
 	)
-	command := fmt.Sprintf(
-		"su - %s -c %s",
-		framework.ShellQuote(sshTestUserName),
-		framework.ShellQuote(sshCommand),
-	)
 
-	return runtime.Jail().RunWithDefaultRetry(ctx, command)
+	return runtime.Jail().RunWithDefaultRetry(ctx, runAsLoginUser(sshTestUserName, sshCommand))
 }
 
 func runSSHCommand(
@@ -246,11 +259,6 @@ func runSSHCommand(
 		framework.ShellQuote(host),
 		framework.ShellQuote(framework.BashLC(remoteCommand)),
 	)
-	command := fmt.Sprintf(
-		"su - %s -c %s",
-		framework.ShellQuote(userName),
-		framework.ShellQuote(sshCommand),
-	)
 
-	return runtime.Jail().Run(ctx, command)
+	return runtime.Jail().Run(ctx, runAsLoginUser(userName, sshCommand))
 }

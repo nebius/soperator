@@ -411,14 +411,7 @@ func (s *SystemSettings) regularUserIsAvailableOnWorker(ctx context.Context) err
 	if err := s.requireWorker(); err != nil {
 		return err
 	}
-	if err := ensureSSHTestUser(ctx, s.runtime, sshTestUserName); err != nil {
-		return err
-	}
-	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, sshTestUserName, s.worker); err != nil {
-		return err
-	}
-	// slurmctld must resolve the user before it accepts a job submitted as them.
-	return waitForSSHTestUserOnController(ctx, s.runtime, sshTestUserName)
+	return prepareSSHTestUser(ctx, s.runtime, sshTestUserName, s.worker)
 }
 
 func (s *SystemSettings) collectRegularUserWorkerResourceLimits(ctx context.Context) error {
@@ -1056,7 +1049,7 @@ func interactiveProbeCommand(userName, workerName, probe string, container probe
 		int(systemSettingsJobTimeout.Seconds()),
 		framework.ShellQuote(srun),
 	)
-	return fmt.Sprintf("su - %s -c %s", framework.ShellQuote(userName), framework.ShellQuote(interactive))
+	return runAsLoginUser(userName, interactive)
 }
 
 // pamSlurmAdoptRequiresJob mirrors the worker PAM account stack: users and
