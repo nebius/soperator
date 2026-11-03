@@ -20,9 +20,7 @@ func TestParseRunOptionsDefaults(t *testing.T) {
 	assert.Empty(t, opts.SoperatorVersion)
 	assert.Empty(t, opts.ScenarioPaths)
 	assert.Equal(t, "artifacts", opts.OutputDir)
-	assert.Equal(t, 4, opts.Parallelism)
-	assert.True(t, opts.HeavyFirst)
-	assert.Zero(t, opts.RandomSeed)
+	assert.Equal(t, 8, opts.Parallelism)
 	assert.Equal(t, 2*time.Hour, opts.WorkerAcquireTimeout)
 }
 
@@ -33,19 +31,6 @@ func TestParseRunOptionsRejectsInvalidConcurrencySettings(t *testing.T) {
 	}
 }
 
-func TestParseRunOptionsRejectsInvalidOrderingSettings(t *testing.T) {
-	for _, tc := range []struct {
-		option string
-		error  string
-	}{
-		{option: "--random-seed=-1", error: "must not be negative"},
-		{option: "--random-seed=104729", error: "requires --heavy-first=false"},
-	} {
-		_, err := parseRunOptions([]string{"--kubectl-context", "unused", "--output-dir", "out", tc.option})
-		require.ErrorContains(t, err, tc.error)
-	}
-}
-
 func TestParseRunOptionsExplicitValues(t *testing.T) {
 	opts, err := parseRunOptions([]string{
 		"--kubectl-context", "dev-context",
@@ -53,10 +38,8 @@ func TestParseRunOptionsExplicitValues(t *testing.T) {
 		"--soperator-version", "4.1.5-reb85d0e5",
 		"--run-unstable=true",
 		"--run-heavy=true",
-		"--parallelism=8",
+		"--parallelism=4",
 		"--worker-acquire-timeout=45m",
-		"--heavy-first=false",
-		"--random-seed=104729",
 		"--scenario", "features/internal_ssh.feature:3",
 		"--scenario=features/observability.feature:3",
 		"--output-dir", "reports",
@@ -66,10 +49,8 @@ func TestParseRunOptionsExplicitValues(t *testing.T) {
 	assert.Equal(t, "custom", opts.SlurmClusterName)
 	assert.True(t, opts.RunUnstableTests)
 	assert.True(t, opts.RunHeavyTests)
-	assert.Equal(t, 8, opts.Parallelism)
+	assert.Equal(t, 4, opts.Parallelism)
 	assert.Equal(t, 45*time.Minute, opts.WorkerAcquireTimeout)
-	assert.False(t, opts.HeavyFirst)
-	assert.EqualValues(t, 104729, opts.RandomSeed)
 	assert.Equal(t, []string{"features/internal_ssh.feature:3", "features/observability.feature:3"}, opts.ScenarioPaths)
 	assert.Equal(t, "reports", opts.OutputDir)
 }

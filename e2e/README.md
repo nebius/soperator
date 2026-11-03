@@ -68,13 +68,8 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
 - `--run-heavy`: optional, defaults to `false`; when false, scenarios tagged
   `@heavy` are excluded. Enabling it includes heavy scenarios alongside ordinary
   scenarios. Heavy and unstable controls are independent.
-- `--parallelism`: maximum concurrent worker-local scenarios, defaults to `4`.
+- `--parallelism`: maximum concurrent worker-local scenarios, defaults to `8`.
   Set to `1` for sequential execution with the same selection and reservation rules.
-- `--heavy-first`: queue heavy scenarios first in the parallel suite, defaults
-  to `true`. Set to `false` to compare with the original feature-list order.
-- `--random-seed`: positive seed for randomized parallel-suite launch order and
-  outline examples, defaults to `0` (disabled). Requires `--heavy-first=false`.
-  The runner logs the seed and selected launch queue so an ordering can be reused.
 - `--worker-acquire-timeout`: maximum wait for free, healthy workers, defaults
   to `2h`. This includes contention and recovery and is separate from job timeouts.
 - `--scenario`: optional. Runs all compatible scenarios in the provided feature
@@ -93,20 +88,15 @@ files are descriptive only; no current runner or workflow consumes them.
 
 The CLI runs two suites in order: `soperator` contains `@sequential` scenarios
 and executes them one at a time; `soperator-parallel` contains all other scenarios
-and uses native Godog concurrency (four by default). Both retain the same version,
+and uses native Godog concurrency (eight by default). Both retain the same version,
 heavy, unstable and scenario-path filters. Exact scenario selectors refer to the
 `Scenario:` or `Scenario Outline:` line in the selected checkout.
 If the sequential suite fails, the concurrent suite is not started against a
 potentially degraded shared baseline.
 
-By default, keep `@heavy` scenarios first in the parallel suite's launch queue.
-`ConcurrentSuites` applies this ordering automatically, preserving the original
-order within heavy and ordinary scenarios. Worker reservations still determine
-when each scenario can obtain its workers; sequential-suite ordering is unchanged.
-Explicit ordering overrides support comparisons of the original order,
-heavy-first order and seeded random order. None changes the scenario selection
-or worker-reservation rules. `SuiteConfig.RandomSeed` provides the same seeded
-ordering for library callers; use either it or `SuiteConfig.HeavyFirst`.
+Both suites preserve feature-list and scenario declaration order within their
+selection. Worker availability determines when concurrent scenarios can proceed;
+scenario correctness must never depend on launch or completion order.
 
 Worker selection waits for active workers' Pods and Kubernetes hosts to be Ready
 and reserves an entire worker set atomically. Waiting requests
@@ -275,7 +265,7 @@ respective tags. `SoperatorSuite` preserves heavy coverage for library callers;
 the standalone CLI explicitly excludes it unless `--run-heavy` is set.
 
 Library callers keep sequential behavior unless they set `SuiteConfig.Concurrency`.
-To reuse the same split, pass `acceptance.ConcurrentSuites(suite, 4)` as
+To reuse the same split, pass `acceptance.ConcurrentSuites(suite, 8)` as
 `RunnerConfig.Suites`. This also works with Managed-owned feature sources and
 step registrars. Set `RunnerConfig.WorkerAcquireTimeout` to override the default
 two-hour acquisition budget. Select workers through `WorkerSelector.Acquire`
