@@ -164,7 +164,11 @@ affects, including workers used by indirectly launched jobs. Even a short smoke 
 such as `hostname` allocates a worker and runs job cleanup. Acquire the complete set
 atomically through `WorkerSelector.Acquire` or its `Pick...Workers` wrappers;
 custom selectors must call `Reserve` before using their selection. An idle worker
-found through a snapshot is not necessarily unreserved. Let acquisition wait for
+found through a snapshot is not necessarily unreserved. When multiple complete
+worker sets or NodeSets are acceptable, use `AcquireAny` so selection and ownership
+are atomic. Shared selection prefers available CPU capacity for GPU-independent
+checks and falls back to GPU capacity; do not preselect a busy NodeSet while
+another eligible set could be used. Let acquisition wait for
 busy or unhealthy configured workers rather than skipping them or holding a subset
 while waiting for more. Pin every job to the reserved workers, use
 `RequireReservedHost` before host-wide faults, and retain reservations until owned

@@ -331,12 +331,16 @@ func (s *WorkerRollingUpdate) prepareRolloutWorkers(ctx context.Context) error {
 }
 
 func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, framework.WorkerAcquireTimeout(ctx))
+	defer cancel()
 	nodeSets, err := listClusterNodeSets(ctx, s.kubectl, s.info.SlurmClusterName)
 	if err != nil {
 		return err
 	}
 
 	var rejected []string
+	var unavailable []error
+	var candidates []WorkerRollingUpdate
 	for _, nodeSet := range nodeSets {
 		if reason := workerRolloutConfigurationProblem(nodeSet, s.info.SlurmClusterName); reason != "" {
 			rejected = append(rejected, fmt.Sprintf("%s: %s", nodeSet.Metadata.Name, reason))
@@ -346,11 +350,12 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if reason := workerRolloutCandidateProblem(nodeSet, s.info.SlurmClusterName, len(names)); reason != "" {
-			return fmt.Errorf("require configured rollout NodeSet %s to be healthy: %s", nodeSet.Metadata.Name, reason)
-		}
 		if len(names) < 2 {
-			rejected = append(rejected, fmt.Sprintf("%s: %d active workers, require at least %d", nodeSet.Metadata.Name, len(names), 2))
+			if reason := workerRolloutCandidateProblem(nodeSet, s.info.SlurmClusterName, len(names)); reason != "" {
+				unavailable = append(unavailable, fmt.Errorf("require configured rollout NodeSet %s to be healthy: %s", nodeSet.Metadata.Name, reason))
+			} else {
+				rejected = append(rejected, fmt.Sprintf("%s: %d active workers, require at least 2", nodeSet.Metadata.Name, len(names)))
+			}
 			continue
 		}
 		budget, err := workerRolloutBudget(nodeSet.Spec.MaxUnavailable, len(names))
@@ -362,11 +367,53 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 			continue
 		}
 		candidate := *s
-		candidate.nodeSet = nodeSet
-		candidate.workerNames = names
+		candidate.nodeSet, candidate.workerNames = nodeSet, names
 		candidate.mk8s = workerRolloutMK8s{}
-		if err := s.selector.Reserve(ctx, framework.WorkerRequirements{NodeSet: nodeSet.Metadata.Name, Names: names, Count: len(names)}); err != nil {
+		candidates = append(candidates, candidate)
+	}
+	for len(candidates) != 0 {
+		var alternatives []framework.WorkerRequirements
+		for _, candidate := range candidates {
+			alternatives = append(alternatives, framework.WorkerRequirements{
+				NodeSet: candidate.nodeSet.Metadata.Name, Names: candidate.workerNames, Count: len(candidate.workerNames), Idle: true,
+			})
+		}
+		workers, err := s.selector.AcquireAny(ctx, alternatives)
+		if err != nil {
 			return err
+		}
+		index := slices.IndexFunc(candidates, func(candidate WorkerRollingUpdate) bool {
+			return candidate.nodeSet.Metadata.Name == workers[0].NodeSetName
+		})
+		if index < 0 {
+			return fmt.Errorf("reserved worker %s belongs to unexpected NodeSet %s", workers[0].Name, workers[0].NodeSetName)
+		}
+		candidate := candidates[index]
+		candidates = slices.Delete(candidates, index, index+1)
+		current, err := listClusterNodeSets(ctx, s.kubectl, s.info.SlurmClusterName)
+		if err != nil {
+			return err
+		}
+		currentIndex := slices.IndexFunc(current, func(nodeSet kubeobjects.NodeSet) bool {
+			return nodeSet.Metadata.Name == candidate.nodeSet.Metadata.Name
+		})
+		if currentIndex < 0 {
+			return fmt.Errorf("reserved NodeSet %s disappeared", candidate.nodeSet.Metadata.Name)
+		}
+		candidate.nodeSet = current[currentIndex]
+		if reason := workerRolloutCandidateProblem(candidate.nodeSet, s.info.SlurmClusterName, len(workers)); reason != "" {
+			return fmt.Errorf("require configured rollout NodeSet %s to be healthy: %s", candidate.nodeSet.Metadata.Name, reason)
+		}
+		currentNames, err := candidate.rolloutWorkerNames(ctx, candidate.nodeSet)
+		if err != nil {
+			return err
+		}
+		if !slices.Equal(currentNames, candidate.workerNames) {
+			return fmt.Errorf("NodeSet %s active workers changed while acquiring its reservation: expected %v, observed %v", candidate.nodeSet.Metadata.Name, candidate.workerNames, currentNames)
+		}
+		budget, err := workerRolloutBudget(candidate.nodeSet.Spec.MaxUnavailable, len(currentNames))
+		if err != nil || budget < 2 {
+			return fmt.Errorf("NodeSet %s rollout budget changed while acquiring its reservation: budget=%d error=%v", candidate.nodeSet.Metadata.Name, budget, err)
 		}
 		if err := candidate.snapshotSelectedWorkers(ctx); err != nil {
 			return err
@@ -377,20 +424,26 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 		}
 		if len(hosts) != len(candidate.initialPods) {
 			framework.ReleaseReservedWorkers(ctx)
-			rejected = append(rejected, fmt.Sprintf("%s: require a separate host for each worker", nodeSet.Metadata.Name))
+			rejected = append(rejected, fmt.Sprintf("%s: require a separate host for each worker", candidate.nodeSet.Metadata.Name))
 			continue
 		}
 		if s.requireMK8s {
 			if err := candidate.selectMK8sGroup(ctx); err != nil {
 				var prerequisite workerRolloutPrerequisiteError
-				if !errors.As(err, &prerequisite) {
+				var notConverged workerMK8sNotConvergedError
+				if errors.As(err, &notConverged) {
+					unavailable = append(unavailable, fmt.Errorf("NodeSet %s: %w", candidate.nodeSet.Metadata.Name, err))
+				} else if errors.As(err, &prerequisite) {
+					rejected = append(rejected, fmt.Sprintf("%s: %v", candidate.nodeSet.Metadata.Name, err))
+				} else {
 					return err
 				}
-				rejected = append(rejected, fmt.Sprintf("%s: %v", nodeSet.Metadata.Name, err))
+				s.runtime.Logf("Acceptance: NodeSet %s cannot drive the MK8s rollout: %v; trying another NodeSet", candidate.nodeSet.Metadata.Name, err)
 				framework.ReleaseReservedWorkers(ctx)
 				continue
 			}
 		}
+		s.runtime.Logf("Worker rollout: selected NodeSet %s gpu=%t workers=%v", candidate.nodeSet.Metadata.Name, candidate.nodeSet.Spec.GPU.Enabled, candidate.workerNames)
 		*s = candidate
 		if isEphemeralRollout(s.nodeSet) {
 			if err := s.holdEphemeralWorkers(ctx, s.workerNames); err != nil {
@@ -405,6 +458,9 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 			}
 		}
 		return s.waitForIdle(ctx, "selected NodeSet workers idle before the rollout", workerRolloutIdleTimeout)
+	}
+	if len(unavailable) != 0 {
+		return fmt.Errorf("select a healthy rollout NodeSet (%s): %w", strings.Join(rejected, "; "), errors.Join(unavailable...))
 	}
 	s.runtime.Logf("Acceptance: no NodeSet satisfies rollout prerequisites (%s), skipping scenario", strings.Join(rejected, "; "))
 	return godog.ErrSkip

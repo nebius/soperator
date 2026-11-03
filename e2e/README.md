@@ -103,7 +103,11 @@ scenario correctness must never depend on launch or completion order.
 Worker selection waits for active workers' Pods and Kubernetes hosts to be Ready
 and reserves an entire worker set atomically. Waiting requests
 are considered in arrival order, but a request that cannot fit does not block
-an independent request. Generic allocations prefer CPU workers. Leases last
+an independent request. Generic allocations prefer CPU workers, including when
+choosing among complete NodeSets; GPU workers are used when no complete CPU-only
+alternative is available. GPU-specific requests still require GPU workers.
+`WorkerSelector.AcquireAny` chooses one complete alternative atomically, so a
+busy preferred NodeSet does not block another eligible free NodeSet. Leases last
 through cleanup; failed cleanup or recovery quarantines the affected workers
 for the rest of the run. Shared configuration mutation, unsafe shared SSH identity
 changes, shared provider quotas, cluster-wide assertions and system DaemonSet restarts require `@sequential`

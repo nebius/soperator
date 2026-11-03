@@ -36,6 +36,8 @@ type workerRolloutMK8s struct {
 	requestedMaxPods             *mk8sInteger
 }
 
+type workerMK8sNotConvergedError struct{ error }
+
 // The CLI can emit protobuf int64 fields as either numbers or strings.
 type mk8sInteger int64
 
@@ -360,8 +362,8 @@ func workerMK8sGroupReady(group workerMK8sGroup, minimumWorkers int) error {
 		group.Status.Target < minimum || group.Status.Target > maximum ||
 		!strings.EqualFold(group.Status.State, "RUNNING") || group.Status.Reconciling || group.Status.Outdated != 0 ||
 		group.Status.Count != group.Status.Target || group.Status.Ready != group.Status.Target {
-		return fmt.Errorf("MK8s group %s not converged: state=%s reconciling=%t target=%d nodes=%d ready=%d outdated=%d bounds=%d..%d minimum_workers=%d",
-			group.Metadata.ID, group.Status.State, group.Status.Reconciling, group.Status.Target, group.Status.Count, group.Status.Ready, group.Status.Outdated, minimum, maximum, minimumWorkers)
+		return workerMK8sNotConvergedError{fmt.Errorf("MK8s group %s not converged: state=%s reconciling=%t target=%d nodes=%d ready=%d outdated=%d bounds=%d..%d minimum_workers=%d",
+			group.Metadata.ID, group.Status.State, group.Status.Reconciling, group.Status.Target, group.Status.Count, group.Status.Ready, group.Status.Outdated, minimum, maximum, minimumWorkers)}
 	}
 	return nil
 }

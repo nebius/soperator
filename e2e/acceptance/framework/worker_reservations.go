@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -21,10 +20,14 @@ type WorkerPool struct {
 }
 
 type workerRequest struct {
-	owner      *WorkerReservation
+	owner   *WorkerReservation
+	choices []workerChoice
+	granted []WorkerInfo
+}
+
+type workerChoice struct {
 	count      int
 	candidates []WorkerInfo
-	granted    []WorkerInfo
 }
 
 // WorkerReservation retains worker ownership until scenario cleanup finishes.
@@ -78,17 +81,13 @@ func (p *WorkerPool) grant() {
 	var waiting []*workerRequest
 	granted := false
 	for _, request := range p.waiting {
-		var available []WorkerInfo
-		for _, worker := range request.candidates {
-			if worker.IsUsable() && worker.SlurmNode.State != "" && p.owners[worker.Name] == nil && p.quarantine[worker.Name] == nil {
-				available = append(available, worker)
-			}
-		}
-		if len(available) < request.count {
+		request.granted = chooseWorkerChoice(request.choices, func(worker WorkerInfo) bool {
+			return worker.IsUsable() && worker.SlurmNode.State != "" && p.owners[worker.Name] == nil && p.quarantine[worker.Name] == nil
+		})
+		if len(request.granted) == 0 {
 			waiting = append(waiting, request)
 			continue
 		}
-		request.granted = available[:request.count]
 		granted = true
 		request.owner.workers = request.granted
 		for _, worker := range request.granted {
@@ -112,8 +111,15 @@ func (p *WorkerPool) remove(request *workerRequest) {
 }
 
 func (r *WorkerReservation) acquire(ctx context.Context, count int, discover func(context.Context) ([]WorkerInfo, error)) ([]WorkerInfo, error) {
+	return r.acquireAny(ctx, func(ctx context.Context) ([]workerChoice, error) {
+		workers, err := discover(ctx)
+		return []workerChoice{{count: count, candidates: workers}}, err
+	})
+}
+
+func (r *WorkerReservation) acquireAny(ctx context.Context, discover func(context.Context) ([]workerChoice, error)) ([]WorkerInfo, error) {
 	p := r.pool
-	request := &workerRequest{owner: r, count: count}
+	request := &workerRequest{owner: r}
 	p.mu.Lock()
 	if len(r.workers) != 0 {
 		p.mu.Unlock()
@@ -135,15 +141,12 @@ func (r *WorkerReservation) acquire(ctx context.Context, count int, discover fun
 		if err := ctx.Err(); err != nil {
 			return nil, fmt.Errorf("reserve workers for %q: %w; last observation: %v", r.name, err, lastErr)
 		}
-		candidates, err := discover(ctx)
+		choices, err := discover(ctx)
 		if err != nil {
 			return nil, err
 		}
-		// Preserve GPU capacity for requests that require it.
-		candidates = append([]WorkerInfo(nil), candidates...)
-		sort.SliceStable(candidates, func(i, j int) bool { return !candidates[i].HasGPU && candidates[j].HasGPU })
 		p.mu.Lock()
-		request.candidates = candidates
+		request.choices = choices
 		p.grant()
 		if len(request.granted) != 0 {
 			workers := append([]WorkerInfo(nil), request.granted...)
@@ -152,20 +155,26 @@ func (r *WorkerReservation) acquire(ctx context.Context, count int, discover fun
 			success = true
 			return workers, nil
 		}
-		var observations []string
-		quarantined := 0
-		for _, worker := range candidates {
-			owner := ""
-			if held := p.owners[worker.Name]; held != nil {
-				owner = held.name
+		var problems []error
+		allQuarantined := len(choices) > 0
+		for _, choice := range choices {
+			var observations []string
+			quarantined := 0
+			for _, worker := range choice.candidates {
+				owner := ""
+				if held := p.owners[worker.Name]; held != nil {
+					owner = held.name
+				}
+				observations = append(observations, fmt.Sprintf("%s state=%s unavailable=%q owner=%q quarantined=%v", worker.Name, worker.SlurmNode.State, worker.unavailableReason, owner, p.quarantine[worker.Name]))
+				if p.quarantine[worker.Name] != nil {
+					quarantined++
+				}
 			}
-			observations = append(observations, fmt.Sprintf("%s state=%s unavailable=%q owner=%q quarantined=%v", worker.Name, worker.SlurmNode.State, worker.unavailableReason, owner, p.quarantine[worker.Name]))
-			if p.quarantine[worker.Name] != nil {
-				quarantined++
-			}
+			problems = append(problems, fmt.Errorf("need %d workers: %s", choice.count, strings.Join(observations, "; ")))
+			allQuarantined = allQuarantined && quarantined > 0 && len(choice.candidates) >= choice.count && len(choice.candidates)-quarantined < choice.count
 		}
-		lastErr = fmt.Errorf("need %d workers: %s", count, strings.Join(observations, "; "))
-		if quarantined > 0 && len(candidates) >= count && len(candidates)-quarantined < count {
+		lastErr = errors.Join(problems...)
+		if allQuarantined {
 			p.mu.Unlock()
 			return nil, fmt.Errorf("reserve workers: %w", lastErr)
 		}

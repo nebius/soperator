@@ -136,7 +136,7 @@ func TestWorkerSelectorWaitsForHostRecoveryWithinSharedAcquisition(t *testing.T)
 			require.Eventually(t, func() bool {
 				pool.mu.Lock()
 				defer pool.mu.Unlock()
-				return len(pool.waiting) == 1 && len(pool.waiting[0].candidates) == 1
+				return len(pool.waiting) == 1 && len(pool.waiting[0].choices) == 1 && len(pool.waiting[0].choices[0].candidates) == 1
 			}, time.Second, time.Millisecond)
 			pool.mu.Lock()
 			assert.Empty(t, pool.owners)

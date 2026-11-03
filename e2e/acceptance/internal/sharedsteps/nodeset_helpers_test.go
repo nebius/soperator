@@ -19,16 +19,18 @@ func TestListClusterNodeSetsFiltersAndSorts(t *testing.T) {
 			"items": [
 				{"metadata":{"name":"worker-z","namespace":"soperator"},"spec":{"clusterName":"soperator"}},
 				{"metadata":{"name":"other","namespace":"soperator"},"spec":{"clusterName":"other"}},
-				{"metadata":{"name":"worker-a","namespace":"soperator"},"spec":{}}
+				{"metadata":{"name":"worker-a","namespace":"soperator"},"spec":{}},
+				{"metadata":{"name":"a-gpu","namespace":"soperator"},"spec":{"gpu":{"enabled":true}}}
 			]
 		}`,
 	}}
 
 	nodeSets, err := listClusterNodeSets(t.Context(), framework.NewKubectlClient(exec), "soperator")
 	require.NoError(t, err)
-	require.Len(t, nodeSets, 2)
+	require.Len(t, nodeSets, 3)
 	assert.Equal(t, "worker-a", nodeSets[0].Metadata.Name)
 	assert.Equal(t, "worker-z", nodeSets[1].Metadata.Name)
+	assert.Equal(t, "a-gpu", nodeSets[2].Metadata.Name)
 }
 
 func TestNodeSetWorkerPodsUsesSharedSelector(t *testing.T) {
