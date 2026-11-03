@@ -77,6 +77,7 @@ func TestSharedSequentialScenariosHaveSpecificReasons(t *testing.T) {
 		"scontrol topology and SLURM_TOPOLOGY_ADDR agree across workers",
 		"A switch limit rejects a cross-leaf allocation",
 		"A worker template update preserves running jobs",
+		"Workers expose local NVMe scratch to jobs",
 		"A failed GPU health check replaces the worker node",
 		"A GPU worker recovers when maintenance arrives during health-check draining",
 		"A GPU worker recovers when maintenance arrives after health-check draining",

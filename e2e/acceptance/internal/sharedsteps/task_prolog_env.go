@@ -175,10 +175,7 @@ func taskPrologWorkerSSHNetworkEnvCommand(user, worker string, timeout time.Dura
 		framework.ShellQuote(worker),
 		framework.ShellQuote(framework.BashLC(taskPrologNetworkEnvProbe())),
 	)
-	return fmt.Sprintf("su - %s -c %s",
-		framework.ShellQuote(user),
-		framework.ShellQuote(sshCommand),
-	)
+	return runAsLoginUser(user, sshCommand)
 }
 
 func bashC(script string) string {
