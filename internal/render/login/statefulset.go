@@ -94,13 +94,14 @@ func RenderStatefulSet(
 					Annotations: renderPodAnnotations(),
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: naming.BuildServiceAccountLoginName(clusterName),
-					HostUsers:          login.HostUsers,
-					ImagePullSecrets:   login.ContainerSshd.ImagePullSecrets,
-					Affinity:           nodeFilter.Affinity,
-					NodeSelector:       nodeFilter.NodeSelector,
-					Tolerations:        nodeFilter.Tolerations,
-					InitContainers:     initContainers,
+					ServiceAccountName:           naming.BuildServiceAccountLoginName(clusterName),
+					AutomountServiceAccountToken: ptr.To(false),
+					HostUsers:                    login.HostUsers,
+					ImagePullSecrets:             login.ContainerSshd.ImagePullSecrets,
+					Affinity:                     nodeFilter.Affinity,
+					NodeSelector:                 nodeFilter.NodeSelector,
+					Tolerations:                  nodeFilter.Tolerations,
+					InitContainers:               initContainers,
 					Containers: []corev1.Container{
 						renderContainerSshd(
 							clusterWithGPU,
