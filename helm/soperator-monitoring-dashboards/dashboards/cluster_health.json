@@ -326,7 +326,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  slurm_node_info{cluster=~\"$cluster\"\n}\n) by()",
+          "expr": "count(\n  slurm_node_info{cluster=~\"$cluster\", node_name=~\"$node_name\"\n}\n) by()",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -529,7 +529,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n    \n  }\n) by()",
+          "expr": "count(\n  DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n    \n  }\n) by()",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -592,7 +592,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  count(slurm_node_nvlink_instance_group{cluster=~\"$cluster\"}) by (cluster, nvlink_instance_group)\n) by (cluster)",
+          "expr": "count(\n  count(slurm_node_nvlink_instance_group{cluster=~\"$cluster\", node_name=~\"$node_name\"}) by (cluster, nvlink_instance_group)\n) by (cluster)",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -670,7 +670,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        \n    }\n        >=\n    10\n)[1d:10m])\n/\nsum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        \n    }\n)[1d:10m])\n* 100",
+          "expr": "sum_over_time(\n    sum(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n        \n    }\n        >= bool 10\n)[1d:10m])\n/\nsum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n        \n    }\n)[1d:10m])\n* 100",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -763,7 +763,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Over the selected time window",
+      "description": "Average power per selected GPU with utilization of at least 10%, over the selected time window. No data means no GPUs meet that threshold or telemetry is unavailable; idle GPU power is excluded.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -817,7 +817,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"\n    \n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n      \n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n    \n  }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n      \n    }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "instant": false,
           "range": true,
@@ -826,7 +826,7 @@
           "useDashValues": false
         }
       ],
-      "title": "Avg Power Usage",
+      "title": "Avg Active GPU Power",
       "type": "stat"
     },
     {
@@ -881,7 +881,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n    slurm_node_info{cluster=~\"$cluster\", \n        \n        state_base=~\"IDLE|MIXED|ALLOCATED\",\n        state_is_drain=\"false\"\n    }\n) by ()\n",
+          "expr": "count(\n    slurm_node_info{cluster=~\"$cluster\", node_name=~\"$node_name\", \n        \n        state_base=~\"IDLE|MIXED|ALLOCATED\",\n        state_is_drain=\"false\"\n    }\n) by ()\n",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -1019,7 +1019,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_avg(sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_avg(sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\", node_name=~\"$node_name\"}[$__rate_interval])) by (le))",
           "hide": false,
           "range": true,
           "refId": "B",
@@ -1084,7 +1084,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        \n    }\n        >=\n    10\n)[7d:1h])\n/\nsum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n           }\n)[7d:1h])\n* 100",
+          "expr": "sum_over_time(\n    sum(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n        \n    }\n        >= bool 10\n)[7d:1h])\n/\nsum_over_time(\n    count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n           }\n)[7d:1h])\n* 100",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -1226,7 +1226,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "with (\n  filters = {}\n)\navg(\n  DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", filters}\n)",
+          "expr": "with (\n  filters = {}\n)\navg(\n  DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$node_name\", filters}\n)",
           "instant": false,
           "range": true,
           "refId": "A",
@@ -1298,7 +1298,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n    slurm_node_info{cluster=~\"$cluster\", \n        \n        state_base=~\"DOWN|ERROR\",\n        state_is_drain=\"true\"\n    }\n) by ()\n",
+          "expr": "count(\n    slurm_node_info{cluster=~\"$cluster\", node_name=~\"$node_name\", \n        \n        state_base=~\"DOWN|ERROR\",\n        state_is_drain=\"true\"\n    }\n) by ()\n",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -1378,7 +1378,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(increase(max by(node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (slurm_node_fails_total{cluster=~\"$cluster\", state_is_maintenance=\"false\", })[$__range]))",
+          "expr": "sum(increase(max by(node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (slurm_node_fails_total{cluster=~\"$cluster\", node_name=~\"$node_name\", state_is_maintenance=\"false\", })[$__range]))",
           "format": "time_series",
           "instant": true,
           "intervalFactor": 2,
@@ -1452,7 +1452,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_avg(sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_avg(sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\", node_name=~\"$node_name\"}[$__rate_interval])) by (le))",
           "hide": false,
           "range": true,
           "refId": "B",
@@ -1581,7 +1581,7 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "count(\n  slurm_node_info{cluster=~\"$cluster\", state_base=\"ALLOCATED\"}\n) by(cluster)",
+          "expr": "count(\n  slurm_node_info{cluster=~\"$cluster\", node_name=~\"$node_name\", state_base=\"ALLOCATED\"}\n) by(cluster)",
           "instant": true,
           "range": false,
           "refId": "A",
@@ -1651,7 +1651,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\n  sum (\n    increase(\n      sum by (node_name, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n        slurm_node_gpu_seconds_total{cluster=~\"$cluster\", \n          \n          state_is_maintenance=\"false\",\n          state_base=~\".*\"\n        }\n      )[7d]\n    )\n  )\n  /\n  (\n    sum (\n      increase(\n        max by (node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n          slurm_node_fails_total{cluster=~\"$cluster\", \n            \n            state_is_maintenance=\"false\"\n          }\n        )[7d]\n      )\n    )\n    or\n    (\n      sum (\n        increase(\n          slurm_node_gpu_seconds_total{cluster=~\"$cluster\", \n            \n            state_is_maintenance=\"false\",\n            state_base=~\".*\"\n          }[7d]\n        )\n      ) * 0\n    )\n  )\n) / 3600",
+          "expr": "(\n  sum (\n    increase(\n      sum by (node_name, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n        slurm_node_gpu_seconds_total{cluster=~\"$cluster\", node_name=~\"$node_name\", \n          \n          state_is_maintenance=\"false\",\n          state_base=~\".*\"\n        }\n      )[7d]\n    )\n  )\n  /\n  (\n    sum (\n      increase(\n        max by (node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n          slurm_node_fails_total{cluster=~\"$cluster\", node_name=~\"$node_name\", \n            \n            state_is_maintenance=\"false\"\n          }\n        )[7d]\n      )\n    )\n    or\n    (\n      sum (\n        increase(\n          slurm_node_gpu_seconds_total{cluster=~\"$cluster\", node_name=~\"$node_name\", \n            \n            state_is_maintenance=\"false\",\n            state_base=~\".*\"\n          }[7d]\n        )\n      ) * 0\n    )\n  )\n) / 3600",
           "format": "time_series",
           "instant": true,
           "intervalFactor": 2,
@@ -1764,7 +1764,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n      >=\n    10\n  ) by(cluster)\n    /\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n  ) by(cluster)\n)\n  *\n100",
+          "expr": "(\n  sum(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n        }\n      >= bool 10\n) by(cluster)\n    /\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n        }\n  ) by(cluster)\n)\n  *\n100",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A",
@@ -1861,7 +1861,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "(\n  sum (\n    increase(\n      sum by (node_name, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n        slurm_node_gpu_seconds_total{cluster=~\"$cluster\", \n          state_is_maintenance=\"false\",\n        }\n      )[7d]\n    )\n  )\n  /\n  (\n    sum (\n      increase(\n        max by (node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n          slurm_node_fails_total{cluster=~\"$cluster\", \n            state_is_maintenance=\"false\"\n          }\n        )[7d]\n      )\n    )\n    or\n    (\n      sum (\n        increase(\n          slurm_node_gpu_seconds_total{cluster=~\"$cluster\", \n            state_is_maintenance=\"false\",\n          }[7d]\n        )\n      ) * 0\n    )\n  )\n) / 36",
+          "expr": "(\n  sum (\n    increase(\n      sum by (node_name, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n        slurm_node_gpu_seconds_total{cluster=~\"$cluster\", node_name=~\"$node_name\", \n          state_is_maintenance=\"false\",\n        }\n      )[7d]\n    )\n  )\n  /\n  (\n    sum (\n      increase(\n        max by (node_name, reason, state_base, state_is_drain, state_is_maintenance, state_is_reserved) (\n          slurm_node_fails_total{cluster=~\"$cluster\", node_name=~\"$node_name\", \n            state_is_maintenance=\"false\"\n          }\n        )[7d]\n      )\n    )\n    or\n    (\n      sum (\n        increase(\n          slurm_node_gpu_seconds_total{cluster=~\"$cluster\", node_name=~\"$node_name\", \n            state_is_maintenance=\"false\",\n          }[7d]\n        )\n      ) * 0\n    )\n  )\n) / 36",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "MTBF",
@@ -1879,7 +1879,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Only for GPUs with at least 10% utilization",
+      "description": "Minimum, average and maximum power per selected GPU with utilization of at least 10%. No data means no GPUs meet that threshold or telemetry is unavailable; idle GPU power is excluded.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2019,7 +2019,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "max(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "legendFormat": "max",
           "range": true,
@@ -2033,7 +2033,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"\n      }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "avg(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n      }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "legendFormat": "avg",
           "range": true,
@@ -2047,7 +2047,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "min(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\"\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
+          "expr": "min(\n  DCGM_FI_DEV_POWER_USAGE{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n    }\n    and on(exported_pod,gpu)\n  count(\n    DCGM_FI_DEV_GPU_UTIL{cluster=~\"$cluster\", exported_pod=~\"$node_name\"\n        }\n      >=\n    10\n  ) by(exported_pod,gpu)\n)",
           "hide": false,
           "legendFormat": "min",
           "range": true,
@@ -2056,7 +2056,7 @@
           "useDashValues": false
         }
       ],
-      "title": "Cluster Power usage",
+      "title": "Active GPU Power Usage",
       "type": "timeseries"
     },
     {
@@ -2302,7 +2302,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(\n  DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}\n)",
+          "expr": "max(\n  DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\", exported_pod=~\"$node_name\"}\n)",
           "hide": false,
           "legendFormat": "max",
           "range": true,
@@ -2316,7 +2316,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "avg(\n  DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}\n)",
+          "expr": "avg(\n  DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\", exported_pod=~\"$node_name\"}\n)",
           "hide": false,
           "legendFormat": "avg",
           "range": true,
@@ -2330,7 +2330,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "min(\n  DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\"}\n)",
+          "expr": "min(\n  DCGM_FI_PROF_SM_ACTIVE{cluster=~\"$cluster\", exported_pod=~\"$node_name\"}\n)",
           "hide": false,
           "legendFormat": "min",
           "range": true,
@@ -2357,7 +2357,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Node categories are mutually exclusive:\n- Other/error: ERROR, NOT_RESPONDING, INVALID (invalid registration), or FAIL; these conditions take precedence over all other categories. Also includes otherwise unclassified nodes.\n- Powered down: DOWN, POWERED_DOWN, POWER_UP, or POWERING_UP, unless an Other/error error condition is present. This grouping does not imply every node is physically powered off.\n- Maintenance: Nodes marked for maintenance, excluding the error and powered-down conditions above.\n- Draining: Nodes with DRAIN and allocated resources (ALLOCATED or MIXED) or unfinished job cleanup (COMPLETING), excluding the conditions above.\n- Drained: IDLE nodes with DRAIN, no COMPLETING, and none of the conditions above.\n- Busy: Nodes with allocated resources or unfinished job cleanup, without DRAIN and none of the conditions above.\n- Idle: IDLE nodes without COMPLETING or DRAIN and none of the conditions above. Includes reserved and planned nodes; does not guarantee eligibility for every job.\nCLOUD, RESERVED, PLANNED, POWER_DOWN, POWERING_DOWN, and POWER_DRAIN do not determine the category.\n\nNodes by Categories and Nodes by State use the same category definitions and the same bottom-to-top stacking order: Busy → Draining → Idle → Drained → Other/error → Maintenance → Powered down. Nodes by Categories shows totals per category; Nodes by State breaks each category down into exact state combinations.\n\nNodes by Categories uses query order (A–G) for its series and bottom-to-top stacking order. It does not use numbering prefixes or ordering transformations.",
+          "description": "Node categories are mutually exclusive:\n- Other/error: ERROR, NOT_RESPONDING, INVALID (invalid registration), or FAIL; these conditions take precedence over all other categories. Also includes otherwise unclassified nodes.\n- Powered down: DOWN, POWERED_DOWN, POWER_UP, or POWERING_UP, unless an Other/error error condition is present. This grouping does not imply every node is physically powered off.\n- Maintenance: Nodes marked for maintenance, excluding the error and powered-down conditions above.\n- Draining: Nodes with DRAIN and allocated resources (ALLOCATED or MIXED) or unfinished job cleanup (COMPLETING), excluding the conditions above.\n- Drained: IDLE nodes with DRAIN, no COMPLETING, and none of the conditions above.\n- Busy: Nodes with allocated resources or unfinished job cleanup, without DRAIN and none of the conditions above.\n- Idle: IDLE nodes without COMPLETING or DRAIN and none of the conditions above. Includes reserved and planned nodes; does not guarantee eligibility for every job.\nCLOUD, RESERVED, PLANNED, POWER_DOWN, POWERING_DOWN, and POWER_DRAIN do not determine the category.\n\nNodes by Categories and Nodes by State use the same category definitions and the same bottom-to-top stacking order: Busy \u2192 Draining \u2192 Idle \u2192 Drained \u2192 Other/error \u2192 Maintenance \u2192 Powered down. Nodes by Categories shows totals per category; Nodes by State breaks each category down into exact state combinations.\n\nNodes by Categories uses query order (A\u2013G) for its series and bottom-to-top stacking order. It does not use numbering prefixes or ordering transformations.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2664,7 +2664,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Node counts by exact Slurm scheduling state and exported flags, grouped by the same categories as Nodes by Categories. Legends include the category followed by the native state combination.\nERROR, NOT_RESPONDING, INVALID (invalid registration), and FAIL take precedence and map to Other/error. Otherwise DOWN, POWERED_DOWN, POWER_UP, and POWERING_UP map to Powered down. POWER_DOWN and POWERING_DOWN do not determine the category.\n\nNodes by Categories and Nodes by State use the same category definitions and the same bottom-to-top stacking order: Busy → Draining → Idle → Drained → Other/error → Maintenance → Powered down. Nodes by Categories shows totals per category; Nodes by State breaks each category down into exact state combinations.\n\nColors share the category palette. Busy MIXED nodes use lighter blue than ALLOCATED; the exact MIXED+CLOUD combination uses an intermediate blue. Power-up flags use lighter shades; power-down flags use darker shades; base DOWN uses the darkest shade. COMPLETING in Busy/Draining and RESERVED/PLANNED in Idle use slightly darker shades. Power shading takes precedence over these details, and base DOWN takes precedence over all other shading. Unmatched series are bright pink.",
+          "description": "Node counts by exact Slurm scheduling state and exported flags, grouped by the same categories as Nodes by Categories. Legends include the category followed by the native state combination.\nERROR, NOT_RESPONDING, INVALID (invalid registration), and FAIL take precedence and map to Other/error. Otherwise DOWN, POWERED_DOWN, POWER_UP, and POWERING_UP map to Powered down. POWER_DOWN and POWERING_DOWN do not determine the category.\n\nNodes by Categories and Nodes by State use the same category definitions and the same bottom-to-top stacking order: Busy \u2192 Draining \u2192 Idle \u2192 Drained \u2192 Other/error \u2192 Maintenance \u2192 Powered down. Nodes by Categories shows totals per category; Nodes by State breaks each category down into exact state combinations.\n\nColors share the category palette. Busy MIXED nodes use lighter blue than ALLOCATED; the exact MIXED+CLOUD combination uses an intermediate blue. Power-up flags use lighter shades; power-down flags use darker shades; base DOWN uses the darkest shade. COMPLETING in Busy/Draining and RESERVED/PLANNED in Idle use slightly darker shades. Power shading takes precedence over these details, and base DOWN takes precedence over all other shading. Unmatched series are bright pink.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3481,7 +3481,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(1, sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(1, sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\", node_name=~\"$node_name\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "max",
               "range": true,
@@ -3495,7 +3495,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_avg(sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_avg(sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\", node_name=~\"$node_name\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "avg",
               "range": true,
@@ -3509,7 +3509,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(0, sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0, sum(increase(slurm_node_unavailability_duration_seconds_bucket{cluster=~\"$cluster\", node_name=~\"$node_name\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "min",
               "range": true,
@@ -3659,7 +3659,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(1, sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(1, sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\", node_name=~\"$node_name\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "max",
               "range": true,
@@ -3673,7 +3673,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_avg(sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_avg(sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\", node_name=~\"$node_name\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "avg",
               "range": true,
@@ -3687,7 +3687,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(0, sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\"}[$__rate_interval])) by (le))",
+              "expr": "histogram_quantile(0, sum(increase(slurm_node_draining_duration_seconds_bucket{cluster=~\"$cluster\", node_name=~\"$node_name\"}[$__rate_interval])) by (le))",
               "hide": false,
               "legendFormat": "min",
               "range": true,
@@ -3909,7 +3909,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "with (\n  filters = {},\n  running_jobs = group(slurm_job_info{cluster=~\"$cluster\", filters, job_state=~\"RUNNING\"}) by (job_id, job_name),\n  node_fails = (\n    # Get nodes with problems: DOWN/ERROR states or drain flag\n    slurm_node_info{cluster=~\"$cluster\", filters, state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"} or\n    slurm_node_info{cluster=~\"$cluster\", filters, state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"}\n  ),\n  node_fails_with_job_id = node_fails * on (node_name) group_left(job_id) slurm_node_job{cluster=~\"$cluster\", filters}\n)\n(\n  node_fails_with_job_id\n  and on (job_id)\n  (\n      running_jobs offset -60m or running_jobs offset 60m\n  )\n)\nor\nnode_fails",
+              "expr": "with (\n  filters = {},\n  running_jobs = group(slurm_job_info{cluster=~\"$cluster\", filters, job_state=~\"RUNNING\"}) by (job_id, job_name),\n  node_fails = (\n    # Get nodes with problems: DOWN/ERROR states or drain flag\n    slurm_node_info{cluster=~\"$cluster\", filters, state_base=~\"DOWN|ERROR\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"} or\n    slurm_node_info{cluster=~\"$cluster\", filters, state_is_drain=\"true\", state_is_maintenance!=\"true\", node_name=~\"$node_name\"}\n  ),\n  node_fails_with_job_id = node_fails * on (node_name) group_left(job_id) slurm_node_job{cluster=~\"$cluster\", node_name=~\"$node_name\", filters}\n)\n(\n  node_fails_with_job_id\n  and on (job_id)\n  (\n      running_jobs offset -60m or running_jobs offset 60m\n  )\n)\nor\nnode_fails",
               "format": "table",
               "instant": false,
               "legendFormat": "__auto",
@@ -6846,7 +6846,7 @@
           "uid": "${datasource}"
         },
         "definition": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
-        "description": "",
+        "description": "Filters node health and GPU panels. Cluster identity, controller and job-only panels remain cluster-wide.",
         "includeAll": true,
         "label": "Nodeset",
         "multi": true,
@@ -6857,12 +6857,11 @@
           "query": "label_values(slurm_node_info{cluster=~\"$cluster\"},nodeset_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "type": "query"
       },
       {
-        "allValue": ".*",
         "allowCustomValue": false,
         "current": {
           "text": "All",
@@ -6873,7 +6872,7 @@
           "uid": "${datasource}"
         },
         "definition": "label_values(slurm_node_info{cluster=~\"$cluster\", nodeset_name=~\"$nodeset\"}, node_name)",
-        "description": "",
+        "description": "Filters node health and GPU panels within the selected nodesets.",
         "includeAll": true,
         "label": "Worker Node",
         "multi": true,
@@ -6884,7 +6883,7 @@
           "query": "label_values(slurm_node_info{cluster=~\"$cluster\", nodeset_name=~\"$nodeset\"}, node_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "sort": 1,
         "type": "query"

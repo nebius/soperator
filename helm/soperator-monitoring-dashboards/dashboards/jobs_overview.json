@@ -25,7 +25,7 @@
           "uid": "${datasource}"
         },
         "enable": false,
-        "expr": "group by (node, pod) (\n  changes(\n      sum without (uid, pod_ip)(\n          kube_pod_info{cluster=~\"$cluster\", pod=~\"worker-.*\", node!=\"\"}\n      )\n  ) > 0\n  and on (pod) \n  sum by (pod)(\n      kube_pod_info{cluster=~\"$cluster\", pod=~\"worker-.*\", node!=\"\"}\n  ) @ start()\n)",
+        "expr": "group by (node, pod) (\n  changes(\n      sum without (uid, pod_ip)(\n          kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\", node!=\"\"}\n      )\n  ) > 0\n  and on (pod) \n  sum by (pod)(\n      kube_pod_info{cluster=~\"$cluster\", pod=~\"$worker\", node!=\"\"}\n  ) @ start()\n)",
         "hide": true,
         "iconColor": "red",
         "name": "Worker Reschedule",
@@ -43,16 +43,14 @@
     {
       "asDropdown": false,
       "icon": "external link",
-      "includeVars": true,
-      "keepTime": true,
-      "tags": [
-        "workers-overview"
-      ],
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
       "targetBlank": true,
-      "title": "Detailed Stats",
+      "title": "Workers Overview",
       "tooltip": "",
-      "type": "dashboards",
-      "url": ""
+      "type": "link",
+      "url": "/d/soperator_workers_overview/workers-overview?${__url_time_range}&${datasource:queryparam}&${cluster:queryparam}&${worker:customqueryparam:var-worker}"
     }
   ],
   "panels": [
@@ -3247,8 +3245,8 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "query_result(count by (job_id) (slurm_job_info{cluster=~\"$cluster\", user_name!=\"soperatorchecks\"}))",
-        "description": "",
+        "definition": "query_result(count by (job_id) (last_over_time(slurm_job_info{cluster=~\"$cluster\", user_name!=\"soperatorchecks\"}[$__range])))",
+        "description": "Jobs observed anywhere in the selected time range, including completed jobs.",
         "includeAll": false,
         "label": "Jobs",
         "multi": true,
@@ -3256,7 +3254,7 @@
         "options": [],
         "query": {
           "qryType": 3,
-          "query": "query_result(count by (job_id) (slurm_job_info{cluster=~\"$cluster\", user_name!=\"soperatorchecks\"}))",
+          "query": "query_result(count by (job_id) (last_over_time(slurm_job_info{cluster=~\"$cluster\", user_name!=\"soperatorchecks\"}[$__range])))",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -3291,7 +3289,6 @@
         "type": "query"
       },
       {
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
@@ -3318,7 +3315,6 @@
         "type": "query"
       },
       {
-        "allValue": ".*",
         "current": {
           "text": "All",
           "value": "$__all"
@@ -3339,7 +3335,7 @@
           "query": "label_values(node_uname_info{cluster=~\"$cluster\", container=\"node-exporter\", nodename=~\"$hostname\"},instance)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "type": "query"
       }
