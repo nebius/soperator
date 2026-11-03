@@ -4,8 +4,12 @@ import (
 	"reflect"
 	"testing"
 
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -299,4 +303,55 @@ func hasLoginVolumeMount(mounts []corev1.VolumeMount, name, mountPath string) bo
 		}
 	}
 	return false
+}
+
+func TestRenderStatefulSetUpdateStrategy(t *testing.T) {
+	tests := []struct {
+		name      string
+		strategy  consts.UpdateStrategy
+		expected  appsv1.StatefulSetUpdateStrategyType
+		wantError bool
+	}{
+		{"omitted without API defaults", "", appsv1.OnDeleteStatefulSetStrategyType, false},
+		{"delayed rollout", consts.UpdateStrategyDelayedRollout, appsv1.OnDeleteStatefulSetStrategyType, false},
+		{"automatic rolling updates", consts.UpdateStrategyRollingUpdate, appsv1.RollingUpdateStatefulSetStrategyType, false},
+		{"unsupported strategy", "unsupported", "", true},
+	}
+	var defaultTemplate *corev1.PodTemplateSpec
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			login := newTestLogin(false, false)
+			login.UpdateStrategy = tt.strategy
+			login.StatefulSet.MaxUnavailable = intstr.FromString("40%")
+			for _, replicas := range []*int32{ptr.To(int32(3)), nil} {
+				result, err := RenderStatefulSet(
+					"test-namespace", "test-cluster", false,
+					[]slurmv1.K8sNodeFilter{{Name: "test-filter"}}, &slurmv1.Secrets{},
+					[]slurmv1.VolumeSource{{Name: "test-volume", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
+					login, replicas,
+				)
+				if tt.wantError {
+					require.ErrorContains(t, err, "unsupported login update strategy")
+					continue
+				}
+				require.NoError(t, err)
+				require.Equal(t, replicas, result.Spec.Replicas)
+				require.Equal(t, tt.expected, result.Spec.UpdateStrategy.Type)
+				if tt.expected == appsv1.OnDeleteStatefulSetStrategyType {
+					require.Nil(t, result.Spec.UpdateStrategy.RollingUpdate)
+				} else {
+					rolling := result.Spec.UpdateStrategy.RollingUpdate
+					require.NotNil(t, rolling)
+					require.Equal(t, login.StatefulSet.MaxUnavailable, *rolling.MaxUnavailable)
+					require.Equal(t, kruisev1b1.RecreatePodUpdateStrategyType, rolling.PodUpdatePolicy)
+					require.EqualValues(t, 0, *rolling.Partition)
+					require.EqualValues(t, 0, *rolling.MinReadySeconds)
+				}
+				if defaultTemplate == nil {
+					defaultTemplate = result.Spec.Template.DeepCopy()
+				}
+				require.Equal(t, *defaultTemplate, result.Spec.Template, "strategy selection must not change the pod template")
+			}
+		})
+	}
 }

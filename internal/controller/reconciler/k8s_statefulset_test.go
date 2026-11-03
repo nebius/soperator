@@ -5,15 +5,19 @@ import (
 	"testing"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
+	"nebius.ai/slurm-operator/internal/consts"
 )
 
 func TestAnnotationsMatch(t *testing.T) {
@@ -407,4 +411,47 @@ func TestStatefulSetPatchCopiesPVCDeletionPolicy(t *testing.T) {
 			existing.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled,
 		)
 	}
+}
+
+func TestAdvancedStatefulSetReconcilePreservesLoginUpdateDuringDependencyChange(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, kruisev1b1.AddToScheme(scheme))
+	require.NoError(t, slurmv1.AddToScheme(scheme))
+	cluster := &slurmv1.SlurmCluster{ObjectMeta: metav1.ObjectMeta{
+		Name: "test-cluster", Namespace: "default", UID: "cluster-uid",
+	}}
+	dependency := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name: "login-config", Namespace: "default", ResourceVersion: "1",
+	}}
+	existing := &kruisev1b1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
+		Name: "login", Namespace: "default", UID: "statefulset-uid",
+		Annotations: map[string]string{consts.AnnotationLoginUpdateInProgress: "login-0"},
+	}, Spec: kruisev1b1.StatefulSetSpec{
+		Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{Name: "sshd", Image: "login:old"}},
+		}},
+	}}
+	require.NoError(t, setVersionsRecursive(existing, dependency))
+	desired := existing.DeepCopy()
+	desired.Annotations = nil
+	desired.Spec.Template.Spec.Containers[0].Image = "login:new"
+	dependency.ResourceVersion = "2"
+
+	updates := 0
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existing).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+				updates++
+				return c.Update(ctx, obj, opts...)
+			},
+		}).Build()
+	r := NewAdvancedStatefulSetReconciler(NewReconciler(c, scheme, nil))
+	require.NoError(t, r.Reconcile(t.Context(), cluster, desired, dependency))
+
+	updated := &kruisev1b1.StatefulSet{}
+	require.NoError(t, c.Get(t.Context(), client.ObjectKeyFromObject(existing), updated))
+	require.Equal(t, 1, updates, "changed dependencies must exercise the full Update path")
+	require.Equal(t, "login:new", updated.Spec.Template.Spec.Containers[0].Image)
+	require.Equal(t, "login-0", updated.Annotations[consts.AnnotationLoginUpdateInProgress])
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -12,6 +13,7 @@ import (
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 
+	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/logfield"
 )
 
@@ -54,6 +56,18 @@ func (r *AdvancedStatefulSetReconciler) patch(existing, desired client.Object) (
 		}
 
 		original := dst.DeepCopy()
+
+		// Dependency changes use a full Update, so keep active replacement state
+		// consistent in both objects. Native rolling updates cancel that state.
+		if src.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
+			delete(dst.Annotations, consts.AnnotationLoginUpdateInProgress)
+			delete(src.Annotations, consts.AnnotationLoginUpdateInProgress)
+		} else if activePod := dst.Annotations[consts.AnnotationLoginUpdateInProgress]; activePod != "" {
+			if src.Annotations == nil {
+				src.Annotations = make(map[string]string)
+			}
+			src.Annotations[consts.AnnotationLoginUpdateInProgress] = activePod
+		}
 
 		res := client.MergeFrom(original)
 		if len(src.Labels) > 0 {
