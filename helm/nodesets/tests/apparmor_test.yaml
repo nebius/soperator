@@ -1,0 +1,53 @@
+suite: Per-container AppArmor profiles
+templates:
+  - templates/nodeset.yaml
+tests:
+  - it: should default slurmd and munge to unconfined
+    asserts:
+      - equal:
+          path: spec.slurmd.security.appArmorProfile
+          value: unconfined
+      - equal:
+          path: spec.munge.security.appArmorProfile
+          value: unconfined
+  - it: should preserve an explicit unconfined override
+    set:
+      nodesets:
+        - &worker
+          name: worker
+          slurmd: &slurmd
+            resources: {cpu: "1", memory: 1Gi}
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+            security:
+              appArmorProfile: unconfined
+          munge:
+            resources: {cpu: 100m, memory: 128Mi}
+    asserts:
+      - equal:
+          path: spec.slurmd.security.appArmorProfile
+          value: unconfined
+  - it: should preserve a custom override
+    set:
+      nodesets:
+        - <<: *worker
+          slurmd:
+            <<: *slurmd
+            security:
+              appArmorProfile: soperator-default
+    asserts:
+      - equal:
+          path: spec.slurmd.security.appArmorProfile
+          value: soperator-default
+  - it: should default to unconfined when security is omitted
+    set:
+      nodesets:
+        - <<: *worker
+          slurmd:
+            <<: *slurmd
+            security: null
+    asserts:
+      - equal:
+          path: spec.slurmd.security.appArmorProfile
+          value: unconfined

@@ -89,6 +89,14 @@ tests:
             apiGroups: [""]
             resources: ["events"]
             verbs: ["create", "patch"]
+      # The controller records through the events.k8s.io API, a different group from the core one
+      # above. Without this rule every event it emits is refused with 403.
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["events.k8s.io"]
+            resources: ["events"]
+            verbs: ["create", "patch"]
       - contains:
           path: rules
           content:

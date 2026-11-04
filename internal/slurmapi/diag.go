@@ -8,6 +8,7 @@ type Diag struct {
 
 type Statistics struct {
 	ServerThreadCount *int32       `json:"server_thread_count"`
+	ScheduleCycleSum  *int64       `json:"schedule_cycle_sum"`
 	RpcsByMessageType *[]RPCByType `json:"rpcs_by_message_type"`
 	RpcsByUser        *[]RPCByUser `json:"rpcs_by_user"`
 }

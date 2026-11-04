@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -19,6 +21,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/slurmapi"
 	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
+	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -47,8 +50,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 					Name:        "node",
 					ClusterName: "slurm-cluster",
 					InstanceID:  "k8s-node",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateDRAIN: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateDRAIN: {},
 					},
 					Reason: ptr.To(slurmapi.NodeReason{
 						Reason:    fmt.Sprintf("%s: extra", consts.SlurmNodeReasonKillTaskFailed),
@@ -66,8 +69,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 						Name:        "node",
 						ClusterName: "slurm-cluster",
 						InstanceID:  "k8s-node",
-						States: map[api.V0041NodeState]struct{}{
-							api.V0041NodeStateDRAIN: {},
+						States: map[api.V0044NodeState]struct{}{
+							api.V0044NodeStateDRAIN: {},
 						},
 						Reason: ptr.To(slurmapi.NodeReason{
 							Reason:         consts.SlurmNodeReasonKillTaskFailed,
@@ -101,8 +104,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 					Name:        "node",
 					ClusterName: "slurm-cluster",
 					InstanceID:  "k8s-node",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateIDLE: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateIDLE: {},
 					},
 					Reason: ptr.To(slurmapi.NodeReason{
 						Reason:    consts.SlurmNodeReasonKillTaskFailed,
@@ -126,8 +129,8 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 					Name:        "node",
 					ClusterName: "slurm-cluster",
 					InstanceID:  "k8s-node",
-					States: map[api.V0041NodeState]struct{}{
-						api.V0041NodeStateDRAIN: {},
+					States: map[api.V0044NodeState]struct{}{
+						api.V0044NodeStateDRAIN: {},
 					},
 					Reason: nil,
 				},
@@ -144,7 +147,7 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 			apiClient := slurmapifake.NewMockClient(t)
 			apiClient.On("ListNodes", ctx).Return(tt.listNodesOut, tt.listNodesErr)
 
-			slurmAPIClients := slurmapi.NewClientSet()
+			slurmAPIClients := slurmapi.NewClientSet(context.Background())
 			slurmAPIClients.AddClient(tt.slurmClusterName, apiClient)
 			c := &SlurmNodesController{
 				slurmAPIClients: slurmAPIClients,
@@ -186,51 +189,77 @@ func TestSlurmNodesController_processSetUnhealthy_waitsForFullyDrainedSlurmNode(
 
 	tests := []struct {
 		name               string
-		slurmNodeStates    map[api.V0041NodeState]struct{}
+		states             []api.V0044NodeState
+		otherWorker        *slurmapi.Node
 		wantHardwareIssues bool
 	}{
 		{
-			name: "allocated drained node waits",
-			slurmNodeStates: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateALLOCATED: {},
-				api.V0041NodeStateDRAIN:     {},
-			},
-			wantHardwareIssues: false,
+			name:   "allocated drained node waits",
+			states: []api.V0044NodeState{api.V0044NodeStateALLOCATED, api.V0044NodeStateDRAIN},
 		},
 		{
-			name: "mixed drained node waits",
-			slurmNodeStates: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateMIXED: {},
-				api.V0041NodeStateDRAIN: {},
-			},
-			wantHardwareIssues: false,
+			name:   "mixed drained node waits",
+			states: []api.V0044NodeState{api.V0044NodeStateMIXED, api.V0044NodeStateDRAIN},
 		},
 		{
-			name: "completing idle drained node waits",
-			slurmNodeStates: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateIDLE:       {},
-				api.V0041NodeStateDRAIN:      {},
-				api.V0041NodeStateCOMPLETING: {},
-			},
-			wantHardwareIssues: false,
+			name:   "completing idle drained node waits",
+			states: []api.V0044NodeState{api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN, api.V0044NodeStateCOMPLETING},
 		},
 		{
-			name: "idle drained node is marked unhealthy",
-			slurmNodeStates: map[api.V0041NodeState]struct{}{
-				api.V0041NodeStateIDLE:  {},
-				api.V0041NodeStateDRAIN: {},
-			},
+			name:               "idle drained node is marked unhealthy",
+			states:             []api.V0044NodeState{api.V0044NodeStateIDLE, api.V0044NodeStateDRAIN},
 			wantHardwareIssues: true,
+		},
+		{
+			name:               "down drained node is marked unhealthy",
+			states:             []api.V0044NodeState{api.V0044NodeStateDOWN, api.V0044NodeStateDRAIN},
+			wantHardwareIssues: true,
+		},
+		{
+			name:   "down undrained node waits",
+			states: []api.V0044NodeState{api.V0044NodeStateDOWN},
+		},
+		{
+			name:   "completing down drained node waits",
+			states: []api.V0044NodeState{api.V0044NodeStateDOWN, api.V0044NodeStateDRAIN, api.V0044NodeStateCOMPLETING},
+		},
+		{
+			name:               "down drained reboot requested node is marked unhealthy",
+			states:             []api.V0044NodeState{api.V0044NodeStateDOWN, api.V0044NodeStateDRAIN, api.V0044NodeStateREBOOTREQUESTED},
+			wantHardwareIssues: true,
+		},
+		{
+			name:               "down drained reboot issued node is marked unhealthy",
+			states:             []api.V0044NodeState{api.V0044NodeStateDOWN, api.V0044NodeStateDRAIN, api.V0044NodeStateREBOOTISSUED},
+			wantHardwareIssues: true,
+		},
+		{
+			name:   "another allocated worker on the host blocks maintenance",
+			states: []api.V0044NodeState{api.V0044NodeStateDOWN, api.V0044NodeStateDRAIN},
+			otherWorker: &slurmapi.Node{
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateALLOCATED: {},
+					api.V0044NodeStateDRAIN:     {},
+				},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			node := slurmapi.Node{States: make(map[api.V0044NodeState]struct{}, len(tt.states))}
+			for _, state := range tt.states {
+				node.States[state] = struct{}{}
+			}
+			var slurmNodes []slurmapi.Node
+			slurmNodes = append(slurmNodes, node)
+			if tt.otherWorker != nil {
+				slurmNodes = append(slurmNodes, *tt.otherWorker)
+			}
 			controller, k8sClient, slurmClusterName, k8sNode, slurmNode := newSlurmNodesControllerForUnhealthyTest(
 				t,
 				ctx,
-				tt.slurmNodeStates,
-				true,
+				slurmNodes...,
 			)
 
 			err := controller.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmNode)
@@ -241,16 +270,161 @@ func TestSlurmNodesController_processSetUnhealthy_waitsForFullyDrainedSlurmNode(
 	}
 }
 
-func TestSlurmNodesController_processHealthCheckFailed_withoutExtensiveCheckWaitsForFullyDrainedSlurmNode(t *testing.T) {
+// The platform replaces a node with HardwareIssuesSuspected only after Compute SetUnhealthy succeeds,
+// so soperator must not turn that condition into its own maintenance: no node replacement drain
+// overriding the health check reason and no SoperatorChecksNodeMaintenance that deletes the node.
+func TestSlurmNodesController_Reconcile_downDrainedWorkerStaysOutOfMaintenance(t *testing.T) {
+	ctx := context.Background()
+	controller, k8sClient, slurmClusterName, k8sNode, slurmNode := newSlurmNodesControllerForUnhealthyTest(
+		t, ctx, slurmapi.Node{States: map[api.V0044NodeState]struct{}{
+			api.V0044NodeStateDOWN:  {},
+			api.V0044NodeStateDRAIN: {},
+		}},
+	)
+	slurmNode.Reason.Reason = slurmNode.Reason.OriginalReason
+	// findDegradedNodes rewrites the listed reason in place, so each listing gets its own copy.
+	secondListing := slurmNode
+	secondListing.Reason = ptr.To(*slurmNode.Reason)
+	apiClient, found := controller.slurmAPIClients.GetClient(slurmClusterName)
+	require.True(t, found)
+	slurmClient := apiClient.(*slurmapifake.MockClient)
+	slurmClient.On("ListNodes", ctx).Return([]slurmapi.Node{slurmNode}, nil).Once()
+	slurmClient.On("ListNodes", ctx).Return([]slurmapi.Node{secondListing}, nil).Once()
+
+	req := ctrl.Request{NamespacedName: slurmClusterName}
+	_, err := controller.Reconcile(ctx, req)
+	require.NoError(t, err)
+	require.True(t, hasHardwareIssuesSuspected(t, ctx, k8sClient, k8sNode.Name))
+
+	_, err = controller.Reconcile(ctx, req)
+	require.NoError(t, err)
+
+	var updated corev1.Node
+	require.NoError(t, k8sClient.Get(ctx, ctrlclient.ObjectKey{Name: k8sNode.Name}, &updated))
+	require.True(t, hasHardwareIssuesSuspected(t, ctx, k8sClient, k8sNode.Name))
+	require.False(t, slices.ContainsFunc(updated.Status.Conditions, func(condition corev1.NodeCondition) bool {
+		return condition.Type == consts.SoperatorChecksK8SNodeMaintenance
+	}), "hardware issues must not enter soperator maintenance")
+	slurmClient.AssertNotCalled(t, "SlurmV0044PostNodeWithResponse", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestHardwareIssuesMessage(t *testing.T) {
+	tests := []struct {
+		name string
+		node slurmapi.Node
+		want string
+	}{
+		{
+			name: "drain reason and comment",
+			node: slurmapi.Node{
+				Comment: "GPU 3: Xid 79",
+				Reason:  ptr.To(slurmapi.NodeReason{Reason: "[node_problem]", OriginalReason: "[node_problem] gpu_health_check: failed [hc_program]"}),
+			},
+			want: "[node_problem] gpu_health_check: failed [hc_program]; GPU 3: Xid 79",
+		},
+		{
+			name: "drain reason without comment",
+			node: slurmapi.Node{Reason: ptr.To(slurmapi.NodeReason{OriginalReason: "[node_problem] gpu_health_check: failed"})},
+			want: "[node_problem] gpu_health_check: failed",
+		},
+		{
+			name: "well-known reason when the original is missing",
+			node: slurmapi.Node{Reason: ptr.To(slurmapi.NodeReason{Reason: "[hardware_problem]"})},
+			want: "[hardware_problem]",
+		},
+		{
+			name: "comment only",
+			node: slurmapi.Node{Comment: "gpu health check failed", Reason: ptr.To(slurmapi.NodeReason{})},
+			want: "gpu health check failed",
+		},
+		{
+			name: "nothing known falls back to the generic message",
+			node: slurmapi.Node{Comment: "  "},
+			want: string(consts.MessageHardwareIssuesSuspected),
+		},
+		{
+			name: "long reason is capped",
+			node: slurmapi.Node{Reason: ptr.To(slurmapi.NodeReason{OriginalReason: strings.Repeat("x", MaxMessageLength+10)})},
+			want: strings.Repeat("x", MaxMessageLength),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, string(hardwareIssuesMessage(tt.node)))
+		})
+	}
+}
+
+func TestSlurmNodesController_processMaintenance(t *testing.T) {
+	tests := []struct {
+		name        string
+		conditions  []corev1.NodeCondition
+		expectDrain bool
+	}{
+		{
+			name:        "no conditions undrains",
+			expectDrain: false,
+		},
+		{
+			name: "maintenance scheduled drains",
+			conditions: []corev1.NodeCondition{
+				{Type: consts.DefaultMaintenanceConditionType, Status: corev1.ConditionTrue},
+			},
+			expectDrain: true,
+		},
+		{
+			name: "maintenance finished undrains",
+			conditions: []corev1.NodeCondition{
+				{Type: consts.DefaultMaintenanceConditionType, Status: corev1.ConditionFalse},
+			},
+			expectDrain: false,
+		},
+		{
+			name: "hardware issues alone are not maintenance",
+			conditions: []corev1.NodeCondition{
+				{Type: consts.HardwareIssuesSuspected, Status: corev1.ConditionTrue},
+			},
+			expectDrain: false,
+		},
+		{
+			name: "hardware issues with maintenance scheduled drains",
+			conditions: []corev1.NodeCondition{
+				{Type: consts.HardwareIssuesSuspected, Status: corev1.ConditionTrue},
+				{Type: consts.DefaultMaintenanceConditionType, Status: corev1.ConditionTrue},
+			},
+			expectDrain: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			controller := &SlurmNodesController{MaintenanceConditionType: consts.DefaultMaintenanceConditionType}
+			k8sNode := &corev1.Node{Status: corev1.NodeStatus{Conditions: tt.conditions}}
+
+			var drained, undrained bool
+			err := controller.processMaintenance(
+				context.Background(),
+				k8sNode,
+				func() error { drained = true; return nil },
+				func() error { undrained = true; return nil },
+			)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectDrain, drained, "drainFn called")
+			require.Equal(t, !tt.expectDrain, undrained, "undrainFn called")
+		})
+	}
+}
+
+func TestSlurmNodesController_processHealthCheckFailed_waitsForFullyDrainedSlurmNode(t *testing.T) {
 	ctx := context.Background()
 	controller, k8sClient, slurmClusterName, k8sNode, slurmNode := newSlurmNodesControllerForUnhealthyTest(
 		t,
 		ctx,
-		map[api.V0041NodeState]struct{}{
-			api.V0041NodeStateALLOCATED: {},
-			api.V0041NodeStateDRAIN:     {},
-		},
-		false,
+		slurmapi.Node{States: map[api.V0044NodeState]struct{}{
+			api.V0044NodeStateALLOCATED: {},
+			api.V0044NodeStateDRAIN:     {},
+		}},
 	)
 
 	err := controller.processHealthCheckFailed(ctx, k8sNode, slurmClusterName, slurmNode, slurmNode.Reason)
@@ -297,22 +471,22 @@ func TestSlurmNodesController_processSetUnhealthy_reassignedInstanceUndrains(t *
 
 	apiClient := slurmapifake.NewMockClient(t)
 	apiClient.On(
-		"SlurmV0041PostNodeWithResponse",
+		"SlurmV0044PostNodeWithResponse",
 		ctx,
 		"worker-0",
-		mock.MatchedBy(func(body api.SlurmV0041PostNodeJSONRequestBody) bool {
+		mock.MatchedBy(func(body api.SlurmV0044PostNodeJSONRequestBody) bool {
 			return body.State != nil &&
 				len(*body.State) == 1 &&
-				(*body.State)[0] == api.V0041UpdateNodeMsgStateUNDRAIN &&
+				(*body.State)[0] == api.V0044UpdateNodeMsgStateUNDRAIN &&
 				body.Comment == nil
 		}),
-	).Return(&api.SlurmV0041PostNodeResponse{
-		JSON200: &api.V0041OpenapiResp{
-			Errors: &[]api.V0041OpenapiError{},
+	).Return(&api.SlurmV0044PostNodeResponse{
+		JSON200: &api.V0044OpenapiResp{
+			Errors: &[]api.V0044OpenapiError{},
 		},
 	}, nil).Once()
 
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
 	slurmAPIClients.AddClient(slurmClusterName, apiClient)
 
 	controller := NewSlurmNodesController(
@@ -321,7 +495,6 @@ func TestSlurmNodesController_processSetUnhealthy_reassignedInstanceUndrains(t *
 		record.NewFakeRecorder(10),
 		slurmAPIClients,
 		time.Minute,
-		true,
 		true,
 		apiReader,
 		"",
@@ -347,11 +520,10 @@ func TestSlurmNodesController_processSetUnhealthy_setsHardwareConditionWhenAssig
 	controller, k8sClient, slurmClusterName, k8sNode, slurmNode := newSlurmNodesControllerForUnhealthyTest(
 		t,
 		ctx,
-		map[api.V0041NodeState]struct{}{
-			api.V0041NodeStateIDLE:  {},
-			api.V0041NodeStateDRAIN: {},
-		},
-		true,
+		slurmapi.Node{States: map[api.V0044NodeState]struct{}{
+			api.V0044NodeStateIDLE:  {},
+			api.V0044NodeStateDRAIN: {},
+		}},
 	)
 
 	err := controller.processSetUnhealthy(ctx, k8sNode, slurmClusterName, slurmNode)
@@ -363,7 +535,7 @@ func TestSlurmNodesController_processSetUnhealthy_setsHardwareConditionWhenAssig
 	require.Equal(t, consts.HardwareIssuesSuspected, updatedNode.Status.Conditions[0].Type)
 	require.Equal(t, corev1.ConditionTrue, updatedNode.Status.Conditions[0].Status)
 	require.Equal(t, string(consts.ReasonGPUHealthCheckFailed), updatedNode.Status.Conditions[0].Reason)
-	require.Equal(t, "gpu health check failed", updatedNode.Status.Conditions[0].Message)
+	require.Equal(t, "[node_problem] gpu health check failed: failed; gpu health check failed", updatedNode.Status.Conditions[0].Message)
 }
 
 func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodFallsBackToSetUnhealthy(t *testing.T) {
@@ -398,9 +570,8 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodFallsBackToSet
 		client,
 		scheme,
 		record.NewFakeRecorder(10),
-		slurmapi.NewClientSet(),
+		slurmapi.NewClientSet(context.Background()),
 		time.Minute,
-		true,
 		true,
 		apiReader,
 		"",
@@ -447,22 +618,22 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodUndrainsWhenCu
 
 	apiClient := slurmapifake.NewMockClient(t)
 	apiClient.On(
-		"SlurmV0041PostNodeWithResponse",
+		"SlurmV0044PostNodeWithResponse",
 		ctx,
 		"worker-0",
-		mock.MatchedBy(func(body api.SlurmV0041PostNodeJSONRequestBody) bool {
+		mock.MatchedBy(func(body api.SlurmV0044PostNodeJSONRequestBody) bool {
 			return body.State != nil &&
 				len(*body.State) == 1 &&
-				(*body.State)[0] == api.V0041UpdateNodeMsgStateUNDRAIN &&
+				(*body.State)[0] == api.V0044UpdateNodeMsgStateUNDRAIN &&
 				body.Comment == nil
 		}),
-	).Return(&api.SlurmV0041PostNodeResponse{
-		JSON200: &api.V0041OpenapiResp{
-			Errors: &[]api.V0041OpenapiError{},
+	).Return(&api.SlurmV0044PostNodeResponse{
+		JSON200: &api.V0044OpenapiResp{
+			Errors: &[]api.V0044OpenapiError{},
 		},
 	}, nil).Once()
 
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(context.Background())
 	slurmAPIClients.AddClient(slurmClusterName, apiClient)
 
 	controller := NewSlurmNodesController(
@@ -471,7 +642,6 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodUndrainsWhenCu
 		record.NewFakeRecorder(10),
 		slurmAPIClients,
 		time.Minute,
-		true,
 		true,
 		apiReader,
 		"",
@@ -495,8 +665,7 @@ func TestSlurmNodesController_processSetUnhealthy_missingWorkerPodUndrainsWhenCu
 func newSlurmNodesControllerForUnhealthyTest(
 	t *testing.T,
 	ctx context.Context,
-	slurmNodeStates map[api.V0041NodeState]struct{},
-	enableExtensiveCheck bool,
+	slurmNodes ...slurmapi.Node,
 ) (*SlurmNodesController, ctrlclient.Client, types.NamespacedName, *corev1.Node, slurmapi.Node) {
 	t.Helper()
 
@@ -544,12 +713,25 @@ func newSlurmNodesControllerForUnhealthyTest(
 		Build()
 
 	apiClient := slurmapifake.NewMockClient(t)
-	apiClient.On("GetNode", ctx, workerPod.Name).Return(slurmapi.Node{
-		Name:   workerPod.Name,
-		States: slurmNodeStates,
-	}, nil).Once()
+	for i := range slurmNodes {
+		node := &slurmNodes[i]
+		node.Name = fmt.Sprintf("worker-%d", i)
+		node.InstanceID = k8sNode.Name
+		node.Comment = "gpu health check failed"
+		node.Reason = ptr.To(slurmapi.NodeReason{
+			OriginalReason: "[node_problem] gpu health check failed: failed",
+			ChangedAt:      drainTime,
+		})
+		if i > 0 {
+			pod := workerPod.DeepCopy()
+			pod.Name = node.Name
+			pod.ResourceVersion = ""
+			require.NoError(t, k8sClient.Create(ctx, pod))
+		}
+		apiClient.On("GetNode", ctx, node.Name).Return(*node, nil).Once()
+	}
 
-	slurmAPIClients := slurmapi.NewClientSet()
+	slurmAPIClients := slurmapi.NewClientSet(ctx)
 	slurmAPIClients.AddClient(slurmClusterName, apiClient)
 
 	controller := NewSlurmNodesController(
@@ -559,19 +741,11 @@ func newSlurmNodesControllerForUnhealthyTest(
 		slurmAPIClients,
 		time.Minute,
 		true,
-		enableExtensiveCheck,
 		k8sClient,
 		"",
 	)
 
-	return controller, k8sClient, slurmClusterName, k8sNode, slurmapi.Node{
-		Name:       workerPod.Name,
-		InstanceID: k8sNode.Name,
-		Comment:    "gpu health check failed",
-		Reason: ptr.To(slurmapi.NodeReason{
-			ChangedAt: drainTime,
-		}),
-	}
+	return controller, k8sClient, slurmClusterName, k8sNode, slurmNodes[0]
 }
 
 func hasHardwareIssuesSuspected(t *testing.T, ctx context.Context, k8sClient ctrlclient.Client, nodeName string) bool {
@@ -585,4 +759,93 @@ func hasHardwareIssuesSuspected(t *testing.T, ctx context.Context, k8sClient ctr
 		}
 	}
 	return false
+}
+
+func TestSlurmNodesController_processK8SNodesMaintenance_readsNodesFromCache(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	slurmClusterName := types.NamespacedName{Namespace: "test-ns", Name: "test-cluster"}
+
+	newNode := func(name string, conditions ...corev1.NodeCondition) *corev1.Node {
+		return &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Status:     corev1.NodeStatus{Conditions: conditions},
+		}
+	}
+	newWorkerPod := func(name, nodeName string) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: slurmClusterName.Namespace,
+				Name:      name,
+				Labels: map[string]string{
+					consts.LabelWorkerKey:   consts.LabelWorkerValue,
+					consts.LabelInstanceKey: slurmClusterName.Name,
+				},
+			},
+			Spec: corev1.PodSpec{NodeName: nodeName},
+		}
+	}
+
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(
+			newNode("instance-maintenance", corev1.NodeCondition{
+				Type:   consts.DefaultMaintenanceConditionType,
+				Status: corev1.ConditionTrue,
+			}),
+			newNode("instance-healthy"),
+			newWorkerPod("worker-0", "instance-maintenance"),
+			newWorkerPod("worker-1", "instance-healthy"),
+		).
+		WithIndex(&corev1.Pod{}, "spec.nodeName", func(obj ctrlclient.Object) []string {
+			return []string{obj.(*corev1.Pod).Spec.NodeName}
+		}).
+		Build()
+
+	apiClient := slurmapifake.NewMockClient(t)
+	apiClient.On(
+		"SlurmV0044PostNodeWithResponse",
+		ctx,
+		"worker-0",
+		mock.MatchedBy(func(body api.SlurmV0044PostNodeJSONRequestBody) bool {
+			return body.State != nil &&
+				len(*body.State) == 1 &&
+				(*body.State)[0] == api.V0044UpdateNodeMsgStateDRAIN
+		}),
+	).Return(&api.SlurmV0044PostNodeResponse{
+		JSON200: &api.V0044OpenapiResp{Errors: &[]api.V0044OpenapiError{}},
+	}, nil).Once()
+	apiClient.On("GetNode", ctx, "worker-0").Return(slurmapi.Node{
+		Name:   "worker-0",
+		States: map[api.V0044NodeState]struct{}{api.V0044NodeStateIDLE: {}, api.V0044NodeStateDRAIN: {}},
+	}, nil).Once()
+
+	slurmAPIClients := slurmapi.NewClientSet(ctx)
+	slurmAPIClients.AddClient(slurmClusterName, apiClient)
+
+	controller := NewSlurmNodesController(
+		k8sClient,
+		scheme,
+		record.NewFakeRecorder(10),
+		slurmAPIClients,
+		time.Minute,
+		true,
+		// Nodes must come from the cached client, so an empty uncached reader is enough here.
+		fake.NewClientBuilder().WithScheme(scheme).Build(),
+		"",
+	)
+
+	require.NoError(t, controller.processK8SNodesMaintenance(ctx))
+
+	var maintained corev1.Node
+	require.NoError(t, k8sClient.Get(ctx, types.NamespacedName{Name: "instance-maintenance"}, &maintained))
+	require.True(t, slices.ContainsFunc(maintained.Status.Conditions, func(c corev1.NodeCondition) bool {
+		return c.Type == consts.SoperatorChecksK8SNodeMaintenance && c.Status == corev1.ConditionTrue
+	}))
+
+	var healthy corev1.Node
+	require.NoError(t, k8sClient.Get(ctx, types.NamespacedName{Name: "instance-healthy"}, &healthy))
+	require.Empty(t, healthy.Status.Conditions)
 }

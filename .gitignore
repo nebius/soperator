@@ -12,3 +12,6 @@ version.txt
 /version/
 
 .ansible
+
+# acceptance run outputs
+/e2e-artifacts/

@@ -24,7 +24,7 @@ alertManager:
   port: 9093
 
 # Where to scrape the job metrics from.
-dataSourceUrl: "http://vmsingle-metrics-victoria-metrics-k8s-stack:8429"
+dataSourceUrl: "http://vmsingle-metrics-victoria-metrics-k8s-stack:8428"
 
 # Configuration of time periods.
 interval:

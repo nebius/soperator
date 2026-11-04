@@ -20,17 +20,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - events
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - nodes
   verbs:
   - delete
@@ -41,12 +30,9 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - nodes/proxy
-  - pods
+  - nodes/stats
   verbs:
   - get
-  - list
-  - watch
 - apiGroups:
   - ""
   resources:
@@ -60,10 +46,30 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - secrets
   verbs:
   - get
   - list
+  - update
+  - watch
+- apiGroups:
+  - ""
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
+  - get
+  - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -123,7 +129,6 @@ rules:
   - slurm.nebius.ai
   resources:
   - activechecks
-  - slurmclusters
   verbs:
   - create
   - delete
@@ -149,10 +154,8 @@ rules:
 - apiGroups:
   - slurm.nebius.ai
   resources:
-  - jailedconfigs
+  - slurmclusters
   verbs:
-  - create
   - get
   - list
-  - patch
   - watch

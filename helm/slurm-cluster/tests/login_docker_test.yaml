@@ -1,0 +1,42 @@
+suite: test login Docker rendering
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should render login Docker disabled by default
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.docker.enabled
+          value: false
+
+  - it: should render login Docker enabled with its prerequisites
+    set:
+      slurmNodes:
+        login:
+          docker:
+            enabled: true
+          userIsolation:
+            enabled: true
+          volumes:
+            jailSubMounts:
+              - name: image-storage
+                mountPath: /mnt/image-storage
+                volumeSourceName: image-storage
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.docker.enabled
+          value: true
+      - equal:
+          path: spec.slurmNodes.login.userIsolation.enabled
+          value: true
+      - equal:
+          path: spec.slurmNodes.login.volumes.jailSubMounts[0].mountPath
+          value: /mnt/image-storage
+
+  - it: should omit login Docker when the values block is removed
+    set:
+      slurmNodes:
+        login:
+          docker: null
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.login.docker

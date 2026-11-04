@@ -14,7 +14,7 @@ Before deploying Soperator, ensure the following prerequisites are met:
 
 ### OpenKruise
 
-Soperator relies on [**OpenKruise operator**](https://github.com/openkruise/charts/tree/master/versions/kruise/1.8.0)
+Soperator relies on [**OpenKruise operator**](https://github.com/openkruise/charts/tree/master/versions/kruise/1.9.1)
 to manage **Advanced StatefulSets**.
 
 By default, it's installed within this chart.
@@ -23,6 +23,8 @@ However, you can disable its installation if you already have OpenKruise operato
 > [!IMPORTANT]
 > Make sure you have required feature gates stated in [values.yaml](./values.yaml)/`kruise.featureGates`
 > opened in case of self-installation.
+>
+> Kubernetes 1.32 and newer require OpenKruise 1.9.1 or later.
 
 ## Installation
 

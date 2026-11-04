@@ -43,6 +43,7 @@
     mode: "0755"
   loop:
     - soperator_instance_login.sh
+    - soperator-nccl-test
     - slurm_task_info.sh
     - worker_nvidia_bug_report.sh
     - fs_usage.sh

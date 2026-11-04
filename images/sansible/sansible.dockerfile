@@ -19,5 +19,7 @@ RUN chmod +x /opt/bin/sansible_entrypoint.sh
 
 ARG SLURM_VERSION
 ENV SLURM_VERSION=$SLURM_VERSION
+ARG SLURM_DEB_VERSION
+ENV SLURM_DEB_VERSION=$SLURM_DEB_VERSION
 
 ENTRYPOINT ["/opt/bin/sansible_entrypoint.sh"]

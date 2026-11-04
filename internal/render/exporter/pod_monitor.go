@@ -18,6 +18,14 @@ func RenderPodMonitor(
 	metricRelabelConfigs = append(metricRelabelConfigs, pmConfig.MetricRelabelConfigs...)
 	scheme := prometheusv1.SchemeHTTP
 	schemeLower := prometheusv1.Scheme((&scheme).String())
+	// Only the self-monitoring endpoint gets the static component label used by the
+	// controllers dashboard; adding it to the Slurm metrics endpoint would change the
+	// identity of every Slurm series downstream.
+	monitoringRelabelConfigs := append([]prometheusv1.RelabelConfig{{
+		Action:      "replace",
+		TargetLabel: "component",
+		Replacement: ptr.To(consts.Exporter),
+	}}, pmConfig.RelabelConfig...)
 
 	return prometheusv1.PodMonitor{
 		ObjectMeta: metav1.ObjectMeta{
@@ -51,7 +59,7 @@ func RenderPodMonitor(
 					Port:                 ptr.To(consts.ContainerPortNameMonitoring),
 					Scheme:               ptr.To(schemeLower),
 					MetricRelabelConfigs: metricRelabelConfigs,
-					RelabelConfigs:       pmConfig.RelabelConfig,
+					RelabelConfigs:       monitoringRelabelConfigs,
 				},
 			},
 		},

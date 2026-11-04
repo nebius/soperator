@@ -48,7 +48,7 @@ func RenderDeploymentExporter(clusterValues *values.SlurmCluster) (*appsv1.Deplo
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      DeploymentName,
+			Name:      clusterValues.SlurmExporter.Deployment.Name,
 			Namespace: clusterValues.Namespace,
 			Labels:    labels,
 		},

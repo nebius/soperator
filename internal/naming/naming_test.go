@@ -76,3 +76,7 @@ func TestBuildConfigMapSecurityLimitsForNodeSetName(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildConfigMapPAMSlurmAdoptName(t *testing.T) {
+	assert.Equal(t, "test-cluster-pam-slurm-adopt", naming.BuildConfigMapPAMSlurmAdoptName("test-cluster"))
+}

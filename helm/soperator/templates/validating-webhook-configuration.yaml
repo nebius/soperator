@@ -15,6 +15,26 @@ webhooks:
     service:
       name: '{{ include "soperator.fullname" . }}-webhook-service'
       namespace: '{{ .Release.Namespace }}'
+      path: /validate-slurm-nebius-ai-v1alpha1-nodeset
+  failurePolicy: Fail
+  name: vnodeset-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - slurm.nebius.ai
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - nodesets
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: '{{ include "soperator.fullname" . }}-webhook-service'
+      namespace: '{{ .Release.Namespace }}'
       path: /validate--v1-secret
   failurePolicy: Fail
   name: vsecret-v1.kb.io
@@ -52,24 +72,4 @@ webhooks:
     - UPDATE
     resources:
     - slurmclusters
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: '{{ include "soperator.fullname" . }}-webhook-service'
-      namespace: '{{ .Release.Namespace }}'
-      path: /validate-slurm-nebius-ai-v1alpha1-nodeset
-  failurePolicy: Fail
-  name: vnodeset-v1alpha1.kb.io
-  rules:
-  - apiGroups:
-    - slurm.nebius.ai
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - nodesets
   sideEffects: None

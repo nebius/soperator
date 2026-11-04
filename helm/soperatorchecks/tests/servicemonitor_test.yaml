@@ -1,0 +1,44 @@
+suite: test controller-runtime metrics scraping
+release:
+  name: test-soperatorchecks
+  namespace: soperator-system
+templates:
+  - templates/servicemonitor.yaml
+
+tests:
+  - it: should label scraped series with the soperatorchecks component
+    template: templates/servicemonitor.yaml
+    asserts:
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: spec.endpoints[0].port
+          value: https-metrics
+      - equal:
+          path: spec.endpoints[0].scheme
+          value: https
+      - equal:
+          path: spec.endpoints[0].relabelings[0]
+          value:
+            action: replace
+            targetLabel: component
+            replacement: soperatorchecks
+
+  - it: should keep the component relabeling ahead of user relabelings
+    template: templates/servicemonitor.yaml
+    set:
+      serviceMonitor:
+        relabelings:
+          - action: labeldrop
+            regex: foo
+    asserts:
+      - lengthEqual:
+          path: spec.endpoints[0].relabelings
+          count: 2
+      - equal:
+          path: spec.endpoints[0].relabelings[0].targetLabel
+          value: component
+      - equal:
+          path: spec.endpoints[0].relabelings[1].action
+          value: labeldrop
+

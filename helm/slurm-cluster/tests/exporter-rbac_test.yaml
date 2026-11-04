@@ -3,6 +3,7 @@ templates:
   - templates/exporter-serviceaccount.yaml
   - templates/exporter-role.yaml
   - templates/exporter-rolebinding.yaml
+  - templates/exporter-node-rbac.yaml
   - templates/slurm-cluster-cr.yaml
 tests:
   # Test ServiceAccount creation with default values
@@ -15,7 +16,7 @@ tests:
           of: ServiceAccount
       - equal:
           path: metadata.name
-          value: slurm-exporter-sa
+          value: test-cluster-exporter-sa
       - equal:
           path: metadata.namespace
           value: NAMESPACE
@@ -73,10 +74,60 @@ tests:
             apiGroups: [""]
             resources: ["secrets"]
             verbs: ["get", "list", "watch"]
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["pods"]
+            verbs: ["list", "watch"]
+
+  - it: should grant exporter read access to Kubernetes nodes
+    template: templates/exporter-node-rbac.yaml
+    set:
+      clusterName: test-cluster
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: ClusterRole
+        documentIndex: 0
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["nodes"]
+            verbs: ["list", "watch"]
+        documentIndex: 0
+      - isKind:
+          of: ClusterRoleBinding
+        documentIndex: 1
+      - equal:
+          path: roleRef.name
+          value: test-cluster-exporter-node-reader
+        documentIndex: 1
+      - contains:
+          path: subjects
+          content:
+            kind: ServiceAccount
+            name: test-cluster-exporter-sa
+            namespace: NAMESPACE
+        documentIndex: 1
 
   # Test Role not created when rbac.create=false
   - it: should not create Role when rbac.create is false
     template: templates/exporter-role.yaml
+    set:
+      clusterName: test-cluster
+      slurmNodes:
+        exporter:
+          rbac:
+            create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not create node RBAC when rbac.create is false
+    template: templates/exporter-node-rbac.yaml
     set:
       clusterName: test-cluster
       slurmNodes:
@@ -114,7 +165,7 @@ tests:
           path: subjects
           content:
             kind: ServiceAccount
-            name: slurm-exporter-sa
+            name: test-cluster-exporter-sa
             namespace: NAMESPACE
 
   # Test RoleBinding with custom ServiceAccount name
@@ -162,7 +213,7 @@ tests:
     asserts:
       - equal:
           path: spec.slurmNodes.exporter.serviceAccountName
-          value: slurm-exporter-sa
+          value: test-cluster-exporter-sa
 
   # Test SlurmCluster CR uses custom ServiceAccount name
   - it: should set custom serviceAccountName in SlurmCluster CR
@@ -207,4 +258,4 @@ tests:
     asserts:
       - equal:
           path: spec.slurmNodes.exporter.serviceAccountName
-          value: slurm-exporter-sa
+          value: test-cluster-exporter-sa

@@ -5,7 +5,11 @@ import (
 	"fmt"
 	"maps"
 
+	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
+	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -16,11 +20,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
-	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
-	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	apparmor "sigs.k8s.io/security-profiles-operator/api/apparmorprofile/v1alpha1"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/logfield"
@@ -201,6 +200,8 @@ func (r Reconciler) reconcile(
 				existing = &kruisev1b1.StatefulSet{}
 			case *appsv1.Deployment:
 				existing = &appsv1.Deployment{}
+			case *autoscalingv2.HorizontalPodAutoscaler:
+				existing = &autoscalingv2.HorizontalPodAutoscaler{}
 			case *prometheusv1.PodMonitor:
 				existing = &prometheusv1.PodMonitor{}
 			case *prometheusv1.ServiceMonitor:
@@ -209,8 +210,6 @@ func (r Reconciler) reconcile(
 				existing = &mariadbv1alpha1.MariaDB{}
 			case *mariadbv1alpha1.Grant:
 				existing = &mariadbv1alpha1.Grant{}
-			case *apparmor.AppArmorProfile:
-				existing = &apparmor.AppArmorProfile{}
 			case *slurmv1alpha1.JailedConfig:
 				existing = &slurmv1alpha1.JailedConfig{}
 			case *slurmv1alpha1.NodeSetPowerState:

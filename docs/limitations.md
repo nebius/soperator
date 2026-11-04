@@ -30,10 +30,10 @@ equipped with different GPU models, use different container images, have differe
 
 ### Software versions
 Our list of supported software versions is pretty short right now:
-- Linux distribution: Ubuntu [22.04](https://releases.ubuntu.com/jammy/).
-- Slurm: versions `25.11.3`.
-- CUDA: version [12.4.1](https://developer.nvidia.com/cuda-12-4-1-download-archive).
-- Kubernetes: >= [1.29](https://kubernetes.io/blog/2023/12/13/kubernetes-v1-29-release/).
+- Linux distribution: Ubuntu [24.04](https://releases.ubuntu.com/noble/).
+- Slurm: version [26.05.4-nebius-1](https://github.com/nebius/slurm).
+- CUDA: version [13.0.3](https://developer.nvidia.com/cuda-13-0-3-download-archive).
+- Kubernetes: >= [1.35](https://kubernetes.io/blog/2025/12/31/kubernetes-v1-35-structured-zpages/).
 - Versions of some preinstalled software packages can't be changed.
 
 Other versions may also be supported, but we haven't checked it yet. It would be cool if someone from the community
@@ -51,6 +51,10 @@ Such software versions must be explicitly supported in container images Soperato
 While setting some configuration options for Slurm should indeed be done by Soperator, there are such ones that some
 people would like to customize themselves. Not all of this is supported.
 
+Configuration changes made with `scontrol` or by editing files under `/etc/slurm` in the jail are not persistent:
+the operator renders Slurm configuration from the `SlurmCluster` resource and rewrites it on the next reconciliation.
+See [`slurm-configuration.md`](slurm-configuration.md) for how configuration is delivered and how to change it.
+
 
 ### Some kernel parameters aren't configurable
 For example, Soperator sets some [sysctl](https://man7.org/linux/man-pages/man8/sysctl.8.html) params on its own, and
@@ -59,5 +63,5 @@ it's not configurable by the user.
 Try this solution as it is and if something doesn't work, let us know, we will fix it.
 
 
-### Slurm integration with LDAP isn't supported
-You can only use Linux users & groups for now.
+### Slurm integration with LDAP
+Supported with SSSD [`sssd.md`](sssd.md)

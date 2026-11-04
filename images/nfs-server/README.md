@@ -23,6 +23,12 @@ Then `/exported/` needs to be mounted as a volume as well.
 | `GRACE_TIME` | NFS grace period in seconds | `10` | - |
 | `LEASE_TIME` | NFS lease time in seconds | `10` | - |
 | `THREADS` | Number of NFS daemon threads | `8` | -  |
+| `MAX_CONNECTIONS` | Server connection limit where supported by the host kernel; `0` uses the kernel default | `8192` | `16384` |
+
+`MAX_CONNECTIONS` is applied through `/proc/fs/nfsd/max_connections` before exporting
+filesystems. Kernels that no longer expose this setting log a message and skip it.
+On kernels with the older connection accounting, `0` derives the limit from the
+thread count; it does not mean unlimited connections.
 
 ## Basic Usage
 

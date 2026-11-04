@@ -1,0 +1,121 @@
+suite: test control-plane cpu requests
+templates:
+  - templates/cert-manager.yaml
+  - templates/mariadb-operator.yaml
+  - templates/backup.yaml
+  - templates/vm-stack.yaml
+  - templates/o11y-tsa-token-writer.yaml
+  - templates/nodeconfigurator.yaml
+tests:
+  # Without a cpu request these pods are scored as free and bin-pack onto whatever node has
+  # room, so every control-plane workload carries a floor.
+  - it: should request a cpu floor for cert-manager and its companions
+    template: templates/cert-manager.yaml
+    asserts:
+      - equal:
+          path: spec.values.resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.values.webhook.resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.values.cainjector.resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.values.startupapicheck.resources.requests.cpu
+          value: 100m
+
+  - it: should request a cpu floor for the mariadb operator, its webhook and cert controller
+    template: templates/mariadb-operator.yaml
+    asserts:
+      - equal:
+          path: spec.values.resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.values.webhook.resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.values.certController.resources.requests.cpu
+          value: 100m
+
+  - it: should request a smaller cpu floor for k8up
+    template: templates/backup.yaml
+    asserts:
+      - equal:
+          path: spec.values.resources.requests.cpu
+          value: 50m
+
+  - it: should request a cpu floor for grafana and the vm operator
+    template: templates/vm-stack.yaml
+    asserts:
+      - equal:
+          path: spec.values.grafana.resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.values.victoria-metrics-operator.resources.requests.cpu
+          value: 100m
+
+  - it: should request a smaller cpu floor for the tsa token writer
+    template: templates/o11y-tsa-token-writer.yaml
+    asserts:
+      # The raw chart takes a list: ServiceAccount, a Role/RoleBinding pair per namespace,
+      # then the Deployment.
+      - equal:
+          path: spec.values.resources[5].kind
+          value: Deployment
+      - equal:
+          path: spec.values.resources[5].spec.template.spec.containers[0].resources.requests.cpu
+          value: 50m
+      - equal:
+          path: spec.values.resources[5].spec.template.spec.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+
+  - it: should set no memory floor alongside the cpu request
+    template: templates/backup.yaml
+    asserts:
+      - notExists:
+          path: spec.values.resources.requests.memory
+      - notExists:
+          path: spec.values.resources.limits
+
+  - it: should let the cpu floor be overridden
+    template: templates/backup.yaml
+    set:
+      backup.values.resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+    asserts:
+      - equal:
+          path: spec.values.resources.requests.cpu
+          value: 250m
+      - equal:
+          path: spec.values.resources.requests.memory
+          value: 256Mi
+
+  # The rebooter competes for the sliver of node cpu left over after the Slurm pod, so it needs to
+  # preempt whatever else lands there - but it runs on every node, so its class must stay below
+  # every Slurm class (the lowest is slurm-login at 100002).
+  - it: should give the rebooter a class that outranks infra pods but no Slurm pod
+    template: templates/nodeconfigurator.yaml
+    asserts:
+      - equal:
+          path: spec.values.rebooter.priorityClassName
+          value: soperator-rebooter
+      - equal:
+          path: spec.values.rebooter.priorityClass.name
+          value: soperator-rebooter
+      - equal:
+          path: spec.values.rebooter.priorityClass.value
+          value: 100000
+      - equal:
+          path: spec.values.rebooter.resources.requests.cpu
+          value: 100m
+
+  - it: should omit the rebooter priority class when unset
+    template: templates/nodeconfigurator.yaml
+    set:
+      soperator.nodeConfigurator.values.rebooter.priorityClassName: ""
+    asserts:
+      - notExists:
+          path: spec.values.rebooter.priorityClassName

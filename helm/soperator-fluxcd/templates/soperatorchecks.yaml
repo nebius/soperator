@@ -10,6 +10,10 @@ spec:
   driftDetection:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .Values.soperator.soperatorChecks.postRenderers }}
+  postRenderers:
+    {{- tpl (toYaml .) $ | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: helm-soperatorchecks

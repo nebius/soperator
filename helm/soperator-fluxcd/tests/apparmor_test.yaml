@@ -1,0 +1,21 @@
+suite: AppArmor is supplied by node provisioning
+templates:
+  - templates/slurm-cluster.yaml
+  - templates/soperator.yaml
+tests:
+  - it: should not depend on SPO even with legacy values
+    template: templates/slurm-cluster.yaml
+    set:
+      securityProfilesOperator.enabled: true
+    asserts:
+      - notContains:
+          path: spec.dependsOn
+          content:
+            name: RELEASE-NAME-security-profiles-operator
+  - it: should not tell the operator to watch SPO CRDs
+    template: templates/soperator.yaml
+    set:
+      securityProfilesOperator.enabled: true
+    asserts:
+      - notExists:
+          path: spec.values.controllerManager.manager.env.isApparmorCrdInstalled

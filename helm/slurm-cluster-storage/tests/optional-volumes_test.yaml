@@ -1,0 +1,57 @@
+suite: test optional storage volumes
+templates:
+  - templates/accounting-mount-daemonset.yaml
+  - templates/accounting-pv.yaml
+  - templates/controller-spool-mount-daemonset.yaml
+  - templates/controller-spool-pv.yaml
+  - templates/controller-spool-pvc.yaml
+tests:
+  - it: should not render accounting storage resources when disabled
+    template: templates/accounting-mount-daemonset.yaml
+    set:
+      volume:
+        accounting:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render accounting PV when disabled
+    template: templates/accounting-pv.yaml
+    set:
+      volume:
+        accounting:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render controller-spool mount DaemonSet when disabled
+    template: templates/controller-spool-mount-daemonset.yaml
+    set:
+      volume:
+        controllerSpool:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render controller-spool PV when disabled
+    template: templates/controller-spool-pv.yaml
+    set:
+      volume:
+        controllerSpool:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render controller-spool PVC when disabled
+    template: templates/controller-spool-pvc.yaml
+    set:
+      volume:
+        controllerSpool:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"testing"
 	"time"
@@ -44,6 +45,15 @@ var _ = ReportAfterEach(func(report SpecReport) {
 		fmt.Printf("✓ %s [%.3fs]\n", report.FullText(), report.RunTime.Seconds())
 	} else if report.State.Is(types.SpecStateFailed) {
 		fmt.Printf("✗ %s [%.3fs]\n", report.FullText(), report.RunTime.Seconds())
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		for _, args := range [][]string{{"get", "nodes", "-o", "wide"}, {"describe", "nodes"}} {
+			output, err := testenv.Run(exec.CommandContext(ctx, "kubectl", args...))
+			fmt.Print(output)
+			if err != nil {
+				fmt.Printf("Collect node diagnostics: %v\n", err)
+			}
+		}
 		fmt.Print(testenv.DumpAllHelmReleases(context.Background(), "flux-system"))
 	}
 })

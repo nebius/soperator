@@ -1,0 +1,58 @@
+suite: test namespaceConfig rendering
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should enable generated namespace configuration by default
+    asserts:
+      - equal:
+          path: spec.namespaceConfig.enabled
+          value: true
+      - notExists:
+          path: spec.namespaceConfig.configMapRef
+      - notExists:
+          path: spec.jobTmpfs
+
+  - it: should render disabled namespace configuration
+    set:
+      namespaceConfig:
+        enabled: false
+    asserts:
+      - equal:
+          path: spec.namespaceConfig.enabled
+          value: false
+
+  - it: should leave the CRD default when the values block is removed
+    set:
+      namespaceConfig: null
+    asserts:
+      - notExists:
+          path: spec.namespaceConfig
+
+  - it: should render a custom namespace configuration reference
+    set:
+      namespaceConfig:
+        configMapRef:
+          name: custom-slurm-namespace
+    asserts:
+      - equal:
+          path: spec.namespaceConfig.enabled
+          value: true
+      - equal:
+          path: spec.namespaceConfig.configMapRef
+          value:
+            name: custom-slurm-namespace
+
+  - it: should preserve disablement with a custom configuration reference
+    set:
+      namespaceConfig:
+        enabled: false
+        configMapRef:
+          name: custom-slurm-namespace
+    asserts:
+      - equal:
+          path: spec.namespaceConfig.enabled
+          value: false
+      - equal:
+          path: spec.namespaceConfig.configMapRef
+          value:
+            name: custom-slurm-namespace

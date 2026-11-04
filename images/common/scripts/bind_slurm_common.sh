@@ -8,6 +8,19 @@ set -e # Exit immediately if any command returns a non-zero error code
 
 usage() { echo "usage: ${0} -j <path_to_jail_dir> [-h]" >&2; exit 1; }
 
+ensure_symlink() {
+    local target=$1
+    local link=$2
+
+    # Compare the link payload without following it. A transient failure to open
+    # the target is not a reason to replace an already-correct shared link.
+    if [[ -L "${link}" ]] && [[ "$(readlink -- "${link}")" == "${target}" ]]; then
+        return
+    fi
+
+    ln -sf -- "${target}" "${link}"
+}
+
 while getopts j:h flag
 do
     case "${flag}" in
@@ -42,8 +55,8 @@ pushd "${jaildir}"
 
     MAJOR=$(printf '%s\n' "$LIBSLURM_REAL" | sed -E 's/.*\.so\.([0-9]+).*/\1/')
     pushd "${JAIL_LIBDIR}"
-        ln -sf "${LIBSLURM_REAL}" "libslurm.so.${MAJOR}"
-        ln -sf "${LIBSLURM_REAL}" "libslurm.so"
+        ensure_symlink "${LIBSLURM_REAL}" "libslurm.so.${MAJOR}"
+        ensure_symlink "${LIBSLURM_REAL}" "libslurm.so"
     popd
 
     # slurm-smd-dev
@@ -60,13 +73,19 @@ pushd "${jaildir}"
     echo "Bind-mount slurm-smd-client package content from container to the jail"
     SLURM_BINARIES=(
         sacct salloc sbatch scancel scrontab sdiag sinfo squeue srun sstat
-        sacctmgr sattach sbcast scontrol scrun sh5util sprio sreport sshare strigger
+        sacctmgr sattach sbcast scrun sh5util sprio sreport sshare strigger
     )
 
     for binary in "${SLURM_BINARIES[@]}"; do
         touch "usr/bin/$binary"
         mount --bind "/usr/bin/$binary" "usr/bin/$binary"
     done
+
+    # scontrol is wrapped to warn about non-persistent configuration changes.
+    # The real binary is exposed as scontrol.real, the wrapper takes its place.
+    touch usr/bin/scontrol.real usr/bin/scontrol
+    mount --bind /usr/bin/scontrol usr/bin/scontrol.real
+    mount --bind /opt/bin/slurm/scontrol_wrapper.sh usr/bin/scontrol
 
     # bash completions
     touch usr/share/bash-completion/completions/slurm_completion.sh

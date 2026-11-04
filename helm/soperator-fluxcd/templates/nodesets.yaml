@@ -10,6 +10,10 @@ spec:
   driftDetection:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .Values.nodesets.postRenderers }}
+  postRenderers:
+    {{- tpl (toYaml .) $ | nindent 4 }}
+  {{- end }}
   chart:
     spec:
       chart: helm-nodesets
@@ -34,6 +38,7 @@ spec:
   upgrade:
     {{- toYaml .Values.nodesets.upgrade | nindent 4 }}
   values:
+    clusterName: {{ .Values.nodesets.clusterName | quote }}
   {{- if .Values.nodesets.overrideValues }}
     {{- toYaml .Values.nodesets.overrideValues | nindent 4 }}
   {{- else }}

@@ -2,19 +2,20 @@ package topologyconfcontroller
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,509 +25,79 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
+	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller/deferral"
+	"nebius.ai/slurm-operator/internal/controller/topologyconfcontroller/topology"
 	"nebius.ai/slurm-operator/internal/controllerconfig"
 	"nebius.ai/slurm-operator/internal/utils/resourcegetter"
+	topologyrefs "nebius.ai/slurm-operator/internal/utils/slurm/topology"
 )
 
-var (
-	WorkerTopologyReconcilerName = "workerTopologyReconciler"
-	DefaultRequeueResult         = ctrl.Result{
-		RequeueAfter: 1 * time.Minute,
-		Requeue:      true,
-	}
-)
+const WorkerTopologyReconcilerName = "workertopology"
 
+const defaultInterval = 1 * time.Minute
+
+// Reasons and actions of the K8s events recorded on the SlurmCluster.
 const (
-	defBlockSize = 16
+	reasonInvalidTopologySpec       = "InvalidTopologySpec"
+	reasonInvalidTopologyConfig     = "InvalidTopologyConfig"
+	reasonConflictingTopologyLabels = "ConflictingTopologyLabels"
+	reasonInvalidNodeTopologyLabels = "InvalidNodeTopologyLabels"
+	reasonTopologyReachesNoNode     = "TopologyReachesNoNode"
+	reasonReconfigureRequested      = "ReconfigureRequested"
+	reasonReconfigureDeferred       = "ReconfigureDeferred"
+
+	actionRenderTopology = "RenderTopology"
+	actionReconfigure    = "Reconfigure"
+
+	maxEventSamples = 5
 )
 
-// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch;create;update;patch
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;update;create;patch
-// +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;
-// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;patch
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=slurmclusters,verbs=get;list;watch
 // +kubebuilder:rbac:groups=slurm.nebius.ai,resources=nodesets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=slurm.nebius.ai,resources=jailedconfigs,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 
 type WorkerTopologyReconciler struct {
-	BaseReconciler
-	namespace string
-}
-
-// Link represents a connection in the topology
-type Link struct {
-	FromSwitch string   // switch name
-	ToSwitches []string // connected switches (for higher tier switches)
-	ToNodes    []string // connected nodes/pods (for lowest tier switches)
+	client              client.Client
+	scheme              *runtime.Scheme
+	namespace           string
+	truncEventRecorder  events.EventRecorder
+	reconfigureDeferral deferral.Policy
 }
 
 func NewWorkerTopologyReconciler(
-	client client.Client, scheme *runtime.Scheme, namespace string) *WorkerTopologyReconciler {
+	client client.Client,
+	scheme *runtime.Scheme,
+	namespace string,
+	eventRecorder events.EventRecorder,
+	reconfigureDeferral deferral.Policy,
+) *WorkerTopologyReconciler {
 	return &WorkerTopologyReconciler{
-		BaseReconciler: BaseReconciler{
-			Client: client,
-			Scheme: scheme,
-		},
-		namespace: namespace,
+		client:              client,
+		scheme:              scheme,
+		namespace:           namespace,
+		truncEventRecorder:  NewTruncateEventRecorder(eventRecorder),
+		reconfigureDeferral: reconfigureDeferral,
 	}
 }
 
-func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithName(WorkerTopologyReconcilerName).WithValues(
-		"SlurmCluster", req.Name, "Namespace", req.Namespace,
-	)
-	logger.Info("Starting reconciliation")
-
-	slurmCluster := &slurmv1.SlurmCluster{}
-	if err := r.Client.Get(ctx, req.NamespacedName, slurmCluster); err != nil {
-		return ctrl.Result{}, fmt.Errorf("get SlurmCluster %q in namespace %q: %w", req.Name, req.Namespace, err)
-	}
-
-	shouldReconcileCluster := isClusterReconciliationNeeded(slurmCluster)
-
-	if !shouldReconcileCluster {
-		return DefaultRequeueResult, nil
-	}
-
-	logger.V(1).Info("Fetching nodeSetList for SlurmCluster")
-	nodeSetList, err := resourcegetter.ListNodeSetsByClusterRef(
-		ctx, r.Client, types.NamespacedName{Namespace: req.Namespace, Name: slurmCluster.Name},
-	)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("list NodeSets: %w", err)
-	}
-
-	logger.V(1).Info("Fetched NodeSets for SlurmCluster", "count", len(nodeSetList))
-
-	existingTopologyConfig, err := r.EnsureWorkerTopologyConfigMap(ctx, req.Namespace, logger)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("ensure worker topology ConfigMap: %w", err)
-	}
-
-	desiredTopology, err := r.buildNodeSetTopologyConfig(ctx, req.Namespace, slurmCluster, nodeSetList)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("build NodeSet topology config: %w", err)
-	}
-	if strings.TrimSpace(desiredTopology) == "" {
-		logger.Info("No worker topology to apply yet (empty desired topology), preserving existing topology config")
-		return DefaultRequeueResult, nil
-	}
-
-	existingTopology := existingTopologyConfig.Data[consts.ConfigMapKeyTopologyConfig]
-
-	desiredHash := r.calculateConfigHash(desiredTopology)
-	existingHash := r.calculateConfigHash(existingTopology)
-
-	if desiredHash == existingHash {
-		logger.Info("Topology config unchanged, skipping update")
-		if err := r.ensureJailedConfig(ctx, req.Namespace); err != nil {
-			return ctrl.Result{}, fmt.Errorf("ensure JailedConfig: %w", err)
-		}
-		return DefaultRequeueResult, nil
-	}
-
-	if err := r.updateTopologyConfigMap(ctx, req.Namespace, desiredTopology); err != nil {
-		logger.Error(err, "Update ConfigMap with topology config")
-		return ctrl.Result{}, fmt.Errorf("update ConfigMap with topology config: %w", err)
-	}
-
-	logger.Info("Reconciliation completed successfully")
-	return DefaultRequeueResult, nil
-}
-
-// isClusterReconciliationNeeded checks if the SlurmCluster requires topology reconciliation based on its SlurmConfig.TopologyPlugin setting.
-func isClusterReconciliationNeeded(slurmCluster *slurmv1.SlurmCluster) bool {
-	return slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyTree ||
-		slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyBlock
-}
-
-// EnsureWorkerTopologyConfigMap checks if the topology ConfigMap and JailedConfig exist, and creates them if they don't.
-func (r *WorkerTopologyReconciler) EnsureWorkerTopologyConfigMap(
-	ctx context.Context, namespace string, logger logr.Logger,
-) (*corev1.ConfigMap, error) {
-	configMapKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
-	jailedConfigKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
-
-	configMap := &corev1.ConfigMap{}
-	configMapExists := true
-	err := r.Client.Get(ctx, configMapKey, configMap)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			configMapExists = false
-			logger.Info("Worker topology ConfigMap not found")
-		} else {
-			return nil, fmt.Errorf("get ConfigMap %s: %w", consts.ConfigMapNameTopologyConfig, err)
-		}
-	}
-
-	jailedConfig := &v1alpha1.JailedConfig{}
-	jailedConfigExists := true
-	err = r.Client.Get(ctx, jailedConfigKey, jailedConfig)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			jailedConfigExists = false
-			logger.Info("Worker topology JailedConfig not found")
-		} else {
-			return nil, fmt.Errorf("get JailedConfig %s: %w", consts.ConfigMapNameTopologyConfig, err)
-		}
-	}
-
-	if !configMapExists || !jailedConfigExists {
-		logger.Info("Creating missing topology resources",
-			"configMapExists", configMapExists,
-			"jailedConfigExists", jailedConfigExists)
-
-		if err = r.createDefaultTopologyResources(ctx, namespace); err != nil {
-			return nil, fmt.Errorf("create default topology resources in namespace %q: %w", namespace, err)
-		}
-
-		if err := r.Client.Get(ctx, configMapKey, configMap); err != nil {
-			return nil, fmt.Errorf("get config map after creation in namespace %q: %w", namespace, err)
-		}
-
-		logger.Info("Created and retrieved topology resources",
-			"configMap", configMap.Name,
-			"namespace", configMap.Namespace)
-	}
-
-	return configMap, nil
-}
-
-// createDefaultTopologyResources creates the default topology ConfigMap and JailedConfig with a basic topology configuration.
-func (r *WorkerTopologyReconciler) createDefaultTopologyResources(
-	ctx context.Context, namespace string,
+func (r *WorkerTopologyReconciler) SetupWithManager(
+	mgr ctrl.Manager,
+	maxConcurrency int,
+	cacheSyncTimeout time.Duration,
 ) error {
-
-	defaultTopology := "SwitchName=root"
-
-	configMap := r.renderTopologyConfigMap(namespace, defaultTopology)
-	err := r.Client.Create(ctx, configMap)
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("create ConfigMap %s: %w", configMap.Name, err)
+	// Matches both the legacy unprefixed name and any cluster-prefixed variant.
+	// Intentionally broad: events from other clusters in the same namespace will
+	// trigger reconciliation, but the reconciler uses its own cluster-specific
+	// ConfigMap name so spurious triggers are harmless.
+	isTopologyConfigName := func(name string) bool {
+		return name == consts.ConfigMapNameTopologyConfig ||
+			strings.HasSuffix(name, "-"+consts.ConfigMapNameTopologyConfig)
 	}
-
-	jailedConfig := r.renderTopologyJailedConfig(namespace)
-	err = r.Client.Create(ctx, jailedConfig)
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("create JailedConfig %s: %w", jailedConfig.Name, err)
-	}
-
-	return nil
-}
-
-func (r *WorkerTopologyReconciler) renderTopologyConfigMap(namespace string, config string) *corev1.ConfigMap {
-	return &corev1.ConfigMap{
-		TypeMeta: ctrl.TypeMeta{
-			APIVersion: corev1.SchemeGroupVersion.String(),
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameTopologyConfig,
-			Namespace: namespace,
-		},
-		Data: map[string]string{
-			consts.ConfigMapKeyTopologyConfig: config,
-		},
-	}
-}
-
-func (r *WorkerTopologyReconciler) renderTopologyJailedConfig(namespace string) *v1alpha1.JailedConfig {
-	return &v1alpha1.JailedConfig{
-		TypeMeta: ctrl.TypeMeta{
-			APIVersion: v1alpha1.GroupVersion.String(),
-			Kind:       "JailedConfig",
-		},
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameTopologyConfig,
-			Namespace: namespace,
-			Labels: map[string]string{
-				consts.LabelJailedAggregationKey: consts.LabelJailedAggregationCommonValue,
-			},
-		},
-		Spec: v1alpha1.JailedConfigSpec{
-			ConfigMap: v1alpha1.ConfigMapReference{
-				Name: consts.ConfigMapNameTopologyConfig,
-			},
-			Items: []corev1.KeyToPath{
-				{
-					Key:  consts.ConfigMapKeyTopologyConfig,
-					Path: filepath.Join("/etc/slurm/", consts.ConfigMapKeyTopologyConfig),
-				},
-			},
-			UpdateActions: []v1alpha1.UpdateAction{},
-		},
-	}
-}
-
-// buildNodeSetTopologyConfig builds the topology config from NodeSets or worker.Size.
-func (r *WorkerTopologyReconciler) buildNodeSetTopologyConfig(
-	ctx context.Context, namespace string, slurmCluster *slurmv1.SlurmCluster, nodeSetList []v1alpha1.NodeSet,
-) (string, error) {
-	nodeTopologyCM, err := r.getNodeTopologyLabelsConfigMap(ctx)
-	if err != nil {
-		return "", fmt.Errorf("get node topology labels config map: %w", err)
-	}
-
-	allNodeNames := collectAllNodeNames(nodeSetList)
-
-	gpuPodsByNode, err := r.collectScheduledGPUPodsByNode(ctx, nodeSetList, slurmCluster.Name, namespace)
-	if err != nil {
-		return "", fmt.Errorf("collect scheduled GPU pods: %w", err)
-	}
-
-	if slurmCluster.Spec.SlurmConfig.TopologyPlugin == consts.SlurmTopologyBlock {
-		var blockSize *int
-		if slurmCluster.Spec.Topology != nil {
-			blockSize = slurmCluster.Spec.Topology.BlockSize
-		}
-		return r.BuildTopologyBlocks(ctx, blockSize, nodeTopologyCM, gpuPodsByNode, allNodeNames)
-	}
-
-	return r.BuildTopologyConfig(ctx, nodeTopologyCM, gpuPodsByNode, allNodeNames)
-}
-
-// collectAllNodeNames returns every Slurm node name derived from the NodeSets' replica ranges,
-// including powered-down ephemeral nodes that currently have no pod. Stage 1 of topology building
-// relies on this complete list to keep topology.conf stable across pod lifecycle changes.
-func collectAllNodeNames(nodeSetList []v1alpha1.NodeSet) []string {
-	var names []string
-	for _, nodeSet := range nodeSetList {
-		for i := int32(0); i < nodeSet.Spec.Replicas; i++ {
-			names = append(names, fmt.Sprintf("%s-%d", nodeSet.Name, i))
-		}
-	}
-	return names
-}
-
-// collectScheduledGPUPodsByNode returns pods of GPU-enabled NodeSets that are scheduled to a K8s
-// node (Spec.NodeName set, not necessarily Running), grouped by K8s node name. These are the only
-// pods that get placed onto a real IB switch in stage 2 of topology building.
-func (r *WorkerTopologyReconciler) collectScheduledGPUPodsByNode(
-	ctx context.Context, nodeSetList []v1alpha1.NodeSet, slurmClusterName, namespace string,
-) (map[string][]string, error) {
-	var gpuNodeSets []v1alpha1.NodeSet
-	for _, nodeSet := range nodeSetList {
-		if nodeSet.Spec.GPU.Enabled {
-			gpuNodeSets = append(gpuNodeSets, nodeSet)
-		}
-	}
-
-	pods, err := r.CollectWorkerPods(ctx, gpuNodeSets, slurmClusterName, namespace)
-	if err != nil {
-		return nil, fmt.Errorf("collect GPU worker pods: %w", err)
-	}
-
-	podsByNode := make(map[string][]string)
-	for _, pod := range pods {
-		if pod.Spec.NodeName == "" {
-			continue
-		}
-		podsByNode[pod.Spec.NodeName] = append(podsByNode[pod.Spec.NodeName], pod.Name)
-	}
-	return podsByNode, nil
-}
-
-// getNodeTopologyLabelsConfigMap retrieves the ConfigMap containing node topology labels, which is used for building the topology config.
-func (r *WorkerTopologyReconciler) getNodeTopologyLabelsConfigMap(ctx context.Context) (*corev1.ConfigMap, error) {
-	configMap := &corev1.ConfigMap{
-		ObjectMeta: ctrl.ObjectMeta{
-			Name:      consts.ConfigMapNameTopologyNodeLabels,
-			Namespace: r.namespace,
-		},
-	}
-	if err := r.Client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
-		return configMap, fmt.Errorf("get node topology labels config map in namespace %q: %w", r.namespace, err)
-	}
-	return configMap, nil
-}
-
-// CollectWorkerPods retrieves all worker pods for the given SlurmCluster.
-func (r *WorkerTopologyReconciler) CollectWorkerPods(
-	ctx context.Context, nodeSetList []v1alpha1.NodeSet, slurmClusterName, namespace string,
-) ([]corev1.Pod, error) {
-
-	logger := log.FromContext(ctx).WithValues(
-		"SlurmCluster", slurmClusterName, "Namespace", namespace,
-	)
-
-	var pods []corev1.Pod
-
-	for _, nodeSet := range nodeSetList {
-		labelSelector := client.MatchingLabels{consts.LabelNodeSetKey: nodeSet.Name}
-
-		pl, err := r.listPods(ctx, labelSelector, namespace)
-		if err != nil {
-			return nil, fmt.Errorf("list pods for NodeSet %s: %w", nodeSet.Name, err)
-		}
-		if len(pl.Items) == 0 {
-			logger.Info(
-				"No pods found for NodeSet, skipping",
-				"NodeSet", nodeSet.Name, "Namespace", namespace,
-			)
-			continue
-		}
-
-		pods = append(pods, pl.Items...)
-
-	}
-
-	return pods, nil
-}
-
-// listPods retrieves the list of pods in the specified namespace with the given label selector.
-func (r *WorkerTopologyReconciler) listPods(
-	ctx context.Context, labelSelector client.MatchingLabels, ns string,
-) (*corev1.PodList, error) {
-	podList := &corev1.PodList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(ns),
-		labelSelector,
-	}
-
-	if err := r.Client.List(ctx, podList, listOpts...); err != nil {
-		return podList, fmt.Errorf("list pods in namespace %s with label selector %v: %w", ns, labelSelector, err)
-	}
-
-	return podList, nil
-}
-
-// BuildTopologyBlocks builds topology/block config.
-func (r *WorkerTopologyReconciler) BuildTopologyBlocks(
-	ctx context.Context,
-	blockSize *int,
-	topologyNodeLabelsCM *corev1.ConfigMap,
-	gpuPodsByNode map[string][]string,
-	allNodeNames []string,
-) (string, error) {
-	bs := defBlockSize
-	if blockSize != nil {
-		bs = *blockSize
-	}
-
-	labelsByNode, err := r.ParseNodeTopologyLabels(topologyNodeLabelsCM.Data)
-	if err != nil {
-		return "", fmt.Errorf("deserialize node block topology: %w", err)
-	}
-
-	blocks := BuildTopologyBlocks(ctx, labelsByNode, gpuPodsByNode, allNodeNames)
-
-	config := strings.Join(blocks.RenderConfigLines(), "\n") + "\n"
-	config = fmt.Sprintf("%sBlockSizes=%d\n", config, bs)
-
-	return config, nil
-}
-
-// BuildTopologyConfig builds topology/tree config.
-func (r *WorkerTopologyReconciler) BuildTopologyConfig(
-	ctx context.Context,
-	topologyNodeLabelsCM *corev1.ConfigMap,
-	gpuPodsByNode map[string][]string,
-	allNodeNames []string,
-) (string, error) {
-	labelsByNode, err := r.ParseNodeTopologyLabels(topologyNodeLabelsCM.Data)
-	if err != nil {
-		return "", fmt.Errorf("deserialize node tree topology: %w", err)
-	}
-	graph := BuildTopologyGraph(ctx, labelsByNode, gpuPodsByNode, allNodeNames)
-	config := strings.Join(graph.RenderConfigLines(), "\n") + "\n"
-	return config, nil
-}
-
-// NodeTopologyLabels represents the labels for a node's topology, e.g.:
-//
-//	{
-//	  "tier-1": "switch1",
-//	  "tier-2": "switch2",
-//	  "tier-3": "switch3"
-//	}
-type NodeTopologyLabels map[string]string
-
-func (r *WorkerTopologyReconciler) ParseNodeTopologyLabels(data map[string]string) (map[string]NodeTopologyLabels, error) {
-	result := make(map[string]NodeTopologyLabels)
-
-	for nodeName, jsonData := range data {
-		var topology NodeTopologyLabels
-		if err := json.Unmarshal([]byte(jsonData), &topology); err != nil {
-			return nil, fmt.Errorf("parse topology labels for node %s: %w", nodeName, err)
-		}
-		result[nodeName] = topology
-	}
-
-	return result, nil
-}
-
-func (r *WorkerTopologyReconciler) calculateConfigHash(config string) string {
-	hash := sha256.Sum256([]byte(strings.TrimSpace(config)))
-	return hex.EncodeToString(hash[:])
-}
-
-func (r *WorkerTopologyReconciler) updateTopologyConfigMap(ctx context.Context, namespace string, config string) error {
-	configMapKey := client.ObjectKey{Name: consts.ConfigMapNameTopologyConfig, Namespace: namespace}
-	existingConfigMap := &corev1.ConfigMap{}
-	err := r.Client.Get(ctx, configMapKey, existingConfigMap)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			cm := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      consts.ConfigMapNameTopologyConfig,
-					Namespace: namespace,
-				},
-				Data: map[string]string{
-					consts.ConfigMapKeyTopologyConfig: config,
-				},
-			}
-			if err := r.Client.Create(ctx, cm); err != nil {
-				return fmt.Errorf("create ConfigMap %s: %w", consts.ConfigMapNameTopologyConfig, err)
-			}
-		} else {
-			return fmt.Errorf("get ConfigMap %s: %w", consts.ConfigMapNameTopologyConfig, err)
-		}
-	} else {
-		existingConfigMap.Data[consts.ConfigMapKeyTopologyConfig] = config
-		if err := r.Client.Update(ctx, existingConfigMap); err != nil {
-			return fmt.Errorf("update ConfigMap %s: %w", existingConfigMap.Name, err)
-		}
-	}
-
-	if err := r.ensureJailedConfig(ctx, namespace); err != nil {
-		return fmt.Errorf("ensure JailedConfig: %w", err)
-	}
-
-	return nil
-}
-
-// ensureJailedConfig ensures the JailedConfig for topology exists and matches the desired state.
-// If it doesn't exist, it creates one. If it exists, it updates the spec to match desired.
-func (r *WorkerTopologyReconciler) ensureJailedConfig(ctx context.Context, namespace string) error {
-	desired := r.renderTopologyJailedConfig(namespace)
-
-	existing := &v1alpha1.JailedConfig{}
-	err := r.Client.Get(ctx, client.ObjectKeyFromObject(desired), existing)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			if createErr := r.Client.Create(ctx, desired); createErr != nil {
-				return fmt.Errorf("create JailedConfig %s: %w", desired.Name, createErr)
-			}
-			return nil
-		}
-		return fmt.Errorf("get JailedConfig %s: %w", desired.Name, err)
-	}
-
-	existing.Labels = desired.Labels
-	existing.Spec = desired.Spec
-
-	if err := r.Client.Update(ctx, existing); err != nil {
-		return fmt.Errorf("update JailedConfig %s: %w", existing.Name, err)
-	}
-
-	return nil
-}
-
-func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
-	maxConcurrency int, cacheSyncTimeout time.Duration) error {
 
 	return ctrl.NewControllerManagedBy(mgr).Named(WorkerTopologyReconcilerName).
 		For(&slurmv1.SlurmCluster{}, builder.WithPredicates(predicate.Funcs{
@@ -544,7 +115,7 @@ func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 			},
 		})).
 		Watches(&v1alpha1.NodeSet{},
-			handler.EnqueueRequestsFromMapFunc(r.findSlurmClusterForNodeSet),
+			handler.EnqueueRequestsFromMapFunc(r.findSlurmClustersInNamespace),
 			builder.WithPredicates(predicate.Funcs{
 				CreateFunc: func(e event.CreateEvent) bool {
 					return true
@@ -559,66 +130,440 @@ func (r *WorkerTopologyReconciler) SetupWithManager(mgr ctrl.Manager,
 					return false
 				},
 			})).
+		// Updates carry the reconfigure confirmation sconfigcontroller writes to the status.
 		Watches(&v1alpha1.JailedConfig{},
-			handler.EnqueueRequestsFromMapFunc(r.findSlurmClusterForJailedConfig),
+			handler.EnqueueRequestsFromMapFunc(r.findSlurmClustersInNamespace),
 			builder.WithPredicates(predicate.Funcs{
 				CreateFunc: func(e event.CreateEvent) bool {
 					return false
 				},
 				DeleteFunc: func(e event.DeleteEvent) bool {
-					return e.Object.GetName() == consts.ConfigMapNameTopologyConfig
+					return isTopologyConfigName(e.Object.GetName())
 				},
 				UpdateFunc: func(e event.UpdateEvent) bool {
-					return false
+					return isTopologyConfigName(e.ObjectNew.GetName())
 				},
 				GenericFunc: func(e event.GenericEvent) bool {
 					return false
 				},
 			})).
+		// Updates of the node labels ConfigMap are where a node's network path changes appear.
 		Watches(&corev1.ConfigMap{},
-			handler.EnqueueRequestsFromMapFunc(r.findSlurmClusterForNodeSet),
+			handler.EnqueueRequestsFromMapFunc(r.findSlurmClustersInNamespace),
 			builder.WithPredicates(predicate.Funcs{
 				CreateFunc: func(e event.CreateEvent) bool {
-					return false
+					return e.Object.GetName() == consts.ConfigMapNameTopologyNodeLabels
 				},
 				DeleteFunc: func(e event.DeleteEvent) bool {
-					return e.Object.GetName() == consts.ConfigMapNameTopologyConfig
+					return isTopologyConfigName(e.Object.GetName())
 				},
 				UpdateFunc: func(e event.UpdateEvent) bool {
-					return false
+					return e.ObjectNew.GetName() == consts.ConfigMapNameTopologyNodeLabels
 				},
 				GenericFunc: func(e event.GenericEvent) bool {
 					return false
 				},
 			})).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).
-		Complete(r)
+		Complete(controllerconfig.NamedReconciler(WorkerTopologyReconcilerName, r))
 }
 
-// findSlurmClusterForNodeSet maps NodeSet events to SlurmCluster reconcile requests.
-func (r *WorkerTopologyReconciler) findSlurmClusterForNodeSet(
-	ctx context.Context, obj client.Object,
-) []reconcile.Request {
-	slurmClusterList := &slurmv1.SlurmClusterList{}
-	if err := r.Client.List(ctx, slurmClusterList, client.InNamespace(obj.GetNamespace())); err != nil {
+func (r *WorkerTopologyReconciler) findSlurmClustersInNamespace(ctx context.Context, obj client.Object) []reconcile.Request {
+	slurmClusters := &slurmv1.SlurmClusterList{}
+	if err := r.client.List(ctx, slurmClusters, client.InNamespace(obj.GetNamespace())); err != nil {
 		return nil
 	}
 
 	var requests []reconcile.Request
-	for _, cluster := range slurmClusterList.Items {
+	for _, cluster := range slurmClusters.Items {
 		requests = append(requests, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      cluster.Name,
-				Namespace: cluster.Namespace,
-			},
+			NamespacedName: types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace},
 		})
 	}
 	return requests
 }
 
-// findSlurmClusterForJailedConfig maps JailedConfig delete events to SlurmCluster reconcile requests.
-func (r *WorkerTopologyReconciler) findSlurmClusterForJailedConfig(
-	ctx context.Context, obj client.Object,
-) []reconcile.Request {
-	return r.findSlurmClusterForNodeSet(ctx, obj)
+func (r *WorkerTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+	logger.V(1).Info("Starting reconciliation")
+
+	// Load the SlurmCluster CR
+	slurmCluster := &slurmv1.SlurmCluster{}
+	if err := r.client.Get(ctx, req.NamespacedName, slurmCluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("get SlurmCluster: %w", err)
+	}
+	slurmClusterRef := req.NamespacedName
+	logger.V(1).Info("Loaded SlurmCluster")
+
+	// Load NodeSet CRs
+	nodeSets, err := resourcegetter.ListNodeSetsByClusterRef(ctx, r.client, slurmClusterRef)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("load NodeSets: %w", err)
+	}
+	logger.V(1).Info("Loaded NodeSets", "count", len(nodeSets))
+
+	// Validate and build the desired topology specifications
+	desiredTopoSpecs := r.newTopoSpecs(logger, slurmCluster, nodeSets)
+	if len(desiredTopoSpecs) == 0 {
+		return ctrl.Result{RequeueAfter: defaultInterval}, nil
+	}
+
+	// Load node topology labels
+	topologyLabelsByNode, err := r.loadTopologyLabels(ctx)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("load node topology labels: %w", err)
+	}
+	logger.V(1).Info("Loaded node topology labels", "count", len(topologyLabelsByNode))
+
+	// Validate and build the desired NodeSet topology models
+	desiredTopoNodeSets, err := r.newTopoNodeSets(ctx, logger, slurmCluster, nodeSets, topologyLabelsByNode)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("build NodeSet topology models: %w", err)
+	}
+
+	// Validate and build the desired Slurm topology
+	desiredSlurmTopology, err := topology.NewMultiTopology(desiredTopoSpecs, desiredTopoNodeSets)
+	if err != nil {
+		reason := reasonInvalidTopologyConfig
+		if errors.As(err, &topology.ConflictingPathsError{}) {
+			reason = reasonConflictingTopologyLabels
+		}
+		r.truncEventRecorder.Eventf(slurmCluster, nil, corev1.EventTypeWarning, reason, actionRenderTopology,
+			"Topology config is not published: %v", err)
+		return ctrl.Result{}, fmt.Errorf("build desired topologies: %w", err)
+	}
+	r.recordEmptyTopologies(slurmCluster, *desiredSlurmTopology)
+
+	// Load the published topology config and the topology it currently holds
+	config, err := r.loadTopologyConfig(ctx, slurmCluster)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("load topology config: %w", err)
+	}
+	currentSlurmTopology, err := config.currentTopology(ctx)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("load current slurm topology: %w", err)
+	}
+
+	// Calculate the change from the current topology config and decide whether
+	// the config should be updated and whether it requires cluster reconfiguration.
+	change := desiredSlurmTopology.ChangeFrom(&currentSlurmTopology)
+	logger = logger.WithValues("ConfigChange", change)
+
+	// Withdraw a confirmed reconfigure request before publishing anything
+	if err := config.withdrawConfirmedReconfigure(ctx, logger); err != nil {
+		return ctrl.Result{}, fmt.Errorf("withdraw confirmed reconfigure: %w", err)
+	}
+
+	switch change {
+	// There are structural changes in the new topology
+	// -> publish the topology config and ask to reconfigure ASAP
+	case topology.ChangeRestructured:
+		if err := config.requestReconfigure(ctx, logger); err != nil {
+			return ctrl.Result{}, fmt.Errorf("request reconfigure: %w", err)
+		}
+		if err := config.publishTopology(ctx, desiredSlurmTopology); err != nil {
+			return ctrl.Result{}, fmt.Errorf("publish topology config: %w", err)
+		}
+		r.truncEventRecorder.Eventf(slurmCluster, nil, corev1.EventTypeNormal, reasonReconfigureRequested, actionReconfigure,
+			"Requested a Slurm reconfigure: the topology structure changed")
+		return ctrl.Result{RequeueAfter: defaultInterval}, nil
+
+	// There are changes in the topology that affect job performance
+	// -> publish the topology config, but defer reconfiguration to give Slurm controller a quiet window.
+	case topology.ChangeReordered:
+		now := time.Now()
+		pending, _ := config.pendingDeferredReconfigure(now)
+		wait, err := config.deferReconfigure(ctx, now)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("defer reconfigure: %w", err)
+		}
+		if err := config.publishTopology(ctx, desiredSlurmTopology); err != nil {
+			return ctrl.Result{}, fmt.Errorf("publish topology config: %w", err)
+		}
+		if wait > 0 {
+			logger.V(1).Info("Deferring reconfigure request", "wait", wait)
+			if !pending {
+				r.truncEventRecorder.Eventf(slurmCluster, nil, corev1.EventTypeNormal, reasonReconfigureDeferred, actionReconfigure,
+					"Deferred the Slurm reconfigure for reordered leaf switches or blocks by %s", wait.Round(time.Second))
+			}
+			return ctrl.Result{RequeueAfter: min(wait, defaultInterval)}, nil
+		}
+		if err := config.requestReconfigure(ctx, logger); err != nil {
+			return ctrl.Result{}, fmt.Errorf("request reconfigure: %w", err)
+		}
+		r.truncEventRecorder.Eventf(slurmCluster, nil, corev1.EventTypeNormal, reasonReconfigureRequested, actionReconfigure,
+			"Requested a Slurm reconfigure: leaf switches or blocks were reordered")
+		return ctrl.Result{RequeueAfter: defaultInterval}, nil
+
+	// There are changes in the topology that dynamic worker registration carries without a reconfigure.
+	// -> publish the topology config without asking to reconfigure.
+	case topology.ChangeRegistered:
+		if err := config.publishTopology(ctx, desiredSlurmTopology); err != nil {
+			return ctrl.Result{}, fmt.Errorf("publish topology config: %w", err)
+		}
+		return ctrl.Result{RequeueAfter: defaultInterval}, nil
+
+	// There are no changes in the topology
+	// -> don't update the topology config, but handle existing deferred reconfigure requests.
+	case topology.ChangeIdentical:
+		pending, wait := config.pendingDeferredReconfigure(time.Now())
+		if pending {
+			if wait > 0 {
+				logger.V(1).Info("Deferring reconfigure request", "wait", wait)
+				return ctrl.Result{RequeueAfter: min(wait, defaultInterval)}, nil
+			}
+			if err := config.requestReconfigure(ctx, logger); err != nil {
+				return ctrl.Result{}, fmt.Errorf("request reconfigure: %w", err)
+			}
+			r.truncEventRecorder.Eventf(slurmCluster, nil, corev1.EventTypeNormal, reasonReconfigureRequested, actionReconfigure,
+				"Requested a Slurm reconfigure: the deferred reconfigure for reordered leaf switches or blocks is due")
+		}
+		return ctrl.Result{RequeueAfter: defaultInterval}, nil
+
+	default:
+		return ctrl.Result{}, fmt.Errorf("unknown topology config change %q", change)
+	}
+}
+
+func (r *WorkerTopologyReconciler) newTopoSpecs(
+	logger logr.Logger,
+	cluster *slurmv1.SlurmCluster,
+	nodeSets []v1alpha1.NodeSet,
+) []topology.Spec {
+	var topoSpecs []topology.Spec
+	if cluster.Spec.Topology == nil {
+		return topoSpecs
+	}
+	for _, topo := range cluster.Spec.Topology.Topologies {
+		logger := logger.WithValues("Topology", topo.Name)
+
+		topoSpec, err := topology.NewSpec(
+			topo.Name,
+			topo.Topo.Type,
+			topo.ClusterDefault != nil && *topo.ClusterDefault,
+			topo.Topo.BlockSizes,
+			listedNodeSetNames(nodeSets, topo.Topo.Type, topo.NodeSetRefs),
+		)
+		if err != nil {
+			logger.Error(err, "Skipping invalid topology spec")
+			r.truncEventRecorder.Eventf(cluster, nil, corev1.EventTypeWarning, reasonInvalidTopologySpec, actionRenderTopology,
+				"Topology %q is left out of topology.yaml: %v", topo.Name, err)
+			continue
+		}
+		topoSpecs = append(topoSpecs, topoSpec)
+	}
+	return topoSpecs
+}
+
+// listedNodeSetNames resolves a topology's nodeSetRefs, NodeSet names, aggregate Slurm NodeSet names
+// or "ALL", to the names of the NodeSets the topology lists.
+func listedNodeSetNames(nodeSets []v1alpha1.NodeSet, topoType string, refs []string) []string {
+	var names []string
+	for _, nodeSet := range topologyrefs.ListedNodeSets(nodeSets, topoType, refs) {
+		names = append(names, nodeSet.Name)
+	}
+	return names
+}
+
+type topologyLabels map[string]string
+
+func (r *WorkerTopologyReconciler) loadTopologyLabels(ctx context.Context) (map[string]topologyLabels, error) {
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: ctrl.ObjectMeta{
+			Name:      consts.ConfigMapNameTopologyNodeLabels,
+			Namespace: r.namespace,
+		},
+	}
+	if err := r.client.Get(ctx, client.ObjectKeyFromObject(configMap), configMap); err != nil {
+		return nil, fmt.Errorf("get node topology labels config map in namespace %q: %w", r.namespace, err)
+	}
+
+	result := make(map[string]topologyLabels)
+	for nodeName, jsonData := range configMap.Data {
+		var topology topologyLabels
+		if err := json.Unmarshal([]byte(jsonData), &topology); err != nil {
+			return nil, fmt.Errorf("parse topology labels for node %q: %w", nodeName, err)
+		}
+		result[nodeName] = topology
+	}
+
+	return result, nil
+}
+
+func (r *WorkerTopologyReconciler) newTopoNodeSets(
+	ctx context.Context,
+	logger logr.Logger,
+	cluster *slurmv1.SlurmCluster,
+	nodeSets []v1alpha1.NodeSet,
+	topoLabelsByNode map[string]topologyLabels,
+) ([]topology.NodeSet, error) {
+	clusterRef := types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Name}
+	var topoNodeSets []topology.NodeSet
+	var invalidLabels []string
+	for _, nodeSet := range nodeSets {
+		logger := logger.WithValues("NodeSet", nodeSet.Name)
+
+		var topoNetworkPathsByWorker map[string]topology.NetworkPath
+		// CPU-only nodes don't have network paths -> skip loading
+		if nodeSet.Spec.GPU.Enabled {
+			var invalid []string
+			var err error
+			topoNetworkPathsByWorker, invalid, err = r.newNetworkPaths(ctx, logger, nodeSet, clusterRef, topoLabelsByNode)
+			if err != nil {
+				return nil, fmt.Errorf("load network paths of NodeSet %q: %w", nodeSet.Name, err)
+			}
+			invalidLabels = append(invalidLabels, invalid...)
+		}
+
+		topoNodeSet, err := topology.NewNodeSet(
+			nodeSet.Name,
+			uint(nodeSet.Spec.Replicas),
+			nodeSet.Spec.Topology.Fabric,
+			topoNetworkPathsByWorker,
+		)
+		if err != nil {
+			logger.Error(err, "Skipping invalid NodeSet")
+			continue
+		}
+		topoNodeSets = append(topoNodeSets, topoNodeSet)
+	}
+	if len(invalidLabels) > 0 {
+		r.truncEventRecorder.Eventf(cluster, nil, corev1.EventTypeWarning, reasonInvalidNodeTopologyLabels, actionRenderTopology,
+			"Nodes with invalid topology labels are placed under unknown: %s", summarizeSamples(invalidLabels))
+	}
+	return topoNodeSets, nil
+}
+
+func (r *WorkerTopologyReconciler) newNetworkPaths(
+	ctx context.Context,
+	logger logr.Logger,
+	nodeSet v1alpha1.NodeSet,
+	clusterRef types.NamespacedName,
+	topoLabelsByNode map[string]topologyLabels,
+) (paths map[string]topology.NetworkPath, invalidLabels []string, err error) {
+	networkPathsByWorker := make(map[string]topology.NetworkPath)
+
+	pods, err := r.loadWorkerPods(ctx, nodeSet, clusterRef)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, pod := range pods {
+		nodeName := pod.Spec.NodeName
+		logger := logger.WithValues("Pod", pod.Name)
+		if ordinal, ok := podOrdinal(pod.Name, nodeSet.Name); !ok || ordinal >= nodeSet.Spec.Replicas {
+			logger.V(1).Info("Skipping pod beyond the NodeSet replicas")
+			continue
+		}
+		if nodeName == "" {
+			logger.V(1).Info("Skipping unscheduled pod")
+			continue
+		}
+		logger = logger.WithValues("Node", nodeName)
+		topoLabels, ok := topoLabelsByNode[nodeName]
+		if !ok {
+			logger.V(1).Info("Skipping pod without topology labels")
+			continue
+		}
+
+		netPath, err := parseTopologyLabels(topoLabels)
+		if err != nil {
+			logger.Error(err, "Skipping pod with invalid topology labels")
+			invalidLabels = append(invalidLabels, fmt.Sprintf("node %q: %v", nodeName, err))
+			continue
+		}
+		networkPathsByWorker[pod.Name] = netPath
+	}
+
+	return networkPathsByWorker, invalidLabels, nil
+}
+
+// recordEmptyTopologies reports events when the Slurm topology is empty (lists no nodes).
+func (r *WorkerTopologyReconciler) recordEmptyTopologies(cluster *slurmv1.SlurmCluster, topologies topology.MultiTopology) {
+	for _, topo := range topologies {
+		if !topo.IsEmpty() {
+			continue
+		}
+		r.truncEventRecorder.Eventf(cluster, nil, corev1.EventTypeWarning, reasonTopologyReachesNoNode, actionRenderTopology,
+			"Topology %q has no nodes and is published as a placeholder", topo.Name)
+	}
+}
+
+// summarizeSamples joins the sorted items, keeping at most maxEventSamples of them.
+func summarizeSamples(items []string) string {
+	sorted := slices.Clone(items)
+	slices.Sort(sorted)
+	shown := min(len(sorted), maxEventSamples)
+	summary := strings.Join(sorted[:shown], "; ")
+	if omitted := len(sorted) - shown; omitted > 0 {
+		summary += fmt.Sprintf("; and %d more", omitted)
+	}
+	return summary
+}
+
+func (r *WorkerTopologyReconciler) loadWorkerPods(
+	ctx context.Context,
+	nodeSet v1alpha1.NodeSet,
+	clusterRef types.NamespacedName,
+) ([]corev1.Pod, error) {
+	list := &corev1.PodList{}
+	selector := client.MatchingLabels{consts.LabelNodeSetKey: nodeSet.Name}
+	listOpts := []client.ListOption{client.InNamespace(clusterRef.Namespace), selector}
+	if err := r.client.List(ctx, list, listOpts...); err != nil {
+		return nil, fmt.Errorf("list pods in namespace %q with label selector %v: %w", clusterRef.Namespace, selector, err)
+	}
+	return list.Items, nil
+}
+
+// podOrdinal is the index of a worker pod named "<nodeSet>-<ordinal>".
+func podOrdinal(podName, nodeSetName string) (int32, bool) {
+	suffix, ok := strings.CutPrefix(podName, nodeSetName+"-")
+	if !ok {
+		return 0, false
+	}
+	ordinal, err := strconv.ParseInt(suffix, 10, 32)
+	if err != nil || ordinal < 0 || strconv.FormatInt(ordinal, 10) != suffix {
+		return 0, false
+	}
+	return int32(ordinal), true
+}
+
+func parseTopologyLabels(topoLabels topologyLabels) (topology.NetworkPath, error) {
+	var pathSegments []topology.NetworkPathSegment
+	for labelKey, labelVal := range topoLabels {
+		suffix, ok := strings.CutPrefix(labelKey, "tier-")
+		if !ok {
+			return topology.NetworkPath{}, fmt.Errorf("parse %q: expected a \"tier-\" prefix", labelKey)
+		}
+		tier, err := strconv.ParseUint(suffix, 10, 64)
+		if err != nil || strconv.FormatUint(tier, 10) != suffix {
+			return topology.NetworkPath{}, fmt.Errorf("parse %q: expected a non-negative integer without leading zeros", labelKey)
+		}
+
+		pathSegments = append(pathSegments, topology.NetworkPathSegment{
+			Tier: uint(tier),
+			Name: labelVal,
+		})
+	}
+	return topology.NewNetworkPath(pathSegments...)
+}
+
+// loadTopologyConfig reads the cluster's topology JailedConfig into a topologyConfig; the config
+// has no JailedConfig while nothing is published yet.
+func (r *WorkerTopologyReconciler) loadTopologyConfig(ctx context.Context, cluster *slurmv1.SlurmCluster) (*topologyConfig, error) {
+	config := newTopologyConfig(r.client, r.scheme, cluster, r.reconfigureDeferral)
+
+	jailedConfig := &v1alpha1.JailedConfig{}
+	err := r.client.Get(ctx, config.key, jailedConfig)
+	switch {
+	case apierrors.IsNotFound(err):
+	case err != nil:
+		return nil, fmt.Errorf("get JailedConfig %q: %w", config.key.Name, err)
+	default:
+		config.jailedConfig = jailedConfig
+	}
+	return config, nil
 }

@@ -1,0 +1,97 @@
+suite: test aggregate Slurm NodeSets rendering
+templates:
+  - templates/nodeset.yaml
+tests:
+  - it: should not render aggregateSlurmNodeSets by default
+    set:
+      nodesets:
+        - name: worker
+          slurmd:
+            resources: {}
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+              jailSubMounts: []
+          munge:
+            resources: {}
+    asserts:
+      - notExists:
+          path: spec.aggregateSlurmNodeSets
+
+  - it: should render configured aggregateSlurmNodeSets
+    set:
+      nodesets:
+        - name: worker-rack2
+          aggregateSlurmNodeSets:
+            - worker
+            - dept1
+          slurmd:
+            resources: {}
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+              jailSubMounts: []
+          munge:
+            resources: {}
+    asserts:
+      - equal:
+          path: spec.aggregateSlurmNodeSets
+          value:
+            - worker
+            - dept1
+
+  - it: should add the range name to every NodeSet of the range
+    set:
+      nodesets:
+        - name: worker
+          range:
+            firstOrdinal: 0
+            lastOrdinal: 1
+            suffix: "-rack"
+          slurmd:
+            resources: {}
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+              jailSubMounts: []
+          munge:
+            resources: {}
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: spec.aggregateSlurmNodeSets
+          value:
+            - worker
+        documentIndex: 0
+      - equal:
+          path: spec.aggregateSlurmNodeSets
+          value:
+            - worker
+        documentIndex: 1
+
+  - it: should merge the range name with configured aggregateSlurmNodeSets
+    set:
+      nodesets:
+        - name: worker
+          range:
+            firstOrdinal: 0
+            lastOrdinal: 0
+            suffix: "-rack"
+          aggregateSlurmNodeSets:
+            - dept1
+            - worker
+          slurmd:
+            resources: {}
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+              jailSubMounts: []
+          munge:
+            resources: {}
+    asserts:
+      - equal:
+          path: spec.aggregateSlurmNodeSets
+          value:
+            - worker
+            - dept1

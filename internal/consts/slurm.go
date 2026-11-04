@@ -14,6 +14,16 @@ const (
 
 	// SlurmDefaultResumeTimeout mirrors the CRD default of SlurmConfig.ResumeTimeout, in seconds.
 	SlurmDefaultResumeTimeout = 1800
+
+	// SlurmDefaultSuspendTimeout mirrors the CRD default, in seconds.
+	SlurmDefaultSuspendTimeout = 90
+
+	// SlurmDefaultLicenses is rendered as Licenses= into slurm.conf. Active checks request these
+	// licenses as cluster-wide semaphores: every gpu-checks job takes gpu_checks:1, so the count
+	// bounds how many nodes run that check at once. A Licenses= line in customSlurmConfig overrides it.
+	SlurmDefaultLicenses = "gpu_checks:200"
+
+	SlurmPowerActionWorkerHandoff = "soperator-worker-handoff"
 )
 
 var (
@@ -39,6 +49,16 @@ var SlurmNodeReasonsList = []string{
 const (
 	SlurmConfigRawStrategyPatch    = "patch"
 	SlurmConfigRawStrategyOverride = "override"
-	SlurmTopologyTree              = "topology/tree"
-	SlurmTopologyBlock             = "topology/block"
+	// SlurmTopologyDefaultFabric is the default IB fabric / top-of-tree switch name used for
+	// NodeSets without an explicit spec.topology.fabric. It preserves the legacy single-root tree.
+	SlurmTopologyDefaultFabric = "root"
+
+	// Topology plugin kinds of a named topology in topology.yaml. These name the per-topology
+	// attribute keys rather than slurm.conf values.
+	SlurmTopologyTypeTree  = "tree"
+	SlurmTopologyTypeBlock = "block"
+	SlurmTopologyTypeFlat  = "flat"
+
+	// SlurmTopologyNodeSetRefAll covers every NodeSet of the cluster in NamedTopology.NodeSetRefs.
+	SlurmTopologyNodeSetRefAll = "ALL"
 )

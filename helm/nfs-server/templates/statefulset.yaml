@@ -45,6 +45,8 @@ spec:
               value: {{ .Values.nfs.leaseTime | quote }}
             - name: THREADS
               value: {{ .Values.nfs.threads | quote }}
+            - name: MAX_CONNECTIONS
+              value: {{ dig "maxConnections" 8192 .Values.nfs | int64 | quote }}
           ports:
             - containerPort: 2049
               name: nfs

@@ -27,7 +27,43 @@ A Helm chart for deploying an NFS server on Kubernetes with built-in monitoring 
 | `nfs.graceTime` | NFS grace period (seconds) | `10` |
 | `nfs.leaseTime` | NFS lease time (seconds) | `10` |
 | `nfs.threads` | Number of NFS daemon threads | `8` |
+| `nfs.maxConnections` | Server connection limit where supported by the host kernel; `0` uses the kernel default | `8192` |
 | `nfs.replicas` | Number of NFS server replicas. Must be `0` or `1` | `1` |
+
+### Connection Limit
+
+The chart passes `nfs.maxConnections` to the server as `MAX_CONNECTIONS`. The server
+writes it to `/proc/fs/nfsd/max_connections` after starting `rpc.nfsd` and before
+exporting filesystems. If the host kernel no longer exposes this setting, the server
+logs that it is skipping it. Changing the Helm value rolls the NFS server pod.
+
+The parameter is optional: upgrades using `--reuse-values` from releases without
+it use `8192`. An explicit `0` is preserved and selects the kernel default.
+
+Provisioning should calculate this value from the expected peak client count and
+the actual client `nconnect` setting. For kernels with a total connection limit,
+`max(8192, 2 * client_count * nconnect)` provides a default floor and 2x connection
+headroom. Count independent client connection pools (usually mounting Kubernetes
+nodes), including login nodes, rather than pods or PVCs that share connections.
+During a mount-option rollout, include clients still using the old `nconnect` value.
+
+The chart's StorageClass defaults to `nconnect=8`. Existing overrides of
+`storageClass.mountOptions` must be updated separately to use this value.
+
+For example, a Terraform `helm_release` can include the calculated value in its
+`values` argument:
+
+```hcl
+values = [yamlencode({
+  nfs = {
+    maxConnections = max(8192, 2 * var.nfs_client_count * var.nfs_nconnect)
+  }
+})]
+```
+
+`var.nfs_nconnect` must match the actual mount option; this example does not change
+mount options. When provisioning through `helm/soperator-fluxcd`, pass the same
+`nfs.maxConnections` value under `nfsServer.overrideValues`.
 
 ### Storage Configuration
 

@@ -90,9 +90,9 @@ func TestValidate_LocalNVMe(t *testing.T) {
 	}{
 		{name: "omitted"},
 		{name: "disabled", nvme: &LocalNVMeDef{}},
-		{name: "defaults", nvme: &LocalNVMeDef{Enabled: true}},
-		{name: "custom", nvme: &LocalNVMeDef{Enabled: true, MountPath: "/scratch/cache-1", FilesystemType: "xfs"}},
-		{name: "ext4", nvme: &LocalNVMeDef{Enabled: true, FilesystemType: "ext4"}},
+		{name: "default mount", nvme: &LocalNVMeDef{Enabled: true, DeviceCount: 6, DeviceCapacityGigabytes: 3840}},
+		{name: "custom mount", nvme: &LocalNVMeDef{Enabled: true, DeviceCount: 6, DeviceCapacityGigabytes: 3840, MountPath: "/scratch/cache-1"}},
+		{name: "shared ext4", nvme: &LocalNVMeDef{Enabled: true, DeviceCount: 6, DeviceCapacityGigabytes: 3840, FilesystemType: "ext4"}},
 		{
 			name:    "relative path",
 			nvme:    &LocalNVMeDef{Enabled: true, MountPath: "scratch"},
@@ -105,8 +105,28 @@ func TestValidate_LocalNVMe(t *testing.T) {
 		},
 		{
 			name:    "unsupported filesystem",
-			nvme:    &LocalNVMeDef{Enabled: true, FilesystemType: "btrfs"},
-			wantErr: "local_nvme.filesystem_type must be ext4 or xfs",
+			nvme:    &LocalNVMeDef{Enabled: true, FilesystemType: "xfs"},
+			wantErr: "local_nvme.filesystem_type must be ext4",
+		},
+		{
+			name:    "missing device count",
+			nvme:    &LocalNVMeDef{Enabled: true, DeviceCapacityGigabytes: 3840},
+			wantErr: "local_nvme.device_count must be positive when enabled",
+		},
+		{
+			name:    "negative device count",
+			nvme:    &LocalNVMeDef{Enabled: true, DeviceCount: -1, DeviceCapacityGigabytes: 3840},
+			wantErr: "local_nvme.device_count must be positive when enabled",
+		},
+		{
+			name:    "missing device capacity",
+			nvme:    &LocalNVMeDef{Enabled: true, DeviceCount: 6},
+			wantErr: "local_nvme.device_capacity_gigabytes must be positive when enabled",
+		},
+		{
+			name:    "negative device capacity",
+			nvme:    &LocalNVMeDef{Enabled: true, DeviceCount: 6, DeviceCapacityGigabytes: -1},
+			wantErr: "local_nvme.device_capacity_gigabytes must be positive when enabled",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

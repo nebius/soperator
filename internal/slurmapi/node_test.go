@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/SlinkyProject/slurm-client/api/v0041"
+	api "github.com/SlinkyProject/slurm-client/api/v0044"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/utils/ptr"
@@ -24,10 +24,12 @@ func TestNodeFromAPI(t *testing.T) {
 				Name:        "worker-1",
 				ClusterName: "",
 				InstanceID:  "computeinstance-xxxxxxxxxxxxx",
-				States: map[api.V0041NodeState]struct{}{
-					api.V0041NodeStateIDLE:        {},
-					api.V0041NodeStateDYNAMICNORM: {},
+				States: map[api.V0044NodeState]struct{}{
+					api.V0044NodeStateIDLE:        {},
+					api.V0044NodeStateDYNAMICNORM: {},
 				},
+				NextStateAfterReboot: []api.V0044NodeNextStateAfterReboot{api.V0044NodeNextStateAfterRebootINVALID},
+
 				Reason:              nil,
 				Partitions:          []string{"main"},
 				Tres:                "cpu=16,mem=191356M,billing=16,gres/gpu=1",
@@ -52,7 +54,7 @@ func TestNodeFromAPI(t *testing.T) {
 			data, err := os.ReadFile(tt.filename)
 			require.NoError(t, err)
 
-			var apiNode api.V0041Node
+			var apiNode api.V0044Node
 			err = json.Unmarshal(data, &apiNode)
 			require.NoError(t, err)
 
@@ -68,6 +70,7 @@ func TestNodeFromAPI(t *testing.T) {
 			assert.Equal(t, tt.want.ClusterName, got.ClusterName)
 			assert.Equal(t, tt.want.InstanceID, got.InstanceID)
 			assert.Equal(t, tt.want.States, got.States)
+			assert.Equal(t, tt.want.NextStateAfterReboot, got.NextStateAfterReboot)
 			assert.Equal(t, tt.want.Partitions, got.Partitions)
 			assert.Equal(t, tt.want.Tres, got.Tres)
 			assert.Equal(t, tt.want.Address, got.Address)

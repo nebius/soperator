@@ -20,6 +20,11 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["create", "patch"]
+  # The controller records events through the events.k8s.io API, which is a separate API group from
+  # the legacy core one above: without this rule event creation fails with 403.
+  - apiGroups: ["events.k8s.io"]
+    resources: ["events"]
+    verbs: ["create", "patch"]
   - apiGroups: ["slurm.nebius.ai"]
     resources: ["jailedconfigs"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

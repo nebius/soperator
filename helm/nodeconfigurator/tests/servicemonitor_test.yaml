@@ -1,0 +1,24 @@
+suite: test rebooter metrics scraping
+release:
+  name: test-nodeconfigurator
+  namespace: soperator
+templates:
+  - templates/servicemonitor.yaml
+
+tests:
+  - it: should label scraped series with the rebooter component
+    asserts:
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: spec.endpoints[0].port
+          value: http-metrics
+      - equal:
+          path: spec.endpoints[0].scheme
+          value: http
+      - equal:
+          path: spec.endpoints[0].relabelings[0]
+          value:
+            action: replace
+            targetLabel: component
+            replacement: rebooter

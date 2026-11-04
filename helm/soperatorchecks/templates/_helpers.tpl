@@ -53,7 +53,7 @@ Create the name of the service account to use
 {{- end }}
 
 {{- define "soperatorchecks.controllersAvailable" -}}
-slurmapiclients,slurmnodes,k8snodes,activecheck,activecheckjob,serviceaccount,activecheckprolog,podephemeralstoragecheck
+slurmapiclients,slurmnodes,k8snodes,activecheck,activecheckjob,serviceaccount,podephemeralstoragecheck
 {{- end }}
 
 {{- define "soperatorchecks.controllersSpec" -}}
