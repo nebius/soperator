@@ -1,14 +1,187 @@
 package sharedsteps
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
+	"github.com/cucumber/godog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
+	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
+
+func TestTopologySchedulingPrerequisites(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		config      string
+		treeDefault bool
+		laterTree   bool
+		wantAllSkip bool
+		wantTree    string
+	}{
+		{
+			name: "all partitions use flat",
+			config: `{"configType":"structured","partitions":[
+				{"name":"main","topologyRef":"flat"},{"name":"hidden","topologyRef":"flat"}]}`,
+			wantAllSkip: true,
+		},
+		{
+			name: "every topology has a partition",
+			config: `{"configType":"structured","partitions":[
+				{"name":"main","topologyRef":"flat"},{"name":"gpu","topologyRef":"tree-ib"}]}`,
+			wantTree: "tree-ib",
+		},
+		{
+			name: "omitted reference uses explicit cluster default",
+			config: `{"configType":"structured","partitions":[
+				{"name":"main"},{"name":"cpu","topologyRef":"flat"}]}`,
+			treeDefault: true, wantTree: "tree-ib",
+		},
+		{
+			name: "omitted reference uses promoted first topology",
+			config: `{"configType":"structured","partitions":[
+				{"name":"main"},{"name":"gpu","topologyRef":"tree-ib"}]}`,
+			wantTree: "tree-ib",
+		},
+		{
+			name: "generated partitions use cluster default", config: `{"configType":"default"}`,
+			treeDefault: true, wantAllSkip: true, wantTree: "tree-ib",
+		},
+		{
+			name: "raw partitions use explicit and default bindings",
+			config: `{"configType":"custom","rawConfig":[
+				"PartitionName=main Nodes=ALL", "PartitionName=gpu Nodes=ALL Topology=tree-ib"]}`,
+			wantTree: "tree-ib",
+		},
+		{
+			name:        "raw partitions all use flat",
+			config:      `{"configType":"custom","rawConfig":["PartitionName=main Nodes=ALL Topology=flat"]}`,
+			wantAllSkip: true,
+		},
+		{
+			name:        "dangling structured reference falls back to cluster default",
+			config:      `{"configType":"structured","partitions":[{"name":"main","topologyRef":"missing"}]}`,
+			wantAllSkip: true,
+		},
+		{
+			name:      "unbound first tree does not hide another bound tree",
+			config:    `{"configType":"structured","partitions":[{"name":"gpu","topologyRef":"tree-other"}]}`,
+			laterTree: true, wantAllSkip: true, wantTree: "tree-other",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := kubeobjects.SlurmCluster{Spec: kubeobjects.SlurmClusterSpec{
+				Topology: &kubeobjects.SlurmClusterTopology{Topologies: []kubeobjects.NamedTopology{
+					{Name: "flat", Topo: kubeobjects.TopologyPlugin{Type: topologyKindFlat}},
+					{Name: "tree-ib", ClusterDefault: &tt.treeDefault, Topo: kubeobjects.TopologyPlugin{Type: topologyKindTree}},
+				}},
+			}}
+			require.NoError(t, json.Unmarshal([]byte(tt.config), &cluster.Spec.PartitionConfiguration))
+			s := newTopologySchedulingTest(t, cluster)
+			if tt.laterTree {
+				cluster.Spec.Topology.Topologies = append(cluster.Spec.Topology.Topologies,
+					kubeobjects.NamedTopology{Name: "tree-other", Topo: kubeobjects.TopologyPlugin{Type: topologyKindTree}})
+				s = newTopologySchedulingTest(t, cluster)
+				other := s.rendered[1]
+				other.Name = "tree-other"
+				s.rendered = append(s.rendered, other)
+			}
+			err := s.everyTopologyIsUsedByPartition(t.Context())
+			if tt.wantAllSkip {
+				require.ErrorIs(t, err, godog.ErrSkip)
+			} else {
+				require.NoError(t, err)
+			}
+			err = s.clusterIsConfiguredWithTreeTopology(t.Context())
+			if tt.wantTree == "" {
+				require.ErrorIs(t, err, godog.ErrSkip)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.wantTree, s.treeTopology)
+			}
+		})
+	}
+}
+
+func newTopologySchedulingTest(t *testing.T, cluster kubeobjects.SlurmCluster) *Topology {
+	t.Helper()
+	data, err := json.Marshal(cluster)
+	require.NoError(t, err)
+	runtime := blockRankTestRuntime{kubectl: framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
+		assert.Equal(t, []string{"get", "slurmcluster", "cluster", "-n", framework.SoperatorNamespace, "-o", "json"}, args)
+		return string(data), nil
+	})}
+	rendered, err := parseTopologyEntries(renderedTopologyConfig)
+	require.NoError(t, err)
+	return &Topology{
+		info: &framework.ClusterInfo{SlurmClusterName: "cluster"}, runtime: runtime,
+		kubectl: framework.NewKubectlClient(runtime), rendered: rendered[:2],
+	}
+}
+
+func TestTopologySchedulingKeepsRuntimeFailures(t *testing.T) {
+	cluster := kubeobjects.SlurmCluster{Spec: kubeobjects.SlurmClusterSpec{
+		Topology: &kubeobjects.SlurmClusterTopology{Topologies: []kubeobjects.NamedTopology{
+			{Name: "flat"}, {Name: "tree-ib", Topo: kubeobjects.TopologyPlugin{Type: topologyKindTree}},
+		}},
+		PartitionConfiguration: kubeobjects.PartitionConfiguration{ConfigType: "custom", RawConfig: []string{
+			"PartitionName=main Topology=flat", "PartitionName=gpu Topology=tree-ib",
+		}},
+	}}
+	s := newTopologySchedulingTest(t, cluster)
+	require.NoError(t, s.everyTopologyIsUsedByPartition(t.Context()))
+	require.NoError(t, s.clusterIsConfiguredWithTreeTopology(t.Context()))
+	s.partitions = []partitionInfo{{Name: "main", Topology: "flat", Nodes: "worker-0"}}
+	s.nodes = map[string]slurmNodeView{"worker-0": {Info: framework.SlurmNodeInfo{State: "IDLE"}}}
+	assert.ErrorContains(t, s.runJobInTopology(t.Context(), "tree-ib"), "bound to no partition")
+	assert.ErrorContains(t, s.pickWorkersOnDifferentLeaves(t.Context()), "bound to no partition")
+	rendered := s.rendered
+	s.rendered = s.rendered[:1]
+	assert.ErrorContains(t, s.clusterIsConfiguredWithTreeTopology(t.Context()), "missing from the published config")
+	s.rendered = rendered
+
+	s.partitions[0].Topology = "tree-ib"
+	s.nodes["worker-0"] = slurmNodeView{Info: framework.SlurmNodeInfo{State: "DOWN"}}
+	assert.ErrorContains(t, s.runJobInTopology(t.Context(), "tree-ib"), "no worker")
+	assert.Contains(t, s.topologyWorkerReport(t.Context(), "tree-ib"), "state=DOWN")
+
+	runtime := blockRankTestRuntime{kubectl: framework.NewArgsScope(func(context.Context, ...string) (string, error) {
+		return "invalid cluster JSON", nil
+	})}
+	s.runtime, s.kubectl = runtime, framework.NewKubectlClient(runtime)
+	assert.ErrorContains(t, s.everyTopologyIsUsedByPartition(t.Context()), "decode kubectl")
+	assert.ErrorContains(t, s.clusterIsConfiguredWithTreeTopology(t.Context()), "decode kubectl")
+}
+
+func TestTopologySchedulingResolvesImplicitDefaultPartition(t *testing.T) {
+	s := newTopologySchedulingTest(t, kubeobjects.SlurmCluster{})
+	s.partitions = []partitionInfo{{Name: "main", Nodes: "worker-0"}}
+	s.nodes = map[string]slurmNodeView{"worker-0": {Info: framework.SlurmNodeInfo{State: "IDLE"}}}
+	partition, ok := s.partitionOfTopology("flat")
+	require.True(t, ok)
+	assert.Equal(t, "main", partition)
+	partition, node, ok, err := s.pickReadyNodeOfTopology(t.Context(), "flat")
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "main", partition)
+	assert.Equal(t, "worker-0", node)
+	assert.Contains(t, s.topologyWorkerReport(t.Context(), "flat"), "worker-0 of partition main")
+	runtime := s.runtime.(blockRankTestRuntime)
+	jobs := 0
+	runtime.jail = framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+		jobs++
+		assert.Contains(t, command, "-p 'main'")
+		assert.Contains(t, command, "-w 'worker-0'")
+		return "worker-0\n", nil
+	})
+	s.runtime = runtime
+	require.NoError(t, s.runJobInTopology(t.Context(), "flat"))
+	assert.Equal(t, 1, jobs)
+}
 
 // renderedTopologyConfig is the topology.yaml the operator publishes, warning header included.
 const renderedTopologyConfig = `# Managed by Soperator.

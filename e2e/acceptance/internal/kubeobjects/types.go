@@ -117,6 +117,7 @@ type TopologyPlugin struct {
 type PartitionConfiguration struct {
 	ConfigType string      `json:"configType"`
 	Partitions []Partition `json:"partitions"`
+	RawConfig  []string    `json:"rawConfig"`
 }
 
 type Partition struct {

@@ -2,7 +2,7 @@ Feature: Slurm tree-topology scheduling
 
   @gpu @tree_topology @soperator_version_>=5.0.0
   Scenario: A switch limit rejects a cross-leaf allocation
-    Given the cluster is configured with a tree topology spanning multiple leaf switches
+    Given the cluster is configured with a partition using a tree topology spanning multiple leaf switches
     And the operator published the topology config
     And Slurm loaded the tree topology
     When two configured workers on different leaf switches are requested without a switch limit

@@ -24,6 +24,7 @@ Feature: Slurm named topologies
 
   @multi_topology @soperator_version_>=5.0.0
   Scenario: Every configured topology can schedule a job
-    Given the operator published the topology config
+    Given every configured topology is used by a partition
+    And the operator published the topology config
     Then a job runs in a partition of every topology
     And eventually no worker is listed under unknown in Slurm topoconf

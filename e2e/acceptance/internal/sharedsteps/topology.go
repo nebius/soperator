@@ -114,7 +114,8 @@ func (s *Topology) RegisterSteps(sc *godog.ScenarioContext) {
 	// cluster that does not ask for the capability under test has nothing to prove. Past them, a
 	// missing or unusable resource is a failure.
 	sc.Step(`^the cluster is configured with several named topologies$`, s.clusterIsConfiguredWithNamedTopologies)
-	sc.Step(`^the cluster is configured with a tree topology spanning multiple leaf switches$`, s.clusterIsConfiguredWithTreeTopology)
+	sc.Step(`^every configured topology is used by a partition$`, s.everyTopologyIsUsedByPartition)
+	sc.Step(`^the cluster is configured with a partition using a tree topology spanning multiple leaf switches$`, s.clusterIsConfiguredWithTreeTopology)
 	sc.Step(`^the cluster is configured with a block topology whose base size can be changed$`, s.clusterIsConfiguredWithResizableBlockTopology)
 	sc.Step(`^the cluster is configured with a topology spanning multiple blocks$`, s.clusterIsConfiguredWithMultipleBlocks)
 	sc.Step(`^a multi-block job assigns SLURM_PROCID in rendered block order$`, s.blockNodeRanksFollowConfig)
@@ -214,6 +215,66 @@ func (s *Topology) clusterIsConfiguredWithNamedTopologies(ctx context.Context) e
 	return nil
 }
 
+// Use requested bindings for applicability so a binding lost in Slurm remains a test failure.
+func (s *Topology) configuredPartitionTopologies(ctx context.Context) (map[string]bool, error) {
+	cluster, err := s.readSlurmCluster(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if cluster.Spec.Topology == nil || len(cluster.Spec.Topology.Topologies) == 0 {
+		return nil, nil
+	}
+	topologies := cluster.Spec.Topology.Topologies
+	bound := make(map[string]bool, len(topologies))
+	defaultTopology := topologies[0].Name
+	for _, topology := range topologies {
+		bound[topology.Name] = false
+		if topology.ClusterDefault != nil && *topology.ClusterDefault {
+			defaultTopology = topology.Name
+		}
+	}
+
+	config := cluster.Spec.PartitionConfiguration
+	var refs []string
+	switch config.ConfigType {
+	case "structured":
+		for _, partition := range config.Partitions {
+			ref := partition.TopologyRef
+			if _, declared := bound[ref]; !declared {
+				ref = ""
+			}
+			refs = append(refs, ref)
+		}
+	case "custom":
+		for _, partition := range parsePartitions(strings.Join(config.RawConfig, "\n")) {
+			refs = append(refs, partition.Topology)
+		}
+	default:
+		refs = append(refs, "")
+	}
+	for _, ref := range refs {
+		if ref == "" {
+			ref = defaultTopology
+		}
+		bound[ref] = true
+	}
+	return bound, nil
+}
+
+func (s *Topology) everyTopologyIsUsedByPartition(ctx context.Context) error {
+	bound, err := s.configuredPartitionTopologies(ctx)
+	if err != nil {
+		return err
+	}
+	for name, used := range bound {
+		if !used {
+			s.runtime.Logf("Acceptance: topology %s is configured without a partition, skipping scheduling scenario", name)
+			return godog.ErrSkip
+		}
+	}
+	return nil
+}
+
 // leafSwitches counts the switches of a tree that carry workers. The root and the intermediate
 // switches are not what the switch limit needs: a tree of "root + one leaf" is a valid
 // configuration, it just holds every worker within one switch and can demonstrate no constraint.
@@ -237,14 +298,18 @@ func (s *Topology) clusterIsConfiguredWithTreeTopology(ctx context.Context) erro
 	if err != nil {
 		return err
 	}
+	bound, err := s.configuredPartitionTopologies(ctx)
+	if err != nil {
+		return err
+	}
 	var configured []string
 	for _, topology := range topologies {
-		if topology.Topo.Type == topologyKindTree {
+		if topology.Topo.Type == topologyKindTree && bound[topology.Name] {
 			configured = append(configured, topology.Name)
 		}
 	}
 	if len(configured) == 0 {
-		s.runtime.Logf("acceptance: SlurmCluster %s configures no tree topology, skipping scenario",
+		s.runtime.Logf("Acceptance: SlurmCluster %s configures no partition using a tree topology, skipping scenario",
 			s.info.SlurmClusterName)
 		return godog.ErrSkip
 	}
@@ -684,7 +749,8 @@ func (s *Topology) pickReadyNodeOfTopology(ctx context.Context, topology string)
 		haveFallback      bool
 	)
 	for _, partition := range s.partitions {
-		if partition.Topology != topology {
+		entry, ok := topologyForPartition(s.rendered, partition.Topology)
+		if !ok || entry.Name != topology {
 			continue
 		}
 		nodes, err := s.expandHostlist(ctx, partition.Nodes)
@@ -712,7 +778,8 @@ func (s *Topology) pickReadyNodeOfTopology(ctx context.Context, topology string)
 func (s *Topology) topologyWorkerReport(ctx context.Context, topology string) string {
 	var lines []string
 	for _, partition := range s.partitions {
-		if partition.Topology != topology {
+		entry, ok := topologyForPartition(s.rendered, partition.Topology)
+		if !ok || entry.Name != topology {
 			continue
 		}
 		nodes, err := s.expandHostlist(ctx, partition.Nodes)
@@ -1345,7 +1412,8 @@ func (s *Topology) loadPartitions(ctx context.Context) error {
 
 func (s *Topology) partitionOfTopology(topology string) (string, bool) {
 	for _, partition := range s.partitions {
-		if partition.Topology == topology {
+		entry, ok := topologyForPartition(s.rendered, partition.Topology)
+		if ok && entry.Name == topology {
 			return partition.Name, true
 		}
 	}
