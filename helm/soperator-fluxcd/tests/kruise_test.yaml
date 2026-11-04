@@ -12,7 +12,7 @@ tests:
           value: 1.9.1-custom
       - equal:
           path: spec.values.manager.image.tag
-          value: v1.9.1
+          value: v1.9.2-ca-fix
 
   - it: should set kruise images explicitly
     asserts:
@@ -20,7 +20,7 @@ tests:
           path: spec.values.manager.image
           value:
             repository: cr.nebius.cloud/soperator/kruise-manager
-            tag: v1.9.1
+            tag: v1.9.2-ca-fix
             pullPolicy: IfNotPresent
       - equal:
           path: spec.values.daemon.image.pullPolicy
@@ -29,7 +29,7 @@ tests:
           path: spec.values.helmHooks.image
           value:
             repository: cr.nebius.cloud/soperator/kruise-helm-hook
-            tag: v0.1.0
+            tag: v0.1.0-ca-fix
 
   - it: should scope the kruise pod mutating webhook to the slurm namespace
     asserts:
