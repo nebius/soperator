@@ -15,7 +15,7 @@ func pickIdleGPUWorkers(snapshot framework.WorkerSnapshot, count int, oneNodeSet
 		return nil, fmt.Errorf("select idle GPU workers: invalid count %d", count)
 	}
 	var configured int
-	var pools [][]framework.WorkerInfo
+	var nodeSets []framework.NodeSetInfo
 	var allWorkers []framework.WorkerInfo
 	for _, nodeSet := range snapshot.NodeSets {
 		if !nodeSet.HasGPU {
@@ -25,7 +25,7 @@ func pickIdleGPUWorkers(snapshot framework.WorkerSnapshot, count int, oneNodeSet
 		if oneNodeSet {
 			configured = max(configured, nodeSet.Replicas)
 			if nodeSet.Replicas >= count {
-				pools = append(pools, workers)
+				nodeSets = append(nodeSets, nodeSet)
 			}
 		} else {
 			configured += nodeSet.Replicas
@@ -44,60 +44,36 @@ func pickIdleGPUWorkers(snapshot framework.WorkerSnapshot, count int, oneNodeSet
 		}
 	}
 	if !oneNodeSet {
-		pools = append(pools, allWorkers)
-	}
-	for _, index := range rand.Perm(len(pools)) {
-		var idle []framework.WorkerInfo
-		for _, worker := range pools[index] {
-			if isIdleGPUWorker(worker) {
-				idle = append(idle, worker)
+		workers, err := framework.PickWorkers(allWorkers, configured, count, "GPU workers", framework.WorkerInfo.IsIdle)
+		if err == nil {
+			return workers, nil
+		}
+	} else {
+		for _, index := range rand.Perm(len(nodeSets)) {
+			nodeSet := nodeSets[index]
+			workers, err := framework.PickWorkers(snapshot.WorkersByNodeSet[nodeSet.Name], nodeSet.Replicas, count, "GPU workers", framework.WorkerInfo.IsIdle)
+			if err == nil {
+				return workers, nil
 			}
 		}
-		if len(idle) >= count {
-			rand.Shuffle(len(idle), func(i, j int) { idle[i], idle[j] = idle[j], idle[i] })
-			return idle[:count], nil
-		}
 	}
-	return nil, fmt.Errorf("select %d idle GPU workers (oneNodeSet=%t): %s", count, oneNodeSet, gpuWorkerAvailability(snapshot))
+	return nil, fmt.Errorf("select %d idle GPU workers (oneNodeSet=%t): %s", count, oneNodeSet, gpuWorkerAvailability(snapshot, count))
 }
 
-func isIdleGPUWorker(worker framework.WorkerInfo) bool {
-	return worker.SlurmNode.IsReadyForImmediateWork() && worker.SlurmNode.HasStateFlag("IDLE")
-}
-
-func gpuWorkerAvailability(snapshot framework.WorkerSnapshot) string {
-	var configured, discovered, totalIdle int
+func gpuWorkerAvailability(snapshot framework.WorkerSnapshot, count int) string {
+	var configured int
+	var allWorkers []framework.WorkerInfo
 	var details []string
 	for _, nodeSet := range snapshot.NodeSets {
 		if !nodeSet.HasGPU {
 			continue
 		}
 		workers := snapshot.WorkersByNodeSet[nodeSet.Name]
-		var idle int
-		var problems []string
-		for _, worker := range workers {
-			if isIdleGPUWorker(worker) {
-				idle++
-			} else {
-				problems = append(problems, fmt.Sprintf("%s state=%s reason=%s", worker.Name, worker.SlurmNode.State, worker.SlurmNode.Reason))
-			}
-		}
-		if missing := nodeSet.Replicas - len(workers); missing > 0 {
-			problems = append(problems, fmt.Sprintf("%d configured GPU workers missing from Slurm", missing))
-		}
-		if extra := len(workers) - nodeSet.Replicas; extra > 0 {
-			problems = append(problems, fmt.Sprintf("%d unexpected GPU workers present in Slurm", extra))
-		}
-		detail := fmt.Sprintf("NodeSet %s: %d configured, %d discovered, %d idle", nodeSet.Name, nodeSet.Replicas, len(workers), idle)
-		if len(problems) > 0 {
-			sort.Strings(problems)
-			detail += ": " + strings.Join(problems, "; ")
-		}
-		details = append(details, detail)
+		details = append(details, fmt.Sprintf("NodeSet %s: %s", nodeSet.Name,
+			framework.WorkerAvailability(workers, nodeSet.Replicas, 0, "GPU workers", framework.WorkerInfo.IsIdle)))
 		configured += nodeSet.Replicas
-		discovered += len(workers)
-		totalIdle += idle
+		allWorkers = append(allWorkers, workers...)
 	}
 	sort.Strings(details)
-	return fmt.Sprintf("%d configured, %d discovered, %d idle; %s", configured, discovered, totalIdle, strings.Join(details, "; "))
+	return framework.WorkerAvailability(allWorkers, configured, count, "GPU workers", framework.WorkerInfo.IsIdle) + "; " + strings.Join(details, "; ")
 }

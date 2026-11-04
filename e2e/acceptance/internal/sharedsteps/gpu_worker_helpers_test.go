@@ -69,7 +69,7 @@ func TestPickIdleGPUWorkersFailsWhenConfiguredWorkersAreUnavailable(t *testing.T
 	require.Error(t, err)
 	assert.False(t, framework.IsInsufficientWorkers(err))
 	assert.ErrorContains(t, err, "select 2 idle GPU workers")
-	assert.ErrorContains(t, err, "2 configured, 2 discovered, 1 idle")
+	assert.ErrorContains(t, err, "found 1 usable GPU workers, need 2 (2 configured, 2 discovered)")
 	assert.ErrorContains(t, err, "worker-1 state=POWERED_DOWN")
 }
 
@@ -99,9 +99,9 @@ func TestPickIdleGPUWorkersKeepsNCCLPairInOneNodeSet(t *testing.T) {
 	_, err = pickIdleGPUWorkers(snapshot, ncclWorkerCount, true)
 	require.Error(t, err)
 	assert.False(t, framework.IsInsufficientWorkers(err))
-	assert.ErrorContains(t, err, "select 2 idle GPU workers (oneNodeSet=true): 4 configured, 4 discovered, 2 idle")
-	assert.ErrorContains(t, err, "NodeSet worker-h100: 2 configured, 2 discovered, 1 idle")
-	assert.ErrorContains(t, err, "NodeSet worker-h200: 2 configured, 2 discovered, 1 idle")
+	assert.ErrorContains(t, err, "select 2 idle GPU workers (oneNodeSet=true): found 2 usable GPU workers, need 2 (4 configured, 4 discovered)")
+	assert.ErrorContains(t, err, "NodeSet worker-h100: found 1 usable GPU workers (2 configured, 2 discovered)")
+	assert.ErrorContains(t, err, "NodeSet worker-h200: found 1 usable GPU workers (2 configured, 2 discovered)")
 
 	workers, err = pickIdleGPUWorkers(snapshot, ncclWorkerCount, false)
 	require.NoError(t, err)
@@ -141,8 +141,8 @@ func TestPickIdleGPUWorkersReportsMissingWorkers(t *testing.T) {
 	_, err := pickIdleGPUWorkers(snapshot, ncclWorkerCount, true)
 	require.Error(t, err)
 	assert.False(t, framework.IsInsufficientWorkers(err))
-	assert.ErrorContains(t, err, "select 2 idle GPU workers (oneNodeSet=true): 2 configured, 1 discovered, 1 idle")
-	assert.ErrorContains(t, err, "NodeSet worker-h200: 2 configured, 1 discovered, 1 idle")
+	assert.ErrorContains(t, err, "select 2 idle GPU workers (oneNodeSet=true): found 1 usable GPU workers, need 2 (2 configured, 1 discovered)")
+	assert.ErrorContains(t, err, "NodeSet worker-h200: found 1 usable GPU workers (2 configured, 1 discovered)")
 	assert.ErrorContains(t, err, "1 configured GPU workers missing from Slurm")
 }
 
@@ -163,16 +163,16 @@ func TestPickIdleGPUWorkersReportsAggregateAndNodeSetCounts(t *testing.T) {
 	_, err := pickIdleGPUWorkers(snapshot, 3, false)
 	require.Error(t, err)
 	assert.False(t, framework.IsInsufficientWorkers(err))
-	assert.ErrorContains(t, err, "select 3 idle GPU workers (oneNodeSet=false): 4 configured, 2 discovered, 2 idle")
-	assert.ErrorContains(t, err, "NodeSet worker-h100: 2 configured, 2 discovered, 2 idle;")
-	assert.ErrorContains(t, err, "NodeSet worker-h200: 2 configured, 0 discovered, 0 idle: 2 configured GPU workers missing from Slurm")
+	assert.ErrorContains(t, err, "select 3 idle GPU workers (oneNodeSet=false): found 2 usable GPU workers, need 3 (4 configured, 2 discovered)")
+	assert.ErrorContains(t, err, "NodeSet worker-h100: found 2 usable GPU workers (2 configured, 2 discovered);")
+	assert.ErrorContains(t, err, "NodeSet worker-h200: found 0 usable GPU workers (2 configured, 0 discovered): 2 configured GPU workers missing from Slurm")
 	assert.NotContains(t, err.Error(), ": ;")
 
 	snapshot.WorkersByNodeSet["worker-h100"] = append(snapshot.WorkersByNodeSet["worker-h100"],
 		framework.WorkerInfo{Name: "worker-h100-2", SlurmNode: framework.SlurmNodeInfo{State: "IDLE+DRAIN", Reason: "maintenance"}})
 	_, err = pickIdleGPUWorkers(snapshot, 3, false)
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "4 configured, 3 discovered, 2 idle")
+	assert.ErrorContains(t, err, "found 2 usable GPU workers, need 3 (4 configured, 3 discovered)")
 	assert.ErrorContains(t, err, "1 unexpected GPU workers present in Slurm")
 	assert.ErrorContains(t, err, "worker-h100-2 state=IDLE+DRAIN reason=maintenance")
 }
