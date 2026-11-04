@@ -146,7 +146,8 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	}
 	tfVars["slurm_nodeset_workers"] = nodesetWorkers
 
-	tfVars["slurm_nodesets_partitions"] = []interface{}{
+	var partitions []interface{}
+	partitions = append(partitions,
 		map[string]interface{}{
 			"name":     "main",
 			"is_all":   true,
@@ -159,7 +160,16 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"topology": "flat",
 			"config":   "Default=NO PriorityTier=10 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES",
 		},
+	)
+	for _, partition := range cfg.Profile.Partitions {
+		partitions = append(partitions, map[string]interface{}{
+			"name":               partition.Name,
+			"slurm_nodeset_refs": partition.NodeSets,
+			"topology":           "flat",
+			"config":             "Default=NO PriorityTier=10 PreemptMode=OFF MaxTime=INFINITE State=UP OverSubscribe=YES",
+		})
 	}
+	tfVars["slurm_nodesets_partitions"] = partitions
 
 	tfVars["slurm_login_ssh_root_public_keys"] = []string{cfg.SSHPublicKey}
 	tfVars["cleanup_bucket_on_destroy"] = true

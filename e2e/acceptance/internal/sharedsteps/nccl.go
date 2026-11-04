@@ -72,7 +72,7 @@ func (s *NCCL) selectIdleGPUWorkers(ctx context.Context) error {
 		return fmt.Errorf("inspect workers for NCCL validation: %w", err)
 	}
 
-	workers, err := pickIdleGPUWorkers(snapshot, ncclWorkerCount)
+	workers, err := pickIdleGPUWorkers(snapshot, ncclWorkerCount, true)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}

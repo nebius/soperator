@@ -154,15 +154,15 @@ func (s *WorkerSelector) PickGPUWorkers(ctx context.Context, count int) ([]Worke
 }
 
 func (s WorkerSnapshot) PickWorkers(count int) ([]WorkerInfo, error) {
-	return pickWorkers(s.Workers, desiredWorkerCount(s.NodeSets), count, "workers")
+	return PickWorkers(s.Workers, desiredWorkerCount(s.NodeSets), count, "workers", WorkerInfo.IsUsable)
 }
 
 func (s WorkerSnapshot) PickCPUWorkers(count int) ([]WorkerInfo, error) {
-	return pickWorkers(s.CPUWorkers, desiredCPUWorkerCount(s.NodeSets), count, "CPU workers")
+	return PickWorkers(s.CPUWorkers, desiredCPUWorkerCount(s.NodeSets), count, "CPU workers", WorkerInfo.IsUsable)
 }
 
 func (s WorkerSnapshot) PickGPUWorkers(count int) ([]WorkerInfo, error) {
-	return pickWorkers(s.GPUWorkers, desiredGPUWorkerCount(s.NodeSets), count, "GPU workers")
+	return PickWorkers(s.GPUWorkers, desiredGPUWorkerCount(s.NodeSets), count, "GPU workers", WorkerInfo.IsUsable)
 }
 
 // PickWorkersByType selects CPU or GPU workers, accepting either type case-insensitively.
@@ -253,7 +253,9 @@ func classifyWorkers(snapshot *WorkerSnapshot, workers []WorkerInfo) error {
 	return nil
 }
 
-func pickWorkers(pool []WorkerInfo, configured, count int, label string) ([]WorkerInfo, error) {
+// PickWorkers randomly selects workers accepted by matches, distinguishing
+// unconfigured capacity from configured workers that are unavailable.
+func PickWorkers(pool []WorkerInfo, configured, count int, label string, matches func(WorkerInfo) bool) ([]WorkerInfo, error) {
 	if count < 1 {
 		return nil, fmt.Errorf("invalid %s count %d", label, count)
 	}
@@ -261,9 +263,9 @@ func pickWorkers(pool []WorkerInfo, configured, count int, label string) ([]Work
 		return nil, &InsufficientWorkersError{Label: label, Found: configured, Need: count}
 	}
 
-	usable := usableWorkers(pool)
+	usable := matchingWorkers(pool, matches)
 	if len(usable) < count {
-		return nil, unavailableWorkersError(pool, configured, count, label)
+		return nil, errors.New(WorkerAvailability(pool, configured, count, label, matches))
 	}
 
 	indices := rand.Perm(len(usable))[:count]
@@ -275,16 +277,16 @@ func pickWorkers(pool []WorkerInfo, configured, count int, label string) ([]Work
 }
 
 func requireAllWorkersUsable(pool []WorkerInfo, configured int, label string) error {
-	if configured == len(pool) && len(usableWorkers(pool)) == configured {
+	if configured == len(pool) && len(matchingWorkers(pool, WorkerInfo.IsUsable)) == configured {
 		return nil
 	}
-	return unavailableWorkersError(pool, configured, configured, label)
+	return errors.New(WorkerAvailability(pool, configured, configured, label, WorkerInfo.IsUsable))
 }
 
-func usableWorkers(workers []WorkerInfo) []WorkerInfo {
+func matchingWorkers(workers []WorkerInfo, matches func(WorkerInfo) bool) []WorkerInfo {
 	usable := make([]WorkerInfo, 0, len(workers))
 	for _, worker := range workers {
-		if worker.IsUsable() {
+		if matches(worker) {
 			usable = append(usable, worker)
 		}
 	}
@@ -321,11 +323,13 @@ func desiredGPUWorkerCount(nodeSets []NodeSetInfo) int {
 	return count
 }
 
-func unavailableWorkersError(pool []WorkerInfo, configured, need int, label string) error {
-	usable := usableWorkers(pool)
+// WorkerAvailability describes matching workers and missing, unexpected, or
+// unavailable workers. A positive need includes the requested count.
+func WorkerAvailability(pool []WorkerInfo, configured, need int, label string, matches func(WorkerInfo) bool) string {
+	usable := matchingWorkers(pool, matches)
 	var problems []string
 	for _, worker := range pool {
-		if worker.IsUsable() {
+		if matches(worker) {
 			continue
 		}
 		problems = append(problems, fmt.Sprintf("%s state=%s reason=%s",
@@ -338,10 +342,13 @@ func unavailableWorkersError(pool []WorkerInfo, configured, need int, label stri
 		problems = append(problems, fmt.Sprintf("%d unexpected %s present in Slurm", extra, label))
 	}
 	sort.Strings(problems)
-	message := fmt.Sprintf("found %d usable %s, need %d (%d configured, %d discovered)",
-		len(usable), label, need, configured, len(pool))
+	message := fmt.Sprintf("found %d usable %s", len(usable), label)
+	if need > 0 {
+		message += fmt.Sprintf(", need %d", need)
+	}
+	message += fmt.Sprintf(" (%d configured, %d discovered)", configured, len(pool))
 	if len(problems) > 0 {
 		message += ": " + strings.Join(problems, "; ")
 	}
-	return errors.New(message)
+	return message
 }

@@ -102,7 +102,7 @@ func (s *NCCLDebug) selectWorker(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	workers, err := pickIdleGPUWorkers(snapshot, 1)
+	workers, err := pickIdleGPUWorkers(snapshot, 1, false)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}

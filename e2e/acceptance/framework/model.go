@@ -11,6 +11,10 @@ func (w WorkerInfo) IsUsable() bool {
 	return w.SlurmNode.IsUsable()
 }
 
+func (w WorkerInfo) IsIdle() bool {
+	return w.SlurmNode.IsReadyForImmediateWork() && w.SlurmNode.HasStateFlag("IDLE")
+}
+
 // ClusterInfo holds static runner metadata. It intentionally contains no
 // discovered cluster topology; steps should query live state at scenario time.
 type ClusterInfo struct {
