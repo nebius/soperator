@@ -8,8 +8,12 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
+	corev1 "k8s.io/api/core/v1"
+
+	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
 
 type WorkerSelector struct {
@@ -69,6 +73,16 @@ func (s *WorkerSelector) Workers(ctx context.Context) ([]WorkerInfo, error) {
 	}
 
 	workers := make([]WorkerInfo, 0, len(names))
+	if workerReservation(ctx) != nil {
+		nodes, err := s.slurm.NodeInfosOnce(ctx, names)
+		if err != nil {
+			return nil, err
+		}
+		for _, node := range nodes {
+			workers = append(workers, WorkerInfo{Name: node.Name, SlurmNode: node})
+		}
+		return workers, nil
+	}
 	for _, name := range names {
 		node, err := s.slurm.NodeInfo(ctx, name)
 		if err != nil {
@@ -130,27 +144,196 @@ func (s *WorkerSelector) GPUWorkers(ctx context.Context) ([]WorkerInfo, error) {
 }
 
 func (s *WorkerSelector) PickWorkers(ctx context.Context, count int) ([]WorkerInfo, error) {
-	snapshot, err := s.Snapshot(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return snapshot.PickWorkers(count)
+	return s.Acquire(ctx, WorkerRequirements{Count: count})
 }
 
 func (s *WorkerSelector) PickCPUWorkers(ctx context.Context, count int) ([]WorkerInfo, error) {
-	snapshot, err := s.Snapshot(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return snapshot.PickCPUWorkers(count)
+	return s.Acquire(ctx, WorkerRequirements{Kind: "CPU", Count: count})
 }
 
 func (s *WorkerSelector) PickGPUWorkers(ctx context.Context, count int) ([]WorkerInfo, error) {
-	snapshot, err := s.Snapshot(ctx)
+	return s.Acquire(ctx, WorkerRequirements{Kind: "GPU", Count: count})
+}
+
+// WorkerRequirements describes a complete scenario allocation. Names and NodeSet
+// restrict selection without changing live discovery or cluster health assertions.
+type WorkerRequirements struct {
+	Kind    string
+	Count   int
+	NodeSet string
+	Names   []string
+	Docker  bool
+	Idle    bool
+}
+
+// Acquire reserves a complete worker set when called from a runner scenario.
+// Outside a reservation scope it retains the existing immediate-selection behavior.
+func (s *WorkerSelector) Acquire(ctx context.Context, needs WorkerRequirements) ([]WorkerInfo, error) {
+	return s.AcquireAny(ctx, []WorkerRequirements{needs})
+}
+
+// AcquireAny atomically reserves one complete alternative, preferring CPU capacity.
+// Alternative order breaks ties between allocations using the same GPU count.
+// Unavailable alternatives never hold workers while another alternative is considered.
+func (s *WorkerSelector) AcquireAny(ctx context.Context, alternatives []WorkerRequirements) ([]WorkerInfo, error) {
+	if len(alternatives) == 0 {
+		return nil, fmt.Errorf("require at least one worker alternative")
+	}
+	for _, needs := range alternatives {
+		if needs.Count < 1 {
+			return nil, fmt.Errorf("invalid worker count %d", needs.Count)
+		}
+		if kind := strings.ToUpper(needs.Kind); kind != "" && kind != "CPU" && kind != "GPU" {
+			return nil, fmt.Errorf("unsupported worker type %q", needs.Kind)
+		}
+		seen := make(map[string]bool, len(needs.Names))
+		for _, name := range needs.Names {
+			if !IsSlurmNodeName(name) || seen[name] {
+				return nil, fmt.Errorf("reserve workers: invalid or duplicate worker name %q", name)
+			}
+			seen[name] = true
+		}
+	}
+	discover := func(ctx context.Context) ([]workerChoice, error) {
+		snapshot, err := s.Snapshot(ctx)
+		if err != nil {
+			return nil, err
+		}
+		var choices []workerChoice
+		var missing []error
+		for _, needs := range alternatives {
+			workers, err := matchingWorkers(snapshot, needs)
+			if err != nil {
+				missing = append(missing, err)
+				continue
+			}
+			choices = append(choices, workerChoice{count: needs.Count, candidates: workers})
+		}
+		if len(choices) == 0 {
+			return nil, errors.Join(missing...)
+		}
+		ready := make(map[string]bool)
+		if workerReservation(ctx) != nil {
+			pods, err := s.kubectl.WorkerPods(ctx)
+			if err != nil {
+				return nil, err
+			}
+			var nodes corev1.NodeList
+			if err := s.kubectl.GetJSON(ctx, &nodes, "get", "nodes", "-o", "json"); err != nil {
+				return nil, fmt.Errorf("list worker Kubernetes hosts: %w", err)
+			}
+			hostReady := make(map[string]bool, len(nodes.Items))
+			for _, node := range nodes.Items {
+				hostReady[node.Name] = kubeobjects.NodeReady(node)
+			}
+			for _, pod := range pods {
+				ready[pod.SlurmNodeName] = pod.Ready && hostReady[pod.KubernetesNodeName]
+			}
+		}
+		for i := range choices {
+			for j, worker := range choices[i].candidates {
+				if workerReservation(ctx) != nil && worker.SlurmNode.IsReadyForImmediateWork() && !ready[worker.Name] {
+					choices[i].candidates[j].unavailableReason = "worker pod or Kubernetes host is not Ready"
+				}
+			}
+		}
+		return choices, nil
+	}
+	if reservation := workerReservation(ctx); reservation != nil {
+		started := time.Now()
+		if len(alternatives) == 1 {
+			s.slurm.runtime.Logf("Waiting for %d %s workers for %s", alternatives[0].Count, alternatives[0].Kind, reservation.name)
+		} else {
+			s.slurm.runtime.Logf("Waiting for one of %d complete worker sets for %s", len(alternatives), reservation.name)
+		}
+		waitCtx, cancel := context.WithTimeout(ctx, WorkerAcquireTimeout(ctx))
+		defer cancel()
+		workers, err := reservation.acquireAny(waitCtx, discover)
+		if err == nil {
+			s.slurm.runtime.Logf("Reserved workers %v for %s after %s", WorkerNames(workers), reservation.name, time.Since(started).Round(time.Millisecond))
+		}
+		return workers, err
+	}
+	choices, err := discover(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return snapshot.PickGPUWorkers(count)
+	var unavailable []error
+	var usable []workerChoice
+	for _, choice := range choices {
+		workers, err := pickWorkers(choice.candidates, choice.count, choice.count, "matching workers")
+		if err != nil {
+			unavailable = append(unavailable, err)
+			continue
+		}
+		usable = append(usable, workerChoice{count: choice.count, candidates: workers})
+	}
+	if workers := chooseWorkerChoice(usable, nil); len(workers) != 0 {
+		return workers, nil
+	}
+	return nil, errors.Join(unavailable...)
+}
+
+func matchingWorkers(snapshot WorkerSnapshot, needs WorkerRequirements) ([]WorkerInfo, error) {
+	if needs.Docker {
+		snapshot = snapshot.WithDocker()
+	}
+	var configured int
+	for _, nodeSet := range snapshot.NodeSets {
+		if needs.NodeSet != "" && nodeSet.Name != needs.NodeSet ||
+			strings.EqualFold(needs.Kind, "GPU") && !nodeSet.HasGPU ||
+			strings.EqualFold(needs.Kind, "CPU") && nodeSet.HasGPU {
+			continue
+		}
+		if nodeSet.Replicas > 0 {
+			configured += nodeSet.Replicas
+		}
+	}
+	if len(needs.Names) != 0 {
+		configured = min(configured, len(needs.Names))
+	}
+	if configured < needs.Count {
+		return nil, &InsufficientWorkersError{Label: "matching workers", Found: configured, Need: needs.Count}
+	}
+	var candidates []WorkerInfo
+	for _, worker := range snapshot.Workers {
+		if needs.NodeSet != "" && worker.NodeSetName != needs.NodeSet ||
+			strings.EqualFold(needs.Kind, "GPU") && !worker.HasGPU ||
+			strings.EqualFold(needs.Kind, "CPU") && worker.HasGPU ||
+			len(needs.Names) != 0 && !slices.Contains(needs.Names, worker.Name) ||
+			needs.Idle && (!worker.SlurmNode.IsReadyForImmediateWork() || !worker.SlurmNode.HasStateFlag("IDLE")) {
+			continue
+		}
+		candidates = append(candidates, worker)
+	}
+	return candidates, nil
+}
+
+type workerAcquireTimeoutKey struct{}
+
+// DefaultWorkerAcquireTimeout allows queued scenarios to wait through heavy worker disruptions.
+const DefaultWorkerAcquireTimeout = 2 * time.Hour
+
+// Reserve acquires a known set for custom selectors before recording baselines.
+// Direct callers outside runner scenarios keep their existing selection behavior.
+func (s *WorkerSelector) Reserve(ctx context.Context, needs WorkerRequirements) error {
+	if workerReservation(ctx) == nil {
+		return nil
+	}
+	_, err := s.Acquire(ctx, needs)
+	return err
+}
+
+// WithWorkerAcquireTimeout bounds lease and recovery waits independently of job timeouts.
+func WithWorkerAcquireTimeout(ctx context.Context, timeout time.Duration) context.Context {
+	return context.WithValue(ctx, workerAcquireTimeoutKey{}, timeout)
+}
+
+func WorkerAcquireTimeout(ctx context.Context) time.Duration {
+	if timeout, ok := ctx.Value(workerAcquireTimeoutKey{}).(time.Duration); ok && timeout > 0 {
+		return timeout
+	}
+	return DefaultWorkerAcquireTimeout
 }
 
 func (s WorkerSnapshot) PickWorkers(count int) ([]WorkerInfo, error) {
@@ -266,12 +449,38 @@ func pickWorkers(pool []WorkerInfo, configured, count int, label string) ([]Work
 		return nil, unavailableWorkersError(pool, configured, count, label)
 	}
 
-	indices := rand.Perm(len(usable))[:count]
-	out := make([]WorkerInfo, 0, count)
-	for _, i := range indices {
-		out = append(out, usable[i])
+	rand.Shuffle(len(usable), func(i, j int) { usable[i], usable[j] = usable[j], usable[i] })
+	return chooseWorkerChoice([]workerChoice{{count: count, candidates: usable}}, nil), nil
+}
+
+// Prefer CPU capacity for every GPU-independent allocation, including whole
+// NodeSet alternatives, to leave GPU workers available for GPU scenarios.
+func chooseWorkerChoice(choices []workerChoice, available func(WorkerInfo) bool) []WorkerInfo {
+	var best []WorkerInfo
+	var bestGPUCount int
+	for _, choice := range choices {
+		var cpus, gpus []WorkerInfo
+		for _, worker := range choice.candidates {
+			if available != nil && !available(worker) {
+				continue
+			}
+			if worker.HasGPU {
+				gpus = append(gpus, worker)
+			} else {
+				cpus = append(cpus, worker)
+			}
+		}
+		gpuCount := max(0, choice.count-len(cpus))
+		if gpuCount > len(gpus) || best != nil && gpuCount >= bestGPUCount {
+			continue
+		}
+		best = append(cpus[:min(choice.count, len(cpus))], gpus[:gpuCount]...)
+		bestGPUCount = gpuCount
+		if gpuCount == 0 {
+			break
+		}
 	}
-	return out, nil
+	return best
 }
 
 func requireAllWorkersUsable(pool []WorkerInfo, configured int, label string) error {

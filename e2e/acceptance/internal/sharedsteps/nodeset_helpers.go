@@ -31,6 +31,11 @@ func listClusterNodeSets(
 		filtered = append(filtered, nodeSet)
 	}
 	sort.Slice(filtered, func(i, j int) bool {
+		// Keep GPU-independent selectors on CPU NodeSets when eligible, including
+		// sequential scenarios that do not acquire worker reservations.
+		if filtered[i].Spec.GPU.Enabled != filtered[j].Spec.GPU.Enabled {
+			return !filtered[i].Spec.GPU.Enabled
+		}
 		if filtered[i].Metadata.Namespace == filtered[j].Metadata.Namespace {
 			return filtered[i].Metadata.Name < filtered[j].Metadata.Name
 		}

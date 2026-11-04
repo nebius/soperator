@@ -23,8 +23,7 @@ const (
 
 	// soperatorchecks replaces the node for any check that drains with a reason with this prefix.
 	nodeReplacementHealthCheckReason = "[node_problem]"
-	// healthCheckInjectErrorReasonPart is the health-checker check name reported for --inject-error,
-	// see docs/passive-checks.md. It separates the simulated failure from a real [node_problem] drain.
+	// The injected check name distinguishes the simulated drain from a real GPU fault.
 	healthCheckInjectErrorReasonPart = "inject_error"
 
 	// gpu_health_check passes --inject-error to the health-checker while this node-local marker exists,
@@ -94,6 +93,7 @@ func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a replacement node joins the cluster$`, s.aReplacementNodeJoinsTheCluster)
 	sc.Step(`^the replacement node passes GPU validation$`, s.theReplacementNodePassesGPUValidation)
 	sc.Step(`^all pre-existing worker nodes are operational$`, s.allPreExistingWorkerNodesAreOperational)
+	sc.Step(`^the replacement CPU worker is operational$`, s.theReplacementCPUWorkerIsOperational)
 }
 
 func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
@@ -106,19 +106,18 @@ func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
 	}
 	if !s.maintenanceJob.IsZero() {
 		if cancelErr := s.cancelJob(cleanupCtx, s.maintenanceJob.ID); cancelErr != nil {
-			s.runtime.Logf("Cleanup: cancel maintenance job: %v", cancelErr)
+			reportCleanupErrorf(ctx, s.runtime, "Cleanup: cancel maintenance job: %v", cancelErr)
 		}
 	}
 	if s.maintenanceRequested {
 		if err := s.finishMaintenance(cleanupCtx); err != nil {
-			s.runtime.Logf("Cleanup: finish maintenance for worker %s, original host %s/%s, instance %s: %v",
+			reportCleanupErrorf(ctx, s.runtime, "Cleanup: finish maintenance for worker %s, original host %s/%s, instance %s: %v",
 				s.original.WorkerName, s.original.NodeName, s.original.NodeUID, s.original.InstanceID, err)
 		}
 	}
 	if s.faultInjected {
-		s.removeHealthCheckInjectErrorMarker(cleanupCtx)
 		if err := s.finishHealthCheckReplacement(cleanupCtx); err != nil {
-			s.runtime.Logf("Cleanup: finish health check replacement for worker %s, original host %s/%s, instance %s: %v",
+			reportCleanupErrorf(ctx, s.runtime, "Cleanup: finish health check replacement for worker %s, original host %s/%s, instance %s: %v",
 				s.original.WorkerName, s.original.NodeName, s.original.NodeUID, s.original.InstanceID, err)
 		}
 	}
@@ -136,7 +135,7 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnWorkerNode(ctx context.
 	if err != nil {
 		return err
 	}
-	workers, err := snapshot.PickWorkersByType(workerType, 1)
+	workers, err := s.selector.Acquire(ctx, framework.WorkerRequirements{Kind: workerType, Count: 1})
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
@@ -149,7 +148,7 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAnIdleGPUWorkerNode(ctx
 	if err != nil {
 		return err
 	}
-	workers, err := pickIdleGPUWorkers(snapshot, 1)
+	workers, err := s.selector.Acquire(ctx, framework.WorkerRequirements{Kind: "GPU", Count: 1, Idle: true})
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
@@ -370,17 +369,16 @@ func healthCheckInjectErrorCommand() string {
 }
 
 // The marker lives on the original node's disk, so it disappears with the node.
-// Removing it matters when the node was never replaced: a leftover marker fails
-// every later GPU prolog on that node, so the removal is retried before giving up.
-func (s *NodeReplacement) removeHealthCheckInjectErrorMarker(ctx context.Context) {
+// Retry removal and confirm it before releasing an unchanged worker.
+func (s *NodeReplacement) removeHealthCheckInjectErrorMarker(ctx context.Context) error {
 	if s.replacementWorker.Name == "" {
-		return
+		return fmt.Errorf("remove health check fault marker: worker is not selected")
 	}
-	command := fmt.Sprintf("rm -f %s", framework.ShellQuote(healthCheckInjectErrorMarker))
-	if _, err := s.runtime.Worker(s.replacementWorker).RunWithDefaultRetry(ctx, command); err != nil {
-		s.runtime.Logf("Cleanup: remove %s from %s: %v; if the node was not replaced, delete the marker by hand or GPU jobs on it will keep failing the prolog check",
-			healthCheckInjectErrorMarker, s.replacementWorker.Name, err)
+	marker := framework.ShellQuote(healthCheckInjectErrorMarker)
+	if _, err := s.runtime.Worker(s.replacementWorker).RunWithDefaultRetry(ctx, fmt.Sprintf("rm -f %s && test ! -e %s", marker, marker)); err != nil {
+		return fmt.Errorf("remove health check fault marker from %s: %w", s.replacementWorker.Name, err)
 	}
+	return nil
 }
 
 func (s *NodeReplacement) theNodeIsDrainedWithANodeProblemReason(ctx context.Context) error {
@@ -469,23 +467,28 @@ func parseSlurmSeconds(raw string) (time.Duration, error) {
 	return time.Duration(seconds) * time.Second, nil
 }
 
-// A simulated failure must end in a replacement unless it never took effect.
-// Only a drained worker on the original host proves the product noticed it.
+// An unchanged worker needs confirmed fault removal. Once replacement starts,
+// wait until the original host and instance are gone and the new worker is ready.
 func (s *NodeReplacement) finishHealthCheckReplacement(ctx context.Context) error {
+	removeErr := s.removeHealthCheckInjectErrorMarker(ctx)
 	host, present, err := s.kubectl.NodeIfPresent(ctx, s.original.NodeName)
 	if err != nil {
-		return fmt.Errorf("inspect original health check host: %w", err)
+		return errors.Join(removeErr, fmt.Errorf("inspect original health check host: %w", err))
 	}
-	if present && host.UID == s.original.NodeUID {
+	if present && host.UID == s.original.NodeUID && host.DeletionTimestamp == nil {
 		node, err := s.slurm.NodeInfoOnce(ctx, s.original.WorkerName)
 		if err != nil {
-			return fmt.Errorf("inspect worker after simulated health check failure: %w", err)
+			return errors.Join(removeErr, fmt.Errorf("inspect worker after simulated health check failure: %w", err))
 		}
-		if !node.HasStateFlag("DRAIN") {
-			return nil
+		if node.InstanceID == s.original.InstanceID && !node.HasStateFlag("DRAIN") {
+			return removeErr
 		}
 	}
-	return s.waitForReplacement(ctx, nodeReplacementRemoveTimeout+nodeReplacementReadyTimeout, nil)
+	if err := s.waitForReplacement(ctx, nodeReplacementRemoveTimeout+nodeReplacementReadyTimeout, nil); err != nil {
+		return errors.Join(removeErr, err)
+	}
+	// A confirmed replacement removes the original fault even when SSH cleanup failed.
+	return nil
 }
 
 func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Context) error {
@@ -502,6 +505,10 @@ func (s *NodeReplacement) theReplacementNodePassesGPUValidation(ctx context.Cont
 
 func (s *NodeReplacement) allPreExistingWorkerNodesAreOperational(ctx context.Context) error {
 	return validateWorkersOperational(ctx, s.runtime, s.slurm, s.preExistingWorkers)
+}
+
+func (s *NodeReplacement) theReplacementCPUWorkerIsOperational(ctx context.Context) error {
+	return framework.RunTargetedWorkerSmoke(ctx, s.runtime, s.replacementWorker)
 }
 
 func (s *NodeReplacement) cancelJob(ctx context.Context, maintenanceJobID string) error {

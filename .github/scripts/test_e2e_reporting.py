@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import io
+import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 from acceptance_summary import NS_PER_SEC, render_comment
@@ -75,6 +77,20 @@ def workflow_jobs(before=None, acceptance="success", after=None):
 
 
 class AcceptanceCommentTest(unittest.TestCase):
+    def test_cli_aggregates_serial_and_parallel_reports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            reports = []
+            for name, status in (("serial", "passed"), ("parallel", "failed")):
+                path = Path(directory) / f"{name}.cucumber.json"
+                path.write_text(json.dumps([cucumber_scenario(name, name, [cucumber_step(name, status)])]))
+                reports.append(str(path))
+            result = subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("acceptance_summary.py")), *reports, "--format", "comment"],
+                check=True, capture_output=True, text=True,
+            )
+            self.assertIn("1 passed · 1 failed · 0 skipped", result.stdout)
+            self.assertIn("Scenario: parallel", result.stdout)
+
     def test_renders_compact_failure_details(self):
         features = [
             cucumber_scenario(

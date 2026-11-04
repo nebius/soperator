@@ -86,7 +86,7 @@ func (s *PAMSlurmAdopt) CleanupAndReset(ctx context.Context) {
 	s.stopSSH(cleanupCtx)
 	if !s.job.IsZero() {
 		if err := s.slurm.CancelJob(cleanupCtx, s.job.ID, pamSlurmAdoptSessionTimeout); err != nil {
-			s.runtime.Logf("cleanup: cancel PAM Slurm adopt job: %v", err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: cancel PAM Slurm adopt job: %v", err)
 		}
 	}
 	if s.identitySet {
@@ -98,7 +98,7 @@ func (s *PAMSlurmAdopt) CleanupAndReset(ctx context.Context) {
 			pamSlurmAdoptKeyName,
 			pamSlurmAdoptKeyComment,
 		); err != nil {
-			s.runtime.Logf("cleanup: remove PAM Slurm adopt SSH identity: %v", err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: remove PAM Slurm adopt SSH identity: %v", err)
 		}
 	}
 

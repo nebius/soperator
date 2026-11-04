@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
+	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
 
 const (
@@ -34,6 +35,8 @@ type workerRolloutMK8s struct {
 	operationID                  string
 	requestedMaxPods             *mk8sInteger
 }
+
+type workerMK8sNotConvergedError struct{ error }
 
 // The CLI can emit protobuf int64 fields as either numbers or strings.
 type mk8sInteger int64
@@ -267,7 +270,7 @@ func workerMK8sHosts(workers map[string]workerPodSnapshot, nodes []corev1.Node) 
 		if node.Labels[workerMK8sGroupLabel] != groupID {
 			continue
 		}
-		if node.UID == "" || node.Spec.Unschedulable || node.DeletionTimestamp != nil || !k8sNodeReady(node) {
+		if node.UID == "" || node.Spec.Unschedulable || node.DeletionTimestamp != nil || !kubeobjects.NodeReady(node) {
 			return "", nil, fmt.Errorf("MK8s host %s is not ready and schedulable", node.Name)
 		}
 		hosts[node.Name] = node.UID
@@ -359,8 +362,8 @@ func workerMK8sGroupReady(group workerMK8sGroup, minimumWorkers int) error {
 		group.Status.Target < minimum || group.Status.Target > maximum ||
 		!strings.EqualFold(group.Status.State, "RUNNING") || group.Status.Reconciling || group.Status.Outdated != 0 ||
 		group.Status.Count != group.Status.Target || group.Status.Ready != group.Status.Target {
-		return fmt.Errorf("MK8s group %s not converged: state=%s reconciling=%t target=%d nodes=%d ready=%d outdated=%d bounds=%d..%d minimum_workers=%d",
-			group.Metadata.ID, group.Status.State, group.Status.Reconciling, group.Status.Target, group.Status.Count, group.Status.Ready, group.Status.Outdated, minimum, maximum, minimumWorkers)
+		return workerMK8sNotConvergedError{fmt.Errorf("MK8s group %s not converged: state=%s reconciling=%t target=%d nodes=%d ready=%d outdated=%d bounds=%d..%d minimum_workers=%d",
+			group.Metadata.ID, group.Status.State, group.Status.Reconciling, group.Status.Target, group.Status.Count, group.Status.Ready, group.Status.Outdated, minimum, maximum, minimumWorkers)}
 	}
 	return nil
 }
@@ -650,7 +653,7 @@ func (s *WorkerRollingUpdate) mk8sGroupAndHostsReady(ctx context.Context, minimu
 			continue
 		}
 		count++
-		if host.DeletionTimestamp != nil || host.Spec.Unschedulable || !k8sNodeReady(host) {
+		if host.DeletionTimestamp != nil || host.Spec.Unschedulable || !kubeobjects.NodeReady(host) {
 			return fmt.Errorf("MK8s group %s host %s not ready and schedulable", s.mk8s.groupID, host.Name)
 		}
 	}

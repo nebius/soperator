@@ -28,7 +28,8 @@ func WaitForJobSucceeded(ctx context.Context, exec Exec, slurm *SlurmClient, job
 
 		info, err := slurm.JobStatus(waitCtx, job.ID)
 		if err != nil {
-			return AnnotateWithJobLog(ctx, exec, slurm, job, err)
+			return AnnotateWithJobLog(ctx, exec, slurm, job,
+				fmt.Errorf("wait for job %s completed successfully: %w", job.ID, err))
 		}
 		if info.SacctFound {
 			if info.CompletedSuccessfully() {

@@ -170,7 +170,7 @@ def render_comment(features, out):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("report")
+    parser.add_argument("report", nargs="+")
     parser.add_argument(
         "--format",
         choices=("summary", "comment"),
@@ -178,8 +178,10 @@ def main():
     )
     args = parser.parse_args()
 
-    with open(args.report) as f:
-        features = json.load(f)
+    features = []
+    for report in args.report:
+        with open(report) as f:
+            features.extend(json.load(f))
     if args.format == "comment":
         render_comment(features, sys.stdout)
     else:

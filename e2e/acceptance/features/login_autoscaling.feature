@@ -1,5 +1,6 @@
 Feature: Login autoscaling
-  @heavy @soperator_version_>=5.0.0
+  # Sequential: Changes shared login scaling and applies CPU pressure to the command endpoint used by other scenarios.
+  @heavy @soperator_version_>=5.0.0 @sequential
   Scenario: Login pods scale up without automatic pod scale-down
     Given the login workload is ready for an autoscaling lifecycle test
     When login autoscaling is enabled with one additional replica of capacity

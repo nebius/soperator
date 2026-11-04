@@ -16,6 +16,15 @@ and obtain approval again.
 
 Use `e2e/README.md` for runner usage.
 
+Review concurrency explicitly: standalone scenarios run concurrently by default.
+Reserve every required worker before use and keep reservations through cleanup;
+isolate shared state or synchronize its setup. Use `@sequential` only for a
+concrete conflict that reservations do not resolve. Put a specific
+`# Sequential: ...` reason immediately above every scenario-level `@sequential`
+tag line. Follow `e2e/AGENTS.md` for the decision criteria and validation; do not
+use `@parallel`. Include the concurrency decision in the scenario design, and
+update the reason or remove the exclusion when its underlying conflict changes.
+
 Decide `@heavy` membership during scenario design. Heavy scenarios are excluded
 from manual runs by default and are usually long (about four minutes or more),
 but very important coverage may remain untagged. If a long scenario's importance

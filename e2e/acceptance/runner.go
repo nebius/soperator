@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -35,6 +36,8 @@ type Runner struct {
 	targetSoperatorVersion string
 	outputDir              string
 	runtime                framework.Runtime
+	workerPool             *framework.WorkerPool
+	workerAcquireTimeout   time.Duration
 }
 
 // RunnerConfig configures an acceptance suite run.
@@ -44,10 +47,14 @@ type RunnerConfig struct {
 	TargetSoperatorVersion string
 	OutputDir              string
 	Suites                 []SuiteConfig
+	WorkerAcquireTimeout   time.Duration
 }
 
 // NewRunner constructs an acceptance runner.
 func NewRunner(config RunnerConfig) (*Runner, error) {
+	if config.WorkerAcquireTimeout < 0 {
+		return nil, fmt.Errorf("worker acquisition timeout must not be negative")
+	}
 	kubectlContext := strings.TrimSpace(config.KubectlContext)
 	if kubectlContext == "" {
 		return nil, fmt.Errorf("kubectl context is required")
@@ -81,6 +88,8 @@ func NewRunner(config RunnerConfig) (*Runner, error) {
 		targetSoperatorVersion: normalizedTargetVersion,
 		outputDir:              strings.TrimSpace(config.OutputDir),
 		runtime:                runtime,
+		workerPool:             framework.NewWorkerPool(),
+		workerAcquireTimeout:   config.WorkerAcquireTimeout,
 	}, nil
 }
 
@@ -95,9 +104,14 @@ func (r *Runner) Run(ctx context.Context) error {
 }
 
 func (r *Runner) runConfiguredSuites(ctx context.Context, info *framework.ClusterInfo, runtime framework.Runtime, suites []SuiteConfig) error {
+	r.workerPool = framework.NewWorkerPool()
 	selectedSuites := 0
 	var failures []error
 	for _, suite := range suites {
+		if suite.RequirePreviousSuccess && len(failures) != 0 {
+			failures = append(failures, fmt.Errorf("skip suite %q: an earlier suite failed", suite.Name))
+			continue
+		}
 		features, err := r.suiteFeaturePaths(info, suite)
 		if err != nil {
 			failures = append(failures, fmt.Errorf("select suite %q scenarios: %w", suite.Name, err))
@@ -149,6 +163,9 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 	out := make([]SuiteConfig, 0, len(suites))
 	seen := make(map[string]struct{}, len(suites))
 	for _, suite := range suites {
+		if suite.Concurrency < 0 {
+			return nil, fmt.Errorf("suite %q concurrency must not be negative", suite.Name)
+		}
 		name := strings.TrimSpace(suite.Name)
 		if name == "" {
 			return nil, fmt.Errorf("suite name is required")
@@ -187,12 +204,14 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 				FS:    suite.Source.FS,
 				Paths: paths,
 			},
-			VersionAxes:     slices.Clone(suite.VersionAxes),
-			Tags:            strings.TrimSpace(suite.Tags),
-			StepRegistrars:  registrars,
-			ExcludeUnstable: suite.ExcludeUnstable,
-			ExcludeHeavy:    suite.ExcludeHeavy,
-			ExcludeManual:   suite.ExcludeManual,
+			VersionAxes:            slices.Clone(suite.VersionAxes),
+			Tags:                   strings.TrimSpace(suite.Tags),
+			StepRegistrars:         registrars,
+			ExcludeUnstable:        suite.ExcludeUnstable,
+			ExcludeHeavy:           suite.ExcludeHeavy,
+			Concurrency:            suite.Concurrency,
+			RequirePreviousSuccess: suite.RequirePreviousSuccess,
+			ExcludeManual:          suite.ExcludeManual,
 		})
 	}
 	return out, nil
@@ -215,6 +234,7 @@ func (r *Runner) suiteFeaturePaths(info *framework.ClusterInfo, suite SuiteConfi
 		}
 	}
 	log.Printf("acceptance: target Soperator version=%s", info.TargetSoperatorVersion)
+	log.Printf("acceptance: suite %s concurrency=%d", suite.Name, suite.Concurrency)
 	log.Printf("acceptance: suite %s running scenarios: %s", suite.Name, strings.Join(paths, ", "))
 	return paths, nil
 }
@@ -235,12 +255,20 @@ func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runt
 		teamCityReporter = reports.NewTeamCityReporter(os.Stdout)
 	}
 	tags := r.suiteTagFilter(suite)
+	var cleanupMu sync.Mutex
+	var cleanupFailures []error
+	recordCleanupFailure := func(err error) {
+		cleanupMu.Lock()
+		defer cleanupMu.Unlock()
+		cleanupFailures = append(cleanupFailures, err)
+	}
 	godogSuite := godog.TestSuite{
 		Name: suite.Name,
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
-			r.initializeSuiteScenario(sc, info, runtime, suite, artifactsManager, teamCityReporter)
+			r.initializeSuiteScenario(sc, info, runtime, suite, artifactsManager, teamCityReporter, recordCleanupFailure)
 		},
 		Options: &godog.Options{
+			Concurrency:    suite.Concurrency,
 			Format:         format,
 			FS:             suite.Source.FS,
 			Paths:          features,
@@ -255,9 +283,9 @@ func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runt
 	status := godogSuite.Run()
 	log.Printf("acceptance: suite %s finished duration=%s", suite.Name, time.Since(suiteStart).Round(time.Millisecond))
 	if status != 0 {
-		return fmt.Errorf("suite %q: godog exited with status %d", suite.Name, status)
+		cleanupFailures = append(cleanupFailures, fmt.Errorf("suite %q: godog exited with status %d", suite.Name, status))
 	}
-	return nil
+	return errors.Join(cleanupFailures...)
 }
 
 func (r *Runner) initializeSuiteScenario(
@@ -267,16 +295,31 @@ func (r *Runner) initializeSuiteScenario(
 	suite SuiteConfig,
 	artifactsManager *framework.ArtifactsManager,
 	teamCityReporter *reports.TeamCityReporter,
+	recordCleanupFailure func(error),
 ) {
+	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
+		ctx = framework.WithWorkerAcquireTimeout(ctx, r.workerAcquireTimeout)
+		return framework.WithWorkerReservation(ctx, r.workerPool, suite.Name+"/"+scenario.Id+"/"+scenario.Name), nil
+	})
 	if teamCityReporter != nil {
 		registerTeamCityStateHook(sc, suite.Name)
 	}
 	registerScenarioArtifacts(sc, suite.Name, runtime, artifactsManager)
-	registerTimingHooks(sc)
 	registerSkipHook(sc)
 	for _, register := range suite.StepRegistrars {
 		register(sc, info, runtime)
 	}
+	sc.After(func(ctx context.Context, scenario *godog.Scenario, _ error) (context.Context, error) {
+		err := framework.FinishWorkerReservation(ctx, runtime)
+		if err != nil {
+			// Godog treats a joined ErrSkip and cleanup error as a skip. Preserve
+			// cleanup failures independently so they still fail the suite.
+			recordCleanupFailure(fmt.Errorf("scenario %q cleanup: %w", scenario.Name, err))
+			recordTeamCityScenarioFailure(ctx, err)
+		}
+		return ctx, err
+	})
+	registerTimingHooks(sc)
 	if teamCityReporter != nil {
 		registerTeamCityResultHooks(sc, teamCityReporter)
 	}

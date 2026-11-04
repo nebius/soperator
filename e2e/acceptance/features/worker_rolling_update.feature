@@ -1,5 +1,6 @@
 Feature: Slurm-aware worker rolling updates
-  @heavy @soperator_version_>=5.0.0
+  # Sequential: Restarts Soperator system DaemonSets across the cluster before updating workers.
+  @heavy @soperator_version_>=5.0.0 @sequential
   Scenario: A worker template update preserves running jobs
     Given test jobs are running on two workers of a NodeSet with slurmAwareRollingUpdate strategy and maxUnavailable at least 2
     When the Soperator system DaemonSets are restarted

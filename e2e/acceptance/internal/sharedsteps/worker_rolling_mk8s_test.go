@@ -215,8 +215,8 @@ func TestWorkerMK8sHostsIncludeIdleGroupMembers(t *testing.T) {
 	require.ErrorAs(t, err, &topology)
 }
 
-func TestSelectMK8sNodeSetSearchesPastUnsupportedPrerequisites(t *testing.T) {
-	for _, prerequisite := range []string{"surge", "unrelated workload"} {
+func TestSelectMK8sNodeSetSearchesPastUnavailableCandidates(t *testing.T) {
+	for _, prerequisite := range []string{"surge", "unrelated workload", "not converged"} {
 		t.Run(prerequisite, func(t *testing.T) {
 			steps, runtime := rolloutSelectionTestSteps(rolloutSelectionTestNodeSet("a-worker", 2), rolloutSelectionTestNodeSet("b-worker", 2))
 			steps.requireMK8s = true
@@ -247,6 +247,9 @@ func TestSelectMK8sNodeSetSearchesPastUnsupportedPrerequisites(t *testing.T) {
 				group := strings.ReplaceAll(workerMK8sAutoscalingLiveShape, "group-1", args[5])
 				if prerequisite == "surge" && args[5] == "group-a" {
 					group = strings.Replace(group, `"max_surge":{"percent":"0"}`, `"max_surge":{"percent":"50"}`, 1)
+				}
+				if prerequisite == "not converged" && args[5] == "group-a" {
+					group = strings.Replace(group, `"ready_node_count":"2"`, `"ready_node_count":"1"`, 1)
 				}
 				return group, nil
 			}
@@ -331,7 +334,7 @@ func TestSelectMK8sNodeSetSkipsOnlyUnsupportedTopology(t *testing.T) {
 }
 
 func TestSelectMK8sNodeSetFailsOnConfiguredGroupErrors(t *testing.T) {
-	for _, problem := range []string{"provider query", "unhealthy group"} {
+	for _, problem := range []string{"provider query", "invalid sizing", "unhealthy group"} {
 		t.Run(problem, func(t *testing.T) {
 			steps, runtime := rolloutSelectionTestSteps(rolloutSelectionTestNodeSet("a-worker", 2), rolloutSelectionTestNodeSet("b-worker", 2))
 			steps.requireMK8s = true
@@ -348,7 +351,10 @@ func TestSelectMK8sNodeSetFailsOnConfiguredGroupErrors(t *testing.T) {
 				if problem == "provider query" {
 					return "", errors.New("provider unavailable")
 				}
-				group := strings.ReplaceAll(workerMK8sAutoscalingLiveShape, "group-1", "group-a")
+				group := strings.ReplaceAll(workerMK8sAutoscalingLiveShape, "group-1", args[5])
+				if problem == "invalid sizing" {
+					return strings.Replace(group, `"max_node_count":"2"`, `"max_node_count":"-1"`, 1), nil
+				}
 				return strings.Replace(group, `"ready_node_count":"2"`, `"ready_node_count":"1"`, 1), nil
 			}
 
@@ -357,10 +363,16 @@ func TestSelectMK8sNodeSetFailsOnConfiguredGroupErrors(t *testing.T) {
 			assert.NotErrorIs(t, err, godog.ErrSkip)
 			if problem == "provider query" {
 				assert.ErrorContains(t, err, "provider unavailable")
+			} else if problem == "invalid sizing" {
+				assert.ErrorContains(t, err, "invalid node count bounds")
 			} else {
 				assert.ErrorContains(t, err, "not converged")
 			}
-			assert.Equal(t, []string{"group-a"}, reads, "a healthy later candidate must not hide a configured failure")
+			if problem == "provider query" || problem == "invalid sizing" {
+				assert.Equal(t, []string{"group-a"}, reads, "unreadable provider state must fail immediately")
+			} else {
+				assert.Equal(t, []string{"group-a", "group-1"}, reads, "all unhealthy alternatives must fail rather than skip")
+			}
 			assert.Empty(t, steps.nodeSet.Metadata.Name)
 			assert.Empty(t, steps.mk8s.groupID)
 			assert.Empty(t, runtime.submissions)
@@ -1082,7 +1094,9 @@ func TestWorkerMK8sScenarioRejectsFailedOperationsBeforeCleanup(t *testing.T) {
 			require.NotNil(t, steps.mk8s.requestedMaxPods, "retain ownership so cleanup can recover after the scenario fails")
 			assert.NotContains(t, strings.Join(runtime.logs, "\n"), "ended unsuccessfully")
 
-			require.NoError(t, steps.cleanupMK8sGroup(t.Context()))
+			cleanupCtx := framework.WithWorkerReservation(t.Context(), framework.NewWorkerPool(), t.Name())
+			require.NoError(t, steps.cleanupMK8sGroup(cleanupCtx))
+			require.NoError(t, framework.FinishWorkerReservation(cleanupCtx, runtime))
 			assert.Equal(t, 3, updates)
 			assert.Equal(t, mk8sInteger(110), maxPods)
 			assert.Equal(t, mk8sInteger(1), budget)

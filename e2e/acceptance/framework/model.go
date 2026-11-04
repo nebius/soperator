@@ -1,14 +1,15 @@
 package framework
 
 type WorkerInfo struct {
-	Name        string
-	NodeSetName string
-	HasGPU      bool
-	SlurmNode   SlurmNodeInfo
+	Name              string
+	NodeSetName       string
+	HasGPU            bool
+	SlurmNode         SlurmNodeInfo
+	unavailableReason string
 }
 
 func (w WorkerInfo) IsUsable() bool {
-	return w.SlurmNode.IsUsable()
+	return w.SlurmNode.IsUsable() && w.unavailableReason == ""
 }
 
 // ClusterInfo holds static runner metadata. It intentionally contains no

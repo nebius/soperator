@@ -80,14 +80,14 @@ func (s *NCCLDebug) CleanupAndReset(ctx context.Context) {
 	for _, run := range s.jobs {
 		if !run.job.IsZero() {
 			if err := s.slurm.CancelJob(ctx, run.job.ID, ncclDebugCleanup); err != nil {
-				s.runtime.Logf("Cleanup: cancel NCCL debug job %s: %v", run.job.ID, err)
+				reportCleanupErrorf(ctx, s.runtime, "Cleanup: cancel NCCL debug job %s: %v", run.job.ID, err)
 				continue
 			}
 			// The allocation is gone, so only worker-level files can remain.
 			if _, err := strconv.ParseUint(run.job.ID, 10, 32); err == nil {
 				command := ncclDebugRemoveResourcesCommand(run.job.ID)
 				if _, err := s.runtime.WorkerPod(s.pod).Run(ctx, command); err != nil {
-					s.runtime.Logf("Cleanup: remove NCCL debug resources for job %s: %v", run.job.ID, err)
+					reportCleanupErrorf(ctx, s.runtime, "Cleanup: remove NCCL debug resources for job %s: %v", run.job.ID, err)
 				}
 			}
 		}
@@ -98,11 +98,7 @@ func (s *NCCLDebug) CleanupAndReset(ctx context.Context) {
 }
 
 func (s *NCCLDebug) selectWorker(ctx context.Context) error {
-	snapshot, err := s.selector.Snapshot(ctx)
-	if err != nil {
-		return err
-	}
-	workers, err := pickIdleGPUWorkers(snapshot, 1)
+	workers, err := s.selector.Acquire(ctx, framework.WorkerRequirements{Kind: "GPU", Count: 1, Idle: true})
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}

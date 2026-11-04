@@ -17,13 +17,14 @@ Feature: Node replacement
     When the test job is cancelled
     Then the old instance is removed
     And a replacement node joins the cluster
-    And all pre-existing worker nodes are operational
+    And the replacement CPU worker is operational
 
   # @manual: the platform replaces the node only after Compute SetUnhealthy succeeds, which taints
   # a real bare-metal host and takes the tenant's unhealthy-node slot until the host is returned.
   # Run it by name with --run-heavy. Drop the tag once Mk8s honours nebius.com/skip-set-unhealthy for
   # HardwareIssuesSuspected and the e2e worker node groups carry that label.
-  @manual @heavy @gpu @soperator_version_>=5.0.0
+  # Sequential: Health fault injection shares the tenant's Compute unhealthy-host quota, outside worker reservations.
+  @manual @heavy @gpu @sequential @soperator_version_>=5.0.0
   Scenario: A failed GPU health check replaces the worker node
     Given a test job is submitted and running on a GPU worker node
     When a GPU health check failure is simulated on that node
@@ -38,7 +39,8 @@ Feature: Node replacement
   # and occupy the tenant's unhealthy-node slot. Run explicitly with --run-heavy.
   # Drop the tag once Mk8s honours nebius.com/skip-set-unhealthy for HardwareIssuesSuspected
   # and the e2e worker node groups carry that label.
-  @manual @heavy @gpu @soperator_version_>=5.0.0
+  # Sequential: Health fault injection shares the tenant's Compute unhealthy-host quota, outside worker reservations.
+  @manual @heavy @gpu @sequential @soperator_version_>=5.0.0
   Scenario: A GPU worker recovers when maintenance arrives during health-check draining
     Given a test job is submitted and running on an idle GPU worker node
     When a GPU health check failure is simulated on that node
@@ -54,7 +56,8 @@ Feature: Node replacement
   # and occupy the tenant's unhealthy-node slot. Run explicitly with --run-heavy.
   # Drop the tag once Mk8s honours nebius.com/skip-set-unhealthy for HardwareIssuesSuspected
   # and the e2e worker node groups carry that label.
-  @manual @heavy @gpu @soperator_version_>=5.0.0
+  # Sequential: Health fault injection shares the tenant's Compute unhealthy-host quota, outside worker reservations.
+  @manual @heavy @gpu @sequential @soperator_version_>=5.0.0
   Scenario: A GPU worker recovers when maintenance arrives after health-check draining
     Given a test job is submitted and running on an idle GPU worker node
     When a GPU health check failure is simulated on that node

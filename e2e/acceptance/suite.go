@@ -19,9 +19,30 @@ type SuiteConfig struct {
 	StepRegistrars  []StepRegistrar
 	ExcludeUnstable bool
 	ExcludeHeavy    bool
-	// ExcludeManual drops scenarios tagged @manual. Such scenarios are meant to run only when
-	// a caller names them explicitly, so the CLI clears it when scenario selectors are given.
-	ExcludeManual bool
+	// ExcludeManual drops scenarios tagged @manual unless explicitly selected.
+	ExcludeManual          bool
+	Concurrency            int
+	RequirePreviousSuccess bool
+}
+
+// ConcurrentSuites runs @sequential scenarios first, then all remaining scenarios
+// with native Godog concurrency. Worker workloads must reserve their complete set.
+func ConcurrentSuites(suite SuiteConfig, concurrency int) []SuiteConfig {
+	serial, parallel := suite, suite
+	serial.Concurrency = 1
+	parallel.Concurrency = concurrency
+	parallel.RequirePreviousSuccess = true
+	parallel.Name += "-parallel"
+	serial.Tags = combineTags(suite.Tags, "@sequential")
+	parallel.Tags = combineTags(suite.Tags, "~@sequential")
+	return []SuiteConfig{serial, parallel}
+}
+
+func combineTags(left, right string) string {
+	if left == "" {
+		return right
+	}
+	return "(" + left + ") && (" + right + ")"
 }
 
 // VersionAxis returns a scenario version axis for product-owned version tags.

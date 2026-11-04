@@ -129,7 +129,7 @@ func (s *WorkerRollingUpdate) CleanupAndReset(ctx context.Context) {
 	if s.mk8s.requestedMaxPods != nil {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*workerMK8sTimeout)
 		if err := s.cleanupMK8sGroup(cleanupCtx); err != nil {
-			s.runtime.Logf("Cleanup: restore MK8s node group %s: %v", s.mk8s.groupID, err)
+			reportCleanupErrorf(ctx, s.runtime, "Cleanup: restore MK8s node group %s: %v", s.mk8s.groupID, err)
 		}
 		cancel()
 	}
@@ -180,7 +180,7 @@ func (s *WorkerRollingUpdate) cleanupSystemDaemonSets(ctx context.Context) {
 			return true, nil
 		})
 	if err != nil {
-		s.runtime.Logf("Cleanup: wait for restarted Soperator system DaemonSets %v to become healthy: %v", s.restartedDaemonSets, err)
+		reportCleanupErrorf(ctx, s.runtime, "Cleanup: wait for restarted Soperator system DaemonSets %v to become healthy: %v", s.restartedDaemonSets, err)
 	}
 }
 
@@ -208,7 +208,7 @@ func (s *WorkerRollingUpdate) waitForWorkerRolloutJobGone(ctx context.Context, j
 			})
 	}
 	if err != nil {
-		s.runtime.Logf("Cleanup: wait for rollout job ID=%s name=%s to leave the queue: %v", job.ID, job.JobName, err)
+		reportCleanupErrorf(ctx, s.runtime, "Cleanup: wait for rollout job ID=%s name=%s to leave the queue: %v", job.ID, job.JobName, err)
 	}
 }
 
@@ -263,7 +263,7 @@ func (s *WorkerRollingUpdate) cleanupRollout(ctx context.Context) {
 			}
 			for _, pod := range pods {
 				host, found := hosts[pod.Spec.NodeName]
-				if !found || host.DeletionTimestamp != nil || host.Spec.Unschedulable || !k8sNodeReady(host) {
+				if !found || host.DeletionTimestamp != nil || host.Spec.Unschedulable || !kubeobjects.NodeReady(host) {
 					return false, fmt.Errorf("worker %s host %s not ready and schedulable", pod.Name, pod.Spec.NodeName)
 				}
 			}
@@ -285,7 +285,7 @@ func (s *WorkerRollingUpdate) cleanupRollout(ctx context.Context) {
 			return true, nil
 		})
 	if err != nil {
-		s.runtime.Logf("Cleanup: wait for NodeSet %s/%s and MK8s group %s to reach a healthy baseline (retaining accepted changes): %v",
+		reportCleanupErrorf(ctx, s.runtime, "Cleanup: wait for NodeSet %s/%s and MK8s group %s to reach a healthy baseline (retaining accepted changes): %v",
 			s.nodeSet.Metadata.Namespace, s.nodeSet.Metadata.Name, s.mk8s.groupID, err)
 	}
 }
@@ -298,17 +298,17 @@ func (s *WorkerRollingUpdate) cleanupWorkerRolloutJob(ctx context.Context, owned
 	defer cancel()
 	if !owned.job.IsZero() {
 		if err := s.slurm.CancelJob(cleanupCtx, owned.job.ID, 0); err != nil {
-			s.runtime.Logf("Cleanup: cancel rolling update job %s: %v", owned.job.ID, err)
+			reportCleanupErrorf(ctx, s.runtime, "Cleanup: cancel rolling update job %s: %v", owned.job.ID, err)
 		}
 	} else if owned.job.JobName != "" {
 		// Submission may succeed even if its response (and therefore job ID) is lost.
 		if _, err := s.runtime.Controller().Run(cleanupCtx, "scancel --name="+framework.ShellQuote(owned.job.JobName)); err != nil {
-			s.runtime.Logf("Cleanup: cancel rollout job named %s: %v", owned.job.JobName, err)
+			reportCleanupErrorf(ctx, s.runtime, "Cleanup: cancel rollout job named %s: %v", owned.job.JobName, err)
 		}
 	}
 	if owned.releasePath != "" {
 		if _, err := s.runtime.Jail().Run(cleanupCtx, "rm -f -- "+framework.ShellQuote(owned.releasePath)); err != nil {
-			s.runtime.Logf("Cleanup: remove rollout gate %s: %v", owned.releasePath, err)
+			reportCleanupErrorf(ctx, s.runtime, "Cleanup: remove rollout gate %s: %v", owned.releasePath, err)
 		}
 	}
 }
@@ -331,12 +331,16 @@ func (s *WorkerRollingUpdate) prepareRolloutWorkers(ctx context.Context) error {
 }
 
 func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, framework.WorkerAcquireTimeout(ctx))
+	defer cancel()
 	nodeSets, err := listClusterNodeSets(ctx, s.kubectl, s.info.SlurmClusterName)
 	if err != nil {
 		return err
 	}
 
 	var rejected []string
+	var unavailable []error
+	var candidates []WorkerRollingUpdate
 	for _, nodeSet := range nodeSets {
 		if reason := workerRolloutConfigurationProblem(nodeSet, s.info.SlurmClusterName); reason != "" {
 			rejected = append(rejected, fmt.Sprintf("%s: %s", nodeSet.Metadata.Name, reason))
@@ -346,11 +350,12 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if reason := workerRolloutCandidateProblem(nodeSet, s.info.SlurmClusterName, len(names)); reason != "" {
-			return fmt.Errorf("require configured rollout NodeSet %s to be healthy: %s", nodeSet.Metadata.Name, reason)
-		}
 		if len(names) < 2 {
-			rejected = append(rejected, fmt.Sprintf("%s: %d active workers, require at least %d", nodeSet.Metadata.Name, len(names), 2))
+			if reason := workerRolloutCandidateProblem(nodeSet, s.info.SlurmClusterName, len(names)); reason != "" {
+				unavailable = append(unavailable, fmt.Errorf("require configured rollout NodeSet %s to be healthy: %s", nodeSet.Metadata.Name, reason))
+			} else {
+				rejected = append(rejected, fmt.Sprintf("%s: %d active workers, require at least 2", nodeSet.Metadata.Name, len(names)))
+			}
 			continue
 		}
 		budget, err := workerRolloutBudget(nodeSet.Spec.MaxUnavailable, len(names))
@@ -362,9 +367,54 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 			continue
 		}
 		candidate := *s
-		candidate.nodeSet = nodeSet
-		candidate.workerNames = names
+		candidate.nodeSet, candidate.workerNames = nodeSet, names
 		candidate.mk8s = workerRolloutMK8s{}
+		candidates = append(candidates, candidate)
+	}
+	for len(candidates) != 0 {
+		var alternatives []framework.WorkerRequirements
+		for _, candidate := range candidates {
+			alternatives = append(alternatives, framework.WorkerRequirements{
+				NodeSet: candidate.nodeSet.Metadata.Name, Names: candidate.workerNames, Count: len(candidate.workerNames), Idle: true,
+			})
+		}
+		workers, err := s.selector.AcquireAny(ctx, alternatives)
+		if err != nil {
+			return err
+		}
+		index := slices.IndexFunc(candidates, func(candidate WorkerRollingUpdate) bool {
+			return candidate.nodeSet.Metadata.Name == workers[0].NodeSetName
+		})
+		if index < 0 {
+			return fmt.Errorf("reserved worker %s belongs to unexpected NodeSet %s", workers[0].Name, workers[0].NodeSetName)
+		}
+		candidate := candidates[index]
+		candidates = slices.Delete(candidates, index, index+1)
+		current, err := listClusterNodeSets(ctx, s.kubectl, s.info.SlurmClusterName)
+		if err != nil {
+			return err
+		}
+		currentIndex := slices.IndexFunc(current, func(nodeSet kubeobjects.NodeSet) bool {
+			return nodeSet.Metadata.Name == candidate.nodeSet.Metadata.Name
+		})
+		if currentIndex < 0 {
+			return fmt.Errorf("reserved NodeSet %s disappeared", candidate.nodeSet.Metadata.Name)
+		}
+		candidate.nodeSet = current[currentIndex]
+		if reason := workerRolloutCandidateProblem(candidate.nodeSet, s.info.SlurmClusterName, len(workers)); reason != "" {
+			return fmt.Errorf("require configured rollout NodeSet %s to be healthy: %s", candidate.nodeSet.Metadata.Name, reason)
+		}
+		currentNames, err := candidate.rolloutWorkerNames(ctx, candidate.nodeSet)
+		if err != nil {
+			return err
+		}
+		if !slices.Equal(currentNames, candidate.workerNames) {
+			return fmt.Errorf("NodeSet %s active workers changed while acquiring its reservation: expected %v, observed %v", candidate.nodeSet.Metadata.Name, candidate.workerNames, currentNames)
+		}
+		budget, err := workerRolloutBudget(candidate.nodeSet.Spec.MaxUnavailable, len(currentNames))
+		if err != nil || budget < 2 {
+			return fmt.Errorf("NodeSet %s rollout budget changed while acquiring its reservation: budget=%d error=%v", candidate.nodeSet.Metadata.Name, budget, err)
+		}
 		if err := candidate.snapshotSelectedWorkers(ctx); err != nil {
 			return err
 		}
@@ -373,19 +423,27 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 			hosts[pod.NodeName] = true
 		}
 		if len(hosts) != len(candidate.initialPods) {
-			rejected = append(rejected, fmt.Sprintf("%s: require a separate host for each worker", nodeSet.Metadata.Name))
+			framework.ReleaseReservedWorkers(ctx)
+			rejected = append(rejected, fmt.Sprintf("%s: require a separate host for each worker", candidate.nodeSet.Metadata.Name))
 			continue
 		}
 		if s.requireMK8s {
 			if err := candidate.selectMK8sGroup(ctx); err != nil {
 				var prerequisite workerRolloutPrerequisiteError
-				if !errors.As(err, &prerequisite) {
+				var notConverged workerMK8sNotConvergedError
+				if errors.As(err, &notConverged) {
+					unavailable = append(unavailable, fmt.Errorf("NodeSet %s: %w", candidate.nodeSet.Metadata.Name, err))
+				} else if errors.As(err, &prerequisite) {
+					rejected = append(rejected, fmt.Sprintf("%s: %v", candidate.nodeSet.Metadata.Name, err))
+				} else {
 					return err
 				}
-				rejected = append(rejected, fmt.Sprintf("%s: %v", nodeSet.Metadata.Name, err))
+				s.runtime.Logf("Acceptance: NodeSet %s cannot drive the MK8s rollout: %v; trying another NodeSet", candidate.nodeSet.Metadata.Name, err)
+				framework.ReleaseReservedWorkers(ctx)
 				continue
 			}
 		}
+		s.runtime.Logf("Worker rollout: selected NodeSet %s gpu=%t workers=%v", candidate.nodeSet.Metadata.Name, candidate.nodeSet.Spec.GPU.Enabled, candidate.workerNames)
 		*s = candidate
 		if isEphemeralRollout(s.nodeSet) {
 			if err := s.holdEphemeralWorkers(ctx, s.workerNames); err != nil {
@@ -400,6 +458,9 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 			}
 		}
 		return s.waitForIdle(ctx, "selected NodeSet workers idle before the rollout", workerRolloutIdleTimeout)
+	}
+	if len(unavailable) != 0 {
+		return fmt.Errorf("select a healthy rollout NodeSet (%s): %w", strings.Join(rejected, "; "), errors.Join(unavailable...))
 	}
 	s.runtime.Logf("Acceptance: no NodeSet satisfies rollout prerequisites (%s), skipping scenario", strings.Join(rejected, "; "))
 	return godog.ErrSkip
@@ -853,7 +914,7 @@ func (s *WorkerRollingUpdate) cleanupEphemeralWorkerHold(ctx context.Context) {
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), workerRolloutCleanupTimeout)
 	defer cancel()
 	if err := s.releaseEphemeralWorkers(cleanupCtx); err != nil {
-		s.runtime.Logf("Cleanup: restore automatic suspension for ephemeral workers %s: %v; check SuspendExcNodes and remove only these scenario additions", strings.Join(s.power.added, ","), err)
+		reportCleanupErrorf(ctx, s.runtime, "Cleanup: restore automatic suspension for ephemeral workers %s: %v; check SuspendExcNodes and remove only these scenario additions", strings.Join(s.power.added, ","), err)
 	}
 }
 

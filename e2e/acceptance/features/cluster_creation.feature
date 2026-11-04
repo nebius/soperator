@@ -1,5 +1,6 @@
 Feature: Cluster creation
-  @soperator_version_>=4.0.0
+  # Sequential: Checks whole-cluster readiness, which intentional concurrent drains and restarts invalidate.
+  @soperator_version_>=4.0.0 @sequential
   Scenario: The provisioned cluster is ready for acceptance tests
     Then all non-job pods in soperator are Running and Ready
     And all HelmReleases are Ready

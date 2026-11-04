@@ -1,6 +1,7 @@
 package sharedsteps
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -9,6 +10,31 @@ import (
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
+
+func TestTopologySuccessfulCleanupDoesNotFailReservation(t *testing.T) {
+	var patched bool
+	runtime := blockRankTestRuntime{
+		kubectl: framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
+			if args[0] == "patch" {
+				patched = true
+				return "", nil
+			}
+			if args[1] == "slurmcluster" {
+				return `{"spec":{"topology":{"topologies":[{"name":"block-nvl72","topo":{"type":"block","blockSizes":[2]}}]}}}`, nil
+			}
+			return renderedTopologyConfig, nil
+		}),
+		controller: framework.NewCommandScope(func(context.Context, string) (string, error) { return showTopologyBlock, nil }),
+	}
+	steps := NewTopology(&framework.ClusterInfo{SlurmClusterName: "soperator"}, runtime, framework.NewKubectlClient(runtime), nil)
+	steps.blockTopology = "block-nvl72"
+	steps.blockSizesRestore = []int{2}
+	ctx := framework.WithWorkerReservation(t.Context(), framework.NewWorkerPool(), t.Name())
+	steps.CleanupAndReset(ctx)
+	assert.True(t, patched)
+	assert.Nil(t, steps.blockSizesRestore)
+	require.NoError(t, framework.FinishWorkerReservation(ctx, runtime))
+}
 
 // renderedTopologyConfig is the topology.yaml the operator publishes, warning header included.
 const renderedTopologyConfig = `# Managed by Soperator.

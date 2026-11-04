@@ -61,9 +61,9 @@ func (s *SlurmConfigUpdates) CleanupAndReset(ctx context.Context) {
 		defer cancel()
 
 		if err := s.patchCustomConfig(cleanupCtx, s.originalCustomConfig); err != nil {
-			s.runtime.Logf("cleanup: restore SlurmCluster custom config: %v", err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: restore SlurmCluster custom config: %v", err)
 		} else if err := s.waitForJobRequeue(cleanupCtx, s.originalJobRequeue); err != nil {
-			s.runtime.Logf("cleanup: wait for original JobRequeue value: %v", err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: wait for original JobRequeue value: %v", err)
 		}
 	}
 

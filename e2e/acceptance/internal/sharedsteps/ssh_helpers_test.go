@@ -62,10 +62,23 @@ func TestRunInternalSSHAsTestUser(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "worker-0\n", output)
 	assert.Equal(t, "su - 'bob' -c "+framework.ShellQuote(
-		"mkdir -p ~/.ssh && touch ~/.ssh/known_hosts && "+
+		"mkdir -p ~/.ssh && flock --wait 30 ~/.ssh/.soperator-e2e-known-hosts.lock bash -ec "+framework.ShellQuote("mkdir -p ~/.ssh && touch ~/.ssh/known_hosts && "+
 			"(ssh-keygen -R 'worker-0' -f ~/.ssh/known_hosts >/dev/null 2>&1 || true) && "+
-			"timeout 30 ssh 'worker-0' 'ulimit -n' </dev/null",
+			"timeout 30 ssh 'worker-0' 'ulimit -n' </dev/null"),
 	), command)
+}
+
+func TestEnsureSSHTestUserLocksCompleteInitialization(t *testing.T) {
+	var command string
+	commandErr := errors.New("initialization failed")
+	runtime := &sshTestUserRuntime{jail: framework.NewCommandScope(func(_ context.Context, value string) (string, error) {
+		command = value
+		return "", commandErr
+	})}
+	err := ensureSSHTestUser(t.Context(), runtime, "bob")
+	require.ErrorIs(t, err, commandErr)
+	assert.Equal(t, "flock --wait 60 /tmp/soperator-e2e-createuser.lock bash -ec "+framework.ShellQuote(
+		"id 'bob' >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh 'bob'"), command)
 }
 
 func TestWaitForSSHTestUserOnController(t *testing.T) {

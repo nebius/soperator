@@ -111,3 +111,17 @@ func TestValidateWorkersOperationalPropagatesSmokeFailure(t *testing.T) {
 	assert.ErrorIs(t, err, smokeErr)
 	assert.ErrorContains(t, err, "validate worker worker-0 is operational")
 }
+
+func TestCPUReplacementValidationTargetsOnlyReservedWorker(t *testing.T) {
+	var commands []string
+	runtime := workerSmokeTestRuntime{jail: framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+		commands = append(commands, command)
+		return "worker-cpu-0", nil
+	})}
+	steps := NodeReplacement{
+		runtime: runtime, replacementWorker: framework.WorkerInfo{Name: "worker-cpu-0"},
+		preExistingWorkers: []framework.WorkerInfo{{Name: "worker-cpu-0"}, {Name: "worker-gpu-0", HasGPU: true}},
+	}
+	require.NoError(t, steps.theReplacementCPUWorkerIsOperational(t.Context()))
+	assert.Equal(t, []string{"timeout 180 srun -w 'worker-cpu-0' hostname"}, commands)
+}

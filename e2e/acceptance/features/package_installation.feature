@@ -1,5 +1,6 @@
 Feature: Package installation
-  @gpu @soperator_version_>=5.0.0
+  # Sequential: Changes the shared jail package database and dependencies used by other workloads.
+  @gpu @soperator_version_>=5.0.0 @sequential
   Scenario: Installing and uninstalling cowsay preserves GPU tooling
     Given the NVIDIA driver is working on a worker node
     And package "cowsay" is not installed on the worker node
@@ -10,7 +11,8 @@ Feature: Package installation
     Then package "cowsay" is not installed on the worker node
     And the NVIDIA driver is still working on the worker node
 
-  @soperator_version_>=5.0.0
+  # Sequential: Changes shared jail packages and requires a stable before/after GPU tooling inventory.
+  @soperator_version_>=5.0.0 @sequential
   Scenario: Installing and uninstalling nvitop preserves GPU tooling
     Given the NVIDIA driver is working on a worker node
     And package "nvitop" is not installed on the worker node

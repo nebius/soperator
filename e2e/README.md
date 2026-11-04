@@ -68,6 +68,10 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
 - `--run-heavy`: optional, defaults to `false`; when false, scenarios tagged
   `@heavy` are excluded. Enabling it includes heavy scenarios alongside ordinary
   scenarios. Heavy and unstable controls are independent.
+- `--parallelism`: maximum concurrent worker-local scenarios, defaults to `8`.
+  Set to `1` for sequential execution with the same selection and reservation rules.
+- `--worker-acquire-timeout`: maximum wait for free, healthy workers, defaults
+  to `2h`. This includes contention and recovery and is separate from job timeouts.
 - `--scenario`: optional. Runs all compatible scenarios in the provided feature
   file, or the single scenario at an exact `Scenario:` line, for example
   `features/internal_ssh.feature:3`. May be repeated. Scenarios tagged
@@ -80,9 +84,45 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
 
 Steps that need a specific worker kind query live Slurm and NodeSet state at
 scenario time. They skip when the required capacity is not configured, but fail
-when it is configured and too few workers are usable. Scenarios that cover all
+when configured workers do not recover within the acquisition timeout. Scenarios that cover all
 workers also fail on partial degradation. CPU, GPU, and topology tags in feature
 files are descriptive only; no current runner or workflow consumes them.
+
+The CLI runs two suites in order: `soperator` contains `@sequential` scenarios
+and executes them one at a time; `soperator-parallel` contains all other scenarios
+and uses native Godog concurrency (eight by default). Both retain the same version,
+heavy, unstable, manual and scenario-path filters. Exact scenario selectors refer to the
+`Scenario:` or `Scenario Outline:` line in the selected checkout.
+If the sequential suite fails, the concurrent suite is not started against a
+potentially degraded shared baseline.
+
+Both suites preserve feature-list and scenario declaration order within their
+selection. Worker availability determines when concurrent scenarios can proceed;
+scenario correctness must never depend on launch or completion order.
+
+Worker selection waits for active workers' Pods and Kubernetes hosts to be Ready
+and reserves an entire worker set atomically. Waiting requests
+are considered in arrival order, but a request that cannot fit does not block
+an independent request. Generic allocations prefer CPU workers, including when
+choosing among complete NodeSets; GPU workers are used when no complete CPU-only
+alternative is available. GPU-specific requests still require GPU workers.
+`WorkerSelector.AcquireAny` chooses one complete alternative atomically, so a
+busy preferred NodeSet does not block another eligible free NodeSet. Leases last
+through cleanup; failed cleanup or recovery quarantines the affected workers
+for the rest of the run. Shared configuration mutation, unsafe shared SSH identity
+changes, shared provider quotas, cluster-wide assertions and system DaemonSet restarts require `@sequential`
+unless their conflicts have been isolated. A
+scenario must acquire its complete set once; incremental lock upgrades are
+rejected. Host-wide faults require ownership of every worker on that host.
+
+For every new or changed scenario, review worker ownership, shared files and
+identities, job placement, cleanup, and cluster-wide assertions. Default concurrency
+is safe only when its full footprint is isolated. Read-only shared checks and
+multi-worker jobs can run concurrently when those conditions hold. Every
+`@sequential` tag must be scenario-level and have a `# Sequential: ...` comment
+immediately above its tag line explaining the concrete conflicting resource or
+assertion. Keep that reason current and remove the exclusion when it is resolved.
+See [AGENTS.md](AGENTS.md) for examples and the full review policy.
 
 For focused manual runs on a dev cluster, pass the scenario location:
 
@@ -239,6 +279,18 @@ library callers; the standalone CLI explicitly excludes it unless `--run-heavy`
 is set. `SoperatorSuite` excludes `@manual` scenarios; a caller that selects
 them through `Source.Paths` clears `ExcludeManual`, as the CLI does for
 `--scenario`.
+
+Library callers keep sequential behavior unless they set `SuiteConfig.Concurrency`.
+To reuse the same split, pass `acceptance.ConcurrentSuites(suite, 8)` as
+`RunnerConfig.Suites`. This also works with Managed-owned feature sources and
+step registrars. Set `RunnerConfig.WorkerAcquireTimeout` to override the default
+two-hour acquisition budget. Select workers through `WorkerSelector.Acquire`
+or its `Pick...Workers` wrappers; custom selectors can call `Reserve` before
+recording worker baselines. The runner supplies scenario ownership through the
+context and finalizes it after all registered cleanup hooks.
+Custom feature sources must review every unmarked scenario before opting in:
+only `@sequential` scenarios are excluded from concurrency. Existing callers
+that do not opt in remain sequential.
 When `OutputDir` is set, each scenario receives matching runner and jail paths
 through `framework.ScenarioArtifacts(ctx)`. Product-specific steps can write
 their own files directly to those paths without registering a collector.

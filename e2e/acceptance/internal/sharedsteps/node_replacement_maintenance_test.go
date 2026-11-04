@@ -353,7 +353,7 @@ func TestHealthMaintenanceCleanupHandlesBothOwnedTriggersAfterCancellation(t *te
 	steps.CleanupAndReset(ctx)
 
 	assert.Contains(t, runtime.calls, "scancel '6'")
-	assert.Equal(t, []string{"rm -f '/opt/soperator-outputs/local/health_checker_inject_error'"}, runtime.workerCommands)
+	assert.Equal(t, []string{"rm -f '/opt/soperator-outputs/local/health_checker_inject_error' && test ! -e '/opt/soperator-outputs/local/health_checker_inject_error'"}, runtime.workerCommands)
 	assert.False(t, steps.maintenanceRequested)
 	assert.False(t, steps.faultInjected)
 	assert.Zero(t, steps.original)

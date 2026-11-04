@@ -27,7 +27,7 @@ const (
 	systemKubeletNodeRecreateTimeout = 30 * time.Minute
 	systemKubeletWorkerReadyTimeout  = 10 * time.Minute
 	systemKubeletSlurmRecoverTimeout = 5 * time.Minute
-	systemWorkerRestartTimeout       = 2 * time.Minute
+	systemWorkerRestartTimeout       = 5 * time.Minute
 	libslurmProbeStartTimeout        = 10 * time.Second
 	libslurmProbeStopTimeout         = 5 * time.Second
 )
@@ -52,6 +52,7 @@ type SystemChecks struct {
 	kubeletK8sNodeUID    string
 	kubeletWorkerPodUID  string
 	kubeletDebugPodName  string
+	ephemeralFillOwned   bool
 
 	restartedWorkerPodUID string
 	libslurmProbeCancel   context.CancelFunc
@@ -113,17 +114,17 @@ func (s *SystemChecks) CleanupAndReset(ctx context.Context) {
 	s.removeLibslurmProbeFiles(ctx)
 	if s.kubeletDebugPodName != "" {
 		if _, err := s.runtime.Kubectl().Run(ctx, "delete", "pod", "-n", framework.SoperatorNamespace, s.kubeletDebugPodName, "--ignore-not-found"); err != nil {
-			s.runtime.Logf("cleanup: delete kubelet debug pod %s: %v", s.kubeletDebugPodName, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: delete kubelet debug pod %s: %v", s.kubeletDebugPodName, err)
 		}
 	}
-	if s.workerPod.Name != "" {
+	if s.ephemeralFillOwned && s.workerPod.Name != "" {
 		if _, err := s.runtime.WorkerPod(s.workerPodInfo).Run(ctx, fmt.Sprintf("rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(systemEphemeralFillPath))); err != nil {
-			s.runtime.Logf("cleanup: remove ephemeral fill file from %s: %v", s.workerPod.Name, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: remove ephemeral fill file from %s: %v", s.workerPod.Name, err)
 		}
 	}
-	if s.worker.Name != "" {
+	if s.ephemeralFillOwned && s.worker.Name != "" {
 		if err := s.slurm.ResumeNodeIfDrainedByReason(ctx, s.worker.Name, systemEphemeralReason); err != nil {
-			s.runtime.Logf("cleanup: resume %s after pod_ephemeral_storage: %v", s.worker.Name, err)
+			reportCleanupErrorf(ctx, s.runtime, "cleanup: resume %s after pod_ephemeral_storage: %v", s.worker.Name, err)
 		}
 	}
 	s.worker = framework.WorkerInfo{}
@@ -135,12 +136,13 @@ func (s *SystemChecks) CleanupAndReset(ctx context.Context) {
 	s.kubeletK8sNodeUID = ""
 	s.kubeletWorkerPodUID = ""
 	s.kubeletDebugPodName = ""
+	s.ephemeralFillOwned = false
 	s.restartedWorkerPodUID = ""
 	s.resetLibslurmProbe()
 }
 
 func (s *SystemChecks) aHealthyWorkerPodIsSelected(ctx context.Context) error {
-	workers, err := s.selector.Workers(ctx)
+	workers, err := s.selector.PickWorkers(ctx, 1)
 	if err != nil {
 		return err
 	}
@@ -175,12 +177,13 @@ func (s *SystemChecks) aHealthyWorkerPodIsSelected(ctx context.Context) error {
 			problems = append(problems, fmt.Sprintf("%s: %v", worker.Name, err))
 			continue
 		}
-		if !k8sNodeReady(k8sNode) {
+		if !kubeobjects.NodeReady(k8sNode) {
 			problems = append(problems, fmt.Sprintf("%s: Kubernetes node %s is not Ready", worker.Name, k8sNode.Name))
 			continue
 		}
 
 		s.worker = worker
+		s.worker.SlurmNode = node
 		s.workerPodInfo = podInfo
 		s.workerPod = pod
 		s.runtime.Logf("system checks: selected worker=%s pod=%s k8s_node=%s",
@@ -216,6 +219,7 @@ func (s *SystemChecks) podLocalEphemeralStorageIsFilledAboveTheWarningThreshold(
 		framework.ShellQuote(systemEphemeralFillPath),
 		framework.ShellQuote(systemEphemeralFillPath),
 	)
+	s.ephemeralFillOwned = true
 	if _, err := s.runtime.WorkerPod(s.workerPodInfo).Run(ctx, cmd); err != nil {
 		return fmt.Errorf("fill ephemeral storage in worker pod %s: %w", s.workerPod.Name, err)
 	}
@@ -276,8 +280,11 @@ func (s *SystemChecks) kubeletIsStoppedOnTheSelectedWorkerKubernetesNode(ctx con
 	if err != nil {
 		return err
 	}
-	if !k8sNodeReady(k8sNode) {
+	if !kubeobjects.NodeReady(k8sNode) {
 		return fmt.Errorf("selected Kubernetes node %s is not Ready", k8sNode.Name)
+	}
+	if err := framework.RequireReservedHost(ctx, s.kubectl, k8sNode.Name); err != nil {
+		return err
 	}
 	s.kubeletWorker = s.worker
 	s.kubeletWorkerPodName = pod.Name
@@ -315,7 +322,7 @@ func (s *SystemChecks) theSelectedWorkerKubernetesNodeIsRecreated(ctx context.Co
 		if !found {
 			return false, nil
 		}
-		return string(node.UID) != s.kubeletK8sNodeUID && k8sNodeReady(node), nil
+		return string(node.UID) != s.kubeletK8sNodeUID && kubeobjects.NodeReady(node), nil
 	})
 }
 
@@ -465,6 +472,9 @@ func (s *SystemChecks) theSelectedWorkerPodIsRestarted(ctx context.Context) erro
 	if s.workerPod.Name == "" || s.workerPod.UID == "" {
 		return fmt.Errorf("worker pod is not selected")
 	}
+	if s.worker.SlurmNode.SlurmdStartTime.IsZero() {
+		return fmt.Errorf("read SlurmdStartTime before restarting worker %s", s.worker.Name)
+	}
 	if err := s.ensureLibslurmProbeRunning(); err != nil {
 		return err
 	}
@@ -490,24 +500,26 @@ func (s *SystemChecks) theRestartedWorkerPodIsReady(ctx context.Context) error {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	var lastErr error
 	for {
 		if err := s.ensureLibslurmProbeRunning(); err != nil {
 			return err
 		}
 		pod, found, err := s.workerPodByNameOnce(waitCtx, s.workerPod.Name)
-		if err != nil {
-			lastErr = err
-		} else if found && string(pod.UID) != s.restartedWorkerPodUID && pod.Status.Phase == corev1.PodRunning && kubeobjects.PodReady(pod) {
-			return nil
+		var node framework.SlurmNodeInfo
+		if err == nil && found && string(pod.UID) != s.restartedWorkerPodUID && pod.Status.Phase == corev1.PodRunning && kubeobjects.PodReady(pod) {
+			node, err = s.slurm.NodeInfoOnce(waitCtx, s.worker.Name)
+			if err == nil && node.IsReadyForImmediateWork() && node.SlurmdStartTime.After(s.worker.SlurmNode.SlurmdStartTime) {
+				return nil
+			}
 		}
 
 		select {
 		case <-waitCtx.Done():
-			if lastErr != nil {
-				return fmt.Errorf("wait for worker pod %s restarted and ready: %w", s.workerPod.Name, lastErr)
+			if err != nil {
+				return fmt.Errorf("wait for worker pod %s restarted and ready: %w", s.workerPod.Name, err)
 			}
-			return fmt.Errorf("wait for worker pod %s restarted and ready: timed out after %s", s.workerPod.Name, systemWorkerRestartTimeout)
+			return fmt.Errorf("wait for worker pod %s restarted and ready: timed out after %s (found=%t phase=%s ready=%t SlurmState=%s SlurmdStartTime=%s)",
+				s.workerPod.Name, systemWorkerRestartTimeout, found, pod.Status.Phase, kubeobjects.PodReady(pod), node.State, node.SlurmdStartTime.Format(time.RFC3339))
 		case <-ticker.C:
 		}
 	}
@@ -574,7 +586,7 @@ func (s *SystemChecks) stopLibslurmProbe(ctx context.Context) {
 			s.libslurmProbeFinished = &result
 		case <-time.After(libslurmProbeStopTimeout):
 			if s.runtime != nil {
-				s.runtime.Logf("cleanup: timed out waiting for libslurm probe to stop")
+				reportCleanupErrorf(ctx, s.runtime, "cleanup: timed out waiting for libslurm probe to stop")
 			}
 		}
 	}
@@ -591,7 +603,7 @@ func (s *SystemChecks) removeLibslurmProbeFiles(ctx context.Context) {
 		return
 	}
 	if _, err := s.runtime.Jail().Run(ctx, "rm -f "+framework.ShellJoin(paths...)); err != nil {
-		s.runtime.Logf("cleanup: remove libslurm probe files: %v", err)
+		reportCleanupErrorf(ctx, s.runtime, "cleanup: remove libslurm probe files: %v", err)
 	}
 }
 

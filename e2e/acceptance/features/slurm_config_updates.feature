@@ -1,6 +1,7 @@
 Feature: Slurm configuration updates
 
-  @soperator_version_>=4.0.0
+  # Sequential: Changes cluster-wide Slurm configuration and waits for all active workers to reconfigure.
+  @soperator_version_>=4.0.0 @sequential
   Scenario: A custom Slurm setting is applied and restored
     Given at least one active worker is available for Slurm reconfiguration
     And the current custom Slurm configuration is recorded
