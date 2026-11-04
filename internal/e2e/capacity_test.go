@@ -1,7 +1,10 @@
 package e2e
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"log"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,17 +45,23 @@ func TestCheckCapacity_MixedProfile(t *testing.T) {
 		h200        uint64
 		missingH200 bool
 		wantErr     error
+		wantReports int
 	}{
 		{name: "both fit exactly", h100: 16, h200: 16},
-		{name: "h100 insufficient", h100: 15, h200: 32, wantErr: ErrInsufficientCapacity},
-		{name: "h200 insufficient", h100: 32, h200: 15, wantErr: ErrInsufficientCapacity},
-		{name: "both insufficient", h100: 15, h200: 15, wantErr: ErrInsufficientCapacity},
+		{name: "h100 insufficient", h100: 15, h200: 32, wantErr: ErrInsufficientCapacity, wantReports: 1},
+		{name: "h200 insufficient", h100: 32, h200: 15, wantErr: ErrInsufficientCapacity, wantReports: 1},
+		{name: "both insufficient", h100: 15, h200: 15, wantErr: ErrInsufficientCapacity, wantReports: 2},
 		{name: "h200 pool absent", h100: 16, missingH200: true, wantErr: ErrInsufficientCapacity},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			var output bytes.Buffer
+			previousOutput := log.Writer()
+			log.SetOutput(&output)
+			t.Cleanup(func() { log.SetOutput(previousOutput) })
 			p := mixedGPUProfile()
 			demands, _ := gpuDemands(p)
 			queried := make(map[affinityKey]bool)
+			var reports int
 			err := checkCapacity(p, demands, func(key affinityKey) (cbgAvailability, error) {
 				queried[key] = true
 				switch key {
@@ -67,6 +76,10 @@ func TestCheckCapacity_MixedProfile(t *testing.T) {
 					t.Fatalf("unexpected capacity affinity: %+v", key)
 					return cbgAvailability{}, nil
 				}
+			}, func(key affinityKey, res cbgAvailability) {
+				reports++
+				assert.Less(t, res.available, demands[key].requiredGPUs)
+				assert.Contains(t, output.String(), fmt.Sprintf("CBG platform=%s fabric=%s: INSUFFICIENT CAPACITY", key.Platform, key.Fabric))
 			})
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
@@ -74,6 +87,7 @@ func TestCheckCapacity_MixedProfile(t *testing.T) {
 				require.NoError(t, err)
 			}
 			assert.Len(t, queried, 2)
+			assert.Equal(t, tc.wantReports, reports)
 		})
 	}
 }
@@ -84,6 +98,8 @@ func TestCheckCapacity_APIError(t *testing.T) {
 	apiErr := errors.New("capacity API unavailable")
 	err := checkCapacity(p, demands, func(affinityKey) (cbgAvailability, error) {
 		return cbgAvailability{}, apiErr
+	}, func(affinityKey, cbgAvailability) {
+		t.Fatal("do not report insufficient capacity on an API error")
 	})
 	require.ErrorIs(t, err, apiErr)
 }
@@ -92,10 +108,14 @@ func TestCheckCapacity_WarnAllowsInsufficientCapacity(t *testing.T) {
 	p := mixedGPUProfile()
 	p.CapacityStrategy = CapacityStrategyWarn
 	demands, _ := gpuDemands(p)
+	var reports int
 	err := checkCapacity(p, demands, func(affinityKey) (cbgAvailability, error) {
 		return cbgAvailability{}, nil
+	}, func(affinityKey, cbgAvailability) {
+		reports++
 	})
 	require.NoError(t, err)
+	assert.Equal(t, 2, reports)
 }
 
 func TestCheckCapacity_MissingTokenSkipsAllStrategies(t *testing.T) {
