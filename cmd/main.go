@@ -322,7 +322,7 @@ func main() {
 
 	if controllersSet.Enabled(loginupdatecontroller.ControllerName) {
 		if err = loginupdatecontroller.NewReconciler(
-			mgr.GetClient(), mgr.GetAPIReader(), mgr.GetScheme(),
+			mgr.GetClient(), mgr.GetScheme(),
 			mgr.GetEventRecorder(loginupdatecontroller.ControllerName), requeueAfterLoginUpdate,
 		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create controller", "controller", loginupdatecontroller.ControllerName)

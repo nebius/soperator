@@ -3,6 +3,7 @@
 Soperator delays login pod updates to give users time to prepare. It replaces outdated pods one at a time,
 waiting for each replacement to become Ready at the latest revision before moving on. A newer template change
 continues the same replacement without another notice period. Administrators can request an earlier restart from the login host.
+Outdated pods that are not Ready are repaired immediately, ahead of healthy pods, without waiting for notice or cron.
 Replacing a pod ends its SSH connections, tmux sessions and other processes.
 
 ## Configuration
@@ -22,7 +23,7 @@ slurmNodes:
 | Setting | Description |
 | --- | --- |
 | `updateStrategy` | `delayedRollout` (default) delays replacement. `rollingUpdate` uses automatic StatefulSet rolling updates. |
-| `updatePolicy.minNotice` | Minimum notice before automatic replacement. Default: `720h` (30 days); `0s` is allowed. |
+| `updatePolicy.minNotice` | Minimum notice before automatic replacement of a Ready pod. Default: `720h` (30 days); `0s` is allowed. |
 | `updatePolicy.schedule` | Optional five-field cron, UTC by default. Selects the first occurrence at or after the notice period ends. Without it, replacement is due when `minNotice` expires. |
 
 Later template changes preserve the original notice period. Changing the policy recalculates pending restart
@@ -48,7 +49,9 @@ sequenceDiagram
 
     T-->>O: Login template changed
     O->>L: Announce update and restart time
-    alt Automatic restart
+    alt Outdated pod is not Ready
+        Note over O,L: Repair immediately
+    else Automatic restart
         Note over O,L: Wait until the scheduled restart time
     else Early restart
         A->>L: sudo soperator-login-restart

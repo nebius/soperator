@@ -189,7 +189,6 @@ func TestReconcileLoginControlledUpdates(t *testing.T) {
 			PodUpdatePolicy: kruisev1b1.RecreatePodUpdateStrategyType,
 		},
 	}
-	current.Spec.Template.Spec.ServiceAccountName = ""
 	require.NoError(t, r.Create(ctx, &current))
 
 	require.NoError(t, r.ReconcileLogin(ctx, cluster, clusterValues))
@@ -198,17 +197,14 @@ func TestReconcileLoginControlledUpdates(t *testing.T) {
 	require.Nil(t, current.Spec.UpdateStrategy.RollingUpdate)
 	require.EqualValues(t, 5, *current.Spec.Replicas)
 
-	account := &corev1.ServiceAccount{}
-	require.NoError(t, r.Get(ctx, types.NamespacedName{
-		Namespace: clusterValues.Namespace, Name: current.Spec.Template.Spec.ServiceAccountName,
-	}, account))
-	require.True(t, metav1.IsControlledBy(account, cluster))
+	require.Empty(t, current.Spec.Template.Spec.ServiceAccountName)
+	require.Nil(t, current.Spec.Template.Spec.AutomountServiceAccountToken)
 
 	binding := &rbacv1.RoleBinding{}
 	require.NoError(t, r.Get(ctx, types.NamespacedName{
 		Namespace: clusterValues.Namespace, Name: naming.BuildRoleBindingLoginName(cluster.Name),
 	}, binding))
-	require.Equal(t, account.Name, binding.Subjects[0].Name)
+	require.Equal(t, "default", binding.Subjects[0].Name)
 	require.True(t, metav1.IsControlledBy(binding, cluster))
 
 	role := &rbacv1.Role{}
@@ -254,12 +250,14 @@ func TestReconcileLoginSwitchesUpdateStrategyPreservingAutoscaling(t *testing.T)
 	key := client.ObjectKey{Namespace: cluster.Namespace, Name: clusterValues.NodeLogin.StatefulSet.Name}
 	require.NoError(t, r.Get(t.Context(), key, current))
 	current.Spec.Replicas = ptr.To(int32(5))
+	current.Annotations[consts.AnnotationLoginUpdateInProgress] = current.Name + "-0/original-uid"
 	require.NoError(t, r.Update(t.Context(), current))
 	originalTemplate := current.Spec.Template.DeepCopy()
 	for _, strategy := range []consts.UpdateStrategy{consts.UpdateStrategyRollingUpdate, consts.UpdateStrategyDelayedRollout} {
 		clusterValues.NodeLogin.UpdateStrategy = strategy
 		reconcileLoginAndCheckReplicas(t, r, cluster, clusterValues, 5, true)
 		require.NoError(t, r.Get(t.Context(), key, current))
+		require.NotContains(t, current.Annotations, consts.AnnotationLoginUpdateInProgress)
 		require.Equal(t, originalTemplate.Spec, current.Spec.Template.Spec)
 		require.Equal(t, originalTemplate.Labels, current.Spec.Template.Labels)
 		if strategy == consts.UpdateStrategyRollingUpdate {

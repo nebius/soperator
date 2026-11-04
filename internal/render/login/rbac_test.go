@@ -7,7 +7,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
-	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/values"
 )
@@ -47,12 +46,8 @@ func TestRenderLoginRBAC(t *testing.T) {
 				StatefulSet: values.StatefulSet{Name: "custom-login", Replicas: tt.replicas},
 				Autoscaling: tt.autoscaling,
 			}
-			account := RenderServiceAccount(namespace, clusterName)
 			role := RenderRole(namespace, clusterName, login)
 			binding := RenderRoleBinding(namespace, clusterName)
-			require.Equal(t, naming.BuildServiceAccountLoginName(clusterName), account.Name)
-			require.Equal(t, namespace, account.Namespace)
-			require.Equal(t, consts.ComponentTypeLogin.String(), account.Labels[consts.LabelComponentKey])
 			require.Equal(t, naming.BuildRoleLoginName(clusterName), role.Name)
 			require.Equal(t, namespace, role.Namespace)
 			if len(tt.expectedPods) == 0 {
@@ -66,7 +61,7 @@ func TestRenderLoginRBAC(t *testing.T) {
 			require.Equal(t, naming.BuildRoleBindingLoginName(clusterName), binding.Name)
 			require.Equal(t, namespace, binding.Namespace)
 			require.Equal(t, []rbacv1.Subject{{
-				Kind: rbacv1.ServiceAccountKind, Name: account.Name, Namespace: namespace,
+				Kind: rbacv1.ServiceAccountKind, Name: "default", Namespace: namespace,
 			}}, binding.Subjects)
 			require.Equal(t, rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: role.Name}, binding.RoleRef)
 		})

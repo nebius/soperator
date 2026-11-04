@@ -3,7 +3,6 @@ package login
 import (
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -12,16 +11,6 @@ import (
 	"nebius.ai/slurm-operator/internal/render/common"
 	"nebius.ai/slurm-operator/internal/values"
 )
-
-func RenderServiceAccount(namespace, clusterName string) corev1.ServiceAccount {
-	return corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      naming.BuildServiceAccountLoginName(clusterName),
-			Namespace: namespace,
-			Labels:    common.RenderLabels(consts.ComponentTypeLogin, clusterName),
-		},
-	}
-}
 
 func RenderRole(namespace, clusterName string, login *values.SlurmLogin) rbacv1.Role {
 	role := rbacv1.Role{
@@ -62,7 +51,7 @@ func RenderRoleBinding(namespace, clusterName string) rbacv1.RoleBinding {
 		},
 		Subjects: []rbacv1.Subject{{
 			Kind:      rbacv1.ServiceAccountKind,
-			Name:      naming.BuildServiceAccountLoginName(clusterName),
+			Name:      "default",
 			Namespace: namespace,
 		}},
 		RoleRef: rbacv1.RoleRef{

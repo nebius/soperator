@@ -3,7 +3,9 @@ package loginupdatecontroller
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
@@ -37,16 +39,15 @@ const (
 // for an early replacement of a specific pod instance.
 type Reconciler struct {
 	client.Client
-	APIReader    client.Reader
 	Scheme       *runtime.Scheme
 	Recorder     events.EventRecorder
 	clock        clock.PassiveClock
 	requeueAfter time.Duration
 }
 
-func NewReconciler(c client.Client, reader client.Reader, scheme *runtime.Scheme, recorder events.EventRecorder, requeueAfter time.Duration) *Reconciler {
+func NewReconciler(c client.Client, scheme *runtime.Scheme, recorder events.EventRecorder, requeueAfter time.Duration) *Reconciler {
 	return &Reconciler{
-		Client: c, APIReader: reader, Scheme: scheme, Recorder: recorder,
+		Client: c, Scheme: scheme, Recorder: recorder,
 		clock: clock.RealClock{}, requeueAfter: requeueAfter,
 	}
 }
@@ -62,7 +63,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	logger.V(1).Info("Reconciling login pod updates")
 
 	sts := &kruisev1b1.StatefulSet{}
-	if err := r.APIReader.Get(ctx, req.NamespacedName, sts); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, sts); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	if !enabled(sts) || sts.DeletionTimestamp != nil {
@@ -71,7 +72,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 	cluster := &slurmv1.SlurmCluster{}
 	owner := metav1.GetControllerOf(sts)
-	if err := r.APIReader.Get(ctx, client.ObjectKey{Namespace: sts.Namespace, Name: owner.Name}, cluster); err != nil {
+	if err := r.Get(ctx, client.ObjectKey{Namespace: sts.Namespace, Name: owner.Name}, cluster); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	if !clusterEligible(sts, cluster) {
@@ -95,7 +96,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			}
 		}
 		if sts.Annotations[consts.AnnotationLoginUpdateInProgress] != "" {
-			return ctrl.Result{}, r.setActiveReplacement(ctx, sts, "")
+			return ctrl.Result{}, r.setActiveReplacement(ctx, sts, nil)
 		}
 		return ctrl.Result{}, nil
 	}
@@ -112,7 +113,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	replacementInProgress, err := r.reconcileActiveReplacement(ctx, sts, pods)
+	replacementInProgress, err := r.reconcileActiveReplacement(ctx, sts, pods, updatePlan.restartCandidates)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -146,6 +147,7 @@ func (r *Reconciler) reconcilePodSchedules(ctx context.Context, sts *kruisev1b1.
 	plan := podUpdatePlan{
 		waitingForReplacement: len(pods) < int(ptr.Deref(sts.Spec.Replicas, 0)),
 	}
+	activePodName, originalPodUID, _ := strings.Cut(sts.Annotations[consts.AnnotationLoginUpdateInProgress], "/")
 	for i := range pods {
 		pod := &pods[i]
 		if pod.DeletionTimestamp != nil {
@@ -159,7 +161,7 @@ func (r *Reconciler) reconcilePodSchedules(ctx context.Context, sts *kruisev1b1.
 			}
 			continue
 		}
-		if pod.Name == sts.Annotations[consts.AnnotationLoginUpdateInProgress] {
+		if pod.Name == activePodName && string(pod.UID) != originalPodUID {
 			continue
 		}
 		scheduledAt, err := r.ensureSchedule(ctx, pod, minNotice, schedule)
@@ -167,8 +169,9 @@ func (r *Reconciler) reconcilePodSchedules(ctx context.Context, sts *kruisev1b1.
 			return podUpdatePlan{}, err
 		}
 		earlyRestartRequested := pod.Annotations[consts.AnnotationLoginUpdateRequested] == string(pod.UID)
-		if earlyRestartRequested || !r.clock.Now().Before(scheduledAt) {
-			logger.V(1).Info("Login pod is eligible for replacement", "pod", pod.Name, "podUID", pod.UID, "earlyRestartRequested", earlyRestartRequested, "scheduledAt", scheduledAt.Format(time.RFC3339Nano))
+		ready := podReady(pod)
+		if !ready || earlyRestartRequested || !r.clock.Now().Before(scheduledAt) {
+			logger.V(1).Info("Login pod is eligible for replacement", "pod", pod.Name, "podUID", pod.UID, "ready", ready, "earlyRestartRequested", earlyRestartRequested, "scheduledAt", scheduledAt.Format(time.RFC3339Nano))
 			plan.restartCandidates = append(plan.restartCandidates, *pod)
 		} else {
 			logger.V(1).Info("Waiting for the login pod replacement time", "pod", pod.Name, "scheduledAt", scheduledAt.Format(time.RFC3339Nano))
@@ -192,14 +195,14 @@ func (r *Reconciler) replaceFirstEligiblePod(ctx context.Context, sts *kruisev1b
 		}
 		return candidates[i].Name < candidates[j].Name
 	})
-	if err := r.setActiveReplacement(ctx, sts, candidates[0].Name); err != nil {
+	if err := r.setActiveReplacement(ctx, sts, &candidates[0]); err != nil {
 		return err
 	}
 	return r.replace(ctx, sts, &candidates[0])
 }
 
-func (r *Reconciler) reconcileActiveReplacement(ctx context.Context, sts *kruisev1b1.StatefulSet, pods []corev1.Pod) (bool, error) {
-	podName := sts.Annotations[consts.AnnotationLoginUpdateInProgress]
+func (r *Reconciler) reconcileActiveReplacement(ctx context.Context, sts *kruisev1b1.StatefulSet, pods, restartCandidates []corev1.Pod) (bool, error) {
+	podName, originalPodUID, _ := strings.Cut(sts.Annotations[consts.AnnotationLoginUpdateInProgress], "/")
 	if podName == "" {
 		return false, nil
 	}
@@ -213,6 +216,12 @@ func (r *Reconciler) reconcileActiveReplacement(ctx context.Context, sts *kruise
 			logger.V(1).Info("Waiting for the active login pod to terminate")
 			return true, nil
 		}
+		if string(pod.UID) == originalPodUID && !slices.ContainsFunc(restartCandidates, func(candidate corev1.Pod) bool {
+			return candidate.UID == pod.UID
+		}) {
+			logger.V(1).Info("Clearing active replacement because the original login pod is no longer eligible for restart")
+			return false, r.setActiveReplacement(ctx, sts, nil)
+		}
 		if pod.Labels[appsv1.StatefulSetRevisionLabel] != sts.Status.UpdateRevision {
 			if !allReadyOrBroken(ctx, sts, pods) {
 				return true, nil
@@ -225,7 +234,7 @@ func (r *Reconciler) reconcileActiveReplacement(ctx context.Context, sts *kruise
 			return true, nil
 		}
 		logger.Info("Completed the active login pod replacement")
-		return false, r.setActiveReplacement(ctx, sts, "")
+		return false, r.setActiveReplacement(ctx, sts, nil)
 	}
 	for ordinal := range ptr.Deref(sts.Spec.Replicas, 0) {
 		if podName == fmt.Sprintf("%s-%d", sts.Name, ordinal) {
@@ -234,18 +243,18 @@ func (r *Reconciler) reconcileActiveReplacement(ctx context.Context, sts *kruise
 		}
 	}
 	logger.Info("Clearing the active login pod replacement after scale-down")
-	return false, r.setActiveReplacement(ctx, sts, "")
+	return false, r.setActiveReplacement(ctx, sts, nil)
 }
 
-func (r *Reconciler) setActiveReplacement(ctx context.Context, sts *kruisev1b1.StatefulSet, podName string) error {
+func (r *Reconciler) setActiveReplacement(ctx context.Context, sts *kruisev1b1.StatefulSet, pod *corev1.Pod) error {
 	base := sts.DeepCopy()
-	if podName == "" {
+	if pod == nil {
 		delete(sts.Annotations, consts.AnnotationLoginUpdateInProgress)
 	} else {
 		if sts.Annotations == nil {
 			sts.Annotations = make(map[string]string)
 		}
-		sts.Annotations[consts.AnnotationLoginUpdateInProgress] = podName
+		sts.Annotations[consts.AnnotationLoginUpdateInProgress] = pod.Name + "/" + string(pod.UID)
 	}
 	if err := r.Patch(ctx, sts, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{})); err != nil {
 		return fmt.Errorf("persist active login pod replacement: %w", err)
@@ -279,7 +288,7 @@ func (r *Reconciler) pods(ctx context.Context, sts *kruisev1b1.StatefulSet) ([]c
 		return nil, fmt.Errorf("parse login pod selector: %w", err)
 	}
 	list := &corev1.PodList{}
-	if err := r.APIReader.List(ctx, list, client.InNamespace(sts.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
+	if err := r.List(ctx, list, client.InNamespace(sts.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
 		return nil, fmt.Errorf("list login pods: %w", err)
 	}
 	var pods []corev1.Pod
@@ -351,8 +360,9 @@ func (r *Reconciler) clearSchedule(ctx context.Context, pod *corev1.Pod) error {
 
 func allReadyOrBroken(ctx context.Context, sts *kruisev1b1.StatefulSet, pods []corev1.Pod) bool {
 	logger := log.FromContext(ctx)
-	if len(pods) != int(*sts.Spec.Replicas) {
-		logger.V(1).Info("Waiting for the desired number of login pods before replacement", "desiredReplicas", *sts.Spec.Replicas, "observedPods", len(pods))
+	desiredReplicas := ptr.Deref(sts.Spec.Replicas, 0)
+	if len(pods) != int(desiredReplicas) {
+		logger.V(1).Info("Waiting for the desired number of login pods before replacement", "desiredReplicas", desiredReplicas, "observedPods", len(pods))
 		return false
 	}
 	for _, pod := range pods {
@@ -422,7 +432,9 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int, cach
 			sts, ok := obj.(*kruisev1b1.StatefulSet)
 			return ok && enabled(sts)
 		}))).
-		Owns(&corev1.Pod{}).
+		Owns(&corev1.Pod{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+			return obj.GetLabels()[consts.LabelComponentKey] == consts.ComponentTypeLogin.String()
+		}))).
 		Watches(&slurmv1.SlurmCluster{}, handler.EnqueueRequestsFromMapFunc(r.clusterRequests), builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Named(ControllerName).
 		WithOptions(controllerconfig.ControllerOptions(maxConcurrency, cacheSyncTimeout)).

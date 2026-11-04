@@ -331,7 +331,7 @@ func TestRenderStatefulSetUpdateStrategy(t *testing.T) {
 					login, replicas,
 				)
 				if tt.wantError {
-					require.ErrorContains(t, err, "unsupported login update strategy")
+					require.ErrorContains(t, err, "configure login update strategy: unsupported value")
 					continue
 				}
 				require.NoError(t, err)

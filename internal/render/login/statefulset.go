@@ -94,14 +94,12 @@ func RenderStatefulSet(
 					Annotations: renderPodAnnotations(),
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName:           naming.BuildServiceAccountLoginName(clusterName),
-					AutomountServiceAccountToken: ptr.To(false),
-					HostUsers:                    login.HostUsers,
-					ImagePullSecrets:             login.ContainerSshd.ImagePullSecrets,
-					Affinity:                     nodeFilter.Affinity,
-					NodeSelector:                 nodeFilter.NodeSelector,
-					Tolerations:                  nodeFilter.Tolerations,
-					InitContainers:               initContainers,
+					HostUsers:        login.HostUsers,
+					ImagePullSecrets: login.ContainerSshd.ImagePullSecrets,
+					Affinity:         nodeFilter.Affinity,
+					NodeSelector:     nodeFilter.NodeSelector,
+					Tolerations:      nodeFilter.Tolerations,
+					InitContainers:   initContainers,
 					Containers: []corev1.Container{
 						renderContainerSshd(
 							clusterWithGPU,
@@ -157,6 +155,6 @@ func renderUpdateStrategy(login *values.SlurmLogin) (kruisev1b1.StatefulSetUpdat
 			},
 		}, nil
 	default:
-		return kruisev1b1.StatefulSetUpdateStrategy{}, fmt.Errorf("unsupported login update strategy %q", login.UpdateStrategy)
+		return kruisev1b1.StatefulSetUpdateStrategy{}, fmt.Errorf("configure login update strategy: unsupported value %q", login.UpdateStrategy)
 	}
 }

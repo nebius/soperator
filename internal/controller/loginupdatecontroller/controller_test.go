@@ -126,7 +126,7 @@ func TestReconcilePersistsNoticeAcrossRevisionChangesAndControllerRestarts(t *te
 		assert.Equal(t, "2026-11-14T12:00:00Z", current.Annotations[consts.AnnotationLoginUpdateScheduledAt])
 	}
 
-	restarted := NewReconciler(r.Client, r.Client, r.Scheme, events.NewFakeRecorder(20), r.requeueAfter)
+	restarted := NewReconciler(r.Client, r.Scheme, events.NewFakeRecorder(20), r.requeueAfter)
 	restarted.clock = clocktesting.NewFakeClock(testNoticeTime.Add(30 * 24 * time.Hour))
 	reconcileLogin(t, restarted, sts)
 	assert.Equal(t, 1, loginPodCount(t, restarted.Client))
@@ -309,7 +309,7 @@ func TestReconcileKeepsActivePodAcrossRevisionChangesAndControllerRestarts(t *te
 			currentSTS.Status.UpdateRevision = "newer-revision"
 			require.NoError(t, r.Status().Update(t.Context(), currentSTS))
 
-			restarted := NewReconciler(r.Client, r.APIReader, r.Scheme, events.NewFakeRecorder(20), r.requeueAfter)
+			restarted := NewReconciler(r.Client, r.Scheme, events.NewFakeRecorder(20), r.requeueAfter)
 			restarted.clock = r.clock
 			reconcileLogin(t, restarted, sts)
 			require.True(t, apierrors.IsNotFound(restarted.Get(t.Context(), client.ObjectKeyFromObject(replacement), &corev1.Pod{})), "retry login-0 immediately without another notice period")
@@ -434,57 +434,55 @@ func TestReconcileCanRestartSingleLoginPod(t *testing.T) {
 	}
 }
 
-func TestReconcilePrioritizesBrokenEligiblePod(t *testing.T) {
+func TestReconcilePrioritizesBrokenPodOverDueHealthyPod(t *testing.T) {
 	r, sts, pods := testLoginReconciler(t, func(_ *kruisev1b1.StatefulSet, pods []*corev1.Pod) []*corev1.Pod {
 		pods[1].Status.Conditions[0].Status = corev1.ConditionFalse
 		return pods
 	})
-	for _, pod := range pods {
-		pod.Annotations = map[string]string{consts.AnnotationLoginUpdateRequested: string(pod.UID)}
-		require.NoError(t, r.Update(t.Context(), pod))
+	pods[0].Annotations = map[string]string{
+		consts.AnnotationLoginUpdateAnnouncedAt: testNoticeTime.Add(-30 * 24 * time.Hour).Format(time.RFC3339Nano),
+		consts.AnnotationLoginUpdateScheduledAt: testNoticeTime.Format(time.RFC3339Nano),
 	}
+	require.NoError(t, r.Update(t.Context(), pods[0]))
 	result, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)})
 	require.NoError(t, err)
 	assert.Equal(t, DefaultRequeueAfter, result.RequeueAfter)
 	assert.Equal(t, 1, loginPodCount(t, r.Client))
 	require.NoError(t, r.Get(t.Context(), client.ObjectKeyFromObject(pods[0]), &corev1.Pod{}))
-	assert.True(t, apierrors.IsNotFound(r.Get(t.Context(), client.ObjectKeyFromObject(pods[1]), &corev1.Pod{})), "broken login-1 must precede healthy login-0")
+	assert.True(t, apierrors.IsNotFound(r.Get(t.Context(), client.ObjectKeyFromObject(pods[1]), &corev1.Pod{})), "repair broken login-1 before replacing the last Ready login, even though login-1's notice has not expired")
 }
 
-func TestBrokenPodsStillRequireDeadlineOrEarlyRequest(t *testing.T) {
-	for _, earlyRequest := range []bool{false, true} {
-		t.Run(fmt.Sprintf("early request %t", earlyRequest), func(t *testing.T) {
-			r, sts, pods := testLoginReconciler(t, func(_ *kruisev1b1.StatefulSet, pods []*corev1.Pod) []*corev1.Pod {
-				pods[0].Status.Phase = corev1.PodFailed
-				pods[1].Status.Phase = corev1.PodPending
-				for _, pod := range pods {
-					pod.Status.Conditions[0].Status = corev1.ConditionFalse
-				}
-				return pods
-			})
-			cluster := getLoginCluster(t, r.Client)
-			cluster.Spec.SlurmNodes.Login.UpdatePolicy = &slurmv1.LoginUpdatePolicy{MinNotice: &metav1.Duration{Duration: time.Hour}}
-			require.NoError(t, r.Update(t.Context(), cluster))
-			result, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)})
-			require.NoError(t, err)
-			assert.Equal(t, time.Hour, result.RequeueAfter)
-			assert.Equal(t, 2, loginPodCount(t, r.Client))
-			deleted := pods[0]
-			if earlyRequest {
-				requested := getLoginPod(t, r.Client, pods[1])
-				requested.Annotations[consts.AnnotationLoginUpdateRequested] = string(requested.UID)
-				require.NoError(t, r.Update(t.Context(), requested))
-				deleted = pods[1]
-			} else {
-				r.clock = clocktesting.NewFakeClock(testNoticeTime.Add(time.Hour))
-			}
-			result, err = r.Reconcile(t.Context(), ctrl.Request{NamespacedName: client.ObjectKeyFromObject(sts)})
-			require.NoError(t, err)
-			assert.Equal(t, DefaultRequeueAfter, result.RequeueAfter)
-			assert.Equal(t, 1, loginPodCount(t, r.Client))
-			assert.True(t, apierrors.IsNotFound(r.Get(t.Context(), client.ObjectKeyFromObject(deleted), &corev1.Pod{})))
-		})
-	}
+func TestReconcileRepairsBrokenPodsWithoutWaitingForNotice(t *testing.T) {
+	r, sts, pods := testLoginReconciler(t, func(_ *kruisev1b1.StatefulSet, pods []*corev1.Pod) []*corev1.Pod {
+		pods[0].Status.Phase = corev1.PodFailed
+		pods[1].Status.Phase = corev1.PodPending
+		for _, pod := range pods {
+			pod.Status.Conditions[0].Status = corev1.ConditionFalse
+		}
+		return pods
+	})
+	cluster := getLoginCluster(t, r.Client)
+	cluster.Spec.SlurmNodes.Login.UpdatePolicy = testClusterPolicy(30*24*time.Hour, "0 0 1 * *")
+	require.NoError(t, r.Update(t.Context(), cluster))
+	reconcileLogin(t, r, sts)
+	assert.True(t, apierrors.IsNotFound(r.Get(t.Context(), client.ObjectKeyFromObject(pods[0]), &corev1.Pod{})), "repair immediately without waiting for notice or cron")
+	require.NoError(t, r.Get(t.Context(), client.ObjectKeyFromObject(pods[1]), &corev1.Pod{}))
+	reconcileLogin(t, r, sts)
+	assert.Equal(t, 1, loginPodCount(t, r.Client), "wait for the first replacement")
+
+	replacement := testLoginPod(sts, 0)
+	replacement.UID = "login-0-replacement"
+	replacement.Labels[appsv1.StatefulSetRevisionLabel] = sts.Status.UpdateRevision
+	replacement.Status.Conditions[0].Status = corev1.ConditionFalse
+	require.NoError(t, r.Create(t.Context(), replacement))
+	reconcileLogin(t, r, sts)
+	assert.Equal(t, 2, loginPodCount(t, r.Client), "wait for the replacement to become Ready")
+	replacement = getLoginPod(t, r.Client, replacement)
+	replacement.Status.Conditions[0].Status = corev1.ConditionTrue
+	require.NoError(t, r.Status().Update(t.Context(), replacement))
+	reconcileLogin(t, r, sts)
+	assert.True(t, apierrors.IsNotFound(r.Get(t.Context(), client.ObjectKeyFromObject(pods[1]), &corev1.Pod{})), "continue repairing the next broken login without waiting for its notice")
+	require.NoError(t, r.Get(t.Context(), client.ObjectKeyFromObject(replacement), &corev1.Pod{}))
 }
 
 func TestReconcileDoesNotActWithoutObservedTargetRevision(t *testing.T) {
@@ -612,7 +610,7 @@ func TestReconcileDeletesWithPodIdentityAndVersionPreconditions(t *testing.T) {
 
 func TestReconcileUsesIndependentClusterPolicies(t *testing.T) {
 	r, sts, pods := testLoginReconciler(t)
-	r = NewReconciler(r.Client, r.APIReader, r.Scheme, r.Recorder, 7*time.Second)
+	r = NewReconciler(r.Client, r.Scheme, r.Recorder, 7*time.Second)
 	r.clock = clocktesting.NewFakeClock(testNoticeTime)
 	cluster := getLoginCluster(t, r.Client)
 	cluster.Spec.SlurmNodes.Login.UpdatePolicy = testClusterPolicy(24*time.Hour, "0 3 * * *")
@@ -1056,7 +1054,7 @@ func testLoginReconciler(t *testing.T, changes ...func(*kruisev1b1.StatefulSet, 
 		objects = append(objects, pod)
 	}
 	kubeClient := clientfake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(sts, &corev1.Pod{}).WithObjects(objects...).Build()
-	r := NewReconciler(kubeClient, kubeClient, scheme, events.NewFakeRecorder(20), DefaultRequeueAfter)
+	r := NewReconciler(kubeClient, scheme, events.NewFakeRecorder(20), DefaultRequeueAfter)
 	r.clock = clocktesting.NewFakeClock(testNoticeTime)
 	return r, sts, pods
 }
