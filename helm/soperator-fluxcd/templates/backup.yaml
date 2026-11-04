@@ -38,10 +38,14 @@ spec:
   {{- if .Values.backup.overrideValues }}
     {{- toYaml .Values.backup.overrideValues | nindent 4 }}
   {{- else }}
+    image:
+      registry: cr.nebius.cloud
+      repository: soperator/k8up
+      tag: v2.14.0-ca-fix
     k8up:
       backupImage:
-        repository: cr.nebius.cloud/soperator-proxy-ghcr-io/k8up-io/k8up
-        tag: v2.13.1
+        repository: cr.nebius.cloud/soperator/k8up
+        tag: v2.13.1-ca-fix
       skipWithoutAnnotation: true
     {{- if .Values.observability.prometheusOperator.enabled }}
       metrics:
