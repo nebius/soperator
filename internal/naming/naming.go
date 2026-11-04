@@ -258,6 +258,14 @@ func BuildRoleBindingNodeSetName(clusterName, nodeSetName string) string {
 	return fmt.Sprintf("%s-%s-nodeset-role-binding", clusterName, nodeSetName)
 }
 
+func BuildRoleLoginName(clusterName string) string {
+	return clusterName + "-login-role"
+}
+
+func BuildRoleBindingLoginName(clusterName string) string {
+	return clusterName + "-login-role-binding"
+}
+
 func BuildServiceAccountActiveCheckName(clusterName string) string {
 	return clusterName + "-activecheck-sa"
 }

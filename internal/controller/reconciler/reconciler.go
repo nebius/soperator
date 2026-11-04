@@ -143,6 +143,12 @@ func (r Reconciler) EnsureUpdated(
 		desired.SetResourceVersion(existing.GetResourceVersion())
 		desired.SetUID(existing.GetUID())
 
+		// Preserve annotations owned by other controllers, as the patch path does.
+		annotations := make(map[string]string)
+		maps.Copy(annotations, existing.GetAnnotations())
+		maps.Copy(annotations, desired.GetAnnotations())
+		desired.SetAnnotations(annotations)
+
 		if err = r.Update(ctx, desired); err != nil {
 			logger.Error(err, "Failed to update resource")
 			return fmt.Errorf("updating resource: %w", err)
