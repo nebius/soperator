@@ -152,9 +152,23 @@ func CheckCapacity(ctx context.Context, profile Profile) error {
 		_ = sdk.Close()
 	}()
 
+	return checkCapacity(profile, demands, func(key affinityKey) (cbgAvailability, error) {
+		res, err := capacityFor(ctx, sdk, profile, key)
+		if err == nil && res.available < demands[key].requiredGPUs {
+			printResourceDetails(ctx, sdk, res.cbg)
+		}
+		return res, err
+	})
+}
+
+func checkCapacity(
+	profile Profile,
+	demands map[affinityKey]affinityDemand,
+	lookup func(affinityKey) (cbgAvailability, error),
+) error {
 	var insufficient bool
 	for key, d := range demands {
-		res, err := capacityFor(ctx, sdk, profile, key)
+		res, err := lookup(key)
 		if errors.Is(err, errNoCapacityBlockGroup) {
 			log.Printf("CBG platform=%s fabric=%s: nodesets=%v required=%d — no capacity block group found",
 				key.Platform, key.Fabric, d.nodesetNames, d.requiredGPUs)
@@ -172,7 +186,6 @@ func CheckCapacity(ctx context.Context, profile Profile) error {
 			log.Printf("CBG platform=%s fabric=%s: INSUFFICIENT CAPACITY — need %d GPUs but only %d available",
 				key.Platform, key.Fabric, d.requiredGPUs, res.available)
 			insufficient = true
-			printResourceDetails(ctx, sdk, res.cbg)
 		}
 	}
 
