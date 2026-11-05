@@ -15,7 +15,7 @@ helmRelease:
   timeout: 5m
   chart:
     name: helm-soperator-fluxcd
-    version: "4.1.18"
+    version: "4.1.17"
     interval: 5m
   # This release renders nothing but the HelmReleases of the Soperator stack.
   # helm-controller v1.5 (Flux v2.8) assesses readiness with kstatus, which waits
