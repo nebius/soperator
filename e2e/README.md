@@ -434,9 +434,21 @@ Scenario-specific restoration, including long replacement operations, happens
 before this verification. Finalization preserves context values and runs even
 after scenario cancellation. Repeated finalization returns its original result.
 
-Within an opted-in scope, `SubmitBatch` requires an explicit owned nodelist,
-fixes the job's node count to it, and tracks the job ID. `ExtraFlags` must not
-override placement. Register indirectly launched jobs with `TrackReservedJob`.
+Within an opted-in scope, `SubmitBatch` requires an explicit, unique owned
+nodelist and fixes the job's node count to it. It rejects placement overrides
+in `ExtraFlags`, including node and cluster options and their abbreviations.
+Scoped extra flags are individual quoted arguments; pass short options and
+their values separately, without option bundles. Option terminators and
+heterogeneous-job separators are also rejected. Outside a scope, extra flags
+retain their existing verbatim shell behavior.
+
+Submission tracks a valid job ID even when execution reports an error, so
+finalization can cancel the job before releasing workers. If submission may
+have succeeded without a recoverable ID, including an incomplete response,
+the allocation is quarantined. A numeric prefix from a truncated response is
+not a reliable job ID. Proven pre-execution connection failures remain safe to
+retry without quarantine. An uncertain submission is never retried, and its
+original error is preserved. Register indirectly launched jobs with `TrackReservedJob`.
 Pin raw `srun` commands and clean up unmanaged workloads in the scenario; even
 short smoke jobs can outlive their command through Slurm's epilog. Use
 `RequireReservedHost` before host-wide disruption to check sibling workers too.

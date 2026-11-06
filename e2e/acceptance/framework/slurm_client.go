@@ -2,7 +2,9 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -35,7 +37,7 @@ type SbatchOptions struct {
 	Nodelist     []string // --nodelist (omitted if empty)
 	GPUsPerNode  int      // --gpus-per-node (omitted if 0)
 	TasksPerNode int      // --ntasks-per-node (omitted if 0)
-	ExtraFlags   []string // verbatim flags appended before --wrap
+	ExtraFlags   []string // verbatim outside ownership scopes; individual quoted arguments inside them
 	Wrap         string   // --wrap body
 	RunAsUser    string   // submit through sudo -iu (omitted if empty)
 	OutputDir    string   // explicit output directory; defaults to scenario artifacts, then AcceptanceJobOutputDir
@@ -64,11 +66,22 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	if err := requireReservedWorkers(ctx, opts.Nodelist); err != nil {
 		return SbatchJob{}, fmt.Errorf("submit reserved job: %w", err)
 	}
-	if workerReservationFromContext(ctx) != nil {
+	scoped := workerReservationFromContext(ctx) != nil
+	if scoped {
+		seen := make(map[string]bool, len(opts.Nodelist))
+		for _, name := range opts.Nodelist {
+			if seen[name] {
+				return SbatchJob{}, fmt.Errorf("submit reserved job: duplicate worker %q in nodelist", name)
+			}
+			seen[name] = true
+		}
 		if opts.Nodes != 0 && opts.Nodes != len(opts.Nodelist) {
 			return SbatchJob{}, fmt.Errorf("submit reserved job: node count must match the nodelist")
 		}
 		opts.Nodes = len(opts.Nodelist)
+		if err := validateReservedBatchFlags(opts.ExtraFlags); err != nil {
+			return SbatchJob{}, err
+		}
 	}
 	jobName := strings.TrimSpace(opts.JobName)
 	if jobName == "" {
@@ -106,6 +119,9 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 		args = append(args, fmt.Sprintf("--ntasks-per-node=%d", opts.TasksPerNode))
 	}
 	for _, flag := range opts.ExtraFlags {
+		if scoped {
+			flag = ShellQuote(flag)
+		}
 		args = append(args, flag)
 	}
 	args = append(args, fmt.Sprintf("--wrap=%s", ShellQuote(opts.Wrap)))
@@ -119,29 +135,77 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	}
 	command := mkdirCommand + " && " + sbatchCommand
 
-	out, err := retryIf(
+	var jobID string
+	var parseErr error
+	_, err := retryIf(
 		ctx,
 		submitBatchRetryAttempts,
 		s.submitRetryDelay,
 		isRetryableSbatchPreExecutionError,
 		func(attemptCtx context.Context) (string, error) {
-			return s.runtime.Jail().Run(attemptCtx, command)
+			out, runErr := s.runtime.Jail().Run(attemptCtx, command)
+			jobID, parseErr = ParseSbatchJobID(out)
+			if scoped {
+				if runErr != nil && !strings.Contains(out, "\n") {
+					// A numeric prefix of a truncated response can name another job.
+					parseErr = fmt.Errorf("read complete sbatch job id: response ended before a newline")
+				}
+				if parseErr == nil {
+					id, idErr := strconv.ParseUint(jobID, 10, 64)
+					if idErr != nil || id == 0 || jobID[0] < '0' || jobID[0] > '9' {
+						parseErr = fmt.Errorf("parse sbatch job id: expected a positive integer, got %q", jobID)
+					}
+				}
+				if parseErr == nil {
+					TrackReservedJob(ctx, jobID)
+				} else if !isRetryableSbatchPreExecutionError(out, runErr) {
+					// Record uncertainty per attempt: cancellation during retry backoff
+					// must not turn a proven pre-execution failure into a quarantine.
+					RecordWorkerCleanupError(ctx, fmt.Errorf("verify sbatch submission %q before releasing workers: job id is unknown: %w", jobName, errors.Join(parseErr, runErr)))
+				}
+			}
+			return out, runErr
 		},
 	)
 	if err != nil {
 		return SbatchJob{}, fmt.Errorf("submit sbatch job %q: %w", jobName, err)
 	}
-	jobID, err := ParseSbatchJobID(out)
-	if err != nil {
-		return SbatchJob{}, fmt.Errorf("parse sbatch job id for %q: %w", jobName, err)
+	if parseErr != nil {
+		return SbatchJob{}, fmt.Errorf("parse sbatch job id for %q: %w", jobName, parseErr)
 	}
-	TrackReservedJob(ctx, jobID)
 	return SbatchJob{
 		ID:         jobID,
 		JobName:    jobName,
 		StdoutPath: fmt.Sprintf("%s/%s-%s.out", outputDir, jobName, jobID),
 		StderrPath: fmt.Sprintf("%s/%s-%s.err", outputDir, jobName, jobID),
 	}, nil
+}
+
+// Scoped extra flags are argv entries, never shell fragments. Reject placement
+// changes and alternate option boundaries; require separate short options and
+// values so a bundle cannot hide -w, -N or -M behind another short option.
+func validateReservedBatchFlags(flags []string) error {
+	for _, flag := range flags {
+		if flag == ":" || flag == "--" {
+			return fmt.Errorf("submit reserved job: extra argument %q changes option boundaries", flag)
+		}
+		if strings.HasPrefix(flag, "--") {
+			name, _, _ := strings.Cut(strings.Fields(flag)[0], "=")
+			for _, placement := range []string{"--nodelist", "--nodes", "--clusters", "--cluster-constraint"} {
+				if strings.HasPrefix(placement, name) {
+					return fmt.Errorf("submit reserved job: extra flag %q overrides reserved placement", flag)
+				}
+			}
+		} else if strings.HasPrefix(flag, "-") && flag != "-" {
+			if strings.ContainsAny(flag[1:], "wNM") {
+				return fmt.Errorf("submit reserved job: extra flag %q overrides reserved placement", flag)
+			}
+			if len(flag) != 2 {
+				return fmt.Errorf("submit reserved job: separate short options and values in extra flag %q", flag)
+			}
+		}
+	}
+	return nil
 }
 
 // isRetryableSbatchPreExecutionError recognizes failures that kubectl reports
