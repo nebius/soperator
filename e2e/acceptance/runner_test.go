@@ -279,6 +279,61 @@ func TestNewRunnerRequiresTargetSoperatorVersion(t *testing.T) {
 	assert.ErrorContains(t, err, "target Soperator version is required")
 }
 
+func TestNewRunnerDefaultsToSharedRuntime(t *testing.T) {
+	runner, err := NewRunner(RunnerConfig{
+		KubectlContext:         " dev-context ",
+		TargetSoperatorVersion: testTargetSoperatorVersion,
+		Suites:                 []SuiteConfig{testSampleSuite()},
+	})
+	require.NoError(t, err)
+	require.IsType(t, &world{}, runner.runtime)
+	runtime := runner.runtime.(*world)
+	assert.Equal(t, "dev-context", runtime.kubectlContext)
+	assert.Equal(t, defaultSlurmClusterName, runtime.slurmClusterName)
+}
+
+func TestRunnerUsesConfiguredRuntimeForScenarioCommands(t *testing.T) {
+	var calls [][]string
+	runtime := &runnerTestRuntime{
+		Runtime: NewRuntime("dev-context", "soperator"),
+		local: framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
+			calls = append(calls, args)
+			return "caller runtime", nil
+		}),
+	}
+	runner, err := NewRunner(RunnerConfig{
+		KubectlContext:         "dev-context",
+		TargetSoperatorVersion: testTargetSoperatorVersion,
+		Runtime:                runtime,
+		Suites: []SuiteConfig{{
+			Name:   "custom-runtime",
+			Source: testRunnableFeatureSource("features/runtime.feature", "the caller runtime executes a command"),
+			StepRegistrars: []StepRegistrar{func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, runtime framework.Runtime) {
+				sc.Step(`^the caller runtime executes a command$`, func(ctx context.Context) error {
+					output, err := runtime.Local().Run(ctx, "nebius", "mk8s", "node-group", "get", "--id", "test-group")
+					if err != nil {
+						return err
+					}
+					assert.Equal(t, "caller runtime", output)
+					return nil
+				})
+			}},
+		}},
+	})
+	require.NoError(t, err)
+	require.NoError(t, runner.Run(t.Context()))
+	assert.Equal(t, [][]string{{"nebius", "mk8s", "node-group", "get", "--id", "test-group"}}, calls)
+}
+
+type runnerTestRuntime struct {
+	framework.Runtime
+	local framework.ArgsScope
+}
+
+func (r *runnerTestRuntime) Local() framework.ArgsScope {
+	return r.local
+}
+
 func TestRunnerRunConfiguredSuitesRunsAllSuitesAndAggregatesFailures(t *testing.T) {
 	var passingRuns int
 	runner, err := NewRunner(RunnerConfig{
