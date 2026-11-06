@@ -38,7 +38,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "Rollout overview",
+      "title": "Nodeset rollouts",
       "type": "row",
       "gridPos": {
         "x": 0,
@@ -1429,12 +1429,866 @@
       }
     },
     {
-      "id": 11,
-      "title": "Controller runtime · process scope",
+      "id": 20,
+      "title": "Login rollouts",
       "type": "row",
       "gridPos": {
         "x": 0,
         "y": 39,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 21,
+      "title": "Active login rollouts",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 6,
+        "h": 4
+      },
+      "description": "SlurmClusters with incomplete delayed login revision updates, readiness, or an active replacement. Duplicate scrape targets are reduced by the full SlurmCluster identity.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "blue",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(max by (cluster, resource_namespace, slurm_cluster) (soperator_login_rollout_active{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\"}))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 22,
+      "title": "Outdated login pods",
+      "type": "stat",
+      "gridPos": {
+        "x": 6,
+        "y": 40,
+        "w": 6,
+        "h": 4
+      },
+      "description": "Observed login pods outside the target revision. Deleted pods disappear before their replacements become Ready; zero backlog alone does not imply rollout completion.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "blue",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(max by (cluster, resource_namespace, slurm_cluster) (soperator_login_rollout_outdated_pods{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\"}))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 23,
+      "title": "Waiting for readiness or errors",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 6,
+        "h": 4
+      },
+      "description": "SlurmClusters waiting for login pods to become Ready, a target revision to be observed, or recovery from a reconciliation error. Waiting for the notice period is excluded.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "blue",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(max by (cluster, resource_namespace, slurm_cluster) (soperator_login_rollout_waiting{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", reason=~\"pods_not_ready|target_revision_pending|reconcile_error\"}))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 24,
+      "title": "Next scheduled login restart",
+      "type": "stat",
+      "gridPos": {
+        "x": 18,
+        "y": 40,
+        "w": 6,
+        "h": 4
+      },
+      "description": "Earliest persisted restart time, including overdue schedules. Replacements proceed one at a time after readiness checks; unhealthy pods and early restart requests may be handled sooner. No data means no persisted schedule is reported.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "blue",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "dateTimeAsIso"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "1000 * min(max by (cluster, resource_namespace, slurm_cluster) (soperator_login_rollout_next_restart_timestamp_seconds{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\"}) > 0)",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 25,
+      "title": "Login rollout progress by SlurmCluster",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 24,
+        "h": 9
+      },
+      "description": "One row per physical cluster / resource namespace / SlurmCluster. The NodeSet filter applies only to workers. The scheduled time is the earliest persisted login pod deadline, not a guaranteed restart time; replacements remain sequential, while unhealthy pods and early requests may restart sooner. A blank scheduled time means no persisted schedule is reported. Duplicate scrape targets are collapsed before joining on the full resource identity.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Active"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "No",
+                        "color": "green"
+                      },
+                      "1": {
+                        "text": "Yes",
+                        "color": "blue"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Waiting for"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "No wait",
+                        "color": "green"
+                      },
+                      "1": {
+                        "text": "Notice period",
+                        "color": "blue"
+                      },
+                      "2": {
+                        "text": "Pods not Ready",
+                        "color": "orange"
+                      },
+                      "3": {
+                        "text": "Target revision pending",
+                        "color": "orange"
+                      },
+                      "4": {
+                        "text": "Reconcile error",
+                        "color": "red"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Next scheduled restart"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (rollout) (label_join((max by (cluster, resource_namespace, slurm_cluster) (soperator_login_rollout_active{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\"})), \"rollout\", \"/\", \"cluster\", \"resource_namespace\", \"slurm_cluster\"))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "A",
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (rollout) (label_join((max by (cluster, resource_namespace, slurm_cluster) (soperator_login_rollout_outdated_pods{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\"})), \"rollout\", \"/\", \"cluster\", \"resource_namespace\", \"slurm_cluster\"))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "B",
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (rollout) (label_join((max by (cluster, resource_namespace, slurm_cluster) ((1 * max by (cluster, resource_namespace, slurm_cluster, reason) (soperator_login_rollout_waiting{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", reason=\"notice_period\"})) or (2 * max by (cluster, resource_namespace, slurm_cluster, reason) (soperator_login_rollout_waiting{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", reason=\"pods_not_ready\"})) or (3 * max by (cluster, resource_namespace, slurm_cluster, reason) (soperator_login_rollout_waiting{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", reason=\"target_revision_pending\"})) or (4 * max by (cluster, resource_namespace, slurm_cluster, reason) (soperator_login_rollout_waiting{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", reason=\"reconcile_error\"})))), \"rollout\", \"/\", \"cluster\", \"resource_namespace\", \"slurm_cluster\"))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "C",
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (rollout) (label_join((1000 * (max by (cluster, resource_namespace, slurm_cluster) (soperator_login_rollout_next_restart_timestamp_seconds{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\"}) > 0)), \"rollout\", \"/\", \"cluster\", \"resource_namespace\", \"slurm_cluster\"))",
+          "instant": true,
+          "range": false,
+          "legendFormat": "",
+          "refId": "D",
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "rollout",
+            "mode": "outerTabular"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "rollout",
+                "Value #A",
+                "Value #B",
+                "Value #C",
+                "Value #D"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "rollout": 0,
+              "Value #A": 1,
+              "Value #B": 2,
+              "Value #C": 3,
+              "Value #D": 4
+            },
+            "renameByName": {
+              "rollout": "Cluster / namespace / SlurmCluster",
+              "Value #A": "Active",
+              "Value #B": "Outdated pods",
+              "Value #C": "Waiting for",
+              "Value #D": "Next scheduled restart"
+            }
+          }
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Cluster / namespace / SlurmCluster",
+            "desc": false
+          }
+        ],
+        "footer": {
+          "show": false,
+          "enablePagination": true
+        }
+      }
+    },
+    {
+      "id": 26,
+      "title": "Login rollout state by pod",
+      "type": "state-timeline",
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 24,
+        "h": 8
+      },
+      "description": "One timeline per login host: notice, restart eligibility, replacement, and readiness at the target revision. A replacement keeps the same host name, so its history remains on one row.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Ready at target revision",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "Notice period",
+                  "color": "blue"
+                },
+                "2": {
+                  "text": "Eligible for restart",
+                  "color": "yellow"
+                },
+                "3": {
+                  "text": "Replacement in progress",
+                  "color": "purple"
+                },
+                "4": {
+                  "text": "Pod not Ready",
+                  "color": "orange"
+                },
+                "5": {
+                  "text": "Awaiting revision or schedule",
+                  "color": "gray"
+                }
+              }
+            }
+          ],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 85,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (cluster, resource_namespace, slurm_cluster, login_pod) (soperator_login_rollout_pod_state{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\"})",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{cluster}} / {{resource_namespace}} / {{slurm_cluster}} / {{login_pod}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "alignValue": "left",
+        "mergeValues": true,
+        "perPage": 20,
+        "rowHeight": 0.85,
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 27,
+      "title": "Outdated login pods over time",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 61,
+        "w": 12,
+        "h": 8
+      },
+      "description": "Outdated login pod counts per SlurmCluster. The per-pod timeline shows whether replacements have become Ready after the count falls.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (cluster, resource_namespace, slurm_cluster) (soperator_login_rollout_outdated_pods{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\"})",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{cluster}} / {{resource_namespace}} / {{slurm_cluster}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 28,
+      "title": "Login controller wait reason",
+      "type": "state-timeline",
+      "gridPos": {
+        "x": 12,
+        "y": 61,
+        "w": 12,
+        "h": 8
+      },
+      "description": "The controller wait reason for each SlurmCluster over time. Waiting for the notice period is expected; pod readiness and target revision waits are shown separately from reconciliation errors.",
+      "pluginVersion": "11.5.1",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "No data",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "No wait",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "Notice period",
+                  "color": "blue"
+                },
+                "2": {
+                  "text": "Pods not Ready",
+                  "color": "orange"
+                },
+                "3": {
+                  "text": "Target revision pending",
+                  "color": "orange"
+                },
+                "4": {
+                  "text": "Reconcile error",
+                  "color": "red"
+                }
+              }
+            }
+          ],
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 85,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "max by (cluster, resource_namespace, slurm_cluster) ((1 * max by (cluster, resource_namespace, slurm_cluster, reason) (soperator_login_rollout_waiting{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", reason=\"notice_period\"})) or (2 * max by (cluster, resource_namespace, slurm_cluster, reason) (soperator_login_rollout_waiting{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", reason=\"pods_not_ready\"})) or (3 * max by (cluster, resource_namespace, slurm_cluster, reason) (soperator_login_rollout_waiting{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", reason=\"target_revision_pending\"})) or (4 * max by (cluster, resource_namespace, slurm_cluster, reason) (soperator_login_rollout_waiting{controller=\"loginupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\", slurm_cluster=~\"${slurm_cluster:regex}\", reason=\"reconcile_error\"})))",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{cluster}} / {{resource_namespace}} / {{slurm_cluster}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "alignValue": "left",
+        "mergeValues": true,
+        "perPage": 20,
+        "rowHeight": 0.85,
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Nodeset rollouts controller runtime",
+      "type": "row",
+      "gridPos": {
+        "x": 0,
+        "y": 69,
         "w": 24,
         "h": 1
       },
@@ -1446,7 +2300,7 @@
           "type": "timeseries",
           "gridPos": {
             "x": 0,
-            "y": 40,
+            "y": 70,
             "w": 8,
             "h": 7
           },
@@ -1543,7 +2397,7 @@
           "type": "timeseries",
           "gridPos": {
             "x": 8,
-            "y": 40,
+            "y": 70,
             "w": 8,
             "h": 7
           },
@@ -1640,7 +2494,7 @@
           "type": "timeseries",
           "gridPos": {
             "x": 16,
-            "y": 40,
+            "y": 70,
             "w": 8,
             "h": 7
           },
@@ -1739,7 +2593,7 @@
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 40,
+        "y": 70,
         "w": 24,
         "h": 1
       },
@@ -1751,7 +2605,7 @@
           "type": "text",
           "gridPos": {
             "x": 0,
-            "y": 41,
+            "y": 71,
             "w": 24,
             "h": 30
           },
@@ -1814,7 +2668,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(soperator_rollout_active{controller=\"rollingupdate\"}, cluster)",
+        "definition": "label_values({__name__=~\"soperator_rollout_active|soperator_login_rollout_active\"}, cluster)",
         "hide": 2,
         "includeAll": true,
         "label": "Physical cluster",
@@ -1822,7 +2676,7 @@
         "name": "cluster",
         "options": [],
         "query": {
-          "query": "label_values(soperator_rollout_active{controller=\"rollingupdate\"}, cluster)",
+          "query": "label_values({__name__=~\"soperator_rollout_active|soperator_login_rollout_active\"}, cluster)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery",
           "qryType": 1
         },
@@ -1840,13 +2694,13 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(soperator_rollout_active{controller=\"rollingupdate\", cluster=~\"$cluster\"}, resource_namespace)",
+        "definition": "label_values({__name__=~\"soperator_rollout_active|soperator_login_rollout_active\", cluster=~\"$cluster\"}, resource_namespace)",
         "query": {
-          "query": "label_values(soperator_rollout_active{controller=\"rollingupdate\", cluster=~\"$cluster\"}, resource_namespace)",
+          "query": "label_values({__name__=~\"soperator_rollout_active|soperator_login_rollout_active\", cluster=~\"$cluster\"}, resource_namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery",
           "qryType": 1
         },
-        "description": "Namespace of the managed NodeSet, not the operator metrics Pod namespace.",
+        "description": "Namespace of the managed worker NodeSet or login StatefulSet, not the operator metrics Pod namespace.",
         "current": {
           "text": [
             "All"
@@ -1872,13 +2726,13 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(soperator_rollout_active{controller=\"rollingupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\"}, slurm_cluster)",
+        "definition": "label_values({__name__=~\"soperator_rollout_active|soperator_login_rollout_active\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\"}, slurm_cluster)",
         "query": {
-          "query": "label_values(soperator_rollout_active{controller=\"rollingupdate\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\"}, slurm_cluster)",
+          "query": "label_values({__name__=~\"soperator_rollout_active|soperator_login_rollout_active\", cluster=~\"$cluster\", resource_namespace=~\"${resource_namespace:regex}\"}, slurm_cluster)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery",
           "qryType": 1
         },
-        "description": "Logical SlurmCluster CR used by rollout telemetry. This filter does not apply to controller process metrics.",
+        "description": "Logical SlurmCluster CR used by worker and login rollout telemetry. This filter does not apply to controller process metrics.",
         "current": {
           "text": [
             "All"
