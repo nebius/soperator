@@ -3,6 +3,7 @@ package soperatorchecks
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -262,6 +263,8 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		var errorJobsAndReasons []slurmv1alpha1.JobAndReason
 		var cancelledJobs []string
 		if activeCheck.Status.SlurmJobsStatus.LastRunId == firstJobId {
+			jobName = activeCheck.Status.SlurmJobsStatus.LastRunName
+			submitTime = activeCheck.Status.SlurmJobsStatus.LastRunSubmitTime
 			failJobsAndReasons = activeCheck.Status.SlurmJobsStatus.LastRunFailJobsAndReasons
 			errorJobsAndReasons = activeCheck.Status.SlurmJobsStatus.LastRunErrorJobsAndReasons
 			cancelledJobs = activeCheck.Status.SlurmJobsStatus.LastRunCancelledJobs
@@ -317,28 +320,35 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 					continue
 				}
 
+				jobIDStr := fmt.Sprint(slurmJob.ID)
 				switch {
 				case slurmJob.IsFailedState():
-					failJobsAndReasons = append(failJobsAndReasons, slurmv1alpha1.JobAndReason{
-						JobID:  fmt.Sprint(slurmJob.ID),
-						Reason: slurmJob.StateReason,
-					})
+					failed := slurmv1alpha1.JobAndReason{JobID: jobIDStr, Reason: slurmJob.StateReason}
+					if i := slices.IndexFunc(failJobsAndReasons, func(e slurmv1alpha1.JobAndReason) bool { return e.JobID == jobIDStr }); i >= 0 {
+						failJobsAndReasons[i] = failed
+					} else {
+						failJobsAndReasons = append(failJobsAndReasons, failed)
+					}
 					err = executeFailureReactions(ctx, slurmJob, activeCheck, slurmAPIClient, logger)
 					if err != nil {
 						return ctrl.Result{}, fmt.Errorf("executing failure reactions: %w", err)
 					}
 				case slurmJob.IsCancelledState():
-					cancelledJobs = append(cancelledJobs, fmt.Sprint(slurmJob.ID))
+					if !slices.Contains(cancelledJobs, jobIDStr) {
+						cancelledJobs = append(cancelledJobs, jobIDStr)
+					}
 				case slurmJob.IsCompletedState():
 					err = executeSuccessReactions(ctx, slurmJob, activeCheck, slurmAPIClient, logger)
 					if err != nil {
 						return ctrl.Result{}, fmt.Errorf("executing success reactions: %w", err)
 					}
 				default:
-					errorJobsAndReasons = append(errorJobsAndReasons, slurmv1alpha1.JobAndReason{
-						JobID:  fmt.Sprint(slurmJob.ID),
-						Reason: slurmJob.StateReason,
-					})
+					errored := slurmv1alpha1.JobAndReason{JobID: jobIDStr, Reason: slurmJob.StateReason}
+					if i := slices.IndexFunc(errorJobsAndReasons, func(e slurmv1alpha1.JobAndReason) bool { return e.JobID == jobIDStr }); i >= 0 {
+						errorJobsAndReasons[i] = errored
+					} else {
+						errorJobsAndReasons = append(errorJobsAndReasons, errored)
+					}
 					// Do nothing. The job could have been cancelled or interrupted. The job will run again.
 					logger.Info(fmt.Sprintf("unhandled state. The job is probably cancelled or interrupted and it will run again. Current state: %s ", slurmJob.State))
 				}
@@ -355,22 +365,6 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 				"job_ids", notFoundInAccountingIDs,
 				"total", len(oldUnhandledIDs),
 			)
-		}
-
-		k8sJobPatch := client.MergeFrom(k8sJob.DeepCopy())
-		unhandledIds := make([]string, 0, len(unhandledIdsMap))
-		for id := range unhandledIdsMap {
-			unhandledIds = append(unhandledIds, id)
-		}
-		k8sJob.Annotations["unhandled-slurm-job-id"] = strings.Join(unhandledIds, ",")
-		if latestHandledFinalStateTime > lastHandledFinalStateTime {
-			// Maybe we could delete the job because it will not be processed anymore
-			// Otherwise, we will have many of these jobs and they will keep being listed in every Reconcile()
-			k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] = fmt.Sprintf("%d", latestHandledFinalStateTime)
-		}
-
-		if err := r.Job.Patch(ctx, k8sJob, k8sJobPatch); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to patch k8s Job: %w", err)
 		}
 
 		activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
@@ -391,6 +385,22 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		if err != nil {
 			logger.Error(err, "Failed to reconcile ActiveCheckJob")
 			return ctrl.Result{}, fmt.Errorf("reconciling ActiveCheckJob: %w", err)
+		}
+
+		k8sJobPatch := client.MergeFrom(k8sJob.DeepCopy())
+		unhandledIds := make([]string, 0, len(unhandledIdsMap))
+		for id := range unhandledIdsMap {
+			unhandledIds = append(unhandledIds, id)
+		}
+		k8sJob.Annotations["unhandled-slurm-job-id"] = strings.Join(unhandledIds, ",")
+		if latestHandledFinalStateTime > lastHandledFinalStateTime {
+			// Maybe we could delete the job because it will not be processed anymore
+			// Otherwise, we will have many of these jobs and they will keep being listed in every Reconcile()
+			k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] = fmt.Sprintf("%d", latestHandledFinalStateTime)
+		}
+
+		if err := r.Job.Patch(ctx, k8sJob, k8sJobPatch); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to patch k8s Job: %w", err)
 		}
 
 		if requeue {
