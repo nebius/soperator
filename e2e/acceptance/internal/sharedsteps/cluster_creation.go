@@ -299,16 +299,16 @@ func (s *ClusterCreation) checkPartitions(ctx context.Context) error {
 	if _, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "sinfo -Nel >/dev/null"); err != nil {
 		return fmt.Errorf("sinfo -Nel: %w", err)
 	}
-	if !strings.Contains(allPartitions, "PartitionName=main") {
-		return fmt.Errorf("partition main is missing from scontrol output")
+	if !strings.Contains(allPartitions, "PartitionName="+framework.MainPartitionName) {
+		return fmt.Errorf("partition %s is missing from scontrol output", framework.MainPartitionName)
 	}
 	if !strings.Contains(allPartitions, "PartitionName=hidden") {
 		return fmt.Errorf("partition hidden is missing from scontrol output")
 	}
 
-	mainPartition, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "scontrol show partition main")
+	mainPartition, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "scontrol show partition "+framework.MainPartitionName)
 	if err != nil {
-		return fmt.Errorf("show partition main: %w", err)
+		return fmt.Errorf("show partition %s: %w", framework.MainPartitionName, err)
 	}
 	hiddenPartition, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "scontrol show partition hidden")
 	if err != nil {
@@ -595,14 +595,4 @@ func ownedByJob(pod corev1.Pod) bool {
 		}
 	}
 	return false
-}
-
-func extractField(line, field string) string {
-	prefix := field + "="
-	for _, token := range strings.Fields(line) {
-		if strings.HasPrefix(token, prefix) {
-			return strings.TrimPrefix(token, prefix)
-		}
-	}
-	return ""
 }

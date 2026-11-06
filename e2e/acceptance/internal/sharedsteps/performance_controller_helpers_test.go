@@ -1,0 +1,186 @@
+package sharedsteps
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestParseStressSample(t *testing.T) {
+	const header = "squeue_ms=120\nsqueue_status=0\nsinfo_ms=45\nsinfo_status=0\nsdiag_ms=250\nsdiag_status=0\n"
+	const sdiag = `{"statistics": {"server_thread_count": 2, "jobs_submitted": 40, "jobs_canceled": 0}}` + "\n"
+	sample := parseStressSample(header + "states:\n    300 PENDING\n    320 RUNNING\nsdiag:\n" + sdiag)
+	assert.Equal(t, stressSample{
+		SqueueMillis: 120, SinfoMillis: 45, SdiagMillis: 250, Pending: 300, Running: 320,
+		Sdiag: &sdiagStatistics{ServerThreadCount: 2, JobsSubmitted: 40},
+	}, sample)
+
+	idle := parseStressSample(header + "states:\n\nsdiag:\n" + sdiag)
+	assert.Equal(t, 0, idle.Pending)
+	assert.Empty(t, idle.Error)
+
+	broken := parseStressSample("squeue_ms=120\nsqueue_status=1\nsinfo_ms=x\nsinfo_status=0\nsdiag_ms=1\nsdiag_status=0\n")
+	assert.Equal(t, int64(120), broken.SqueueMillis)
+	assert.Contains(t, broken.Error, `sinfo_ms="x"`)
+	assert.Contains(t, broken.Error, `squeue_status="1"`)
+	assert.Contains(t, broken.Error, "no states: section")
+	assert.Contains(t, broken.Error, "no sdiag: section")
+
+	noSdiag := parseStressSample(header + "states:\n\nsdiag:\nsdiag: error: Unable to contact slurm controller\n")
+	assert.Nil(t, noSdiag.Sdiag)
+	assert.Contains(t, noSdiag.Error, "parse sdiag JSON")
+}
+
+func TestStressProbeCommandCountsStates(t *testing.T) {
+	command := stressProbeCommand()
+	assert.Contains(t, command, "set -o pipefail; ")
+	assert.Contains(t, command, "states=$(squeue --noheader --states=PD,R --format='%T' | sort | uniq --count)")
+	assert.Contains(t, command, "sdiag=$(sdiag --json); sdiag_status=$?")
+	assert.True(t, strings.HasSuffix(command, `echo states:; echo "$states"; echo sdiag:; echo "$sdiag"`), command)
+	assert.NotContains(t, command, "\n")
+}
+
+func TestEvaluateStressProbes(t *testing.T) {
+	at := time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC)
+	samples := []stressSample{
+		{At: at, SqueueMillis: 100, SinfoMillis: 50},
+		{At: at.Add(10 * time.Second), SqueueMillis: 900, SinfoMillis: 70},
+		{At: at.Add(20 * time.Second), SqueueMillis: 300, SinfoMillis: 60},
+	}
+	budget := stressProbeBudget{SqueueMean: time.Second, SqueueMax: 5 * time.Second, SinfoMax: 5 * time.Second, SdiagMax: 5 * time.Second, MinSamples: 3}
+	require.NoError(t, evaluateStressProbes(summarizeStressProbes(samples), budget))
+	require.ErrorContains(t, evaluateStressProbes(summarizeStressProbes(samples[:2]), budget), "only 2 of 2 responsiveness probes ran")
+
+	samples[2].Error = "kubectl exec: dial tcp: i/o timeout"
+	require.ErrorContains(t, evaluateStressProbes(summarizeStressProbes(samples), budget), "only 2 of 3 responsiveness probes ran",
+		"a probe that could not run is not a controller failure, but enough probes must run")
+	budget.MinSamples = 2
+	require.NoError(t, evaluateStressProbes(summarizeStressProbes(samples), budget))
+
+	samples[1].SqueueMillis = 7000
+	summary := summarizeStressProbes(samples)
+	assert.Equal(t, stressProbeSummary{
+		Samples: 3, Errors: 1,
+		Squeue: stressDistribution{Mean: 3550, P50: 100, P90: 7000, P95: 7000, P99: 7000, Max: 7000},
+		Sinfo:  stressDistribution{Mean: 60, P50: 50, P90: 70, P95: 70, P99: 70, Max: 70},
+	}, summary, "samples with errors are excluded from the latency percentiles")
+	err := evaluateStressProbes(summary, budget)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "squeue mean 3550 ms, budget 1s")
+	assert.Contains(t, err.Error(), "squeue max 7000 ms, budget 5s")
+	assert.NotContains(t, err.Error(), "sinfo")
+
+	summary.Squeue = stressDistribution{Mean: 1500, P95: 1500, Max: 1500}
+	require.ErrorContains(t, evaluateStressProbes(summary, budget), "squeue mean 1500 ms, budget 1s",
+		"a slow typical probe fails even below the single-probe budget")
+
+	summary.Squeue = stressDistribution{Mean: 400, P95: 1900, Max: 1900}
+	summary.Sinfo = stressDistribution{Mean: 400, P95: 1900, Max: 1900}
+	require.NoError(t, evaluateStressProbes(summary, budget), "stalls behind the scheduler pass are not a typical-latency failure")
+	summary.Sinfo.Max = 6000
+	require.ErrorContains(t, evaluateStressProbes(summary, budget), "sinfo max 6000 ms, budget 5s")
+	summary.Sinfo.Max = 100
+	summary.Sdiag = stressDistribution{P95: 300, Max: 5500}
+	require.ErrorContains(t, evaluateStressProbes(summary, budget), "sdiag max 5500 ms, budget 5s")
+	budget.SdiagMax = 6 * time.Second
+	require.NoError(t, evaluateStressProbes(summary, budget), "each command has its own max budget")
+}
+
+func TestParseSdiag(t *testing.T) {
+	statistics, err := parseSdiag(`{
+  "statistics": {
+    "req_time": {"set": true, "infinite": false, "number": 1793727578},
+    "server_thread_count": 3,
+    "agent_queue_size": 1,
+    "schedule_cycle_sum": 83139,
+    "schedule_cycle_total": 1299,
+    "schedule_cycle_mean": 64,
+    "jobs_submitted": 4,
+    "jobs_canceled": 2,
+    "jobs_failed": 1,
+    "bf_active": false
+  },
+  "warnings": [],
+  "errors": []
+}`)
+	require.NoError(t, err)
+	assert.Equal(t, sdiagStatistics{
+		ServerThreadCount: 3, AgentQueueSize: 1, ScheduleCycleSum: 83139, ScheduleCycleTotal: 1299,
+		JobsSubmitted: 4, JobsCanceled: 2, JobsFailed: 1,
+	}, statistics)
+
+	_, err = parseSdiag("sdiag: error: Unable to contact slurm controller")
+	require.ErrorContains(t, err, "parse sdiag JSON")
+}
+
+func TestSummarizeStressScheduler(t *testing.T) {
+	before := sdiagStatistics{ServerThreadCount: 1, ScheduleCycleSum: 83139, ScheduleCycleTotal: 1299, JobsSubmitted: 4}
+	after := sdiagStatistics{ServerThreadCount: 3, ScheduleCycleSum: 583139, ScheduleCycleTotal: 1399, JobsSubmitted: 1004}
+
+	summary := summarizeStressScheduler([]sdiagStatistics{before, after})
+	assert.Equal(t, stressSchedulerSummary{
+		JobsSubmitted:         1000,
+		ScheduleCycles:        100,
+		ScheduleCycleMeanSecs: 0.005,
+		ServerThreadCount:     3,
+	}, summary)
+}
+
+func TestSummarizeStressSchedulerAcrossDailyReset(t *testing.T) {
+	snapshots := []sdiagStatistics{
+		{ScheduleCycleSum: 83139, ScheduleCycleTotal: 1299, JobsSubmitted: 5000, JobsCanceled: 1, JobsFailed: 2},
+		{ScheduleCycleSum: 84000, ScheduleCycleTotal: 1310, JobsSubmitted: 5500, JobsCanceled: 1, JobsFailed: 2},
+		// The daily reset happened in this interval: the counters restarted from zero.
+		{ScheduleCycleSum: 500, ScheduleCycleTotal: 5, JobsSubmitted: 30, JobsFailed: 1},
+		{ScheduleCycleSum: 2000, ScheduleCycleTotal: 20, JobsSubmitted: 1000, JobsFailed: 1, ServerThreadCount: 4},
+	}
+
+	summary := summarizeStressScheduler(snapshots)
+	assert.Equal(t, 1, summary.Resets)
+	assert.Equal(t, int64(500+30+970), summary.JobsSubmitted, "the interval with the reset contributes its absolutes")
+	assert.Equal(t, int64(1), summary.JobsFailed)
+	assert.Equal(t, int64(0), summary.JobsCanceled)
+	assert.Equal(t, int64(11+5+15), summary.ScheduleCycles)
+	assert.InDelta(t, float64(861+500+1500)/31/1e6, summary.ScheduleCycleMeanSecs, 1e-12)
+	assert.Equal(t, int64(4), summary.ServerThreadCount)
+
+	gaugesOnly := summarizeStressScheduler([]sdiagStatistics{
+		{JobsSubmitted: 10, ServerThreadCount: 9, AgentQueueSize: 3},
+		{JobsSubmitted: 12, ServerThreadCount: 1, AgentQueueSize: 0},
+	})
+	assert.Equal(t, 0, gaugesOnly.Resets, "gauges dropping is not a reset")
+	assert.Equal(t, int64(2), gaugesOnly.JobsSubmitted)
+
+	canceledDrop := summarizeStressScheduler([]sdiagStatistics{{JobsSubmitted: 10, JobsCanceled: 3}, {JobsSubmitted: 11, JobsCanceled: 0}})
+	assert.Equal(t, 1, canceledDrop.Resets, "every cumulative counter is watched")
+}
+
+func TestEvaluateStressScheduler(t *testing.T) {
+	summary := stressSchedulerSummary{
+		JobsSubmitted: 3, JobsFailed: 2, JobsCanceled: 1,
+		ScheduleCycles: 10, ScheduleCycleMeanSecs: 2.5, AgentQueueSize: 4, ServerThreadCount: 20,
+	}
+	budget := stressSchedulerBudget{MinSubmitted: 5, ScheduleCycleMean: time.Second, MaxServerThreads: 10}
+	err := evaluateStressScheduler(summary, budget)
+	require.Error(t, err)
+	for _, expected := range []string{
+		"counted 3 submitted jobs, expected at least 5",
+		"mean cycle 2.500s over 10 cycles exceeds budget 1s",
+		"agent queue still holds 4 requests",
+		"still runs 20 server threads, expected at most 10",
+	} {
+		assert.Contains(t, err.Error(), expected)
+	}
+
+	require.ErrorContains(t, evaluateStressScheduler(stressSchedulerSummary{JobsSubmitted: 5}, budget),
+		"recorded no main scheduler cycles")
+	require.NoError(t, evaluateStressScheduler(stressSchedulerSummary{JobsSubmitted: 5, JobsFailed: 2, JobsCanceled: 1, ScheduleCycles: 10, ScheduleCycleMeanSecs: 0.5},
+		budget),
+		"failed and canceled jobs of other users are not the load's problem")
+	require.ErrorContains(t, evaluateStressScheduler(stressSchedulerSummary{Resets: 1, JobsSubmitted: 2, ScheduleCycles: 10, ScheduleCycleMeanSecs: 0.5},
+		budget),
+		"counted 2 submitted jobs", "the summed deltas are checked even across a reset")
+}

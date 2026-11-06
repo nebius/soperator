@@ -15,6 +15,13 @@ const (
 	sshTestUserPropagationTimeout = time.Minute
 )
 
+// userOwnedDirCommand creates dir if missing, owned by user and writable by everyone,
+// for files a test user's jobs write into a scenario artifact directory.
+func userOwnedDirCommand(user, dir string) string {
+	return fmt.Sprintf("install --directory --owner=%s --group=%s --mode=0777 %s",
+		framework.ShellQuote(user), framework.ShellQuote(user), framework.ShellQuote(dir))
+}
+
 // runAsLoginUser wraps command in a login shell of userName, run from the jail as root.
 func runAsLoginUser(userName, command string) string {
 	return fmt.Sprintf("su - %s -c %s", framework.ShellQuote(userName), framework.ShellQuote(command))
