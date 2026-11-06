@@ -3576,7 +3576,8 @@
                   }
                 ]
               },
-              "unit": "short"
+              "unit": "short",
+              "noValue": "No matching node problem data in the selected range"
             },
             "overrides": []
           },
@@ -3624,6 +3625,14 @@
           ],
           "title": "Node Problems Timeline",
           "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "pattern": ".*"
+                }
+              }
+            },
             {
               "id": "sortBy",
               "options": {
@@ -5768,7 +5777,8 @@
                     "value": 80
                   }
                 ]
-              }
+              },
+              "noValue": "No matching job data in the selected range"
             },
             "overrides": []
           },
@@ -5815,7 +5825,17 @@
             }
           ],
           "title": "Job State Timeline",
-          "type": "state-timeline"
+          "type": "state-timeline",
+          "transformations": [
+            {
+              "id": "filterFieldsByName",
+              "options": {
+                "include": {
+                  "pattern": ".*"
+                }
+              }
+            }
+          ]
         },
         {
           "datasource": {

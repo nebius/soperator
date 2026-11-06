@@ -1218,7 +1218,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "noValue": "No matching job data in the selected range"
         },
         "overrides": []
       },
@@ -1265,7 +1266,17 @@
         }
       ],
       "title": "Job State Timeline",
-      "type": "state-timeline"
+      "type": "state-timeline",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "pattern": ".*"
+            }
+          }
+        }
+      ]
     },
     {
       "collapsed": false,
