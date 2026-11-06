@@ -44,6 +44,8 @@ type RunnerConfig struct {
 	TargetSoperatorVersion string
 	OutputDir              string
 	Suites                 []SuiteConfig
+	// Runtime defaults to NewRuntime when nil.
+	Runtime framework.Runtime
 }
 
 // NewRunner constructs an acceptance runner.
@@ -73,7 +75,10 @@ func NewRunner(config RunnerConfig) (*Runner, error) {
 	if len(suites) == 0 {
 		return nil, fmt.Errorf("at least one suite is required")
 	}
-	runtime := NewRuntime(kubectlContext, slurmClusterName)
+	runtime := config.Runtime
+	if runtime == nil {
+		runtime = NewRuntime(kubectlContext, slurmClusterName)
+	}
 
 	return &Runner{
 		suites:                 suites,
