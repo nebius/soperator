@@ -73,26 +73,11 @@ func parseSlurmSettingsTable(table *godog.Table) (map[string]string, error) {
 	if len(table.Rows) == 1 {
 		return nil, fmt.Errorf("find settings below the table header")
 	}
-
-	expected := make(map[string]string, len(table.Rows)-1)
-	for rowNumber, row := range table.Rows[1:] {
-		if len(row.Cells) != 2 {
-			return nil, fmt.Errorf("parse row %d: expected 2 cells, got %d", rowNumber+2, len(row.Cells))
-		}
-		setting := strings.TrimSpace(row.Cells[0].Value)
-		value := strings.TrimSpace(row.Cells[1].Value)
-		if setting == "" {
-			return nil, fmt.Errorf("parse row %d: setting name is empty", rowNumber+2)
-		}
-		if value == "" {
-			return nil, fmt.Errorf("parse row %d: value for %q is empty", rowNumber+2, setting)
-		}
-		if _, found := expected[setting]; found {
-			return nil, fmt.Errorf("parse row %d: setting %q is duplicated", rowNumber+2, setting)
-		}
-		expected[setting] = value
+	settings, err := parseKeyValueTable(&godog.Table{Rows: table.Rows[1:]})
+	if err != nil {
+		return nil, err
 	}
-	return expected, nil
+	return settings.values, nil
 }
 
 func validateSlurmSettings(configuration, expected map[string]string) error {
