@@ -377,6 +377,83 @@ Concrete public Soperator step structs are intentionally internal. Reuse shared
 steps through `acceptance.SharedStepRegistrar()` and add caller-specific steps
 through additional `StepRegistrar` values.
 
+## Worker reservations
+
+Worker reservations are optional framework infrastructure. The CLI and existing
+suites remain sequential and do not enable ownership checks. A ported custom
+suite opts in with `SuiteConfig.WorkerReservations = true`. The runner then gives
+each scenario its own ownership scope, shares one pool across all participating
+suites in that run, and finalizes ownership after registered cleanup hooks.
+Do not enable the option on an unported suite: every worker-using path must
+acquire its complete allocation and pin its jobs to those workers first.
+
+External runners can also manage scopes directly, sharing a `NewWorkerPool()`
+across scenarios targeting the same cluster:
+
+```go
+func checkGPUWorker(ctx context.Context, pool *framework.WorkerPool,
+	selector *framework.WorkerSelector, runtime framework.Runtime,
+) (result error) {
+	ctx = framework.WithWorkerReservation(ctx, pool, "GPU smoke")
+	defer func() {
+		result = errors.Join(result, framework.FinishWorkerReservation(ctx, runtime))
+	}()
+
+	workers, err := selector.Acquire(ctx, framework.WorkerRequirements{
+		Kind: "GPU", Count: 1,
+	})
+	if err != nil {
+		return err
+	}
+	return framework.RunTargetedWorkerSmoke(ctx, runtime, workers[0])
+}
+```
+
+`Acquire` requires an ownership scope. `PickWorkers`, `PickCPUWorkers` and
+`PickGPUWorkers` acquire ownership inside a scope and retain their existing
+immediate selection behavior outside it. Snapshot selection is always read-only.
+For a custom selection, use `Reserve` with `Names` and `Count` describing the
+entire allocation, then refresh state before recording baselines. Requirements
+also support a NodeSet, Docker-enabled workers, and active idle workers. Healthy
+powered-down workers remain eligible unless `Idle` is requested.
+
+Acquisition takes the complete set atomically. Requests are considered in
+arrival order, with backfill for requests that fit while an older request cannot.
+Backfill does not guarantee freedom from starvation. Tentative grants are
+revalidated against live Slurm, Pod and host state before they reach the caller.
+Configured but unavailable workers wait; insufficient optional configured
+capacity returns `InsufficientWorkersError`, preserving the existing skip policy.
+Timeout errors include the last observed state, ownership and quarantine reasons.
+
+The default acquisition budget is two hours, covering contention and readiness;
+an earlier caller deadline still applies. `RunnerConfig.WorkerAcquireTimeout`
+or `framework.WithWorkerAcquireTimeout` overrides it. Final verification has a
+separate six-minute default budget, configurable with
+`RunnerConfig.WorkerCleanupTimeout` or `framework.WithWorkerCleanupTimeout`.
+Scenario-specific restoration, including long replacement operations, happens
+before this verification. Finalization preserves context values and runs even
+after scenario cancellation. Repeated finalization returns its original result.
+
+Within an opted-in scope, `SubmitBatch` requires an explicit owned nodelist,
+fixes the job's node count to it, and tracks the job ID. `ExtraFlags` must not
+override placement. Register indirectly launched jobs with `TrackReservedJob`.
+Pin raw `srun` commands and clean up unmanaged workloads in the scenario; even
+short smoke jobs can outlive their command through Slurm's epilog. Use
+`RequireReservedHost` before host-wide disruption to check sibling workers too.
+Ownership cannot be upgraded incrementally after a successful acquisition.
+
+Report unsafe restoration failures with `RecordWorkerCleanupError`; only log
+best-effort diagnostic artifact cleanup errors. Finalization still attempts to
+cancel owned jobs after other cleanup failures, waits for their disappearance
+and worker epilogs, and checks Pod and host recovery before release. An unsafe
+cleanup or unverifiable recovery quarantines the complete allocation for the
+rest of the run. A new run creates a fresh pool. Runner cleanup failures fail
+the run even when the scenario otherwise skips.
+
+The pool coordinates participating scenarios in one process. It does not create
+Slurm reservations, protect shared configuration or files, synchronize separate
+runner processes, or make unported scenarios safe to run concurrently.
+
 ## Package Layout
 
 - `acceptance`: public runner API, embedded feature files, suite configs,

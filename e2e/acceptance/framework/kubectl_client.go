@@ -304,7 +304,7 @@ func (c *KubectlClient) WorkerPods(ctx context.Context) ([]WorkerPodInfo, error)
 			PodName:            pod.Name,
 			NodeSetName:        strings.TrimSpace(pod.Labels["slurm.nebius.ai/nodeset"]),
 			KubernetesNodeName: pod.Spec.NodeName,
-			Ready:              kubeobjects.PodReady(pod),
+			Ready:              pod.DeletionTimestamp == nil && kubeobjects.PodReady(pod),
 			HasLocalNVMe:       podHasVolume(pod, LocalNVMeVolumeName),
 		})
 	}
