@@ -507,6 +507,12 @@ spec:
         {{- if .cpuWeight }}
         cpuWeight: {{ .cpuWeight }}
         {{- end }}
+        {{- if .cpuQuota }}
+        cpuQuota: {{ .cpuQuota | quote }}
+        {{- end }}
+        {{- if .cpuPeriod }}
+        cpuPeriod: {{ .cpuPeriod }}
+        {{- end }}
       {{- end }}
       {{- with .Values.slurmNodes.login.autoscaling }}
       autoscaling:

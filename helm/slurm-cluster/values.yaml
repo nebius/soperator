@@ -673,6 +673,13 @@ slurmNodes:
       # CPU weight per user (cgroup v2 cpu.weight, 1-10000). CPU is shared
       # proportionally between users under contention; idle CPU stays usable.
       cpuWeight: 100
+      # Hard CPU limit per user in CPUs (cgroup v2 cpu.max quota), e.g. "8" or
+      # "500m". Unlike cpuWeight, it caps the user even when the node is idle.
+      # Unset = not capped.
+      # cpuQuota: "8"
+      # Enforcement period of cpuQuota in microseconds (cgroup v2 cpu.max
+      # period, 1000-1000000).
+      # cpuPeriod: 100000
     # Rootful Docker support for SSH sessions. Enabling it requires
     # userIsolation.enabled=true and a writable jail sub-mount at
     # /mnt/image-storage. It remains opt-in here so an operator/chart upgrade
