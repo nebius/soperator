@@ -427,6 +427,20 @@ func TestKubectlClientWorkerPodsRejectsMissingHostname(t *testing.T) {
 	assert.ErrorContains(t, err, "empty spec.hostname")
 }
 
+func TestKubectlClientWorkerPodsRejectsDeletingPodAsReady(t *testing.T) {
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00pods\x00-n\x00soperator\x00-l\x00slurm.nebius.ai/worker=true\x00-o\x00json": `{"items":[{
+			"metadata":{"name":"worker-0","deletionTimestamp":"2026-11-06T12:00:00Z"},
+			"spec":{"hostname":"worker-0","nodeName":"host-0"},
+			"status":{"conditions":[{"type":"Ready","status":"True"}]}
+		}]}`,
+	}}
+	pods, err := NewKubectlClient(exec).WorkerPods(t.Context())
+	require.NoError(t, err)
+	require.Len(t, pods, 1)
+	assert.False(t, pods[0].Ready)
+}
+
 func TestKubectlClientWorkerPodsRejectsDuplicateHostname(t *testing.T) {
 	exec := &kubectlClientTestExec{kubectl: map[string]string{
 		"get\x00pods\x00-n\x00soperator\x00-l\x00slurm.nebius.ai/worker=true\x00-o\x00json": `{

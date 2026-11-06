@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -19,6 +20,8 @@ import (
 )
 
 type timingCtxKey string
+
+type workerPoolContextKey struct{}
 
 const (
 	scenarioStartTimeKey    timingCtxKey = "acceptance_scenario_start_time"
@@ -35,6 +38,8 @@ type Runner struct {
 	targetSoperatorVersion string
 	outputDir              string
 	runtime                framework.Runtime
+	workerAcquireTimeout   time.Duration
+	workerCleanupTimeout   time.Duration
 }
 
 // RunnerConfig configures an acceptance suite run.
@@ -44,12 +49,17 @@ type RunnerConfig struct {
 	TargetSoperatorVersion string
 	OutputDir              string
 	Suites                 []SuiteConfig
+	WorkerAcquireTimeout   time.Duration
+	WorkerCleanupTimeout   time.Duration
 	// Runtime defaults to NewRuntime when nil.
 	Runtime framework.Runtime
 }
 
 // NewRunner constructs an acceptance runner.
 func NewRunner(config RunnerConfig) (*Runner, error) {
+	if config.WorkerAcquireTimeout < 0 || config.WorkerCleanupTimeout < 0 {
+		return nil, fmt.Errorf("worker reservation timeouts must not be negative")
+	}
 	kubectlContext := strings.TrimSpace(config.KubectlContext)
 	if kubectlContext == "" {
 		return nil, fmt.Errorf("kubectl context is required")
@@ -86,6 +96,8 @@ func NewRunner(config RunnerConfig) (*Runner, error) {
 		targetSoperatorVersion: normalizedTargetVersion,
 		outputDir:              strings.TrimSpace(config.OutputDir),
 		runtime:                runtime,
+		workerAcquireTimeout:   config.WorkerAcquireTimeout,
+		workerCleanupTimeout:   config.WorkerCleanupTimeout,
 	}, nil
 }
 
@@ -100,6 +112,7 @@ func (r *Runner) Run(ctx context.Context) error {
 }
 
 func (r *Runner) runConfiguredSuites(ctx context.Context, info *framework.ClusterInfo, runtime framework.Runtime, suites []SuiteConfig) error {
+	ctx = context.WithValue(ctx, workerPoolContextKey{}, framework.NewWorkerPool())
 	selectedSuites := 0
 	var failures []error
 	for _, suite := range suites {
@@ -192,12 +205,13 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 				FS:    suite.Source.FS,
 				Paths: paths,
 			},
-			VersionAxes:     slices.Clone(suite.VersionAxes),
-			Tags:            strings.TrimSpace(suite.Tags),
-			StepRegistrars:  registrars,
-			ExcludeUnstable: suite.ExcludeUnstable,
-			ExcludeHeavy:    suite.ExcludeHeavy,
-			ExcludeManual:   suite.ExcludeManual,
+			VersionAxes:        slices.Clone(suite.VersionAxes),
+			Tags:               strings.TrimSpace(suite.Tags),
+			StepRegistrars:     registrars,
+			ExcludeUnstable:    suite.ExcludeUnstable,
+			ExcludeHeavy:       suite.ExcludeHeavy,
+			ExcludeManual:      suite.ExcludeManual,
+			WorkerReservations: suite.WorkerReservations,
 		})
 	}
 	return out, nil
@@ -225,6 +239,9 @@ func (r *Runner) suiteFeaturePaths(info *framework.ClusterInfo, suite SuiteConfi
 }
 
 func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runtime framework.Runtime, suite SuiteConfig, features []string) error {
+	if ctx.Value(workerPoolContextKey{}) == nil {
+		ctx = context.WithValue(ctx, workerPoolContextKey{}, framework.NewWorkerPool())
+	}
 	format, err := reports.Format(r.outputDir, suite.Name)
 	if err != nil {
 		return fmt.Errorf("suite %q report format: %w", suite.Name, err)
@@ -240,10 +257,17 @@ func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runt
 		teamCityReporter = reports.NewTeamCityReporter(os.Stdout)
 	}
 	tags := r.suiteTagFilter(suite)
+	var cleanupMu sync.Mutex
+	var cleanupFailures []error
+	recordCleanupFailure := func(err error) {
+		cleanupMu.Lock()
+		defer cleanupMu.Unlock()
+		cleanupFailures = append(cleanupFailures, err)
+	}
 	godogSuite := godog.TestSuite{
 		Name: suite.Name,
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
-			r.initializeSuiteScenario(sc, info, runtime, suite, artifactsManager, teamCityReporter)
+			r.initializeSuiteScenario(sc, info, runtime, suite, artifactsManager, teamCityReporter, recordCleanupFailure)
 		},
 		Options: &godog.Options{
 			Format:         format,
@@ -260,9 +284,9 @@ func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runt
 	status := godogSuite.Run()
 	log.Printf("acceptance: suite %s finished duration=%s", suite.Name, time.Since(suiteStart).Round(time.Millisecond))
 	if status != 0 {
-		return fmt.Errorf("suite %q: godog exited with status %d", suite.Name, status)
+		cleanupFailures = append(cleanupFailures, fmt.Errorf("suite %q: godog exited with status %d", suite.Name, status))
 	}
-	return nil
+	return errors.Join(cleanupFailures...)
 }
 
 func (r *Runner) initializeSuiteScenario(
@@ -272,16 +296,37 @@ func (r *Runner) initializeSuiteScenario(
 	suite SuiteConfig,
 	artifactsManager *framework.ArtifactsManager,
 	teamCityReporter *reports.TeamCityReporter,
+	recordCleanupFailure func(error),
 ) {
+	if suite.WorkerReservations {
+		sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
+			pool := ctx.Value(workerPoolContextKey{}).(*framework.WorkerPool)
+			ctx = framework.WithWorkerAcquireTimeout(ctx, r.workerAcquireTimeout)
+			ctx = framework.WithWorkerCleanupTimeout(ctx, r.workerCleanupTimeout)
+			return framework.WithWorkerReservation(ctx, pool, suite.Name+"/"+scenario.Id+"/"+scenario.Name), nil
+		})
+	}
 	if teamCityReporter != nil {
 		registerTeamCityStateHook(sc, suite.Name)
 	}
 	registerScenarioArtifacts(sc, suite.Name, runtime, artifactsManager)
-	registerTimingHooks(sc)
 	registerSkipHook(sc)
 	for _, register := range suite.StepRegistrars {
 		register(sc, info, runtime)
 	}
+	if suite.WorkerReservations {
+		sc.After(func(ctx context.Context, scenario *godog.Scenario, _ error) (context.Context, error) {
+			err := framework.FinishWorkerReservation(ctx, runtime)
+			if err != nil {
+				// Godog can classify a joined skip and cleanup failure as a skip.
+				// Preserve cleanup failure independently in the suite result.
+				recordCleanupFailure(fmt.Errorf("scenario %q cleanup: %w", scenario.Name, err))
+				recordTeamCityScenarioFailure(ctx, err)
+			}
+			return ctx, err
+		})
+	}
+	registerTimingHooks(sc)
 	if teamCityReporter != nil {
 		registerTeamCityResultHooks(sc, teamCityReporter)
 	}
