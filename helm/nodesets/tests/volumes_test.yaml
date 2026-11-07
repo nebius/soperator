@@ -86,19 +86,19 @@ tests:
       - isNotEmpty:
           path: spec.slurmd.volumes.jailSubMounts
       - equal:
-          path: spec.slurmd.volumes.jailSubMounts[0].name
+          path: spec.slurmd.volumes.jailSubMounts[1].name
           value: "tmp"
       - equal:
-          path: spec.slurmd.volumes.jailSubMounts[0].mountPath
+          path: spec.slurmd.volumes.jailSubMounts[1].mountPath
           value: "/tmp"
       - equal:
-          path: spec.slurmd.volumes.jailSubMounts[0].subPath
+          path: spec.slurmd.volumes.jailSubMounts[1].subPath
           value: "tmp"
       - equal:
-          path: spec.slurmd.volumes.jailSubMounts[0].readOnly
+          path: spec.slurmd.volumes.jailSubMounts[1].readOnly
           value: false
       - exists:
-          path: spec.slurmd.volumes.jailSubMounts[0].volumeSource.emptyDir
+          path: spec.slurmd.volumes.jailSubMounts[1].volumeSource.emptyDir
 
   - it: should configure custom mounts correctly
     set:
@@ -136,19 +136,19 @@ tests:
       - isNotEmpty:
           path: spec.slurmd.volumes.customVolumeMounts
       - equal:
-          path: spec.slurmd.volumes.customVolumeMounts[0].name
+          path: spec.slurmd.volumes.customVolumeMounts[1].name
           value: "tmp"
       - equal:
-          path: spec.slurmd.volumes.customVolumeMounts[0].mountPath
+          path: spec.slurmd.volumes.customVolumeMounts[1].mountPath
           value: "/tmp"
       - equal:
-          path: spec.slurmd.volumes.customVolumeMounts[0].subPath
+          path: spec.slurmd.volumes.customVolumeMounts[1].subPath
           value: "tmp"
       - equal:
-          path: spec.slurmd.volumes.customVolumeMounts[0].readOnly
+          path: spec.slurmd.volumes.customVolumeMounts[1].readOnly
           value: false
       - exists:
-          path: spec.slurmd.volumes.customVolumeMounts[0].volumeSource.emptyDir
+          path: spec.slurmd.volumes.customVolumeMounts[1].volumeSource.emptyDir
 
   - it: should configure security context correctly
     set:

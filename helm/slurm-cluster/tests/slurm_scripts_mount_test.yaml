@@ -1,0 +1,107 @@
+suite: test slurm-scripts mount injection
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should inject volume source and login mounts with defaults
+    set:
+      clusterName: my-cluster
+    asserts:
+      - equal:
+          path: spec.volumeSources[0]
+          value:
+            name: slurm-scripts
+            configMap: {name: my-cluster-slurm-scripts, defaultMode: 493}
+      - equal:
+          path: spec.slurmNodes.login.volumes.customMounts
+          value:
+            - {name: slurm-scripts, mountPath: /opt/slurm_scripts/, volumeSourceName: slurm-scripts}
+            - {name: slurm-scripts-jail, mountPath: /mnt/jail.upper/opt/slurm_scripts/, volumeSourceName: slurm-scripts}
+
+  - it: should not duplicate login mounts that already exist with the same name
+    set:
+      clusterName: my-cluster
+      slurmNodes:
+        login:
+          volumes:
+            customMounts:
+              - {name: slurm-scripts, mountPath: /custom/scripts, volumeSourceName: my-source}
+              - {name: slurm-scripts-jail, mountPath: /mnt/jail.upper/custom/scripts, volumeSourceName: my-source}
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.volumes.customMounts
+          value:
+            - {name: slurm-scripts, mountPath: /custom/scripts, volumeSourceName: my-source}
+            - {name: slurm-scripts-jail, mountPath: /mnt/jail.upper/custom/scripts, volumeSourceName: my-source}
+
+  - it: should not inject login mounts that use another name but the same mountPath
+    set:
+      clusterName: my-cluster
+      slurmNodes:
+        login:
+          volumes:
+            customMounts:
+              - {name: my-scripts, mountPath: /opt/slurm_scripts, volumeSourceName: my-source}
+              - {name: my-scripts-jail, mountPath: /mnt/jail.upper/opt/./slurm_scripts//, volumeSourceName: my-source}
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.volumes.customMounts
+          value:
+            - {name: my-scripts, mountPath: /opt/slurm_scripts, volumeSourceName: my-source}
+            - {name: my-scripts-jail, mountPath: /mnt/jail.upper/opt/./slurm_scripts//, volumeSourceName: my-source}
+
+  - it: should inject login mounts next to user mounts on unrelated paths
+    set:
+      clusterName: my-cluster
+      slurmNodes:
+        login:
+          volumes:
+            customMounts:
+              - {name: data, mountPath: /opt/slurm_scripts_extra, volumeSourceName: my-source}
+    asserts:
+      - lengthEqual:
+          path: spec.slurmNodes.login.volumes.customMounts
+          count: 3
+      - equal:
+          path: spec.slurmNodes.login.volumes.customMounts[2].name
+          value: data
+
+  - it: should not duplicate an existing slurm-scripts volume source
+    set:
+      clusterName: my-cluster
+      volumeSources:
+        - name: slurm-scripts
+          emptyDir: {}
+    asserts:
+      - lengthEqual:
+          path: spec.volumeSources
+          count: 1
+      - equal:
+          path: spec.volumeSources[0]
+          value:
+            name: slurm-scripts
+            emptyDir: {}
+
+  - it: should fall back to the chart name when clusterName is empty
+    set:
+      clusterName: ""
+    asserts:
+      - equal:
+          path: spec.volumeSources[0].configMap.name
+          value: helm-slurm-cluster-slurm-scripts
+
+  - it: should use an explicit slurmScriptsConfigMapName
+    set:
+      clusterName: my-cluster
+      slurmScriptsConfigMapName: custom-scripts
+    asserts:
+      - equal:
+          path: spec.volumeSources[0].configMap.name
+          value: custom-scripts
+
+  - it: should truncate a long clusterName and trim a trailing dash
+    set:
+      clusterName: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbb
+    asserts:
+      - equal:
+          path: spec.volumeSources[0].configMap.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-slurm-scripts

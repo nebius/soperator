@@ -26,7 +26,21 @@
 
 {{/* Name of the slurm-scripts ConfigMap */}}
 {{- define "slurm-cluster.slurmScriptsCMName" -}}
+{{- if .Values.slurmScriptsConfigMapName -}}
+{{- .Values.slurmScriptsConfigMapName -}}
+{{- else -}}
 {{- printf "%s-slurm-scripts" (include "slurm-cluster.name" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{/* True if list has an entry with the given name or mountPath. */}}
+{{- define "slurm-cluster.hasMount" -}}
+{{- $found := false -}}
+{{- $path := .path | default "" -}}
+{{- range .list }}
+{{- if or (eq .name $.name) (and $path .mountPath (eq (clean .mountPath) (clean $path))) }}{{ $found = true }}{{- end }}
+{{- end -}}
+{{- $found -}}
 {{- end -}}
 
 {{- define "validateAccountingConfig" -}}

@@ -1,0 +1,160 @@
+suite: test slurm-scripts mount injection
+templates:
+  - templates/nodeset.yaml
+set:
+  nodesets:
+    - &worker
+      name: worker
+      slurmd: &slurmd
+        resources: {cpu: "1", memory: 1Gi}
+        volumes:
+          spool: {emptyDir: {}}
+          jail: {emptyDir: {}}
+      munge:
+        resources: {cpu: 100m, memory: 128Mi}
+tests:
+  - it: should inject both mounts with the cluster-derived ConfigMap name
+    set:
+      clusterName: my-cluster
+    asserts:
+      - equal:
+          path: spec.slurmd.volumes.jailSubMounts[0]
+          value:
+            name: slurm-scripts-jail
+            mountPath: /opt/slurm_scripts
+            volumeSource:
+              configMap: {name: my-cluster-slurm-scripts, defaultMode: 493}
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0]
+          value:
+            name: slurm-scripts
+            mountPath: /opt/slurm_scripts
+            volumeSource:
+              configMap: {name: my-cluster-slurm-scripts, defaultMode: 493}
+
+  - it: should not inject mounts that already exist with the same name
+    set:
+      clusterName: my-cluster
+      nodesets:
+        - <<: *worker
+          slurmd:
+            <<: *slurmd
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+              jailSubMounts:
+                - {name: slurm-scripts-jail, mountPath: /somewhere/else, volumeSource: {emptyDir: {}}}
+              customVolumeMounts:
+                - {name: slurm-scripts, mountPath: /elsewhere, volumeSource: {emptyDir: {}}}
+    asserts:
+      - lengthEqual:
+          path: spec.slurmd.volumes.jailSubMounts
+          count: 1
+      - equal:
+          path: spec.slurmd.volumes.jailSubMounts[0].mountPath
+          value: /somewhere/else
+      - lengthEqual:
+          path: spec.slurmd.volumes.customVolumeMounts
+          count: 1
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0].mountPath
+          value: /elsewhere
+
+  - it: should not inject mounts that use another name but the same mountPath
+    set:
+      clusterName: my-cluster
+      nodesets:
+        - <<: *worker
+          slurmd:
+            <<: *slurmd
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+              jailSubMounts:
+                - {name: my-jail-scripts, mountPath: /opt/slurm_scripts/, volumeSource: {emptyDir: {}}}
+              customVolumeMounts:
+                - {name: my-scripts, mountPath: /opt/./slurm_scripts//, volumeSource: {emptyDir: {}}}
+    asserts:
+      - lengthEqual:
+          path: spec.slurmd.volumes.jailSubMounts
+          count: 1
+      - equal:
+          path: spec.slurmd.volumes.jailSubMounts[0].name
+          value: my-jail-scripts
+      - lengthEqual:
+          path: spec.slurmd.volumes.customVolumeMounts
+          count: 1
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0].name
+          value: my-scripts
+
+  - it: should inject mounts next to user mounts on unrelated paths
+    set:
+      clusterName: my-cluster
+      nodesets:
+        - <<: *worker
+          slurmd:
+            <<: *slurmd
+            volumes:
+              spool: {emptyDir: {}}
+              jail: {emptyDir: {}}
+              customVolumeMounts:
+                - {name: data, mountPath: /opt/slurm_scripts_extra, volumeSource: {emptyDir: {}}}
+    asserts:
+      - lengthEqual:
+          path: spec.slurmd.volumes.customVolumeMounts
+          count: 2
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0].name
+          value: slurm-scripts
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[1].name
+          value: data
+
+  - it: should fall back to the slurm-cluster default name when clusterName is empty
+    asserts:
+      - equal:
+          path: spec.slurmd.volumes.jailSubMounts[0].volumeSource.configMap.name
+          value: helm-slurm-cluster-slurm-scripts
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0].volumeSource.configMap.name
+          value: helm-slurm-cluster-slurm-scripts
+
+  - it: should use an explicit slurmScriptsConfigMapName
+    set:
+      clusterName: my-cluster
+      slurmScriptsConfigMapName: custom-scripts
+    asserts:
+      - equal:
+          path: spec.slurmd.volumes.jailSubMounts[0].volumeSource.configMap.name
+          value: custom-scripts
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0].volumeSource.configMap.name
+          value: custom-scripts
+
+  - it: should use an explicit slurmScriptsConfigMapName with empty clusterName
+    set:
+      slurmScriptsConfigMapName: custom-scripts
+    asserts:
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0].volumeSource.configMap.name
+          value: custom-scripts
+
+  - it: should truncate a long clusterName like the slurm-cluster chart
+    set:
+      clusterName: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbb
+    asserts:
+      - equal:
+          path: spec.slurmd.volumes.jailSubMounts[0].volumeSource.configMap.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-slurm-scripts
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0].volumeSource.configMap.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-slurm-scripts
+
+  - it: should truncate a long clusterName without a trailing dash
+    set:
+      clusterName: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - equal:
+          path: spec.slurmd.volumes.customVolumeMounts[0].volumeSource.configMap.name
+          value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-slurm-scripts
