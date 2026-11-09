@@ -596,13 +596,3 @@ func ownedByJob(pod corev1.Pod) bool {
 	}
 	return false
 }
-
-func extractField(line, field string) string {
-	prefix := field + "="
-	for _, token := range strings.Fields(line) {
-		if strings.HasPrefix(token, prefix) {
-			return strings.TrimPrefix(token, prefix)
-		}
-	}
-	return ""
-}
