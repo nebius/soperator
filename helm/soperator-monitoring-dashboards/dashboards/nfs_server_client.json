@@ -116,15 +116,15 @@
               },
               {
                 "color": "yellow",
-                "value": 70
+                "value": 0.7
               },
               {
                 "color": "orange",
-                "value": 80
+                "value": 0.8
               },
               {
                 "color": "red",
-                "value": 90
+                "value": 0.9
               }
             ]
           },
@@ -163,7 +163,8 @@
           },
           "editorMode": "code",
           "expr": "kubelet_volume_stats_used_bytes{cluster=~\"$cluster\", \n    persistentvolumeclaim=\"nfs-server-storage\"\n}\n/\nkubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", \n    persistentvolumeclaim=\"nfs-server-storage\"\n}",
-          "range": true,
+          "instant": true,
+          "range": false,
           "refId": "A",
           "useCustomValues": false,
           "useDashValues": false
@@ -240,7 +241,8 @@
           },
           "editorMode": "code",
           "expr": "kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", \n    persistentvolumeclaim=\"nfs-server-storage\"\n}",
-          "range": true,
+          "instant": true,
+          "range": false,
           "refId": "A",
           "useCustomValues": false,
           "useDashValues": false
