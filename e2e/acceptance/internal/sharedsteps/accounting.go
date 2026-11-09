@@ -259,11 +259,7 @@ func (s *Accounting) submitAccountingSmokeJob(ctx context.Context) error {
 	prepareOutputDir := ""
 	if artifacts, ok := framework.ScenarioArtifacts(ctx); ok {
 		outputDir = artifacts.JailDir
-		prepareOutputDir = fmt.Sprintf("install -d -o %s -g %s -m 0777 %s && ",
-			framework.ShellQuote(sshTestUserName),
-			framework.ShellQuote(sshTestUserName),
-			framework.ShellQuote(outputDir),
-		)
+		prepareOutputDir = userOwnedDirCommand(sshTestUserName, outputDir) + " && "
 	}
 	stdoutPath := outputDir + "/e2e-accounting.out"
 	stderrPath := outputDir + "/e2e-accounting.err"
