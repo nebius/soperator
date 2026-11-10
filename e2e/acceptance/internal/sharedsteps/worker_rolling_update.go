@@ -674,29 +674,16 @@ func workerRolloutBudget(value *intstr.IntOrString, replicas int) (int, error) {
 }
 
 func rolloutInvariant(format string, args ...any) error {
-	return rolloutInvariantError{fmt.Errorf(format, args...)}
+	return &framework.PermanentError{Err: rolloutInvariantError{fmt.Errorf(format, args...)}}
 }
 
-// WaitFor retries transient errors; an observed safety violation must survive later recovery.
 func (s *WorkerRollingUpdate) waitForRollout(ctx context.Context, description string, timeout, interval time.Duration, condition func(context.Context) (bool, error)) error {
-	var fatal error
-	err := s.runtime.WaitFor(ctx, description, timeout, interval, func(waitCtx context.Context) (bool, error) {
-		err := s.checkRolloutWorkerSet(waitCtx)
-		var done bool
-		if err == nil {
-			done, err = condition(waitCtx)
+	return s.runtime.WaitFor(ctx, description, timeout, interval, func(waitCtx context.Context) (bool, error) {
+		if err := s.checkRolloutWorkerSet(waitCtx); err != nil {
+			return false, err
 		}
-		var invariant rolloutInvariantError
-		if errors.As(err, &invariant) {
-			fatal = err
-			return true, nil
-		}
-		return done, err
+		return condition(waitCtx)
 	})
-	if fatal != nil {
-		return fatal
-	}
-	return err
 }
 
 func isEphemeralRollout(nodeSet kubeobjects.NodeSet) bool {

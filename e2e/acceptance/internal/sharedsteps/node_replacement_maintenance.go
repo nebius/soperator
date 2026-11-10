@@ -63,7 +63,7 @@ func (s *NodeReplacement) aMaintenanceEventIsTriggeredAfterThatNodeHasFullyDrain
 	if err := s.slurm.WaitForJobGone(waitCtx, s.maintenanceJob.ID, nodeReplacementJobTimeout); err != nil {
 		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.maintenanceJob, err)
 	}
-	err := s.waitForReplacementCondition(waitCtx, "original worker fully drained before maintenance", nodeReplacementJobTimeout, time.Second,
+	err := s.runtime.WaitFor(waitCtx, "original worker fully drained before maintenance", nodeReplacementJobTimeout, time.Second,
 		func(waitCtx context.Context) (bool, error) {
 			node, err := s.originalWorkerNode(waitCtx)
 			if err != nil {

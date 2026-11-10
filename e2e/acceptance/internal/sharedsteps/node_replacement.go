@@ -3,7 +3,6 @@ package sharedsteps
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"path"
 	"strconv"
@@ -178,7 +177,7 @@ func (s *NodeReplacement) submitTestJobOnWorker(ctx context.Context, worker fram
 }
 
 func (s *NodeReplacement) selectWorker(ctx context.Context, worker framework.WorkerInfo) error {
-	original, err := framework.CaptureWorkerReplacement(ctx, s.kubectl, s.slurm, worker.Name)
+	original, err := framework.CaptureWorkerReplacement(ctx, s.runtime, s.kubectl, s.slurm, worker.Name)
 	if err != nil {
 		return fmt.Errorf("record original worker for replacement: %w", err)
 	}
@@ -222,7 +221,7 @@ func (s *NodeReplacement) theNodeIsDrainedWithAMaintenanceReason(ctx context.Con
 
 func (s *NodeReplacement) waitForMaintenanceDrain(ctx context.Context, guard func(context.Context) error) error {
 	workerName := s.replacementWorker.Name
-	return s.waitForReplacementCondition(ctx, "node drain reason", nodeReplacementDrainTimeout, 15*time.Second, func(waitCtx context.Context) (bool, error) {
+	return s.runtime.WaitFor(ctx, "node drain reason", nodeReplacementDrainTimeout, 15*time.Second, func(waitCtx context.Context) (bool, error) {
 		if guard != nil {
 			if err := guard(waitCtx); err != nil {
 				return false, err
@@ -292,7 +291,7 @@ func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) e
 }
 
 func (s *NodeReplacement) waitForReplacement(ctx context.Context, timeout time.Duration, guard func(context.Context) error) error {
-	return s.waitForReplacementCondition(ctx, "replacement worker ready on a new host", timeout, 60*time.Second, func(waitCtx context.Context) (bool, error) {
+	return s.runtime.WaitFor(ctx, "replacement worker ready on a new host", timeout, 60*time.Second, func(waitCtx context.Context) (bool, error) {
 		if guard != nil {
 			if err := guard(waitCtx); err != nil {
 				return false, err
@@ -305,24 +304,6 @@ func (s *NodeReplacement) waitForReplacement(ctx context.Context, timeout time.D
 		return false, fmt.Errorf("worker %s replacement pending: original host=%s UID=%s instance=%s pod UID=%s host=%s",
 			s.original.WorkerName, s.original.NodeName, s.original.NodeUID, s.original.InstanceID, pod.UID, pod.Spec.NodeName)
 	})
-}
-
-// Runtime.WaitFor retries observation errors; an observed invariant violation must stay fatal.
-func (s *NodeReplacement) waitForReplacementCondition(ctx context.Context, description string, timeout, interval time.Duration, condition func(context.Context) (bool, error)) error {
-	var fatal error
-	err := s.runtime.WaitFor(ctx, description, timeout, interval, func(waitCtx context.Context) (bool, error) {
-		done, err := condition(waitCtx)
-		var invariant rolloutInvariantError
-		if errors.As(err, &invariant) {
-			fatal = err
-			return true, nil
-		}
-		return done, err
-	})
-	if fatal != nil {
-		return fatal
-	}
-	return err
 }
 
 // An owned maintenance event must finish; clearing it midway would leave a
@@ -398,7 +379,7 @@ func (s *NodeReplacement) waitForHealthCheckDrain(ctx context.Context, guard fun
 		return err
 	}
 	s.runtime.Logf("Node replacement: waiting up to %s for Slurm's periodic health check to drain %s", timeout, workerName)
-	err = s.waitForReplacementCondition(ctx, "simulated health check drain", timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+	err = s.runtime.WaitFor(ctx, "simulated health check drain", timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		if guard != nil {
 			if err := guard(waitCtx); err != nil {
 				return false, err
