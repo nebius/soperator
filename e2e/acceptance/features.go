@@ -66,5 +66,6 @@ func FeaturePaths() []string {
 		"features/topology_tree.feature",
 		"features/topology_block.feature",
 		"features/topology_legacy.feature",
+		"features/performance.feature",
 	}
 }

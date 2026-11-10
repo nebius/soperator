@@ -152,8 +152,11 @@ func (s *SlurmClient) NodeInfosOnce(ctx context.Context, names []string) ([]Slur
 	return nodes, nil
 }
 
+// MainPartitionName is the default partition Soperator renders for every worker.
+const MainPartitionName = "main"
+
 func (s *SlurmClient) MainPartitionNodeNames(ctx context.Context) ([]string, error) {
-	out, err := s.runtime.Controller().RunWithDefaultRetry(ctx, `sinfo -hN -p main -o '%N'`)
+	out, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "sinfo -hN -p "+MainPartitionName+" -o '%N'")
 	if err != nil {
 		return nil, fmt.Errorf("list Slurm main partition nodes: %w", err)
 	}
