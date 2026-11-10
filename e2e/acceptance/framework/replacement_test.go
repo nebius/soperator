@@ -17,6 +17,7 @@ import (
 type replacementRuntime struct {
 	Runtime
 	instanceLookups []error
+	instanceOutput  string
 	nodeStates      []string
 	kubectlOutputs  map[string]string
 	kubectlErrors   map[string]error
@@ -56,7 +57,11 @@ func (r *replacementRuntime) Local() ArgsScope {
 		}
 		err := r.instanceLookups[0]
 		r.instanceLookups = r.instanceLookups[1:]
-		return "", err
+		output := r.instanceOutput
+		if output == "" {
+			output = fmt.Sprintf(`{"metadata":{"id":%q}}`, args[5])
+		}
+		return output, err
 	})
 }
 
@@ -72,7 +77,7 @@ func (r *replacementRuntime) Controller() CommandScope {
 }
 
 func TestWaitForInstanceRemoval(t *testing.T) {
-	runtime := &replacementRuntime{instanceLookups: []error{nil, errors.New("instance not found")}}
+	runtime := &replacementRuntime{instanceLookups: []error{nil, errors.New("rpc error: code = NotFound desc = instance not found")}}
 	require.NoError(t, WaitForInstanceRemoval(t.Context(), runtime, "old-instance", time.Minute, time.Second))
 }
 
@@ -104,9 +109,11 @@ func TestCaptureWorkerReplacementRecordsActualPodAndHostIdentities(t *testing.T)
 		ObjectMeta: metav1.ObjectMeta{Name: original.NodeName, UID: original.NodeUID},
 	})
 	runtime.nodeStates = []string{"NodeName=worker-0 InstanceId=original-instance State=IDLE"}
+	runtime.instanceLookups = []error{nil}
 	captured, err := CaptureWorkerReplacement(t.Context(), kubectl, slurm, original.WorkerName)
 	require.NoError(t, err)
 	require.Equal(t, original, captured)
+	require.Empty(t, runtime.instanceLookups, "read the original Compute instance before recording the baseline")
 	// Kubernetes host names do not have to equal Compute instance IDs.
 	require.NotEqual(t, captured.NodeName, captured.InstanceID)
 }
@@ -127,6 +134,21 @@ func TestCaptureWorkerReplacementRejectsIncompleteOrUnreadyBaseline(t *testing.T
 		{"missing Compute identity", func(_ *corev1.Pod, runtime *replacementRuntime) {
 			runtime.nodeStates = []string{"NodeName=worker-0 State=IDLE"}
 		}, "record Compute instance"},
+		{"Compute permission denied", func(_ *corev1.Pod, runtime *replacementRuntime) {
+			runtime.instanceLookups = []error{errors.New("rpc error: code = PermissionDenied desc = permission denied")}
+		}, "permission denied"},
+		{"original Compute instance absent", func(_ *corev1.Pod, runtime *replacementRuntime) {
+			runtime.instanceLookups = []error{errors.New("rpc error: code = NotFound desc = instance not found")}
+		}, "instance does not exist"},
+		{"malformed Compute response", func(_ *corev1.Pod, runtime *replacementRuntime) {
+			runtime.instanceOutput = "{"
+		}, "decode response"},
+		{"missing Compute response identity", func(_ *corev1.Pod, runtime *replacementRuntime) {
+			runtime.instanceOutput = `{}`
+		}, `observed ID=""`},
+		{"wrong Compute response identity", func(_ *corev1.Pod, runtime *replacementRuntime) {
+			runtime.instanceOutput = `{"metadata":{"id":"another-instance"}}`
+		}, `observed ID="another-instance"`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			runtime, kubectl, slurm, original := workerReplacementFixture(t)
@@ -137,6 +159,7 @@ func TestCaptureWorkerReplacementRejectsIncompleteOrUnreadyBaseline(t *testing.T
 				ObjectMeta: metav1.ObjectMeta{Name: original.NodeName, UID: original.NodeUID},
 			})
 			runtime.nodeStates = []string{"NodeName=worker-0 InstanceId=original-instance State=IDLE"}
+			runtime.instanceLookups = []error{nil}
 			tt.change(&pod, runtime)
 			runtime.kubectlOutputs["get\x00pod\x00worker-pod-0\x00-n\x00soperator\x00-o\x00json"] = replacementJSON(t, pod)
 			_, err := CaptureWorkerReplacement(t.Context(), kubectl, slurm, original.WorkerName)
@@ -234,7 +257,7 @@ func workerReplacementFixture(t *testing.T) (*replacementRuntime, *KubectlClient
 			"get\x00node\x00original-host\x00--ignore-not-found\x00-o\x00json": "",
 		},
 		nodeStates:      []string{"NodeName=worker-0 InstanceId=new-instance State=IDLE"},
-		instanceLookups: []error{errors.New("instance not found")},
+		instanceLookups: []error{errors.New("rpc error: code = NotFound desc = instance not found")},
 	}
 	return runtime, NewKubectlClient(runtime), NewSlurmClient(runtime), original
 }

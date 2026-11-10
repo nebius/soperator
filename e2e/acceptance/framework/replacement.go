@@ -2,6 +2,8 @@ package framework
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +13,9 @@ import (
 
 	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
+
+// ErrComputeInstanceLookup marks an observation failure that must stop replacement polling.
+var ErrComputeInstanceLookup = errors.New("read Compute instance")
 
 type WorkerReplacementSnapshot struct {
 	Namespace  string
@@ -51,6 +56,13 @@ func CaptureWorkerReplacement(ctx context.Context, kubectl *KubectlClient, slurm
 	}
 	if node.InstanceID == "" {
 		return WorkerReplacementSnapshot{}, fmt.Errorf("record Compute instance for worker %s: state=%s reason=%s", workerName, node.State, node.Reason)
+	}
+	present, err = computeInstancePresent(ctx, kubectl.exec, node.InstanceID)
+	if err != nil {
+		return WorkerReplacementSnapshot{}, err
+	}
+	if !present {
+		return WorkerReplacementSnapshot{}, fmt.Errorf("record original Compute instance %s: instance does not exist", node.InstanceID)
 	}
 	return WorkerReplacementSnapshot{
 		Namespace: pod.Namespace, WorkerName: workerName, PodName: pod.Name, PodUID: pod.UID,
@@ -99,23 +111,55 @@ func ObserveWorkerReplacement(ctx context.Context, runtime Runtime, kubectl *Kub
 }
 
 // WaitForInstanceRemoval waits until Compute no longer returns the original instance.
+// Lookup and response validation errors stop the wait immediately.
 func WaitForInstanceRemoval(ctx context.Context, runtime Runtime, instanceID string, timeout, pollInterval time.Duration) error {
-	return runtime.WaitFor(ctx, "old instance removal", timeout, pollInterval, func(waitCtx context.Context) (bool, error) {
-		return InstanceRemoved(waitCtx, runtime, instanceID)
+	var lookupErr error
+	err := runtime.WaitFor(ctx, "old instance removal", timeout, pollInterval, func(waitCtx context.Context) (bool, error) {
+		removed, err := InstanceRemoved(waitCtx, runtime, instanceID)
+		if err != nil {
+			// Runtime.WaitFor retries callback errors; a failed lookup must survive a later NotFound.
+			lookupErr = err
+			return true, nil
+		}
+		return removed, nil
 	})
+	if lookupErr != nil {
+		return fmt.Errorf("wait for old instance removal: %w", lookupErr)
+	}
+	return err
 }
 
 // InstanceRemoved checks whether Compute no longer returns an original instance.
 // Authentication, network, and other query errors must never count as removal.
 func InstanceRemoved(ctx context.Context, runtime Runtime, instanceID string) (bool, error) {
-	_, err := runtime.Local().Run(ctx, "nebius", "compute", "instance", "get", "--id", instanceID, "--format", "json")
-	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "not found") {
-			return true, nil
-		}
-		return false, err
+	present, err := computeInstancePresent(ctx, runtime, instanceID)
+	return !present && err == nil, err
+}
+
+func computeInstancePresent(ctx context.Context, exec Exec, instanceID string) (bool, error) {
+	if strings.TrimSpace(instanceID) == "" {
+		return false, fmt.Errorf("%w: instance ID is empty", ErrComputeInstanceLookup)
 	}
-	return false, nil
+	output, err := exec.Local().Run(ctx, "nebius", "compute", "instance", "get", "--id", instanceID, "--format", "json")
+	if err != nil {
+		_, status, found := strings.Cut(err.Error(), "rpc error: code = ")
+		if found && strings.HasPrefix(status, "NotFound desc = ") {
+			return false, nil
+		}
+		return false, fmt.Errorf("%w %s: %w", ErrComputeInstanceLookup, instanceID, err)
+	}
+	var instance struct {
+		Metadata struct {
+			ID string `json:"id"`
+		} `json:"metadata"`
+	}
+	if err := json.Unmarshal([]byte(output), &instance); err != nil {
+		return false, fmt.Errorf("%w %s: decode response: %w", ErrComputeInstanceLookup, instanceID, err)
+	}
+	if instance.Metadata.ID != instanceID {
+		return false, fmt.Errorf("%w %s: observed ID=%q", ErrComputeInstanceLookup, instanceID, instance.Metadata.ID)
+	}
+	return true, nil
 }
 
 // WaitForUsableReplacement waits for a Slurm worker to become usable on a different instance.

@@ -307,13 +307,13 @@ func (s *NodeReplacement) waitForReplacement(ctx context.Context, timeout time.D
 	})
 }
 
-// Runtime.WaitFor retries observation errors; an observed invariant violation must stay fatal.
+// Runtime.WaitFor retries observation errors; invariant violations and failed Compute lookups must stay fatal.
 func (s *NodeReplacement) waitForReplacementCondition(ctx context.Context, description string, timeout, interval time.Duration, condition func(context.Context) (bool, error)) error {
 	var fatal error
 	err := s.runtime.WaitFor(ctx, description, timeout, interval, func(waitCtx context.Context) (bool, error) {
 		done, err := condition(waitCtx)
 		var invariant rolloutInvariantError
-		if errors.As(err, &invariant) {
+		if errors.As(err, &invariant) || errors.Is(err, framework.ErrComputeInstanceLookup) {
 			fatal = err
 			return true, nil
 		}

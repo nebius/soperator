@@ -336,7 +336,9 @@ func TestHealthMaintenanceCleanupHandlesBothOwnedTriggersAfterCancellation(t *te
 	host := runtime.hosts[steps.original.NodeName]
 	host.Status.Conditions = []corev1.NodeCondition{{Type: nodeReplacementMaintenanceCondition, Status: corev1.ConditionTrue, Reason: "AcceptanceTest"}}
 	runtime.hosts[host.Name] = host
-	runtime.local = func(...string) (string, error) { return "", errors.New("instance not found") }
+	runtime.local = func(...string) (string, error) {
+		return "", errors.New("rpc error: code = NotFound desc = instance not found")
+	}
 	runtime.observe = func(base *maintenanceTestRuntime) {
 		if base.waitLabels[len(base.waitLabels)-1] != "replacement worker ready on a new host" {
 			return
@@ -403,7 +405,9 @@ func TestHealthMaintenanceCleanupTakesOverBeforeCancellingTheJob(t *testing.T) {
 					base.nodes["worker-0"] = "NodeName=worker-0 State=IDLE InstanceId=replacement-instance"
 				}
 			}
-			runtime.local = func(...string) (string, error) { return "", errors.New("instance not found") }
+			runtime.local = func(...string) (string, error) {
+				return "", errors.New("rpc error: code = NotFound desc = instance not found")
+			}
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
 
@@ -441,10 +445,54 @@ func TestHealthMaintenanceCleanupDoesNotScheduleMaintenanceOnAChangedHost(t *tes
 func TestNodeReplacementHoldJobCoversBothDrainWaits(t *testing.T) {
 	steps, runtime := healthMaintenanceSteps(t)
 	setHealthMaintenanceNode(runtime, "IDLE", 0, 0)
+	runtime.local = func(args ...string) (string, error) {
+		return fmt.Sprintf(`{"metadata":{"id":%q}}`, args[5]), nil
+	}
 	err := steps.submitTestJobOnWorker(t.Context(), steps.replacementWorker, framework.WorkerSnapshot{})
 	require.NoError(t, err)
 	assert.Greater(t, nodeReplacementJobHold, nodeReplacementHealthCheckDrainMaxWait+nodeReplacementDrainTimeout+nodeReplacementJobTimeout)
 	assert.Contains(t, strings.Join(runtime.calls, "\n"), "--wrap='sleep 1800'")
 	assert.Equal(t, "6", steps.maintenanceJob.ID)
 	assert.LessOrEqual(t, nodeReplacementJobHold, 30*time.Minute)
+}
+
+func TestNodeReplacementRequiresReadableOriginalBeforeSubmittingJob(t *testing.T) {
+	for _, lookupErr := range []error{
+		errors.New("rpc error: code = PermissionDenied desc = permission denied"),
+		errors.New("rpc error: code = NotFound desc = instance not found"),
+	} {
+		t.Run(lookupErr.Error(), func(t *testing.T) {
+			steps, runtime := healthMaintenanceSteps(t)
+			runtime.local = func(...string) (string, error) { return "", lookupErr }
+			err := steps.submitTestJobOnWorker(t.Context(), steps.replacementWorker, framework.WorkerSnapshot{})
+			require.Error(t, err)
+			assert.ErrorContains(t, err, steps.original.InstanceID)
+			assert.NotContains(t, strings.Join(runtime.calls, "\n"), "sbatch ")
+			assert.Zero(t, maintenancePatchCount(runtime))
+		})
+	}
+}
+
+func TestNodeReplacementWaitPreservesComputeLookupFailure(t *testing.T) {
+	steps, runtime := healthMaintenanceSteps(t)
+	pod := runtime.pods[steps.original.PodName]
+	pod.UID, pod.Spec.NodeName = "replacement-pod-uid", "replacement-host"
+	runtime.pods[pod.Name] = pod
+	delete(runtime.hosts, steps.original.NodeName)
+	runtime.nodes[steps.original.WorkerName] = "NodeName=worker-0 State=IDLE InstanceId=replacement-instance"
+	lookupErr := errors.New("rpc error: code = PermissionDenied desc = permission denied")
+	var lookups int
+	runtime.local = func(...string) (string, error) {
+		lookups++
+		if lookups == 1 {
+			return "", lookupErr
+		}
+		return "", errors.New("rpc error: code = NotFound desc = instance not found")
+	}
+
+	err := steps.aReplacementNodeJoinsTheCluster(t.Context())
+
+	require.ErrorIs(t, err, lookupErr)
+	assert.ErrorIs(t, err, framework.ErrComputeInstanceLookup)
+	assert.Equal(t, 1, lookups)
 }
