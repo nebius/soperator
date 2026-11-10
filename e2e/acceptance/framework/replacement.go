@@ -115,13 +115,10 @@ func ObserveWorkerReplacement(ctx context.Context, runtime Runtime, kubectl *Kub
 func WaitForInstanceRemoval(ctx context.Context, runtime Runtime, instanceID string, timeout, pollInterval time.Duration) error {
 	var lookupErr error
 	err := runtime.WaitFor(ctx, "old instance removal", timeout, pollInterval, func(waitCtx context.Context) (bool, error) {
-		removed, err := InstanceRemoved(waitCtx, runtime, instanceID)
-		if err != nil {
-			// Runtime.WaitFor retries callback errors; a failed lookup must survive a later NotFound.
-			lookupErr = err
-			return true, nil
-		}
-		return removed, nil
+		// Stop on lookup errors and return the captured error below, outside the retrying poller.
+		var removed bool
+		removed, lookupErr = InstanceRemoved(waitCtx, runtime, instanceID)
+		return removed || lookupErr != nil, nil
 	})
 	if lookupErr != nil {
 		return fmt.Errorf("wait for old instance removal: %w", lookupErr)
