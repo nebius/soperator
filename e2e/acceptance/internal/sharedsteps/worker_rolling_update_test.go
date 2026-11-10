@@ -726,6 +726,10 @@ func (*rolloutPollRuntime) WaitFor(ctx context.Context, _ string, _, _ time.Dura
 	var last error
 	for range 3 {
 		done, err := condition(ctx)
+		var permanent *framework.PermanentError
+		if errors.As(err, &permanent) {
+			return err
+		}
 		last = err
 		if done && err == nil {
 			return nil

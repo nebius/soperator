@@ -82,7 +82,7 @@ func TestWaitForInstanceRemoval(t *testing.T) {
 }
 
 func TestWaitForInstanceRemovalPropagatesLookupError(t *testing.T) {
-	runtime := &replacementRuntime{instanceLookups: []error{errors.New("permission denied")}}
+	runtime := &replacementRuntime{instanceLookups: []error{errors.New("rpc error: code = PermissionDenied desc = permission denied")}}
 	err := WaitForInstanceRemoval(t.Context(), runtime, "old-instance", time.Minute, time.Second)
 	require.ErrorContains(t, err, "permission denied")
 }
@@ -110,7 +110,7 @@ func TestCaptureWorkerReplacementRecordsActualPodAndHostIdentities(t *testing.T)
 	})
 	runtime.nodeStates = []string{"NodeName=worker-0 InstanceId=original-instance State=IDLE"}
 	runtime.instanceLookups = []error{nil}
-	captured, err := CaptureWorkerReplacement(t.Context(), kubectl, slurm, original.WorkerName)
+	captured, err := CaptureWorkerReplacement(t.Context(), runtime, kubectl, slurm, original.WorkerName)
 	require.NoError(t, err)
 	require.Equal(t, original, captured)
 	require.Empty(t, runtime.instanceLookups, "read the original Compute instance before recording the baseline")
@@ -162,7 +162,7 @@ func TestCaptureWorkerReplacementRejectsIncompleteOrUnreadyBaseline(t *testing.T
 			runtime.instanceLookups = []error{nil}
 			tt.change(&pod, runtime)
 			runtime.kubectlOutputs["get\x00pod\x00worker-pod-0\x00-n\x00soperator\x00-o\x00json"] = replacementJSON(t, pod)
-			_, err := CaptureWorkerReplacement(t.Context(), kubectl, slurm, original.WorkerName)
+			_, err := CaptureWorkerReplacement(t.Context(), runtime, kubectl, slurm, original.WorkerName)
 			require.ErrorContains(t, err, tt.want)
 		})
 	}

@@ -134,11 +134,20 @@ func (r *maintenanceTestRuntime) WaitFor(ctx context.Context, label string, _, _
 	r.waitLabels = append(r.waitLabels, label)
 	var last error
 	for r.iteration = 1; r.iteration <= 3; r.iteration++ {
+		if ctx.Err() != nil {
+			break
+		}
 		if r.observe != nil {
 			r.observe(r)
 		}
 		done, err := condition(ctx)
-		last = err
+		if err != nil && ctx.Err() == nil {
+			var permanent *framework.PermanentError
+			if errors.As(err, &permanent) {
+				return err
+			}
+			last = err
+		}
 		if done && err == nil {
 			return nil
 		}

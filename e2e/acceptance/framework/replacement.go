@@ -14,8 +14,8 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
 
-// ErrComputeInstanceLookup marks an observation failure that must stop replacement polling.
-var ErrComputeInstanceLookup = errors.New("read Compute instance")
+// ErrComputeInstanceAccess marks a Compute authentication or authorization failure.
+var ErrComputeInstanceAccess = errors.New("access Compute instance")
 
 type WorkerReplacementSnapshot struct {
 	Namespace  string
@@ -28,7 +28,7 @@ type WorkerReplacementSnapshot struct {
 }
 
 // CaptureWorkerReplacement records the identities that maintenance must replace.
-func CaptureWorkerReplacement(ctx context.Context, kubectl *KubectlClient, slurm *SlurmClient, workerName string) (WorkerReplacementSnapshot, error) {
+func CaptureWorkerReplacement(ctx context.Context, exec Exec, kubectl *KubectlClient, slurm *SlurmClient, workerName string) (WorkerReplacementSnapshot, error) {
 	info, err := kubectl.WorkerPodForSlurmNode(ctx, workerName)
 	if err != nil {
 		return WorkerReplacementSnapshot{}, err
@@ -57,7 +57,7 @@ func CaptureWorkerReplacement(ctx context.Context, kubectl *KubectlClient, slurm
 	if node.InstanceID == "" {
 		return WorkerReplacementSnapshot{}, fmt.Errorf("record Compute instance for worker %s: state=%s reason=%s", workerName, node.State, node.Reason)
 	}
-	present, err = computeInstancePresent(ctx, kubectl.exec, node.InstanceID)
+	present, err = computeInstancePresent(ctx, exec, node.InstanceID)
 	if err != nil {
 		return WorkerReplacementSnapshot{}, err
 	}
@@ -104,26 +104,15 @@ func ObserveWorkerReplacement(ctx context.Context, runtime Runtime, kubectl *Kub
 		return pod, false, nil
 	}
 	removed, err := InstanceRemoved(ctx, runtime, original.InstanceID)
-	if err != nil {
-		return pod, false, fmt.Errorf("check original Compute instance %s: %w", original.InstanceID, err)
-	}
-	return pod, removed, nil
+	return pod, removed, err
 }
 
 // WaitForInstanceRemoval waits until Compute no longer returns the original instance.
-// Lookup and response validation errors stop the wait immediately.
+// Authentication and authorization errors stop the wait; other observation errors are retried.
 func WaitForInstanceRemoval(ctx context.Context, runtime Runtime, instanceID string, timeout, pollInterval time.Duration) error {
-	var lookupErr error
-	err := runtime.WaitFor(ctx, "old instance removal", timeout, pollInterval, func(waitCtx context.Context) (bool, error) {
-		// Stop on lookup errors and return the captured error below, outside the retrying poller.
-		var removed bool
-		removed, lookupErr = InstanceRemoved(waitCtx, runtime, instanceID)
-		return removed || lookupErr != nil, nil
+	return runtime.WaitFor(ctx, "old instance removal", timeout, pollInterval, func(waitCtx context.Context) (bool, error) {
+		return InstanceRemoved(waitCtx, runtime, instanceID)
 	})
-	if lookupErr != nil {
-		return fmt.Errorf("wait for old instance removal: %w", lookupErr)
-	}
-	return err
 }
 
 // InstanceRemoved checks whether Compute no longer returns an original instance.
@@ -135,15 +124,19 @@ func InstanceRemoved(ctx context.Context, runtime Runtime, instanceID string) (b
 
 func computeInstancePresent(ctx context.Context, exec Exec, instanceID string) (bool, error) {
 	if strings.TrimSpace(instanceID) == "" {
-		return false, fmt.Errorf("%w: instance ID is empty", ErrComputeInstanceLookup)
+		return false, fmt.Errorf("read Compute instance: instance ID is empty")
 	}
 	output, err := exec.Local().Run(ctx, "nebius", "compute", "instance", "get", "--id", instanceID, "--format", "json")
 	if err != nil {
-		_, status, found := strings.Cut(err.Error(), "rpc error: code = ")
-		if found && strings.HasPrefix(status, "NotFound desc = ") {
+		_, status, _ := strings.Cut(err.Error(), "rpc error: code = ")
+		code, _, _ := strings.Cut(status, " desc = ")
+		switch strings.ToLower(code) {
+		case "notfound":
 			return false, nil
+		case "permissiondenied", "unauthenticated":
+			return false, &PermanentError{Err: fmt.Errorf("%w %s: %w", ErrComputeInstanceAccess, instanceID, err)}
 		}
-		return false, fmt.Errorf("%w %s: %w", ErrComputeInstanceLookup, instanceID, err)
+		return false, fmt.Errorf("read Compute instance %s: %w", instanceID, err)
 	}
 	var instance struct {
 		Metadata struct {
@@ -151,10 +144,10 @@ func computeInstancePresent(ctx context.Context, exec Exec, instanceID string) (
 		} `json:"metadata"`
 	}
 	if err := json.Unmarshal([]byte(output), &instance); err != nil {
-		return false, fmt.Errorf("%w %s: decode response: %w", ErrComputeInstanceLookup, instanceID, err)
+		return false, fmt.Errorf("read Compute instance %s: decode response: %w", instanceID, err)
 	}
 	if instance.Metadata.ID != instanceID {
-		return false, fmt.Errorf("%w %s: observed ID=%q", ErrComputeInstanceLookup, instanceID, instance.Metadata.ID)
+		return false, fmt.Errorf("read Compute instance %s: observed ID=%q", instanceID, instance.Metadata.ID)
 	}
 	return true, nil
 }

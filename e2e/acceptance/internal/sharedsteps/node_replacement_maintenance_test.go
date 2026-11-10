@@ -473,26 +473,54 @@ func TestNodeReplacementRequiresReadableOriginalBeforeSubmittingJob(t *testing.T
 	}
 }
 
-func TestNodeReplacementWaitPreservesComputeLookupFailure(t *testing.T) {
-	steps, runtime := healthMaintenanceSteps(t)
-	pod := runtime.pods[steps.original.PodName]
-	pod.UID, pod.Spec.NodeName = "replacement-pod-uid", "replacement-host"
-	runtime.pods[pod.Name] = pod
-	delete(runtime.hosts, steps.original.NodeName)
-	runtime.nodes[steps.original.WorkerName] = "NodeName=worker-0 State=IDLE InstanceId=replacement-instance"
-	lookupErr := errors.New("rpc error: code = PermissionDenied desc = permission denied")
-	var lookups int
-	runtime.local = func(...string) (string, error) {
-		lookups++
-		if lookups == 1 {
-			return "", lookupErr
+func TestNodeReplacementWaitAndCleanupClassifyComputeLookupFailures(t *testing.T) {
+	for _, action := range []struct {
+		name string
+		run  func(*NodeReplacement, context.Context) error
+	}{
+		{"scenario", (*NodeReplacement).aReplacementNodeJoinsTheCluster},
+		{"maintenance cleanup", (*NodeReplacement).finishMaintenance},
+		{"health cleanup", (*NodeReplacement).finishHealthCheckReplacement},
+	} {
+		for _, tt := range []struct {
+			name      string
+			lookupErr error
+			wantError bool
+		}{
+			{"permission denied", errors.New("rpc error: code = PermissionDenied desc = permission denied"), true},
+			{"unauthenticated", errors.New("rpc error: code = Unauthenticated desc = invalid credentials"), true},
+			{"unavailable", errors.New("rpc error: code = Unavailable desc = temporary failure"), false},
+			{"internal", errors.New("rpc error: code = Internal desc = temporary failure"), false},
+			{"network reset", errors.New("connection reset by peer"), false},
+			{"command timeout", errors.New("nebius compute instance get: signal: killed"), false},
+		} {
+			t.Run(action.name+"/"+tt.name, func(t *testing.T) {
+				steps, runtime := healthMaintenanceSteps(t)
+				pod := runtime.pods[steps.original.PodName]
+				pod.UID, pod.Spec.NodeName = "replacement-pod-uid", "replacement-host"
+				runtime.pods[pod.Name] = pod
+				delete(runtime.hosts, steps.original.NodeName)
+				runtime.nodes[steps.original.WorkerName] = "NodeName=worker-0 State=IDLE InstanceId=replacement-instance"
+				var lookups int
+				runtime.local = func(...string) (string, error) {
+					lookups++
+					if lookups == 1 {
+						return "", tt.lookupErr
+					}
+					return "", errors.New("rpc error: code = NotFound desc = instance not found")
+				}
+
+				err := action.run(steps, t.Context())
+
+				if tt.wantError {
+					require.ErrorIs(t, err, tt.lookupErr)
+					assert.ErrorIs(t, err, framework.ErrComputeInstanceAccess)
+					assert.Equal(t, 1, lookups)
+				} else {
+					require.NoError(t, err)
+					assert.Equal(t, 2, lookups)
+				}
+			})
 		}
-		return "", errors.New("rpc error: code = NotFound desc = instance not found")
 	}
-
-	err := steps.aReplacementNodeJoinsTheCluster(t.Context())
-
-	require.ErrorIs(t, err, lookupErr)
-	assert.ErrorIs(t, err, framework.ErrComputeInstanceLookup)
-	assert.Equal(t, 1, lookups)
 }
