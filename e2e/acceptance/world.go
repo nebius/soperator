@@ -170,6 +170,11 @@ func (w *world) WaitFor(ctx context.Context, description string, timeout, pollIn
 			return nil
 		}
 		if err != nil && waitCtx.Err() == nil {
+			// Retrying API access failures can turn a later NotFound into a false success.
+			message := strings.ToLower(err.Error())
+			if strings.Contains(message, "code = permissiondenied") || strings.Contains(message, "code = unauthenticated") {
+				return fmt.Errorf("wait for %s: %w", description, err)
+			}
 			lastErr = err
 			w.logf("wait for %s still pending: %v", description, err)
 		}
