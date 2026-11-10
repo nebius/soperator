@@ -51,15 +51,16 @@ func (r stressSubmitResult) Duration() time.Duration {
 
 // stressSummary is written to summary.json in the scenario artifacts.
 type stressSummary struct {
-	RunName      string                 `json:"run_name"`
-	Cores        int                    `json:"reserved_cores"`
-	Workers      []string               `json:"reserved_workers"`
-	ExpectedJobs int                    `json:"expected_jobs"`
-	Submit       stressSubmitResult     `json:"submit"`
-	SubmitSecs   float64                `json:"submit_seconds"`
-	Jobs         stressJobStats         `json:"jobs"`
-	Probes       stressProbeSummary     `json:"probes"`
-	Scheduler    stressSchedulerSummary `json:"scheduler"`
+	RunName         string                 `json:"run_name"`
+	NodeReservation string                 `json:"node_reservation"`
+	Cores           int                    `json:"reserved_cores"`
+	Workers         []string               `json:"reserved_workers"`
+	ExpectedJobs    int                    `json:"expected_jobs"`
+	Submit          stressSubmitResult     `json:"submit"`
+	SubmitSecs      float64                `json:"submit_seconds"`
+	Jobs            stressJobStats         `json:"jobs"`
+	Probes          stressProbeSummary     `json:"probes"`
+	Scheduler       stressSchedulerSummary `json:"scheduler"`
 }
 
 // stressMonitor samples controller responsiveness in the background while a load runs.
@@ -79,7 +80,10 @@ type Performance struct {
 	// - the --job-name of every job.
 	// So squeue, sacct and scancel select the run's jobs by name.
 	runName string
-	cores   int
+	// nodeReservation is the whole-node reservation the core reservation nests in;
+	// it keeps every other job off the reserved workers while the load runs.
+	nodeReservation string
+	cores           int
 	// reservedWorkers are the idle nodes picked for the reservation: the only
 	// nodes the load runs on, and the only ones the scenario prepares and cleans.
 	reservedWorkers []framework.WorkerInfo
@@ -119,9 +123,14 @@ func (s *Performance) CleanupAndReset(ctx context.Context) {
 		// Each phase has its own deadline: a queue that drains slowly must not starve the
 		// reservation deletion, since a leftover reservation keeps the nodes from being idle.
 		s.cleanupPhase(ctx, "cancel stress jobs", s.cancelStressJobs)
-		s.cleanupPhase(ctx, "delete stress reservation "+s.runName, func(ctx context.Context) error {
-			_, err := s.runtime.Jail().RunWithRetry(ctx, stressDeleteReservationCommand(s.runName), stressCleanupAttempts, stressCleanupPoll)
-			return err
+		s.cleanupPhase(ctx, "delete stress reservations", func(ctx context.Context) error {
+			var problems []string
+			for _, name := range []string{s.runName, s.nodeReservation} {
+				if _, err := s.runtime.Jail().RunWithRetry(ctx, stressDeleteReservationCommand(name), stressCleanupAttempts, stressCleanupPoll); err != nil {
+					problems = append(problems, name+": "+err.Error())
+				}
+			}
+			return joinProblems(problems)
 		})
 		s.cleanupPhase(ctx, "drop worker caches", s.dropWorkerCaches)
 	}
@@ -202,6 +211,9 @@ func (s *Performance) slurmQueueIsIdle(ctx context.Context) error {
 // The cores are reserved as an even share per node (TRESPerNode), so the number of jobs a worker
 // runs at once is the same on every platform; a plain CoreCnt would pack them onto as few nodes
 // as possible and the split would depend on the node size.
+// The core reservation nests, with the OVERLAP flag, inside a whole-node reservation of the same
+// workers: the cores bound the load, the nodes keep every other job, GPU or not, off the workers
+// while it runs, so nothing else shares their slurmd, memory or prolog with the measured jobs.
 // The step skips when the partition does not have enough nodes large enough for an even share,
 // and fails when it does but the cores cannot be reserved, for example because a node is down or busy.
 func (s *Performance) coresAreReserved(ctx context.Context, cores, nodes int) error {
@@ -246,21 +258,31 @@ func (s *Performance) coresAreReserved(ctx context.Context, cores, nodes int) er
 	}
 
 	name := fmt.Sprintf("e2e-stress-%d", time.Now().UnixNano())
+	nodeName := name + "-nodes"
 	s.runName = name
+	s.nodeReservation = nodeName
 	s.cores = cores
-	// The show after the create decides success, so a retry after a lost exec
-	// stream finds the reservation already created instead of failing.
-	command := stressReservationCommand(name, chosen, cores, stressReservationDuration) +
-		"; scontrol show reservation " + framework.ShellQuote(name) + " --oneliner"
+	// The shows after the creates decide success, so a retry after a lost exec
+	// stream finds the reservations already created instead of failing.
+	command := strings.Join([]string{
+		stressNodeReservationCommand(nodeName, chosen, stressReservationDuration),
+		stressReservationCommand(name, chosen, cores, stressReservationDuration),
+		"scontrol show reservation " + framework.ShellQuote(nodeName) + " --oneliner",
+		"scontrol show reservation " + framework.ShellQuote(name) + " --oneliner",
+	}, "; ")
 	shown, err := s.runtime.Jail().RunWithDefaultRetry(ctx, command)
 	if err != nil {
-		return fmt.Errorf("reserve %d cores on %s: %w", cores, strings.Join(chosen, ", "), err)
+		return fmt.Errorf("reserve %s and %d cores on them: %w", strings.Join(chosen, ", "), cores, err)
 	}
-	if got := extractField(shown, "CoreCnt"); got != strconv.Itoa(cores) {
+	reservations := reservationsByName(shown)
+	if nodes := extractField(reservations[nodeName], "Nodes"); nodes == "" {
+		return fmt.Errorf("node reservation %s was not created: %s", nodeName, strings.TrimSpace(shown))
+	}
+	if got := extractField(reservations[name], "CoreCnt"); got != strconv.Itoa(cores) {
 		return fmt.Errorf("reservation %s holds %q cores, expected %d: %s", name, got, cores, strings.TrimSpace(shown))
 	}
-	s.runtime.Logf("Performance: reservation %s holds %d cores for %s: %s",
-		name, cores, stressReservationDuration, strings.Join(reservationCoreSplit(shown), ", "))
+	s.runtime.Logf("Performance: reservation %s holds %d cores for %s inside node reservation %s: %s",
+		name, cores, stressReservationDuration, nodeName, strings.Join(reservationCoreSplit(reservations[name]), ", "))
 	return nil
 }
 
@@ -560,15 +582,16 @@ func (s *Performance) saveSamples(samples []stressSample) {
 // saveSummary writes summary.json with whatever the steps so far have measured.
 func (s *Performance) saveSummary() {
 	summary := stressSummary{
-		RunName:      s.runName,
-		Cores:        s.cores,
-		Workers:      framework.WorkerNames(s.reservedWorkers),
-		ExpectedJobs: s.expectedJobs,
-		Submit:       s.submitResult,
-		SubmitSecs:   s.submitResult.Duration().Seconds(),
-		Jobs:         s.jobs,
-		Probes:       s.probes,
-		Scheduler:    s.scheduler,
+		RunName:         s.runName,
+		NodeReservation: s.nodeReservation,
+		Cores:           s.cores,
+		Workers:         framework.WorkerNames(s.reservedWorkers),
+		ExpectedJobs:    s.expectedJobs,
+		Submit:          s.submitResult,
+		SubmitSecs:      s.submitResult.Duration().Seconds(),
+		Jobs:            s.jobs,
+		Probes:          s.probes,
+		Scheduler:       s.scheduler,
 	}
 	encoded, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {
@@ -713,9 +736,22 @@ func chooseStressNodes(nodes []partitionNode, count, cores int) ([]string, error
 	return chosen[:count], nil
 }
 
-// stressReservationCommand reserves cores in total on the named nodes for the
-// user, starting now. The nodes are explicit so that the step controls which idle
-// nodes take part; Slurm decides how the cores are packed onto them.
+// stressNodeReservationCommand reserves the named nodes whole for the user, starting now:
+// every core, GPU and byte of memory, so that no other job can share the workers with the load.
+func stressNodeReservationCommand(name string, nodes []string, duration time.Duration) string {
+	return framework.ShellJoin("scontrol", "create", "reservation",
+		"ReservationName="+name,
+		"Users="+stressUserName,
+		"PartitionName="+framework.MainPartitionName,
+		"StartTime=now",
+		fmt.Sprintf("Duration=%d", int(duration.Minutes())),
+		"Nodes="+strings.Join(nodes, ","),
+	)
+}
+
+// stressReservationCommand reserves cores in total on the named nodes for the user, starting now,
+// inside the node reservation of the same nodes: the OVERLAP flag lets it take cores the node
+// reservation already holds. The jobs name this reservation, so Slurm confines them to its cores.
 func stressReservationCommand(name string, nodes []string, cores int, duration time.Duration) string {
 	return framework.ShellJoin("scontrol", "create", "reservation",
 		"ReservationName="+name,
@@ -726,7 +762,19 @@ func stressReservationCommand(name string, nodes []string, cores int, duration t
 		"Nodes="+strings.Join(nodes, ","),
 		// Cores per node, despite the name: Slurm rejects a per-node list in CoreCnt since 24.x.
 		fmt.Sprintf("TRESPerNode=cpu=%d", cores/len(nodes)),
+		"Flags=OVERLAP",
 	)
+}
+
+// reservationsByName maps each `scontrol show reservation --oneliner` line to its name.
+func reservationsByName(output string) map[string]string {
+	shown := map[string]string{}
+	for line := range strings.SplitSeq(output, "\n") {
+		if name := extractField(line, "ReservationName"); name != "" {
+			shown[name] = line
+		}
+	}
+	return shown
 }
 
 // stressDeleteReservationCommand succeeds when the reservation is deleted or already gone,

@@ -9,6 +9,8 @@ Feature: Performance
   Scenario: A burst of batch jobs is accepted and drained within the budget
     Given Slurm accounting is reachable and the cluster is registered
     And the Slurm queue is idle
+    # The cores are reserved inside a whole-node reservation of the same workers, so the load
+    # runs on a fixed number of cores while nothing else, GPU jobs included, shares the workers.
     And 128 free cores on 2 workers are reserved for the stress test user
     # Mixed core counts keep most jobs off the serial-job path that pack_serial_at_end optimizes.
     # Short sleeps let the reserved cores retire jobs almost as fast as the per-user RPC limit

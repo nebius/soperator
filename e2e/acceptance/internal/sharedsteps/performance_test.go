@@ -51,11 +51,24 @@ func TestCancelStressUserJobsCommand(t *testing.T) {
 		"a fresh cluster has no stress user yet, and scancel rejects an unknown user name")
 }
 
-func TestStressReservationCommand(t *testing.T) {
+func TestStressReservationCommands(t *testing.T) {
+	assert.Equal(t,
+		"'scontrol' 'create' 'reservation' 'ReservationName=e2e-stress-7-nodes' 'Users=stress' 'PartitionName=main' "+
+			"'StartTime=now' 'Duration=40' 'Nodes=worker-0,worker-1'",
+		stressNodeReservationCommand("e2e-stress-7-nodes", []string{"worker-0", "worker-1"}, 40*time.Minute),
+		"the node reservation takes the whole nodes, so no other job shares them")
 	assert.Equal(t,
 		"'scontrol' 'create' 'reservation' 'ReservationName=e2e-stress-7' 'Users=stress' 'PartitionName=main' "+
-			"'StartTime=now' 'Duration=40' 'Nodes=worker-0,worker-1' 'TRESPerNode=cpu=64'",
-		stressReservationCommand("e2e-stress-7", []string{"worker-0", "worker-1"}, 128, 40*time.Minute))
+			"'StartTime=now' 'Duration=40' 'Nodes=worker-0,worker-1' 'TRESPerNode=cpu=64' 'Flags=OVERLAP'",
+		stressReservationCommand("e2e-stress-7", []string{"worker-0", "worker-1"}, 128, 40*time.Minute),
+		"the core reservation overlaps the node reservation")
+
+	shown := "ReservationName=e2e-stress-7-nodes StartTime=2026-11-10T14:00:00 Nodes=worker-[0-1] NodeCnt=2 CoreCnt=320 Users=stress\n" +
+		"ReservationName=e2e-stress-7 StartTime=2026-11-10T14:00:00 Nodes=worker-[0-1] NodeCnt=2 CoreCnt=128 Flags=OVERLAP,SPEC_NODES Users=stress\n"
+	byName := reservationsByName(shown)
+	assert.Equal(t, "worker-[0-1]", extractField(byName["e2e-stress-7-nodes"], "Nodes"))
+	assert.Equal(t, "128", extractField(byName["e2e-stress-7"], "CoreCnt"))
+	assert.Empty(t, byName["missing"])
 }
 
 func TestStaleStressReservations(t *testing.T) {
