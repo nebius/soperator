@@ -22,12 +22,18 @@ func TestParseStressSample(t *testing.T) {
 	assert.Equal(t, 0, idle.Pending)
 	assert.Empty(t, idle.Error)
 
-	broken := parseStressSample("squeue_ms=120\nsqueue_status=1\nsinfo_ms=x\nsinfo_status=0\nsdiag_ms=1\nsdiag_status=0\n")
+	broken := parseStressSample("squeue_ms=120\nsqueue_status=1\nsinfo_ms=x\nsinfo_status=0\nsdiag_ms=1\n")
 	assert.Equal(t, int64(120), broken.SqueueMillis)
 	assert.Contains(t, broken.Error, `sinfo_ms="x"`)
-	assert.Contains(t, broken.Error, `squeue_status="1"`)
+	assert.Contains(t, broken.Error, "sdiag_status missing")
 	assert.Contains(t, broken.Error, "no states: section")
 	assert.Contains(t, broken.Error, "no sdiag: section")
+	assert.Equal(t, "squeue exited 1 after 120 ms", broken.SlurmError, "a nonzero Slurm exit is a failure, not a missing measurement")
+
+	timedOut := parseStressSample("squeue_ms=60210\nsqueue_status=1\nsinfo_ms=60205\nsinfo_status=1\nsdiag_ms=250\nsdiag_status=0\n" +
+		"states:\n\nsdiag:\n" + sdiag)
+	assert.Empty(t, timedOut.Error)
+	assert.Equal(t, "squeue exited 1 after 60210 ms, sinfo exited 1 after 60205 ms", timedOut.SlurmError)
 
 	noSdiag := parseStressSample(header + "states:\n\nsdiag:\nsdiag: error: Unable to contact slurm controller\n")
 	assert.Nil(t, noSdiag.Sdiag)
@@ -75,6 +81,13 @@ func TestEvaluateStressProbes(t *testing.T) {
 	assert.Contains(t, err.Error(), "squeue mean 2400 ms, budget 1s")
 	assert.Contains(t, err.Error(), "squeue max 7000 ms, budget 5s")
 	assert.NotContains(t, err.Error(), "sinfo")
+
+	failed := append(samples[:3:3], stressSample{At: at.Add(30 * time.Second), SqueueMillis: 60210, SinfoMillis: 60, SlurmError: "squeue exited 1 after 60210 ms"})
+	failedSummary := summarizeStressProbes(failed)
+	assert.Equal(t, 1, failedSummary.SlurmErrors)
+	assert.Equal(t, "10:00:30: squeue exited 1 after 60210 ms", failedSummary.FirstSlurmError)
+	assert.Equal(t, float64(60210), failedSummary.Squeue.Max, "a failed probe keeps its measured latency")
+	require.ErrorContains(t, evaluateStressProbes(failedSummary, budget), "controller failed 1 of 4 responsiveness probes during the load, first at 10:00:30: squeue exited 1 after 60210 ms")
 
 	summary.Squeue = stressDistribution{Mean: 1500, P95: 1500, Max: 1500}
 	require.ErrorContains(t, evaluateStressProbes(summary, budget), "squeue mean 1500 ms, budget 1s",
@@ -197,7 +210,10 @@ func TestEvaluateStressScheduler(t *testing.T) {
 	healthy := stressSchedulerSummary{JobsSubmitted: 5, JobsFailed: 2, JobsCanceled: 1, ScheduleCycles: 10, ScheduleCycleMeanSecs: 0.5, BackfillCycles: 4, BackfillCycleMeanSecs: 0.1}
 	require.NoError(t, evaluateStressScheduler(healthy, budget),
 		"failed and canceled jobs of other users are not the load's problem")
-	require.ErrorContains(t, evaluateStressScheduler(stressSchedulerSummary{Resets: 1, JobsSubmitted: 2, ScheduleCycles: 10, ScheduleCycleMeanSecs: 0.5, BackfillCycles: 4},
+	require.NoError(t, evaluateStressScheduler(stressSchedulerSummary{Resets: 1, JobsSubmitted: 2, ScheduleCycles: 10, ScheduleCycleMeanSecs: 0.5, BackfillCycles: 4},
 		budget),
-		"counted 2 submitted jobs", "the summed deltas are checked even across a reset")
+		"a counter reset during the load loses submissions, so the count is not asserted after one")
+	require.ErrorContains(t, evaluateStressScheduler(stressSchedulerSummary{Resets: 1, JobsSubmitted: 2, ScheduleCycles: 10, ScheduleCycleMeanSecs: 5, BackfillCycles: 4},
+		budget),
+		"main scheduler mean cycle", "the cycle budgets still apply across a reset")
 }

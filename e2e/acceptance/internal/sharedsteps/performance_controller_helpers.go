@@ -19,7 +19,13 @@ type stressSample struct {
 	Running int `json:"running"`
 	// Sdiag is the controller's statistics at the probe, nil when sdiag failed.
 	Sdiag *sdiagStatistics `json:"sdiag,omitempty"`
-	Error string           `json:"error,omitempty"`
+	// Error is set when the probe could not be measured: the exec failed or its output is incomplete.
+	// Such a sample says nothing about the controller and is left out of the statistics.
+	Error string `json:"error,omitempty"`
+	// SlurmError names the Slurm commands that exited nonzero, with their status and how long they ran.
+	// The controller answered badly or not within MessageTimeout, so the latencies are real observations
+	// and stay in the statistics, and one such sample fails the responsiveness check.
+	SlurmError string `json:"slurm_error,omitempty"`
 }
 
 // sdiagStatistics is the subset of `sdiag --json` statistics the scenario evaluates:
@@ -59,7 +65,7 @@ func (s sdiagStatistics) wentBackwards(to sdiagStatistics) bool {
 // sdiag snapshots taken before, during and after it.
 type stressSchedulerSummary struct {
 	// Resets counts the counter resets seen between consecutive snapshots; each costs
-	// at most one probe interval of counters.
+	// at most one probe interval of counters, which makes JobsSubmitted a lower bound.
 	Resets        int   `json:"resets"`
 	JobsSubmitted int64 `json:"jobs_submitted"`
 	// JobsFailed and JobsCanceled count every user's jobs, so they are reported, not
@@ -76,8 +82,15 @@ type stressSchedulerSummary struct {
 
 // stressProbeSummary aggregates the responsiveness probes; latencies are in milliseconds.
 type stressProbeSummary struct {
-	Samples    int                `json:"samples"`
-	Errors     int                `json:"errors"`
+	Samples int `json:"samples"`
+
+	// Errors counts the probes that could not be measured.
+	Errors int `json:"errors"`
+	// SlurmErrors counts the probes whose Slurm command exited nonzero.
+	SlurmErrors int `json:"slurm_errors"`
+	// FirstSlurmError describes the earliest of those probes, prefixed with its time.
+	FirstSlurmError string `json:"first_slurm_error,omitempty"`
+
 	Squeue     stressDistribution `json:"squeue_ms"`
 	Sinfo      stressDistribution `json:"sinfo_ms"`
 	Sdiag      stressDistribution `json:"sdiag_ms"`
@@ -143,11 +156,20 @@ func parseStressSample(output string) stressSample {
 	sample.SqueueMillis = millis("squeue_ms")
 	sample.SinfoMillis = millis("sinfo_ms")
 	sample.SdiagMillis = millis("sdiag_ms")
-	for _, key := range []string{"squeue_status", "sinfo_status", "sdiag_status"} {
-		if values[key] != "0" {
-			problems = append(problems, fmt.Sprintf("%s=%q", key, values[key]))
+	var failed []string
+	for _, command := range []struct {
+		name   string
+		millis int64
+	}{{"squeue", sample.SqueueMillis}, {"sinfo", sample.SinfoMillis}, {"sdiag", sample.SdiagMillis}} {
+		status, ok := values[command.name+"_status"]
+		switch {
+		case !ok:
+			problems = append(problems, command.name+"_status missing")
+		case status != "0":
+			failed = append(failed, fmt.Sprintf("%s exited %s after %d ms", command.name, status, command.millis))
 		}
 	}
+	sample.SlurmError = strings.Join(failed, ", ")
 	counts := parseStateCounts(states)
 	sample.Pending = counts["PENDING"]
 	sample.Running = counts["RUNNING"]
@@ -173,6 +195,12 @@ func summarizeStressProbes(samples []stressSample) stressProbeSummary {
 		if sample.Error != "" {
 			summary.Errors++
 			continue
+		}
+		if sample.SlurmError != "" {
+			summary.SlurmErrors++
+			if summary.FirstSlurmError == "" {
+				summary.FirstSlurmError = sample.At.Format(time.TimeOnly) + ": " + sample.SlurmError
+			}
 		}
 		squeue = append(squeue, float64(sample.SqueueMillis))
 		sinfo = append(sinfo, float64(sample.SinfoMillis))
@@ -205,6 +233,12 @@ func evaluateStressProbes(summary stressProbeSummary, budget stressProbeBudget) 
 	const stressMinProbeSamples = 3
 	if measured := summary.Samples - summary.Errors; measured < stressMinProbeSamples {
 		return fmt.Errorf("only %d of %d responsiveness probes ran, expected at least %d", measured, summary.Samples, stressMinProbeSamples)
+	}
+	// A Slurm command that fails during the load is never within budget: the client gave up
+	// after MessageTimeout or the controller refused it, whatever the latency statistics say.
+	if summary.SlurmErrors > 0 {
+		return fmt.Errorf("controller failed %d of %d responsiveness probes during the load, first at %s",
+			summary.SlurmErrors, summary.Samples, summary.FirstSlurmError)
 	}
 	var problems []string
 	for _, probe := range []struct {
@@ -284,7 +318,11 @@ type stressSchedulerBudget struct {
 
 func evaluateStressScheduler(summary stressSchedulerSummary, budget stressSchedulerBudget) error {
 	var problems []string
-	if summary.JobsSubmitted < budget.MinSubmitted {
+	// The counters reset at midnight on the controller; a reset inside the submission phase
+	// loses up to one probe interval of submissions, so the count is only a lower bound then.
+	// Accounting has already proven every job individually by this step, so the sdiag count
+	// is only asserted when it is exact.
+	if summary.Resets == 0 && summary.JobsSubmitted < budget.MinSubmitted {
 		problems = append(problems, fmt.Sprintf("controller counted %d submitted jobs, expected at least %d", summary.JobsSubmitted, budget.MinSubmitted))
 	}
 	for _, scheduler := range []struct {

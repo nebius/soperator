@@ -92,7 +92,8 @@ func stressTestRecordWithSteps(id string, submit, start, firstStep, lastStep, en
 }
 
 func TestStressJobProblems(t *testing.T) {
-	require.NoError(t, stressJobProblems([]stressJobRecord{stressTestRecord("1", 0, 1, 2, "worker-0")}))
+	good := stressTestRecordWithSteps("1", 0, 1, 1, 2, 2, 2, "worker-0")
+	require.NoError(t, stressJobProblems([]stressJobRecord{good}))
 
 	failed := stressTestRecord("2", 0, 1, 2, "worker-1")
 	failed.State = "FAILED"
@@ -101,12 +102,16 @@ func TestStressJobProblems(t *testing.T) {
 	unstarted.Start = time.Time{}
 	requeued := stressTestRecord("4", 0, 1, 2, "worker-0")
 	requeued.Restarts = 1
-	err := stressJobProblems([]stressJobRecord{stressTestRecord("1", 0, 1, 2, "worker-0"), failed, unstarted, requeued})
+	noSteps := stressTestRecord("5", 0, 1, 2, "worker-1")
+	err := stressJobProblems([]stressJobRecord{good, failed, unstarted, requeued, noSteps})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "3 of 4 jobs did not complete successfully")
+	assert.Contains(t, err.Error(), "4 of 5 jobs did not complete successfully")
 	assert.Contains(t, err.Error(), "job 2 finished with state=FAILED exit_code=1:0 node=worker-1")
 	assert.Contains(t, err.Error(), "job 3 lacks submit, start or end time")
 	assert.Contains(t, err.Error(), "job 4 was requeued 1 times, last node=worker-0")
+	assert.Contains(t, err.Error(), "job 5 lacks step records", "a completed job without step rows must not vanish from the phase statistics")
+	assert.Equal(t, []string{"5", "2"}, stressJobsWithoutSteps([]stressJobRecord{good, noSteps, failed}),
+		"the step-record wait lists every job without step rows, whatever its state")
 }
 
 func TestStressJobProblemsTruncates(t *testing.T) {
@@ -128,16 +133,16 @@ func TestComputeStressJobStats(t *testing.T) {
 		stressTestRecordWithSteps("1", 100, 101, 102, 104, 105, 107, "worker-0"),
 		stressTestRecordWithSteps("2", 100, 103, 103, 110, 110, 0, "worker-1"),
 		stressTestRecordWithSteps("3", 101, 110, 112, 118, 119, 119, "worker-0"),
-		stressTestRecord("4", 102, 102, 120, "worker-1"),
+		stressTestRecordWithSteps("4", 102, 102, 104, 118, 120, 0, "worker-1"),
 	}
 	stats := computeStressJobStats(records)
 	assert.Equal(t, 4, stats.Jobs)
 	assert.Equal(t, 20.0, stats.WallSeconds)
 	assert.InDelta(t, 0.2, stats.ThroughputPerSecond, 1e-9)
 	assert.Equal(t, stressDistribution{Mean: 3.25, P50: 1, P90: 9, P95: 9, P99: 9, Max: 9}, stats.QueueWait)
-	assert.Equal(t, stressDistribution{Mean: 1, P50: 1, P90: 2, P95: 2, P99: 2, Max: 2}, stats.Startup, "jobs without step rows are left out of the step phases")
-	assert.Equal(t, stressDistribution{Mean: 5, P50: 6, P90: 7, P95: 7, P99: 7, Max: 7}, stats.Steps)
-	assert.Equal(t, stressDistribution{Mean: 1.0 + 1.0/3.0, P50: 1, P90: 3, P95: 3, P99: 3, Max: 3}, stats.Teardown, "teardown ends at the job end without an extern step")
+	assert.Equal(t, stressDistribution{Mean: 1.25, P50: 1, P90: 2, P95: 2, P99: 2, Max: 2}, stats.Startup)
+	assert.Equal(t, stressDistribution{Mean: 7.25, P50: 6, P90: 14, P95: 14, P99: 14, Max: 14}, stats.Steps)
+	assert.Equal(t, stressDistribution{Mean: 1.5, P50: 1, P90: 3, P95: 3, P99: 3, Max: 3}, stats.Teardown, "teardown ends at the job end without an extern step")
 	assert.Equal(t, stressDistribution{Mean: 9.5, P50: 7, P90: 18, P95: 18, P99: 18, Max: 18}, stats.Run)
 	assert.Equal(t, []string{"worker-0", "worker-1"}, stats.Workers)
 	assert.Equal(t, "mean 3.2s p50 1.0s p90 9.0s p95 9.0s p99 9.0s max 9.0s", stats.QueueWait.String())

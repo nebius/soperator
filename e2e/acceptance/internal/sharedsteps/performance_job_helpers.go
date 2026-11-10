@@ -236,7 +236,28 @@ func stressJobProblem(record stressJobRecord) string {
 	if record.Submit.IsZero() || record.Start.IsZero() || record.End.IsZero() {
 		return fmt.Sprintf("job %s lacks submit, start or end time", record.ID)
 	}
+	if !record.hasSteps() {
+		return fmt.Sprintf("job %s lacks step records", record.ID)
+	}
 	return ""
+}
+
+// hasSteps reports whether accounting holds the step timestamps the node-side phases are computed from.
+func (r stressJobRecord) hasSteps() bool {
+	return !r.FirstStepStart.IsZero() && !r.LastStepEnd.IsZero()
+}
+
+// stressJobsWithoutSteps lists the jobs whose step records accounting does not hold yet.
+// Step rows reach slurmdbd through the same queue as the job's completion, so they may trail
+// the allocation row briefly; a job still missing them after the accounting wait is a failure.
+func stressJobsWithoutSteps(records []stressJobRecord) []string {
+	var missing []string
+	for _, record := range records {
+		if !record.hasSteps() {
+			missing = append(missing, record.ID)
+		}
+	}
+	return missing
 }
 
 // stressJobProblems reports jobs that did not complete cleanly, quoting the first few in sacct order.
@@ -279,15 +300,13 @@ func computeStressJobStats(records []stressJobRecord) stressJobStats {
 		}
 		waits = append(waits, secondsBetween(eligible, record.Start))
 		runs = append(runs, secondsBetween(record.Start, record.End))
-		if !record.FirstStepStart.IsZero() && !record.LastStepEnd.IsZero() {
-			startups = append(startups, secondsBetween(record.Start, record.FirstStepStart))
-			steps = append(steps, secondsBetween(record.FirstStepStart, record.LastStepEnd))
-			released := record.ExternEnd
-			if released.IsZero() {
-				released = record.End
-			}
-			teardowns = append(teardowns, secondsBetween(record.LastStepEnd, released))
+		startups = append(startups, secondsBetween(record.Start, record.FirstStepStart))
+		steps = append(steps, secondsBetween(record.FirstStepStart, record.LastStepEnd))
+		released := record.ExternEnd
+		if released.IsZero() {
+			released = record.End
 		}
+		teardowns = append(teardowns, secondsBetween(record.LastStepEnd, released))
 		if record.NodeList != "" {
 			workers[record.NodeList] = struct{}{}
 		}

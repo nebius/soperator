@@ -357,14 +357,16 @@ func (s *Performance) controllerStaysResponsive(_ context.Context, table *godog.
 	samples := s.monitor.samples
 	summary := summarizeStressProbes(samples)
 	s.probes = summary
-	s.runtime.Logf("Performance: %d probes (%d failed to run), squeue %s, sinfo %s, sdiag %s, pending max %d, running max %d",
-		summary.Samples, summary.Errors, summary.Squeue.format("ms"), summary.Sinfo.format("ms"), summary.Sdiag.format("ms"),
+	s.runtime.Logf("Performance: %d probes (%d failed to run, %d failed in Slurm), squeue %s, sinfo %s, sdiag %s, pending max %d, running max %d",
+		summary.Samples, summary.Errors, summary.SlurmErrors, summary.Squeue.format("ms"), summary.Sinfo.format("ms"), summary.Sdiag.format("ms"),
 		summary.PendingMax, summary.RunningMax)
 	for _, sample := range samples {
 		at := sample.At.Format(time.TimeOnly)
 		switch {
 		case sample.Error != "":
 			s.runtime.Logf("Performance: probe at %s failed to run: %s", at, sample.Error)
+		case sample.SlurmError != "":
+			s.runtime.Logf("Performance: probe at %s failed in Slurm: %s", at, sample.SlurmError)
 		case sample.SqueueMillis > budget.SqueueMax.Milliseconds() || sample.SinfoMillis > budget.SinfoMax.Milliseconds() ||
 			sample.SdiagMillis > budget.SdiagMax.Milliseconds():
 			s.runtime.Logf("Performance: probe at %s: squeue %d ms, sinfo %d ms, sdiag %d ms",
@@ -425,7 +427,9 @@ func (s *Performance) deleteStaleReservations(ctx context.Context) error {
 }
 
 // collectCompletedJobs waits up to drainTimeout for the load to leave the queue and then for
-// accounting to hold every job, reads the full records once, saves them and stores the statistics in s.jobs.
+// accounting to hold every job with its step records, saves them and stores the statistics in s.jobs.
+// The cheap count query absorbs the usual accounting lag before the full records are read, and the
+// full read repeats only while some job's step rows still trail its allocation row.
 func (s *Performance) collectCompletedJobs(ctx context.Context, drainTimeout time.Duration) error {
 	queueCommand := stressQueueStatesCommand(s.runName)
 	if err := s.runtime.WaitFor(ctx, fmt.Sprintf("jobs %s to leave the queue", s.runName),
@@ -453,17 +457,30 @@ func (s *Performance) collectCompletedJobs(ctx context.Context, drainTimeout tim
 		return err
 	}
 
-	raw, err := s.runtime.Jail().RunWithDefaultRetry(ctx, stressSacctCommand(s.runName, lookback))
-	if err != nil {
-		return fmt.Errorf("query accounting for %s: %w", s.runName, err)
-	}
-	s.saveArtifact("jobs.csv", raw)
-	records, err := parseStressJobRecords(raw)
-	if err != nil {
+	var records []stressJobRecord
+	recordsCommand := stressSacctCommand(s.runName, lookback)
+	if err := s.runtime.WaitFor(ctx, fmt.Sprintf("step records of %d jobs", s.expectedJobs),
+		accountingTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+			raw, err := s.runtime.Jail().RunWithDefaultRetry(waitCtx, recordsCommand)
+			if err != nil {
+				return false, fmt.Errorf("query accounting for %s: %w", s.runName, err)
+			}
+			s.saveArtifact("jobs.csv", raw)
+			parsed, err := parseStressJobRecords(raw)
+			if err != nil {
+				return false, err
+			}
+			if len(parsed) != s.expectedJobs {
+				return false, fmt.Errorf("expected %d accounting records, got %d", s.expectedJobs, len(parsed))
+			}
+			records = parsed
+			if missing := stressJobsWithoutSteps(parsed); len(missing) > 0 {
+				return false, fmt.Errorf("%d of %d jobs lack step records, e.g. %s",
+					len(missing), len(parsed), strings.Join(missing[:min(len(missing), stressMaxJobProblems)], ", "))
+			}
+			return true, nil
+		}); err != nil {
 		return err
-	}
-	if len(records) != s.expectedJobs {
-		return fmt.Errorf("expected %d accounting records, got %d", s.expectedJobs, len(records))
 	}
 	if err := stressJobProblems(records); err != nil {
 		return err
