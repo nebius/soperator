@@ -15,6 +15,7 @@ import (
 const (
 	passiveCPUJobTimeout          = 3 * time.Minute
 	passiveGPUJobTimeout          = 5 * time.Minute
+	passiveHCProgramTimeout       = 2 * time.Minute
 	passiveAllocGPUDrainTimeout   = 3 * time.Minute
 	passiveAllocGPUJobTimeout     = 4 * time.Minute
 	passiveAllocGPURecoverTimeout = 3 * time.Minute
@@ -45,8 +46,9 @@ type PassiveChecks struct {
 	cpuEpilogOutput string
 	cpuHooksJob     framework.SbatchJob
 
-	gpuHooksJob     framework.SbatchJob
-	gpuHealthRunIDs []string
+	gpuHooksJob                framework.SbatchJob
+	gpuHealthRunIDs            []string
+	gpuHCProgramBaselineRunIDs []string
 
 	tmpfsJobID   string
 	tmpfsExisted bool
@@ -87,6 +89,8 @@ func (s *PassiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a small GPU Slurm job runs on the selected GPU worker$`, s.aSmallGPUSlurmJobRunsOnTheSelectedGPUWorker)
 	sc.Step(`^the GPU job health-check Prolog report is fresh and passing$`, s.theGPUJobHealthCheckPrologReportIsFreshAndPassing)
 	sc.Step(`^the GPU job health-check Epilog report is fresh and passing$`, s.theGPUJobHealthCheckEpilogReportIsFreshAndPassing)
+	sc.Step(`^HealthCheckProgram runs on the selected GPU worker$`, s.healthCheckProgramRunsOnTheSelectedGPUWorker)
+	sc.Step(`^the GPU HealthCheckProgram report is fresh and passing$`, s.theGPUHealthCheckProgramReportIsFreshAndPassing)
 	sc.Step(`^raw GPU health-check command outputs are present$`, s.rawGPUHealthCheckCommandOutputsArePresent)
 	sc.Step(`^a Slurm job checks its job tmpfs directory on the selected worker$`, s.aSlurmJobChecksItsJobTmpfsDirectoryOnTheSelectedWorker)
 	sc.Step(`^the job tmpfs directory existed during the job$`, s.theJobTmpfsDirectoryExistedDuringTheJob)
@@ -111,6 +115,7 @@ func (s *PassiveChecks) CleanupAndReset(ctx context.Context) {
 	s.cpuHooksJob = framework.SbatchJob{}
 	s.gpuHooksJob = framework.SbatchJob{}
 	s.gpuHealthRunIDs = nil
+	s.gpuHCProgramBaselineRunIDs = nil
 	s.gpuCount = 0
 }
 
@@ -359,9 +364,47 @@ func (s *PassiveChecks) gpuJobHealthCheckReportIsFreshAndPassing(ctx context.Con
 	if s.gpuHooksJob.IsZero() {
 		return fmt.Errorf("GPU hook job is not captured")
 	}
-	ids, err := waitForPassingHealthCheckReportsForJob(ctx, s.runtime, s.gpuWorker, gpuHealthCheckOutputPath(s.info.TargetSoperatorVersion, s.gpuWorker.Name, hook), s.gpuHooksJob.ID, passiveGPUJobTimeout)
+	ids, err := waitForPassingHealthCheckReports(ctx, s.runtime, s.gpuWorker, gpuHealthCheckOutputPath(s.info.TargetSoperatorVersion, s.gpuWorker.Name, hook), s.gpuHooksJob.ID, nil, passiveGPUJobTimeout)
 	if err != nil {
 		return fmt.Errorf("%s %s report: %w", hook, gpuHealthCheckName, err)
+	}
+	s.gpuHealthRunIDs = append(s.gpuHealthRunIDs, ids...)
+	return nil
+}
+
+func (s *PassiveChecks) healthCheckProgramRunsOnTheSelectedGPUWorker(ctx context.Context) error {
+	if s.gpuWorker.Name == "" {
+		return fmt.Errorf("GPU worker is not selected")
+	}
+	runCtx, cancel := context.WithTimeout(ctx, passiveHCProgramTimeout)
+	defer cancel()
+	if err := assertHealthCheckProgramConfigured(runCtx, s.runtime); err != nil {
+		return err
+	}
+	s.gpuHCProgramBaselineRunIDs = nil
+	output, exists, err := readWorkerFileIfExists(runCtx, s.runtime, s.gpuWorker, gpuHealthCheckOutputPath(s.info.TargetSoperatorVersion, s.gpuWorker.Name, "hc_program"))
+	if err != nil {
+		return fmt.Errorf("read previous GPU HealthCheckProgram report: %w", err)
+	}
+	if exists {
+		reports, err := parseHealthCheckReports(output)
+		if err != nil {
+			return fmt.Errorf("parse previous GPU HealthCheckProgram report: %w", err)
+		}
+		for _, report := range reports {
+			s.gpuHCProgramBaselineRunIDs = append(s.gpuHCProgramBaselineRunIDs, healthCheckRunID(report))
+		}
+	}
+	return runManualHCProgram(runCtx, s.runtime, s.gpuWorker)
+}
+
+func (s *PassiveChecks) theGPUHealthCheckProgramReportIsFreshAndPassing(ctx context.Context) error {
+	if s.gpuWorker.Name == "" {
+		return fmt.Errorf("GPU worker is not selected")
+	}
+	ids, err := waitForPassingHealthCheckReports(ctx, s.runtime, s.gpuWorker, gpuHealthCheckOutputPath(s.info.TargetSoperatorVersion, s.gpuWorker.Name, "hc_program"), "", s.gpuHCProgramBaselineRunIDs, passiveHCProgramTimeout)
+	if err != nil {
+		return fmt.Errorf("hc_program %s report: %w", gpuHealthCheckName, err)
 	}
 	s.gpuHealthRunIDs = append(s.gpuHealthRunIDs, ids...)
 	return nil
