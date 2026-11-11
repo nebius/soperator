@@ -106,14 +106,16 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	degradedNodes, err := c.findDegradedNodes(ctx)
-	if err != nil {
-		logger.Error(err, "Find degraded nodes produced an error")
-		return ctrl.Result{}, err
+	degradedNodes, findErr := c.findDegradedNodes(ctx)
+	if findErr != nil {
+		logger.Error(findErr, "Find degraded nodes produced an error")
 	}
 
 	logger.Info(fmt.Sprintf("found %d degraded nodes", len(degradedNodes)))
 	var errs []error
+	if findErr != nil {
+		errs = append(errs, findErr)
+	}
 	for slurmClusterName, nodes := range degradedNodes {
 		for _, node := range nodes {
 			if err := c.processDegradedNode(ctx, slurmClusterName, node); err != nil {
@@ -135,11 +137,13 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 // TODO: filter slurmNodes by supported slurm clusters
 func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types.NamespacedName][]slurmapi.Node, error) {
 	degradedNodes := make(map[types.NamespacedName][]slurmapi.Node)
+	var errs []error
 
 	for slurmClusterName, slurmAPIClient := range c.slurmAPIClients.GetClients() {
 		slurmNodes, err := slurmAPIClient.ListNodes(ctx)
 		if err != nil {
-			return nil, err
+			errs = append(errs, fmt.Errorf("list slurm nodes for cluster %s: %w", slurmClusterName, err))
+			continue
 		}
 
 		for _, node := range slurmNodes {
@@ -168,7 +172,7 @@ func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types
 		}
 	}
 
-	return degradedNodes, nil
+	return degradedNodes, errors.Join(errs...)
 }
 
 func (c *SlurmNodesController) processDegradedNode(
