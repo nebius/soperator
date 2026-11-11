@@ -18,6 +18,7 @@ import (
 )
 
 const (
+	nodeReplacementEnabledFlag          = "--enable-node-replacement"
 	nodeReplacementMaintenanceCondition = "NebiusMaintenanceScheduled"
 	nodeReplacementDrainReason          = "[compute_maintenance] node replacement process"
 
@@ -117,7 +118,7 @@ func (s *NodeReplacement) healthCheckDrivenNodeReplacementIsEnabled(ctx context.
 			return fmt.Errorf("read health-check replacement configuration from Deployment %s/%s: %w", deployment.Namespace, deployment.Name, err)
 		}
 		if !enabled {
-			s.runtime.Logf("Skipping health-check-driven node replacement: --enable-node-replacement=false in Deployment %s/%s", deployment.Namespace, deployment.Name)
+			s.runtime.Logf("Skipping health-check-driven node replacement: %s=false in Deployment %s/%s", nodeReplacementEnabledFlag, deployment.Namespace, deployment.Name)
 			return godog.ErrSkip
 		}
 		return nil
@@ -130,7 +131,7 @@ func healthCheckNodeReplacementEnabled(args []string) (bool, error) {
 	enabled := true
 	for _, arg := range args {
 		name, value, hasValue := strings.Cut(arg, "=")
-		if name != "--enable-node-replacement" && name != "-enable-node-replacement" {
+		if name != nodeReplacementEnabledFlag && name != strings.TrimPrefix(nodeReplacementEnabledFlag, "-") {
 			continue
 		}
 		if !hasValue {
@@ -140,7 +141,7 @@ func healthCheckNodeReplacementEnabled(args []string) (bool, error) {
 		var err error
 		enabled, err = strconv.ParseBool(value)
 		if err != nil {
-			return false, fmt.Errorf("parse --enable-node-replacement value %q: %w", value, err)
+			return false, fmt.Errorf("parse %s value %q: %w", nodeReplacementEnabledFlag, value, err)
 		}
 	}
 	return enabled, nil
