@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cucumber/godog"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -17,6 +19,7 @@ import (
 )
 
 const (
+	nodeReplacementEnabledFlag          = "--enable-node-replacement"
 	nodeReplacementMaintenanceCondition = "NebiusMaintenanceScheduled"
 	nodeReplacementDrainReason          = "[compute_maintenance] node replacement process"
 
@@ -93,6 +96,34 @@ func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a replacement node joins the cluster$`, s.aReplacementNodeJoinsTheCluster)
 	sc.Step(`^the replacement node passes GPU validation$`, s.theReplacementNodePassesGPUValidation)
 	sc.Step(`^all pre-existing worker nodes are operational$`, s.allPreExistingWorkerNodesAreOperational)
+}
+
+func (s *NodeReplacement) healthCheckDrivenNodeReplacementIsEnabled(ctx context.Context) error {
+	var deployments appsv1.DeploymentList
+	if err := s.kubectl.GetJSON(ctx, &deployments, "get", "deployments", "-n", framework.SoperatorSystemNamespace,
+		"-l", "control-plane=soperatorchecks", "-o", "json"); err != nil {
+		return fmt.Errorf("read health-check replacement configuration: %w", err)
+	}
+	if len(deployments.Items) == 0 {
+		s.runtime.Logf("Skipping health-check-driven node replacement: soperatorchecks is not deployed")
+		return godog.ErrSkip
+	}
+	if len(deployments.Items) != 1 {
+		return fmt.Errorf("read health-check replacement configuration: expected one soperatorchecks Deployment in %s, found %d",
+			framework.SoperatorSystemNamespace, len(deployments.Items))
+	}
+	deployment := deployments.Items[0]
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		if container.Name != "manager" {
+			continue
+		}
+		if slices.Contains(container.Args, nodeReplacementEnabledFlag+"=false") {
+			s.runtime.Logf("Skipping health-check-driven node replacement: %s=false in Deployment %s/%s", nodeReplacementEnabledFlag, deployment.Namespace, deployment.Name)
+			return godog.ErrSkip
+		}
+		return nil
+	}
+	return fmt.Errorf("read health-check replacement configuration: manager container is missing from Deployment %s/%s", deployment.Namespace, deployment.Name)
 }
 
 func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
@@ -332,6 +363,9 @@ func nodeMaintenanceEventOwned(host corev1.Node) bool {
 func (s *NodeReplacement) aGPUHealthCheckFailureIsSimulatedOnThatNode(ctx context.Context) error {
 	if s.replacementWorker.Name == "" {
 		return fmt.Errorf("worker is not selected")
+	}
+	if err := s.healthCheckDrivenNodeReplacementIsEnabled(ctx); err != nil {
+		return err
 	}
 	// Mark before running: cleanup must inspect the node even when the command ran
 	// but its result never came back.
