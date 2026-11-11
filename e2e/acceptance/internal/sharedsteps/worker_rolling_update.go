@@ -423,7 +423,9 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 			hosts[pod.NodeName] = true
 		}
 		if len(hosts) != len(candidate.initialPods) {
-			framework.ReleaseReservedWorkers(ctx)
+			if err := framework.ReleaseReservedWorkers(ctx); err != nil {
+				return err
+			}
 			rejected = append(rejected, fmt.Sprintf("%s: require a separate host for each worker", candidate.nodeSet.Metadata.Name))
 			continue
 		}
@@ -439,7 +441,9 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 					return err
 				}
 				s.runtime.Logf("Acceptance: NodeSet %s cannot drive the MK8s rollout: %v; trying another NodeSet", candidate.nodeSet.Metadata.Name, err)
-				framework.ReleaseReservedWorkers(ctx)
+				if err := framework.ReleaseReservedWorkers(ctx); err != nil {
+					return err
+				}
 				continue
 			}
 		}

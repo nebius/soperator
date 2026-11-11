@@ -318,6 +318,7 @@ func TestWorkerRolloutCleanupSettlesPartiallyRestartedDaemonSets(t *testing.T) {
 
 type rolloutWorkersRuntime struct {
 	framework.Runtime
+	reservations  concurrentSelectionRuntime
 	nodeSet       kubeobjects.NodeSet
 	nodeSets      []kubeobjects.NodeSet
 	active        []int32
@@ -896,8 +897,13 @@ func (r *rolloutWorkersRuntime) Kubectl() framework.ArgsScope {
 }
 
 func (r *rolloutWorkersRuntime) Controller() framework.CommandScope {
-	return framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
 		r.calls = append(r.calls, command)
+		if command == "scontrol -o show reservations" || strings.HasPrefix(command, "scontrol create reservation ") ||
+			strings.HasPrefix(command, "scontrol delete ReservationName=") ||
+			strings.HasPrefix(command, "scontrol show hostnames ") && len(r.reservations.leases) != 0 {
+			return r.reservations.Controller().Run(ctx, command)
+		}
 		switch {
 		case command == "scontrol show config":
 			return "SuspendExcNodes = worker-0,worker-3\n", nil

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,8 +20,10 @@ import (
 
 type concurrentSelectionRuntime struct {
 	framework.Runtime
-	pods  []corev1.Pod
-	debug bool
+	pods    []corev1.Pod
+	debug   bool
+	leaseMu sync.Mutex
+	leases  map[string][]string
 }
 
 type partitionSmokeRuntime struct {
@@ -133,8 +136,49 @@ func concurrentSelectionHost(name string) corev1.Node {
 		Status: corev1.NodeStatus{Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}}}
 }
 
-func (*concurrentSelectionRuntime) Controller() framework.CommandScope {
+func (r *concurrentSelectionRuntime) Controller() framework.CommandScope {
 	return framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+		r.leaseMu.Lock()
+		defer r.leaseMu.Unlock()
+		value := func(key string) string {
+			for _, field := range strings.Fields(command) {
+				if v, ok := strings.CutPrefix(field, key+"="); ok {
+					return strings.Trim(v, "'")
+				}
+			}
+			return ""
+		}
+		switch {
+		case command == "scontrol -o show reservations":
+			var lines []string
+			for name, nodes := range r.leases {
+				lines = append(lines, "ReservationName="+name+" Nodes="+strings.Join(nodes, ","))
+			}
+			return strings.Join(lines, "\n"), nil
+		case strings.HasPrefix(command, "scontrol show hostnames "):
+			return strings.ReplaceAll(strings.Trim(strings.TrimPrefix(command, "scontrol show hostnames "), "'"), ",", "\n"), nil
+		case strings.HasPrefix(command, "scontrol create reservation "):
+			if r.leases == nil {
+				r.leases = make(map[string][]string)
+			}
+			nodes := strings.Split(value("Nodes"), ",")
+			for _, owned := range r.leases {
+				for _, node := range nodes {
+					for _, other := range owned {
+						if other == node {
+							return "", fmt.Errorf("requested nodes are busy")
+						}
+					}
+				}
+			}
+			r.leases[value("ReservationName")] = nodes
+			return "", nil
+		case strings.HasPrefix(command, "scontrol delete "):
+			delete(r.leases, value("ReservationName"))
+			return "", nil
+		case strings.HasPrefix(command, "squeue "):
+			return "", nil
+		}
 		if strings.HasPrefix(command, "sinfo ") {
 			return "worker-0\nworker-1", nil
 		}

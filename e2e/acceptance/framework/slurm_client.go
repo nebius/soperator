@@ -35,7 +35,7 @@ type SbatchOptions struct {
 	Nodelist     []string // --nodelist (omitted if empty)
 	GPUsPerNode  int      // --gpus-per-node (omitted if 0)
 	TasksPerNode int      // --ntasks-per-node (omitted if 0)
-	ExtraFlags   []string // verbatim flags appended before --wrap
+	ExtraFlags   []string // flags before --wrap; one argv token per element in reservation scopes
 	Wrap         string   // --wrap body
 	RunAsUser    string   // submit through sudo -iu (omitted if empty)
 	OutputDir    string   // explicit output directory; defaults to scenario artifacts, then AcceptanceJobOutputDir
@@ -97,6 +97,13 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	runAsUser := strings.TrimSpace(opts.RunAsUser)
 
 	var args []string
+	reservationFlags, err := WorkerReservationJobFlags(ctx, runAsUser)
+	if err != nil {
+		return SbatchJob{}, err
+	}
+	if len(reservationFlags) != 0 {
+		args = append(args, reservationFlags[0])
+	}
 	args = append(args, "--parsable")
 	args = append(args, fmt.Sprintf("--job-name=%s", ShellQuote(jobName)))
 	args = append(args, fmt.Sprintf("-o %s", ShellQuote(outputDir+"/%x-%j.out")))
@@ -114,7 +121,16 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 		args = append(args, fmt.Sprintf("--ntasks-per-node=%d", opts.TasksPerNode))
 	}
 	for _, flag := range opts.ExtraFlags {
+		if workerReservation(ctx) != nil {
+			if flag == ":" || flag == "--" {
+				return SbatchJob{}, fmt.Errorf("submit reserved job: unexpected option boundary %q", flag)
+			}
+			flag = ShellQuote(flag)
+		}
 		args = append(args, flag)
+	}
+	if len(reservationFlags) != 0 {
+		args = append(args, reservationFlags[1])
 	}
 	args = append(args, fmt.Sprintf("--wrap=%s", ShellQuote(opts.Wrap)))
 
@@ -143,7 +159,6 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	if err != nil {
 		return SbatchJob{}, fmt.Errorf("parse sbatch job id for %q: %w", jobName, err)
 	}
-	TrackReservedJob(ctx, jobID)
 	return SbatchJob{
 		ID:         jobID,
 		JobName:    jobName,

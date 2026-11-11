@@ -22,13 +22,13 @@ func TestRolloutSelectionUsesAvailableCPUOrGPUWithoutWaitingOnBusyCPU(t *testing
 		if busyCPU {
 			_, err := steps.selector.Acquire(holder, framework.WorkerRequirements{NodeSet: "z-cpu", Count: 1})
 			require.NoError(t, err)
-			defer framework.ReleaseReservedWorkers(holder)
+			defer func() { require.NoError(t, framework.ReleaseReservedWorkers(holder)) }()
 		}
 		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 		ctx = framework.WithWorkerReservation(ctx, pool, "rollout")
 		require.NoError(t, steps.selectNodeSet(ctx))
-		defer framework.ReleaseReservedWorkers(ctx)
+		defer func() { require.NoError(t, framework.ReleaseReservedWorkers(ctx)) }()
 		want := "z-cpu"
 		if busyCPU {
 			want = "a-gpu"
@@ -48,9 +48,9 @@ func TestRolloutSelectionCanUseTwoIndependentCPUNodeSets(t *testing.T) {
 	firstCtx := framework.WithWorkerReservation(t.Context(), pool, "first rollout")
 	secondCtx := framework.WithWorkerReservation(t.Context(), pool, "second rollout")
 	require.NoError(t, first.selectNodeSet(firstCtx))
-	defer framework.ReleaseReservedWorkers(firstCtx)
+	defer func() { require.NoError(t, framework.ReleaseReservedWorkers(firstCtx)) }()
 	require.NoError(t, second.selectNodeSet(secondCtx))
-	defer framework.ReleaseReservedWorkers(secondCtx)
+	defer func() { require.NoError(t, framework.ReleaseReservedWorkers(secondCtx)) }()
 	assert.Equal(t, "cpu-a", first.nodeSet.Metadata.Name)
 	assert.Equal(t, "cpu-b", second.nodeSet.Metadata.Name)
 }
@@ -62,7 +62,7 @@ func TestRolloutSelectionRejectsUnavailableCPUHostsAndKeepsGPUFallback(t *testin
 	runtime.nodes[0].Status.Conditions = []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionFalse}}
 	ctx := framework.WithWorkerReservation(t.Context(), framework.NewWorkerPool(), t.Name())
 	require.NoError(t, steps.selectNodeSet(ctx))
-	defer framework.ReleaseReservedWorkers(ctx)
+	defer func() { require.NoError(t, framework.ReleaseReservedWorkers(ctx)) }()
 	assert.Equal(t, "gpu", steps.nodeSet.Metadata.Name)
 }
 
@@ -74,7 +74,7 @@ func TestRolloutSelectionWaitsWhenEveryCompleteNodeSetIsBusy(t *testing.T) {
 	holder := framework.WithWorkerReservation(t.Context(), pool, "holder")
 	_, err := steps.selector.Acquire(holder, framework.WorkerRequirements{Names: []string{"cpu-0", "gpu-0"}, Count: 2})
 	require.NoError(t, err)
-	defer framework.ReleaseReservedWorkers(holder)
+	defer func() { require.NoError(t, framework.ReleaseReservedWorkers(holder)) }()
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 	defer cancel()
 	ctx = framework.WithWorkerReservation(ctx, pool, t.Name())

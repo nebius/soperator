@@ -267,8 +267,13 @@ func (s *Accounting) submitAccountingSmokeJob(ctx context.Context) error {
 	}
 	stdoutPath := outputDir + "/e2e-accounting.out"
 	stderrPath := outputDir + "/e2e-accounting.err"
+	reservationFlags, err := framework.WorkerReservationJobFlags(ctx, sshTestUserName)
+	if err != nil {
+		return err
+	}
 	command := strings.Join([]string{
 		prepareOutputDir + "sudo", "-iu", framework.ShellQuote(sshTestUserName), "--", "sbatch",
+		strings.Join(reservationFlags, " "),
 		"--parsable",
 		"--job-name=" + framework.ShellQuote(accountingTestJobName),
 		"--account=" + framework.ShellQuote(accountingTestAccount),
