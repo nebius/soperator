@@ -248,9 +248,9 @@ func (s *WorkerSelector) AcquireAny(ctx context.Context, alternatives []WorkerRe
 		}
 		waitCtx, cancel := context.WithTimeout(ctx, WorkerAcquireTimeout(ctx))
 		defer cancel()
-		workers, err := reservation.acquireAny(waitCtx, discover)
+		workers, err := reservation.acquireAny(waitCtx, s.slurm, discover)
 		if err == nil {
-			s.slurm.runtime.Logf("Reserved workers %v for %s after %s", WorkerNames(workers), reservation.name, time.Since(started).Round(time.Millisecond))
+			s.slurm.runtime.Logf("Reserved workers %v for %s after %s Slurm_reservation=%s", WorkerNames(workers), reservation.name, time.Since(started).Round(time.Millisecond), reservation.id)
 		}
 		return workers, err
 	}

@@ -545,6 +545,10 @@ func (s *SystemSettings) runInteractiveJobs(ctx context.Context) error {
 	if err := s.requireWorker(); err != nil {
 		return err
 	}
+	reservationFlags, err := framework.WorkerReservationJobFlags(ctx, sshTestUserName)
+	if err != nil {
+		return err
+	}
 	for _, jobSpec := range []struct {
 		kind      string
 		container probeContainer
@@ -557,6 +561,7 @@ func (s *SystemSettings) runInteractiveJobs(ctx context.Context) error {
 			s.worker.Name,
 			resourceLimitsAndKernelSettingsProbe(),
 			jobSpec.container,
+			reservationFlags...,
 		)
 		output, err := s.runtime.Jail().Run(ctx, command)
 		if err != nil {
@@ -1031,12 +1036,13 @@ func resourceLimitsAndKernelSettingsProbe() string {
 // interactiveProbeCommand runs probe as userName in an interactive srun --pty
 // job on workerName. srun needs a terminal for --pty, which kubectl exec does
 // not provide, so script allocates one.
-func interactiveProbeCommand(userName, workerName, probe string, container probeContainer) string {
-	srun := srunProbeCommand(probe, container,
+func interactiveProbeCommand(userName, workerName, probe string, container probeContainer, reservationFlags ...string) string {
+	flags := append([]string{
 		"--pty",
 		fmt.Sprintf("--immediate=%d", int(interactiveJobImmediate.Seconds())),
-		"--nodelist="+framework.ShellQuote(workerName),
-	)
+		"--nodelist=" + framework.ShellQuote(workerName),
+	}, reservationFlags...)
+	srun := srunProbeCommand(probe, container, flags...)
 	interactive := fmt.Sprintf("timeout %d script -qec %s /dev/null",
 		int(systemSettingsJobTimeout.Seconds()),
 		framework.ShellQuote(srun),

@@ -356,6 +356,10 @@ func TestHealthCheckCleanupFailureQuarantinesWorkerAfterCancellation(t *testing.
 	removeErr := errors.New("fault marker remains")
 	runtime := healthCheckReplacementRuntime{
 		Runtime: base, kubectl: base.Kubectl(),
+		wait: func(ctx context.Context, condition func(context.Context) (bool, error)) error {
+			_, err := condition(ctx)
+			return err
+		},
 		controller: framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
 			if strings.HasPrefix(command, "scontrol show node ") {
 				return "NodeName=worker-0 InstanceId=original-instance State=IDLE", nil
@@ -382,7 +386,7 @@ func TestHealthCheckCleanupFailureQuarantinesWorkerAfterCancellation(t *testing.
 	assert.False(t, steps.faultInjected, "reset scenario state even when cleanup reports a failure")
 	other := framework.WithWorkerReservation(t.Context(), pool, "next scenario")
 	_, err = selector.Acquire(other, framework.WorkerRequirements{Names: []string{"worker-0"}, Count: 1})
-	require.ErrorContains(t, err, "quarantined=")
+	require.ErrorContains(t, err, "quarantined workers")
 }
 
 func TestHealthCheckDrainReasonMatchesOnlyTheSimulatedFailure(t *testing.T) {

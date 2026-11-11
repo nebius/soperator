@@ -345,9 +345,6 @@ func (s *ActiveChecks) theGPUActiveCheckIsTriggered(ctx context.Context) error {
 		return err
 	}
 	s.gpuCheckJobIDs = jobIDs
-	for _, id := range jobIDs {
-		framework.TrackReservedJob(ctx, id)
-	}
 	return nil
 }
 

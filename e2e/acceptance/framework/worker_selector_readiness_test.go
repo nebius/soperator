@@ -15,13 +15,17 @@ import (
 
 type workerReadinessRuntime struct {
 	Runtime
-	state string
-	pods  string
-	hosts func() string
+	state  string
+	native *fakeReservations
+	pods   string
+	hosts  func() string
 }
 
 func (r *workerReadinessRuntime) Controller() CommandScope {
 	return NewCommandScope(func(_ context.Context, command string) (string, error) {
+		if strings.HasPrefix(command, "scontrol ") && command != "scontrol -o show nodes" && !strings.HasPrefix(command, "scontrol show node") || strings.HasPrefix(command, "squeue ") || strings.HasPrefix(command, "scancel ") {
+			return r.native.command(context.Background(), command)
+		}
 		if command == `sinfo -hN -p main -o '%N'` {
 			return "worker-0\nworker-1", nil
 		}
@@ -48,7 +52,8 @@ func (*workerReadinessRuntime) Logf(string, ...any) {}
 
 func workerReadinessFixture() *workerReadinessRuntime {
 	return &workerReadinessRuntime{
-		state: "IDLE",
+		state:  "IDLE",
+		native: newFakeReservations(),
 		pods: `{"items":[
 			{"metadata":{"name":"worker-0"},"spec":{"hostname":"worker-0","nodeName":"host-0"},"status":{"conditions":[{"type":"Ready","status":"True"}]}},
 			{"metadata":{"name":"worker-1"},"spec":{"hostname":"worker-1","nodeName":"host-1"},"status":{"conditions":[{"type":"Ready","status":"True"}]}}
@@ -133,31 +138,15 @@ func TestWorkerSelectorWaitsForHostRecoveryWithinSharedAcquisition(t *testing.T)
 			case <-ctx.Done():
 				t.Fatal("worker acquisition did not query host readiness")
 			}
-			require.Eventually(t, func() bool {
-				pool.mu.Lock()
-				defer pool.mu.Unlock()
-				return len(pool.waiting) == 1 && len(pool.waiting[0].choices) == 1 && len(pool.waiting[0].choices[0].candidates) == 1
-			}, time.Second, time.Millisecond)
-			pool.mu.Lock()
-			assert.Empty(t, pool.owners)
+			assert.Empty(t, runtime.native.leases, "unready capacity must not be held")
 			if recoverHost {
 				ready.Store(true)
+				require.NoError(t, <-result)
+				assert.Len(t, runtime.native.leases, 1)
 			} else {
 				cancel()
-			}
-			pool.notify()
-			pool.mu.Unlock()
-			if recoverHost {
-				require.NoError(t, <-result)
-				pool.mu.Lock()
-				assert.Same(t, workerReservation(ctx), pool.owners["worker-0"])
-				pool.mu.Unlock()
-			} else {
 				require.ErrorIs(t, <-result, context.Canceled)
-				pool.mu.Lock()
-				assert.Empty(t, pool.owners)
-				assert.Empty(t, pool.waiting)
-				pool.mu.Unlock()
+				assert.Empty(t, runtime.native.leases)
 			}
 		})
 	}
@@ -173,8 +162,7 @@ func TestWorkerSelectorReservationSkipsOnlyUnconfiguredCapacity(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, SkipIfInsufficientWorkers(nil, err), godog.ErrSkip)
 		require.NoError(t, FinishWorkerReservation(ctx, runtime))
-		assert.Empty(t, pool.owners)
-		assert.Empty(t, pool.waiting)
+		assert.Empty(t, runtime.native.leases)
 	}
 
 	runtime := workerReadinessFixture()
@@ -186,6 +174,5 @@ func TestWorkerSelectorReservationSkipsOnlyUnconfiguredCapacity(t *testing.T) {
 	_, err := selector.Acquire(ctx, WorkerRequirements{Count: 1, Names: []string{"worker-0"}})
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.NotErrorIs(t, SkipIfInsufficientWorkers(nil, err), godog.ErrSkip)
-	assert.Empty(t, pool.owners)
-	assert.Empty(t, pool.waiting)
+	assert.Empty(t, runtime.native.leases)
 }

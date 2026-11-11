@@ -211,6 +211,7 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 			ExcludeHeavy:           suite.ExcludeHeavy,
 			Concurrency:            suite.Concurrency,
 			RequirePreviousSuccess: suite.RequirePreviousSuccess,
+			WorkerReservations:     suite.WorkerReservations,
 			ExcludeManual:          suite.ExcludeManual,
 		})
 	}
@@ -240,6 +241,7 @@ func (r *Runner) suiteFeaturePaths(info *framework.ClusterInfo, suite SuiteConfi
 }
 
 func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runtime framework.Runtime, suite SuiteConfig, features []string) error {
+	runtime = framework.WithWorkerReservationRuntime(runtime)
 	format, err := reports.Format(r.outputDir, suite.Name)
 	if err != nil {
 		return fmt.Errorf("suite %q report format: %w", suite.Name, err)
@@ -299,7 +301,10 @@ func (r *Runner) initializeSuiteScenario(
 ) {
 	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
 		ctx = framework.WithWorkerAcquireTimeout(ctx, r.workerAcquireTimeout)
-		return framework.WithWorkerReservation(ctx, r.workerPool, suite.Name+"/"+scenario.Id+"/"+scenario.Name), nil
+		if suite.WorkerReservations {
+			return framework.WithWorkerReservation(ctx, r.workerPool, suite.Name+"/"+scenario.Id+"/"+scenario.Name), nil
+		}
+		return framework.WithWorkerCleanup(ctx), nil
 	})
 	if teamCityReporter != nil {
 		registerTeamCityStateHook(sc, suite.Name)

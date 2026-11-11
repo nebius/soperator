@@ -100,20 +100,42 @@ Both suites preserve feature-list and scenario declaration order within their
 selection. Worker availability determines when concurrent scenarios can proceed;
 scenario correctness must never depend on launch or completion order.
 
-Worker selection waits for active workers' Pods and Kubernetes hosts to be Ready
-and reserves an entire worker set atomically. Waiting requests
-are considered in arrival order, but a request that cannot fit does not block
-an independent request. Generic allocations prefer CPU workers, including when
+In the parallel suite, worker selection waits for idle workers and for active
+workers' Pods and Kubernetes hosts to be Ready. Slurm atomically creates a
+whole-node reservation over the complete selected set. Contention is retried
+once per second within the acquisition budget; there is no in-process ownership
+queue or strict FIFO guarantee. A request that cannot fit holds no workers.
+Generic allocations prefer CPU workers, including when
 choosing among complete NodeSets; GPU workers are used when no complete CPU-only
 alternative is available. GPU-specific requests still require GPU workers.
 `WorkerSelector.AcquireAny` chooses one complete alternative atomically, so a
 busy preferred NodeSet does not block another eligible free NodeSet. Leases last
-through cleanup; failed cleanup or recovery quarantines the affected workers
-for the rest of the run. Shared configuration mutation, unsafe shared SSH identity
+through cleanup. They use explicit worker names and `STATIC_ALLOC`, so replacement
+or drain does not move ownership to other workers. Failed cleanup or recovery
+retains the Slurm reservation and quarantines the affected workers for this run.
+Each lease has an eight-hour TTL in case the runner disappears; cleanup normally
+removes it immediately. Default job limits are two hours, overridable by explicit
+scenario flags. This keeps otherwise unlimited jobs schedulable within a finite
+reservation. Shared configuration mutation, unsafe shared SSH identity
 changes, shared provider quotas, cluster-wide assertions and system DaemonSet restarts require `@sequential`
 unless their conflicts have been isolated. A
 scenario must acquire its complete set once; incremental lock upgrades are
 rejected. Host-wide faults require ownership of every worker on that host.
+
+Batch jobs receive `--reservation` explicitly. The runtime also scopes raw
+`sbatch`, `srun` and `salloc` commands through their per-command environment;
+commands crossing `sudo -iu` must use `WorkerReservationJobFlags` to preserve the
+lease and grant the user's access. Cleanup cancels all jobs by reservation,
+including submissions whose IDs were lost, waits for epilogs and worker recovery,
+then removes the lease. Inspect retained leases with `scontrol show reservations`;
+remove an `e2e-*` lease manually only after its jobs and workers have recovered.
+
+This prototype requires periodic GPU checks to be suspended manually before a
+run and their existing producer/Slurm jobs to be drained. It does not change
+CronJobs or ActiveChecks automatically. The GPU ActiveCheck scenario is temporarily
+`@unstable`: its external submitter lacks reservation routing and cancels jobs
+by a shared name. The existing sequential selection is unchanged and executes
+without native leases. See [the comparison plan](reservation-benchmark.md).
 
 For every new or changed scenario, review worker ownership, shared files and
 identities, job placement, cleanup, and cluster-wide assertions. Default concurrency
@@ -288,6 +310,8 @@ two-hour acquisition budget. Select workers through `WorkerSelector.Acquire`
 or its `Pick...Workers` wrappers; custom selectors can call `Reserve` before
 recording worker baselines. The runner supplies scenario ownership through the
 context and finalizes it after all registered cleanup hooks.
+The split enables `SuiteConfig.WorkerReservations` only for its parallel suite,
+even at concurrency one; custom concurrent suites must enable it explicitly.
 Custom feature sources must review every unmarked scenario before opting in:
 only `@sequential` scenarios are excluded from concurrency. Existing callers
 that do not opt in remain sequential.

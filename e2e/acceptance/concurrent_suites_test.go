@@ -85,6 +85,33 @@ func TestConcurrentSuitesKeepGlobalAssertionsSerial(t *testing.T) {
 	}
 }
 
+func TestConcurrentSuitesOnlyLeaseParallelScenariosEvenAtConcurrencyOne(t *testing.T) {
+	for _, concurrency := range []int{1, 8} {
+		suites := ConcurrentSuites(SoperatorSuite("5.0.0"), concurrency)
+		assert.False(t, suites[0].WorkerReservations)
+		assert.True(t, suites[1].WorkerReservations)
+		normalized, err := normalizeSuites(suites)
+		require.NoError(t, err)
+		assert.False(t, normalized[0].WorkerReservations)
+		assert.True(t, normalized[1].WorkerReservations)
+	}
+}
+
+func TestNativePrototypeGPUActiveCheckRequiresUnstableOptIn(t *testing.T) {
+	suite := SoperatorSuite("5.0.0")
+	normal := selectedScenarios(t, suite, "5.0.0")
+	suite.ExcludeUnstable = false
+	selected := selectedScenarios(t, suite, "5.0.0")
+	found := false
+	for key := range selected {
+		if strings.Contains(key, "GPU ActiveCheck succeeds on all GPU workers") {
+			found = true
+			assert.NotContains(t, normal, key)
+		}
+	}
+	assert.True(t, found)
+}
+
 func TestHealthReplacementScenariosRequireManualHeavyOptInAndRunSerially(t *testing.T) {
 	for _, manual := range []bool{false, true} {
 		for _, heavy := range []bool{false, true} {

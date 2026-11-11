@@ -23,6 +23,8 @@ type SuiteConfig struct {
 	ExcludeManual          bool
 	Concurrency            int
 	RequirePreviousSuccess bool
+	// WorkerReservations isolates workloads with native Slurm reservations.
+	WorkerReservations bool
 }
 
 // ConcurrentSuites runs @sequential scenarios first, then all remaining scenarios
@@ -30,7 +32,9 @@ type SuiteConfig struct {
 func ConcurrentSuites(suite SuiteConfig, concurrency int) []SuiteConfig {
 	serial, parallel := suite, suite
 	serial.Concurrency = 1
+	serial.WorkerReservations = false
 	parallel.Concurrency = concurrency
+	parallel.WorkerReservations = true
 	parallel.RequirePreviousSuccess = true
 	parallel.Name += "-parallel"
 	serial.Tags = combineTags(suite.Tags, "@sequential")
