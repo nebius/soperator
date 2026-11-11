@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -77,6 +78,7 @@ func NewNodeReplacement(runtime framework.Runtime, slurm *framework.SlurmClient,
 }
 
 func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
+	sc.Step(`^health-check-driven node replacement is enabled$`, s.healthCheckDrivenNodeReplacementIsEnabled)
 	sc.Step(`^a test job is submitted and running on a (CPU|GPU) worker node$`, s.aTestJobIsSubmittedAndRunningOnWorkerNode)
 	sc.Step(`^a test job is submitted and running on an idle GPU worker node$`, s.aTestJobIsSubmittedAndRunningOnAnIdleGPUWorkerNode)
 	sc.Step(`^a maintenance event is triggered for that node$`, s.aMaintenanceEventIsTriggeredForThatNode)
@@ -93,6 +95,55 @@ func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a replacement node joins the cluster$`, s.aReplacementNodeJoinsTheCluster)
 	sc.Step(`^the replacement node passes GPU validation$`, s.theReplacementNodePassesGPUValidation)
 	sc.Step(`^all pre-existing worker nodes are operational$`, s.allPreExistingWorkerNodesAreOperational)
+}
+
+func (s *NodeReplacement) healthCheckDrivenNodeReplacementIsEnabled(ctx context.Context) error {
+	var deployments appsv1.DeploymentList
+	if err := s.kubectl.GetJSON(ctx, &deployments, "get", "deployments", "-n", framework.SoperatorSystemNamespace,
+		"-l", "control-plane=soperatorchecks", "-o", "json"); err != nil {
+		return fmt.Errorf("read health-check replacement configuration: %w", err)
+	}
+	if len(deployments.Items) != 1 {
+		return fmt.Errorf("read health-check replacement configuration: expected one soperatorchecks Deployment in %s, found %d",
+			framework.SoperatorSystemNamespace, len(deployments.Items))
+	}
+	deployment := deployments.Items[0]
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		if container.Name != "manager" {
+			continue
+		}
+		enabled, err := healthCheckNodeReplacementEnabled(container.Args)
+		if err != nil {
+			return fmt.Errorf("read health-check replacement configuration from Deployment %s/%s: %w", deployment.Namespace, deployment.Name, err)
+		}
+		if !enabled {
+			s.runtime.Logf("Skipping health-check-driven node replacement: --enable-node-replacement=false in Deployment %s/%s", deployment.Namespace, deployment.Name)
+			return godog.ErrSkip
+		}
+		return nil
+	}
+	return fmt.Errorf("read health-check replacement configuration: manager container is missing from Deployment %s/%s", deployment.Namespace, deployment.Name)
+}
+
+func healthCheckNodeReplacementEnabled(args []string) (bool, error) {
+	// Match the binary's default; the Helm chart explicitly supplies its configured value.
+	enabled := true
+	for _, arg := range args {
+		name, value, hasValue := strings.Cut(arg, "=")
+		if name != "--enable-node-replacement" && name != "-enable-node-replacement" {
+			continue
+		}
+		if !hasValue {
+			enabled = true
+			continue
+		}
+		var err error
+		enabled, err = strconv.ParseBool(value)
+		if err != nil {
+			return false, fmt.Errorf("parse --enable-node-replacement value %q: %w", value, err)
+		}
+	}
+	return enabled, nil
 }
 
 func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {

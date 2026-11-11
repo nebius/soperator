@@ -86,6 +86,26 @@ func TestSharedManualScenarios(t *testing.T) {
 	}, sharedScenariosTagged(t, "@manual"))
 }
 
+func TestHealthFailureScenariosCheckReplacementCapabilityBeforeJobs(t *testing.T) {
+	content, err := fs.ReadFile(acceptanceFeatures, "features/node_replacement.feature")
+	require.NoError(t, err)
+	doc, err := gherkin.ParseGherkinDocument(strings.NewReader(string(content)), (&messages.Incrementing{}).NewId)
+	require.NoError(t, err)
+	var checked int
+	for _, child := range doc.Feature.Children {
+		if child.Scenario == nil {
+			continue
+		}
+		for _, step := range child.Scenario.Steps {
+			if step.Text == "a GPU health check failure is simulated on that node" {
+				assert.Equal(t, "health-check-driven node replacement is enabled", child.Scenario.Steps[0].Text, child.Scenario.Name)
+				checked++
+			}
+		}
+	}
+	assert.Equal(t, 3, checked)
+}
+
 func TestSharedFeaturesHaveValidVersionTags(t *testing.T) {
 	suite := SoperatorSuite("5.0.0")
 	runner, err := NewRunner(RunnerConfig{
