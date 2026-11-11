@@ -25,8 +25,7 @@ Feature: Node replacement
   # HardwareIssuesSuspected and the e2e worker node groups carry that label.
   @manual @heavy @gpu @soperator_version_>=5.0.0
   Scenario: A failed GPU health check replaces the worker node
-    Given health-check-driven node replacement is enabled
-    And a test job is submitted and running on a GPU worker node
+    Given a test job is submitted and running on a GPU worker node
     When a GPU health check failure is simulated on that node
     Then the node is drained with a node problem reason
     When the test job is cancelled
@@ -41,8 +40,7 @@ Feature: Node replacement
   # and the e2e worker node groups carry that label.
   @manual @heavy @gpu @soperator_version_>=5.0.0
   Scenario: A GPU worker recovers when maintenance arrives during health-check draining
-    Given health-check-driven node replacement is enabled
-    And a test job is submitted and running on an idle GPU worker node
+    Given a test job is submitted and running on an idle GPU worker node
     When a GPU health check failure is simulated on that node
     Then the node is draining with a node problem reason while the test job is running
     When a maintenance event is triggered while that node is draining
@@ -58,8 +56,7 @@ Feature: Node replacement
   # and the e2e worker node groups carry that label.
   @manual @heavy @gpu @soperator_version_>=5.0.0
   Scenario: A GPU worker recovers when maintenance arrives after health-check draining
-    Given health-check-driven node replacement is enabled
-    And a test job is submitted and running on an idle GPU worker node
+    Given a test job is submitted and running on an idle GPU worker node
     When a GPU health check failure is simulated on that node
     Then the node is draining with a node problem reason while the test job is running
     When the test job is cancelled

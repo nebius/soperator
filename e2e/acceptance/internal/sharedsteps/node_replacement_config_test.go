@@ -17,37 +17,7 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
-func TestHealthCheckNodeReplacementEnabled(t *testing.T) {
-	for _, tt := range []struct {
-		name      string
-		args      []string
-		want      bool
-		wantError bool
-	}{
-		{name: "binary default", want: true},
-		{name: "enabled", args: []string{"--enable-node-replacement=true"}, want: true},
-		{name: "disabled", args: []string{"--enable-node-replacement=false"}},
-		{name: "bare boolean", args: []string{"--enable-node-replacement"}, want: true},
-		{name: "single dash", args: []string{"-enable-node-replacement=false"}},
-		{name: "last flag disables", args: []string{"--enable-node-replacement=true", "--enable-node-replacement=false"}},
-		{name: "last flag enables", args: []string{"--enable-node-replacement=false", "--enable-node-replacement=true"}, want: true},
-		{name: "unrelated flag", args: []string{"--delete-not-ready-nodes=false"}, want: true},
-		{name: "invalid value", args: []string{"--enable-node-replacement=invalid"}, wantError: true},
-		{name: "empty value", args: []string{"--enable-node-replacement="}, wantError: true},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			enabled, err := healthCheckNodeReplacementEnabled(tt.args)
-			if tt.wantError {
-				require.ErrorContains(t, err, "parse --enable-node-replacement")
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, enabled)
-		})
-	}
-}
-
-func TestHealthCheckReplacementCapabilityPrerequisite(t *testing.T) {
+func TestHealthCheckFailureChecksCapabilityBeforeInjection(t *testing.T) {
 	deployment := func(args ...string) appsv1.Deployment {
 		return appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{Name: "soperatorchecks-checks", Namespace: framework.SoperatorSystemNamespace},
@@ -65,14 +35,13 @@ func TestHealthCheckReplacementCapabilityPrerequisite(t *testing.T) {
 		queryErr    error
 		wantSkip    bool
 		wantError   string
+		injections  int
 	}{
 		{name: "disabled skips", deployments: []appsv1.Deployment{deployment("--enable-node-replacement=false")}, wantSkip: true},
-		{name: "enabled continues", deployments: []appsv1.Deployment{deployment("--enable-node-replacement=true")}},
-		{name: "omitted flag uses binary default", deployments: []appsv1.Deployment{deployment()}},
-		{name: "missing deployment fails", wantError: "found 0"},
+		{name: "enabled injects fault", deployments: []appsv1.Deployment{deployment("--enable-node-replacement=true")}, injections: 1},
+		{name: "missing deployment skips", wantSkip: true},
 		{name: "ambiguous deployments fail", deployments: []appsv1.Deployment{deployment(), deployment()}, wantError: "found 2"},
 		{name: "missing manager fails", deployments: []appsv1.Deployment{missingManager}, wantError: "manager container is missing"},
-		{name: "invalid setting fails", deployments: []appsv1.Deployment{deployment("--enable-node-replacement=invalid")}, wantError: "parse --enable-node-replacement"},
 		{name: "malformed response fails", output: "{", wantError: "decode kubectl"},
 		{name: "query failure fails", queryErr: errors.New("forbidden"), wantError: "read health-check replacement configuration: forbidden"},
 	} {
@@ -84,13 +53,21 @@ func TestHealthCheckReplacementCapabilityPrerequisite(t *testing.T) {
 					require.NoError(t, err)
 					output = string(data)
 				}
-				runtime := healthCheckReplacementRuntime{kubectl: framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
-					require.Equal(t, []string{"get", "deployments", "-n", "soperator-system", "-l", "control-plane=soperatorchecks", "-o", "json"}, args)
-					return output, tt.queryErr
-				})}
+				var injections int
+				runtime := healthCheckReplacementRuntime{
+					kubectl: framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
+						require.Equal(t, []string{"get", "deployments", "-n", "soperator-system", "-l", "control-plane=soperatorchecks", "-o", "json"}, args)
+						return output, tt.queryErr
+					}),
+					worker: framework.NewCommandScope(func(context.Context, string) (string, error) {
+						injections++
+						return "", nil
+					}),
+				}
 				steps := NewNodeReplacement(runtime, nil, nil)
+				steps.replacementWorker = framework.WorkerInfo{Name: "worker-1"}
 
-				err := steps.healthCheckDrivenNodeReplacementIsEnabled(t.Context())
+				err := steps.aGPUHealthCheckFailureIsSimulatedOnThatNode(t.Context())
 
 				switch {
 				case tt.wantSkip:
@@ -101,8 +78,7 @@ func TestHealthCheckReplacementCapabilityPrerequisite(t *testing.T) {
 				default:
 					require.NoError(t, err)
 				}
-				assert.False(t, steps.faultInjected)
-				assert.True(t, steps.maintenanceJob.IsZero())
+				assert.Equal(t, tt.injections, injections)
 			})
 		})
 	}

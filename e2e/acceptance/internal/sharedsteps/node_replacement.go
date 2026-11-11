@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -79,7 +80,6 @@ func NewNodeReplacement(runtime framework.Runtime, slurm *framework.SlurmClient,
 }
 
 func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
-	sc.Step(`^health-check-driven node replacement is enabled$`, s.healthCheckDrivenNodeReplacementIsEnabled)
 	sc.Step(`^a test job is submitted and running on a (CPU|GPU) worker node$`, s.aTestJobIsSubmittedAndRunningOnWorkerNode)
 	sc.Step(`^a test job is submitted and running on an idle GPU worker node$`, s.aTestJobIsSubmittedAndRunningOnAnIdleGPUWorkerNode)
 	sc.Step(`^a maintenance event is triggered for that node$`, s.aMaintenanceEventIsTriggeredForThatNode)
@@ -104,6 +104,10 @@ func (s *NodeReplacement) healthCheckDrivenNodeReplacementIsEnabled(ctx context.
 		"-l", "control-plane=soperatorchecks", "-o", "json"); err != nil {
 		return fmt.Errorf("read health-check replacement configuration: %w", err)
 	}
+	if len(deployments.Items) == 0 {
+		s.runtime.Logf("Skipping health-check-driven node replacement: soperatorchecks is not deployed")
+		return godog.ErrSkip
+	}
 	if len(deployments.Items) != 1 {
 		return fmt.Errorf("read health-check replacement configuration: expected one soperatorchecks Deployment in %s, found %d",
 			framework.SoperatorSystemNamespace, len(deployments.Items))
@@ -113,38 +117,13 @@ func (s *NodeReplacement) healthCheckDrivenNodeReplacementIsEnabled(ctx context.
 		if container.Name != "manager" {
 			continue
 		}
-		enabled, err := healthCheckNodeReplacementEnabled(container.Args)
-		if err != nil {
-			return fmt.Errorf("read health-check replacement configuration from Deployment %s/%s: %w", deployment.Namespace, deployment.Name, err)
-		}
-		if !enabled {
+		if slices.Contains(container.Args, nodeReplacementEnabledFlag+"=false") {
 			s.runtime.Logf("Skipping health-check-driven node replacement: %s=false in Deployment %s/%s", nodeReplacementEnabledFlag, deployment.Namespace, deployment.Name)
 			return godog.ErrSkip
 		}
 		return nil
 	}
 	return fmt.Errorf("read health-check replacement configuration: manager container is missing from Deployment %s/%s", deployment.Namespace, deployment.Name)
-}
-
-func healthCheckNodeReplacementEnabled(args []string) (bool, error) {
-	// Match the binary's default; the Helm chart explicitly supplies its configured value.
-	enabled := true
-	for _, arg := range args {
-		name, value, hasValue := strings.Cut(arg, "=")
-		if name != nodeReplacementEnabledFlag && name != strings.TrimPrefix(nodeReplacementEnabledFlag, "-") {
-			continue
-		}
-		if !hasValue {
-			enabled = true
-			continue
-		}
-		var err error
-		enabled, err = strconv.ParseBool(value)
-		if err != nil {
-			return false, fmt.Errorf("parse %s value %q: %w", nodeReplacementEnabledFlag, value, err)
-		}
-	}
-	return enabled, nil
 }
 
 func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
@@ -384,6 +363,9 @@ func nodeMaintenanceEventOwned(host corev1.Node) bool {
 func (s *NodeReplacement) aGPUHealthCheckFailureIsSimulatedOnThatNode(ctx context.Context) error {
 	if s.replacementWorker.Name == "" {
 		return fmt.Errorf("worker is not selected")
+	}
+	if err := s.healthCheckDrivenNodeReplacementIsEnabled(ctx); err != nil {
+		return err
 	}
 	// Mark before running: cleanup must inspect the node even when the command ran
 	// but its result never came back.

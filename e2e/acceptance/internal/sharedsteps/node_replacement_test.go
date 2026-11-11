@@ -15,6 +15,8 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
+const enabledHealthCheckReplacementConfig = `{"items":[{"spec":{"template":{"spec":{"containers":[{"name":"manager","args":["--enable-node-replacement=true"]}]}}}}]}`
+
 type healthCheckReplacementRuntime struct {
 	framework.Runtime
 	kubectl    framework.ArgsScope
@@ -107,12 +109,17 @@ func TestHealthCheckInjectErrorCommandWritesResolutionToNodeLocalMarker(t *testi
 
 func TestSimulateHealthCheckFailureWritesMarkerOnSelectedWorker(t *testing.T) {
 	var commands []string
-	runtime := healthCheckReplacementRuntime{worker: framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
-		require.NoError(t, ctx.Err())
-		commands = append(commands, command)
-		return "", nil
-	})}
-	steps := NodeReplacement{runtime: runtime, replacementWorker: framework.WorkerInfo{Name: "worker-1"}}
+	runtime := healthCheckReplacementRuntime{
+		kubectl: framework.NewArgsScope(func(context.Context, ...string) (string, error) {
+			return enabledHealthCheckReplacementConfig, nil
+		}),
+		worker: framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+			require.NoError(t, ctx.Err())
+			commands = append(commands, command)
+			return "", nil
+		})}
+	steps := NewNodeReplacement(runtime, nil, nil)
+	steps.replacementWorker = framework.WorkerInfo{Name: "worker-1"}
 
 	require.NoError(t, steps.aGPUHealthCheckFailureIsSimulatedOnThatNode(t.Context()))
 
@@ -123,12 +130,17 @@ func TestSimulateHealthCheckFailureWritesMarkerOnSelectedWorker(t *testing.T) {
 func TestSimulateHealthCheckFailureKeepsOwnershipOnFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	runtime := healthCheckReplacementRuntime{worker: framework.NewCommandScope(func(context.Context, string) (string, error) {
-		// Give up after the first failure so the test does not sit through the retry delays.
-		cancel()
-		return "", errors.New("ssh: connection refused")
-	})}
-	steps := NodeReplacement{runtime: runtime, replacementWorker: framework.WorkerInfo{Name: "worker-1"}}
+	runtime := healthCheckReplacementRuntime{
+		kubectl: framework.NewArgsScope(func(context.Context, ...string) (string, error) {
+			return enabledHealthCheckReplacementConfig, nil
+		}),
+		worker: framework.NewCommandScope(func(context.Context, string) (string, error) {
+			// Give up after the first failure so the test does not sit through the retry delays.
+			cancel()
+			return "", errors.New("ssh: connection refused")
+		})}
+	steps := NewNodeReplacement(runtime, nil, nil)
+	steps.replacementWorker = framework.WorkerInfo{Name: "worker-1"}
 
 	err := steps.aGPUHealthCheckFailureIsSimulatedOnThatNode(ctx)
 
