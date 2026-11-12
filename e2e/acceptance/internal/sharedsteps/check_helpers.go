@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -84,7 +85,7 @@ func waitForHealthyCheckRunnerOutputForJob(ctx context.Context, runtime framewor
 	return content, nil
 }
 
-func waitForPassingHealthCheckReportsForJob(ctx context.Context, runtime framework.Runtime, worker framework.WorkerInfo, targetPath, jobID string, timeout time.Duration) ([]string, error) {
+func waitForPassingHealthCheckReports(ctx context.Context, runtime framework.Runtime, worker framework.WorkerInfo, targetPath, jobID string, previousRunIDs []string, timeout time.Duration) ([]string, error) {
 	var content string
 	var runIDs []string
 	err := runtime.WaitFor(ctx, fmt.Sprintf("passing health-check reports %s", targetPath), timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
@@ -100,6 +101,11 @@ func waitForPassingHealthCheckReportsForJob(ctx context.Context, runtime framewo
 		if parseErr == nil {
 			if jobID != "" && !healthCheckReportsMatchJob(reports, jobID) {
 				return false, nil
+			}
+			for _, report := range reports {
+				if slices.Contains(previousRunIDs, healthCheckRunID(report)) {
+					return false, nil
+				}
 			}
 			ids, err := assertHealthCheckReportsPassing(reports)
 			if err != nil {
@@ -336,7 +342,11 @@ func assertHealthCheckRawOutputsPresent(ctx context.Context, exec framework.Exec
 }
 
 func runManualHCProgram(ctx context.Context, exec framework.Exec, worker framework.WorkerInfo) error {
-	_, err := exec.Worker(worker).RunWithDefaultRetry(ctx,
+	pod, err := framework.NewKubectlClient(exec).WorkerPodForSlurmNode(ctx, worker.Name)
+	if err != nil {
+		return fmt.Errorf("find worker pod for %s: %w", worker.Name, err)
+	}
+	_, err = exec.WorkerPod(pod).RunWithDefaultRetry(ctx,
 		fmt.Sprintf("SLURMD_NODENAME=%s /opt/slurm_scripts/hc_program.sh", framework.ShellQuote(worker.Name)))
 	if err != nil {
 		return fmt.Errorf("run hc_program.sh on %s: %w", worker.Name, err)
