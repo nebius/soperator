@@ -17,7 +17,7 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
-func TestHealthCheckFailureChecksCapabilityBeforeInjection(t *testing.T) {
+func TestHealthCheckDrivenNodeReplacementIsEnabled(t *testing.T) {
 	deployment := func(args ...string) appsv1.Deployment {
 		return appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{Name: "soperatorchecks-checks", Namespace: framework.SoperatorSystemNamespace},
@@ -35,10 +35,9 @@ func TestHealthCheckFailureChecksCapabilityBeforeInjection(t *testing.T) {
 		queryErr    error
 		wantSkip    bool
 		wantError   string
-		injections  int
 	}{
 		{name: "disabled skips", deployments: []appsv1.Deployment{deployment("--enable-node-replacement=false")}, wantSkip: true},
-		{name: "enabled injects fault", deployments: []appsv1.Deployment{deployment("--enable-node-replacement=true")}, injections: 1},
+		{name: "enabled passes", deployments: []appsv1.Deployment{deployment("--enable-node-replacement=true")}},
 		{name: "missing deployment skips", wantSkip: true},
 		{name: "ambiguous deployments fail", deployments: []appsv1.Deployment{deployment(), deployment()}, wantError: "found 2"},
 		{name: "missing manager fails", deployments: []appsv1.Deployment{missingManager}, wantError: "manager container is missing"},
@@ -53,21 +52,15 @@ func TestHealthCheckFailureChecksCapabilityBeforeInjection(t *testing.T) {
 					require.NoError(t, err)
 					output = string(data)
 				}
-				var injections int
 				runtime := healthCheckReplacementRuntime{
 					kubectl: framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
 						require.Equal(t, []string{"get", "deployments", "-n", "soperator-system", "-l", "control-plane=soperatorchecks", "-o", "json"}, args)
 						return output, tt.queryErr
 					}),
-					worker: framework.NewCommandScope(func(context.Context, string) (string, error) {
-						injections++
-						return "", nil
-					}),
 				}
 				steps := NewNodeReplacement(runtime, nil, nil)
-				steps.replacementWorker = framework.WorkerInfo{Name: "worker-1"}
 
-				err := steps.aGPUHealthCheckFailureIsSimulatedOnThatNode(t.Context())
+				err := steps.healthCheckDrivenNodeReplacementIsEnabled(t.Context())
 
 				switch {
 				case tt.wantSkip:
@@ -78,7 +71,6 @@ func TestHealthCheckFailureChecksCapabilityBeforeInjection(t *testing.T) {
 				default:
 					require.NoError(t, err)
 				}
-				assert.Equal(t, tt.injections, injections)
 			})
 		})
 	}
