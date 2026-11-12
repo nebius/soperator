@@ -24,6 +24,11 @@ const (
 	SlurmDefaultLicenses = "gpu_checks:200"
 
 	SlurmPowerActionWorkerHandoff = "soperator-worker-handoff"
+
+	// SlurmNodeFeatureEphemeral and SlurmNodeFeatureStatic are Slurm node features telling whether a node
+	// belongs to a NodeSet with ephemeral nodes. Powering down a static node only recreates its worker pod.
+	SlurmNodeFeatureEphemeral = "ephemeral"
+	SlurmNodeFeatureStatic    = "static"
 )
 
 var (

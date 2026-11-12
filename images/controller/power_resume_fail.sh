@@ -1,8 +1,9 @@
 #!/bin/bash
-# Slurm ResumeFailProgram for ephemeral nodes
+# Slurm ResumeFailProgram
 # This script is called by slurmctld when nodes fail to resume within ResumeTimeout
 # It calls power-manager which removes the ordinals from NodeSetPowerState CRs,
-# so the worker pods that did not become ready in time are torn down
+# so the worker pods that did not become ready in time are torn down.
+# Worker pods of static nodes are recreated instead.
 
 log_json() {
     local level="$1"

@@ -140,10 +140,12 @@ func AddNodeSetsToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values
 // All replicas in a NodeSet share an identical body, so we emit one line per
 // NodeSet using Slurm hostlist range syntax. This keeps the ConfigMap well
 // under the Kubernetes 1 MiB object size limit on large clusters.
+// Every node gets the "ephemeral" or "static" feature after the NodeSet's own features, which include
+// the Feature= and Features= values of the static line.
 //
 // Example output:
-// NodeName=gb200-0-0 State=CLOUD NodeAddr=gb200-0-0.gb200-0.soperator.svc RealMemory=1612639 Feature=platform-gb200,gb200-rack-0 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
-// NodeName=gb200-1-[0-17] State=CLOUD NodeAddr=gb200-1-[0-17].gb200-1.soperator.svc RealMemory=1612639 Feature=platform-gb200,gb200-rack-1 Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-0-0 State=CLOUD NodeAddr=gb200-0-0.gb200-0.soperator.svc RealMemory=1612639 Feature=platform-gb200,gb200-rack-0,static Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
+// NodeName=gb200-1-[0-17] State=CLOUD NodeAddr=gb200-1-[0-17].gb200-1.soperator.svc RealMemory=1612639 Feature=platform-gb200,gb200-rack-1,ephemeral Gres=gpu:nvidia-b200:4 NodeCPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=2
 func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.SlurmCluster) {
 	res.AddComment("Nodes section")
 
@@ -191,25 +193,36 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 		}
 		nodeConfig := strings.Join(nodeConfigParts, " ")
 
-		if len(nodeSet.Spec.NodeConfig.Features) > 0 {
-			features := strings.Join(nodeSet.Spec.NodeConfig.Features, ",")
-			nodeConfig = fmt.Sprintf("%s %s%s", nodeConfig, nodeFeatureKey, features)
+		nodeTypeFeature := consts.SlurmNodeFeatureStatic
+		if nodeSet.Spec.EphemeralNodes != nil && *nodeSet.Spec.EphemeralNodes {
+			nodeTypeFeature = consts.SlurmNodeFeatureEphemeral
 		}
-
-		staticConfig := strings.Join(
-			slices.Filter(
-				nil,
-				strings.Split(nodeSet.Spec.NodeConfig.Static, " "),
-				func(s string) bool {
-					return !strings.HasPrefix(s, nodeFeatureKey) &&
-						!strings.HasPrefix(s, stateKey)
-				},
-			),
-			" ",
+		var (
+			features     []string
+			staticConfig []string
 		)
+		features = append(features, nodeSet.Spec.NodeConfig.Features...)
+		// Slurm reads only one of Feature and Features, so the features of the static line are merged in.
+		for _, token := range strings.Split(nodeSet.Spec.NodeConfig.Static, " ") {
+			if value, ok := nodeFeatureValue(token); ok {
+				for _, feature := range strings.Split(value, ",") {
+					if feature != "" && !slices.Contains(features, feature) {
+						features = append(features, feature)
+					}
+				}
+				continue
+			}
+			if !strings.HasPrefix(token, stateKey) {
+				staticConfig = append(staticConfig, token)
+			}
+		}
+		if !slices.Contains(features, nodeTypeFeature) {
+			features = append(features, nodeTypeFeature)
+		}
+		nodeConfig = fmt.Sprintf("%s %s%s", nodeConfig, nodeFeatureKey, strings.Join(features, ","))
 
 		if len(nodeConfig) > 0 {
-			nodeConfig = fmt.Sprintf("%s %s", nodeConfig, staticConfig)
+			nodeConfig = fmt.Sprintf("%s %s", nodeConfig, strings.Join(staticConfig, " "))
 		}
 
 		// State=CLOUD keeps nodes registered in Slurm even when the
@@ -219,6 +232,15 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 			fmt.Sprintf("%s State=CLOUD %s", nodeRange, nodeConfig),
 		)
 	}
+}
+
+// nodeFeatureValue returns the value of a Feature= or Features= token. Slurm matches keys case-insensitively.
+func nodeFeatureValue(token string) (string, bool) {
+	key, value, ok := strings.Cut(token, "=")
+	if !ok || !strings.EqualFold(key, "Feature") && !strings.EqualFold(key, "Features") {
+		return "", false
+	}
+	return value, true
 }
 
 // AddPartitionsToSlurmConfig adds structured partition configuration to the slurm config.

@@ -17,21 +17,51 @@ This follows Slurm's power saving model:
 - `spec.initialNumberEphemeralNodes` seeds the first active ordinals when the
   `NodeSetPowerState` is created.
 
-`NodeSetPowerState` is the runtime power state for one `NodeSet`:
+`NodeSetPowerState` is the runtime power state for one `NodeSet`. Every
+`NodeSet` has one, ephemeral or static:
 
 - It is named the same as the `NodeSet`.
 - `spec.nodeSetRef` points back to the `NodeSet`.
 - `spec.activeNodes` contains the powered-on ordinals, for example
   `[0, 3, 5]` for `worker-gpu-0`, `worker-gpu-3`, and `worker-gpu-5`.
+- `spec.recreateNodes` contains requests to recreate the worker pods of nodes
+  that Slurm powered down, see [Static Nodes](#static-nodes).
 
 The NodeSet controller owns creation and status reconciliation of
-`NodeSetPowerState`. The `power-manager` binary owns changes to
-`spec.activeNodes`.
+`NodeSetPowerState`. For ephemeral NodeSets, the `power-manager` binary owns
+changes to `spec.activeNodes`. For static NodeSets, the NodeSet controller keeps
+every ordinal in `spec.activeNodes`, so a switch to ephemeral mode starts with
+all workers running.
 
 For ephemeral NodeSets, Soperator renders the worker StatefulSet from
 `activeNodes`: active ordinals get pods, inactive ordinals are put into
 OpenKruise `reserveOrdinals`, and an empty `activeNodes` list means zero worker
 pods.
+
+## Node Type Features
+
+With structured partition configuration, Soperator adds a Slurm node feature to
+every node, after the features from `spec.nodeConfig.features` and from
+`Feature=` or `Features=` in `spec.nodeConfig.static`:
+
+- `ephemeral` for nodes of NodeSets with `spec.ephemeralNodes: true`;
+- `static` for all other nodes.
+
+```text
+NodeName=worker-gpu-[0-15] State=CLOUD ... Feature=platform-h100,ephemeral
+NodeName=worker-cpu-[0-3] State=CLOUD ... Feature=static
+```
+
+The feature is not added twice when the NodeSet already lists it. Use it to tell
+the node types apart before powering nodes down manually, or to target them with
+`--constraint`:
+
+```bash
+sinfo -N -o "%N %f %t"
+sbatch --constraint=ephemeral job.sh
+```
+
+The feature follows `spec.ephemeralNodes` after the next Slurm reconfigure.
 
 ## Resume Flow
 
@@ -129,7 +159,8 @@ The script runs:
 
 `power-manager` removes the requested ordinals from
 `NodeSetPowerState.spec.activeNodes`. The NodeSet controller then updates the
-StatefulSet so Kubernetes removes the corresponding pods.
+StatefulSet so Kubernetes removes the corresponding pods. Nodes of static
+NodeSets take a different path, see [Static Nodes](#static-nodes).
 
 Automatic suspend is controlled by:
 
@@ -146,6 +177,40 @@ automatic power down. Automatic resume for jobs is independent of
 After changing Slurm config, apply the change and reconfigure or restart
 `slurmctld`.
 
+## Static Nodes
+
+Static nodes are excluded from automatic suspend through `SuspendExcNodes`, but
+Slurm still accepts a manual power down for them. A static NodeSet always keeps
+its pods, and Slurm takes a powered down node back only when a fresh `slurmd`
+registers. So powering down a static node restarts its worker pod:
+
+1. Slurm moves the node to `POWERING_DOWN` and calls the suspend program.
+2. `power-manager` adds a request with the ordinal and the request time to
+   `NodeSetPowerState.spec.recreateNodes`.
+3. The NodeSet controller waits until `SuspendTimeout` (plus a small margin)
+   has passed since the request. Slurm ignores the registration of a `slurmd`
+   that starts while the node is still `POWERING_DOWN`, so restarting the pod
+   earlier would leave the node powered down.
+4. The controller deletes the worker pod, using the pod UID as a deletion
+   precondition, and removes the request. A pod whose `slurmd` container
+   started after the wait, or is not running yet, is kept.
+5. The StatefulSet recreates the pod. Its `slurmd` registers, and Slurm clears
+   the power down states and returns the node to service.
+
+The node is unavailable for about `SuspendTimeout` plus the pod start time, and
+shows `POWERED_DOWN` between the end of `SuspendTimeout` and the registration.
+
+A plain power down waits for the node to become idle, so no jobs run in the
+restarted pod. `power down force` makes Slurm kill or requeue the jobs first.
+A power up of a static node does not change anything in Kubernetes.
+
+If a static pod does not register within `ResumeTimeout`, the resume failure
+program requests another recreation in the same way. Nodes left in
+`POWERING_UP` by older Soperator versions recover the same way once
+`ResumeTimeout` expires. Nodes left in `POWERED_DOWN` stay there until something
+resumes them: power them down again, or delete their worker pods. A `slurmd`
+that starts after the power down has completed is accepted right away.
+
 ## Manual Power Control
 
 You can exercise the same Slurm power path manually from a Slurm login or
@@ -157,6 +222,9 @@ scontrol power down worker-gpu-[0-1] Reason="manual suspend test"
 scontrol power down asap worker-gpu-2 Reason="finish current job, then suspend"
 scontrol power down force worker-gpu-3 Reason="force suspend test"
 ```
+
+Check the `ephemeral` / `static` feature first: powering down a static node
+restarts its worker pod instead of removing it, see [Static Nodes](#static-nodes).
 
 Equivalent state updates are also supported by Slurm:
 

@@ -818,7 +818,7 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=a,b Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=a,b,c,d,static Gres=gpu:nvidia-a100:4 NodeCPUs=64 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Single nodeset with AutoResume disabled",
@@ -876,7 +876,7 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeB-[0-2] State=CLOUD NodeAddr=nodeB-[0-2].slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeB-[0-2] State=CLOUD NodeAddr=nodeB-[0-2].slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=4096 Feature=static Gres=gpu:nvidia-a100:8 NodeCPUs=128 Boards=1 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
 		},
 		{
 			name: "Multiple nodesets with varying replicas",
@@ -922,8 +922,128 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: "NodeName=nodeC-[0-1] State=CLOUD NodeAddr=nodeC-[0-1].slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
-				"NodeName=nodeD-0 State=CLOUD NodeAddr=nodeD-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=16384 Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+			expected: "NodeName=nodeC-[0-1] State=CLOUD NodeAddr=nodeC-[0-1].slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=8192 Feature=static Gres=gpu:nvidia-a100:16 NodeCPUs=256 Boards=2 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1\n" +
+				"NodeName=nodeD-0 State=CLOUD NodeAddr=nodeD-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=16384 Feature=static Gres=gpu:nvidia-a100:32 NodeCPUs=512 Boards=4 SocketsPerBoard=4 CoresPerSocket=32 ThreadsPerCode=1",
+		},
+		{
+			name: "Ephemeral nodeset gets the ephemeral feature",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeF",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas:       2,
+							EphemeralNodes: ptr.To(true),
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Features: []string{"gpu"},
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeF-[0-1] State=CLOUD NodeAddr=nodeF-[0-1].slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=gpu,ephemeral",
+		},
+		{
+			name: "Node type feature listed by the user is not duplicated",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeG",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas:       1,
+							EphemeralNodes: ptr.To(false),
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Features: []string{"static", "gpu"},
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeG-0 State=CLOUD NodeAddr=nodeG-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=static,gpu",
+		},
+		{
+			name: "Features of the static line are kept without NodeSet features",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeH",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 1,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "Features=h100,ib NodeCPUs=8",
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeH-0 State=CLOUD NodeAddr=nodeH-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=h100,ib,static NodeCPUs=8",
+		},
+		{
+			name: "Features of the static line are merged with NodeSet features",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeI",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas:       1,
+							EphemeralNodes: ptr.To(true),
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Features: []string{"gpu"},
+								Static:   "features=h100,gpu,ephemeral NodeCPUs=8 FEATURE=ib State=DOWN",
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeI-0 State=CLOUD NodeAddr=nodeI-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 Feature=gpu,h100,ephemeral,ib NodeCPUs=8",
 		},
 		{
 			name: "Nodeset with zero replicas",
@@ -979,6 +1099,26 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAddNodesToSlurmConfigKeepsNodeSetFeatures(t *testing.T) {
+	features := make([]string, 1, 4)
+	features[0] = "gpu"
+	cluster := &values.SlurmCluster{
+		NamespacedName: types.NamespacedName{Namespace: "soperator", Name: "slurm-test"},
+		NodeSets: []slurmv1alpha1.NodeSet{{
+			ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Namespace: "soperator"},
+			Spec: slurmv1alpha1.NodeSetSpec{
+				Replicas:   1,
+				NodeConfig: slurmv1alpha1.NodeConfig{Features: features},
+			},
+		}},
+	}
+
+	AddNodesToSlurmConfig(&renderutils.PropertiesConfig{}, cluster)
+
+	assert.Equal(t, []string{"gpu"}, cluster.NodeSets[0].Spec.NodeConfig.Features)
+	assert.Equal(t, []string{"gpu", "", "", ""}, features[:cap(features)], "rendering must not write into the NodeSet spec")
 }
 
 func TestAddNodeSetsToSlurmConfig(t *testing.T) {
