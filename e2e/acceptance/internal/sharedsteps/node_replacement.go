@@ -80,6 +80,7 @@ func NewNodeReplacement(runtime framework.Runtime, slurm *framework.SlurmClient,
 }
 
 func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
+	sc.Step(`^health-check-driven node replacement is enabled$`, s.healthCheckDrivenNodeReplacementIsEnabled)
 	sc.Step(`^a test job is submitted and running on a (CPU|GPU) worker node$`, s.aTestJobIsSubmittedAndRunningOnWorkerNode)
 	sc.Step(`^a test job is submitted and running on an idle GPU worker node$`, s.aTestJobIsSubmittedAndRunningOnAnIdleGPUWorkerNode)
 	sc.Step(`^a maintenance event is triggered for that node$`, s.aMaintenanceEventIsTriggeredForThatNode)
@@ -363,9 +364,6 @@ func nodeMaintenanceEventOwned(host corev1.Node) bool {
 func (s *NodeReplacement) aGPUHealthCheckFailureIsSimulatedOnThatNode(ctx context.Context) error {
 	if s.replacementWorker.Name == "" {
 		return fmt.Errorf("worker is not selected")
-	}
-	if err := s.healthCheckDrivenNodeReplacementIsEnabled(ctx); err != nil {
-		return err
 	}
 	// Mark before running: cleanup must inspect the node even when the command ran
 	// but its result never came back.
