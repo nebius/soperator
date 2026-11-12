@@ -19,6 +19,9 @@ import (
 
 const stressUserName = "stress"
 
+// stressReservationPrefix names the reservations of the stress scenario.
+const stressReservationPrefix = "e2e-stress-"
+
 const (
 	// stressDrainGrace is how long past the completion budget the queue may take to drain,
 	// so a slow load fails on the budget with its statistics instead of on the queue wait.
@@ -126,7 +129,7 @@ func (s *Performance) CleanupAndReset(ctx context.Context) {
 		s.cleanupPhase(ctx, "delete stress reservations", func(ctx context.Context) error {
 			var problems []string
 			for _, name := range []string{s.runName, s.nodeReservation} {
-				if _, err := s.runtime.Jail().RunWithRetry(ctx, stressDeleteReservationCommand(name), stressCleanupAttempts, stressCleanupPoll); err != nil {
+				if _, err := s.runtime.Jail().RunWithRetry(ctx, deleteReservationCommand(name), stressCleanupAttempts, stressCleanupPoll); err != nil {
 					problems = append(problems, name+": "+err.Error())
 				}
 			}
@@ -143,13 +146,9 @@ const (
 	stressCleanupAttempts = 3
 )
 
-// cleanupPhase runs one best-effort cleanup step under its own deadline and logs its failure.
+// cleanupPhase runs one best-effort cleanup step under the stress cleanup deadline.
 func (s *Performance) cleanupPhase(ctx context.Context, name string, phase func(ctx context.Context) error) {
-	phaseCtx, cancel := context.WithTimeout(ctx, stressCleanupTimeout)
-	defer cancel()
-	if err := phase(phaseCtx); err != nil {
-		s.runtime.Logf("Cleanup: %s: %v", name, err)
-	}
+	runCleanupPhase(ctx, s.runtime, name, stressCleanupTimeout, phase)
 }
 
 // cancelStressJobs cancels the run's jobs and waits for them to leave the queue,
@@ -220,7 +219,7 @@ func (s *Performance) coresAreReserved(ctx context.Context, cores, nodes int) er
 	if nodes < 1 || cores < nodes || cores%nodes != 0 {
 		return fmt.Errorf("invalid reservation shape: %d cores on %d nodes must divide evenly", cores, nodes)
 	}
-	if err := s.deleteStaleReservations(ctx); err != nil {
+	if err := deleteStaleReservations(ctx, s.runtime, stressReservationPrefix); err != nil {
 		return err
 	}
 	sinfoOutput, err := s.runtime.Jail().RunWithDefaultRetry(ctx, partitionNodesCommand(framework.MainPartitionName))
@@ -257,7 +256,7 @@ func (s *Performance) coresAreReserved(ctx context.Context, cores, nodes int) er
 		return err
 	}
 
-	name := fmt.Sprintf("e2e-stress-%d", time.Now().UnixNano())
+	name := fmt.Sprintf("%s%d", stressReservationPrefix, time.Now().UnixNano())
 	nodeName := name + "-nodes"
 	s.runName = name
 	s.nodeReservation = nodeName
@@ -265,7 +264,7 @@ func (s *Performance) coresAreReserved(ctx context.Context, cores, nodes int) er
 	// The shows after the creates decide success, so a retry after a lost exec
 	// stream finds the reservations already created instead of failing.
 	command := strings.Join([]string{
-		stressNodeReservationCommand(nodeName, chosen, stressReservationDuration),
+		nodeReservationCommand(nodeName, stressUserName, chosen, stressReservationDuration),
 		stressReservationCommand(name, chosen, cores, stressReservationDuration),
 		"scontrol show reservation " + framework.ShellQuote(nodeName) + " --oneliner",
 		"scontrol show reservation " + framework.ShellQuote(name) + " --oneliner",
@@ -431,22 +430,6 @@ func (s *Performance) schedulerStatisticsWithinBudget(ctx context.Context, table
 }
 
 // Helpers.
-
-// deleteStaleReservations removes reservations left by a run that lost its cleanup;
-// they would keep the nodes from being idle.
-func (s *Performance) deleteStaleReservations(ctx context.Context) error {
-	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, "scontrol show reservations --oneliner 2>/dev/null || true")
-	if err != nil {
-		return fmt.Errorf("list reservations: %w", err)
-	}
-	for _, name := range staleStressReservations(output) {
-		s.runtime.Logf("Performance: deleting stale reservation %s", name)
-		if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, stressDeleteReservationCommand(name)); err != nil {
-			return fmt.Errorf("delete stale reservation %s: %w", name, err)
-		}
-	}
-	return nil
-}
 
 // collectCompletedJobs waits up to drainTimeout for the load to leave the queue and then for
 // accounting to hold every job with its step records, saves them and stores the statistics in s.jobs.
@@ -689,18 +672,6 @@ func formatStateCounts(counts map[string]int) string {
 	return strings.Join(parts, " ")
 }
 
-// staleStressReservations returns the names of this scenario's reservations in
-// `scontrol show reservations -o` output.
-func staleStressReservations(output string) []string {
-	var names []string
-	for line := range strings.SplitSeq(output, "\n") {
-		if name := extractField(line, "ReservationName"); strings.HasPrefix(name, "e2e-stress-") {
-			names = append(names, name)
-		}
-	}
-	return names
-}
-
 // cancelStressUserJobsCommand cancels the jobs of the stress user, which can only be leftovers of a run that
 // lost its cleanup. On a fresh cluster the user does not exist yet and scancel would reject the name.
 func cancelStressUserJobsCommand() string {
@@ -736,19 +707,6 @@ func chooseStressNodes(nodes []partitionNode, count, cores int) ([]string, error
 	return chosen[:count], nil
 }
 
-// stressNodeReservationCommand reserves the named nodes whole for the user, starting now:
-// every core, GPU and byte of memory, so that no other job can share the workers with the load.
-func stressNodeReservationCommand(name string, nodes []string, duration time.Duration) string {
-	return framework.ShellJoin("scontrol", "create", "reservation",
-		"ReservationName="+name,
-		"Users="+stressUserName,
-		"PartitionName="+framework.MainPartitionName,
-		"StartTime=now",
-		fmt.Sprintf("Duration=%d", int(duration.Minutes())),
-		"Nodes="+strings.Join(nodes, ","),
-	)
-}
-
 // stressReservationCommand reserves cores in total on the named nodes for the user, starting now,
 // inside the node reservation of the same nodes: the OVERLAP flag lets it take cores the node
 // reservation already holds. The jobs name this reservation, so Slurm confines them to its cores.
@@ -764,24 +722,6 @@ func stressReservationCommand(name string, nodes []string, cores int, duration t
 		fmt.Sprintf("TRESPerNode=cpu=%d", cores/len(nodes)),
 		"Flags=OVERLAP",
 	)
-}
-
-// reservationsByName maps each `scontrol show reservation --oneliner` line to its name.
-func reservationsByName(output string) map[string]string {
-	shown := map[string]string{}
-	for line := range strings.SplitSeq(output, "\n") {
-		if name := extractField(line, "ReservationName"); name != "" {
-			shown[name] = line
-		}
-	}
-	return shown
-}
-
-// stressDeleteReservationCommand succeeds when the reservation is deleted or already gone,
-// so a retry after a lost exec stream does not fail on the missing reservation.
-func stressDeleteReservationCommand(name string) string {
-	quoted := framework.ShellQuote(name)
-	return "scontrol delete reservation " + quoted + " || ! scontrol show reservation " + quoted + " --oneliner >/dev/null 2>&1"
 }
 
 // reservationCoreSplit lists node=core-ids pairs from `scontrol show reservation -o`.
