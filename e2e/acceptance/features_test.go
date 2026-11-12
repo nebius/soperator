@@ -63,6 +63,7 @@ func TestSharedHeavyScenarios(t *testing.T) {
 		"An MK8s node group update preserves running jobs",
 		"A worker update preserves maintenance drains before and during handoff",
 		"Non-responding kubelet recreates a Kubernetes node and recovers the worker",
+		"A manually powered down static worker returns to service",
 	}, heavy)
 }
 

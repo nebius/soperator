@@ -211,6 +211,27 @@ func (c *KubectlClient) NodeIfPresent(ctx context.Context, name string) (corev1.
 	return node, true, nil
 }
 
+// PodIfPresent reads a pod once, distinguishing absence from query errors.
+// Callers that expect eventual replacement own the polling and retry policy.
+func (c *KubectlClient) PodIfPresent(ctx context.Context, namespace, name string) (corev1.Pod, bool, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return corev1.Pod{}, false, fmt.Errorf("pod name is empty")
+	}
+	output, err := c.exec.Kubectl().Run(ctx, "get", "pod", name, "-n", namespace, "--ignore-not-found", "-o", "json")
+	if err != nil {
+		return corev1.Pod{}, false, fmt.Errorf("get pod %s/%s: %w", namespace, name, err)
+	}
+	if strings.TrimSpace(output) == "" {
+		return corev1.Pod{}, false, nil
+	}
+	var pod corev1.Pod
+	if err := json.Unmarshal([]byte(output), &pod); err != nil {
+		return corev1.Pod{}, false, fmt.Errorf("decode pod %s/%s: %w", namespace, name, err)
+	}
+	return pod, true, nil
+}
+
 // NodeEvents lists the events recorded for one Kubernetes node identity.
 // Events outlive the node for the API server's event retention period,
 // so a caller can inspect what happened to a node that has already been deleted.

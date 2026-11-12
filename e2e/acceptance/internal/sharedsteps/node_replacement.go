@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
@@ -407,19 +406,6 @@ func healthCheckDrainTimeout(configuration map[string]string) (time.Duration, er
 			interval, timeout, nodeReplacementHealthCheckDrainMaxWait)
 	}
 	return timeout, nil
-}
-
-// parseSlurmSeconds reads scontrol's "<N> sec" duration format.
-func parseSlurmSeconds(raw string) (time.Duration, error) {
-	value, unit, found := strings.Cut(strings.TrimSpace(raw), " ")
-	if !found || strings.TrimSpace(unit) != "sec" {
-		return 0, fmt.Errorf("expected \"<seconds> sec\"")
-	}
-	seconds, err := strconv.Atoi(value)
-	if err != nil || seconds < 0 {
-		return 0, fmt.Errorf("expected a non-negative integer number of seconds")
-	}
-	return time.Duration(seconds) * time.Second, nil
 }
 
 // A simulated failure must end in a replacement unless it never took effect.

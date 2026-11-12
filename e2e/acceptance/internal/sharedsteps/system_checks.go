@@ -495,7 +495,7 @@ func (s *SystemChecks) theRestartedWorkerPodIsReady(ctx context.Context) error {
 		if err := s.ensureLibslurmProbeRunning(); err != nil {
 			return err
 		}
-		pod, found, err := s.workerPodByNameOnce(waitCtx, s.workerPod.Name)
+		pod, found, err := s.kubectl.PodIfPresent(waitCtx, framework.SoperatorNamespace, s.workerPod.Name)
 		if err != nil {
 			lastErr = err
 		} else if found && string(pod.UID) != s.restartedWorkerPodUID && pod.Status.Phase == corev1.PodRunning && kubeobjects.PodReady(pod) {
@@ -644,33 +644,12 @@ func (s *SystemChecks) workerPodByName(ctx context.Context, name string) (corev1
 	return pod, nil
 }
 
-func (s *SystemChecks) workerPodByNameOnce(ctx context.Context, name string) (corev1.Pod, bool, error) {
-	output, err := s.runtime.Kubectl().Run(ctx, "get", "pod", "-n", framework.SoperatorNamespace, name, "-o", "json")
-	if err != nil {
-		if isKubectlNotFound(err) {
-			return corev1.Pod{}, false, nil
-		}
-		return corev1.Pod{}, false, fmt.Errorf("get worker pod %s: %w", name, err)
-	}
-
-	var pod corev1.Pod
-	if err := json.Unmarshal([]byte(output), &pod); err != nil {
-		return corev1.Pod{}, false, fmt.Errorf("decode worker pod %s: %w", name, err)
-	}
-	return pod, true, nil
-}
-
 func (s *SystemChecks) k8sNodeByName(ctx context.Context, name string) (corev1.Node, error) {
 	var node corev1.Node
 	if err := s.kubectl.GetJSON(ctx, &node, "get", "node", name, "-o", "json"); err != nil {
 		return corev1.Node{}, fmt.Errorf("get Kubernetes node %s: %w", name, err)
 	}
 	return node, nil
-}
-
-func isKubectlNotFound(err error) bool {
-	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "notfound") || strings.Contains(message, "not found")
 }
 
 func parseKubectlDebugPodName(output string) string {

@@ -54,6 +54,7 @@ func FeaturePaths() []string {
 		"features/task_prolog_env.feature",
 		"features/soperator_utils.feature",
 		"features/nodeset_ephemeral_mode_transition.feature",
+		"features/static_worker_power_down.feature",
 		"features/node_replacement.feature",
 		"features/worker_rolling_update.feature",
 		"features/docker_containers.feature",

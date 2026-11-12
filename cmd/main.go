@@ -140,6 +140,7 @@ func main() {
 		restConfigBurst           int
 		requeueAfterRollingUpdate time.Duration
 		idleSlurmAuditInterval    time.Duration
+		staticWorkerRecreateDelay time.Duration
 
 		topologyReconfigureCooldown    time.Duration
 		topologyReconfigureDebounce    time.Duration
@@ -173,6 +174,7 @@ func main() {
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.DurationVar(&requeueAfterRollingUpdate, "requeue-after-rolling-update", time.Minute, "The interval between rolling update reconciliations for each worker NodeSet")
 	flag.DurationVar(&idleSlurmAuditInterval, "rolling-update-idle-slurm-audit-interval", 15*time.Minute, "The interval between Slurm audits for idle worker NodeSets; must be positive and is checked on regular rolling update reconciliations")
+	flag.DurationVar(&staticWorkerRecreateDelay, "static-worker-recreate-delay", nodesetcontroller.DefaultStaticRecreateDelay, "How long after a Slurm power down of a static node its worker pod is recreated; must be the cluster's SuspendTimeout plus 10s, as Slurm ignores a slurmd that starts earlier")
 	flag.IntVar(&maxConcurrency, "max-concurrent-reconciles", 1, "Configures number of concurrent reconciles. It should improve performance for clusters with many objects.")
 	flag.StringVar(&controllersFlag, "controllers", "", "A comma-separated list of controllers to enable or disable. Use '*' for all, and '-name' to disable. Overrides SLURM_OPERATOR_CONTROLLERS if set.")
 	flag.Float64Var(&restConfigQPS, "rest-config-qps", 30, "Kubernetes API requests per second shared by manager clients")
@@ -183,6 +185,10 @@ func main() {
 	flag.Parse()
 	if float32(restConfigQPS) <= 0 || math.IsNaN(restConfigQPS) || math.IsInf(restConfigQPS, 0) || restConfigQPS > math.MaxFloat32 || restConfigBurst <= 0 {
 		fmt.Fprintln(os.Stderr, "REST config QPS and burst must be positive and finite")
+		os.Exit(1)
+	}
+	if staticWorkerRecreateDelay <= 0 {
+		fmt.Fprintln(os.Stderr, "Static worker recreate delay must be positive")
 		os.Exit(1)
 	}
 	if topologyReconfigureCooldown < 0 || topologyReconfigureDebounce < 0 || topologyReconfigureDebounceCap < 0 {
@@ -326,6 +332,7 @@ func main() {
 			mgr.GetScheme(),
 			mgr.GetEventRecorderFor(nodeSetNameLower+"-controller"),
 			controllersSet.Enabled("rollingupdate"),
+			staticWorkerRecreateDelay,
 		).
 			SetupWithManager(mgr, nodeSetNameLower, maxConcurrency, cacheSyncTimeout); err != nil {
 			cli.Fail(setupLog, err, "unable to create controller", "controller", nodeSetName)
