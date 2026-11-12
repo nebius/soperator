@@ -16,7 +16,7 @@ needs_warning() {
     local subcommand=""
     while [ $# -gt 0 ]; do
         case "$1" in
-            -M|--clusters|--cluster)
+            -M|--clusters|--cluster|-u|--uid)
                 shift 2
                 continue
                 ;;
@@ -44,20 +44,25 @@ needs_warning() {
     local partition=0 node=0 node_attribute=0 arg
     for arg in "$@"; do
         case "$arg" in
+            # Jobs and reservations are saved in StateSaveLocation. Both accept Features=, and
+            # reservations take PartitionName= as a parameter, so they never need the warning:
+            #   scontrol create reservation ReservationName=r1 PartitionName=main Users=alice
+            jobid=*|jobname=*|reservation|reservationname=*) return 1 ;;
+
             # Any partition change is dropped at the next reconfigure, for example:
             #   scontrol create PartitionName=spot Nodes=worker-[0-15] PriorityTier=1
             #   scontrol update PartitionName=main MaxTime=2-00:00:00
             #   scontrol delete PartitionName=spot
-            partitionname=*) partition=1 ;;
+            #   scontrol delete partition spot
+            partitionname=*|partition) partition=1 ;;
 
             # A node update is non-persistent only when it touches attributes that come from the
             # NodeName= line of slurm.conf; State=, Reason= and Comment= are saved in
             # StateSaveLocation and survive reconfigure and restart.
             nodename=*) node=1 ;;
 
-            # These attributes are checked together with NodeName= because jobs and reservations
-            # accept Features= and Gres= as well (scontrol update JobId=5 Features=h100), and
-            # those updates are persistent. Features= is the scontrol alias of AvailableFeatures=.
+            # These attributes are checked together with NodeName= because scontrol rejects an
+            # update without an entity. Features= is the scontrol alias of AvailableFeatures=.
             # Examples:
             #   scontrol update NodeName=worker-0 Features=h100,ib
             #   scontrol update NodeName=worker-0 ActiveFeatures=h100
