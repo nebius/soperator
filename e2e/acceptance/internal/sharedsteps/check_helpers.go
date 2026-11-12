@@ -342,7 +342,11 @@ func assertHealthCheckRawOutputsPresent(ctx context.Context, exec framework.Exec
 }
 
 func runManualHCProgram(ctx context.Context, exec framework.Exec, worker framework.WorkerInfo) error {
-	_, err := exec.Worker(worker).RunWithDefaultRetry(ctx,
+	pod, err := framework.NewKubectlClient(exec).WorkerPodForSlurmNode(ctx, worker.Name)
+	if err != nil {
+		return fmt.Errorf("find worker pod for %s: %w", worker.Name, err)
+	}
+	_, err = exec.WorkerPod(pod).RunWithDefaultRetry(ctx,
 		fmt.Sprintf("SLURMD_NODENAME=%s /opt/slurm_scripts/hc_program.sh", framework.ShellQuote(worker.Name)))
 	if err != nil {
 		return fmt.Errorf("run hc_program.sh on %s: %w", worker.Name, err)

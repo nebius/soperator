@@ -15,12 +15,20 @@ import (
 
 type passiveCheckRuntime struct {
 	rolloutPollRuntime
-	worker framework.CommandScope
-	jail   framework.CommandScope
+	worker      framework.CommandScope
+	workerPod   framework.CommandScope
+	jail        framework.CommandScope
+	kubectl     framework.ArgsScope
+	selectedPod framework.WorkerPodInfo
 }
 
 func (r *passiveCheckRuntime) Worker(framework.WorkerInfo) framework.CommandScope { return r.worker }
 func (r *passiveCheckRuntime) Jail() framework.CommandScope                       { return r.jail }
+func (r *passiveCheckRuntime) Kubectl() framework.ArgsScope                       { return r.kubectl }
+func (r *passiveCheckRuntime) WorkerPod(pod framework.WorkerPodInfo) framework.CommandScope {
+	r.selectedPod = pod
+	return r.workerPod
+}
 
 func TestGPUHealthCheckProgramRequiresFreshReportAndRawOutputs(t *testing.T) {
 	const oldReport = `{"status":"PASS","meta":{"run_id":"hc-old"}}`
@@ -30,11 +38,23 @@ func TestGPUHealthCheckProgramRequiresFreshReportAndRawOutputs(t *testing.T) {
 			reads, runs := 0, 0
 			var rawCommands []string
 			runtime := &passiveCheckRuntime{
+				kubectl: framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
+					require.Equal(t, []string{"get", "pods", "-n", "soperator", "-l", "slurm.nebius.ai/worker=true", "-o", "json"}, args)
+					return `{"items":[{"metadata":{"name":"worker-pod-0"},"spec":{"hostname":"worker-0"}}]}`, nil
+				}),
 				jail: framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
 					require.Equal(t, "scontrol show config | grep -E 'HealthCheckProgram|HealthCheckInterval'", command)
 					return "HealthCheckProgram = /opt/slurm_scripts/hc_program.sh\nHealthCheckInterval = 120", nil
 				}),
-				worker: framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+				workerPod: framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+					require.Equal(t, "SLURMD_NODENAME='worker-0' /opt/slurm_scripts/hc_program.sh", command)
+					deadline, bounded := ctx.Deadline()
+					require.True(t, bounded)
+					assert.WithinDuration(t, time.Now().Add(passiveHCProgramTimeout), deadline, time.Second)
+					runs++
+					return "", nil
+				}),
+				worker: framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
 					switch {
 					case strings.HasPrefix(command, "test -f "):
 						require.Contains(t, command, "/opt/soperator-outputs/local/slurm_scripts/worker-0.gpu_health_check.hc_program.out")
@@ -50,13 +70,6 @@ func TestGPUHealthCheckProgramRequiresFreshReportAndRawOutputs(t *testing.T) {
 						default:
 							return freshReport, nil
 						}
-					case strings.HasPrefix(command, "SLURMD_NODENAME="):
-						require.Equal(t, "SLURMD_NODENAME='worker-0' /opt/slurm_scripts/hc_program.sh", command)
-						deadline, bounded := ctx.Deadline()
-						require.True(t, bounded)
-						assert.WithinDuration(t, time.Now().Add(passiveHCProgramTimeout), deadline, time.Second)
-						runs++
-						return "", nil
 					case strings.HasPrefix(command, "find "):
 						rawCommands = append(rawCommands, command)
 						return "/opt/soperator-outputs/local/health_checker_cmd_stdout/raw.out", nil
@@ -73,6 +86,8 @@ func TestGPUHealthCheckProgramRequiresFreshReportAndRawOutputs(t *testing.T) {
 				gpuHealthRunIDs: []string{"prolog", "epilog"},
 			}
 			require.NoError(t, steps.healthCheckProgramRunsOnTheSelectedGPUWorker(t.Context()))
+			assert.Equal(t, "worker-pod-0", runtime.selectedPod.PodName)
+			assert.Equal(t, "worker-0", runtime.selectedPod.SlurmNodeName)
 			require.NoError(t, steps.theGPUHealthCheckProgramReportIsFreshAndPassing(t.Context()))
 			assert.Equal(t, 1, runs)
 			assert.Equal(t, 4, reads)
@@ -134,13 +149,16 @@ func TestGPUHealthCheckProgramRequiresSlurmConfiguration(t *testing.T) {
 func TestGPUHealthCheckProgramExecutionIsBounded(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		runtime := &passiveCheckRuntime{
+			kubectl: framework.NewArgsScope(func(context.Context, ...string) (string, error) {
+				return `{"items":[{"metadata":{"name":"worker-pod-0"},"spec":{"hostname":"worker-0"}}]}`, nil
+			}),
 			jail: framework.NewCommandScope(func(context.Context, string) (string, error) {
 				return "HealthCheckProgram = /opt/slurm_scripts/hc_program.sh\nHealthCheckInterval = 120", nil
 			}),
-			worker: framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
-				if strings.HasPrefix(command, "test -f ") {
-					return "", nil
-				}
+			worker: framework.NewCommandScope(func(context.Context, string) (string, error) {
+				return "", nil
+			}),
+			workerPod: framework.NewCommandScope(func(ctx context.Context, _ string) (string, error) {
 				<-ctx.Done()
 				return "", ctx.Err()
 			}),
@@ -154,4 +172,14 @@ func TestGPUHealthCheckProgramExecutionIsBounded(t *testing.T) {
 		require.ErrorIs(t, steps.healthCheckProgramRunsOnTheSelectedGPUWorker(t.Context()), context.DeadlineExceeded)
 		assert.Equal(t, passiveHCProgramTimeout, time.Since(started))
 	})
+}
+
+func TestRunManualHCProgramRequiresMatchingWorkerPod(t *testing.T) {
+	runtime := &passiveCheckRuntime{
+		kubectl: framework.NewArgsScope(func(context.Context, ...string) (string, error) {
+			return `{"items":[{"metadata":{"name":"other-pod"},"spec":{"hostname":"other-worker"}}]}`, nil
+		}),
+	}
+	err := runManualHCProgram(t.Context(), runtime, framework.WorkerInfo{Name: "worker-0"})
+	require.ErrorContains(t, err, `worker pod for Slurm node "worker-0" was not found`)
 }
