@@ -12,10 +12,10 @@ LOGGER = logging.getLogger("nvidia_libraries")
 # exactly the path a job takes, so a 0-byte target or a dangling symlink fails here first.
 REQUIRED_SONAMES = ("libcuda.so.1", "libnvidia-ml.so.1")
 
-# The jail flattens every driver library into this directory (see jail_mount_target in complement_jail.sh).
+# The jail flattens every driver library into this directory (see jail_mount_target in complement_jail.py).
 LIB_DIR = f"/usr/lib/{platform.machine()}-linux-gnu"
 
-# Same threshold as lib_has_real_content in complement_jail.sh: placeholders are small marker
+# Same threshold as has_real_content in complement_jail.py: placeholders are small marker
 # files, no real driver library is this small.
 MIN_REAL_LIBRARY_SIZE = 1024
 
@@ -23,7 +23,7 @@ NVIDIA_CONTAINER_CLI_LIST = ["nvidia-container-cli", "list", "--libraries"]
 
 # WARNING: this duplicates the private compute_libs and utility_libs tables from libnvidia-container
 # (src/nvc_info.c, checked against v1.18.2). `nvidia-container-cli list` cannot filter by capability,
-# while complement_jail.sh mounts only the capabilities from NVIDIA_DRIVER_CAPABILITIES (compute and
+# while complement_jail.py mounts only the capabilities from NVIDIA_DRIVER_CAPABILITIES (compute and
 # utility are always among them) and leaves small placeholder files for the rest. So only the libraries
 # of these two capabilities are guaranteed to be real files on every GPU worker. Review this table when
 # upgrading nvidia-container-toolkit in the jail image; a library missing here is merely not checked,
@@ -53,7 +53,7 @@ def write_details(message: str) -> None:
 
 
 # Details become part of the Slurm drain reason, so they are one of three fixed phrases;
-# the exact size and the dlopen error text go to the check log only. The file checks trust complement_jail.sh to put
+# the exact size and the dlopen error text go to the check log only. The file checks trust complement_jail.py to put
 # every driver library and its soname into LIB_DIR, so `path` is where dlopen of `name` ends up.
 def load_library_failure(name: str, path: str) -> str | None:
     try:
