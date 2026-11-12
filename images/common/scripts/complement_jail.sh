@@ -90,7 +90,6 @@ ensure_nvml_soname() {
     local so1="usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml.so.1"
     # A GPU worker whose capability set excludes `utility` gets no NVML mounted by design, so no
     # soname is expected (NVML consumers like the enroot hook are knowingly opted out with it).
-    # CPU workers in GPU clusters keep the check: they see the soname over their libdummy mounts.
     if [ "$NODESET_GPU_ENABLED" = "true" ] && [ "$(grep -cF "${jaildir}/usr/lib/${ALT_ARCH}-linux-gnu/libnvidia-ml" /proc/self/mountinfo)" -lt 1 ]; then
         echo "[nvml] libnvidia-ml not mounted (capability set excludes utility), skipping the soname check"
         return 0
@@ -194,7 +193,7 @@ mount_gpu_libs() {
 # jail is etc/nvidia/nvidia-application-profiles-rc.d — an EGL-only profile dir shadowed by a
 # per-node tmpfs; we pass --device=all, so losing it to a failing neighbor's cleanup (rmdir
 # of an empty dir) is a no-op, and the next cold CLI run recreates it.
-# Must be called with CWD = ${jaildir}.
+# Uses GPU_MOUNT_TARGETS. Must be called with CWD = ${jaildir}.
 readonly GPU_PLACEHOLDER_MARKER="soperator gpu placeholder"
 
 # Where nvidia-container-cli will mount the given host file inside the jail.
@@ -216,23 +215,32 @@ jail_mount_target() {
     esac
 }
 
-precreate_gpu_placeholders() (
-    # The () body runs the function in a subshell, so the umask change stays local to this call.
-    # 0022 makes mkdir -p create 0755 directories on every component — same as the host dirs
-    # and what the CLI's own make_ancestors produces (the CLI never compares directory modes)
-    umask 0022
-    local list_output host_path jail_path created lockfd
-    local missing=()
+# Host path and jail mount target of every file nvidia-container-cli is going to mount, tab-separated.
+# Must be called with CWD = ${jaildir}.
+gpu_mount_targets() {
+    local list_output host_path
     if ! list_output=$(nvidia-container-cli list); then
-        echo "[nvml] nvidia-container-cli list failed, exiting so the container restarts"
+        echo "[nvml] nvidia-container-cli list failed, exiting so the container restarts" >&2
         exit 1
     fi
     while IFS= read -r host_path; do
         [ -n "${host_path}" ] || continue
-        jail_path=$(jail_mount_target "${host_path}")
+        printf '%s\t%s\n' "${host_path}" "$(jail_mount_target "${host_path}")"
+    done <<< "${list_output}"
+}
+
+precreate_gpu_placeholders() (
+    # The () body runs the function in a subshell, so the umask and noclobber changes stay local to this call.
+    # 0022 makes mkdir -p create 0755 directories on every component — same as the host dirs
+    # and what the CLI's own make_ancestors produces (the CLI never compares directory modes)
+    umask 0022
+    local host_path jail_path created lockfd
+    local missing=()
+    while IFS=$'\t' read -r host_path jail_path; do
+        [ -n "${host_path}" ] || continue
         [ -e "${jail_path}" ] && continue
         missing+=("${host_path}")
-    done <<< "${list_output}"
+    done <<< "${GPU_MOUNT_TARGETS}"
 
     if [ "${#missing[@]}" -eq 0 ]; then
         echo "[nvml] all GPU placeholders already present in the jail"
@@ -248,14 +256,16 @@ precreate_gpu_placeholders() (
         exit 1
     fi
     created=()
+    set -o noclobber
     for host_path in "${missing[@]}"; do
         jail_path=$(jail_mount_target "${host_path}")
-        [ -e "${jail_path}" ] && continue  # created by a previous lock holder
         mkdir -p "$(dirname "${jail_path}")"
-        # The write can fail spuriously (a possible EEXIST from O_CREAT on a stale view of the
-        # shared FS, or a transient network-FS error) — tolerated: only the file's existence
-        # matters, and the mount verification and ensure_nvml_soname judge the end state later.
-        echo "${GPU_PLACEHOLDER_MARKER}" > "${jail_path}" || true
+        # noclobber makes this an exclusive create: a placeholder another worker made meanwhile is never
+        # truncated (a 0-byte moment is what a failing CLI's cleanup deletes). Other write errors are
+        # tolerated: only the file's existence matters, the mount verification judges the end state later.
+        if ! echo "${GPU_PLACEHOLDER_MARKER}" 2>/dev/null > "${jail_path}" && [ -e "${jail_path}" ]; then
+            continue
+        fi
         # Exact host st_mode: file_create() skips creation only on full mode equality, and
         # the skip (a single lstat, no create syscall) is what removes the creation race
         chmod --reference="${host_path}" "${jail_path}" || true
@@ -271,6 +281,109 @@ precreate_gpu_placeholders() (
         ls -la "${created[@]}" | sed 's/^/[nvml]   /'
     fi
 )
+
+# dpkg installs and removes files by renaming over the target, which fails on a bind mount and
+# would replace the shared soname symlinks. Local diversions make dpkg use <dir>/soperator-diverted/<name>
+# instead. A subdirectory, not the default .distrib suffix: ldconfig would prefer such a lib*.so* sibling
+# for the soname symlink. Diversions only redirect what dpkg places; ldconfig run by a postinst can still
+# repoint a soname symlink to a newer packaged library.
+readonly DIVERT_SUBDIR="soperator-diverted"
+
+# Run a command holding dpkg's own lock files the way apt and dpkg do (POSIX locks, which flock(1) cannot
+# take), so no package operation on any node interleaves with it. Exits 75 without waiting when they are busy.
+with_dpkg_locks() {
+    python3 - "${jaildir}" "$@" <<'PY'
+import fcntl, subprocess, sys
+jail, argv = sys.argv[1], sys.argv[2:]
+locks = [open(f"{jail}/var/lib/dpkg/{name}", "a") for name in ("lock-frontend", "lock")]
+try:
+    for lock in locks:
+        fcntl.lockf(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    sys.exit(75)
+sys.exit(subprocess.run(argv).returncode)
+PY
+}
+
+# The expected "from<TAB>to" lines (in $1) that are not in dpkg's database yet
+missing_diversions() {
+    local current
+    # The diversions file holds three lines per entry: diverted path, divert-to path, package
+    current=$(awk 'NR%3==1 {from=$0} NR%3==2 {print from "\t" $0}' var/lib/dpkg/diversions 2>/dev/null | sort -u || true)
+    comm -23 <(printf '%s\n' "$1") <(printf '%s\n' "${current}")
+}
+
+# Add the missing diversions for the given jail-absolute paths (one per line). dpkg-divert takes no lock
+# and rewrites the diversions file wholesale, so adding runs under a cross-node flock and dpkg's own locks.
+# Non-fatal: the jail works without diversions. Must be called with CWD = ${jaildir}.
+divert_jail_paths() {
+    local expected missing from to lockfd
+    expected=$(while IFS= read -r from; do
+        [ -n "${from}" ] || continue
+        printf '%s\t%s\n' "${from}" "${from%/*}/${DIVERT_SUBDIR}/${from##*/}"
+    done <<< "$1" | sort -u)
+    missing=$(missing_diversions "${expected}")
+    if [ -z "${missing}" ]; then
+        echo "[divert] all dpkg diversions present"
+        return 0
+    fi
+    echo "[divert] adding $(wc -l <<< "${missing}" | tr -d ' ') dpkg diversions under lock"
+    exec {lockfd}>etc/complement_jail_dpkg_diverts.lock
+    if ! flock --wait 60 "${lockfd}"; then
+        echo "[divert] timed out waiting for the dpkg diversions lock, skipping"
+        exec {lockfd}>&-
+        return 0
+    fi
+    missing=$(missing_diversions "${expected}")  # another worker usually added them while we waited
+    if [ -z "${missing}" ]; then
+        echo "[divert] all dpkg diversions added by another worker meanwhile"
+        exec {lockfd}>&-
+        return 0
+    fi
+    while IFS=$'\t' read -r from to; do
+        # dpkg does not create the divert-to directory; a diversion added meanwhile by another worker is a no-op
+        mkdir -p ".${to%/*}"
+        with_dpkg_locks chroot "${jaildir}" /usr/bin/dpkg-divert --local --no-rename --divert "${to}" --add "${from}" && continue
+        rc=$?
+        if [ "$rc" -eq 75 ]; then
+            echo "[divert] dpkg database is in use (a package operation is running), skipping until the next start"
+            break
+        fi
+        echo "[divert] ANOMALY: diverting ${from} failed with exit code ${rc}"
+    done <<< "${missing}"
+    exec {lockfd}>&-
+}
+
+# Divert every regular file mounted by nvidia-container-cli. Non-library files listed as /lib/... are also
+# diverted under that spelling: dpkg matches the literal packaged path, not the resolved one.
+# Uses GPU_MOUNT_TARGETS. Must be called with CWD = ${jaildir}.
+divert_gpu_mount_targets() {
+    local host_path jail_path from paths=""
+    while IFS=$'\t' read -r host_path jail_path; do
+        [ -f "${jail_path}" ] || continue
+        from="/$(realpath -m --relative-to=. "${jail_path}")"
+        paths+="${from}"$'\n'
+        case "${host_path##*/}" in
+            lib*.so*) ;;
+            *) [ "${host_path}" = "${from}" ] || paths+="${host_path}"$'\n' ;;
+        esac
+    done <<< "${GPU_MOUNT_TARGETS}"
+    divert_jail_paths "${paths}"
+}
+
+# Divert the soname symlinks ldconfig created for the mounted libraries, e.g. libnvidia-ml.so.1.
+# Uses GPU_MOUNT_TARGETS. Must be called with CWD = ${jaildir}.
+divert_gpu_sonames() {
+    local mounted link paths=""
+    mounted=$(cut -f2 <<< "${GPU_MOUNT_TARGETS}")
+    for link in "usr/lib/${ALT_ARCH}-linux-gnu"/lib*.so*; do
+        [ -L "${link}" ] || continue
+        if grep -qxF "$(realpath -m "${link}")" <<< "${mounted}"; then
+            paths+="/${link}"$'\n'
+        fi
+    done
+    divert_jail_paths "${paths}"
+}
 
 pushd "${jaildir}"
     log "[virtual-fs] Bind-mount virtual filesystems"
@@ -354,11 +467,13 @@ pushd "${jaildir}"
 
         echo "[nvml] Jail mount: $(findmnt --target . --output SOURCE,FSTYPE,OPTIONS --noheadings 2>&1)"
 
+        GPU_MOUNT_TARGETS=$(gpu_mount_targets)
         # With the placeholders pre-created, running the CLI in parallel across
         # workers on the shared jail is safe (see precreate_gpu_placeholders)
         precreate_gpu_placeholders
         mount_gpu_libs
         touch "etc/gpu_libs_installed.flag"
+        divert_gpu_mount_targets
 
         echo "[nvml] /lib symlink: $(readlink lib 2>/dev/null || echo 'NOT a symlink')"
         dump_nvml_state "after nvidia-container-cli"
@@ -445,6 +560,12 @@ pushd "${jaildir}"
             sleep 10
         done
         log "[gpu-wait] Bind-mount all GPU-specific lib placeholder files into the host's libdummy"
+        # Under the placeholder lock, so a batch a GPU worker is creating right now is seen whole
+        exec {lockfd}>etc/complement_jail_gpu_placeholders.lock
+        if ! flock --wait 60 "${lockfd}"; then
+            echo "[gpu-wait] timed out waiting for the GPU placeholder lock, exiting so the container restarts"
+            exit 1
+        fi
         # Placeholders are small marker files now (see precreate_gpu_placeholders), or 0-byte on
         # jails from before that change — match both by size; no real library is this small.
         # Only versioned lib names: the jail image ships other small files in this dir (glibc
@@ -452,6 +573,7 @@ pushd "${jaildir}"
         find "${jaildir}/lib/${ALT_ARCH}-linux-gnu" -maxdepth 1 -type f ! -type l -size -64c -name 'lib*.so.*' -print0 | while IFS= read -r -d '' file; do
             mount --bind "/lib/${ALT_ARCH}-linux-gnu/libdummy.so" "$file"
         done
+        exec {lockfd}>&-
     fi
 
     # For worker node only
@@ -496,65 +618,70 @@ EOF
             done
         fi
 
-        # ld.so.cache lives in the shared jail root, so running ldconfig rewrites the cache
-        # that every running job on every node depends on, briefly leaving it empty. To avoid
-        # this on each worker pod start (e.g. node auto-replacement), rebuild the shared cache
-        # only when its contents would actually change.
-        #
-        # The check builds a throwaway candidate cache from the libraries currently visible in
-        # the jail and compares it with the cache already in place; the real ldconfig runs only
-        # if they differ. This detects any library change (driver upgrade, OpenMPI, custom
-        # libs) without a version heuristic or a shared marker file.
-        #
-        # /tmp inside the jail is node-local (bind-mounted from the host), so the candidate
-        # cache plus -X (don't update symlinks) and -i (don't touch the shared aux-cache)
-        # keep the shared jail untouched while we probe. The first line of `ldconfig -p`
-        # is a header that embeds the cache path, so compare only the entry lines (=>).
-        current_cache_dump=$(mktemp)
-        candidate_cache_dump=$(mktemp)
-        candidate_cache="tmp/ld.so.cache.candidate.$$"
+        # CPU workers in GPU clusters see libdummy (no SONAME) over the placeholders, so their probe never
+        # matches a cache built by a GPU worker and vice versa: letting them rebuild would make the shared
+        # cache flip on every worker start. Only GPU workers refresh it there.
+        if [ "$SLURM_CLUSTER_WITH_GPU" != "true" ] || [ "$NODESET_GPU_ENABLED" = "true" ]; then
+            # ld.so.cache lives in the shared jail root, so running ldconfig rewrites the cache
+            # that every running job on every node depends on, briefly leaving it empty. To avoid
+            # this on each worker pod start (e.g. node auto-replacement), rebuild the shared cache
+            # only when its contents would actually change.
+            #
+            # The check builds a throwaway candidate cache from the libraries currently visible in
+            # the jail and compares it with the cache already in place; the real ldconfig runs only
+            # if they differ. This detects any library change (driver upgrade, OpenMPI, custom
+            # libs) without a version heuristic or a shared marker file.
+            #
+            # /tmp inside the jail is node-local (bind-mounted from the host), so the candidate
+            # cache plus -X (don't update symlinks) and -i (don't touch the shared aux-cache)
+            # keep the shared jail untouched while we probe. The first line of `ldconfig -p`
+            # is a header that embeds the cache path, so compare only the entry lines (=>).
+            current_cache_dump=$(mktemp)
+            candidate_cache_dump=$(mktemp)
+            candidate_cache="tmp/ld.so.cache.candidate.$$"
 
-        # Gate the SCHED-1041 diagnostics on the cluster-level flag, not NODESET_GPU_ENABLED:
-        # in a GPU cluster a CPU-nodeset worker can win the ldconfig flock too, and its run
-        # decides whether the shared soname symlinks get created — it must not stay silent
-        if [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; then
-            dump_nvml_state "before ldconfig"
-        fi
-
-        log "[ldcache] Probing whether the linker cache is up to date"
-        chroot "${jaildir}" /usr/sbin/ldconfig -p 2>/dev/null | grep '=>' | sort > "$current_cache_dump"
-        chroot "${jaildir}" /usr/sbin/ldconfig -X -i -C "/${candidate_cache}"
-        chroot "${jaildir}" /usr/sbin/ldconfig -C "/${candidate_cache}" -p 2>/dev/null | grep '=>' | sort > "$candidate_cache_dump"
-        rm -f "${jaildir}/${candidate_cache}"
-
-        ldconfig_how="skipped"
-        if cmp -s "$current_cache_dump" "$candidate_cache_dump"; then
-            log "[ldcache] Linker cache is already up to date, skipping ldconfig"
-        else
-            log "[ldcache] Linker cache is stale, updating it inside the jail"
-            ldconfig_rc=0
-            # --conflict-exit-code distinguishes "another worker holds the lock" (a benign skip,
-            # that worker rebuilds the shared cache) from a real ldconfig failure, which must
-            # fail the entry point so the container restarts instead of leaving a broken cache.
-            flock --nonblock --conflict-exit-code 75 etc/complement_jail_ldconfig.lock \
-                -c "chroot \"${jaildir}\" /usr/sbin/ldconfig" || ldconfig_rc=$?
-            if [ "$ldconfig_rc" -eq 0 ]; then
-                log "[ldcache] ldconfig completed successfully (got flock)"
-                ldconfig_how="ran"
-            elif [ "$ldconfig_rc" -eq 75 ]; then
-                log "[ldcache] ldconfig skipped: another worker holds the lock and is rebuilding the cache"
-                ldconfig_how="lock-busy"
-            else
-                log "[ldcache] ldconfig FAILED with exit code ${ldconfig_rc}"
-                if [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; then
-                    ensure_nvml_soname "failed"
-                fi
-                exit "$ldconfig_rc"
+            if [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; then
+                dump_nvml_state "before ldconfig"
             fi
-        fi
-        rm -f "$current_cache_dump" "$candidate_cache_dump"
-        if [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; then
-            ensure_nvml_soname "$ldconfig_how"
+
+            log "[ldcache] Probing whether the linker cache is up to date"
+            chroot "${jaildir}" /usr/sbin/ldconfig -p 2>/dev/null | grep '=>' | sort > "$current_cache_dump"
+            chroot "${jaildir}" /usr/sbin/ldconfig -X -i -C "/${candidate_cache}"
+            chroot "${jaildir}" /usr/sbin/ldconfig -C "/${candidate_cache}" -p 2>/dev/null | grep '=>' | sort > "$candidate_cache_dump"
+            rm -f "${jaildir}/${candidate_cache}"
+
+            ldconfig_how="skipped"
+            if cmp -s "$current_cache_dump" "$candidate_cache_dump"; then
+                log "[ldcache] Linker cache is already up to date, skipping ldconfig"
+            else
+                log "[ldcache] Linker cache is stale, updating it inside the jail"
+                ldconfig_rc=0
+                # --conflict-exit-code distinguishes "another worker holds the lock" (a benign skip,
+                # that worker rebuilds the shared cache) from a real ldconfig failure, which must
+                # fail the entry point so the container restarts instead of leaving a broken cache.
+                flock --nonblock --conflict-exit-code 75 etc/complement_jail_ldconfig.lock \
+                    -c "chroot \"${jaildir}\" /usr/sbin/ldconfig" || ldconfig_rc=$?
+                if [ "$ldconfig_rc" -eq 0 ]; then
+                    log "[ldcache] ldconfig completed successfully (got flock)"
+                    ldconfig_how="ran"
+                elif [ "$ldconfig_rc" -eq 75 ]; then
+                    log "[ldcache] ldconfig skipped: another worker holds the lock and is rebuilding the cache"
+                    ldconfig_how="lock-busy"
+                else
+                    log "[ldcache] ldconfig FAILED with exit code ${ldconfig_rc}"
+                    if [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; then
+                        ensure_nvml_soname "failed"
+                    fi
+                    exit "$ldconfig_rc"
+                fi
+            fi
+            rm -f "$current_cache_dump" "$candidate_cache_dump"
+            if [ "$SLURM_CLUSTER_WITH_GPU" = "true" ]; then
+                ensure_nvml_soname "$ldconfig_how"
+            fi
+            if [ "$NODESET_GPU_ENABLED" = "true" ]; then
+                divert_gpu_sonames
+            fi
         fi
     fi
 popd
