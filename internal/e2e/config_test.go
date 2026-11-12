@@ -7,6 +7,109 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func mixedGPUProfile() Profile {
+	p := validProfile()
+	p.CapacityStrategy = CapacityStrategyCancel
+	p.NodeSets[0].Name = "worker-h100"
+	p.NodeSets[0].InfinibandFabric = "fabric-2"
+	h200 := p.NodeSets[0]
+	h200.Name = "worker-h200"
+	h200.Platform = "gpu-h200-sxm"
+	h200.InfinibandFabric = "fabric-7"
+	p.NodeSets = append(p.NodeSets, h200, NodeSetDef{
+		Name:     "worker-cpu",
+		Platform: "cpu-d3",
+		Preset:   "8vcpu-32gb",
+		Size:     2,
+	})
+	p.Partitions = []PartitionDef{
+		{Name: "gpu", NodeSets: []string{"worker-h100", "worker-h200"}},
+		{Name: "cpu", NodeSets: []string{"worker-cpu"}},
+	}
+	return p
+}
+
+func TestMixedGPUProfile(t *testing.T) {
+	p := mixedGPUProfile()
+	require.NoError(t, p.Validate())
+	assert.Empty(t, p.Labels)
+	require.Len(t, p.NodeSets, 3)
+	for _, ns := range p.NodeSets {
+		assert.Equal(t, 2, ns.Size, ns.Name)
+	}
+	assert.Equal(t, []PartitionDef{
+		{Name: "gpu", NodeSets: []string{"worker-h100", "worker-h200"}},
+		{Name: "cpu", NodeSets: []string{"worker-cpu"}},
+	}, p.Partitions)
+
+	raw, err := p.YAML()
+	require.NoError(t, err)
+	parsed, err := ParseProfile(raw)
+	require.NoError(t, err)
+	assert.Equal(t, p, parsed)
+}
+
+func TestValidate_Partitions(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		partitions []PartitionDef
+		wantErr    string
+	}{
+		{name: "omitted"},
+		{name: "valid", partitions: []PartitionDef{{Name: "gpu", NodeSets: []string{"worker-gpu"}}}},
+		{
+			name: "empty name", partitions: []PartitionDef{{NodeSets: []string{"worker-gpu"}}},
+			wantErr: `name "" must match`,
+		},
+		{
+			name: "invalid name", partitions: []PartitionDef{{Name: "gpu\nState=DOWN", NodeSets: []string{"worker-gpu"}}},
+			wantErr: "must match",
+		},
+		{
+			name: "main collision", partitions: []PartitionDef{{Name: "main", NodeSets: []string{"worker-gpu"}}},
+			wantErr: `duplicate or generated partition name "main"`,
+		},
+		{
+			name: "hidden collision", partitions: []PartitionDef{{Name: "hidden", NodeSets: []string{"worker-gpu"}}},
+			wantErr: `duplicate or generated partition name "hidden"`,
+		},
+		{
+			name: "nodeset collision", partitions: []PartitionDef{{Name: "worker-gpu", NodeSets: []string{"worker-gpu"}}},
+			wantErr: `duplicate or generated partition name "worker-gpu"`,
+		},
+		{
+			name: "no nodesets", partitions: []PartitionDef{{Name: "gpu"}},
+			wantErr: "nodesets must not be empty",
+		},
+		{
+			name: "unknown nodeset", partitions: []PartitionDef{{Name: "gpu", NodeSets: []string{"absent"}}},
+			wantErr: `unknown nodeset "absent"`,
+		},
+		{
+			name: "duplicate nodeset", partitions: []PartitionDef{{Name: "gpu", NodeSets: []string{"worker-gpu", "worker-gpu"}}},
+			wantErr: `duplicate nodeset "worker-gpu"`,
+		},
+		{
+			name: "duplicate partition", partitions: []PartitionDef{
+				{Name: "gpu", NodeSets: []string{"worker-gpu"}},
+				{Name: "gpu", NodeSets: []string{"worker-gpu"}},
+			},
+			wantErr: `duplicate or generated partition name "gpu"`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := validProfile()
+			p.Partitions = tc.partitions
+			err := p.Validate()
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func validProfile() Profile {
 	return Profile{
 		NebiusProjectID: "project-123",

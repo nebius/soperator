@@ -3,14 +3,15 @@ package sharedsteps
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cucumber/godog"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -18,11 +19,15 @@ import (
 )
 
 const (
+	nodeReplacementEnabledFlag          = "--enable-node-replacement"
 	nodeReplacementMaintenanceCondition = "NebiusMaintenanceScheduled"
 	nodeReplacementDrainReason          = "[compute_maintenance] node replacement process"
 
 	// soperatorchecks replaces the node for any check that drains with a reason with this prefix.
 	nodeReplacementHealthCheckReason = "[node_problem]"
+	// healthCheckInjectErrorReasonPart is the health-checker check name reported for --inject-error,
+	// see docs/passive-checks.md. It separates the simulated failure from a real [node_problem] drain.
+	healthCheckInjectErrorReasonPart = "inject_error"
 
 	// gpu_health_check passes --inject-error to the health-checker while this node-local marker exists,
 	// so only the Soperator run of the health-checker fails and nothing reaches platform monitoring of the host.
@@ -42,6 +47,7 @@ const (
 	nodeReplacementDrainTimeout  = 10 * time.Minute
 	nodeReplacementRemoveTimeout = 30 * time.Minute
 	nodeReplacementReadyTimeout  = 20 * time.Minute
+	nodeReplacementJobHold       = 30 * time.Minute
 
 	// Slurm runs HealthCheckProgram on its own schedule: with HealthCheckNodeState=CYCLE
 	// the next run on a node starts within one HealthCheckInterval, and one more
@@ -59,6 +65,7 @@ type NodeReplacement struct {
 	original             framework.WorkerReplacementSnapshot
 	maintenanceJob       framework.SbatchJob
 	maintenanceRequested bool
+	maintenanceRecovery  bool
 	faultInjected        bool
 	preExistingWorkers   []framework.WorkerInfo
 }
@@ -74,10 +81,15 @@ func NewNodeReplacement(runtime framework.Runtime, slurm *framework.SlurmClient,
 
 func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a test job is submitted and running on a (CPU|GPU) worker node$`, s.aTestJobIsSubmittedAndRunningOnWorkerNode)
+	sc.Step(`^a test job is submitted and running on an idle GPU worker node$`, s.aTestJobIsSubmittedAndRunningOnAnIdleGPUWorkerNode)
 	sc.Step(`^a maintenance event is triggered for that node$`, s.aMaintenanceEventIsTriggeredForThatNode)
 	sc.Step(`^the node is drained with a maintenance reason$`, s.theNodeIsDrainedWithAMaintenanceReason)
 	sc.Step(`^a GPU health check failure is simulated on that node$`, s.aGPUHealthCheckFailureIsSimulatedOnThatNode)
 	sc.Step(`^the node is drained with a node problem reason$`, s.theNodeIsDrainedWithANodeProblemReason)
+	sc.Step(`^the node is draining with a node problem reason while the test job is running$`, s.theNodeIsDrainingWithANodeProblemReasonWhileTheTestJobIsRunning)
+	sc.Step(`^a maintenance event is triggered while that node is draining$`, s.aMaintenanceEventIsTriggeredWhileThatNodeIsDraining)
+	sc.Step(`^the node remains drained while the test job is running$`, s.theNodeRemainsDrainedWhileTheTestJobIsRunning)
+	sc.Step(`^a maintenance event is triggered after that node has fully drained$`, s.aMaintenanceEventIsTriggeredAfterThatNodeHasFullyDrained)
 	sc.Step(`^the test job is cancelled$`, s.theTestJobIsCancelled)
 	sc.Step(`^the old instance is removed$`, s.theOldInstanceIsRemoved)
 	sc.Step(`^the platform reported deleting the old node$`, s.thePlatformReportedDeletingTheOldNode)
@@ -86,9 +98,42 @@ func (s *NodeReplacement) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^all pre-existing worker nodes are operational$`, s.allPreExistingWorkerNodesAreOperational)
 }
 
+func (s *NodeReplacement) healthCheckDrivenNodeReplacementIsEnabled(ctx context.Context) error {
+	var deployments appsv1.DeploymentList
+	if err := s.kubectl.GetJSON(ctx, &deployments, "get", "deployments", "-n", framework.SoperatorSystemNamespace,
+		"-l", "control-plane=soperatorchecks", "-o", "json"); err != nil {
+		return fmt.Errorf("read health-check replacement configuration: %w", err)
+	}
+	if len(deployments.Items) == 0 {
+		s.runtime.Logf("Skipping health-check-driven node replacement: soperatorchecks is not deployed")
+		return godog.ErrSkip
+	}
+	if len(deployments.Items) != 1 {
+		return fmt.Errorf("read health-check replacement configuration: expected one soperatorchecks Deployment in %s, found %d",
+			framework.SoperatorSystemNamespace, len(deployments.Items))
+	}
+	deployment := deployments.Items[0]
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		if container.Name != "manager" {
+			continue
+		}
+		if slices.Contains(container.Args, nodeReplacementEnabledFlag+"=false") {
+			s.runtime.Logf("Skipping health-check-driven node replacement: %s=false in Deployment %s/%s", nodeReplacementEnabledFlag, deployment.Namespace, deployment.Name)
+			return godog.ErrSkip
+		}
+		return nil
+	}
+	return fmt.Errorf("read health-check replacement configuration: manager container is missing from Deployment %s/%s", deployment.Namespace, deployment.Name)
+}
+
 func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), nodeReplacementRemoveTimeout+nodeReplacementReadyTimeout+time.Minute)
 	defer cancel()
+	if s.maintenanceRecovery && s.faultInjected {
+		if err := s.ensureMaintenanceForCleanup(cleanupCtx); err != nil {
+			s.runtime.Logf("Cleanup: request maintenance before cancelling job %s on worker %s: %v", s.maintenanceJob.ID, s.original.WorkerName, err)
+		}
+	}
 	if !s.maintenanceJob.IsZero() {
 		if cancelErr := s.cancelJob(cleanupCtx, s.maintenanceJob.ID); cancelErr != nil {
 			s.runtime.Logf("Cleanup: cancel maintenance job: %v", cancelErr)
@@ -111,6 +156,7 @@ func (s *NodeReplacement) CleanupAndReset(ctx context.Context) {
 	s.original = framework.WorkerReplacementSnapshot{}
 	s.maintenanceJob = framework.SbatchJob{}
 	s.maintenanceRequested = false
+	s.maintenanceRecovery = false
 	s.faultInjected = false
 	s.preExistingWorkers = nil
 }
@@ -127,6 +173,19 @@ func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnWorkerNode(ctx context.
 	return s.submitTestJobOnWorker(ctx, workers[0], snapshot)
 }
 
+func (s *NodeReplacement) aTestJobIsSubmittedAndRunningOnAnIdleGPUWorkerNode(ctx context.Context) error {
+	s.maintenanceRecovery = true
+	snapshot, err := s.selector.Snapshot(ctx)
+	if err != nil {
+		return err
+	}
+	workers, err := pickIdleGPUWorkers(snapshot, 1, false)
+	if err != nil {
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
+	}
+	return s.submitTestJobOnWorker(ctx, workers[0], snapshot)
+}
+
 func (s *NodeReplacement) submitTestJobOnWorker(ctx context.Context, worker framework.WorkerInfo, snapshot framework.WorkerSnapshot) error {
 	if err := s.selectWorker(ctx, worker); err != nil {
 		return err
@@ -136,7 +195,7 @@ func (s *NodeReplacement) submitTestJobOnWorker(ctx context.Context, worker fram
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:  "e2e-node-replacement",
 		Nodelist: []string{s.replacementWorker.Name},
-		Wrap:     "sleep 600",
+		Wrap:     fmt.Sprintf("sleep %.0f", nodeReplacementJobHold.Seconds()),
 	})
 	if err != nil {
 		return err
@@ -149,7 +208,7 @@ func (s *NodeReplacement) submitTestJobOnWorker(ctx context.Context, worker fram
 }
 
 func (s *NodeReplacement) selectWorker(ctx context.Context, worker framework.WorkerInfo) error {
-	original, err := framework.CaptureWorkerReplacement(ctx, s.kubectl, s.slurm, worker.Name)
+	original, err := framework.CaptureWorkerReplacement(ctx, s.runtime, s.kubectl, s.slurm, worker.Name)
 	if err != nil {
 		return fmt.Errorf("record original worker for replacement: %w", err)
 	}
@@ -193,42 +252,28 @@ func (s *NodeReplacement) theNodeIsDrainedWithAMaintenanceReason(ctx context.Con
 
 func (s *NodeReplacement) waitForMaintenanceDrain(ctx context.Context, guard func(context.Context) error) error {
 	workerName := s.replacementWorker.Name
-	var guardErr error
-	var stop bool
-	err := s.runtime.WaitFor(ctx, "node drain reason", nodeReplacementDrainTimeout, 15*time.Second, func(waitCtx context.Context) (bool, error) {
-		if stop {
-			return true, nil
-		}
+	return s.runtime.WaitFor(ctx, "node drain reason", nodeReplacementDrainTimeout, 15*time.Second, func(waitCtx context.Context) (bool, error) {
 		if guard != nil {
-			err := guard(waitCtx)
-			var invariant rolloutInvariantError
-			if errors.As(err, &invariant) {
-				guardErr = err
-				stop = true
-			} else if err != nil {
+			if err := guard(waitCtx); err != nil {
 				return false, err
 			}
-		}
-		if stop {
-			return true, nil
 		}
 		node, err := s.slurm.NodeInfo(waitCtx, workerName)
 		if err != nil {
 			return false, err
 		}
-		return node.HasStateFlag("DRAIN") && maintenanceReasonMatches(node.Reason), nil
+		if !node.HasStateFlag("DRAIN") || !maintenanceReasonMatches(node.Reason) {
+			return false, fmt.Errorf("worker %s maintenance drain pending: state=%s reason=%q instance=%s",
+				workerName, node.State, node.Reason, node.InstanceID)
+		}
+		return true, nil
 	})
-	if guardErr != nil {
-		return guardErr
-	}
-	return err
 }
 
 func (s *NodeReplacement) theTestJobIsCancelled(ctx context.Context) error {
 	if err := s.cancelJob(ctx, s.maintenanceJob.ID); err != nil {
 		return err
 	}
-	s.maintenanceJob = framework.SbatchJob{}
 	return nil
 }
 
@@ -277,24 +322,11 @@ func (s *NodeReplacement) aReplacementNodeJoinsTheCluster(ctx context.Context) e
 }
 
 func (s *NodeReplacement) waitForReplacement(ctx context.Context, timeout time.Duration, guard func(context.Context) error) error {
-	var guardErr error
-	var stop bool
-	err := s.runtime.WaitFor(ctx, "replacement worker ready on a new host", timeout, 60*time.Second, func(waitCtx context.Context) (bool, error) {
-		if stop {
-			return true, nil
-		}
+	return s.runtime.WaitFor(ctx, "replacement worker ready on a new host", timeout, 60*time.Second, func(waitCtx context.Context) (bool, error) {
 		if guard != nil {
-			err := guard(waitCtx)
-			var invariant rolloutInvariantError
-			if errors.As(err, &invariant) {
-				guardErr = err
-				stop = true
-			} else if err != nil {
+			if err := guard(waitCtx); err != nil {
 				return false, err
 			}
-		}
-		if stop {
-			return true, nil
 		}
 		pod, ready, err := framework.ObserveWorkerReplacement(waitCtx, s.runtime, s.kubectl, s.slurm, s.original)
 		if err != nil || ready {
@@ -303,10 +335,6 @@ func (s *NodeReplacement) waitForReplacement(ctx context.Context, timeout time.D
 		return false, fmt.Errorf("worker %s replacement pending: original host=%s UID=%s instance=%s pod UID=%s host=%s",
 			s.original.WorkerName, s.original.NodeName, s.original.NodeUID, s.original.InstanceID, pod.UID, pod.Spec.NodeName)
 	})
-	if guardErr != nil {
-		return guardErr
-	}
-	return err
 }
 
 // An owned maintenance event must finish; clearing it midway would leave a
@@ -336,10 +364,13 @@ func (s *NodeReplacement) aGPUHealthCheckFailureIsSimulatedOnThatNode(ctx contex
 	if s.replacementWorker.Name == "" {
 		return fmt.Errorf("worker is not selected")
 	}
+	if err := s.healthCheckDrivenNodeReplacementIsEnabled(ctx); err != nil {
+		return err
+	}
 	// Mark before running: cleanup must inspect the node even when the command ran
 	// but its result never came back.
 	s.faultInjected = true
-	if _, err := s.runtime.Worker(s.replacementWorker).Run(ctx, healthCheckInjectErrorCommand()); err != nil {
+	if _, err := s.runtime.Worker(s.replacementWorker).RunWithDefaultRetry(ctx, healthCheckInjectErrorCommand()); err != nil {
 		return fmt.Errorf("simulate GPU health check failure on %s: %w", s.replacementWorker.Name, err)
 	}
 	s.runtime.Logf("Node replacement: wrote %s with %s on %s", healthCheckInjectErrorMarker, healthCheckInjectErrorResolution, s.replacementWorker.Name)
@@ -353,18 +384,25 @@ func healthCheckInjectErrorCommand() string {
 		framework.ShellQuote(healthCheckInjectErrorMarker))
 }
 
-// The marker lives on the original node's disk, so it disappears with the node;
-// removing it only matters when the replacement never happened.
+// The marker lives on the original node's disk, so it disappears with the node.
+// Removing it matters when the node was never replaced: a leftover marker fails
+// every later GPU prolog on that node, so the removal is retried before giving up.
 func (s *NodeReplacement) removeHealthCheckInjectErrorMarker(ctx context.Context) {
 	if s.replacementWorker.Name == "" {
 		return
 	}
-	if _, err := s.runtime.Worker(s.replacementWorker).Run(ctx, fmt.Sprintf("rm -f %s", framework.ShellQuote(healthCheckInjectErrorMarker))); err != nil {
-		s.runtime.Logf("Cleanup: remove %s from %s: %v", healthCheckInjectErrorMarker, s.replacementWorker.Name, err)
+	command := fmt.Sprintf("rm -f %s", framework.ShellQuote(healthCheckInjectErrorMarker))
+	if _, err := s.runtime.Worker(s.replacementWorker).RunWithDefaultRetry(ctx, command); err != nil {
+		s.runtime.Logf("Cleanup: remove %s from %s: %v; if the node was not replaced, delete the marker by hand or GPU jobs on it will keep failing the prolog check",
+			healthCheckInjectErrorMarker, s.replacementWorker.Name, err)
 	}
 }
 
 func (s *NodeReplacement) theNodeIsDrainedWithANodeProblemReason(ctx context.Context) error {
+	return s.waitForHealthCheckDrain(ctx, nil)
+}
+
+func (s *NodeReplacement) waitForHealthCheckDrain(ctx context.Context, guard func(context.Context) error) error {
 	workerName := s.replacementWorker.Name
 	configuration, err := s.slurm.Configuration(ctx)
 	if err != nil {
@@ -375,16 +413,40 @@ func (s *NodeReplacement) theNodeIsDrainedWithANodeProblemReason(ctx context.Con
 		return err
 	}
 	s.runtime.Logf("Node replacement: waiting up to %s for Slurm's periodic health check to drain %s", timeout, workerName)
-	err = s.slurm.WaitForNodeReasonContains(ctx, workerName, nodeReplacementHealthCheckReason, timeout)
+	err = s.runtime.WaitFor(ctx, "simulated health check drain", timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+		if guard != nil {
+			if err := guard(waitCtx); err != nil {
+				return false, err
+			}
+		}
+		node, err := s.slurm.NodeInfo(waitCtx, workerName)
+		if err != nil {
+			return false, err
+		}
+		if !node.HasStateFlag("DRAIN") || !healthCheckDrainReasonMatches(node.Reason) {
+			return false, fmt.Errorf("worker %s simulated health check drain pending: state=%s reason=%q instance=%s",
+				workerName, node.State, node.Reason, node.InstanceID)
+		}
+		return true, nil
+	})
 	node, stateErr := s.slurm.NodeInfo(ctx, workerName)
 	if stateErr == nil {
 		s.runtime.Logf("Worker state after waiting for the health check drain: name=%s state=%s reason=%s instance_id=%s",
 			node.Name, node.State, node.Reason, node.InstanceID)
 	}
 	if err != nil {
-		return fmt.Errorf("wait for %s to be drained with a node problem reason: %w", workerName, err)
+		return fmt.Errorf("wait for %s to be drained with a node problem reason from the simulated health check failure: %w", workerName, err)
 	}
 	return nil
+}
+
+// healthCheckDrainReasonMatches accepts a drain caused by the simulated failure only: the
+// [node_problem] prefix is what makes soperator replace the node, and the inject_error check
+// name proves the marker, not a real failure, drained it. The check name, resolution text and
+// the [prolog]/[hc_program] context are left out: they may change or vary with cluster activity.
+func healthCheckDrainReasonMatches(reason string) bool {
+	return strings.HasPrefix(reason, nodeReplacementHealthCheckReason) &&
+		strings.Contains(reason, healthCheckInjectErrorReasonPart)
 }
 
 // healthCheckDrainTimeout derives the drain wait from the effective HealthCheckInterval.

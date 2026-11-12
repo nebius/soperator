@@ -77,5 +77,5 @@ func TestValidateAccountingJobRecordReportsMismatches(t *testing.T) {
 
 func TestParseAccountingRowsTrimsFieldsAndTrailingDelimiter(t *testing.T) {
 	assert.Equal(t, [][]string{{"soperator", "bob", "e2e-research"}},
-		parseAccountingRows("  soperator | bob | e2e-research |  \n\n"))
+		parsePipeRows("  soperator | bob | e2e-research |  \n\n"))
 }

@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"os"
 	"path"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -102,7 +100,7 @@ func (s *NCCLDebug) selectWorker(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	workers, err := pickIdleGPUWorkers(snapshot, 1)
+	workers, err := pickIdleGPUWorkers(snapshot, 1, false)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
@@ -412,9 +410,8 @@ func (s *NCCLDebug) saveJobArtifacts(ctx context.Context, run *ncclDebugJob) {
 		files[name] = output
 	}
 	for name, output := range files {
-		file := filepath.Join(artifacts.RunnerDir, strings.ToLower(run.level)+"-"+run.job.ID+"-"+name)
-		if err := os.WriteFile(file, []byte(output), 0o644); err != nil {
-			s.runtime.Logf("Write NCCL debug artifact %s: %v", file, err)
+		if err := artifacts.WriteRunnerFile(strings.ToLower(run.level)+"-"+run.job.ID+"-"+name, output); err != nil {
+			s.runtime.Logf("Write NCCL debug artifact: %v", err)
 		}
 	}
 }

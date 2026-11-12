@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a godog cucumber JSON report as Markdown."""
+"""Render godog cucumber JSON reports as Markdown."""
 import argparse
 import json
 import re
@@ -170,7 +170,7 @@ def render_comment(features, out):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("report")
+    parser.add_argument("report", nargs="+")
     parser.add_argument(
         "--format",
         choices=("summary", "comment"),
@@ -178,8 +178,16 @@ def main():
     )
     args = parser.parse_args()
 
-    with open(args.report) as f:
-        features = json.load(f)
+    features = []
+    for report in args.report:
+        try:
+            with open(report) as f:
+                report_features = json.load(f)
+        except (OSError, json.JSONDecodeError) as error:
+            parser.error(f"{report}: {error}")
+        if not isinstance(report_features, list):
+            parser.error(f"{report}: expected a JSON array of features")
+        features.extend(report_features)
     if args.format == "comment":
         render_comment(features, sys.stdout)
     else:

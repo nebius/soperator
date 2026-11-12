@@ -28,6 +28,54 @@ func TestWorkerSnapshotPickWorkersSelectsFromAllWorkers(t *testing.T) {
 	assert.ElementsMatch(t, snapshot.Workers, workers)
 }
 
+func TestPickWorkersUsesPredicate(t *testing.T) {
+	pool := []WorkerInfo{
+		{Name: "idle", SlurmNode: SlurmNodeInfo{State: "IDLE"}},
+		{Name: "allocated", SlurmNode: SlurmNodeInfo{State: "ALLOCATED"}},
+		{Name: "powered-down", SlurmNode: SlurmNodeInfo{State: "POWERED_DOWN"}},
+		{Name: "drained", SlurmNode: SlurmNodeInfo{State: "IDLE+DRAIN"}},
+	}
+	workers, err := PickWorkers(pool, 4, 3, "GPU workers", WorkerInfo.IsUsable)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"idle", "allocated", "powered-down"}, WorkerNames(workers))
+	workers, err = PickWorkers(pool, 4, 1, "GPU workers", WorkerInfo.IsIdle)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"idle"}, WorkerNames(workers))
+
+	_, err = PickWorkers(pool, 4, 2, "GPU workers", WorkerInfo.IsIdle)
+	require.Error(t, err)
+	assert.False(t, IsInsufficientWorkers(err))
+	assert.ErrorContains(t, err, "found 1 usable GPU workers, need 2 (4 configured, 4 discovered)")
+	assert.ErrorContains(t, err, "allocated state=ALLOCATED")
+	assert.ErrorContains(t, err, "powered-down state=POWERED_DOWN")
+	assert.ErrorContains(t, err, "drained state=IDLE+DRAIN")
+}
+
+func TestWorkerAvailabilityReportsMissingAndUnexpectedWorkers(t *testing.T) {
+	pool := []WorkerInfo{{Name: "worker-0", SlurmNode: SlurmNodeInfo{State: "IDLE"}}}
+	for _, tc := range []struct {
+		name       string
+		configured int
+		want       string
+	}{
+		{name: "missing", configured: 2, want: "1 configured GPU workers missing from Slurm"},
+		{name: "unexpected", want: "1 unexpected GPU workers present in Slurm"},
+		{name: "healthy", configured: 1, want: "found 1 usable GPU workers (1 configured, 1 discovered)"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, matches := range []func(WorkerInfo) bool{WorkerInfo.IsUsable, WorkerInfo.IsIdle} {
+				message := WorkerAvailability(pool, tc.configured, 0, "GPU workers", matches)
+				assert.Contains(t, message, tc.want)
+				assert.NotContains(t, message, ", need")
+				assert.NotContains(t, message, ": ;")
+				if tc.name == "healthy" {
+					assert.Equal(t, tc.want, message)
+				}
+			}
+		})
+	}
+}
+
 func TestWorkerSnapshotPickCPUWorkersSelectsFromCPUWorkers(t *testing.T) {
 	snapshot := WorkerSnapshot{
 		NodeSets: []NodeSetInfo{

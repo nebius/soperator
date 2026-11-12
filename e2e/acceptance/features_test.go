@@ -30,8 +30,11 @@ func TestSharedFeaturesParseWithGherkin(t *testing.T) {
 	}
 }
 
-func TestSharedHeavyScenarios(t *testing.T) {
-	var heavy []string
+// sharedScenariosTagged returns the names of default-suite scenarios carrying the tag.
+func sharedScenariosTagged(t *testing.T, tag string) []string {
+	t.Helper()
+
+	var names []string
 	for _, path := range FeaturePaths() {
 		content, err := fs.ReadFile(acceptanceFeatures, path)
 		require.NoError(t, err)
@@ -42,13 +45,17 @@ func TestSharedHeavyScenarios(t *testing.T) {
 			if child.Scenario == nil {
 				continue
 			}
-			for _, tag := range child.Scenario.Tags {
-				if tag.Name == "@heavy" {
-					heavy = append(heavy, child.Scenario.Name)
+			for _, scenarioTag := range child.Scenario.Tags {
+				if scenarioTag.Name == tag {
+					names = append(names, child.Scenario.Name)
 				}
 			}
 		}
 	}
+	return names
+}
+
+func TestSharedHeavyScenarios(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"GPU ActiveCheck succeeds on all GPU workers",
 		"Docker containers can access GPUs",
@@ -60,10 +67,23 @@ func TestSharedHeavyScenarios(t *testing.T) {
 		"A maintenance event replaces the selected worker node",
 		"A maintenance event replaces a CPU worker node when CPU and GPU workers exist",
 		"A failed GPU health check replaces the worker node",
+		"A GPU worker recovers when maintenance arrives during health-check draining",
+		"A GPU worker recovers when maintenance arrives after health-check draining",
 		"An MK8s node group update preserves running jobs",
 		"A worker update preserves maintenance drains before and during handoff",
 		"Non-responding kubelet recreates a Kubernetes node and recovers the worker",
-	}, heavy)
+		"A burst of batch jobs is accepted and drained within the budget",
+	}, sharedScenariosTagged(t, "@heavy"))
+}
+
+// Manual scenarios never run unless named with --scenario; keep the list short and
+// every entry justified by a comment next to the tag in its feature file.
+func TestSharedManualScenarios(t *testing.T) {
+	assert.ElementsMatch(t, []string{
+		"A failed GPU health check replaces the worker node",
+		"A GPU worker recovers when maintenance arrives during health-check draining",
+		"A GPU worker recovers when maintenance arrives after health-check draining",
+	}, sharedScenariosTagged(t, "@manual"))
 }
 
 func TestSharedFeaturesHaveValidVersionTags(t *testing.T) {

@@ -19,10 +19,12 @@ package v1_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -236,4 +238,74 @@ func TestValidateSlurmClusterLoginDocker(t *testing.T) {
 		))
 		assert.NoError(t, err)
 	})
+}
+
+func TestValidateSlurmClusterLoginUpdatePolicy(t *testing.T) {
+	tests := []struct {
+		name    string
+		policy  *slurmv1.LoginUpdatePolicy
+		wantErr bool
+	}{
+		{name: "omitted policy uses defaults"},
+		{name: "empty policy uses defaults", policy: &slurmv1.LoginUpdatePolicy{}},
+		{
+			name:   "notice without schedule is allowed",
+			policy: &slurmv1.LoginUpdatePolicy{MinNotice: &metav1.Duration{Duration: time.Hour}},
+		},
+		{
+			name: "explicit zero notice is allowed",
+			policy: &slurmv1.LoginUpdatePolicy{
+				MinNotice: &metav1.Duration{},
+			},
+		},
+		{
+			name:   "first day monthly cron is allowed",
+			policy: &slurmv1.LoginUpdatePolicy{Schedule: ptr.To("0 0 1 * *")},
+		},
+		{
+			name: "February 31 has no occurrence", wantErr: true,
+			policy: &slurmv1.LoginUpdatePolicy{Schedule: ptr.To("0 0 31 2 *")},
+		},
+		{
+			name:   "leap day has a future occurrence",
+			policy: &slurmv1.LoginUpdatePolicy{Schedule: ptr.To("0 0 29 2 *")},
+		},
+		{
+			name:   "restricted weekday preserves cron OR semantics",
+			policy: &slurmv1.LoginUpdatePolicy{Schedule: ptr.To("0 0 31 2 1")},
+		},
+		{
+			name:   "partial policy uses defaults",
+			policy: &slurmv1.LoginUpdatePolicy{Schedule: ptr.To("CRON_TZ=Europe/Amsterdam 0 3 * * 2")},
+		},
+		{
+			name: "interval descriptor is rejected", wantErr: true,
+			policy: &slurmv1.LoginUpdatePolicy{Schedule: ptr.To("@every 1m")},
+		},
+		{
+			name: "invalid schedule is rejected", wantErr: true,
+			policy: &slurmv1.LoginUpdatePolicy{Schedule: ptr.To("not a schedule")},
+		},
+		{
+			name: "empty schedule is rejected", wantErr: true,
+			policy: &slurmv1.LoginUpdatePolicy{Schedule: ptr.To("")},
+		},
+	}
+	validator := &SlurmClusterCustomValidator{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &slurmv1.SlurmCluster{Spec: slurmv1.SlurmClusterSpec{
+				SlurmNodes: slurmv1.SlurmNodes{Login: slurmv1.SlurmNodeLogin{UpdatePolicy: tt.policy}},
+			}}
+			_, createErr := validator.ValidateCreate(context.Background(), cluster)
+			_, updateErr := validator.ValidateUpdate(context.Background(), &slurmv1.SlurmCluster{}, cluster)
+			if tt.wantErr {
+				assert.ErrorContains(t, createErr, "login.updatePolicy")
+				assert.ErrorContains(t, updateErr, "login.updatePolicy")
+			} else {
+				assert.NoError(t, createErr)
+				assert.NoError(t, updateErr)
+			}
+		})
+	}
 }

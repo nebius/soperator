@@ -15,6 +15,8 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
+const enabledHealthCheckReplacementConfig = `{"items":[{"spec":{"template":{"spec":{"containers":[{"name":"manager","args":["--enable-node-replacement=true"]}]}}}}]}`
+
 type healthCheckReplacementRuntime struct {
 	framework.Runtime
 	kubectl    framework.ArgsScope
@@ -107,12 +109,17 @@ func TestHealthCheckInjectErrorCommandWritesResolutionToNodeLocalMarker(t *testi
 
 func TestSimulateHealthCheckFailureWritesMarkerOnSelectedWorker(t *testing.T) {
 	var commands []string
-	runtime := healthCheckReplacementRuntime{worker: framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
-		require.NoError(t, ctx.Err())
-		commands = append(commands, command)
-		return "", nil
-	})}
-	steps := NodeReplacement{runtime: runtime, replacementWorker: framework.WorkerInfo{Name: "worker-1"}}
+	runtime := healthCheckReplacementRuntime{
+		kubectl: framework.NewArgsScope(func(context.Context, ...string) (string, error) {
+			return enabledHealthCheckReplacementConfig, nil
+		}),
+		worker: framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+			require.NoError(t, ctx.Err())
+			commands = append(commands, command)
+			return "", nil
+		})}
+	steps := NewNodeReplacement(runtime, nil, nil)
+	steps.replacementWorker = framework.WorkerInfo{Name: "worker-1"}
 
 	require.NoError(t, steps.aGPUHealthCheckFailureIsSimulatedOnThatNode(t.Context()))
 
@@ -121,28 +128,39 @@ func TestSimulateHealthCheckFailureWritesMarkerOnSelectedWorker(t *testing.T) {
 }
 
 func TestSimulateHealthCheckFailureKeepsOwnershipOnFailure(t *testing.T) {
-	writeErr := errors.New("ssh: connection refused")
-	runtime := healthCheckReplacementRuntime{worker: framework.NewCommandScope(func(context.Context, string) (string, error) {
-		return "", writeErr
-	})}
-	steps := NodeReplacement{runtime: runtime, replacementWorker: framework.WorkerInfo{Name: "worker-1"}}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	runtime := healthCheckReplacementRuntime{
+		kubectl: framework.NewArgsScope(func(context.Context, ...string) (string, error) {
+			return enabledHealthCheckReplacementConfig, nil
+		}),
+		worker: framework.NewCommandScope(func(context.Context, string) (string, error) {
+			// Give up after the first failure so the test does not sit through the retry delays.
+			cancel()
+			return "", errors.New("ssh: connection refused")
+		})}
+	steps := NewNodeReplacement(runtime, nil, nil)
+	steps.replacementWorker = framework.WorkerInfo{Name: "worker-1"}
 
-	err := steps.aGPUHealthCheckFailureIsSimulatedOnThatNode(t.Context())
+	err := steps.aGPUHealthCheckFailureIsSimulatedOnThatNode(ctx)
 
-	assert.ErrorIs(t, err, writeErr)
 	assert.ErrorContains(t, err, "simulate GPU health check failure on worker-1")
 	assert.True(t, steps.faultInjected, "cleanup must still inspect the node after a lost response")
 }
 
 func TestRemoveHealthCheckInjectErrorMarkerIsBestEffort(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 	var commands []string
 	runtime := healthCheckReplacementRuntime{worker: framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
 		commands = append(commands, command)
+		// Give up after the first failure so the test does not sit through the retry delays.
+		cancel()
 		return "", errors.New("node is gone")
 	})}
 	steps := NodeReplacement{runtime: runtime, replacementWorker: framework.WorkerInfo{Name: "worker-1"}}
 
-	steps.removeHealthCheckInjectErrorMarker(t.Context())
+	steps.removeHealthCheckInjectErrorMarker(ctx)
 
 	assert.Equal(t, []string{"rm -f '/opt/soperator-outputs/local/health_checker_inject_error'"}, commands)
 }
@@ -173,6 +191,21 @@ func TestFinishHealthCheckReplacementSkipsWaitWhenInjectionTookNoEffect(t *testi
 
 	require.Len(t, kubectlCalls, 1, "an untouched host must not start the replacement wait")
 	assert.Equal(t, []string{"get", "node", "original-host", "--ignore-not-found", "-o", "json"}, kubectlCalls[0])
+}
+
+func TestHealthCheckDrainReasonMatchesOnlyTheSimulatedFailure(t *testing.T) {
+	assert.True(t, healthCheckDrainReasonMatches(
+		"[node_problem] gpu_health_check: inject_error.inject_error: Injecting error with resolution RedeployProfile [hc_program] [root@2026-10-27T17:13:00]"))
+	assert.True(t, healthCheckDrainReasonMatches(
+		"[node_problem] gpu_health_check: inject_error.inject_error: Injecting error with resolution RedeployProfile [prolog]"),
+		"a GPU job landing on the node drains it from the prolog with the same marker")
+	assert.False(t, healthCheckDrainReasonMatches(
+		"[node_problem] gpu_health_check: nvidia_smi.recovery_action: GPU ID 00000000:B3:00.0: Gpu recovery action: Reset [prolog]"),
+		"a real health check failure must not pass as the simulated one")
+	assert.False(t, healthCheckDrainReasonMatches("[node_problem] boot_disk_full: usage above threshold [hc_program]"))
+	assert.False(t, healthCheckDrainReasonMatches("[software_problem] inject_error [hc_program]"),
+		"only a [node_problem] drain leads to node replacement")
+	assert.False(t, healthCheckDrainReasonMatches(""))
 }
 
 func TestHealthCheckDrainTimeoutFollowsHealthCheckInterval(t *testing.T) {

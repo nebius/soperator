@@ -166,10 +166,17 @@ func (w *world) WaitFor(ctx context.Context, description string, timeout, pollIn
 		}
 
 		done, err := condition(waitCtx)
+		if waitCtx.Err() != nil {
+			continue
+		}
 		if err == nil && done {
 			return nil
 		}
-		if err != nil && waitCtx.Err() == nil {
+		if err != nil {
+			var permanent *framework.PermanentError
+			if errors.As(err, &permanent) {
+				return fmt.Errorf("wait for %s: %w", description, err)
+			}
 			lastErr = err
 			w.logf("wait for %s still pending: %v", description, err)
 		}

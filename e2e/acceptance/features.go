@@ -45,7 +45,6 @@ func FeaturePaths() []string {
 		"features/tailscale.feature",
 		"features/observability.feature",
 		"features/internal_ssh.feature",
-		"features/pam_slurm_adopt.feature",
 		"features/package_installation.feature",
 		"features/gpu_profiling.feature",
 		"features/nccl.feature",
@@ -60,11 +59,13 @@ func FeaturePaths() []string {
 		"features/enroot_containers.feature",
 		"features/passive_checks.feature",
 		"features/job_tmpfs.feature",
+		"features/local_nvme.feature",
 		"features/active_checks.feature",
 		"features/system_checks.feature",
 		"features/topology.feature",
 		"features/topology_tree.feature",
 		"features/topology_block.feature",
 		"features/topology_legacy.feature",
+		"features/performance.feature",
 	}
 }

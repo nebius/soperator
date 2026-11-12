@@ -75,6 +75,12 @@ func TestSuiteFromOptionsFiltersHeavyAndUnstableIndependently(t *testing.T) {
 	}
 }
 
+func TestSuiteFromOptionsRunsManualScenariosOnlyWithSelectors(t *testing.T) {
+	assert.True(t, suiteFromOptions(runOptions{}, "5.0.0").ExcludeManual)
+	assert.True(t, suiteFromOptions(runOptions{RunHeavyTests: true, RunUnstableTests: true}, "5.0.0").ExcludeManual)
+	assert.False(t, suiteFromOptions(runOptions{ScenarioPaths: []string{"features/internal_ssh.feature:3"}}, "5.0.0").ExcludeManual)
+}
+
 func TestParseRunOptionsRequiresCommonOptions(t *testing.T) {
 	_, err := parseRunOptions(nil)
 	require.Error(t, err)

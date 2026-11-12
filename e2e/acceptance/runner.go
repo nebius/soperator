@@ -44,6 +44,8 @@ type RunnerConfig struct {
 	TargetSoperatorVersion string
 	OutputDir              string
 	Suites                 []SuiteConfig
+	// Runtime defaults to NewRuntime when nil.
+	Runtime framework.Runtime
 }
 
 // NewRunner constructs an acceptance runner.
@@ -73,7 +75,10 @@ func NewRunner(config RunnerConfig) (*Runner, error) {
 	if len(suites) == 0 {
 		return nil, fmt.Errorf("at least one suite is required")
 	}
-	runtime := NewRuntime(kubectlContext, slurmClusterName)
+	runtime := config.Runtime
+	if runtime == nil {
+		runtime = NewRuntime(kubectlContext, slurmClusterName)
+	}
 
 	return &Runner{
 		suites:                 suites,
@@ -133,6 +138,10 @@ func (r *Runner) suiteTagFilter(suite SuiteConfig) string {
 		log.Printf("acceptance: suite %s excluding @heavy scenarios", suite.Name)
 		filters = append(filters, "~@heavy")
 	}
+	if suite.ExcludeManual {
+		log.Printf("acceptance: suite %s excluding @manual scenarios", suite.Name)
+		filters = append(filters, "~@manual")
+	}
 
 	return strings.Join(filters, " && ")
 }
@@ -188,6 +197,7 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 			StepRegistrars:  registrars,
 			ExcludeUnstable: suite.ExcludeUnstable,
 			ExcludeHeavy:    suite.ExcludeHeavy,
+			ExcludeManual:   suite.ExcludeManual,
 		})
 	}
 	return out, nil

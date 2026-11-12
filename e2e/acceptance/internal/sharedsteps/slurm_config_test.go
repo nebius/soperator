@@ -4,13 +4,12 @@ import (
 	"testing"
 
 	"github.com/cucumber/godog"
-	messages "github.com/cucumber/messages/go/v34"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestParseSlurmSettingsTable(t *testing.T) {
-	table := newSlurmSettingsTable(
+	table := newTable(
 		[]string{"setting", "value"},
 		[]string{" MpiDefault ", " pmix "},
 		[]string{"SlurmdTimeout", "180 sec"},
@@ -28,12 +27,12 @@ func TestParseSlurmSettingsTableRejectsInvalidTables(t *testing.T) {
 	for name, table := range map[string]*godog.Table{
 		"nil":              nil,
 		"empty":            {},
-		"wrong header":     newSlurmSettingsTable([]string{"name", "expected"}, []string{"MpiDefault", "pmix"}),
-		"header only":      newSlurmSettingsTable([]string{"setting", "value"}),
-		"wrong cell count": newSlurmSettingsTable([]string{"setting", "value"}, []string{"MpiDefault"}),
-		"empty setting":    newSlurmSettingsTable([]string{"setting", "value"}, []string{"", "pmix"}),
-		"empty value":      newSlurmSettingsTable([]string{"setting", "value"}, []string{"MpiDefault", ""}),
-		"duplicate": newSlurmSettingsTable(
+		"wrong header":     newTable([]string{"name", "expected"}, []string{"MpiDefault", "pmix"}),
+		"header only":      newTable([]string{"setting", "value"}),
+		"wrong cell count": newTable([]string{"setting", "value"}, []string{"MpiDefault"}),
+		"empty setting":    newTable([]string{"setting", "value"}, []string{"", "pmix"}),
+		"empty value":      newTable([]string{"setting", "value"}, []string{"MpiDefault", ""}),
+		"duplicate": newTable(
 			[]string{"setting", "value"},
 			[]string{"MpiDefault", "pmix"},
 			[]string{"MpiDefault", "none"},
@@ -66,16 +65,4 @@ func TestValidateSlurmSettingsAcceptsExactValues(t *testing.T) {
 	}
 
 	assert.NoError(t, validateSlurmSettings(configuration, configuration))
-}
-
-func newSlurmSettingsTable(rows ...[]string) *godog.Table {
-	table := &godog.Table{}
-	for _, values := range rows {
-		row := &messages.PickleTableRow{}
-		for _, value := range values {
-			row.Cells = append(row.Cells, &messages.PickleTableCell{Value: value})
-		}
-		table.Rows = append(table.Rows, row)
-	}
-	return table
 }

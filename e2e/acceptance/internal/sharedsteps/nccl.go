@@ -5,8 +5,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -72,7 +70,7 @@ func (s *NCCL) selectIdleGPUWorkers(ctx context.Context) error {
 		return fmt.Errorf("inspect workers for NCCL validation: %w", err)
 	}
 
-	workers, err := pickIdleGPUWorkers(snapshot, ncclWorkerCount)
+	workers, err := pickIdleGPUWorkers(snapshot, ncclWorkerCount, true)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
@@ -132,9 +130,8 @@ func writeNCCLOutputArtifact(ctx context.Context, output string) error {
 	if !ok {
 		return nil
 	}
-	artifactPath := filepath.Join(artifacts.RunnerDir, ncclOutputFilename)
-	if err := os.WriteFile(artifactPath, []byte(output), 0o644); err != nil {
-		return fmt.Errorf("write NCCL output artifact %q: %w", artifactPath, err)
+	if err := artifacts.WriteRunnerFile(ncclOutputFilename, output); err != nil {
+		return fmt.Errorf("write NCCL output artifact: %w", err)
 	}
 	return nil
 }

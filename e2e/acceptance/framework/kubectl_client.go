@@ -17,6 +17,12 @@ import (
 const (
 	SoperatorNamespace       = "soperator"
 	SoperatorSystemNamespace = "soperator-system"
+
+	// LocalNVMeVolumeName names both the worker pod volume and
+	// the NodeSet jail submount that expose node-local NVMe disks.
+	LocalNVMeVolumeName = "local-nvme"
+	// LocalDataVolumeName names the NodeSet jail submount of the node-local network disk.
+	LocalDataVolumeName = "local-data"
 )
 
 type KubectlClient struct {
@@ -24,14 +30,15 @@ type KubectlClient struct {
 }
 
 type NodeSetInfo struct {
-	Name          string
-	Namespace     string
-	Replicas      int
-	ReadyReplicas int
-	HasGPU        bool
-	DockerEnabled bool
-	Phase         string
-	JailSubMounts []JailSubMountInfo
+	Name            string
+	Namespace       string
+	Replicas        int
+	ReadyReplicas   int
+	HasGPU          bool
+	DockerEnabled   bool
+	Phase           string
+	SlurmdResources corev1.ResourceList
+	JailSubMounts   []JailSubMountInfo
 }
 
 type SlurmClusterInfo struct {
@@ -54,6 +61,7 @@ type JailSubMountInfo struct {
 	MountPath               string
 	ReadOnly                bool
 	UsesVolumeClaimTemplate bool
+	VolumeSource            *corev1.VolumeSource
 }
 
 type WorkerPodInfo struct {
@@ -242,14 +250,15 @@ func (c *KubectlClient) NodeSets(ctx context.Context, clusterName string) ([]Nod
 			continue
 		}
 		out = append(out, NodeSetInfo{
-			Name:          nodeSet.Metadata.Name,
-			Namespace:     nodeSet.Metadata.Namespace,
-			Replicas:      int(nodeSet.Spec.Replicas),
-			ReadyReplicas: int(nodeSet.Status.Replicas),
-			HasGPU:        nodeSet.Spec.GPU.Enabled,
-			DockerEnabled: nodeSet.Spec.Docker.Enabled == nil || *nodeSet.Spec.Docker.Enabled,
-			Phase:         nodeSet.Status.Phase,
-			JailSubMounts: jailSubMountInfos(nodeSet.Spec.Slurmd.Volumes.JailSubMounts),
+			Name:            nodeSet.Metadata.Name,
+			Namespace:       nodeSet.Metadata.Namespace,
+			Replicas:        int(nodeSet.Spec.Replicas),
+			ReadyReplicas:   int(nodeSet.Status.Replicas),
+			HasGPU:          nodeSet.Spec.GPU.Enabled,
+			DockerEnabled:   nodeSet.Spec.Docker.Enabled == nil || *nodeSet.Spec.Docker.Enabled,
+			Phase:           nodeSet.Status.Phase,
+			SlurmdResources: nodeSet.Spec.Slurmd.Resources,
+			JailSubMounts:   jailSubMountInfos(nodeSet.Spec.Slurmd.Volumes.JailSubMounts),
 		})
 	}
 
@@ -296,7 +305,7 @@ func (c *KubectlClient) WorkerPods(ctx context.Context) ([]WorkerPodInfo, error)
 			NodeSetName:        strings.TrimSpace(pod.Labels["slurm.nebius.ai/nodeset"]),
 			KubernetesNodeName: pod.Spec.NodeName,
 			Ready:              kubeobjects.PodReady(pod),
-			HasLocalNVMe:       podHasVolume(pod, "local-nvme"),
+			HasLocalNVMe:       podHasVolume(pod, LocalNVMeVolumeName),
 		})
 	}
 
@@ -317,6 +326,7 @@ func jailSubMountInfos(mounts []kubeobjects.NodeVolumeMount) []JailSubMountInfo 
 			MountPath:               mount.MountPath,
 			ReadOnly:                mount.ReadOnly,
 			UsesVolumeClaimTemplate: mount.VolumeClaimTemplateSpec != nil,
+			VolumeSource:            mount.VolumeSource,
 		})
 	}
 	return out

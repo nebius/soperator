@@ -19,6 +19,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -66,10 +67,25 @@ func (v *SlurmClusterCustomValidator) ValidateUpdate(_ context.Context, _, newSl
 }
 
 func validateSlurmCluster(cluster *slurmv1.SlurmCluster) error {
+	switch cluster.Spec.SlurmNodes.Login.UpdateStrategy {
+	case "", consts.UpdateStrategyDelayedRollout, consts.UpdateStrategyRollingUpdate:
+	default:
+		return fmt.Errorf("configure login.updateStrategy as delayedRollout or rollingUpdate")
+	}
 	if err := validateLoginUserIsolation(cluster); err != nil {
 		return err
 	}
-	return validateLoginDocker(cluster)
+	if err := validateLoginDocker(cluster); err != nil {
+		return err
+	}
+	_, schedule, err := values.ResolveLoginUpdatePolicy(cluster.Spec.SlurmNodes.Login.UpdatePolicy)
+	if err != nil {
+		return fmt.Errorf("configure login.updatePolicy: %w", err)
+	}
+	if schedule != nil && schedule.Next(time.Now().UTC()).IsZero() {
+		return fmt.Errorf("configure login.updatePolicy.schedule: cron expression has no next occurrence")
+	}
+	return nil
 }
 
 func validateLoginDocker(cluster *slurmv1.SlurmCluster) error {

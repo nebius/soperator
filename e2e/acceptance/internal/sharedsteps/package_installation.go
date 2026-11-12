@@ -89,11 +89,7 @@ func (s *PackageInstallation) logInstallFailureDiagnostics(ctx context.Context, 
 		"tail -n 60 /var/log/apt/term.log || true",
 	}
 	if len(packages) > 0 {
-		var quoted []string
-		for _, name := range packages {
-			quoted = append(quoted, framework.ShellQuote(name))
-		}
-		commands = append(commands, "apt-cache policy "+strings.Join(quoted, " ")+" || true")
+		commands = append(commands, "apt-cache policy "+framework.ShellJoin(packages...)+" || true")
 	}
 
 	for _, command := range commands {
@@ -193,12 +189,8 @@ func (s *PackageInstallation) uninstallPackage(ctx context.Context, name string)
 	}
 	sort.Strings(added)
 	if len(added) > 0 {
-		var quoted []string
-		for _, installed := range added {
-			quoted = append(quoted, framework.ShellQuote(installed))
-		}
 		// Remove only packages introduced by this installation, avoiding global autoremove.
-		command := "DEBIAN_FRONTEND=noninteractive apt-get remove -y --no-auto-remove " + strings.Join(quoted, " ")
+		command := "DEBIAN_FRONTEND=noninteractive apt-get remove -y --no-auto-remove " + framework.ShellJoin(added...)
 		if _, err := s.runtime.Worker(s.packageWorker).Run(ctx, command); err != nil {
 			s.logInstallFailureDiagnostics(ctx, s.packageWorker, added...)
 			return fmt.Errorf("remove packages %v on %s: %w", added, s.packageWorker.Name, err)

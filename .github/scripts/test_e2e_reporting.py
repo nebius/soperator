@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import io
+import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 from acceptance_summary import NS_PER_SEC, render_comment
@@ -75,6 +77,37 @@ def workflow_jobs(before=None, acceptance="success", after=None):
 
 
 class AcceptanceCommentTest(unittest.TestCase):
+    def test_cli_aggregates_reports_with_failure_in_either_suite(self):
+        for failed_suite in ("serial", "parallel"):
+            with self.subTest(failed_suite=failed_suite), tempfile.TemporaryDirectory() as directory:
+                reports = []
+                for name in ("serial", "parallel"):
+                    status = "failed" if name == failed_suite else "passed"
+                    path = Path(directory) / f"{name}.cucumber.json"
+                    feature = cucumber_scenario("Shared feature", name, [cucumber_step(name, status)])
+                    path.write_text(json.dumps([feature]))
+                    reports.append(str(path))
+                result = subprocess.run(
+                    [sys.executable, str(Path(__file__).with_name("acceptance_summary.py")), *reports, "--format", "comment"],
+                    check=True, capture_output=True, text=True,
+                )
+                self.assertIn("1 passed · 1 failed · 0 skipped", result.stdout)
+                self.assertIn(f"Scenario: {failed_suite}", result.stdout)
+
+    def test_cli_rejects_invalid_reports_with_filename(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid.cucumber.json"
+            for content in ("{", "{}"):
+                with self.subTest(content=content):
+                    path.write_text(content)
+                    result = subprocess.run(
+                        [sys.executable, str(Path(__file__).with_name("acceptance_summary.py")), str(path)],
+                        capture_output=True, text=True,
+                    )
+                    self.assertNotEqual(0, result.returncode)
+                    self.assertIn(str(path), result.stderr)
+                    self.assertEqual("", result.stdout)
+
     def test_renders_compact_failure_details(self):
         features = [
             cucumber_scenario(

@@ -123,6 +123,8 @@ func suiteFromOptions(opts runOptions, targetSoperatorVersion string) acceptance
 	if opts.RunUnstableTests {
 		suite.ExcludeUnstable = false
 	}
+	// Naming a feature or scenario is the explicit opt-in for @manual scenarios.
+	suite.ExcludeManual = len(opts.ScenarioPaths) == 0
 	return suite
 }
 
