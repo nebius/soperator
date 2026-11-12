@@ -275,7 +275,7 @@ func (s *WorkerRollingUpdate) cleanupRollout(ctx context.Context) {
 			if len(names) == 0 {
 				return true, nil
 			}
-			workers, err := s.slurm.NodeInfosOnce(waitCtx, names)
+			workers, err := s.slurm.NodeInfosNoRetries(waitCtx, names)
 			if err != nil {
 				return false, err
 			}
@@ -589,7 +589,7 @@ func (s *WorkerRollingUpdate) waitForIdle(ctx context.Context, description strin
 	}
 	return s.runtime.WaitFor(ctx, description, timeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			nodes, err := s.slurm.NodeInfosOnce(waitCtx, names)
+			nodes, err := s.slurm.NodeInfosNoRetries(waitCtx, names)
 			if err != nil {
 				return false, err
 			}
