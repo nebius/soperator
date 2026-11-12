@@ -30,12 +30,14 @@ type KubectlClient struct {
 }
 
 type NodeSetInfo struct {
-	Name            string
-	Namespace       string
-	Replicas        int
-	ReadyReplicas   int
-	HasGPU          bool
-	DockerEnabled   bool
+	Name          string
+	Namespace     string
+	Replicas      int
+	ReadyReplicas int
+	HasGPU        bool
+	DockerEnabled bool
+	// Ephemeral NodeSets power their workers up and down on demand.
+	Ephemeral       bool
 	Phase           string
 	SlurmdResources corev1.ResourceList
 	JailSubMounts   []JailSubMountInfo
@@ -256,6 +258,7 @@ func (c *KubectlClient) NodeSets(ctx context.Context, clusterName string) ([]Nod
 			ReadyReplicas:   int(nodeSet.Status.Replicas),
 			HasGPU:          nodeSet.Spec.GPU.Enabled,
 			DockerEnabled:   nodeSet.Spec.Docker.Enabled == nil || *nodeSet.Spec.Docker.Enabled,
+			Ephemeral:       nodeSet.Spec.EphemeralNodes != nil && *nodeSet.Spec.EphemeralNodes,
 			Phase:           nodeSet.Status.Phase,
 			SlurmdResources: nodeSet.Spec.Slurmd.Resources,
 			JailSubMounts:   jailSubMountInfos(nodeSet.Spec.Slurmd.Volumes.JailSubMounts),
