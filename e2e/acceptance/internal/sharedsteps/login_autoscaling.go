@@ -25,17 +25,10 @@ const (
 	loginAutoscalingPressurePercent      = int64(30)
 	loginAutoscalingMaxPressureProcesses = int32(16)
 	loginAutoscalingPressurePIDFile      = "/tmp/soperator-acceptance-login-autoscaling.pids"
-	loginAutoscalingHPAResource          = "horizontalpodautoscalers.autoscaling"
-	loginAutoscalingSSHDContainer        = "sshd"
-	loginAutoscalingInstanceLabel        = "app.kubernetes.io/instance"
-	loginAutoscalingComponentLabel       = "app.kubernetes.io/component"
-	loginAutoscalingComponentLabelValue  = "login"
 )
 
 type LoginAutoscaling struct {
-	info    *framework.ClusterInfo
-	runtime framework.Runtime
-	kubectl *framework.KubectlClient
+	loginWorkload
 
 	initialConfigCaptured bool
 	initialSize           int32
@@ -52,9 +45,7 @@ func NewLoginAutoscaling(
 	kubectl *framework.KubectlClient,
 ) *LoginAutoscaling {
 	return &LoginAutoscaling{
-		info:    info,
-		runtime: runtime,
-		kubectl: kubectl,
+		loginWorkload: loginWorkload{info: info, runtime: runtime, kubectl: kubectl},
 	}
 }
 
@@ -97,7 +88,7 @@ func (s *LoginAutoscaling) CleanupAndReset(ctx context.Context) {
 }
 
 func (s *LoginAutoscaling) selectReadyLoginWorkload(ctx context.Context) error {
-	var cluster kubeobjects.LoginAutoscalingCluster
+	var cluster kubeobjects.SlurmCluster
 	if err := s.kubectl.GetJSON(ctx, &cluster,
 		"get", "slurmcluster", s.info.SlurmClusterName,
 		"-n", framework.SoperatorNamespace, "-o", "json",
@@ -111,7 +102,7 @@ func (s *LoginAutoscaling) selectReadyLoginWorkload(ctx context.Context) error {
 	}
 	s.initialConfigCaptured = true
 	s.initialAutoscaling = append(json.RawMessage(nil), cluster.Spec.SlurmNodes.Login.Autoscaling...)
-	initialAutoscalingEnabled, err := loginAutoscalingEnabled(s.initialAutoscaling)
+	initialAutoscalingEnabled, err := loginFeatureEnabled(s.initialAutoscaling)
 	if err != nil {
 		return err
 	}
@@ -192,7 +183,7 @@ func (s *LoginAutoscaling) enableLoginAutoscaling(ctx context.Context) error {
 	return s.runtime.WaitFor(ctx, "login HPA with configured replica bounds",
 		loginAutoscalingTimeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			hpa, exists, err := s.loginHPA(waitCtx)
+			hpa, exists, err := s.loginHPA(waitCtx, s.statefulSetName)
 			if err != nil {
 				return false, err
 			}
@@ -232,7 +223,7 @@ func (s *LoginAutoscaling) createLoginCPUPressure(ctx context.Context) error {
 		s.pressurePods = append(s.pressurePods, pod.Name)
 		if _, err := s.runtime.Kubectl().Run(ctx,
 			"exec", "-n", framework.SoperatorNamespace, pod.Name,
-			"-c", loginAutoscalingSSHDContainer, "--", "sh", "-c", script,
+			"-c", loginSSHDContainer, "--", "sh", "-c", script,
 		); err != nil {
 			return fmt.Errorf("create CPU pressure in login pod %s: %w", pod.Name, err)
 		}
@@ -248,7 +239,7 @@ func (s *LoginAutoscaling) waitForLoginScaleUp(ctx context.Context) error {
 	if err := s.runtime.WaitFor(ctx, "login HPA to report maximum desired replicas",
 		loginAutoscalingTimeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			hpa, exists, err := s.loginHPA(waitCtx)
+			hpa, exists, err := s.loginHPA(waitCtx, s.statefulSetName)
 			if err != nil {
 				return false, err
 			}
@@ -282,7 +273,7 @@ func (s *LoginAutoscaling) removeLoginCPUPressure(ctx context.Context) error {
 		)
 		if _, err := s.runtime.Kubectl().Run(ctx,
 			"exec", "-n", framework.SoperatorNamespace, podName,
-			"-c", loginAutoscalingSSHDContainer, "--", "sh", "-c", script,
+			"-c", loginSSHDContainer, "--", "sh", "-c", script,
 		); err != nil {
 			problems = append(problems, fmt.Sprintf("%s: %v", podName, err))
 			remainingPods = append(remainingPods, podName)
@@ -299,7 +290,7 @@ func (s *LoginAutoscaling) checkLoginDoesNotScaleDown(ctx context.Context) error
 	if err := s.runtime.WaitFor(ctx, "login CPU utilization below the HPA target",
 		loginAutoscalingTimeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			hpa, exists, err := s.loginHPA(waitCtx)
+			hpa, exists, err := s.loginHPA(waitCtx, s.statefulSetName)
 			if err != nil {
 				return false, err
 			}
@@ -308,7 +299,7 @@ func (s *LoginAutoscaling) checkLoginDoesNotScaleDown(ctx context.Context) error
 			}
 			for _, metric := range hpa.Status.CurrentMetrics {
 				if metric.Type != autoscalingv2.ContainerResourceMetricSourceType || metric.ContainerResource == nil ||
-					metric.ContainerResource.Container != loginAutoscalingSSHDContainer ||
+					metric.ContainerResource.Container != loginSSHDContainer ||
 					metric.ContainerResource.Name != corev1.ResourceCPU {
 					continue
 				}
@@ -352,13 +343,7 @@ func (s *LoginAutoscaling) waitForLoginScaleDown(ctx context.Context) error {
 }
 
 func (s *LoginAutoscaling) waitForLoginHPARemoval(ctx context.Context) error {
-	return s.runtime.WaitFor(ctx, "login HPA removal",
-		loginAutoscalingTimeout, framework.DefaultPollInterval,
-		func(waitCtx context.Context) (bool, error) {
-			_, exists, err := s.loginHPA(waitCtx)
-			return !exists, err
-		},
-	)
+	return s.waitLoginHPA(ctx, s.statefulSetName, false, loginAutoscalingTimeout)
 }
 
 func (s *LoginAutoscaling) waitForReadyLoginReplicas(ctx context.Context, expected int32) error {
@@ -425,78 +410,6 @@ func (s *LoginAutoscaling) observePodSnapshot(ctx context.Context, expected map[
 	}
 }
 
-func (s *LoginAutoscaling) loginStatefulSet(ctx context.Context) (kubeobjects.LoginStatefulSet, error) {
-	var statefulSets kubeobjects.LoginStatefulSetList
-	if err := s.kubectl.GetJSON(ctx, &statefulSets,
-		"get", kruiseStatefulSetResource,
-		"-n", framework.SoperatorNamespace,
-		"-l", s.loginSelector(), "-o", "json",
-	); err != nil {
-		return kubeobjects.LoginStatefulSet{}, fmt.Errorf("list login StatefulSets: %w", err)
-	}
-	if len(statefulSets.Items) != 1 {
-		return kubeobjects.LoginStatefulSet{}, fmt.Errorf("found %d login StatefulSets, expected 1", len(statefulSets.Items))
-	}
-	return statefulSets.Items[0], nil
-}
-
-func (s *LoginAutoscaling) loginPods(ctx context.Context) ([]corev1.Pod, error) {
-	var pods corev1.PodList
-	if err := s.kubectl.GetJSON(ctx, &pods,
-		"get", "pods", "-n", framework.SoperatorNamespace,
-		"-l", s.loginSelector(), "-o", "json",
-	); err != nil {
-		return nil, fmt.Errorf("list login pods: %w", err)
-	}
-	return pods.Items, nil
-}
-
-func (s *LoginAutoscaling) loginHPA(ctx context.Context) (autoscalingv2.HorizontalPodAutoscaler, bool, error) {
-	var hpa autoscalingv2.HorizontalPodAutoscaler
-	output, err := s.runtime.Kubectl().Run(ctx,
-		"get", loginAutoscalingHPAResource, s.statefulSetName,
-		"-n", framework.SoperatorNamespace, "--ignore-not-found", "-o", "json",
-	)
-	if err != nil {
-		return hpa, false, fmt.Errorf("get login HPA: %w", err)
-	}
-	if strings.TrimSpace(output) == "" {
-		return hpa, false, nil
-	}
-	if err := json.Unmarshal([]byte(output), &hpa); err != nil {
-		return hpa, false, fmt.Errorf("decode login HPA: %w", err)
-	}
-	return hpa, true, nil
-}
-
-func (s *LoginAutoscaling) loginSelector() string {
-	return fmt.Sprintf("%s=%s,%s=%s",
-		loginAutoscalingInstanceLabel, s.info.SlurmClusterName,
-		loginAutoscalingComponentLabel, loginAutoscalingComponentLabelValue,
-	)
-}
-
-func (s *LoginAutoscaling) patchLogin(ctx context.Context, loginPatch map[string]any) error {
-	patch := map[string]any{
-		"spec": map[string]any{
-			"slurmNodes": map[string]any{
-				"login": loginPatch,
-			},
-		},
-	}
-	data, err := json.Marshal(patch)
-	if err != nil {
-		return fmt.Errorf("marshal login patch: %w", err)
-	}
-	if _, err := s.runtime.Kubectl().RunWithDefaultRetry(ctx,
-		"patch", "slurmcluster", s.info.SlurmClusterName,
-		"-n", framework.SoperatorNamespace, "--type=merge", "-p", string(data),
-	); err != nil {
-		return fmt.Errorf("patch login configuration: %w", err)
-	}
-	return nil
-}
-
 func (s *LoginAutoscaling) restoreInitialLoginConfig(ctx context.Context) error {
 	if err := s.patchLogin(ctx, map[string]any{
 		"size":        s.initialSize,
@@ -515,47 +428,22 @@ func (s *LoginAutoscaling) restoreInitialLoginConfig(ctx context.Context) error 
 }
 
 func (s *LoginAutoscaling) waitForInitialLoginConfig(ctx context.Context) error {
-	enabled, err := loginAutoscalingEnabled(s.initialAutoscaling)
+	enabled, err := loginFeatureEnabled(s.initialAutoscaling)
 	if err != nil {
 		return err
 	}
-	if enabled {
-		return s.runtime.WaitFor(ctx, "restored login HPA",
-			loginAutoscalingCleanupTimeout, framework.DefaultPollInterval,
-			func(waitCtx context.Context) (bool, error) {
-				_, exists, err := s.loginHPA(waitCtx)
-				return exists, err
-			},
-		)
-	}
-	if err := s.runtime.WaitFor(ctx, "login HPA cleanup",
-		loginAutoscalingCleanupTimeout, framework.DefaultPollInterval,
-		func(waitCtx context.Context) (bool, error) {
-			_, exists, err := s.loginHPA(waitCtx)
-			return !exists, err
-		},
-	); err != nil {
+	if err := s.waitLoginHPA(ctx, s.statefulSetName, enabled, loginAutoscalingCleanupTimeout); err != nil {
 		return err
+	}
+	if enabled {
+		return nil
 	}
 	return s.waitForReadyLoginReplicas(ctx, s.initialSize)
 }
 
-func loginAutoscalingEnabled(raw json.RawMessage) (bool, error) {
-	if len(raw) == 0 || string(raw) == "null" {
-		return false, nil
-	}
-	var autoscaling struct {
-		Enabled bool `json:"enabled"`
-	}
-	if err := json.Unmarshal(raw, &autoscaling); err != nil {
-		return false, fmt.Errorf("decode initial login autoscaling state: %w", err)
-	}
-	return autoscaling.Enabled, nil
-}
-
 func loginPressureProcessCount(pod corev1.Pod) (int32, error) {
 	for _, container := range pod.Spec.Containers {
-		if container.Name != loginAutoscalingSSHDContainer {
+		if container.Name != loginSSHDContainer {
 			continue
 		}
 		cpuRequest := container.Resources.Requests.Cpu().MilliValue()
@@ -574,20 +462,5 @@ func loginPressureProcessCount(pod corev1.Pod) (int32, error) {
 		}
 		return processes, nil
 	}
-	return 0, fmt.Errorf("login pod %s has no %s container", pod.Name, loginAutoscalingSSHDContainer)
-}
-
-func snapshotPods(pods []corev1.Pod) map[string]string {
-	snapshot := make(map[string]string, len(pods))
-	for _, pod := range pods {
-		snapshot[pod.Name] = string(pod.UID)
-	}
-	return snapshot
-}
-
-func replicaValue(replicas *int32) any {
-	if replicas == nil {
-		return "<nil>"
-	}
-	return *replicas
+	return 0, fmt.Errorf("login pod %s has no %s container", pod.Name, loginSSHDContainer)
 }
