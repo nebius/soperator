@@ -86,6 +86,12 @@ COPY ansible/roles/skel /opt/ansible/roles/skel
 RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local skel.yml
 
+# Configure the SSH client for connecting to workers
+COPY ansible/ssh_client.yml /opt/ansible/ssh_client.yml
+COPY ansible/roles/ssh_client /opt/ansible/roles/ssh_client
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local ssh_client.yml
+
 # Replace SSH "message of the day" scripts
 COPY ansible/motd.yml /opt/ansible/motd.yml
 COPY ansible/roles/motd /opt/ansible/roles/motd
