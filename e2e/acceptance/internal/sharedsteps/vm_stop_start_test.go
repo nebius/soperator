@@ -151,7 +151,9 @@ type vmStopStartStepRuntime struct {
 	// controller answers every controller command without a prefix match in controllerOutputs.
 	controller        string
 	controllerOutputs map[string]string
-	commands          []string
+	// kubectl answers every kubectl command.
+	kubectl  string
+	commands []string
 }
 
 func (r *vmStopStartStepRuntime) Jail() framework.CommandScope {
@@ -168,6 +170,13 @@ func (r *vmStopStartStepRuntime) Jail() framework.CommandScope {
 			}
 		}
 		return "", nil
+	})
+}
+
+func (r *vmStopStartStepRuntime) Kubectl() framework.ArgsScope {
+	return framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
+		r.commands = append(r.commands, "kubectl: "+strings.Join(args, " "))
+		return r.kubectl, nil
 	})
 }
 
@@ -244,7 +253,7 @@ func TestVMStopStartCleanupStartsStoppedInstancesAndReleasesReservation(t *testi
 		controller: "NodeName=worker-0 State=IDLE+RESERVED\nNodeName=worker-1 State=IDLE+RESERVED\n",
 	}
 	steps := newVMStopStartTestSteps(runtime)
-	steps.instancesStopped = true
+	steps.workersDisrupted = true
 
 	steps.CleanupAndReset(t.Context())
 
@@ -253,7 +262,7 @@ func TestVMStopStartCleanupStartsStoppedInstancesAndReleasesReservation(t *testi
 	assert.Contains(t, runtime.commands, "jail: "+deleteReservationCommand("e2e-vm-stop-start-1"))
 	assert.Empty(t, steps.workers)
 	assert.Empty(t, steps.reservation)
-	assert.False(t, steps.instancesStopped)
+	assert.False(t, steps.workersDisrupted)
 
 	runtime.commands = nil
 	steps.CleanupAndReset(t.Context())
@@ -338,11 +347,90 @@ func TestReturnToServiceAcceptsTheDrainedWorkerOnlyWhenItRespondsAgain(t *testin
 	}}
 	steps := newVMStopStartTestSteps(runtime)
 	steps.drainedWorker = "worker-0"
+	steps.workersDisrupted = true
 	require.NoError(t, steps.reservedWorkersReturnToService(t.Context()))
+	assert.False(t, steps.workersDisrupted, "workers seen back in service need no recovery wait in cleanup")
 
 	steps.drainedWorker = ""
+	steps.workersDisrupted = true
 	assert.ErrorContains(t, steps.reservedWorkersReturnToService(t.Context()), `worker-0 state=IDLE+DRAIN+RESERVED reason="manual"`,
 		"a worker nobody drained must come back without a drain")
+	assert.True(t, steps.workersDisrupted, "cleanup must still wait for workers that did not come back")
+}
+
+func TestReservedScratchNodeSetsChecksEveryReservedScratchWorkerWithFreshState(t *testing.T) {
+	nodeSets := []framework.NodeSetInfo{
+		localNVMeTestNodeSet("worker", "1000Gi", 4, localNVMeTestMount("/scratch", "1000Gi")),
+		localNVMeTestNodeSet("cpu", "", 2),
+	}
+	workers := []framework.WorkerInfo{
+		localNVMeTestWorker("worker-0", "worker", "DOWN+NOT_RESPONDING"),
+		localNVMeTestWorker("worker-1", "worker", "DOWN+NOT_RESPONDING"),
+		localNVMeTestWorker("cpu-0", "cpu", "IDLE"),
+	}
+	nodes := []framework.SlurmNodeInfo{
+		{Name: "worker-0", State: "IDLE+RESERVED"}, {Name: "worker-1", State: "IDLE+RESERVED"}, {Name: "cpu-0", State: "IDLE+RESERVED"},
+	}
+	pods := []framework.WorkerPodInfo{
+		localNVMeTestPod("worker-0", "worker", true, true),
+		localNVMeTestPod("worker-1", "worker", true, true),
+		localNVMeTestPod("cpu-0", "cpu", true, false),
+	}
+
+	scratch, err := reservedScratchNodeSets(nodeSets, workers, nodes, pods)
+
+	require.NoError(t, err, "the state recorded at selection is replaced by the fresh one")
+	assert.Equal(t, map[string][]string{"worker": {"worker-0", "worker-1"}}, localNVMeTestNames(scratch),
+		"only reserved workers of NodeSets with scratch are checked, the other 2 workers of the NodeSet are not looked at")
+}
+
+func TestReservedScratchNodeSetsFailsWhenAReservedScratchWorkerCannotBeChecked(t *testing.T) {
+	nodeSets := []framework.NodeSetInfo{localNVMeTestNodeSet("worker", "1000Gi", 2, localNVMeTestMount("/scratch", "1000Gi"))}
+	workers := []framework.WorkerInfo{
+		localNVMeTestWorker("worker-0", "worker", "IDLE"),
+		localNVMeTestWorker("worker-1", "worker", "IDLE"),
+	}
+	nodes := []framework.SlurmNodeInfo{{Name: "worker-0", State: "IDLE+RESERVED"}, {Name: "worker-1", State: "DOWN+NOT_RESPONDING", Reason: "Not responding"}}
+	pods := []framework.WorkerPodInfo{localNVMeTestPod("worker-0", "worker", true, true)}
+
+	_, err := reservedScratchNodeSets(nodeSets, workers, nodes, pods)
+
+	assert.ErrorContains(t, err, "NodeSet worker: reserved workers with node-local scratch cannot be checked: worker-1 state=DOWN+NOT_RESPONDING",
+		"a reserved worker must not drop out of the check silently")
+}
+
+func TestLocalScratchStepReadsOnlyTheReservedWorkers(t *testing.T) {
+	runtime := &vmStopStartStepRuntime{
+		controller: "NodeName=worker-0 State=IDLE+RESERVED\nNodeName=worker-1 State=IDLE+RESERVED\n",
+		kubectl: `{"kind": "List", "items": [` +
+			`{"metadata": {"name": "worker-0"}, "spec": {"hostname": "worker-0"}, "status": {"conditions": [{"type": "Ready", "status": "True"}]}},` +
+			`{"metadata": {"name": "worker-1"}, "spec": {"hostname": "worker-1"}, "status": {"conditions": [{"type": "Ready", "status": "True"}]}}]}`,
+	}
+	steps := newVMStopStartTestSteps(runtime)
+	steps.nodeSets = []framework.NodeSetInfo{localNVMeTestNodeSet("worker", "", 500)}
+
+	require.NoError(t, steps.localScratchIsMounted(t.Context()))
+
+	assert.Equal(t, []string{
+		"controller: scontrol -o show node 'worker-0,worker-1'",
+		"kubectl: get pods -n soperator --ignore-not-found -o json worker-0 worker-1",
+	}, runtime.commands, "a large cluster must not be read in full for 2 reserved workers")
+}
+
+func TestStartVMsKeepsRecoveryForCleanup(t *testing.T) {
+	runtime := &vmStopStartStepRuntime{computeInstanceRuntime: computeInstanceRuntime{
+		operations: map[string][]string{
+			"op-start-instance-worker-0": {`{"id":"op-start-instance-worker-0","finished_at":"2026-11-12T10:00:00Z","status":{}}`},
+			"op-start-instance-worker-1": {`{"id":"op-start-instance-worker-1","finished_at":"2026-11-12T10:00:00Z","status":{}}`},
+		},
+		states: map[string][]string{"instance-worker-0": {"RUNNING"}, "instance-worker-1": {"RUNNING"}},
+	}}
+	steps := newVMStopStartTestSteps(runtime)
+	steps.workersDisrupted = true
+
+	require.NoError(t, steps.startVMs(t.Context()))
+
+	assert.True(t, steps.workersDisrupted, "a RUNNING instance does not mean slurmd is back, so cleanup keeps waiting for the workers")
 }
 
 func TestDrainedWorkerKeepsDrainReportsAClearedDrain(t *testing.T) {
@@ -370,7 +458,7 @@ func TestVMStopStartCleanupResumesOnlyItsOwnDrainBeforeWaiting(t *testing.T) {
 		},
 	}
 	steps := newVMStopStartTestSteps(runtime)
-	steps.instancesStopped = true
+	steps.workersDisrupted = true
 	steps.drainedWorker = "worker-0"
 
 	steps.CleanupAndReset(t.Context())
@@ -402,32 +490,43 @@ func TestStopVMsFailsWithTheComputeErrorAndKeepsOwnership(t *testing.T) {
 	err := steps.stopVMs(t.Context())
 
 	assert.ErrorContains(t, err, "Compute operation op-stop-instance-worker-1 (Stop Instance of instance-worker-1) failed with code 9: instance is being maintained")
-	assert.True(t, steps.instancesStopped, "cleanup must start whatever the scenario tried to stop")
+	assert.True(t, steps.workersDisrupted, "cleanup must start whatever the scenario tried to stop")
 	assert.NotContains(t, runtime.calls, "nebius compute instance get --id instance-worker-0 --format json",
 		"a failed operation ends the step before the instance state wait")
 }
 
-func TestVMStopStartCleanupWaitsForInFlightStopBeforeReadingStates(t *testing.T) {
+func TestVMStopStartCleanupWaitsForEveryInFlightStopBeforeReadingStates(t *testing.T) {
+	inFlight := "nebius compute instance operation get --id op-stop-instance-worker-0 --format json"
 	runtime := &vmStopStartStepRuntime{
 		computeInstanceRuntime: computeInstanceRuntime{
-			operations: map[string][]string{"op-stop-instance-worker-0": {
-				`{"id":"op-stop-instance-worker-0"}`,
-				`{"id":"op-stop-instance-worker-0","finished_at":"2026-11-12T10:00:00Z","status":{}}`,
-			}},
+			operations: map[string][]string{
+				"op-stop-instance-worker-1": {`{"id":"op-stop-instance-worker-1","finished_at":"2026-11-12T10:00:00Z",` +
+					`"status":{"code":13,"message":"internal error"}}`},
+				"op-stop-instance-worker-0": {
+					`{"id":"op-stop-instance-worker-0"}`,
+					`{"id":"op-stop-instance-worker-0","finished_at":"2026-11-12T10:00:00Z","status":{}}`,
+				},
+			},
 			states: map[string][]string{"instance-worker-0": {"STOPPED", "RUNNING"}, "instance-worker-1": {"RUNNING"}},
 		},
 		controller: "NodeName=worker-0 State=IDLE+RESERVED\nNodeName=worker-1 State=IDLE+RESERVED\n",
 	}
 	steps := newVMStopStartTestSteps(runtime)
-	steps.instancesStopped = true
-	steps.operations = []string{"op-stop-instance-worker-0"}
+	steps.workersDisrupted = true
+	steps.operations = []string{"op-stop-instance-worker-1", "op-stop-instance-worker-0"}
 
 	steps.CleanupAndReset(t.Context())
 
-	lastOperation := slices.Index(runtime.calls, "nebius compute instance operation get --id op-stop-instance-worker-0 --format json")
+	lastInFlightPoll, inFlightPolls := -1, 0
+	for i, call := range runtime.calls {
+		if call == inFlight {
+			lastInFlightPoll, inFlightPolls = i, inFlightPolls+1
+		}
+	}
 	firstState := slices.Index(runtime.calls, "nebius compute instance get --id instance-worker-0 --format json")
 	require.NotEqual(t, -1, firstState)
-	assert.Less(t, lastOperation, firstState,
-		"an instance still RUNNING right after its stop request would otherwise be left alone and stop afterwards")
+	assert.Equal(t, 2, inFlightPolls, "the in-flight stop is polled until it finishes")
+	assert.Less(t, lastInFlightPoll, firstState,
+		"a failed stop of one instance must not end the wait for a stop still in flight on another")
 	assert.Contains(t, runtime.calls, "nebius compute instance start --id instance-worker-0 --async --format json")
 }

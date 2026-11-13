@@ -3,6 +3,7 @@ package sharedsteps
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -60,10 +61,11 @@ type computeOperation struct {
 	} `json:"status"`
 }
 
-// waitForInstanceOperations waits until every Compute instance operation finishes and fails as soon
-// as one of them fails, with the error Compute reports.
+// waitForInstanceOperations waits until every Compute instance operation finishes, also after one fails,
+// and returns the errors Compute reports for the failed ones.
+// Waiting for all of them leaves no operation to change an instance after the caller has moved on.
 func waitForInstanceOperations(ctx context.Context, runtime framework.Runtime, operationIDs []string, timeout time.Duration) error {
-	var failed error
+	var failures []error
 	finished := make(map[string]bool, len(operationIDs))
 	err := runtime.WaitFor(ctx, "Compute instance operations", timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 		var pending []string
@@ -85,9 +87,8 @@ func waitForInstanceOperations(ctx context.Context, runtime framework.Runtime, o
 			}
 			finished[id] = true
 			if operation.Status.Code != 0 {
-				failed = fmt.Errorf("Compute operation %s (%s of %s) failed with code %d: %s",
-					id, operation.Description, operation.ResourceID, operation.Status.Code, operation.Status.Message)
-				return true, nil
+				failures = append(failures, fmt.Errorf("Compute operation %s (%s of %s) failed with code %d: %s",
+					id, operation.Description, operation.ResourceID, operation.Status.Code, operation.Status.Message))
 			}
 		}
 		if len(pending) > 0 {
@@ -95,10 +96,7 @@ func waitForInstanceOperations(ctx context.Context, runtime framework.Runtime, o
 		}
 		return true, nil
 	})
-	if failed != nil {
-		return failed
-	}
-	return err
+	return errors.Join(append(failures, err)...)
 }
 
 // instanceState returns the status.state of a Compute instance, for example RUNNING or STOPPED.
