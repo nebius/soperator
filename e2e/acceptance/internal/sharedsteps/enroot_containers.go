@@ -18,7 +18,6 @@ const (
 	enrootJobStartTimeout = 5 * time.Minute
 	enrootProbeTimeout    = 5 * time.Minute
 	enrootStopTimeout     = 3 * time.Minute
-	enrootGPUSmokeTimeout = 10 * time.Minute
 	enrootSSHSmokeTimeout = 8 * time.Minute
 
 	enrootSSHKeyName    = "soperator_e2e_enroot_ssh"
@@ -391,7 +390,7 @@ func (s *EnrootContainers) theEnrootGPUSmokeJobSucceedsAndReportsVisibleGPUs(ctx
 		return fmt.Errorf("enroot GPU smoke job ID is empty")
 	}
 	job := s.job
-	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, job, enrootGPUSmokeTimeout); err != nil {
+	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, job, gpuSmokeEnrootJobTimeout); err != nil {
 		return err
 	}
 	if err := assertJobStdoutReportsVisibleGPUs(ctx, s.runtime, job); err != nil {

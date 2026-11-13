@@ -97,6 +97,14 @@ func (c probeContainer) isDocker() bool {
 	return c == probeContainerDocker || c == probeContainerDockerGPU
 }
 
+// jobTimeout is the wait budget for a job that runs its probe in this container.
+func (c probeContainer) jobTimeout() time.Duration {
+	if c == probeContainerEnrootGPU {
+		return gpuSmokeEnrootJobTimeout
+	}
+	return systemSettingsJobTimeout
+}
+
 // probeJobSpec describes a single-task system-settings job on the selected worker.
 type probeJobSpec struct {
 	name      string
@@ -712,7 +720,7 @@ func (s *SystemSettings) completeResourceLimitsJob(ctx context.Context, expected
 	if err != nil {
 		return err
 	}
-	output, err := s.completeJob(ctx, job)
+	output, err := s.completeJob(ctx, job, systemSettingsJobTimeout)
 	if err != nil {
 		return err
 	}
@@ -791,7 +799,7 @@ func (s *SystemSettings) dockerKernelSettingsJobSucceeds(ctx context.Context) er
 	if err != nil {
 		return err
 	}
-	output, err := s.completeJob(ctx, job)
+	output, err := s.completeJob(ctx, job, systemSettingsJobTimeout)
 	if err != nil {
 		return err
 	}
@@ -811,7 +819,7 @@ func (s *SystemSettings) kernelSettingsJobsSucceed(ctx context.Context) error {
 		return fmt.Errorf("find kernel-settings jobs: got %d, want 2", len(s.jobs))
 	}
 	for _, tracked := range s.jobs {
-		output, err := s.completeJob(ctx, tracked.job)
+		output, err := s.completeJob(ctx, tracked.job, tracked.container.jobTimeout())
 		if err != nil {
 			return err
 		}
@@ -894,7 +902,7 @@ func (s *SystemSettings) nvidiaLibrariesJobsSucceed(ctx context.Context) error {
 		return fmt.Errorf("find submitted NVIDIA library jobs")
 	}
 	for _, tracked := range s.jobs {
-		output, err := s.completeJob(ctx, tracked.job)
+		output, err := s.completeJob(ctx, tracked.job, tracked.container.jobTimeout())
 		if err != nil {
 			return err
 		}
@@ -949,8 +957,8 @@ func (s *SystemSettings) latestJob() (framework.SbatchJob, error) {
 	return s.jobs[len(s.jobs)-1].job, nil
 }
 
-func (s *SystemSettings) completeJob(ctx context.Context, job framework.SbatchJob) (string, error) {
-	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, job, systemSettingsJobTimeout); err != nil {
+func (s *SystemSettings) completeJob(ctx context.Context, job framework.SbatchJob, timeout time.Duration) (string, error) {
+	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, job, timeout); err != nil {
 		return "", err
 	}
 	output, err := readJobFile(ctx, s.runtime, job.StdoutPath)

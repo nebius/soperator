@@ -26,7 +26,7 @@ echo "Create privilege separation directory /var/run/sshd"
 mkdir -p /var/run/sshd
 
 echo "Complement jail rootfs"
-/opt/bin/slurm/complement_jail.sh -j /mnt/jail -u /mnt/jail.upper
+/opt/bin/slurm/complement_jail.py -j /mnt/jail -u /mnt/jail.upper
 
 echo "Set up per-user cgroup isolation for SSH sessions (if enabled)"
 setup_user_isolation() {

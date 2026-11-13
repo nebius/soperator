@@ -398,3 +398,10 @@ func renderResourceLimitSnapshotsForTest(direct, nested resourceLimitSnapshot) s
 	}
 	return output
 }
+
+func TestProbeContainerJobTimeout(t *testing.T) {
+	assert.Equal(t, gpuSmokeEnrootJobTimeout, probeContainerEnrootGPU.jobTimeout(), "the Enroot GPU image is imported cold")
+	for _, container := range []probeContainer{probeContainerNone, probeContainerEnroot, probeContainerDocker, probeContainerDockerGPU} {
+		assert.Equal(t, systemSettingsJobTimeout, container.jobTimeout())
+	}
+}

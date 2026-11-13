@@ -34,7 +34,7 @@ remove_empty_lib_mount_targets() {
     rm -f "/mnt/jail/etc/gpu_libs_installed.flag"
 
     echo "Removing placeholder library files that were used as bind-mount targets on the previous cluster"
-    # Placeholders are small marker files created by complement_jail.sh (or 0-byte on jails
+    # Placeholders are small marker files created by complement_jail.py (or 0-byte on jails
     # populated before that change) — match both by size; no real library is this small.
     # Only versioned lib names: the jail image ships other small '*.so*' files in this dir
     # (e.g. the ncurses .so linker scripts) that must not be deleted
