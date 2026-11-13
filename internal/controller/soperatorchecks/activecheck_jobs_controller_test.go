@@ -19,6 +19,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	clientfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -590,6 +591,164 @@ func TestActiveCheckJobReconciler_Reconcile_FailedSlurmJobExecutesCommentReactio
 	assert.Equal(t, []slurmv1alpha1.JobAndReason{{
 		JobID:  "101",
 		Reason: "boom",
+	}}, updatedCheck.Status.SlurmJobsStatus.LastRunFailJobsAndReasons)
+}
+
+func TestActiveCheckJobReconciler_Reconcile_PreservesFailedStatusAfterTransientStatusUpdateError(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	scheme := newActiveCheckJobTestScheme(t)
+
+	activeCheck, cronJob, k8sJob, pod := newActiveCheckJobTestObjects("gpu-check", "gpu-check-123", "slurmJob")
+	k8sJob.Annotations["slurm-job-id"] = "101"
+	k8sJob.Annotations["unhandled-slurm-job-id"] = "101"
+
+	submitTime := metav1.NewTime(time.Date(2026, time.April, 13, 10, 0, 0, 0, time.UTC))
+	failedEndTime := metav1.NewTime(submitTime.Add(1 * time.Minute))
+
+	mockClient := slurmapifake.NewMockClient(t)
+	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "101").Return([]slurmapi.Job{{
+		ID:          101,
+		Name:        activeCheck.Name,
+		State:       string(api.V0044JobInfoJobStateFAILED),
+		StateReason: "gpu xid error",
+		SubmitTime:  &submitTime,
+		EndTime:     &failedEndTime,
+	}}, nil).Twice()
+
+	statusUpdateAttempts := 0
+	fakeClient := clientfake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(activeCheck).
+		WithObjects(activeCheck, cronJob, k8sJob, pod).
+		WithInterceptorFuncs(interceptor.Funcs{
+			SubResourceUpdate: func(
+				ctx context.Context,
+				c client.Client,
+				subResourceName string,
+				obj client.Object,
+				opts ...client.SubResourceUpdateOption,
+			) error {
+				statusUpdateAttempts++
+				if statusUpdateAttempts == 1 {
+					return fmt.Errorf("transient apiserver conflict")
+				}
+				return c.Status().Update(ctx, obj, opts...)
+			},
+		}).
+		Build()
+
+	slurmClients := slurmapi.NewClientSet(context.Background())
+	slurmClients.AddClient(types.NamespacedName{
+		Namespace: activeCheck.Namespace,
+		Name:      activeCheck.Spec.SlurmClusterRefName,
+	}, mockClient)
+
+	reconciler := NewActiveCheckJobController(
+		fakeClient,
+		scheme,
+		record.NewFakeRecorder(10),
+		slurmClients,
+		time.Minute,
+	)
+
+	req := newActiveCheckJobRequest(k8sJob)
+	_, err := reconciler.Reconcile(ctx, req)
+	require.ErrorContains(t, err, "transient apiserver conflict")
+
+	// Retry after transient status update error must not lose the failed Slurm job or mark the run Complete.
+	result, err := reconciler.Reconcile(ctx, req)
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter)
+
+	updatedCheck := &slurmv1alpha1.ActiveCheck{}
+	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
+	assert.Equal(t, consts.ActiveCheckSlurmRunStatusFailed, updatedCheck.Status.SlurmJobsStatus.LastRunStatus)
+	assert.Equal(t, activeCheck.Name, updatedCheck.Status.SlurmJobsStatus.LastRunName)
+	require.NotNil(t, updatedCheck.Status.SlurmJobsStatus.LastRunSubmitTime)
+	assert.Equal(t, submitTime.Unix(), updatedCheck.Status.SlurmJobsStatus.LastRunSubmitTime.Unix())
+	assert.Equal(t, []slurmv1alpha1.JobAndReason{{
+		JobID:  "101",
+		Reason: "gpu xid error",
+	}}, updatedCheck.Status.SlurmJobsStatus.LastRunFailJobsAndReasons)
+}
+
+func TestActiveCheckJobReconciler_Reconcile_DoesNotDuplicateFailuresAfterTransientJobPatchError(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	scheme := newActiveCheckJobTestScheme(t)
+
+	activeCheck, cronJob, k8sJob, pod := newActiveCheckJobTestObjects("gpu-check", "gpu-check-123", "slurmJob")
+	k8sJob.Annotations["slurm-job-id"] = "101"
+	k8sJob.Annotations["unhandled-slurm-job-id"] = "101"
+
+	submitTime := metav1.NewTime(time.Date(2026, time.April, 13, 10, 0, 0, 0, time.UTC))
+	failedEndTime := metav1.NewTime(submitTime.Add(1 * time.Minute))
+
+	mockClient := slurmapifake.NewMockClient(t)
+	mockClient.EXPECT().GetJobsByIDFromAccounting(mock.Anything, "101").Return([]slurmapi.Job{{
+		ID:          101,
+		Name:        activeCheck.Name,
+		State:       string(api.V0044JobInfoJobStateFAILED),
+		StateReason: "gpu xid error",
+		SubmitTime:  &submitTime,
+		EndTime:     &failedEndTime,
+	}}, nil).Twice()
+
+	jobPatchAttempts := 0
+	fakeClient := clientfake.NewClientBuilder().
+		WithScheme(scheme).
+		WithStatusSubresource(activeCheck).
+		WithObjects(activeCheck, cronJob, k8sJob, pod).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Patch: func(
+				ctx context.Context,
+				c client.WithWatch,
+				obj client.Object,
+				patch client.Patch,
+				opts ...client.PatchOption,
+			) error {
+				if _, ok := obj.(*batchv1.Job); ok {
+					jobPatchAttempts++
+					if jobPatchAttempts == 1 {
+						return fmt.Errorf("transient job patch error")
+					}
+				}
+				return c.Patch(ctx, obj, patch, opts...)
+			},
+		}).
+		Build()
+
+	slurmClients := slurmapi.NewClientSet(context.Background())
+	slurmClients.AddClient(types.NamespacedName{
+		Namespace: activeCheck.Namespace,
+		Name:      activeCheck.Spec.SlurmClusterRefName,
+	}, mockClient)
+
+	reconciler := NewActiveCheckJobController(
+		fakeClient,
+		scheme,
+		record.NewFakeRecorder(10),
+		slurmClients,
+		time.Minute,
+	)
+
+	req := newActiveCheckJobRequest(k8sJob)
+	_, err := reconciler.Reconcile(ctx, req)
+	require.ErrorContains(t, err, "transient job patch error")
+
+	result, err := reconciler.Reconcile(ctx, req)
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter)
+
+	updatedCheck := &slurmv1alpha1.ActiveCheck{}
+	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
+	assert.Equal(t, consts.ActiveCheckSlurmRunStatusFailed, updatedCheck.Status.SlurmJobsStatus.LastRunStatus)
+	assert.Equal(t, []slurmv1alpha1.JobAndReason{{
+		JobID:  "101",
+		Reason: "gpu xid error",
 	}}, updatedCheck.Status.SlurmJobsStatus.LastRunFailJobsAndReasons)
 }
 
