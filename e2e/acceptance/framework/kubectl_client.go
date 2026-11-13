@@ -27,6 +27,8 @@ const (
 
 type KubectlClient struct {
 	exec Exec
+	// Reservation discovery fails fast on permanent errors; other callers keep their retry policy.
+	retryTransientOnly bool
 }
 
 type NodeSetInfo struct {
@@ -186,8 +188,15 @@ func (c *KubectlClient) PatchSlurmClusterCustomConfig(ctx context.Context, name 
 	return nil
 }
 
+func (c *KubectlClient) read(ctx context.Context, args ...string) (string, error) {
+	if c.retryTransientOnly {
+		return discoveryRead(ctx, func(ctx context.Context) (string, error) { return c.exec.Kubectl().Run(ctx, args...) })
+	}
+	return c.exec.Kubectl().RunWithDefaultRetry(ctx, args...)
+}
+
 func (c *KubectlClient) GetJSON(ctx context.Context, out any, args ...string) error {
-	output, err := c.exec.Kubectl().RunWithDefaultRetry(ctx, args...)
+	output, err := c.read(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -320,7 +329,7 @@ func (c *KubectlClient) WorkerPodsForSlurmNodes(ctx context.Context, slurmNodeNa
 		return nil, nil
 	}
 	args := append([]string{"get", "pods", "-n", SoperatorNamespace, "--ignore-not-found", "-o", "json"}, slurmNodeNames...)
-	output, err := c.exec.Kubectl().RunWithDefaultRetry(ctx, args...)
+	output, err := c.read(ctx, args...)
 	if err != nil {
 		return nil, fmt.Errorf("get worker pods %s: %w", strings.Join(slurmNodeNames, ","), err)
 	}
@@ -367,7 +376,7 @@ func workerPodInfo(pod corev1.Pod) WorkerPodInfo {
 		PodName:            pod.Name,
 		NodeSetName:        strings.TrimSpace(pod.Labels["slurm.nebius.ai/nodeset"]),
 		KubernetesNodeName: pod.Spec.NodeName,
-		Ready:              kubeobjects.PodReady(pod),
+		Ready:              pod.DeletionTimestamp == nil && kubeobjects.PodReady(pod),
 		HasLocalNVMe:       podHasVolume(pod, LocalNVMeVolumeName),
 	}
 }

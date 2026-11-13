@@ -107,7 +107,11 @@ func TestSlurmClientSuspendExclusionsClassifiesInvalidOutput(t *testing.T) {
 			_, err := NewSlurmClient(runtime).SuspendExclusions(t.Context())
 			var invalid SlurmConfigurationError
 			require.ErrorAs(t, err, &invalid)
-			require.ErrorContains(t, err, "invalid node name")
+			if hosts == "" {
+				require.ErrorContains(t, err, "expanded to nothing")
+			} else {
+				require.ErrorContains(t, err, "invalid node name")
+			}
 		})
 	}
 }

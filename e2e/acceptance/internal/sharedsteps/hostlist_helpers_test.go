@@ -37,6 +37,21 @@ func TestHostlistExpanderParsesPlainValuesLocally(t *testing.T) {
 	assert.Zero(t, runtime.calls)
 }
 
+func TestHostlistExpanderRejectsInvalidExpansion(t *testing.T) {
+	for _, output := range []string{"", "worker-0 extra", "worker-[0-1]"} {
+		t.Run(output, func(t *testing.T) {
+			runtime := &hostlistRuntime{outputs: map[string]string{
+				"scontrol show hostnames 'worker-[0-1]'": output,
+			}}
+			hostlists := newCachedHostlistExpander(runtime)
+			_, err := hostlists.expand(t.Context(), "worker-[0-1]")
+			require.Error(t, err)
+			assert.Empty(t, hostlists.cache, "invalid output must not become a cached expansion")
+			assert.Equal(t, 1, runtime.calls)
+		})
+	}
+}
+
 func TestPlainHostlistDefersRangesToScontrol(t *testing.T) {
 	nodes, ok := plainHostlist("worker-0,worker-1")
 	assert.True(t, ok)

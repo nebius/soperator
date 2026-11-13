@@ -2,7 +2,9 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -30,15 +32,17 @@ func NewSlurmClient(runtime Runtime) *SlurmClient {
 // SubmitBatch adds -o/-e pointing inside OutputDir. When OutputDir is empty,
 // scenario artifacts take precedence over AcceptanceJobOutputDir.
 type SbatchOptions struct {
-	JobName      string   // required; used in output filename
-	Nodes        int      // -N (omitted if 0)
-	Nodelist     []string // --nodelist (omitted if empty)
-	GPUsPerNode  int      // --gpus-per-node (omitted if 0)
-	TasksPerNode int      // --ntasks-per-node (omitted if 0)
-	ExtraFlags   []string // verbatim flags appended before --wrap
-	Wrap         string   // --wrap body
-	RunAsUser    string   // submit through sudo -iu (omitted if empty)
-	OutputDir    string   // explicit output directory; defaults to scenario artifacts, then AcceptanceJobOutputDir
+	JobName      string        // required; used in output filename
+	Nodes        int           // -N (omitted if 0)
+	Nodelist     []string      // --nodelist (omitted if empty)
+	GPUsPerNode  int           // --gpus-per-node (omitted if 0)
+	TasksPerNode int           // --ntasks-per-node (omitted if 0)
+	ExtraFlags   []string      // legacy shell fragments; use Args for reservation-bound submissions
+	Args         []string      // self-contained option argv entries in every mode (--mem=128M, -c1)
+	TimeLimit    time.Duration // finite job limit; zero uses the reservation profile default
+	Wrap         string        // --wrap body
+	RunAsUser    string        // submit through sudo -iu (omitted if empty)
+	OutputDir    string        // explicit output directory; defaults to scenario artifacts, then AcceptanceJobOutputDir
 }
 
 // SbatchJob is the handle returned by SubmitBatch. StdoutPath and StderrPath
@@ -61,6 +65,16 @@ func (j SbatchJob) IsZero() bool {
 // directory exists, submits it from the jail, and returns an SbatchJob with
 // the parsed job id and the resolved stdout / stderr paths.
 func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (SbatchJob, error) {
+	scoped := workerReservationFromContext(ctx) != nil
+	if scoped && len(opts.ExtraFlags) > 0 {
+		return SbatchJob{}, fmt.Errorf("submit reserved job: migrate legacy ExtraFlags to argv Args")
+	}
+	binding, err := bindReservation(ctx, opts.Args, opts.Nodelist, opts.Nodes, opts.RunAsUser, opts.TimeLimit)
+	if err != nil {
+		return SbatchJob{}, err
+	}
+	defer binding.done()
+	opts.Nodes = binding.nodes
 	jobName := strings.TrimSpace(opts.JobName)
 	if jobName == "" {
 		return SbatchJob{}, fmt.Errorf("sbatch: job name is required")
@@ -96,8 +110,25 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 	if opts.TasksPerNode > 0 {
 		args = append(args, fmt.Sprintf("--ntasks-per-node=%d", opts.TasksPerNode))
 	}
-	for _, flag := range opts.ExtraFlags {
-		args = append(args, flag)
+	// Put caller argv before controlled binding and placement options. Slurm's
+	// native argument parser handles ordinary options; no shell fragments are parsed.
+	if !scoped {
+		args = append(args, opts.ExtraFlags...)
+	}
+	var extra []string
+	for _, arg := range opts.Args {
+		extra = append(extra, ShellQuote(arg))
+	}
+	if scoped {
+		args = append(extra, args...)
+	} else {
+		args = append(args, extra...)
+	}
+	for _, arg := range binding.flags {
+		args = append(args, ShellQuote(arg))
+	}
+	if !scoped && opts.TimeLimit > 0 {
+		args = append(args, ShellQuote("--time="+slurmDuration(opts.TimeLimit)))
 	}
 	args = append(args, fmt.Sprintf("--wrap=%s", ShellQuote(opts.Wrap)))
 
@@ -109,48 +140,82 @@ func (s *SlurmClient) SubmitBatch(ctx context.Context, opts SbatchOptions) (Sbat
 		sbatchCommand = fmt.Sprintf("sudo -iu %s -- sbatch %s", quotedUser, strings.Join(args, " "))
 	}
 	command := mkdirCommand + " && " + sbatchCommand
+	if scoped {
+		if _, err := discoveryRead(ctx, func(ctx context.Context) (string, error) { return s.runtime.Jail().Run(ctx, mkdirCommand) }); err != nil {
+			return SbatchJob{}, fmt.Errorf("prepare sbatch output directory: %w", err)
+		}
+		command = sbatchCommand
+	}
 
-	out, err := retryIf(
+	var jobID string
+	var parseErr error
+	_, err = retryIf(
 		ctx,
 		submitBatchRetryAttempts,
 		s.submitRetryDelay,
 		isRetryableSbatchPreExecutionError,
 		func(attemptCtx context.Context) (string, error) {
-			return s.runtime.Jail().Run(attemptCtx, command)
+			out, runErr := s.runtime.Jail().Run(attemptCtx, command)
+			jobID, parseErr = ParseSbatchJobID(out)
+			if scoped && parseErr == nil {
+				id, idErr := strconv.ParseUint(jobID, 10, 64)
+				if idErr != nil || id == 0 {
+					parseErr = fmt.Errorf("parse sbatch job id: expected positive integer, got %q", jobID)
+					jobID = ""
+				}
+			}
+			if runErr != nil && !strings.Contains(out, "\n") {
+				jobID = ""
+				parseErr = fmt.Errorf("read complete sbatch response")
+			}
+
+			return out, runErr
 		},
 	)
-	if err != nil {
-		return SbatchJob{}, fmt.Errorf("submit sbatch job %q: %w", jobName, err)
+	if parseErr != nil || jobID == "" {
+		if err != nil {
+			if scoped && !definiteSbatchRejection(err) && !isRetryableSbatchPreExecutionError("", err) {
+				return SbatchJob{}, fmt.Errorf("submit sbatch job %q: outcome uncertain; reconcile reservation: %w", jobName, err)
+			}
+			return SbatchJob{}, fmt.Errorf("submit sbatch job %q: %w", jobName, err)
+		}
+		return SbatchJob{}, fmt.Errorf("parse sbatch job id for %q: %w", jobName, parseErr)
 	}
-	jobID, err := ParseSbatchJobID(out)
+	job := SbatchJob{ID: jobID, JobName: jobName, StdoutPath: fmt.Sprintf("%s/%s-%s.out", outputDir, jobName, jobID), StderrPath: fmt.Sprintf("%s/%s-%s.err", outputDir, jobName, jobID)}
 	if err != nil {
-		return SbatchJob{}, fmt.Errorf("parse sbatch job id for %q: %w", jobName, err)
+		return job, fmt.Errorf("submit sbatch job %q: %w", jobName, err)
 	}
-	return SbatchJob{
-		ID:         jobID,
-		JobName:    jobName,
-		StdoutPath: fmt.Sprintf("%s/%s-%s.out", outputDir, jobName, jobID),
-		StderrPath: fmt.Sprintf("%s/%s-%s.err", outputDir, jobName, jobID),
-	}, nil
+	return job, nil
 }
 
-// isRetryableSbatchPreExecutionError recognizes failures that kubectl reports
-// before it establishes the exec stream, so the remote sbatch command cannot
-// have started. Unknown failures, partial stdout, and stream errors such as EOF
-// deliberately fail closed to avoid duplicate job submissions.
+func definiteSbatchRejection(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := commandFailureText(err)
+	for _, line := range strings.Split(message, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "sbatch: error: batch job submission failed:") {
+			return !strings.Contains(message, "timed out") && !strings.Contains(message, "timeout") && !strings.Contains(message, "eof")
+		}
+	}
+	return false
+}
+
+// Only failures proven to precede remote execution are retryable. A Slurm
+// rejection is returned directly; uncertain execution is reconciled by lease.
 func isRetryableSbatchPreExecutionError(out string, err error) bool {
 	if err == nil || strings.TrimSpace(out) != "" {
 		return false
 	}
-
-	message := strings.ToLower(err.Error())
-	if !strings.Contains(message, "kubectl") || !strings.Contains(message, "dial tcp") {
+	var command *CommandError
+	if !errors.As(err, &command) || command.Name != "kubectl" {
 		return false
 	}
-
-	return strings.Contains(message, "i/o timeout") ||
-		strings.Contains(message, "no route to host") ||
-		strings.Contains(message, "connection timed out")
+	message := commandFailureText(err)
+	if !strings.Contains(message, "dial tcp") {
+		return false
+	}
+	return strings.Contains(message, "i/o timeout") || strings.Contains(message, "no route to host") || strings.Contains(message, "connection timed out")
 }
 
 func (s *SlurmClient) WaitForJobRunning(ctx context.Context, jobID string, timeout time.Duration) error {

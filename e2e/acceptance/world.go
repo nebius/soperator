@@ -125,10 +125,7 @@ func (w *world) Run(ctx context.Context, name string, args ...string) (string, e
 	out := stdout.String()
 	errOut := strings.TrimSpace(stderr.String())
 	if err != nil {
-		if errOut != "" {
-			return out, fmt.Errorf("%s %s: %w: %s", name, strings.Join(args, " "), err, errOut)
-		}
-		return out, fmt.Errorf("%s %s: %w", name, strings.Join(args, " "), err)
+		return out, &framework.CommandError{Name: name, Args: args, Err: err, Stderr: errOut}
 	}
 
 	if errOut != "" {

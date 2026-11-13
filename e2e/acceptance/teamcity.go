@@ -28,6 +28,13 @@ type teamCityScenarioState struct {
 
 type teamCityScenarioStateKey struct{}
 
+func recordTeamCityScenarioFailure(ctx context.Context, err error) {
+	if state, ok := ctx.Value(teamCityScenarioStateKey{}).(*teamCityScenarioState); ok {
+		state.result = teamCityScenarioFailed
+		state.message = err.Error()
+	}
+}
+
 func registerTeamCityStateHook(sc *godog.ScenarioContext, suiteName string) {
 	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
 		state := &teamCityScenarioState{

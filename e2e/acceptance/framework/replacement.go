@@ -33,6 +33,9 @@ func CaptureWorkerReplacement(ctx context.Context, exec Exec, kubectl *KubectlCl
 	if err != nil {
 		return WorkerReplacementSnapshot{}, err
 	}
+	if err := RequireReservedHost(ctx, kubectl, info.KubernetesNodeName); err != nil {
+		return WorkerReplacementSnapshot{}, err
+	}
 	var pod corev1.Pod
 	if err := kubectl.GetJSON(ctx, &pod, "get", "pod", info.PodName, "-n", SoperatorNamespace, "-o", "json"); err != nil {
 		return WorkerReplacementSnapshot{}, fmt.Errorf("read original worker pod %s: %w", info.PodName, err)

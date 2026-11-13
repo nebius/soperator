@@ -2,7 +2,6 @@ package sharedsteps
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
@@ -40,14 +39,9 @@ func (e *cachedHostlistExpander) expand(ctx context.Context, value string) ([]st
 		return nodes, nil
 	}
 
-	out, err := e.runtime.Controller().RunWithDefaultRetry(ctx,
-		fmt.Sprintf("scontrol show hostnames %s", framework.ShellQuote(value)))
+	nodes, err := framework.NewSlurmClient(e.runtime).ExpandHostnames(ctx, value)
 	if err != nil {
-		return nil, fmt.Errorf("expand hostlist %q: %w", value, err)
-	}
-	nodes := framework.ParseSlurmNodeNames(out)
-	if len(nodes) == 0 {
-		return nil, fmt.Errorf("hostlist %q expanded to nothing", value)
+		return nil, err
 	}
 	e.cache[value] = nodes
 	return nodes, nil

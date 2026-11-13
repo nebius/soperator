@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os/exec"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -13,6 +14,18 @@ import (
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
+
+func TestCommandErrorSeparatesStderrAndPreservesExitStatus(t *testing.T) {
+	w := &world{}
+	_, err := w.Run(t.Context(), "sh", "-c", "printf 'connection refused' >&2; exit 7", "invalid timeout payload")
+	var command *framework.CommandError
+	require.ErrorAs(t, err, &command)
+	assert.Equal(t, "connection refused", command.Stderr)
+	assert.Contains(t, command.Args, "invalid timeout payload")
+	var exit *exec.ExitError
+	require.ErrorAs(t, err, &exit)
+	assert.Equal(t, 7, exit.ExitCode())
+}
 
 func TestKubectlArgsAddsContext(t *testing.T) {
 	assert.Equal(t,

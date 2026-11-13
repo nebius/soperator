@@ -1318,7 +1318,11 @@ func TestEphemeralWorkerHoldRejectsInvalidExpansion(t *testing.T) {
 	for _, output := range []string{"", "worker-0 extra", "worker-[0-2]"} {
 		runtime := newRolloutPowerRuntime(t, powerConfigReply("worker-[0-2]"), powerHostsReply("worker-[0-2]", output))
 		s := WorkerRollingUpdate{slurm: framework.NewSlurmClient(runtime), runtime: runtime}
-		require.ErrorContains(t, s.holdEphemeralWorkers(context.Background(), []string{"worker-0"}), "invalid node name")
+		want := "invalid node name"
+		if output == "" {
+			want = "expanded to nothing"
+		}
+		require.ErrorContains(t, s.holdEphemeralWorkers(context.Background(), []string{"worker-0"}), want)
 		assert.Empty(t, s.power.names)
 	}
 }
