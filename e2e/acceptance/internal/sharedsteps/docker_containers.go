@@ -25,7 +25,6 @@ const (
 	dockerGPUSmokeTimeout      = 10 * time.Minute
 	dockerSSHSmokeTimeout      = 10 * time.Minute
 
-	dockerSSHUserName   = "dockeruser"
 	dockerSSHKeyName    = "soperator_e2e_docker_ssh"
 	dockerSSHKeyComment = "soperator-e2e-docker-ssh"
 	dockerWorkerSSHOK   = "WORKER_SSH_DOCKER_OK"

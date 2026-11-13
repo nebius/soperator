@@ -3,6 +3,7 @@ package sharedsteps
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,6 +67,54 @@ func TestRunInternalSSHAsTestUser(t *testing.T) {
 			"(ssh-keygen -R 'worker-0' -f ~/.ssh/known_hosts >/dev/null 2>&1 || true) && "+
 			"timeout 30 ssh 'worker-0' 'ulimit -n' </dev/null",
 	), command)
+}
+
+func TestRunInternalSSHAsUser(t *testing.T) {
+	var command string
+	runtime := &sshTestUserRuntime{
+		jail: framework.NewCommandScope(func(_ context.Context, value string) (string, error) {
+			command = value
+			return "worker-0\n", nil
+		}),
+	}
+
+	_, err := runInternalSSHAsUser(t.Context(), runtime, pamSlurmAdoptLimitsUser, "worker-0", 30*time.Second, "ulimit -n")
+	require.NoError(t, err)
+	assert.Contains(t, command, "su - 'soperatoradoptlimits' -c ")
+	assert.NotContains(t, command, "'bob'")
+}
+
+func TestWaitForSSHHolderJobNeedsBatchStart(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		stdout string
+		ready  bool
+	}{
+		{name: "running before batch start"},
+		{name: "batch started", stdout: "SOPERATOR_E2E_SSH_HOLDER_STARTED\n", ready: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			job := framework.SbatchJob{ID: "42", StdoutPath: "/jobs/42.out"}
+			runtime := &sshTestUserRuntime{
+				jail: framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+					switch {
+					case strings.HasPrefix(command, "squeue "):
+						return "RUNNING\n", nil
+					case strings.Contains(command, job.StdoutPath):
+						return tc.stdout, nil
+					default:
+						return "", nil
+					}
+				}),
+			}
+			err := waitForSSHHolderJob(t.Context(), runtime, framework.NewSlurmClient(runtime), job, time.Minute)
+			if tc.ready {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
 }
 
 func TestUnprivilegedSSHUserCreationAndExistingGroupRemoval(t *testing.T) {

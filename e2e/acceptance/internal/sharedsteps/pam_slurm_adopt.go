@@ -13,10 +13,9 @@ import (
 )
 
 const (
-	pamSlurmAdoptUser       = "soperatoradopt"
 	pamSlurmAdoptKeyName    = "soperator_e2e_pam_slurm_adopt"
 	pamSlurmAdoptKeyComment = "soperator-e2e-pam-slurm-adopt"
-	pamSlurmAdoptStatusPath = "/home/soperatoradopt/.soperator-e2e-pam-slurm-adopt-status"
+	pamSlurmAdoptStatusPath = "/home/" + pamSlurmAdoptUser + "/.soperator-e2e-pam-slurm-adopt-status"
 
 	pamSlurmAdoptJobTimeout     = 5 * time.Minute
 	pamSlurmAdoptSessionTimeout = 2 * time.Minute
@@ -196,14 +195,14 @@ func (s *PAMSlurmAdopt) startGPUJobAndSSH(ctx context.Context) error {
 		Nodes:       1,
 		Nodelist:    []string{s.worker.Name},
 		GPUsPerNode: 1,
-		Wrap:        "sleep 3600",
+		Wrap:        sshHolderJobCommand,
 		RunAsUser:   pamSlurmAdoptUser,
 	})
 	if err != nil {
 		return err
 	}
 	s.job = job
-	if err := s.slurm.WaitForJobRunning(ctx, job.ID, pamSlurmAdoptJobTimeout); err != nil {
+	if err := waitForSSHHolderJob(ctx, s.runtime, s.slurm, job, pamSlurmAdoptJobTimeout); err != nil {
 		return err
 	}
 

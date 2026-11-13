@@ -79,6 +79,17 @@ func TestOverrideTestValuesDefaultPartitions(t *testing.T) {
 	assert.Equal(t, "hidden", partitions[1].(map[string]interface{})["name"])
 }
 
+func TestOverrideTestValuesSSHFeatures(t *testing.T) {
+	for _, profile := range []Profile{validProfile(), mixedGPUProfile()} {
+		vars := overrideTestValues(map[string]interface{}{}, Config{Profile: profile})
+		assert.Equal(t, true, vars["slurm_login_docker_enabled"])
+		policy, ok := vars["pam_slurm_adopt"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, true, policy["enabled"])
+		assert.Equal(t, []string{"bob", "dockeruser"}, policy["exempt_users"])
+	}
+}
+
 func TestOverrideTestValuesNFS(t *testing.T) {
 	for _, tc := range []struct {
 		name     string

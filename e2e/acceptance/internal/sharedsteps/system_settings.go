@@ -245,6 +245,7 @@ func (s *SystemSettings) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^root collects direct and nested Bash resource limits over SSH to the worker$`, s.collectWorkerResourceLimits)
 	sc.Step(`^direct and nested worker SSH resource limits match the compute profile$`, s.resourceLimitsMatchComputeProfile)
 	sc.Step(`^a regular user account is available on the worker$`, s.regularUserIsAvailableOnWorker)
+	sc.Step(`^a regular user for adopted SSH checks is available on the worker$`, s.adoptedSSHUserIsAvailableOnWorker)
 	sc.Step(`^worker SSH without a job is allowed for the regular user$`, s.workerSSHWithoutJobIsAllowedForRegularUser)
 	sc.Step(`^PAM Slurm adopt requires a job for the regular user$`, s.pamSlurmAdoptRequiresJobForRegularUser)
 	sc.Step(`^the regular user starts a job on the worker and collects direct and nested Bash resource limits over SSH$`, s.collectAdoptedWorkerResourceLimits)
@@ -414,6 +415,13 @@ func (s *SystemSettings) regularUserIsAvailableOnWorker(ctx context.Context) err
 	return prepareSSHTestUser(ctx, s.runtime, sshTestUserName, s.worker)
 }
 
+func (s *SystemSettings) adoptedSSHUserIsAvailableOnWorker(ctx context.Context) error {
+	if err := s.requireWorker(); err != nil {
+		return err
+	}
+	return prepareSSHTestUser(ctx, s.runtime, pamSlurmAdoptLimitsUser, s.worker)
+}
+
 func (s *SystemSettings) collectRegularUserWorkerResourceLimits(ctx context.Context) error {
 	if err := s.requireWorker(); err != nil {
 		return err
@@ -436,7 +444,7 @@ func (s *SystemSettings) collectRegularUserWorkerResourceLimits(ctx context.Cont
 }
 
 func (s *SystemSettings) workerSSHWithoutJobIsAllowedForRegularUser(ctx context.Context) error {
-	requiresJob, err := s.regularUserNeedsJobForWorkerSSH(ctx)
+	requiresJob, err := s.userNeedsJobForWorkerSSH(ctx, sshTestUserName)
 	if err != nil {
 		return err
 	}
@@ -448,18 +456,18 @@ func (s *SystemSettings) workerSSHWithoutJobIsAllowedForRegularUser(ctx context.
 }
 
 func (s *SystemSettings) pamSlurmAdoptRequiresJobForRegularUser(ctx context.Context) error {
-	requiresJob, err := s.regularUserNeedsJobForWorkerSSH(ctx)
+	requiresJob, err := s.userNeedsJobForWorkerSSH(ctx, pamSlurmAdoptLimitsUser)
 	if err != nil {
 		return err
 	}
 	if !requiresJob {
-		s.runtime.Logf("system settings: PAM Slurm adopt is disabled or exempts %s, skipping scenario", sshTestUserName)
+		s.runtime.Logf("system settings: PAM Slurm adopt is disabled or exempts %s, skipping scenario", pamSlurmAdoptLimitsUser)
 		return godog.ErrSkip
 	}
 	return nil
 }
 
-func (s *SystemSettings) regularUserNeedsJobForWorkerSSH(ctx context.Context) (bool, error) {
+func (s *SystemSettings) userNeedsJobForWorkerSSH(ctx context.Context, userName string) (bool, error) {
 	cluster, err := s.kubectl.SlurmCluster(ctx, s.info.SlurmClusterName)
 	if err != nil {
 		return false, err
@@ -467,11 +475,11 @@ func (s *SystemSettings) regularUserNeedsJobForWorkerSSH(ctx context.Context) (b
 	if !cluster.PAMSlurmAdoptEnabled {
 		return false, nil
 	}
-	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, "id -nG "+framework.ShellQuote(sshTestUserName))
+	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, "id -nG "+framework.ShellQuote(userName))
 	if err != nil {
-		return false, fmt.Errorf("list groups of %s: %w", sshTestUserName, err)
+		return false, fmt.Errorf("list groups of %s: %w", userName, err)
 	}
-	return pamSlurmAdoptRequiresJob(cluster, sshTestUserName, strings.Fields(output)), nil
+	return pamSlurmAdoptRequiresJob(cluster, userName, strings.Fields(output)), nil
 }
 
 func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context) error {
@@ -483,22 +491,24 @@ func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context)
 		Nodes:        1,
 		Nodelist:     []string{s.worker.Name},
 		TasksPerNode: 1,
-		Wrap:         "sleep 3600",
-		RunAsUser:    sshTestUserName,
+		ExtraFlags:   []string{"--mem=1G"},
+		Wrap:         sshHolderJobCommand,
+		RunAsUser:    pamSlurmAdoptLimitsUser,
 	})
 	if err != nil {
 		return err
 	}
 	s.trackJob(job, adoptedSSHHolderJobName, probeContainerNone)
 	s.runtime.Logf("system settings: submitted job=%s id=%s worker=%s user=%s",
-		adoptedSSHHolderJobName, job.ID, s.worker.Name, sshTestUserName)
-	if err := s.slurm.WaitForJobRunning(ctx, job.ID, systemSettingsJobTimeout); err != nil {
-		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, err)
+		adoptedSSHHolderJobName, job.ID, s.worker.Name, pamSlurmAdoptLimitsUser)
+	if err := waitForSSHHolderJob(ctx, s.runtime, s.slurm, job, systemSettingsJobTimeout); err != nil {
+		return err
 	}
 
-	output, err := runInternalSSHAsTestUser(
+	output, err := runInternalSSHAsUser(
 		ctx,
 		s.runtime,
+		pamSlurmAdoptLimitsUser,
 		s.worker.Name,
 		systemSettingsSSHTimeout,
 		pairedResourceLimitProbe(),
