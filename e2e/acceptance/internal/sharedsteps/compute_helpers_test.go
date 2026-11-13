@@ -146,15 +146,19 @@ func TestWaitForInstanceOperationsWaitsForEveryOperation(t *testing.T) {
 	}, runtime.calls, "only the unfinished operation is polled again")
 }
 
-func TestWaitForInstanceOperationsFailsOnAFailedOperationAtOnce(t *testing.T) {
+func TestWaitForInstanceOperationsWaitsPastAFailure(t *testing.T) {
 	runtime := &computeInstanceRuntime{operations: map[string][]string{
-		"op-1": {`{"id":"op-1"}`},
-		"op-2": {`{"id":"op-2","description":"Start Instance","resource_id":"computeinstance-2",` +
-			`"finished_at":"2026-11-12T10:00:00Z","status":{"code":8,"message":"not enough resources"}}`},
+		"op-1": {`{"id":"op-1","description":"Stop Instance","resource_id":"computeinstance-1",` +
+			`"finished_at":"2026-11-12T10:00:00Z","status":{"code":13,"message":"internal error"}}`},
+		"op-2": {`{"id":"op-2"}`, `{"id":"op-2","finished_at":"2026-11-12T10:00:00Z","status":{}}`},
 	}}
 
 	err := waitForInstanceOperations(t.Context(), runtime, []string{"op-1", "op-2"}, time.Minute)
 
-	assert.EqualError(t, err, "Compute operation op-2 (Start Instance of computeinstance-2) failed with code 8: not enough resources")
-	assert.Len(t, runtime.calls, 2, "a failed operation ends the wait without waiting for the others")
+	assert.EqualError(t, err, "Compute operation op-1 (Stop Instance of computeinstance-1) failed with code 13: internal error")
+	assert.Equal(t, []string{
+		"nebius compute instance operation get --id op-1 --format json",
+		"nebius compute instance operation get --id op-2 --format json",
+		"nebius compute instance operation get --id op-2 --format json",
+	}, runtime.calls, "the operation still running after another failed is awaited, the failed one is not polled again")
 }

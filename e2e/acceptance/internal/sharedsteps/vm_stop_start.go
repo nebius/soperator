@@ -73,10 +73,13 @@ type VMStopStart struct {
 	reservation string
 	// workers keep the Slurm node state recorded at selection.
 	workers []framework.WorkerInfo
+	// nodeSets are the NodeSets of the reserved workers, kept so later steps need not read the whole cluster.
+	nodeSets []framework.NodeSetInfo
 	// topologies lists, by worker, the topologies slurmctld placed it in before the stop-start.
 	topologies map[string][]string
-	// instancesStopped records that the scenario requested to stop the reserved instances; cleanup starts them again.
-	instancesStopped bool
+	// workersDisrupted records that the scenario requested to stop the reserved instances and has not yet seen
+	// the workers back in service: cleanup starts the instances again and waits for the workers.
+	workersDisrupted bool
 	// operations are the Compute operations requested last; cleanup waits for them before it looks at instance states.
 	operations []string
 	// drainedWorker is the worker drained by hand before the stop-start; cleanup resumes it.
@@ -112,11 +115,12 @@ func (s *VMStopStart) RegisterSteps(sc *godog.ScenarioContext) {
 // CleanupAndReset starts every instance the scenario stopped, resumes its own drain,
 // waits for the workers to become usable again, and releases the reservation.
 func (s *VMStopStart) CleanupAndReset(ctx context.Context) {
-	if s.instancesStopped {
+	if s.workersDisrupted {
 		ids := s.instanceIDs()
 		runCleanupPhase(ctx, s.runtime, "start stopped Compute instances "+strings.Join(ids, ","), 2*vmStopStartInstanceTimeout, func(ctx context.Context) error {
-			// A stop requested just before a failure may not show yet: an instance still reported RUNNING
-			// would be left alone and stop afterwards. A failed operation changes nothing, so its error only matters as a log.
+			// A stop requested just before a failure may not show yet: an instance still reported RUNNING would be
+			// left alone and stop afterwards, so the operations must finish first.
+			// A failed operation changes nothing, so its error only matters as a log.
 			if err := waitForInstanceOperations(ctx, s.runtime, s.operations, vmStopStartInstanceTimeout); err != nil {
 				s.runtime.Logf("Cleanup: wait for Compute operations %s: %v", strings.Join(s.operations, ","), err)
 			}
@@ -129,7 +133,7 @@ func (s *VMStopStart) CleanupAndReset(ctx context.Context) {
 			return s.slurm.ResumeNodeIfDrainedByReason(ctx, s.drainedWorker, vmStopStartDrainReason)
 		})
 	}
-	if s.instancesStopped {
+	if s.workersDisrupted {
 		runCleanupPhase(ctx, s.runtime, "wait for reserved workers "+strings.Join(s.workerNames(), ","), vmStopStartCleanupTimeout, func(ctx context.Context) error {
 			return s.waitForWorkers(ctx, "reserved workers usable after cleanup", vmStopStartCleanupTimeout, framework.SlurmNodeInfo.IsUsable)
 		})
@@ -180,6 +184,11 @@ func (s *VMStopStart) reserveWorkers(ctx context.Context, perNodeSet int) error 
 	}
 
 	s.workers = selected
+	for _, nodeSet := range snapshot.NodeSets {
+		if slices.ContainsFunc(selected, func(worker framework.WorkerInfo) bool { return worker.NodeSetName == nodeSet.Name }) {
+			s.nodeSets = append(s.nodeSets, nodeSet)
+		}
+	}
 	placements, err := s.readTopologyPlacements(ctx, newCachedHostlistExpander(s.runtime), s.runtime.Controller().RunWithDefaultRetry)
 	if err != nil {
 		return err
@@ -267,7 +276,7 @@ func (s *VMStopStart) reservedWorkersAreIdle(ctx context.Context) error {
 
 func (s *VMStopStart) stopVMs(ctx context.Context) error {
 	// Record ownership before the requests: a lost response may still have stopped an instance.
-	s.instancesStopped = true
+	s.workersDisrupted = true
 	return s.applyInstanceAction(ctx, "stop", instanceStateStopped)
 }
 
@@ -312,15 +321,11 @@ func (s *VMStopStart) controllerAnswers(ctx context.Context) error {
 }
 
 func (s *VMStopStart) startVMs(ctx context.Context) error {
-	if err := s.applyInstanceAction(ctx, "start", instanceStateRunning); err != nil {
-		return err
-	}
-	s.instancesStopped = false
-	return nil
+	return s.applyInstanceAction(ctx, "start", instanceStateRunning)
 }
 
 // applyInstanceAction requests the action on every reserved instance, waits for the Compute operations,
-// which report a failure such as missing capacity as soon as it happens, and then confirms the instance states.
+// which report a failure such as missing capacity directly, and then confirms the instance states.
 func (s *VMStopStart) applyInstanceAction(ctx context.Context, action, state string) error {
 	ids := s.instanceIDs()
 	s.operations = nil
@@ -373,7 +378,11 @@ func (s *VMStopStart) reservedWorkersReturnToService(ctx context.Context) error 
 		}
 		return node.IsIdle()
 	}
-	return s.waitForWorkers(ctx, "reserved workers back in service", vmStopStartRecoveryTimeout, ready)
+	if err := s.waitForWorkers(ctx, "reserved workers back in service", vmStopStartRecoveryTimeout, ready); err != nil {
+		return err
+	}
+	s.workersDisrupted = false
+	return nil
 }
 
 func (s *VMStopStart) drainedWorkerKeepsDrain(ctx context.Context) error {
@@ -616,39 +625,85 @@ func parseVMStopStartGPUCounts(output string) (map[string]int, error) {
 }
 
 func (s *VMStopStart) localScratchIsMounted(ctx context.Context) error {
-	snapshot, err := s.selector.Snapshot(ctx)
+	names := s.workerNames()
+	nodes, err := s.slurm.NodeInfosWithRetries(ctx, names)
 	if err != nil {
 		return err
 	}
-	pods, err := s.kubectl.WorkerPods(ctx)
+	pods, err := s.kubectl.WorkerPodsForSlurmNodes(ctx, names)
 	if err != nil {
 		return err
 	}
-	nodeSets, err := discoverLocalNVMeNodeSets(snapshot, pods)
+	nodeSets, err := reservedScratchNodeSets(s.nodeSets, s.workers, nodes, pods)
 	if err != nil {
 		return err
 	}
-	reserved := make(map[string]bool, len(s.workers))
-	for _, worker := range s.workers {
-		reserved[worker.Name] = true
+	if len(nodeSets) == 0 {
+		s.runtime.Logf("VM stop-start: no reserved worker has node-local scratch, nothing to check")
+		return nil
 	}
 	var problems []error
-	checked := 0
 	for _, nodeSet := range nodeSets {
 		for _, worker := range nodeSet.Workers {
-			if !reserved[worker.Name] {
-				continue
-			}
-			checked++
 			if err := s.checkLocalScratch(ctx, nodeSet, worker.Name); err != nil {
 				problems = append(problems, fmt.Errorf("worker %s: %w", worker.Name, err))
 			}
 		}
 	}
-	if checked == 0 {
-		s.runtime.Logf("VM stop-start: no reserved worker has node-local scratch, nothing to check")
-	}
 	return errors.Join(problems...)
+}
+
+// reservedScratchNodeSets groups the reserved workers of NodeSets with node-local scratch, with fresh Slurm
+// state, and fails if any of them cannot be checked: workers outside the reservation are never looked at.
+func reservedScratchNodeSets(
+	nodeSets []framework.NodeSetInfo,
+	workers []framework.WorkerInfo,
+	nodes []framework.SlurmNodeInfo,
+	pods []framework.WorkerPodInfo,
+) ([]localNVMeNodeSet, error) {
+	fresh := make(map[string]framework.SlurmNodeInfo, len(nodes))
+	for _, node := range nodes {
+		fresh[node.Name] = node
+	}
+	podsByWorker := make(map[string]framework.WorkerPodInfo, len(pods))
+	for _, pod := range pods {
+		podsByWorker[pod.SlurmNodeName] = pod
+	}
+	var scratch []localNVMeNodeSet
+	var problems []error
+	for _, nodeSet := range nodeSets {
+		mount, ok := localNVMeSubMount(nodeSet.JailSubMounts)
+		if !ok {
+			continue
+		}
+		entry, err := newLocalNVMeNodeSet(nodeSet, mount)
+		if err != nil {
+			problems = append(problems, err)
+			continue
+		}
+		var reserved []framework.WorkerInfo
+		for _, worker := range workers {
+			if worker.NodeSetName != nodeSet.Name {
+				continue
+			}
+			if node, ok := fresh[worker.Name]; ok {
+				worker.SlurmNode = node
+			}
+			reserved = append(reserved, worker)
+		}
+		var workerProblems []error
+		entry.Workers, entry.UnusableWorkers, workerProblems = localNVMeNodeSetWorkers(nodeSet.Name, reserved, podsByWorker)
+		problems = append(problems, workerProblems...)
+		if len(entry.UnusableWorkers) > 0 {
+			problems = append(problems, fmt.Errorf("NodeSet %s: reserved workers with node-local scratch cannot be checked: %s",
+				nodeSet.Name, strings.Join(entry.UnusableWorkers, ", ")))
+		}
+		scratch = append(scratch, entry)
+	}
+	if len(problems) > 0 {
+		return nil, errors.Join(problems...)
+	}
+	return scratch, nil
 }
 
 func (s *VMStopStart) checkLocalScratch(ctx context.Context, nodeSet localNVMeNodeSet, worker string) error {

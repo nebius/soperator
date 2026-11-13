@@ -302,20 +302,74 @@ func (c *KubectlClient) WorkerPods(ctx context.Context) ([]WorkerPodInfo, error)
 		}
 		seen[slurmNodeName] = pod.Name
 
-		out = append(out, WorkerPodInfo{
-			SlurmNodeName:      slurmNodeName,
-			PodName:            pod.Name,
-			NodeSetName:        strings.TrimSpace(pod.Labels["slurm.nebius.ai/nodeset"]),
-			KubernetesNodeName: pod.Spec.NodeName,
-			Ready:              kubeobjects.PodReady(pod),
-			HasLocalNVMe:       podHasVolume(pod, LocalNVMeVolumeName),
-		})
+		out = append(out, workerPodInfo(pod))
 	}
 
 	sort.Slice(out, func(i, j int) bool {
 		return out[i].SlurmNodeName < out[j].SlurmNodeName
 	})
 	return out, nil
+}
+
+// WorkerPodsForSlurmNodes reads the worker pods of the given Slurm nodes by name instead of listing every
+// worker pod, which matters on large clusters.
+// A worker pod is named after its Slurm node, which it also declares in spec.hostname.
+// A node without a pod is left out of the result.
+func (c *KubectlClient) WorkerPodsForSlurmNodes(ctx context.Context, slurmNodeNames []string) ([]WorkerPodInfo, error) {
+	if len(slurmNodeNames) == 0 {
+		return nil, nil
+	}
+	args := append([]string{"get", "pods", "-n", SoperatorNamespace, "--ignore-not-found", "-o", "json"}, slurmNodeNames...)
+	output, err := c.exec.Kubectl().RunWithDefaultRetry(ctx, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get worker pods %s: %w", strings.Join(slurmNodeNames, ","), err)
+	}
+	pods, err := decodePods(output)
+	if err != nil {
+		return nil, fmt.Errorf("decode worker pods %s: %w", strings.Join(slurmNodeNames, ","), err)
+	}
+
+	out := make([]WorkerPodInfo, 0, len(pods))
+	for _, pod := range pods {
+		if strings.TrimSpace(pod.Spec.Hostname) != pod.Name {
+			return nil, fmt.Errorf("worker pod %s declares spec.hostname=%q, expected the pod name", pod.Name, pod.Spec.Hostname)
+		}
+		out = append(out, workerPodInfo(pod))
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].SlurmNodeName < out[j].SlurmNodeName
+	})
+	return out, nil
+}
+
+// decodePods reads what `kubectl get pods <names> -o json` prints: a Pod for one name, a List for several,
+// and nothing when --ignore-not-found finds none.
+func decodePods(output string) ([]corev1.Pod, error) {
+	if strings.TrimSpace(output) == "" {
+		return nil, nil
+	}
+	var podOrList struct {
+		corev1.Pod
+		Items []corev1.Pod `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(output), &podOrList); err != nil {
+		return nil, err
+	}
+	if podOrList.Kind != "Pod" {
+		return podOrList.Items, nil
+	}
+	return []corev1.Pod{podOrList.Pod}, nil
+}
+
+func workerPodInfo(pod corev1.Pod) WorkerPodInfo {
+	return WorkerPodInfo{
+		SlurmNodeName:      strings.TrimSpace(pod.Spec.Hostname),
+		PodName:            pod.Name,
+		NodeSetName:        strings.TrimSpace(pod.Labels["slurm.nebius.ai/nodeset"]),
+		KubernetesNodeName: pod.Spec.NodeName,
+		Ready:              kubeobjects.PodReady(pod),
+		HasLocalNVMe:       podHasVolume(pod, LocalNVMeVolumeName),
+	}
 }
 
 func jailSubMountInfos(mounts []kubeobjects.NodeVolumeMount) []JailSubMountInfo {
