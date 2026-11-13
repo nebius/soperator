@@ -3,6 +3,7 @@ package sharedsteps
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,16 +47,68 @@ func prepareSSHTestUser(ctx context.Context, runtime framework.Runtime, userName
 }
 
 func ensureSSHTestUser(ctx context.Context, runtime framework.Runtime, userName string) error {
+	return createSSHTestUser(ctx, runtime, userName, nil)
+}
+
+func createSSHTestUser(ctx context.Context, runtime framework.Runtime, userName string, flags []string) error {
 	quotedUserName := framework.ShellQuote(userName)
-	command := fmt.Sprintf(
-		"id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s",
-		quotedUserName,
-		quotedUserName,
-	)
+	var quotedFlags []string
+	for _, flag := range flags {
+		quotedFlags = append(quotedFlags, framework.ShellQuote(flag))
+	}
+	options := ""
+	if len(quotedFlags) > 0 {
+		options = strings.Join(quotedFlags, " ") + " "
+	}
+	command := fmt.Sprintf("id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s%s",
+		quotedUserName, options, quotedUserName)
 	if _, err := runtime.Jail().Run(ctx, command); err != nil {
 		return fmt.Errorf("create SSH test user %s: %w", userName, err)
 	}
 
+	return nil
+}
+
+func ensureUnprivilegedSSHTestUser(ctx context.Context, runtime framework.Runtime, userName string) error {
+	if err := createSSHTestUser(ctx, runtime, userName, []string{"--without-sudo", "--without-docker"}); err != nil {
+		return err
+	}
+	quoted := framework.ShellQuote(userName)
+	identity, err := runtime.Jail().Run(ctx, "id -u "+quoted+" && id -nG "+quoted)
+	if err != nil {
+		return fmt.Errorf("read unprivileged SSH identity %s: %w", userName, err)
+	}
+	fields := strings.Fields(identity)
+	if len(fields) < 2 {
+		return fmt.Errorf("read unprivileged SSH identity %s: got %q", userName, identity)
+	}
+	uid, err := strconv.ParseUint(fields[0], 10, 32)
+	if err != nil || uid < 1000 {
+		return fmt.Errorf("require a regular SSH user %s: got UID %q", userName, fields[0])
+	}
+	for _, group := range fields[1:] {
+		if group == "sudo" || group == "docker" {
+			if _, err := runtime.Jail().Run(ctx, "gpasswd -d "+quoted+" "+framework.ShellQuote(group)); err != nil {
+				return fmt.Errorf("remove SSH test user %s from group %s: %w", userName, group, err)
+			}
+		}
+	}
+	output, err := runtime.Jail().Run(ctx, "id -nG "+quoted)
+	if err != nil {
+		return fmt.Errorf("verify unprivileged SSH groups for %s: %w", userName, err)
+	}
+	return validateUnprivilegedSSHGroups(strings.Fields(output))
+}
+
+func validateUnprivilegedSSHGroups(groups []string) error {
+	if len(groups) == 0 {
+		return fmt.Errorf("read unprivileged SSH groups: group list is empty")
+	}
+	for _, group := range groups {
+		if group == "sudo" || group == "docker" || group == "root" {
+			return fmt.Errorf("require unprivileged SSH groups: found %s in %v", group, groups)
+		}
+	}
 	return nil
 }
 
