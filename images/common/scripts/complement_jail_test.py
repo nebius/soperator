@@ -59,7 +59,7 @@ class DriverCapabilityFlagsTest(unittest.TestCase):
 
     def test_all_expands_to_every_capability(self):
         self.assertEqual(
-            ["--compute", "--compat32", "--display", "--graphics", "--utility", "--video"],
+            ["--compute", "--compat32", "--display", "--graphics", "--utility", "--video", "--ngx"],
             cj.driver_capability_flags("all"),
         )
 
