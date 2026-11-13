@@ -106,10 +106,11 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	degradedNodes, err := c.findDegradedNodes(ctx)
-	if err != nil {
-		logger.Error(err, "Find degraded nodes produced an error")
-		return ctrl.Result{}, err
+	// An unreachable cluster must not block remediation on the others: the degraded nodes that
+	// were found are processed first, and the listing error is returned afterwards.
+	degradedNodes, findErr := c.findDegradedNodes(ctx)
+	if findErr != nil {
+		logger.Error(findErr, "Find degraded nodes produced an error")
 	}
 
 	logger.Info(fmt.Sprintf("found %d degraded nodes", len(degradedNodes)))
@@ -124,7 +125,10 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	if err := errors.Join(errs...); err != nil {
 		logger.Error(err, "Process degraded nodes produced an error")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, errors.Join(findErr, err)
+	}
+	if findErr != nil {
+		return ctrl.Result{}, findErr
 	}
 
 	// Set RequeueAfter so SlurmNodesController can perform periodical checks against
@@ -132,14 +136,19 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 	return ctrl.Result{RequeueAfter: c.requeueAfter}, nil
 }
 
+// findDegradedNodes collects the drained nodes with a well-known reason from every registered
+// cluster. A cluster whose node listing fails is skipped and reported in the returned error, so
+// the degraded nodes of the clusters that did respond are still returned.
 // TODO: filter slurmNodes by supported slurm clusters
 func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types.NamespacedName][]slurmapi.Node, error) {
 	degradedNodes := make(map[types.NamespacedName][]slurmapi.Node)
 
+	var errs []error
 	for slurmClusterName, slurmAPIClient := range c.slurmAPIClients.GetClients() {
 		slurmNodes, err := slurmAPIClient.ListNodes(ctx)
 		if err != nil {
-			return nil, err
+			errs = append(errs, fmt.Errorf("list nodes of slurm cluster %s: %w", slurmClusterName, err))
+			continue
 		}
 
 		for _, node := range slurmNodes {
@@ -168,7 +177,7 @@ func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types
 		}
 	}
 
-	return degradedNodes, nil
+	return degradedNodes, errors.Join(errs...)
 }
 
 func (c *SlurmNodesController) processDegradedNode(
