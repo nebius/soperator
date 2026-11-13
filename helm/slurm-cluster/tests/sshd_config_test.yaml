@@ -1,0 +1,35 @@
+suite: test login SSHD config references
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should use the default SSHD config when no reference is configured
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.login.sshdConfigMapRefName
+
+  - it: should render a custom SSHD config reference
+    set:
+      slurmNodes.login.sshdConfigMapRefName: login-sshd-custom
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.sshdConfigMapRefName
+          value: login-sshd-custom
+
+  - it: should render a custom SSHD config reference without root public keys
+    set:
+      slurmNodes.login.sshdConfigMapRefName: login-sshd-custom
+      slurmNodes.login.sshRootPublicKeys: []
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.sshdConfigMapRefName
+          value: login-sshd-custom
+      - equal:
+          path: spec.slurmNodes.login.sshRootPublicKeys
+          value: []
+
+  - it: should omit an explicitly empty SSHD config reference
+    set:
+      slurmNodes.login.sshdConfigMapRefName: ""
+    asserts:
+      - notExists:
+          path: spec.slurmNodes.login.sshdConfigMapRefName

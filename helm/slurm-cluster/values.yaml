@@ -603,6 +603,8 @@ slurmNodes:
         ephemeralStorage: "30Gi"
       command: []
       args: []
+    # ConfigMap containing a custom sshd_config; empty uses the default configuration
+    sshdConfigMapRefName: ""
     # Authorized keys required for SSH connection to Slurm login nodes
     sshRootPublicKeys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKzxkjzPQ4EyZSjan4MLGFSA18idpZicoKW7Hfff username1"
