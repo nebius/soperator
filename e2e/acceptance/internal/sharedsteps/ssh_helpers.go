@@ -12,7 +12,21 @@ import (
 const (
 	soperatorChecksUserName       = "soperatorchecks"
 	sshTestUserPropagationTimeout = time.Minute
+	sshHolderJobStartedMarker     = "SOPERATOR_E2E_SSH_HOLDER_STARTED"
+	sshHolderJobCommand           = "echo " + sshHolderJobStartedMarker + "; exec sleep 3600"
 )
+
+// A scheduler RUNNING state can precede prolog completion and extern-step
+// creation. Wait for the batch script itself before attempting PAM adoption.
+func waitForSSHHolderJob(ctx context.Context, runtime framework.Runtime, slurm *framework.SlurmClient, job framework.SbatchJob, timeout time.Duration) error {
+	err := framework.WaitForWithJobAlive(ctx, runtime, slurm, job,
+		"SSH holder job batch script started", timeout, framework.DefaultPollInterval,
+		func(waitCtx context.Context) (bool, error) {
+			output, err := readJobFile(waitCtx, runtime, job.StdoutPath)
+			return strings.Contains(output, sshHolderJobStartedMarker), err
+		})
+	return framework.AnnotateWithJobLog(ctx, runtime, slurm, job, err)
+}
 
 // userOwnedDirCommand creates dir if missing, owned by user and writable by everyone,
 // for files a test user's jobs write into a scenario artifact directory.

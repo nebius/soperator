@@ -195,14 +195,14 @@ func (s *PAMSlurmAdopt) startGPUJobAndSSH(ctx context.Context) error {
 		Nodes:       1,
 		Nodelist:    []string{s.worker.Name},
 		GPUsPerNode: 1,
-		Wrap:        "sleep 3600",
+		Wrap:        sshHolderJobCommand,
 		RunAsUser:   pamSlurmAdoptUser,
 	})
 	if err != nil {
 		return err
 	}
 	s.job = job
-	if err := s.slurm.WaitForJobRunning(ctx, job.ID, pamSlurmAdoptJobTimeout); err != nil {
+	if err := waitForSSHHolderJob(ctx, s.runtime, s.slurm, job, pamSlurmAdoptJobTimeout); err != nil {
 		return err
 	}
 
