@@ -398,6 +398,9 @@ spec:
         readinessProbe:
           {{- toYaml . | nindent 10 }}
         {{- end }}
+      {{- with .Values.slurmNodes.login.sshdConfigMapRefName }}
+      sshdConfigMapRefName: {{ . | quote }}
+      {{- end }}
       sshRootPublicKeys:
         {{- default list .Values.slurmNodes.login.sshRootPublicKeys | toYaml | nindent 8 }}
       sshdServiceType: {{ default "LoadBalancer" .Values.slurmNodes.login.sshdServiceType | quote }}
