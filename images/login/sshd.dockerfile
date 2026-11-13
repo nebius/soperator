@@ -122,11 +122,13 @@ COPY images/common/scripts/scontrol_wrapper.sh /opt/bin/slurm/
 
 # Copy script for preparing an SSHD configuration compatible with the PAM jail
 COPY images/common/scripts/prepare_sshd_pam_jail_config.sh /opt/bin/slurm/
+COPY images/login/login_warning.sh images/login/prepare_login_warning.sh /opt/bin/slurm/
 
 RUN chmod +x /opt/bin/slurm/complement_jail.sh && \
     chmod +x /opt/bin/slurm/bind_slurm_common.sh && \
     chmod +x /opt/bin/slurm/scontrol_wrapper.sh && \
-    chmod +x /opt/bin/slurm/prepare_sshd_pam_jail_config.sh
+    chmod +x /opt/bin/slurm/prepare_sshd_pam_jail_config.sh && \
+    chmod +x /opt/bin/slurm/prepare_login_warning.sh
 
 # Update linker cache
 RUN ldconfig

@@ -56,6 +56,7 @@ const (
 	VolumeNameNvidiaIMEXConfigJail     = "nvidia-imex-config-jail"
 	VolumeNameBoot                     = boot
 	VolumeNameSSHDConfigsLogin         = sshConfigsLogin
+	VolumeNameLoginState               = "login-state"
 	VolumeNameSSHDConfigsWorker        = sshConfigsWorker
 	VolumeNameSSHRootKeys              = sshRootKeys
 	VolumeNameSSHDKeys                 = "sshd-keys"
@@ -92,6 +93,7 @@ const (
 	VolumeMountPathNvidia                   = "/run/" + nvidia
 	VolumeMountPathBoot                     = "/" + boot
 	VolumeMountPathSSHConfigs               = "/mnt/" + sshConfigs
+	VolumeMountPathLoginState               = "/run/soperator-login-state"
 	VolumeMountPathSSHRootKeys              = "/root/.ssh/" + authorizedKeys
 	VolumeMountSubPathSSHRootKeys           = authorizedKeys
 	VolumeMountPathSecurityLimits           = "/etc/security/" + securityLimitsConfFile

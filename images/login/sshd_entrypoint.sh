@@ -28,6 +28,9 @@ mkdir -p /var/run/sshd
 echo "Complement jail rootfs"
 /opt/bin/slurm/complement_jail.sh -j /mnt/jail -u /mnt/jail.upper
 
+echo "Set up interactive login update warnings"
+/opt/bin/slurm/prepare_login_warning.sh /mnt/jail
+
 echo "Set up per-user cgroup isolation for SSH sessions (if enabled)"
 setup_user_isolation() {
     local conf="/etc/soperator/user-isolation.conf"
