@@ -91,9 +91,7 @@ func (s *Topology) blockNodeRanksFollowConfig(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		selected, blockByWorker, err := pickBlockRankWorkers(entry, base, idle, func(value string) ([]string, error) {
-			return s.expandHostlist(ctx, value)
-		})
+		selected, blockByWorker, err := pickBlockRankWorkers(entry, base, idle, s.hostlists.bind(ctx))
 		if err != nil {
 			return err
 		}

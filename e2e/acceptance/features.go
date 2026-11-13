@@ -38,6 +38,10 @@ func SharedFeatureSource() FeatureSource {
 func FeaturePaths() []string {
 	return []string{
 		"features/cluster_creation.feature",
+		// Right after cluster creation so the scenarios that follow also run on workers whose
+		// VMs were just stopped and started. That extra coverage is opportunistic: the scenario
+		// checks the restarted workers itself and no scenario may depend on this order.
+		"features/vm_stop_start.feature",
 		"features/accounting.feature",
 		"features/slurm_config.feature",
 		"features/slurm_config_updates.feature",

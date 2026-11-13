@@ -448,19 +448,6 @@ func splitSlurmList(value string) []string {
 	return out
 }
 
-// plainHostlist splits a hostlist that needs no expansion, reporting false when it carries a "["
-// range that only scontrol can resolve.
-func plainHostlist(value string) ([]string, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" || value == "(null)" {
-		return nil, true
-	}
-	if strings.Contains(value, "[") {
-		return nil, false
-	}
-	return splitSlurmList(value), true
-}
-
 func sortedKeys(set map[string]struct{}) []string {
 	keys := make([]string, 0, len(set))
 	for key := range set {

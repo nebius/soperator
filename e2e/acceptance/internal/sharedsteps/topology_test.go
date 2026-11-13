@@ -330,19 +330,6 @@ func TestHalveBlockSizes(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestPlainHostlistDefersRangesToScontrol(t *testing.T) {
-	nodes, ok := plainHostlist("worker-0,worker-1")
-	assert.True(t, ok)
-	assert.Equal(t, []string{"worker-0", "worker-1"}, nodes)
-
-	nodes, ok = plainHostlist("(null)")
-	assert.True(t, ok)
-	assert.Nil(t, nodes)
-
-	_, ok = plainHostlist("worker-[0-2]")
-	assert.False(t, ok)
-}
-
 func TestSrunRequestCommand(t *testing.T) {
 	unconstrained := srunRequest{
 		Partition: "worker",

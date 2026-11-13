@@ -485,3 +485,21 @@ func TestWorkerSnapshotWithDockerPreservesIndexes(t *testing.T) {
 	assert.Len(t, original.Workers, 8)
 	assert.Len(t, original.WorkersByNodeSet, 4)
 }
+
+func TestWorkerSelectorWorkersReadsAllNodesInOneQuery(t *testing.T) {
+	runtime := &slurmNodeRuntime{outputs: map[string]string{
+		"sinfo -hN -p main -o '%N'": "worker-1\nworker-0\nworker-1\n",
+		"scontrol -o show node 'worker-1,worker-0'": "NodeName=login-0 State=IDLE\n" +
+			"NodeName=worker-0 InstanceId=instance-0 State=IDLE\n" +
+			"NodeName=worker-1 InstanceId=instance-1 State=MIXED\n",
+	}}
+	selector := NewWorkerSelector(nil, NewSlurmClient(runtime), "soperator")
+
+	workers, err := selector.Workers(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"worker-0", "worker-1"}, WorkerNames(workers))
+	assert.Equal(t, "instance-1", workers[1].SlurmNode.InstanceID)
+	assert.Equal(t, []string{"sinfo -hN -p main -o '%N'", "scontrol -o show node 'worker-1,worker-0'"}, runtime.calls,
+		"one node query keeps worker discovery cheap on large clusters")
+}

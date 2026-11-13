@@ -60,3 +60,15 @@ func extractField(line, field string) string {
 	}
 	return ""
 }
+
+// parseValuesForKey returns the value of every key=value line with the key, in output order,
+// for output where the key repeats, such as one line per node of a job.
+func parseValuesForKey(output, key string) []string {
+	var values []string
+	for line := range strings.SplitSeq(output, "\n") {
+		if value, found := strings.CutPrefix(strings.TrimSpace(line), key+"="); found {
+			values = append(values, strings.TrimSpace(value))
+		}
+	}
+	return values
+}

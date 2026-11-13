@@ -73,6 +73,7 @@ func TestSharedHeavyScenarios(t *testing.T) {
 		"A worker update preserves maintenance drains before and during handoff",
 		"Non-responding kubelet recreates a Kubernetes node and recovers the worker",
 		"A burst of batch jobs is accepted and drained within the budget",
+		"Workers recover after their VMs are stopped and started",
 	}, sharedScenariosTagged(t, "@heavy"))
 }
 

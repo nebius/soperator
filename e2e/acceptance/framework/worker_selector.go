@@ -68,12 +68,12 @@ func (s *WorkerSelector) Workers(ctx context.Context) ([]WorkerInfo, error) {
 		return nil, err
 	}
 
-	workers := make([]WorkerInfo, 0, len(names))
-	for _, name := range names {
-		node, err := s.slurm.NodeInfo(ctx, name)
-		if err != nil {
-			return nil, err
-		}
+	nodes, err := s.slurm.NodeInfosWithRetries(ctx, names)
+	if err != nil {
+		return nil, err
+	}
+	workers := make([]WorkerInfo, 0, len(nodes))
+	for _, node := range nodes {
 		workers = append(workers, WorkerInfo{Name: node.Name, SlurmNode: node})
 	}
 	sort.Slice(workers, func(i, j int) bool {

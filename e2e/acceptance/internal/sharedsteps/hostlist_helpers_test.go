@@ -12,15 +12,15 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
-func TestExpandSlurmHostlistCachesExpandedValues(t *testing.T) {
-	runtime := &topologyHostlistRuntime{outputs: map[string]string{
+func TestHostlistExpanderCachesExpandedValues(t *testing.T) {
+	runtime := &hostlistRuntime{outputs: map[string]string{
 		"scontrol show hostnames 'worker-[0-1]'": "worker-0\nworker-1\n",
 	}}
-	cache := make(map[string][]string)
+	hostlists := newCachedHostlistExpander(runtime)
 
-	first, err := expandSlurmHostlist(t.Context(), runtime, "worker-[0-1]", cache)
+	first, err := hostlists.expand(t.Context(), "worker-[0-1]")
 	require.NoError(t, err)
-	second, err := expandSlurmHostlist(t.Context(), runtime, "worker-[0-1]", cache)
+	second, err := hostlists.expand(t.Context(), "worker-[0-1]")
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"worker-0", "worker-1"}, first)
@@ -28,22 +28,35 @@ func TestExpandSlurmHostlistCachesExpandedValues(t *testing.T) {
 	assert.Equal(t, 1, runtime.calls)
 }
 
-func TestExpandSlurmHostlistParsesPlainValuesLocally(t *testing.T) {
-	runtime := &topologyHostlistRuntime{}
+func TestHostlistExpanderParsesPlainValuesLocally(t *testing.T) {
+	runtime := &hostlistRuntime{}
 
-	nodes, err := expandSlurmHostlist(t.Context(), runtime, "worker-0,worker-1", nil)
+	nodes, err := newCachedHostlistExpander(runtime).expand(t.Context(), "worker-0,worker-1")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"worker-0", "worker-1"}, nodes)
 	assert.Zero(t, runtime.calls)
 }
 
-type topologyHostlistRuntime struct {
+func TestPlainHostlistDefersRangesToScontrol(t *testing.T) {
+	nodes, ok := plainHostlist("worker-0,worker-1")
+	assert.True(t, ok)
+	assert.Equal(t, []string{"worker-0", "worker-1"}, nodes)
+
+	nodes, ok = plainHostlist("(null)")
+	assert.True(t, ok)
+	assert.Nil(t, nodes)
+
+	_, ok = plainHostlist("worker-[0-2]")
+	assert.False(t, ok)
+}
+
+type hostlistRuntime struct {
 	framework.Runtime
 	outputs map[string]string
 	calls   int
 }
 
-func (r *topologyHostlistRuntime) Controller() framework.CommandScope {
+func (r *hostlistRuntime) Controller() framework.CommandScope {
 	return framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
 		r.calls++
 		output, found := r.outputs[command]
