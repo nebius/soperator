@@ -68,6 +68,21 @@ func TestRunInternalSSHAsTestUser(t *testing.T) {
 	), command)
 }
 
+func TestRunInternalSSHAsUser(t *testing.T) {
+	var command string
+	runtime := &sshTestUserRuntime{
+		jail: framework.NewCommandScope(func(_ context.Context, value string) (string, error) {
+			command = value
+			return "worker-0\n", nil
+		}),
+	}
+
+	_, err := runInternalSSHAsUser(t.Context(), runtime, pamSlurmAdoptLimitsUser, "worker-0", 30*time.Second, "ulimit -n")
+	require.NoError(t, err)
+	assert.Contains(t, command, "su - 'soperatoradoptlimits' -c ")
+	assert.NotContains(t, command, "'bob'")
+}
+
 func TestWaitForSSHTestUserOnController(t *testing.T) {
 	var command string
 	runtime := &sshTestUserRuntime{

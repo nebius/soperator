@@ -57,6 +57,14 @@ func readTFVars(filename string) (map[string]interface{}, error) {
 func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]interface{} {
 	tfVars["active_checks_scope"] = "testing"
 	tfVars["tailscale_enabled"] = true
+	tfVars["slurm_login_docker_enabled"] = true
+	// These accounts need worker SSH without a Slurm job. Adoption checks use
+	// separate non-exempt users; keep this list in sync with e2e/acceptance/internal/sharedsteps/test_users.go.
+	var pamAdoptExemptTestUsers = []string{"bob", "dockeruser"}
+	tfVars["pam_slurm_adopt"] = map[string]interface{}{
+		"enabled":      true,
+		"exempt_users": pamAdoptExemptTestUsers,
+	}
 	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
 	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
 	if nfs, ok := tfVars["nfs_in_k8s"].(map[string]interface{}); ok {

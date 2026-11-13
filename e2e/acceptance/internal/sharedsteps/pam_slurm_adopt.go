@@ -13,10 +13,9 @@ import (
 )
 
 const (
-	pamSlurmAdoptUser       = "soperatoradopt"
 	pamSlurmAdoptKeyName    = "soperator_e2e_pam_slurm_adopt"
 	pamSlurmAdoptKeyComment = "soperator-e2e-pam-slurm-adopt"
-	pamSlurmAdoptStatusPath = "/home/soperatoradopt/.soperator-e2e-pam-slurm-adopt-status"
+	pamSlurmAdoptStatusPath = "/home/" + pamSlurmAdoptUser + "/.soperator-e2e-pam-slurm-adopt-status"
 
 	pamSlurmAdoptJobTimeout     = 5 * time.Minute
 	pamSlurmAdoptSessionTimeout = 2 * time.Minute

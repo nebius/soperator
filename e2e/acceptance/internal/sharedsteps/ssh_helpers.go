@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	sshTestUserName               = "bob"
 	soperatorChecksUserName       = "soperatorchecks"
 	sshTestUserPropagationTimeout = time.Minute
 )
@@ -236,6 +235,17 @@ func runInternalSSHAsTestUser(
 	timeout time.Duration,
 	remoteCommand string,
 ) (string, error) {
+	return runInternalSSHAsUser(ctx, runtime, sshTestUserName, host, timeout, remoteCommand)
+}
+
+func runInternalSSHAsUser(
+	ctx context.Context,
+	runtime framework.Runtime,
+	userName string,
+	host string,
+	timeout time.Duration,
+	remoteCommand string,
+) (string, error) {
 	quotedHost := framework.ShellQuote(host)
 	// Remove the host key before each SSH attempt so retries don't depend on
 	// persisted known_hosts state from previous attempts.
@@ -247,7 +257,7 @@ func runInternalSSHAsTestUser(
 		framework.ShellQuote(remoteCommand),
 	)
 
-	return runtime.Jail().RunWithDefaultRetry(ctx, runAsLoginUser(sshTestUserName, sshCommand))
+	return runtime.Jail().RunWithDefaultRetry(ctx, runAsLoginUser(userName, sshCommand))
 }
 
 func runSSHCommand(
