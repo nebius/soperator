@@ -118,7 +118,7 @@ func validateLoginDocker(cluster *slurmv1.SlurmCluster) error {
 	return fmt.Errorf("configure a writable login jail sub-mount at %s when login Docker is enabled", consts.ImageStorageMountPath)
 }
 
-// validateLoginUserIsolation checks the effective per-user memory limits.
+// validateLoginUserIsolation checks the effective per-user CPU and memory limits.
 func validateLoginUserIsolation(cluster *slurmv1.SlurmCluster) error {
 	isolation := cluster.Spec.SlurmNodes.Login.UserIsolation
 	if isolation == nil || !ptr.Deref(isolation.Enabled, false) {
@@ -136,6 +136,21 @@ func validateLoginUserIsolation(cluster *slurmv1.SlurmCluster) error {
 			"login.userIsolation.memoryMax (%s) must be greater than zero",
 			isolation.MemoryMax.String(),
 		)
+	}
+
+	if isolation.CPUQuota != nil {
+		if isolation.CPUQuota.Sign() <= 0 {
+			return fmt.Errorf(
+				"login.userIsolation.cpuQuota (%s) must be greater than zero",
+				isolation.CPUQuota.String(),
+			)
+		}
+		if quotaUS, periodUS := values.ResolveLoginUserIsolationCPUMax(isolation); *quotaUS < values.LoginUserIsolationCPUQuotaMinUS {
+			return fmt.Errorf(
+				"login.userIsolation.cpuQuota (%s) with cpuPeriod %dus gives a quota below %dus",
+				isolation.CPUQuota.String(), periodUS, values.LoginUserIsolationCPUQuotaMinUS,
+			)
+		}
 	}
 
 	containerMemory := cluster.Spec.SlurmNodes.Login.Sshd.Resources.Memory()

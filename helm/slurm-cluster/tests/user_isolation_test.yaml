@@ -17,6 +17,10 @@ tests:
           path: spec.slurmNodes.login.userIsolation.memoryHigh
       - notExists:
           path: spec.slurmNodes.login.userIsolation.memoryMax
+      - notExists:
+          path: spec.slurmNodes.login.userIsolation.cpuQuota
+      - notExists:
+          path: spec.slurmNodes.login.userIsolation.cpuPeriod
 
   - it: should not render memoryHigh, memoryMax and cpuWeight if unset
     set:
@@ -57,6 +61,22 @@ tests:
       - equal:
           path: spec.slurmNodes.login.userIsolation.cpuWeight
           value: 250
+
+  - it: should render cpuQuota and cpuPeriod
+    set:
+      slurmNodes:
+        login:
+          userIsolation:
+            enabled: true
+            cpuQuota: "8"
+            cpuPeriod: 50000
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.userIsolation.cpuQuota
+          value: "8"
+      - equal:
+          path: spec.slurmNodes.login.userIsolation.cpuPeriod
+          value: 50000
 
   - it: should not render user isolation section when values block is removed
     set:

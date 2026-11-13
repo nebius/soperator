@@ -65,6 +65,10 @@ if [ -n "${SOPERATOR_USER_ISOLATION_CPU_WEIGHT:-}" ]; then
     echo "${SOPERATOR_USER_ISOLATION_CPU_WEIGHT}" > "${user_cg}/cpu.weight" 2>/dev/null \
         || log "failed to set cpu.weight for uid ${uid}"
 fi
+if [ -n "${SOPERATOR_USER_ISOLATION_CPU_QUOTA_US:-}" ]; then
+    echo "${SOPERATOR_USER_ISOLATION_CPU_QUOTA_US} ${SOPERATOR_USER_ISOLATION_CPU_PERIOD_US:-100000}" > "${user_cg}/cpu.max" 2>/dev/null \
+        || log "failed to set cpu.max for uid ${uid}"
+fi
 
 if [ "${docker_enabled}" = "true" ]; then
     # Keep user-<uid> free of processes so resource controllers can be
