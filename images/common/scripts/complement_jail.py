@@ -44,7 +44,7 @@ GPU_LIBS_FLAG = "etc/gpu_libs_installed.flag"
 NVML_SONAME = "libnvidia-ml.so.1"
 # Same bound as the kernel's path walk
 MAX_SYMLINKS = 40
-DRIVER_CAPABILITIES = ("compute", "compat32", "display", "graphics", "utility", "video")
+DRIVER_CAPABILITIES = ("compute", "compat32", "display", "graphics", "utility", "video", "ngx")
 # ldconfig is disabled in the CLI and run later under a cross-node lock to avoid races between workers
 FAKE_LDCONFIG = "/usr/bin/true"
 
