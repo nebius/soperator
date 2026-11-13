@@ -2,6 +2,7 @@ package sharedsteps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -47,7 +48,7 @@ func (s *NodeSetEphemeralModeTransition) RegisterSteps(sc *godog.ScenarioContext
 	sc.Step(`^the selected NodeSet is switched to ephemeral mode$`, s.switchToEphemeralMode)
 	sc.Step(`^all requested workers remain active without pod recreation$`, s.checkWorkersPreserved)
 	sc.Step(`^the selected NodeSet is switched back to static mode$`, s.switchToStaticMode)
-	sc.Step(`^its power state is removed and all static workers are ready$`, s.checkStaticModeRestored)
+	sc.Step(`^all static workers are active and ready$`, s.checkStaticModeRestored)
 }
 
 func (s *NodeSetEphemeralModeTransition) CleanupAndReset(ctx context.Context) {
@@ -137,10 +138,7 @@ func (s *NodeSetEphemeralModeTransition) checkWorkersPreserved(ctx context.Conte
 		return err
 	}
 
-	wantActiveNodes := make([]int32, s.initialNodeSet.Spec.Replicas)
-	for ordinal := range s.initialNodeSet.Spec.Replicas {
-		wantActiveNodes[ordinal] = ordinal
-	}
+	wantActiveNodes := allNodeSetOrdinals(s.initialNodeSet.Spec.Replicas)
 	if err := s.runtime.WaitFor(ctx, "all requested NodeSet ordinals to become active",
 		nodeSetEphemeralModeTransitionTimeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
@@ -188,15 +186,20 @@ func (s *NodeSetEphemeralModeTransition) checkStaticModeRestored(ctx context.Con
 	if err := s.waitForModeApplied(ctx, metav1.ConditionFalse); err != nil {
 		return err
 	}
-	if err := s.runtime.WaitFor(ctx, "NodeSetPowerState removal",
+	wantActiveNodes := allNodeSetOrdinals(s.initialNodeSet.Spec.Replicas)
+	if err := s.runtime.WaitFor(ctx,
+		fmt.Sprintf("NodeSetPowerState %s/%s to activate all ordinals",
+			s.initialNodeSet.Metadata.Namespace, s.initialNodeSet.Metadata.Name),
 		nodeSetEphemeralModeTransitionTimeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			out, err := s.runtime.Kubectl().Run(waitCtx,
-				"get", "nodesetpowerstate", s.initialNodeSet.Metadata.Name,
-				"-n", s.initialNodeSet.Metadata.Namespace,
-				"--ignore-not-found", "-o", "name",
-			)
-			return err == nil && strings.TrimSpace(out) == "", err
+			powerState, found, err := s.powerStateIfPresent(waitCtx)
+			if err != nil {
+				return false, err
+			}
+			if err := checkStaticPowerState(powerState, found, wantActiveNodes); err != nil {
+				return false, err
+			}
+			return true, nil
 		},
 	); err != nil {
 		return err
@@ -244,6 +247,45 @@ func (s *NodeSetEphemeralModeTransition) checkStaticModeRestored(ctx context.Con
 			return true, nil
 		},
 	)
+}
+
+func (s *NodeSetEphemeralModeTransition) powerStateIfPresent(ctx context.Context) (kubeobjects.NodeSetPowerState, bool, error) {
+	var powerState kubeobjects.NodeSetPowerState
+	name, namespace := s.initialNodeSet.Metadata.Name, s.initialNodeSet.Metadata.Namespace
+	output, err := s.runtime.Kubectl().Run(ctx,
+		"get", "nodesetpowerstate", name, "-n", namespace, "--ignore-not-found", "-o", "json",
+	)
+	if err != nil {
+		return powerState, false, fmt.Errorf("get NodeSetPowerState %s/%s: %w", namespace, name, err)
+	}
+	if strings.TrimSpace(output) == "" {
+		return powerState, false, nil
+	}
+	if err := json.Unmarshal([]byte(output), &powerState); err != nil {
+		return powerState, false, fmt.Errorf("decode NodeSetPowerState %s/%s: %w", namespace, name, err)
+	}
+	return powerState, true, nil
+}
+
+// checkStaticPowerState accepts the NodeSetPowerState of a static NodeSet. Newer operators keep it
+// with every ordinal active.
+// TODO: Stop accepting a missing NodeSetPowerState once no tested 5.0.0 build deletes it in static mode.
+func checkStaticPowerState(powerState kubeobjects.NodeSetPowerState, found bool, wantActiveNodes []int32) error {
+	if !found {
+		return nil
+	}
+	if !slices.Equal(powerState.Spec.ActiveNodes, wantActiveNodes) {
+		return fmt.Errorf("NodeSetPowerState has activeNodes %v, expected %v", powerState.Spec.ActiveNodes, wantActiveNodes)
+	}
+	return nil
+}
+
+func allNodeSetOrdinals(replicas int32) []int32 {
+	ordinals := make([]int32, replicas)
+	for ordinal := range replicas {
+		ordinals[ordinal] = ordinal
+	}
+	return ordinals
 }
 
 func (s *NodeSetEphemeralModeTransition) waitForModeApplied(ctx context.Context, status metav1.ConditionStatus) error {

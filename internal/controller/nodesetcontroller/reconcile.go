@@ -132,11 +132,11 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 		return ctrl.Result{}, err
 	}
 
-	// Remove any stale NodeSetPowerState after the NodeSet becomes static.
-	// Apply static replicas and clear reserved ordinals before removing the power state.
+	// Static NodeSets keep a NodeSetPowerState for worker pod recreation requests, see static_recreate.go.
+	// Apply static replicas and clear reserved ordinals before activating every ordinal.
 	if !ephemeralNodesEnabled {
-		if err = r.deleteNodeSetPowerState(ctx, nodeSet); err != nil {
-			return ctrl.Result{}, fmt.Errorf("deleting NodeSetPowerState: %w", err)
+		if err = r.reconcileStaticNodeSetPowerState(ctx, nodeSet); err != nil {
+			return ctrl.Result{}, fmt.Errorf("reconcile static NodeSetPowerState: %w", err)
 		}
 	}
 
@@ -199,6 +199,12 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 	}
 	// endregion Phase computation
 
+	// See static_recreate.go. Runs after the status updates, so that a failing pod deletion does not block them.
+	recreateAfter, err := r.recreateRequestedPods(ctx, nodeSet, cluster)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("recreate requested worker pods: %w", err)
+	}
+	res.RequeueAfter = earliestRequeue(res.RequeueAfter, recreateAfter)
 	if res.RequeueAfter > 0 {
 		logger.Info("Reconciliation requeued")
 		return res, nil
@@ -808,19 +814,6 @@ func (r *NodeSetReconciler) reconcileNodeSetPowerState(
 	)
 
 	return existing, nil
-}
-
-func (r *NodeSetReconciler) deleteNodeSetPowerState(
-	ctx context.Context,
-	nodeSet *slurmv1alpha1.NodeSet,
-) error {
-	powerState := &slurmv1alpha1.NodeSetPowerState{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      nodeSet.Name,
-			Namespace: nodeSet.Namespace,
-		},
-	}
-	return client.IgnoreNotFound(r.Delete(ctx, powerState))
 }
 
 func buildActiveNodesForNewPowerState(nodeSet *slurmv1alpha1.NodeSet) []int32 {

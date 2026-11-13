@@ -15091,7 +15091,8 @@ spec:
       openAPIV3Schema:
         description: |-
           NodeSetPowerState is the Schema for the nodesetpowerstates API.
-          It manages the power state of nodes in a NodeSet for ephemeral node scaling.
+          It manages the power state of nodes in a NodeSet: ephemeral node scaling, and worker pod
+          recreation for static nodes that Slurm powered down.
           One NodeSetPowerState exists per NodeSet, providing a clear 1:1 mapping.
         properties:
           apiVersion:
@@ -15117,7 +15118,9 @@ spec:
               activeNodes:
                 description: |-
                   ActiveNodes is the list of node ordinals that should be powered on.
-                  The power-manager binary updates this list based on Slurm's ResumeProgram/SuspendProgram calls.
+                  For ephemeral NodeSets, the power-manager binary updates this list based on Slurm's
+                  ResumeProgram/SuspendProgram calls.
+                  For static NodeSets, the NodeSet controller keeps all ordinals active.
                   For example, [0, 3, 5, 7, 12] means nodes with ordinals 0, 3, 5, 7, and 12 should be active.
                 items:
                   format: int32
@@ -15130,6 +15133,35 @@ spec:
                   This creates a 1:1 mapping between NodeSetPowerState and NodeSet.
                 minLength: 1
                 type: string
+              recreateNodes:
+                description: |-
+                  RecreateNodes lists node ordinals whose worker pods must be recreated because Slurm powered
+                  the node down. A static node only leaves the powered down state when a fresh slurmd registers.
+                  The power-manager binary adds requests and the NodeSet controller removes them once handled.
+                items:
+                  description: NodeRecreateRequest asks for the worker pod of a node
+                    to be recreated.
+                  properties:
+                    ordinal:
+                      description: Ordinal is the ordinal of the node in the NodeSet.
+                      format: int32
+                      minimum: 0
+                      type: integer
+                    requestedAt:
+                      description: |-
+                        RequestedAt is the time of the request. Slurm ignores a slurmd that starts within
+                        SuspendTimeout of the request, so the pod is recreated after SuspendTimeout passes,
+                        unless its slurmd started after that.
+                      format: date-time
+                      type: string
+                  required:
+                  - ordinal
+                  - requestedAt
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - ordinal
+                x-kubernetes-list-type: map
             required:
             - nodeSetRef
             type: object

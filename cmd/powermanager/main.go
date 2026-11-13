@@ -217,6 +217,7 @@ func runPowerAction(ctx context.Context, namespace, nodes string, timeout time.D
 	}
 
 	targets := make(map[string]*slurmv1alpha1.NodeSetPowerState)
+	staticNodes := make(map[string][]int32)
 	for nodeSetName, ordinals := range nodesByNodeSet {
 		nodeSet, exists := nodeSetMap[nodeSetName]
 		if !exists {
@@ -225,6 +226,11 @@ func runPowerAction(ctx context.Context, namespace, nodes string, timeout time.D
 		}
 
 		if nodeSet.Spec.EphemeralNodes == nil || !*nodeSet.Spec.EphemeralNodes {
+			// See static_recreate.go.
+			if !resume {
+				staticNodes[nodeSetName] = ordinals
+				continue
+			}
 			log.Info("NodeSet is not ephemeral, skipping", "nodeSet", nodeSetName)
 			continue
 		}
@@ -238,6 +244,8 @@ func runPowerAction(ctx context.Context, namespace, nodes string, timeout time.D
 		targets[nodeSetName] = powerState
 		log.Info("Updated NodeSetPowerState", "nodeSet", nodeSetName, "action", action, "ordinals", ordinals)
 	}
+	// After the ephemeral updates, so that waiting for a static NodeSetPowerState does not take their time.
+	recreateStaticNodes(ctx, client, namespace, staticNodes)
 
 	if waitForReady {
 		if err := waitForPowerStates(ctx, client, namespace, nodesByNodeSet, targets, resume); err != nil {

@@ -5,4 +5,4 @@ Feature: NodeSet ephemeral mode transitions
     When the selected NodeSet is switched to ephemeral mode
     Then all requested workers remain active without pod recreation
     When the selected NodeSet is switched back to static mode
-    Then its power state is removed and all static workers are ready
+    Then all static workers are active and ready

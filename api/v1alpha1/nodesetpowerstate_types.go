@@ -13,7 +13,8 @@ import (
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // NodeSetPowerState is the Schema for the nodesetpowerstates API.
-// It manages the power state of nodes in a NodeSet for ephemeral node scaling.
+// It manages the power state of nodes in a NodeSet: ephemeral node scaling, and worker pod
+// recreation for static nodes that Slurm powered down.
 // One NodeSetPowerState exists per NodeSet, providing a clear 1:1 mapping.
 type NodeSetPowerState struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -43,12 +44,39 @@ type NodeSetPowerStateSpec struct {
 	NodeSetRef string `json:"nodeSetRef"`
 
 	// ActiveNodes is the list of node ordinals that should be powered on.
-	// The power-manager binary updates this list based on Slurm's ResumeProgram/SuspendProgram calls.
+	// For ephemeral NodeSets, the power-manager binary updates this list based on Slurm's
+	// ResumeProgram/SuspendProgram calls.
+	// For static NodeSets, the NodeSet controller keeps all ordinals active.
 	// For example, [0, 3, 5, 7, 12] means nodes with ordinals 0, 3, 5, 7, and 12 should be active.
 	//
 	// +kubebuilder:validation:Optional
 	// +listType=set
 	ActiveNodes []int32 `json:"activeNodes,omitempty"`
+
+	// RecreateNodes lists node ordinals whose worker pods must be recreated because Slurm powered
+	// the node down. A static node only leaves the powered down state when a fresh slurmd registers.
+	// The power-manager binary adds requests and the NodeSet controller removes them once handled.
+	//
+	// +kubebuilder:validation:Optional
+	// +listType=map
+	// +listMapKey=ordinal
+	RecreateNodes []NodeRecreateRequest `json:"recreateNodes,omitempty"`
+}
+
+// NodeRecreateRequest asks for the worker pod of a node to be recreated.
+type NodeRecreateRequest struct {
+	// Ordinal is the ordinal of the node in the NodeSet.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=0
+	Ordinal int32 `json:"ordinal"`
+
+	// RequestedAt is the time of the request. Slurm ignores a slurmd that starts within
+	// SuspendTimeout of the request, so the pod is recreated after SuspendTimeout passes,
+	// unless its slurmd started after that.
+	//
+	// +kubebuilder:validation:Required
+	RequestedAt metav1.Time `json:"requestedAt"`
 }
 
 // NodeSetPowerStateStatus defines the observed state of NodeSetPowerState
