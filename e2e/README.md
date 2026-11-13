@@ -187,8 +187,7 @@ version metadata among the latest 15 first-parent commits. Only periodic runs
 (`is_scheduled=true`) using default refs send failure alerts to Slack.
 Direct manual runs and PR commands use `is_scheduled=false`.
 
-Note: The node replacement scenarios use the local `nebius` CLI to check
-instance removal.
+Note: Some scenarios use the local `nebius` CLI.
 
 Collect a reusable cluster snapshot before or after acceptance:
 

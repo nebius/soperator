@@ -62,6 +62,7 @@ func TestSharedHeavyScenarios(t *testing.T) {
 		"NVIDIA bug report is collected from a worker",
 		"Enroot containers can access GPUs",
 		"Login pods scale up without automatic pod scale-down",
+		"A login user exceeding the memory limit is OOM-killed without affecting other users or login services",
 		"Manage jail dry-run detects drift without modifying the jail",
 		"A worker template update preserves running jobs",
 		"A maintenance event replaces the selected worker node",
@@ -73,6 +74,7 @@ func TestSharedHeavyScenarios(t *testing.T) {
 		"A worker update preserves maintenance drains before and during handoff",
 		"Non-responding kubelet recreates a Kubernetes node and recovers the worker",
 		"A burst of batch jobs is accepted and drained within the budget",
+		"Workers recover after their VMs are stopped and started",
 	}, sharedScenariosTagged(t, "@heavy"))
 }
 

@@ -12,7 +12,7 @@ func (w WorkerInfo) IsUsable() bool {
 }
 
 func (w WorkerInfo) IsIdle() bool {
-	return w.SlurmNode.IsReadyForImmediateWork() && w.SlurmNode.HasStateFlag("IDLE")
+	return w.SlurmNode.IsIdle()
 }
 
 // ClusterInfo holds static runner metadata. It intentionally contains no

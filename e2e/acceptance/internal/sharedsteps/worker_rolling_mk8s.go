@@ -591,7 +591,7 @@ func (s *WorkerRollingUpdate) waitForMK8sGroupReady(ctx context.Context, allowFa
 			if err := s.mk8sGroupAndHostsReady(waitCtx, len(s.workerNames), nodes.Items, allowFailedOperation); err != nil {
 				return false, err
 			}
-			workers, err := s.slurm.NodeInfosOnce(waitCtx, s.workerNames)
+			workers, err := s.slurm.NodeInfosNoRetries(waitCtx, s.workerNames)
 			if err != nil {
 				return false, err
 			}

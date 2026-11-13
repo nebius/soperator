@@ -26,6 +26,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewSlurmConfig(info, slurm),
 		NewSlurmConfigUpdates(info, runtime, slurm, kubectl),
 		NewLoginAutoscaling(info, runtime, kubectl),
+		NewLoginUserIsolation(info, runtime, kubectl),
 		NewTailscale(info, runtime, kubectl),
 		NewObservability(kubectl),
 		NewInternalSSH(runtime, selector),
@@ -50,6 +51,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewTopology(info, runtime, kubectl, selector),
 		NewTopologyLegacy(runtime, selector),
 		NewPerformance(runtime),
+		NewVMStopStart(runtime, slurm, kubectl, selector),
 	} {
 		registerScenarioScoped(sc, family)
 	}

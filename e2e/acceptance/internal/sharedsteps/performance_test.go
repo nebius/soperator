@@ -55,7 +55,7 @@ func TestStressReservationCommands(t *testing.T) {
 	assert.Equal(t,
 		"'scontrol' 'create' 'reservation' 'ReservationName=e2e-stress-7-nodes' 'Users=stress' 'PartitionName=main' "+
 			"'StartTime=now' 'Duration=40' 'Nodes=worker-0,worker-1'",
-		stressNodeReservationCommand("e2e-stress-7-nodes", []string{"worker-0", "worker-1"}, 40*time.Minute),
+		nodeReservationCommand("e2e-stress-7-nodes", stressUserName, []string{"worker-0", "worker-1"}, 40*time.Minute),
 		"the node reservation takes the whole nodes, so no other job shares them")
 	assert.Equal(t,
 		"'scontrol' 'create' 'reservation' 'ReservationName=e2e-stress-7' 'Users=stress' 'PartitionName=main' "+
@@ -75,8 +75,8 @@ func TestStaleStressReservations(t *testing.T) {
 	output := "ReservationName=e2e-stress-1793814313593480000 StartTime=2026-11-04T17:45:13 Nodes=worker-[0-1] Users=stress\n" +
 		"ReservationName=maintenance-weekly StartTime=2026-11-05T00:00:00 Nodes=worker-0 Users=root\n" +
 		"ReservationName=e2e-stress-1793814320000000000 StartTime=2026-11-04T17:50:00 Nodes=worker-[0-1] Users=stress\n"
-	assert.Equal(t, []string{"e2e-stress-1793814313593480000", "e2e-stress-1793814320000000000"}, staleStressReservations(output))
-	assert.Empty(t, staleStressReservations("No reservations in the system\n"))
+	assert.Equal(t, []string{"e2e-stress-1793814313593480000", "e2e-stress-1793814320000000000"}, reservationNamesWithPrefix(output, stressReservationPrefix))
+	assert.Empty(t, reservationNamesWithPrefix("No reservations in the system\n", stressReservationPrefix))
 }
 
 func TestReservationCoreSplit(t *testing.T) {
