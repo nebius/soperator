@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
@@ -22,6 +23,9 @@ const (
 	gpuSmokeImageRef    = "ml-containers/training_diag:13.0.3-ubuntu24.04-20261028105116"
 	gpuSmokeDockerImage = "cr.nebius.cloud/" + gpuSmokeImageRef
 	gpuSmokeEnrootImage = "docker://cr.nebius.cloud#" + gpuSmokeImageRef
+	// A cold Pyxis import of gpuSmokeEnrootImage into the shared cache takes about five
+	// minutes before the job step even starts, so jobs using it get this budget.
+	gpuSmokeEnrootJobTimeout = 10 * time.Minute
 )
 
 func assertJobStdoutReportsVisibleGPUs(ctx context.Context, exec framework.Exec, job framework.SbatchJob) error {
