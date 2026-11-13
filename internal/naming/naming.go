@@ -69,6 +69,9 @@ func BuildServiceFQDN(svcName, namespace string) string {
 	return fmt.Sprintf("%s.%s.svc.cluster.local", svcName, namespace)
 }
 
+// BuildNodeSetUmbrellaServiceFQDN returns the domain all worker pods resolve under.
+// The jail SSH client config (ansible/roles/ssh_client/files/soperator-workers.conf)
+// recognizes workers by the "-nodeset-svc.<namespace>.svc." part of it.
 func BuildNodeSetUmbrellaServiceFQDN(
 	namespace,
 	clusterName string,

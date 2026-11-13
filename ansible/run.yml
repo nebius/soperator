@@ -40,6 +40,7 @@
     - spank_nccl_inspector_preconf
     - slurm_divert # role doubled here, because we need to do that after Slurm version upgrade
     - sssd
+    - ssh_client
     - motd
     - nc_health_checker
   tags:
