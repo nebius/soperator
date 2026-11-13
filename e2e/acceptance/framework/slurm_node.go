@@ -107,10 +107,18 @@ func (s *SlurmClient) NodeInfoOnce(ctx context.Context, worker string) (SlurmNod
 // is the cheaper query and keeps the command line short on large clusters.
 const nodeInfosListLimit = 100
 
-// NodeInfosWithRetries reads the requested nodes in one controller query, retrying transient
-// command failures, and returns them in the caller's order. Use it for one-shot reads.
+// NodeInfosWithRetries reads nodes in caller order with default command retries.
+// Reservation scopes use short retries for classified transient failures only.
 func (s *SlurmClient) NodeInfosWithRetries(ctx context.Context, names []string) ([]SlurmNodeInfo, error) {
-	return s.nodeInfos(ctx, names, s.runtime.Controller().RunWithDefaultRetry)
+	run := s.runtime.Controller().RunWithDefaultRetry
+	if workerReservationFromContext(ctx) != nil {
+		run = func(ctx context.Context, command string) (string, error) {
+			return discoveryRead(ctx, func(ctx context.Context) (string, error) {
+				return s.runtime.Controller().Run(ctx, command)
+			})
+		}
+	}
+	return s.nodeInfos(ctx, names, run)
 }
 
 // NodeInfosNoRetries reads the requested nodes in one controller query without retries and returns
@@ -140,6 +148,14 @@ func (s *SlurmClient) nodeInfos(ctx context.Context, names []string, run func(co
 	}
 	output, err := run(ctx, nodeInfosCommand(names))
 	if err != nil {
+		// scontrol reports missing requested nodes on stdout, alongside any valid records.
+		for _, line := range strings.Split(output, "\n") {
+			for _, name := range names {
+				if strings.TrimSpace(line) == "Node "+name+" not found" {
+					return nil, pendingRecovery("read Slurm nodes: missing record for %s: %v", name, err)
+				}
+			}
+		}
 		return nil, fmt.Errorf("show Slurm nodes: %w", err)
 	}
 	byName := make(map[string]SlurmNodeInfo, len(names))
@@ -168,7 +184,7 @@ func (s *SlurmClient) nodeInfos(ctx context.Context, names []string, run func(co
 	for _, name := range names {
 		node, found := byName[name]
 		if !found {
-			return nil, fmt.Errorf("read Slurm nodes: missing record for %s", name)
+			return nil, pendingRecovery("read Slurm nodes: missing record for %s", name)
 		}
 		nodes = append(nodes, node)
 	}
@@ -179,7 +195,16 @@ func (s *SlurmClient) nodeInfos(ctx context.Context, names []string, run func(co
 const MainPartitionName = "main"
 
 func (s *SlurmClient) MainPartitionNodeNames(ctx context.Context) ([]string, error) {
-	out, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "sinfo -hN -p "+MainPartitionName+" -o '%N'")
+	command := "sinfo -hN -p " + MainPartitionName + " -o '%N'"
+	var out string
+	var err error
+	if workerReservationFromContext(ctx) == nil {
+		out, err = s.runtime.Controller().RunWithDefaultRetry(ctx, command)
+	} else {
+		out, err = discoveryRead(ctx, func(ctx context.Context) (string, error) {
+			return s.runtime.Controller().Run(ctx, command)
+		})
+	}
 	if err != nil {
 		return nil, fmt.Errorf("list Slurm main partition nodes: %w", err)
 	}

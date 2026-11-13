@@ -222,6 +222,46 @@ func TestSlurmClientNodeInfosNoRetriesReturnsCommandErrorWithoutRetry(t *testing
 	assert.Equal(t, []string{"scontrol -o show node 'worker-0'"}, runtime.calls)
 }
 
+func TestSlurmClientMissingNodesUseStdoutDiagnostics(t *testing.T) {
+	var many []string
+	var records []string
+	for i := range nodeInfosListLimit + 1 {
+		name := fmt.Sprintf("worker-%d", i)
+		many = append(many, name)
+		if i < nodeInfosListLimit {
+			records = append(records, "NodeName="+name+" State=IDLE")
+		}
+	}
+	for _, test := range []struct {
+		name, output, stderr string
+		names                []string
+		pending              bool
+	}{
+		{name: "single missing", names: []string{"worker-999"}, output: "Node worker-999 not found\n", stderr: "command terminated with exit code 1", pending: true},
+		{name: "mixed", names: []string{"worker-0", "worker-999"}, output: "NodeName=worker-0 State=IDLE\n\nNode worker-999 not found\n", stderr: "command terminated with exit code 1", pending: true},
+		{name: "full listing", names: many, output: strings.Join(records, "\n"), pending: true},
+		{name: "unrequested name", names: []string{"worker-0"}, output: "Node other-0 not found\n", stderr: "command terminated with exit code 1"},
+		{name: "permission error", names: []string{"worker-0"}, stderr: "Forbidden: controller exec"},
+		{name: "transport error", names: []string{"worker-0"}, stderr: "connection refused"},
+		{name: "unrecognized stderr", names: []string{"worker-0"}, stderr: "slurm_load_node error: Invalid node name specified"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			runtime := &slurmNodeRuntime{outputs: map[string]string{nodeInfosCommand(test.names): test.output}}
+			if test.stderr != "" {
+				runtime.runError = kubectlCommandFailure(test.stderr)
+			}
+			nodes, err := NewSlurmClient(runtime).NodeInfosNoRetries(t.Context(), test.names)
+			require.Error(t, err)
+			assert.Equal(t, test.pending, isPendingRecovery(err))
+			assert.Empty(t, nodes, "a partial response must not become a complete allocation")
+			if !test.pending {
+				assert.ErrorIs(t, err, runtime.runError)
+			}
+			assert.Len(t, runtime.calls, 1)
+		})
+	}
+}
+
 type slurmNodeRuntime struct {
 	Runtime
 	outputs  map[string]string
@@ -233,7 +273,7 @@ func (r *slurmNodeRuntime) Controller() CommandScope {
 	return NewCommandScope(func(ctx context.Context, command string) (string, error) {
 		r.calls = append(r.calls, command)
 		if r.runError != nil {
-			return "", r.runError
+			return r.outputs[command], r.runError
 		}
 		output, found := r.outputs[command]
 		if !found {

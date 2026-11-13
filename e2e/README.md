@@ -376,6 +376,107 @@ Concrete public Soperator step structs are intentionally internal. Reuse shared
 steps through `acceptance.SharedStepRegistrar()` and add caller-specific steps
 through additional `StepRegistrar` values.
 
+## Worker reservations
+
+Worker reservations let scenarios acquire complete worker sets through native
+Slurm whole-node reservations. Membership stays fixed through worker restarts
+and replacements. The target must allow Slurm administrative operations and
+Kubernetes discovery reads.
+
+Reservations are opt-in. A custom suite enables them with
+`SuiteConfig.WorkerReservations = true`; the runner creates a scope for each
+scenario and finalizes it after scenario cleanup. The CLI and `SoperatorSuite`
+leave reservations disabled.
+
+External callers can manage scopes directly. Share a `ReservationManager` across
+scenarios targeting the same cluster to reuse discovery reads:
+
+```go
+func checkGPUWorker(ctx context.Context, manager *framework.ReservationManager,
+    selector *framework.WorkerSelector, runtime framework.Runtime,
+) (result error) {
+    ctx = framework.WithWorkerReservation(ctx, manager, "GPU smoke")
+    defer func() {
+        result = errors.Join(result, framework.FinishWorkerReservation(ctx, runtime))
+    }()
+
+    workers, err := selector.Acquire(ctx, framework.WorkerRequirements{
+        Kind: "GPU", Count: 1,
+    })
+    if err != nil {
+        return err
+    }
+    return framework.RunTargetedWorkerSmoke(ctx, runtime, workers[0])
+}
+```
+
+Acquire every required worker before recording baselines or changing cluster
+state. `Acquire` selects a complete set; `Reserve` acquires an explicit list.
+Requirements can restrict worker kind, NodeSet, names, Docker support and idle
+state. To reserve a whole NodeSet, pass all its logical worker names together.
+An existing reservation does not expand when the NodeSet scales.
+
+Within a scope, `PickWorkers`, `PickCPUWorkers` and `PickGPUWorkers` acquire
+workers and wait for unavailable configured capacity. Outside a scope they
+select immediately. Snapshot selection is always read-only. Insufficient
+optional configured capacity returns `InsufficientWorkersError`, which callers
+can map to a skip with `SkipIfInsufficientWorkers`. Acquisition defaults to two
+hours, respects an earlier caller deadline, and provides best-effort fairness.
+
+### Submitting work
+
+Use `SubmitBatch` for batch jobs and `RunSlurm` for `srun`/`salloc`. These helpers
+bind allocations to the scope and support `RunAsUser`, including `sudo -iu`.
+Keep an explicit `Nodelist` when assertions require particular workers; the
+helpers validate membership and control the requested node count. `JobID` on
+`RunSlurm` selects an existing step only if its allocation belongs to the lease.
+Direct launch mode (`--no-allocate`/`-Z`) is not supported in a bound command.
+
+`Args` contains self-contained option argv entries such as `--mem=128M` or `-c1`.
+Pass executable arguments separately to `RunSlurm`, or use `Wrap` for batch
+scripts. `ExtraFlags` accepts shell fragments only for unscoped batch calls.
+Custom runtime adapters should return `CommandError` with separate stderr and
+execution errors to support classified retries. Opaque submission errors remain
+uncertain and are not automatically retried.
+
+`RunReservationUtility` supplies reservation/time environment variables to an
+external utility after an optional login-user switch. Utilities that override
+these through CLI flags or another user switch need an adapter applying
+`WithWorkerReservationJobFlags` at the actual submission boundary; its callback
+keeps admission open until the adapter finishes. Keep returned job
+IDs for assertions and mid-scenario operations; final cleanup discovers jobs by
+reservation, including submissions whose IDs were lost.
+
+### Cleanup and limits
+
+Restore scenario state and finish verification, including recovery smoke jobs,
+then stop background producers before calling `FinishWorkerReservation`.
+Finalization closes submission admission, awaits in-flight operations, drains
+reservation jobs and epilogs, verifies recovery, and deletes the lease. It runs
+after cancellation and returns the same result on repeated calls.
+
+Use `RequireReservedHost` before a host-wide disruption to check ownership of
+sibling workers. Report unsafe restoration with `RecordWorkerCleanupError`.
+When cleanup cannot prove recovery, it returns an error and retains the native
+lease until its finite expiry; diagnostics identify the reservation and workers.
+
+Set profile limits with `RunnerConfig.ReservationOptions` or
+`WithReservationOptions` before creating a scope:
+
+| Option | Default |
+| --- | --- |
+| `LeaseDuration` | 8h |
+| `JobTimeLimit` | 2h |
+| `JobDrainTimeout` | 15m |
+| `RecoveryTimeout` | 5m |
+| `RequireActiveRecovery` | false; healthy powered-down workers are accepted |
+
+Explicit job time limits must leave room for cleanup before lease expiry.
+Observed power transitions receive the configured Slurm timeout plus one minute
+from each worker's first observation. `WorkerAcquireTimeout` overrides the
+acquisition budget; `WorkerCleanupTimeout` optionally caps finalization without
+shortening scenario restoration.
+
 ## Package Layout
 
 - `acceptance`: public runner API, embedded feature files, suite configs,

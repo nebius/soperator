@@ -3,7 +3,9 @@ package framework
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // SlurmConfigurationError distinguishes invalid configuration or parsed output
@@ -59,6 +61,48 @@ func parseSlurmConfiguration(output string) (map[string]string, error) {
 	return configuration, nil
 }
 
+// ExpandHostnames expands a Slurm hostlist and validates each literal name.
+// Ordering follows Slurm; callers may cache pure expansion independently.
+func (s *SlurmClient) ExpandHostnames(ctx context.Context, expression string) ([]string, error) {
+	command := "scontrol show hostnames " + ShellQuote(expression)
+	var output string
+	var err error
+	if workerReservationFromContext(ctx) == nil {
+		output, err = s.runtime.Controller().RunWithDefaultRetry(ctx, command)
+	} else {
+		output, err = discoveryRead(ctx, func(ctx context.Context) (string, error) {
+			return s.runtime.Controller().Run(ctx, command)
+		})
+	}
+	if err != nil {
+		return nil, fmt.Errorf("expand hostlist %q: %w", expression, err)
+	}
+	names := ParseSlurmNodeNames(output)
+	if len(names) == 0 {
+		return nil, SlurmConfigurationError{err: fmt.Errorf("expand hostlist %q: expanded to nothing", expression)}
+	}
+	for _, name := range names {
+		if !IsSlurmNodeName(name) {
+			return nil, SlurmConfigurationError{err: fmt.Errorf("expand hostlist: invalid node name %q", name)}
+		}
+	}
+	return names, nil
+}
+
+// ParseSlurmSeconds reads scontrol's "<N> sec" duration format. Callers decide
+// whether zero is a supported value for their particular setting.
+func ParseSlurmSeconds(raw string) (time.Duration, error) {
+	fields := strings.Fields(raw)
+	if len(fields) != 2 || fields[1] != "sec" {
+		return 0, fmt.Errorf("parse Slurm seconds: expected <seconds> sec")
+	}
+	seconds, err := strconv.ParseUint(fields[0], 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("parse Slurm seconds: expected a non-negative integer: %w", err)
+	}
+	return time.Duration(seconds) * time.Second, nil
+}
+
 func (s *SlurmClient) SuspendExclusions(ctx context.Context) (SlurmSuspendExclusions, error) {
 	result := SlurmSuspendExclusions{Names: make(map[string]bool)}
 	configuration, err := s.Configuration(ctx)
@@ -87,16 +131,11 @@ func (s *SlurmClient) SuspendExclusions(ctx context.Context) (SlurmSuspendExclus
 	if len(unconditional) == 0 {
 		return result, nil
 	}
-	output, err := s.runtime.Controller().RunWithDefaultRetry(ctx,
-		"scontrol show hostnames "+ShellQuote(strings.Join(unconditional, ",")))
+	names, err := s.ExpandHostnames(ctx, strings.Join(unconditional, ","))
 	if err != nil {
 		return result, fmt.Errorf("expand SuspendExcNodes hostlist: %w", err)
 	}
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
-		name := strings.TrimSpace(line)
-		if !IsSlurmNodeName(name) {
-			return result, SlurmConfigurationError{err: fmt.Errorf("expand SuspendExcNodes: invalid node name %q", name)}
-		}
+	for _, name := range names {
 		result.Names[name] = true
 	}
 	return result, nil

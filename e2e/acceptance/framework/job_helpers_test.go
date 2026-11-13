@@ -76,7 +76,9 @@ func TestWaitForJobSucceededBoundsAccountingWait(t *testing.T) {
 				err := framework.WaitForJobSucceeded(t.Context(), runtime, framework.NewSlurmClient(runtime), completionTestJob(), 10*time.Minute)
 
 				require.ErrorIs(t, err, context.DeadlineExceeded)
-				assert.ErrorContains(t, err, "wait for job 123 completed successfully")
+				// A poll and the deadline can become ready together; cancellation may
+				// surface from the queue query or the outer accounting wait.
+				assert.ErrorContains(t, err, "job 123")
 				assert.Equal(t, 2*time.Minute, time.Since(start))
 			})
 		})

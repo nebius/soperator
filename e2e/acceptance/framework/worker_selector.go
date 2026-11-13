@@ -76,9 +76,7 @@ func (s *WorkerSelector) Workers(ctx context.Context) ([]WorkerInfo, error) {
 	for _, node := range nodes {
 		workers = append(workers, WorkerInfo{Name: node.Name, SlurmNode: node})
 	}
-	sort.Slice(workers, func(i, j int) bool {
-		return workers[i].Name < workers[j].Name
-	})
+	sort.Slice(workers, func(i, j int) bool { return workers[i].Name < workers[j].Name })
 	return workers, nil
 }
 
@@ -130,6 +128,9 @@ func (s *WorkerSelector) GPUWorkers(ctx context.Context) ([]WorkerInfo, error) {
 }
 
 func (s *WorkerSelector) PickWorkers(ctx context.Context, count int) ([]WorkerInfo, error) {
+	if workerReservationFromContext(ctx) != nil {
+		return s.Acquire(ctx, WorkerRequirements{Count: count})
+	}
 	snapshot, err := s.Snapshot(ctx)
 	if err != nil {
 		return nil, err
@@ -138,6 +139,9 @@ func (s *WorkerSelector) PickWorkers(ctx context.Context, count int) ([]WorkerIn
 }
 
 func (s *WorkerSelector) PickCPUWorkers(ctx context.Context, count int) ([]WorkerInfo, error) {
+	if workerReservationFromContext(ctx) != nil {
+		return s.Acquire(ctx, WorkerRequirements{Kind: "CPU", Count: count})
+	}
 	snapshot, err := s.Snapshot(ctx)
 	if err != nil {
 		return nil, err
@@ -146,6 +150,9 @@ func (s *WorkerSelector) PickCPUWorkers(ctx context.Context, count int) ([]Worke
 }
 
 func (s *WorkerSelector) PickGPUWorkers(ctx context.Context, count int) ([]WorkerInfo, error) {
+	if workerReservationFromContext(ctx) != nil {
+		return s.Acquire(ctx, WorkerRequirements{Kind: "GPU", Count: count})
+	}
 	snapshot, err := s.Snapshot(ctx)
 	if err != nil {
 		return nil, err
