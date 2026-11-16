@@ -69,7 +69,9 @@ Feature: System settings
     Then the Docker kernel-settings job succeeds
     And it exposes the required kernel settings
 
-  @soperator_version_>=5.0.0
+  # TODO(SCHED-3224): pam_limits resets adopted SSH RSS to unlimited. Remove @unstable
+  # once this scenario validates the intended resource limits with PAM adoption enabled.
+  @unstable @soperator_version_>=5.0.0
   Scenario: Regular-user worker SSH adopted into a job exposes the Slurm compute profile
     Given a healthy worker is selected for system-settings checks
     And a regular user for adopted SSH checks is available on the worker

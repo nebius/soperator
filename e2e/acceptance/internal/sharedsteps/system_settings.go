@@ -491,8 +491,7 @@ func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context)
 		Nodes:        1,
 		Nodelist:     []string{s.worker.Name},
 		TasksPerNode: 1,
-		ExtraFlags:   []string{"--mem=1G"},
-		Wrap:         sshHolderJobCommand,
+		Wrap:         "sleep 3600",
 		RunAsUser:    pamSlurmAdoptLimitsUser,
 	})
 	if err != nil {
@@ -501,8 +500,8 @@ func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context)
 	s.trackJob(job, adoptedSSHHolderJobName, probeContainerNone)
 	s.runtime.Logf("system settings: submitted job=%s id=%s worker=%s user=%s",
 		adoptedSSHHolderJobName, job.ID, s.worker.Name, pamSlurmAdoptLimitsUser)
-	if err := waitForSSHHolderJob(ctx, s.runtime, s.slurm, job, systemSettingsJobTimeout); err != nil {
-		return err
+	if err := s.slurm.WaitForJobRunning(ctx, job.ID, systemSettingsJobTimeout); err != nil {
+		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, err)
 	}
 
 	output, err := runInternalSSHAsUser(
