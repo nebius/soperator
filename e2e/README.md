@@ -242,6 +242,14 @@ When `OutputDir` is set, each scenario receives matching runner and jail paths
 through `framework.ScenarioArtifacts(ctx)`. Product-specific steps can write
 their own files directly to those paths without registering a collector.
 
+Failed NVIDIA report downloads and Enroot image-artifact waits save
+`<worker>-diagnostics.txt` in the runner's scenario directory before cleanup.
+These best-effort snapshots include processes, locks, TCP connections, and
+report/cache file metadata, with a 30-second total collection deadline. NVIDIA
+failures also retain wrapper output there and copy available worker reports to
+the jail scenario directory as `*.partial.log.gz` (at most 16 MiB per file).
+Enroot snapshots include the job's current stdout/stderr tails.
+
 `acceptance.SoperatorSuite(targetSoperatorVersion)` embeds the public Soperator
 feature files, registers public Soperator steps, enables the default shared
 filters, and filters scenarios by `@soperator_version_...`. Custom runners can
