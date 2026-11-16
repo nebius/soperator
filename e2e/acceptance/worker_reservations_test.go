@@ -23,7 +23,10 @@ type reservationRunnerRuntime struct {
 }
 
 func (r *reservationRunnerRuntime) Controller() framework.CommandScope {
-	return framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
 		switch {
 		case strings.HasPrefix(command, "sinfo "):
 			return "worker-0", nil
@@ -77,7 +80,10 @@ func (*reservationRunnerRuntime) Kubectl() framework.ArgsScope {
 	})
 }
 func (r *reservationRunnerRuntime) Jail() framework.CommandScope {
-	return framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
 		if strings.Contains(command, "sbatch") {
 			r.jobs = true
 			return "123\n", nil
@@ -133,24 +139,108 @@ func TestRunnerFinalizesAfterExternalRecoverySmoke(t *testing.T) {
 	assert.Equal(t, []string{"external recovery", "cancel owned job", "delete lease"}, runtime.events)
 }
 func TestRunnerCleanupFailureDoesNotDisappearBehindSkip(t *testing.T) {
-	for _, hookSkip := range []bool{false, true} {
-		t.Run(fmt.Sprint(hookSkip), func(t *testing.T) {
-			cleanupErr := errors.New("restore skipped scenario")
-			suite := reservationTestSuite("skip", func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, _ framework.Runtime) {
-				if hookSkip {
-					sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
-						framework.RecordWorkerCleanupError(ctx, cleanupErr)
-						return ctx, godog.ErrSkip
+	for _, reservations := range []bool{false, true} {
+		for _, phase := range []string{"before", "step", "after"} {
+			t.Run(fmt.Sprintf("reservations=%t/%s", reservations, phase), func(t *testing.T) {
+				cleanupErr := errors.New("restore skipped scenario")
+				suite := reservationTestSuite("skip", func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, _ framework.Runtime) {
+					if phase == "before" {
+						sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
+							framework.RecordWorkerCleanupError(ctx, cleanupErr)
+							return ctx, godog.ErrSkip
+						})
+					}
+					sc.Step(`^the test runs$`, func(ctx context.Context) error {
+						if phase == "step" {
+							framework.RecordWorkerCleanupError(ctx, cleanupErr)
+						}
+						return godog.ErrSkip
 					})
-				}
+					if phase == "after" {
+						sc.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
+							return ctx, cleanupErr
+						})
+					}
+				})
+				suite.WorkerReservations = reservations
+				runner, err := NewRunner(RunnerConfig{KubectlContext: "dev", TargetSoperatorVersion: "5.0.0", Suites: []SuiteConfig{suite}})
+				require.NoError(t, err)
+				require.ErrorIs(t, runner.runConfiguredSuites(t.Context(), testClusterInfo(), nil, runner.suites), cleanupErr)
+			})
+		}
+	}
+}
+
+func TestConcurrentSuitesKeepSequentialScenariosUnleased(t *testing.T) {
+	runtime := &reservationRunnerRuntime{}
+	suite := reservationTestSuite("modes", func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, runtime framework.Runtime) {
+		sc.Step(`^the sequential case runs$`, func(ctx context.Context) error {
+			_, err := framework.NewWorkerSelector(framework.NewKubectlClient(runtime), framework.NewSlurmClient(runtime), "soperator").Acquire(ctx, framework.WorkerRequirements{Count: 1})
+			require.ErrorContains(t, err, "ownership scope is required")
+			return nil
+		})
+		sc.Step(`^the test runs$`, func(ctx context.Context) error {
+			_, err := framework.NewWorkerSelector(framework.NewKubectlClient(runtime), framework.NewSlurmClient(runtime), "soperator").Acquire(ctx, framework.WorkerRequirements{Count: 1})
+			return err
+		})
+	})
+	suite.Source = FeatureSource{FS: fstest.MapFS{"test.feature": {Data: []byte("Feature: modes\n  @sequential\n  Scenario: sequential\n    Given the sequential case runs\n  Scenario: parallel\n    Given the test runs\n")}}, Paths: []string{"test.feature"}}
+	runner, err := NewRunner(RunnerConfig{KubectlContext: "dev", TargetSoperatorVersion: "5.0.0", Suites: ConcurrentSuites(suite, 1)})
+	require.NoError(t, err)
+	require.NoError(t, runner.runConfiguredSuites(t.Context(), testClusterInfo(), runtime, runner.suites))
+	assert.Equal(t, []string{"delete lease"}, runtime.events)
+	assert.Empty(t, runtime.lease)
+}
+
+func TestRunnerRestoresAndFinalizesAfterCancellation(t *testing.T) {
+	runtime := &reservationRunnerRuntime{}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	suite := reservationTestSuite("cancel", func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, runtime framework.Runtime) {
+		sc.Step(`^the test runs$`, func(ctx context.Context) error {
+			_, err := framework.NewWorkerSelector(framework.NewKubectlClient(runtime), framework.NewSlurmClient(runtime), "soperator").Acquire(ctx, framework.WorkerRequirements{Count: 1})
+			if err != nil {
+				return err
+			}
+			cancel()
+			return ctx.Err()
+		})
+		sc.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
+			assert.ErrorIs(t, ctx.Err(), context.Canceled)
+			runtime.(*reservationRunnerRuntime).events = append(runtime.(*reservationRunnerRuntime).events, "external recovery")
+			_, err := framework.NewSlurmClient(runtime).SubmitBatch(context.WithoutCancel(ctx), framework.SbatchOptions{JobName: "recovery", Wrap: "true"})
+			return ctx, err
+		})
+	})
+	runner, err := NewRunner(RunnerConfig{KubectlContext: "dev", TargetSoperatorVersion: "5.0.0", Suites: []SuiteConfig{suite}})
+	require.NoError(t, err)
+	require.Error(t, runner.runConfiguredSuites(ctx, testClusterInfo(), runtime, runner.suites))
+	assert.Equal(t, []string{"external recovery", "cancel owned job", "delete lease"}, runtime.events)
+	assert.Empty(t, runtime.lease)
+}
+
+func TestRunnerRetainsLeaseWhenExternalCleanupReturnsFailure(t *testing.T) {
+	for _, stepErr := range []error{nil, godog.ErrSkip, errors.New("original step failure"), context.Canceled} {
+		t.Run(fmt.Sprint(stepErr), func(t *testing.T) {
+			runtime := &reservationRunnerRuntime{}
+			cleanupErr := errors.New("external recovery smoke failed")
+			if stepErr == context.Canceled {
+				cleanupErr = stepErr
+			}
+			suite := reservationTestSuite("unsafe", func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, runtime framework.Runtime) {
 				sc.Step(`^the test runs$`, func(ctx context.Context) error {
-					framework.RecordWorkerCleanupError(ctx, cleanupErr)
-					return godog.ErrSkip
+					_, err := framework.NewWorkerSelector(framework.NewKubectlClient(runtime), framework.NewSlurmClient(runtime), "soperator").Acquire(ctx, framework.WorkerRequirements{Count: 1})
+					return errors.Join(err, stepErr)
+				})
+				sc.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
+					return ctx, cleanupErr
 				})
 			})
 			runner, err := NewRunner(RunnerConfig{KubectlContext: "dev", TargetSoperatorVersion: "5.0.0", Suites: []SuiteConfig{suite}})
 			require.NoError(t, err)
-			require.ErrorIs(t, runner.runConfiguredSuites(t.Context(), testClusterInfo(), nil, runner.suites), cleanupErr)
+			require.ErrorIs(t, runner.runConfiguredSuites(t.Context(), testClusterInfo(), runtime, runner.suites), cleanupErr)
+			assert.NotEmpty(t, runtime.lease)
+			assert.NotContains(t, runtime.events, "delete lease")
 		})
 	}
 }

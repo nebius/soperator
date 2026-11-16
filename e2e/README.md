@@ -129,6 +129,22 @@ periodic ones, and run only when a selector names their feature file or line.
 The heavy and unstable filters still apply to them, so a `@manual @heavy`
 scenario is run with a selector plus `--run-heavy` (or `/e2e-full`).
 
+### Suite execution
+
+The standalone CLI runs scenario-level `@sequential` exclusions in the
+`soperator` suite first, then all remaining selected cases in
+`soperator-parallel`. Both suites currently use native Godog concurrency 1,
+and native worker reservations remain disabled while workload paths are
+migrated. The second suite still runs if the first fails; the runner returns
+the combined failures after all suites finish.
+
+Each suite preserves feature-list and scenario declaration order, including
+Scenario Outline examples. Version, manual, heavy, unstable and caller tag
+filters apply to both partitions. Every `@sequential` tag has an adjacent
+`# Sequential: ...` comment naming the shared resource or assertion that
+worker reservations do not isolate. Untagged scenarios still require a
+reservation and shared-state audit before concurrency is enabled.
+
 `@heavy` usually marks long scenarios (about four minutes or more), based on
 observed durations such as
 [the MDC_B200 run](https://github.com/nebius/soperator/actions/runs/40326945727).
@@ -223,7 +239,7 @@ runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 	SlurmClusterName:       "soperator",
 	TargetSoperatorVersion: "5.0.0",
 	OutputDir:              "e2e-artifacts/acceptance",
-	Suites:                 []acceptance.SuiteConfig{suite},
+	Suites:                 acceptance.ConcurrentSuites(suite, 1),
 })
 ```
 
@@ -238,6 +254,21 @@ library callers; the standalone CLI explicitly excludes it unless `--run-heavy`
 is set. `SoperatorSuite` excludes `@manual` scenarios; a caller that selects
 them through `Source.Paths` clears `ExcludeManual`, as the CLI does for
 `--scenario`.
+
+`SuiteConfig.Concurrency` controls native Godog scenario concurrency and
+defaults to 1. `ConcurrentSuites(suite, concurrency)` partitions a caller's
+suite into sequential exclusions at concurrency 1 and the remaining cases at
+the requested concurrency. The first keeps the original name; the second adds
+`-parallel`. The helper disables native ownership on the first and preserves
+the caller's explicit `WorkerReservations` setting on the second, even at
+concurrency 1. Ordinary suites and existing library callers remain sequential
+unless configured otherwise. All configured suites run even after an earlier
+failure, and their errors are combined.
+
+`SuiteConfig.Tags` uses Godog's native syntax: `&&` means AND, comma means OR,
+and `~` negates a tag. Parentheses are unsupported. The runner applies suite
+partitioning and exclusions to every OR branch.
+
 When `OutputDir` is set, each scenario receives matching runner and jail paths
 through `framework.ScenarioArtifacts(ctx)`. Product-specific steps can write
 their own files directly to those paths without registering a collector.
@@ -304,6 +335,13 @@ that suite. All suites are configured before the run starts. Scenario-local
 fields such as selected workers, Slurm job IDs, and ActiveCheck job IDs are
 owned by the shared step objects and reset before and after every shared
 scenario.
+
+Create independent step objects inside each registrar invocation; Godog invokes
+registrars separately for every scenario. Keep scenario-specific files, SSH
+identities and artifacts separate, and scope assertions and cleanup to owned
+resources. Worker reservations do not isolate shared login Pods, configuration
+or jail files. Synchronize unavoidable shared initialization across the complete
+read-modify-write operation, or document a sequential exclusion.
 
 ## Static Suites
 
@@ -454,6 +492,14 @@ then stop background producers before calling `FinishWorkerReservation`.
 Finalization closes submission admission, awaits in-flight operations, drains
 reservation jobs and epilogs, verifies recovery, and deletes the lease. It runs
 after cancellation and returns the same result on repeated calls.
+
+The runner also tracks cleanup errors for unleased scenarios, including
+sequential exclusions, through a lightweight `WithWorkerCleanup` scope. It
+preserves ordinary worker selection and submission behavior. External callers
+using this scope report its errors with `FinishWorkerReservation` after their
+cleanup. Required restoration failures reported through
+`RecordWorkerCleanupError` fail the suite even when Godog classifies the
+scenario as skipped; TeamCity reports them as failures too.
 
 Use `RequireReservedHost` before a host-wide disruption to check ownership of
 sibling workers. Report unsafe restoration with `RecordWorkerCleanupError`.

@@ -23,7 +23,8 @@ Feature: Node replacement
   # a real bare-metal host and takes the tenant's unhealthy-node slot until the host is returned.
   # Run it by name with --run-heavy. Drop the tag once Mk8s honours nebius.com/skip-set-unhealthy for
   # HardwareIssuesSuspected and the e2e worker node groups carry that label.
-  @manual @heavy @gpu @soperator_version_>=5.0.0
+  # Sequential: Health fault injection consumes the tenant's shared Compute unhealthy-host quota.
+  @manual @heavy @gpu @soperator_version_>=5.0.0 @sequential
   Scenario: A failed GPU health check replaces the worker node
     Given health-check-driven node replacement is enabled
     And a test job is submitted and running on a GPU worker node
@@ -39,7 +40,8 @@ Feature: Node replacement
   # and occupy the tenant's unhealthy-node slot. Run explicitly with --run-heavy.
   # Drop the tag once Mk8s honours nebius.com/skip-set-unhealthy for HardwareIssuesSuspected
   # and the e2e worker node groups carry that label.
-  @manual @heavy @gpu @soperator_version_>=5.0.0
+  # Sequential: Health fault injection consumes the tenant's shared Compute unhealthy-host quota.
+  @manual @heavy @gpu @soperator_version_>=5.0.0 @sequential
   Scenario: A GPU worker recovers when maintenance arrives during health-check draining
     Given a test job is submitted and running on an idle GPU worker node
     When a GPU health check failure is simulated on that node
@@ -55,7 +57,8 @@ Feature: Node replacement
   # and occupy the tenant's unhealthy-node slot. Run explicitly with --run-heavy.
   # Drop the tag once Mk8s honours nebius.com/skip-set-unhealthy for HardwareIssuesSuspected
   # and the e2e worker node groups carry that label.
-  @manual @heavy @gpu @soperator_version_>=5.0.0
+  # Sequential: Health fault injection consumes the tenant's shared Compute unhealthy-host quota.
+  @manual @heavy @gpu @soperator_version_>=5.0.0 @sequential
   Scenario: A GPU worker recovers when maintenance arrives after health-check draining
     Given a test job is submitted and running on an idle GPU worker node
     When a GPU health check failure is simulated on that node

@@ -87,7 +87,7 @@ func runAcceptance(ctx context.Context, args []string) error {
 		SlurmClusterName:       opts.SlurmClusterName,
 		TargetSoperatorVersion: targetVersion,
 		OutputDir:              opts.OutputDir,
-		Suites:                 []acceptance.SuiteConfig{suiteFromOptions(opts, targetVersion)},
+		Suites:                 acceptance.ConcurrentSuites(suiteFromOptions(opts, targetVersion), 1),
 	})
 	if err != nil {
 		return err

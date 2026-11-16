@@ -72,8 +72,10 @@ func WithWorkerReservation(ctx context.Context, manager *ReservationManager, nam
 		panic("worker reservation requires a manager")
 	}
 	options, _ := ctx.Value(reservationOptionsKey{}).(ReservationOptions)
+	ctx = WithWorkerCleanup(ctx)
 	return context.WithValue(ctx, workerReservationKey{}, &workerReservation{
 		manager: manager, name: name, id: newReservationID(), options: options.defaults(),
+		cleanup:    workerCleanupFromContext(ctx),
 		finishDone: make(chan struct{}), users: map[string]bool{"root": true, "": true},
 	})
 }
@@ -103,11 +105,7 @@ func WithWorkerCleanupTimeout(ctx context.Context, timeout time.Duration) contex
 // RecordWorkerCleanupError records an unproved scenario restoration failure.
 // A submission response error alone is not a restoration failure.
 func RecordWorkerCleanupError(ctx context.Context, err error) {
-	if r := workerReservationFromContext(ctx); r != nil && err != nil {
-		r.mu.Lock()
-		defer r.mu.Unlock()
-		r.cleanupErr = errors.Join(r.cleanupErr, err)
-	}
+	workerCleanupFromContext(ctx).record(err)
 }
 
 func requireReservedWorkers(ctx context.Context, names []string) error {
@@ -187,10 +185,11 @@ func RequireReservedHost(ctx context.Context, kubectl *KubectlClient, nodeName s
 // FinishWorkerReservation closes admission after caller-owned restoration and
 // producer shutdown, then drains and verifies under the live native lease.
 // Cancellation does not bypass cleanup; repeat calls return the original result.
+// Without a reservation, it reports failures tracked by WithWorkerCleanup.
 func FinishWorkerReservation(ctx context.Context, runtime Runtime) (result error) {
 	r := workerReservationFromContext(ctx)
 	if r == nil {
-		return nil
+		return workerCleanupFromContext(ctx).result()
 	}
 	cleanupCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancel()
@@ -218,7 +217,7 @@ func FinishWorkerReservation(ctx context.Context, runtime Runtime) (result error
 			result = errors.Join(result, fmt.Errorf("finalize reservation %s: %v", r.id, recovered))
 		}
 		r.mu.Lock()
-		result = errors.Join(result, r.cleanupErr)
+		result = errors.Join(result, r.cleanup.result())
 		r.finishErr, r.state = result, reservationFinished
 		retained := r.mayExist
 		close(r.finishDone)
@@ -274,9 +273,7 @@ func FinishWorkerReservation(ctx context.Context, runtime Runtime) (result error
 	}
 	drainErr := r.drain(leaseCtx)
 	recoveryErr := r.recover(leaseCtx, runtime)
-	r.mu.Lock()
-	restorationErr := r.cleanupErr
-	r.mu.Unlock()
+	restorationErr := r.cleanup.result()
 	if err := errors.Join(ownershipErr, drainErr, recoveryErr, restorationErr); err != nil {
 		return err
 	}

@@ -23,6 +23,10 @@ type timingCtxKey string
 
 type reservationManagerContextKey struct{}
 
+type scenarioErrorContextKey struct{}
+
+type scenarioError struct{ err error }
+
 const (
 	scenarioStartTimeKey    timingCtxKey = "acceptance_scenario_start_time"
 	stepStartTimeKey        timingCtxKey = "acceptance_step_start_time"
@@ -148,9 +152,6 @@ func (r *Runner) runConfiguredSuites(ctx context.Context, info *framework.Cluste
 func (r *Runner) suiteTagFilter(suite SuiteConfig) string {
 	var filters []string
 
-	if suite.Tags != "" {
-		filters = append(filters, suite.Tags)
-	}
 	if suite.ExcludeUnstable {
 		log.Printf("acceptance: suite %s excluding @unstable scenarios", suite.Name)
 		filters = append(filters, "~@unstable")
@@ -164,7 +165,7 @@ func (r *Runner) suiteTagFilter(suite SuiteConfig) string {
 		filters = append(filters, "~@manual")
 	}
 
-	return strings.Join(filters, " && ")
+	return combineTags(suite.Tags, strings.Join(filters, " && "))
 }
 
 func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
@@ -175,6 +176,12 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 	out := make([]SuiteConfig, 0, len(suites))
 	seen := make(map[string]struct{}, len(suites))
 	for _, suite := range suites {
+		if suite.Concurrency < 0 {
+			return nil, fmt.Errorf("suite %q concurrency must not be negative", suite.Name)
+		}
+		if suite.Concurrency == 0 {
+			suite.Concurrency = 1
+		}
 		name := strings.TrimSpace(suite.Name)
 		if name == "" {
 			return nil, fmt.Errorf("suite name is required")
@@ -219,6 +226,7 @@ func normalizeSuites(suites []SuiteConfig) ([]SuiteConfig, error) {
 			ExcludeUnstable:    suite.ExcludeUnstable,
 			ExcludeHeavy:       suite.ExcludeHeavy,
 			ExcludeManual:      suite.ExcludeManual,
+			Concurrency:        suite.Concurrency,
 			WorkerReservations: suite.WorkerReservations,
 		})
 	}
@@ -278,6 +286,7 @@ func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runt
 			r.initializeSuiteScenario(sc, info, runtime, suite, artifactsManager, teamCityReporter, recordCleanupFailure)
 		},
 		Options: &godog.Options{
+			Concurrency:    suite.Concurrency,
 			Format:         format,
 			FS:             suite.Source.FS,
 			Paths:          features,
@@ -289,6 +298,7 @@ func (r *Runner) runSuite(ctx context.Context, info *framework.ClusterInfo, runt
 	}
 
 	suiteStart := time.Now()
+	log.Printf("acceptance: suite %s started concurrency=%d worker_reservations=%t", suite.Name, suite.Concurrency, suite.WorkerReservations)
 	status := godogSuite.Run()
 	log.Printf("acceptance: suite %s finished duration=%s", suite.Name, time.Since(suiteStart).Round(time.Millisecond))
 	if status != 0 {
@@ -306,38 +316,91 @@ func (r *Runner) initializeSuiteScenario(
 	teamCityReporter *reports.TeamCityReporter,
 	recordCleanupFailure func(error),
 ) {
-	if suite.WorkerReservations {
-		sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
+	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
+		if suite.WorkerReservations {
 			manager := ctx.Value(reservationManagerContextKey{}).(*framework.ReservationManager)
 			ctx = framework.WithReservationOptions(ctx, r.reservationOptions)
 			ctx = framework.WithWorkerAcquireTimeout(ctx, r.workerAcquireTimeout)
 			ctx = framework.WithWorkerCleanupTimeout(ctx, r.workerCleanupTimeout)
 			return framework.WithWorkerReservation(ctx, manager, suite.Name+"/"+scenario.Id+"/"+scenario.Name), nil
-		})
-	}
+		}
+		return framework.WithWorkerCleanup(ctx), nil
+	})
 	if teamCityReporter != nil {
 		registerTeamCityStateHook(sc, suite.Name)
 	}
 	registerScenarioArtifacts(sc, suite.Name, runtime, artifactsManager)
 	registerSkipHook(sc)
+	sc.After(func(ctx context.Context, _ *godog.Scenario, err error) (context.Context, error) {
+		return context.WithValue(ctx, scenarioErrorContextKey{}, scenarioError{err: err}), nil
+	})
 	for _, register := range suite.StepRegistrars {
 		register(sc, info, runtime)
 	}
-	if suite.WorkerReservations {
-		sc.After(func(ctx context.Context, scenario *godog.Scenario, _ error) (context.Context, error) {
-			err := framework.FinishWorkerReservation(ctx, runtime)
-			if err != nil {
-				// Godog can classify a joined skip and cleanup failure as a skip.
-				// Preserve cleanup failure independently in the suite result.
-				recordCleanupFailure(fmt.Errorf("scenario %q cleanup: %w", scenario.Name, err))
-				recordTeamCityScenarioFailure(ctx, err)
-			}
-			return ctx, err
-		})
-	}
+	sc.After(func(ctx context.Context, scenario *godog.Scenario, scenarioErr error) (context.Context, error) {
+		original, _ := ctx.Value(scenarioErrorContextKey{}).(scenarioError)
+		cleanupErr := nonSkipError(cleanupHookError(scenarioErr, original.err))
+		framework.RecordWorkerCleanupError(ctx, cleanupErr)
+		err := framework.FinishWorkerReservation(ctx, runtime)
+		if err == nil && errors.Is(scenarioErr, godog.ErrSkip) {
+			err = nonSkipError(scenarioErr)
+		}
+		if err != nil {
+			// Godog can classify a joined skip and cleanup failure as a skip.
+			// Preserve cleanup failure independently in the suite result.
+			recordCleanupFailure(fmt.Errorf("scenario %q cleanup: %w", scenario.Name, err))
+			recordTeamCityScenarioFailure(ctx, errors.Join(scenarioErr, err))
+		}
+		return ctx, err
+	})
 	registerTimingHooks(sc)
 	if teamCityReporter != nil {
 		registerTeamCityResultHooks(sc, teamCityReporter)
+	}
+}
+
+// Godog joins each hook error on the left of the accumulated error. Remove the
+// original step failure from the right branch so a cleanup returning the same
+// sentinel (for example context.Canceled) is still recorded as a cleanup failure.
+func cleanupHookError(err, original error) error {
+	if err == nil || errors.Is(original, err) {
+		return nil
+	}
+	if original == nil {
+		return err
+	}
+	switch wrapped := err.(type) {
+	case interface{ Unwrap() []error }:
+		failures := slices.Clone(wrapped.Unwrap())
+		if len(failures) > 0 {
+			last := len(failures) - 1
+			failures[last] = cleanupHookError(failures[last], original)
+		}
+		return errors.Join(failures...)
+	case interface{ Unwrap() error }:
+		return cleanupHookError(wrapped.Unwrap(), original)
+	default:
+		return err
+	}
+}
+
+// nonSkipError removes ErrSkip from joined failures while preserving
+// the context of other errors. A chain that only wraps ErrSkip is a clean skip.
+func nonSkipError(err error) error {
+	if !errors.Is(err, godog.ErrSkip) {
+		return err
+	}
+	switch wrapped := err.(type) {
+	case interface{ Unwrap() []error }:
+		var failures []error
+		for _, inner := range wrapped.Unwrap() {
+			failures = append(failures, nonSkipError(inner))
+		}
+		return errors.Join(failures...)
+	case interface{ Unwrap() error }:
+		return nonSkipError(wrapped.Unwrap())
+	default:
+		return nil
 	}
 }
 

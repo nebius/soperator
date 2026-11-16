@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -30,8 +31,12 @@ type teamCityScenarioStateKey struct{}
 
 func recordTeamCityScenarioFailure(ctx context.Context, err error) {
 	if state, ok := ctx.Value(teamCityScenarioStateKey{}).(*teamCityScenarioState); ok {
+		message := err.Error()
+		if state.result == teamCityScenarioFailed && state.message != "" && !strings.Contains(message, state.message) {
+			message = state.message + "\n" + message
+		}
 		state.result = teamCityScenarioFailed
-		state.message = err.Error()
+		state.message = message
 	}
 }
 
@@ -70,8 +75,7 @@ func registerTeamCityResultHooks(sc *godog.ScenarioContext, reporter *reports.Te
 					}
 				}
 			} else {
-				state.result = teamCityScenarioFailed
-				state.message = err.Error()
+				recordTeamCityScenarioFailure(ctx, err)
 			}
 		}
 

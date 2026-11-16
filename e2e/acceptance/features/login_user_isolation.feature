@@ -1,5 +1,6 @@
 Feature: Login user isolation
-  @heavy @soperator_version_>=5.0.0
+  # Sequential: Changes shared login limits and autoscaling, restarting the command endpoint.
+  @heavy @soperator_version_>=5.0.0 @sequential
   Scenario: A login user exceeding the memory limit is OOM-killed without affecting other users or login services
     Given login user isolation is configured with explicit per-user memory limits
     And two regular users have SSH sessions on the same login node

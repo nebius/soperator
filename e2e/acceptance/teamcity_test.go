@@ -2,10 +2,13 @@ package acceptance
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"io"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 
@@ -13,8 +16,89 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nebius/soperator/e2e/acceptance/framework"
 	"github.com/nebius/soperator/e2e/acceptance/internal/reports"
 )
+
+func TestRunnerTeamCityReportsCleanupFailuresWithAndWithoutReservations(t *testing.T) {
+	for _, reservations := range []bool{false, true} {
+		t.Run(fmt.Sprint(reservations), func(t *testing.T) {
+			var output bytes.Buffer
+			reporter := reports.NewTeamCityReporter(&output)
+			var mu sync.Mutex
+			var cleanupFailures []error
+			config := SuiteConfig{
+				Name: "cleanup", WorkerReservations: reservations,
+				Source: FeatureSource{FS: fstest.MapFS{"test.feature": {Data: []byte(`Feature: Cleanup reporting
+  Scenario: passes
+    Given the case runs
+  Scenario: clean skip
+    Given the case runs
+  Scenario: recorded cleanup failure
+    Given the case runs
+  Scenario: returned cleanup failure
+    Given the case runs
+  Scenario: step and cleanup fail
+    Given the case runs
+    And the case runs
+`)}}, Paths: []string{"test.feature"}},
+				StepRegistrars: []StepRegistrar{func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, _ framework.Runtime) {
+					var name string
+					sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
+						name = scenario.Name
+						return ctx, nil
+					})
+					sc.Step(`^the case runs$`, func() error {
+						switch name {
+						case "passes":
+							return nil
+						case "step and cleanup fail":
+							return errors.New("original step failure")
+						default:
+							return fmt.Errorf("optional prerequisite absent: %w", godog.ErrSkip)
+						}
+					})
+					sc.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
+						switch name {
+						case "recorded cleanup failure", "step and cleanup fail":
+							framework.RecordWorkerCleanupError(ctx, errors.New("restore scenario state"))
+						case "returned cleanup failure":
+							return ctx, errors.New("returned restoration failure")
+						}
+						return ctx, nil
+					})
+				}},
+			}
+			runner := &Runner{}
+			ctx := context.WithValue(t.Context(), reservationManagerContextKey{}, framework.NewReservationManager())
+			suite := godog.TestSuite{
+				Name: config.Name,
+				ScenarioInitializer: func(sc *godog.ScenarioContext) {
+					runner.initializeSuiteScenario(sc, testClusterInfo(), nil, config, framework.NewArtifactsManager("", nil), reporter, func(err error) {
+						mu.Lock()
+						defer mu.Unlock()
+						cleanupFailures = append(cleanupFailures, err)
+					})
+				},
+				Options: &godog.Options{Format: "progress", Output: io.Discard, FS: config.Source.FS, Paths: config.Source.Paths, Strict: true, DefaultContext: ctx, Concurrency: 3},
+			}
+			assert.Equal(t, 1, suite.Run())
+			assert.Len(t, cleanupFailures, 3)
+			report := output.String()
+			assert.Equal(t, 5, strings.Count(report, "##teamcity[testStarted"))
+			assert.Equal(t, 5, strings.Count(report, "##teamcity[testFinished"))
+			assert.Equal(t, 3, strings.Count(report, "##teamcity[testFailed"))
+			assert.Equal(t, 1, strings.Count(report, "##teamcity[testIgnored"))
+			assert.Contains(t, report, "testIgnored name='cleanup: test.feature: clean skip'")
+			assert.Contains(t, report, "testFailed name='cleanup: test.feature: recorded cleanup failure'")
+			assert.Contains(t, report, "testFailed name='cleanup: test.feature: returned cleanup failure'")
+			assert.Contains(t, report, "testFailed name='cleanup: test.feature: step and cleanup fail'")
+			assert.Contains(t, report, "original step failure")
+			assert.Contains(t, report, "restore scenario state")
+			assert.Contains(t, report, "returned restoration failure")
+		})
+	}
+}
 
 func TestTeamCityHooksReportParallelScenarioResults(t *testing.T) {
 	var output bytes.Buffer

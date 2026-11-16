@@ -5,7 +5,8 @@ Feature: Performance
   # bottleneck instead: with up to a hundred jobs starting at once on a reserved worker, slurmd serializes
   # the job cgroup setup, and that gets slower as finished jobs leave dying cgroups behind (the stress jobs
   # skip the epilog cache drop). The node-side phase budgets tell the two apart from the controller budgets.
-  @heavy @soperator_version_>=5.0.0
+  # Sequential: Requires an idle global queue and measures controller-wide scheduler latency under load.
+  @heavy @soperator_version_>=5.0.0 @sequential
   Scenario: A burst of batch jobs is accepted and drained within the budget
     Given Slurm accounting is reachable and the cluster is registered
     And the Slurm queue is idle

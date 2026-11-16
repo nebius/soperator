@@ -78,6 +78,83 @@ func TestSharedHeavyScenarios(t *testing.T) {
 	}, sharedScenariosTagged(t, "@heavy"))
 }
 
+func TestSharedSequentialScenarios(t *testing.T) {
+	assert.ElementsMatch(t, []string{
+		"The provisioned cluster is ready for acceptance tests",
+		"A custom Slurm setting is applied and restored",
+		"Installing and uninstalling cowsay preserves GPU tooling",
+		"Installing and uninstalling nvitop preserves GPU tooling",
+		"Docker containers can run over login SSH",
+		"Docker containers can run over SSH on <worker_type> workers",
+		"Enroot containers can run over SSH",
+		"Workers expose local NVMe scratch to jobs",
+		"Login pods scale up without automatic pod scale-down",
+		"A login user exceeding the memory limit is OOM-killed without affecting other users or login services",
+		"A burst of batch jobs is accepted and drained within the budget",
+		"Workers recover after their VMs are stopped and started",
+		"A static NodeSet can transition to ephemeral mode and back",
+		"Tailscale login sidecars wait for authentication and persist their state",
+		"Partitions and workers use their configured topologies",
+		"Every configured topology can schedule a job",
+		"A job assigns task ranks in rendered block order",
+		"Blocks are sorted according to IB topology labels",
+		"A block topology schedules jobs after its base size changes",
+		"A switch limit rejects a cross-leaf allocation",
+		"scontrol topology and SLURM_TOPOLOGY_ADDR agree across workers",
+		"A worker template update preserves running jobs",
+		"A failed GPU health check replaces the worker node",
+		"A GPU worker recovers when maintenance arrives during health-check draining",
+		"A GPU worker recovers when maintenance arrives after health-check draining",
+		"GPU ActiveCheck succeeds on all GPU workers",
+	}, sharedScenariosTagged(t, "@sequential"))
+}
+
+func TestSequentialTagsHaveScenarioLevelReasons(t *testing.T) {
+	paths, err := fs.Glob(acceptanceFeatures, "features/*.feature")
+	require.NoError(t, err)
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			content, err := fs.ReadFile(acceptanceFeatures, path)
+			require.NoError(t, err)
+			doc, err := gherkin.ParseGherkinDocument(strings.NewReader(string(content)), (&messages.Incrementing{}).NewId)
+			require.NoError(t, err)
+			lines := strings.Split(string(content), "\n")
+			checkTags := func(tags []*messages.Tag, scenarioLevel bool) {
+				for _, tag := range tags {
+					assert.NotEqual(t, "@parallel", tag.Name, "use untagged scenarios for the concurrency-capable suite")
+					if tag.Name != "@sequential" {
+						continue
+					}
+					assert.True(t, scenarioLevel, "@sequential must be on a scenario")
+					require.Greater(t, tag.Location.Line, int64(1))
+					reason := strings.TrimSpace(lines[tag.Location.Line-2])
+					assert.True(t, strings.HasPrefix(reason, "# Sequential: ") && strings.TrimSpace(strings.TrimPrefix(reason, "# Sequential: ")) != "", "line %d: add a concrete # Sequential: reason immediately above the tag", tag.Location.Line)
+				}
+			}
+			checkTags(doc.Feature.Tags, false)
+			for _, child := range doc.Feature.Children {
+				if child.Scenario != nil {
+					checkTags(child.Scenario.Tags, true)
+					for _, examples := range child.Scenario.Examples {
+						checkTags(examples.Tags, false)
+					}
+				}
+				if child.Rule != nil {
+					checkTags(child.Rule.Tags, false)
+					for _, ruleChild := range child.Rule.Children {
+						if ruleChild.Scenario != nil {
+							checkTags(ruleChild.Scenario.Tags, true)
+							for _, examples := range ruleChild.Scenario.Examples {
+								checkTags(examples.Tags, false)
+							}
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
 // Manual scenarios never run unless named with --scenario; keep the list short and
 // every entry justified by a comment next to the tag in its feature file.
 func TestSharedManualScenarios(t *testing.T) {
