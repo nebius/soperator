@@ -1,0 +1,19 @@
+---
+
+- name: Copy SSH client config for connecting to workers
+  ansible.builtin.copy:
+    src: soperator-workers.conf
+    dest: /etc/ssh/ssh_config.d/soperator-workers.conf
+    owner: root
+    group: root
+    mode: "0644"
+  tags:
+    - ssh_client
+
+# Jails populated by older versions keep handing this file out to new users
+- name: Remove the per-user SSH client config from /etc/skel
+  ansible.builtin.file:
+    path: /etc/skel/.ssh/config
+    state: absent
+  tags:
+    - ssh_client

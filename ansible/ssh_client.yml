@@ -1,0 +1,9 @@
+---
+
+- name: Configure the SSH client for connecting to workers
+  hosts: localhost
+  become: true
+  roles:
+    - ssh_client
+  tags:
+    - ssh_client
