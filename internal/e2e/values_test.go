@@ -82,7 +82,15 @@ func TestOverrideTestValuesDefaultPartitions(t *testing.T) {
 func TestOverrideTestValuesSSHFeatures(t *testing.T) {
 	for _, profile := range []Profile{validProfile(), mixedGPUProfile()} {
 		vars := overrideTestValues(map[string]interface{}{}, Config{Profile: profile})
-		assert.Equal(t, true, vars["slurm_login_docker_enabled"])
+		assert.Equal(t, map[string]interface{}{
+			"enabled": true,
+			"spec": map[string]interface{}{
+				"size_gibibytes":  93,
+				"filesystem_type": "ext4",
+				"disk_type":       "NETWORK_SSD_IO_M3",
+			},
+		}, vars["slurm_login_image_disk"])
+		assert.Equal(t, true, vars["slurm_login_user_isolation_enabled"])
 		policy, ok := vars["pam_slurm_adopt"].(map[string]interface{})
 		require.True(t, ok)
 		assert.Equal(t, true, policy["enabled"])
