@@ -166,9 +166,9 @@ func TestPercentile(t *testing.T) {
 
 func TestEvaluateStressCompletion(t *testing.T) {
 	stats := stressJobStats{Jobs: 1000, WallSeconds: 120, ThroughputPerSecond: 8.3, Workers: []string{"worker-0", "worker-1"}}
-	require.NoError(t, evaluateStressCompletion(stats, stressCompletionBudget{Wall: 5 * time.Minute, MinWorkers: 2}))
+	require.NoError(t, errOnly(evaluateStressCompletion(stats, stressCompletionBudget{Wall: 5 * time.Minute, MinWorkers: 2})))
 
-	err := evaluateStressCompletion(stats, stressCompletionBudget{Wall: time.Minute, MinWorkers: 3})
+	_, err := evaluateStressCompletion(stats, stressCompletionBudget{Wall: time.Minute, MinWorkers: 3})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "1000 jobs took 120.0s from first submission to last completion, budget 1m0s")
 	assert.Contains(t, err.Error(), "jobs ran on 2 workers (worker-0, worker-1), expected at least 3")
@@ -181,11 +181,11 @@ func TestEvaluateStressJobPhases(t *testing.T) {
 		Teardown: stressDistribution{P99: 6, Max: 20},
 	}
 	budget := stressPhaseBudget{StartupP99: 30 * time.Second, StepsP99: 30 * time.Second, TeardownP99: 15 * time.Second}
-	require.NoError(t, evaluateStressJobPhases(stats, budget), "the slowest single job does not count")
+	require.NoError(t, errOnly(evaluateStressJobPhases(stats, budget)), "the slowest single job does not count")
 
 	stats.Startup.P99 = 45
 	stats.Teardown.P99 = 15.5
-	err := evaluateStressJobPhases(stats, budget)
+	_, err := evaluateStressJobPhases(stats, budget)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "job startup p99 45.0s, budget 30s")
 	assert.Contains(t, err.Error(), "job teardown p99 15.5s, budget 15s")

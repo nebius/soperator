@@ -372,9 +372,10 @@ type stressCompletionBudget struct {
 	MinWorkers int
 }
 
-func evaluateStressCompletion(stats stressJobStats, budget stressCompletionBudget) error {
+func evaluateStressCompletion(stats stressJobStats, budget stressCompletionBudget) (rows []stressBudgetRow, err error) {
 	var problems []string
-	if stats.WallSeconds > budget.Wall.Seconds() {
+	wall := stressDurationBudget(stressBudgetCompleted, stressSeconds(stats.WallSeconds), budget.Wall)
+	if wall.Failed {
 		problems = append(problems, fmt.Sprintf("%d jobs took %.1fs from first submission to last completion, budget %s",
 			stats.Jobs, stats.WallSeconds, budget.Wall))
 	}
@@ -382,7 +383,7 @@ func evaluateStressCompletion(stats stressJobStats, budget stressCompletionBudge
 		problems = append(problems, fmt.Sprintf("jobs ran on %d workers (%s), expected at least %d",
 			len(stats.Workers), strings.Join(stats.Workers, ", "), budget.MinWorkers))
 	}
-	return joinProblems(problems)
+	return []stressBudgetRow{wall}, joinProblems(problems)
 }
 
 // stressPhaseBudget bounds the node-side phases of a job at p99, where a prolog,
@@ -394,20 +395,22 @@ type stressPhaseBudget struct {
 	TeardownP99 time.Duration
 }
 
-func evaluateStressJobPhases(stats stressJobStats, budget stressPhaseBudget) error {
+func evaluateStressJobPhases(stats stressJobStats, budget stressPhaseBudget) (rows []stressBudgetRow, err error) {
 	var problems []string
 	for _, phase := range []struct {
 		name   string
 		p99    float64
 		budget time.Duration
 	}{
-		{"startup", stats.Startup.P99, budget.StartupP99},
-		{"steps", stats.Steps.P99, budget.StepsP99},
-		{"teardown", stats.Teardown.P99, budget.TeardownP99},
+		{stressBudgetStartupP99, stats.Startup.P99, budget.StartupP99},
+		{stressBudgetStepsP99, stats.Steps.P99, budget.StepsP99},
+		{stressBudgetTeardownP99, stats.Teardown.P99, budget.TeardownP99},
 	} {
-		if phase.p99 > phase.budget.Seconds() {
-			problems = append(problems, fmt.Sprintf("job %s p99 %.1fs, budget %s", phase.name, phase.p99, phase.budget))
+		row := stressDurationBudget(phase.name, stressSeconds(phase.p99), phase.budget)
+		if row.Failed {
+			problems = append(problems, fmt.Sprintf("job %s %.1fs, budget %s", phase.name, phase.p99, phase.budget))
 		}
+		rows = append(rows, row)
 	}
-	return joinProblems(problems)
+	return rows, joinProblems(problems)
 }
