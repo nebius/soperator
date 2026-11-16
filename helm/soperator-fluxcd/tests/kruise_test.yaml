@@ -2,6 +2,29 @@ suite: test kruise
 templates:
   - templates/kruise.yaml
 tests:
+  - it: should ignore only runtime-managed certificate and webhook fields while warning on other drift
+    asserts:
+      - equal:
+          path: spec.driftDetection
+          value:
+            mode: warn
+            ignore:
+              - paths:
+                  - /data
+                target:
+                  version: v1
+                  kind: Secret
+                  namespace: kruise-system
+                  name: kruise-webhook-certs
+              - paths:
+                  - /metadata/annotations/template
+                  - /webhooks
+                target:
+                  group: admissionregistration.k8s.io
+                  version: v1
+                  kind: "(Mutating|Validating)WebhookConfiguration"
+                  name: "kruise-(mutating|validating)-webhook-configuration"
+
   # The post-renderer patches kruise webhooks by index. The indexes below were checked against
   # this chart version: mutating 0 is mpod, validating 0-8 are the builtin-resource webhooks.
   # Re-render the chart and re-check them before bumping the version.
