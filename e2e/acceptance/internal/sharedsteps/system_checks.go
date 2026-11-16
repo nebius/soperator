@@ -584,13 +584,13 @@ func (s *SystemChecks) removeLibslurmProbeFiles(ctx context.Context) {
 	var paths []string
 	for _, path := range []string{s.libslurmProbeReady, s.libslurmProbeFailure, s.libslurmProbePID} {
 		if path != "" {
-			paths = append(paths, framework.ShellQuote(path))
+			paths = append(paths, path)
 		}
 	}
 	if len(paths) == 0 || s.runtime == nil {
 		return
 	}
-	if _, err := s.runtime.Jail().Run(ctx, "rm -f "+strings.Join(paths, " ")); err != nil {
+	if _, err := s.runtime.Jail().Run(ctx, "rm -f "+framework.ShellJoin(paths...)); err != nil {
 		s.runtime.Logf("cleanup: remove libslurm probe files: %v", err)
 	}
 }

@@ -70,7 +70,9 @@ cannot resolve a version, the CLI fails before running scenarios and asks for
   scenarios. Heavy and unstable controls are independent.
 - `--scenario`: optional. Runs all compatible scenarios in the provided feature
   file, or the single scenario at an exact `Scenario:` line, for example
-  `features/internal_ssh.feature:3`. May be repeated.
+  `features/internal_ssh.feature:3`. May be repeated. Scenarios tagged
+  `@manual` run only when selected this way; without selectors they are
+  excluded regardless of the other flags.
 - `--output-dir`: required. The runner writes Cucumber and JUnit reports plus
   per-scenario artifacts into this directory. Under TeamCity, scenarios are
   also reported directly through native test service messages and JUnit files
@@ -122,6 +124,10 @@ The default CLI, manual workflow, and `/e2e` exclude both `@heavy` and
 ones. Both PR commands support the optional Terraform branch and `--scenarios`;
 other flags are rejected. Periodic runs always include heavy scenarios and
 exclude unstable ones. Explicit scenario selectors still obey these filters.
+`@manual` scenarios are excluded from every run that has no selectors, including
+periodic ones, and run only when a selector names their feature file or line.
+The heavy and unstable filters still apply to them, so a `@manual @heavy`
+scenario is run with a selector plus `--run-heavy` (or `/e2e-full`).
 
 `@heavy` usually marks long scenarios (about four minutes or more), based on
 observed durations such as
@@ -163,8 +169,7 @@ version metadata among the latest 15 first-parent commits. Only periodic runs
 (`is_scheduled=true`) using default refs send failure alerts to Slack.
 Direct manual runs and PR commands use `is_scheduled=false`.
 
-Note: The node replacement scenarios use the local `nebius` CLI to check
-instance removal.
+Note: Some scenarios use the local `nebius` CLI.
 
 Collect a reusable cluster snapshot before or after acceptance:
 
@@ -175,8 +180,10 @@ bin/acceptance collect-artifacts \
   --output-dir e2e-artifacts/snapshots/before-destroy
 ```
 
-The common snapshot contains Kubernetes, Soperator, redacted FluxCD, Slurm,
-and jail diagnostics. Add `--nebius-project-id <project-id>` to include Managed
+The common snapshot contains Kubernetes, Soperator, FluxCD, Slurm,
+and jail diagnostics. FluxCD saves ConfigMap values referenced by HelmRelease
+`spec.valuesFrom` in `values-from/configmaps.json`.
+Add `--nebius-project-id <project-id>` to include Managed
 Kubernetes clusters and node groups. When that optional flag is omitted, the
 `mk8s` collector creates no files and does not invoke the Nebius CLI.
 If Terraform fails before a Kubernetes context is available, omit
@@ -209,6 +216,7 @@ suite.Source.Paths = []string{"features/internal_ssh.feature:3"}
 suite.Tags = "~@custom_only"
 suite.ExcludeUnstable = false
 suite.ExcludeHeavy = true
+suite.ExcludeManual = false
 
 runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 	KubectlContext:         kubectlContext,
@@ -224,9 +232,12 @@ target cluster. `SlurmClusterName` defaults to `soperator` when omitted.
 `TargetSoperatorVersion` is normalized once and stored in static
 `framework.ClusterInfo`. The caller controls scenario selection through
 `SuiteConfig.Source.Paths` and Godog tag filtering through `SuiteConfig.Tags`.
-`SuiteConfig.ExcludeHeavy` and `ExcludeUnstable` independently exclude their
-respective tags. `SoperatorSuite` preserves heavy coverage for library callers;
-the standalone CLI explicitly excludes it unless `--run-heavy` is set.
+`SuiteConfig.ExcludeHeavy`, `ExcludeUnstable` and `ExcludeManual` independently
+exclude their respective tags. `SoperatorSuite` preserves heavy coverage for
+library callers; the standalone CLI explicitly excludes it unless `--run-heavy`
+is set. `SoperatorSuite` excludes `@manual` scenarios; a caller that selects
+them through `Source.Paths` clears `ExcludeManual`, as the CLI does for
+`--scenario`.
 When `OutputDir` is set, each scenario receives matching runner and jail paths
 through `framework.ScenarioArtifacts(ctx)`. Product-specific steps can write
 their own files directly to those paths without registering a collector.
@@ -364,6 +375,107 @@ common Kubernetes, Slurm, and worker primitives:
 Concrete public Soperator step structs are intentionally internal. Reuse shared
 steps through `acceptance.SharedStepRegistrar()` and add caller-specific steps
 through additional `StepRegistrar` values.
+
+## Worker reservations
+
+Worker reservations let scenarios acquire complete worker sets through native
+Slurm whole-node reservations. Membership stays fixed through worker restarts
+and replacements. The target must allow Slurm administrative operations and
+Kubernetes discovery reads.
+
+Reservations are opt-in. A custom suite enables them with
+`SuiteConfig.WorkerReservations = true`; the runner creates a scope for each
+scenario and finalizes it after scenario cleanup. The CLI and `SoperatorSuite`
+leave reservations disabled.
+
+External callers can manage scopes directly. Share a `ReservationManager` across
+scenarios targeting the same cluster to reuse discovery reads:
+
+```go
+func checkGPUWorker(ctx context.Context, manager *framework.ReservationManager,
+    selector *framework.WorkerSelector, runtime framework.Runtime,
+) (result error) {
+    ctx = framework.WithWorkerReservation(ctx, manager, "GPU smoke")
+    defer func() {
+        result = errors.Join(result, framework.FinishWorkerReservation(ctx, runtime))
+    }()
+
+    workers, err := selector.Acquire(ctx, framework.WorkerRequirements{
+        Kind: "GPU", Count: 1,
+    })
+    if err != nil {
+        return err
+    }
+    return framework.RunTargetedWorkerSmoke(ctx, runtime, workers[0])
+}
+```
+
+Acquire every required worker before recording baselines or changing cluster
+state. `Acquire` selects a complete set; `Reserve` acquires an explicit list.
+Requirements can restrict worker kind, NodeSet, names, Docker support and idle
+state. To reserve a whole NodeSet, pass all its logical worker names together.
+An existing reservation does not expand when the NodeSet scales.
+
+Within a scope, `PickWorkers`, `PickCPUWorkers` and `PickGPUWorkers` acquire
+workers and wait for unavailable configured capacity. Outside a scope they
+select immediately. Snapshot selection is always read-only. Insufficient
+optional configured capacity returns `InsufficientWorkersError`, which callers
+can map to a skip with `SkipIfInsufficientWorkers`. Acquisition defaults to two
+hours, respects an earlier caller deadline, and provides best-effort fairness.
+
+### Submitting work
+
+Use `SubmitBatch` for batch jobs and `RunSlurm` for `srun`/`salloc`. These helpers
+bind allocations to the scope and support `RunAsUser`, including `sudo -iu`.
+Keep an explicit `Nodelist` when assertions require particular workers; the
+helpers validate membership and control the requested node count. `JobID` on
+`RunSlurm` selects an existing step only if its allocation belongs to the lease.
+Direct launch mode (`--no-allocate`/`-Z`) is not supported in a bound command.
+
+`Args` contains self-contained option argv entries such as `--mem=128M` or `-c1`.
+Pass executable arguments separately to `RunSlurm`, or use `Wrap` for batch
+scripts. `ExtraFlags` accepts shell fragments only for unscoped batch calls.
+Custom runtime adapters should return `CommandError` with separate stderr and
+execution errors to support classified retries. Opaque submission errors remain
+uncertain and are not automatically retried.
+
+`RunReservationUtility` supplies reservation/time environment variables to an
+external utility after an optional login-user switch. Utilities that override
+these through CLI flags or another user switch need an adapter applying
+`WithWorkerReservationJobFlags` at the actual submission boundary; its callback
+keeps admission open until the adapter finishes. Keep returned job
+IDs for assertions and mid-scenario operations; final cleanup discovers jobs by
+reservation, including submissions whose IDs were lost.
+
+### Cleanup and limits
+
+Restore scenario state and finish verification, including recovery smoke jobs,
+then stop background producers before calling `FinishWorkerReservation`.
+Finalization closes submission admission, awaits in-flight operations, drains
+reservation jobs and epilogs, verifies recovery, and deletes the lease. It runs
+after cancellation and returns the same result on repeated calls.
+
+Use `RequireReservedHost` before a host-wide disruption to check ownership of
+sibling workers. Report unsafe restoration with `RecordWorkerCleanupError`.
+When cleanup cannot prove recovery, it returns an error and retains the native
+lease until its finite expiry; diagnostics identify the reservation and workers.
+
+Set profile limits with `RunnerConfig.ReservationOptions` or
+`WithReservationOptions` before creating a scope:
+
+| Option | Default |
+| --- | --- |
+| `LeaseDuration` | 8h |
+| `JobTimeLimit` | 2h |
+| `JobDrainTimeout` | 15m |
+| `RecoveryTimeout` | 5m |
+| `RequireActiveRecovery` | false; healthy powered-down workers are accepted |
+
+Explicit job time limits must leave room for cleanup before lease expiry.
+Observed power transitions receive the configured Slurm timeout plus one minute
+from each worker's first observation. `WorkerAcquireTimeout` overrides the
+acquisition budget; `WorkerCleanupTimeout` optionally caps finalization without
+shortening scenario restoration.
 
 ## Package Layout
 

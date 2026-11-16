@@ -179,8 +179,8 @@ func TestValidateRegularUserSlurmResourceLimitSnapshots(t *testing.T) {
 
 func TestSrunProbeCommandForGPUContainers(t *testing.T) {
 	assert.Equal(t,
-		"NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video srun --nodes=1 --ntasks=1 "+
-			"--container-image="+framework.ShellQuote(gpuSmokeEnrootImage)+" bash -lc 'true'",
+		"NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video srun --nodes=1 --ntasks=1 "+
+			"--container-image='docker://cr.nebius.cloud#soperator/ubuntu:noble' bash -lc 'true'",
 		srunProbeCommand("true", probeContainerEnrootGPU),
 	)
 	assert.Equal(t,

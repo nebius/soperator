@@ -13,6 +13,7 @@ controllerManager:
       # - --topology-reconfigure-debounce-cap=15m
     controllersEnabled:
       cluster: true
+      loginupdate: true
       nodeconfigurator: true
       nodeset: true
       rollingupdate: true

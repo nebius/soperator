@@ -41,6 +41,8 @@ Feature: Passive checks
     When a small GPU Slurm job runs on the selected GPU worker
     Then the GPU job health-check Prolog report is fresh and passing
     And the GPU job health-check Epilog report is fresh and passing
+    When HealthCheckProgram runs on the selected GPU worker
+    Then the GPU HealthCheckProgram report is fresh and passing
     And raw GPU health-check command outputs are present
 
   @soperator_version_>=4.0.0,<5.0.0

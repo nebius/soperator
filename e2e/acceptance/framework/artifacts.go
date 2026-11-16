@@ -26,6 +26,15 @@ type ScenarioArtifactPaths struct {
 	JailDir   string
 }
 
+// WriteRunnerFile stores content as the named file in the scenario's runner artifact directory.
+func (p ScenarioArtifactPaths) WriteRunnerFile(name, content string) error {
+	file := filepath.Join(p.RunnerDir, name)
+	if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("write artifact %s: %w", file, err)
+	}
+	return nil
+}
+
 // ArtifactsManager prepares per-scenario artifact directories.
 type ArtifactsManager struct {
 	outputDir string

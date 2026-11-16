@@ -19,6 +19,12 @@ type SuiteConfig struct {
 	StepRegistrars  []StepRegistrar
 	ExcludeUnstable bool
 	ExcludeHeavy    bool
+	// ExcludeManual drops scenarios tagged @manual. Such scenarios are meant to run only when
+	// a caller names them explicitly, so the CLI clears it when scenario selectors are given.
+	ExcludeManual bool
+	// WorkerReservations opts this suite into native Slurm ownership and finalization.
+	// Every worker-using caller in the suite must first acquire its complete set and bind every allocation to it.
+	WorkerReservations bool
 }
 
 // VersionAxis returns a scenario version axis for product-owned version tags.
@@ -50,5 +56,6 @@ func SoperatorSuite(targetSoperatorVersion string) SuiteConfig {
 		VersionAxes:     []ScenarioVersionAxis{SoperatorVersionAxis(targetSoperatorVersion)},
 		StepRegistrars:  []StepRegistrar{SharedStepRegistrar()},
 		ExcludeUnstable: true,
+		ExcludeManual:   true,
 	}
 }

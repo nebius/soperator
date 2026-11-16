@@ -9,6 +9,76 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestOverrideTestValuesMixedProfile(t *testing.T) {
+	p := mixedGPUProfile()
+	vars := overrideTestValues(map[string]interface{}{}, Config{Profile: p})
+	data, err := json.Marshal(vars)
+	require.NoError(t, err)
+	var rendered struct {
+		Workers []struct {
+			Name     string `json:"name"`
+			Size     int    `json:"size"`
+			Resource struct {
+				Platform string `json:"platform"`
+				Preset   string `json:"preset"`
+			} `json:"resource"`
+			GPUCluster *struct {
+				Fabric string `json:"infiniband_fabric"`
+			} `json:"gpu_cluster"`
+			CreatePartition bool `json:"create_partition"`
+		} `json:"slurm_nodeset_workers"`
+		Partitions []struct {
+			Name             string   `json:"name"`
+			IsAll            bool     `json:"is_all"`
+			SlurmNodeSetRefs []string `json:"slurm_nodeset_refs"`
+			Topology         string   `json:"topology"`
+			Config           string   `json:"config"`
+		} `json:"slurm_nodesets_partitions"`
+	}
+	require.NoError(t, json.Unmarshal(data, &rendered))
+	require.Len(t, rendered.Workers, 3)
+	var total int
+	for i, worker := range rendered.Workers {
+		ns := p.NodeSets[i]
+		assert.Equal(t, ns.Name, worker.Name)
+		assert.Equal(t, ns.Size, worker.Size)
+		assert.Equal(t, ns.Platform, worker.Resource.Platform)
+		assert.Equal(t, ns.Preset, worker.Resource.Preset)
+		assert.True(t, worker.CreatePartition)
+		total += worker.Size
+		if ns.InfinibandFabric == "" {
+			assert.Nil(t, worker.GPUCluster)
+			continue
+		}
+		require.NotNil(t, worker.GPUCluster)
+		assert.Equal(t, ns.InfinibandFabric, worker.GPUCluster.Fabric)
+	}
+	assert.Equal(t, 6, total)
+	require.Len(t, rendered.Partitions, 4)
+	assert.Equal(t, "main", rendered.Partitions[0].Name)
+	assert.True(t, rendered.Partitions[0].IsAll)
+	assert.Contains(t, rendered.Partitions[0].Config, "Default=YES")
+	assert.Equal(t, "hidden", rendered.Partitions[1].Name)
+	assert.True(t, rendered.Partitions[1].IsAll)
+	assert.Contains(t, rendered.Partitions[1].Config, "Hidden=YES")
+	for i, partition := range rendered.Partitions[2:] {
+		assert.Equal(t, p.Partitions[i].Name, partition.Name)
+		assert.Equal(t, p.Partitions[i].NodeSets, partition.SlurmNodeSetRefs)
+		assert.False(t, partition.IsAll)
+		assert.Equal(t, "flat", partition.Topology)
+		assert.Contains(t, partition.Config, "Default=NO")
+	}
+}
+
+func TestOverrideTestValuesDefaultPartitions(t *testing.T) {
+	vars := overrideTestValues(map[string]interface{}{}, Config{Profile: validProfile()})
+	partitions, ok := vars["slurm_nodesets_partitions"].([]interface{})
+	require.True(t, ok)
+	require.Len(t, partitions, 2)
+	assert.Equal(t, "main", partitions[0].(map[string]interface{})["name"])
+	assert.Equal(t, "hidden", partitions[1].(map[string]interface{})["name"])
+}
+
 func TestOverrideTestValuesNFS(t *testing.T) {
 	for _, tc := range []struct {
 		name     string

@@ -369,6 +369,9 @@ observability:
               memory: 512Mi
         nodeLogs:
           enabled: true
+          # Supplementary host group IDs for reading node logs; adm is 4 on Ubuntu.
+          supplementalGroups:
+            - 4
           resources:
             requests:
               memory: 200Mi

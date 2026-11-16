@@ -70,6 +70,12 @@ type SlurmClusterAccounting struct {
 }
 
 type SlurmClusterLogin struct {
+	Size          int32           `json:"size"`
+	UserIsolation json.RawMessage `json:"userIsolation"`
+	Autoscaling   json.RawMessage `json:"autoscaling"`
+	Sshd          struct {
+		Resources corev1.ResourceList `json:"resources"`
+	} `json:"sshd"`
 	CustomInitContainers []corev1.Container       `json:"customInitContainers"`
 	Docker               SlurmClusterLoginDocker  `json:"docker"`
 	Volumes              SlurmClusterLoginVolumes `json:"volumes"`
@@ -129,25 +135,21 @@ type SlurmClusterStatus struct {
 	Conditions []metav1.Condition `json:"conditions"`
 }
 
-type LoginAutoscalingCluster struct {
-	Spec struct {
-		SlurmNodes struct {
-			Login struct {
-				Size        int32           `json:"size"`
-				Autoscaling json.RawMessage `json:"autoscaling,omitempty"`
-			} `json:"login"`
-		} `json:"slurmNodes"`
-	} `json:"spec"`
-}
-
 type LoginStatefulSet struct {
 	Metadata metav1.ObjectMeta `json:"metadata"`
 	Spec     struct {
-		Replicas *int32 `json:"replicas"`
+		Replicas       *int32 `json:"replicas"`
+		UpdateStrategy struct {
+			Type string `json:"type"`
+		} `json:"updateStrategy"`
 	} `json:"spec"`
 	Status struct {
-		Replicas      int32 `json:"replicas"`
-		ReadyReplicas int32 `json:"readyReplicas"`
+		Replicas             int32  `json:"replicas"`
+		ReadyReplicas        int32  `json:"readyReplicas"`
+		ObservedGeneration   int64  `json:"observedGeneration"`
+		UpdateRevision       string `json:"updateRevision"`
+		CurrentRevision      string `json:"currentRevision"`
+		UpdatedReadyReplicas int32  `json:"updatedReadyReplicas"`
 	} `json:"status"`
 }
 
@@ -179,7 +181,8 @@ type NodeSetSpec struct {
 }
 
 type NodeSetSlurmd struct {
-	Volumes NodeSetVolumes `json:"volumes"`
+	Resources corev1.ResourceList `json:"resources"`
+	Volumes   NodeSetVolumes      `json:"volumes"`
 }
 
 type NodeSetVolumes struct {
@@ -187,10 +190,11 @@ type NodeSetVolumes struct {
 }
 
 type NodeVolumeMount struct {
-	Name                    string           `json:"name"`
-	MountPath               string           `json:"mountPath"`
-	ReadOnly                bool             `json:"readOnly"`
-	VolumeClaimTemplateSpec *json.RawMessage `json:"volumeClaimTemplateSpec"`
+	Name                    string               `json:"name"`
+	MountPath               string               `json:"mountPath"`
+	ReadOnly                bool                 `json:"readOnly"`
+	VolumeSource            *corev1.VolumeSource `json:"volumeSource"`
+	VolumeClaimTemplateSpec *json.RawMessage     `json:"volumeClaimTemplateSpec"`
 }
 
 type NodeSetGPUSpec struct {
