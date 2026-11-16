@@ -1009,6 +1009,9 @@ soperator:
       ignore:
         - paths:
             - /data
+            # Kruise replaces the Secret without preserving Flux tracking labels.
+            - /metadata/labels/helm.toolkit.fluxcd.io~1name
+            - /metadata/labels/helm.toolkit.fluxcd.io~1namespace
           target:
             version: v1
             kind: Secret
@@ -1022,6 +1025,13 @@ soperator:
             version: v1
             kind: "(Mutating|Validating)WebhookConfiguration"
             name: "kruise-(mutating|validating)-webhook-configuration"
+        - paths:
+            - /spec/conversion/webhook/clientConfig
+          target:
+            group: apiextensions.k8s.io
+            version: v1
+            kind: CustomResourceDefinition
+            name: "(daemonsets|sidecarsets)\\.apps\\.kruise\\.io"
   soperatorChecks:
     enabled: true
     interval: 5m

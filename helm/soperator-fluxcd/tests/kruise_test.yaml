@@ -11,6 +11,8 @@ tests:
             ignore:
               - paths:
                   - /data
+                  - /metadata/labels/helm.toolkit.fluxcd.io~1name
+                  - /metadata/labels/helm.toolkit.fluxcd.io~1namespace
                 target:
                   version: v1
                   kind: Secret
@@ -24,6 +26,13 @@ tests:
                   version: v1
                   kind: "(Mutating|Validating)WebhookConfiguration"
                   name: "kruise-(mutating|validating)-webhook-configuration"
+              - paths:
+                  - /spec/conversion/webhook/clientConfig
+                target:
+                  group: apiextensions.k8s.io
+                  version: v1
+                  kind: CustomResourceDefinition
+                  name: "(daemonsets|sidecarsets)\\.apps\\.kruise\\.io"
 
   # The post-renderer patches kruise webhooks by index. The indexes below were checked against
   # this chart version: mutating 0 is mpod, validating 0-8 are the builtin-resource webhooks.
