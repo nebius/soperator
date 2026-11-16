@@ -13,7 +13,7 @@ import (
 	"nebius.ai/slurm-operator/internal/consts"
 )
 
-//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
+//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;delete
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;delete;update
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update;patch;watch;list

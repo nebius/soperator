@@ -152,10 +152,10 @@ func Test_SlurmNodesController_findDegradedNodes(t *testing.T) {
 			c := &SlurmNodesController{
 				slurmAPIClients: slurmAPIClients,
 			}
-			got, err := c.findDegradedNodes(ctx)
+			slurmNodes, err := c.listSlurmNodes(ctx)
 			require.Equal(t, tt.wantErr, err != nil)
 			if !tt.wantErr {
-				require.EqualValues(t, tt.want, got)
+				require.EqualValues(t, tt.want, findDegradedNodes(slurmNodes))
 			}
 		})
 	}

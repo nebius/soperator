@@ -106,14 +106,19 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	degradedNodes, err := c.findDegradedNodes(ctx)
+	slurmNodes, err := c.listSlurmNodes(ctx)
 	if err != nil {
-		logger.Error(err, "Find degraded nodes produced an error")
+		logger.Error(err, "List slurm nodes produced an error")
 		return ctrl.Result{}, err
 	}
 
-	logger.Info(fmt.Sprintf("found %d degraded nodes", len(degradedNodes)))
 	var errs []error
+	if err := c.recreatePoweredDownWorkers(ctx, slurmNodes); err != nil {
+		errs = append(errs, fmt.Errorf("recreate powered down workers: %w", err))
+	}
+
+	degradedNodes := findDegradedNodes(slurmNodes)
+	logger.Info(fmt.Sprintf("found %d degraded nodes", len(degradedNodes)))
 	for slurmClusterName, nodes := range degradedNodes {
 		for _, node := range nodes {
 			if err := c.processDegradedNode(ctx, slurmClusterName, node); err != nil {
@@ -133,16 +138,23 @@ func (c *SlurmNodesController) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 // TODO: filter slurmNodes by supported slurm clusters
-func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types.NamespacedName][]slurmapi.Node, error) {
-	degradedNodes := make(map[types.NamespacedName][]slurmapi.Node)
-
+func (c *SlurmNodesController) listSlurmNodes(ctx context.Context) (map[types.NamespacedName][]slurmapi.Node, error) {
+	slurmNodes := make(map[types.NamespacedName][]slurmapi.Node)
 	for slurmClusterName, slurmAPIClient := range c.slurmAPIClients.GetClients() {
-		slurmNodes, err := slurmAPIClient.ListNodes(ctx)
+		nodes, err := slurmAPIClient.ListNodes(ctx)
 		if err != nil {
 			return nil, err
 		}
+		slurmNodes[slurmClusterName] = nodes
+	}
+	return slurmNodes, nil
+}
 
-		for _, node := range slurmNodes {
+func findDegradedNodes(slurmNodes map[types.NamespacedName][]slurmapi.Node) map[types.NamespacedName][]slurmapi.Node {
+	degradedNodes := make(map[types.NamespacedName][]slurmapi.Node)
+
+	for slurmClusterName, nodes := range slurmNodes {
+		for _, node := range nodes {
 			if _, ok := node.States[api.V0044NodeStateDRAIN]; !ok {
 				// Node is not drained, skipping
 				continue
@@ -159,16 +171,14 @@ func (c *SlurmNodesController) findDegradedNodes(ctx context.Context) (map[types
 					node.Reason.OriginalReason = node.Reason.Reason
 					node.Reason.Reason = wellKnownReason
 
-					nodes := degradedNodes[slurmClusterName]
-					nodes = append(nodes, node)
-					degradedNodes[slurmClusterName] = nodes
+					degradedNodes[slurmClusterName] = append(degradedNodes[slurmClusterName], node)
 					break
 				}
 			}
 		}
 	}
 
-	return degradedNodes, nil
+	return degradedNodes
 }
 
 func (c *SlurmNodesController) processDegradedNode(
