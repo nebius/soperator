@@ -11,8 +11,8 @@ tests:
             ignore:
               - paths:
                   - /data
-                  - /metadata/labels/helm.toolkit.fluxcd.io~1name
-                  - /metadata/labels/helm.toolkit.fluxcd.io~1namespace
+                  - /metadata/labels
+                  - /metadata/annotations
                 target:
                   version: v1
                   kind: Secret

@@ -1009,9 +1009,9 @@ soperator:
       ignore:
         - paths:
             - /data
-            # Kruise replaces the Secret without preserving Flux tracking labels.
-            - /metadata/labels/helm.toolkit.fluxcd.io~1name
-            - /metadata/labels/helm.toolkit.fluxcd.io~1namespace
+            # Kruise replaces the Secret without preserving Helm/Flux metadata maps.
+            - /metadata/labels
+            - /metadata/annotations
           target:
             version: v1
             kind: Secret
