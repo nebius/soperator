@@ -229,38 +229,41 @@ type stressProbeBudget struct {
 	SdiagMax  time.Duration
 }
 
-func evaluateStressProbes(summary stressProbeSummary, budget stressProbeBudget) error {
+func evaluateStressProbes(summary stressProbeSummary, budget stressProbeBudget) (rows []stressBudgetRow, err error) {
+	var problems []string
+	for _, probe := range []struct {
+		name     string
+		observed float64
+		budget   time.Duration
+	}{
+		{stressBudgetSqueueMean, summary.Squeue.Mean, budget.SqueueMean},
+		{stressBudgetSinfoMean, summary.Sinfo.Mean, budget.SinfoMean},
+		{stressBudgetSqueueMax, summary.Squeue.Max, budget.SqueueMax},
+		{stressBudgetSinfoMax, summary.Sinfo.Max, budget.SinfoMax},
+		{stressBudgetSdiagMax, summary.Sdiag.Max, budget.SdiagMax},
+	} {
+		row := stressDurationBudget(probe.name, stressMillis(probe.observed), probe.budget)
+		if row.Failed {
+			problems = append(problems, fmt.Sprintf("%s %.0f ms, budget %s", probe.name, probe.observed, probe.budget))
+		}
+		rows = append(rows, row)
+	}
+
 	const stressMinProbeSamples = 3
 	if measured := summary.Samples - summary.Errors; measured < stressMinProbeSamples {
-		return fmt.Errorf("only %d of %d responsiveness probes ran, expected at least %d", measured, summary.Samples, stressMinProbeSamples)
+		return stressBudgetsNotMeasured(rows), fmt.Errorf("only %d of %d responsiveness probes ran, expected at least %d",
+			measured, summary.Samples, stressMinProbeSamples)
 	}
 	// A Slurm command that fails during the load is never within budget: the client gave up
 	// after MessageTimeout or the controller refused it, whatever the latency statistics say.
 	if summary.SlurmErrors > 0 {
-		return fmt.Errorf("controller failed %d of %d responsiveness probes during the load, first at %s",
+		return rows, fmt.Errorf("controller failed %d of %d responsiveness probes during the load, first at %s",
 			summary.SlurmErrors, summary.Samples, summary.FirstSlurmError)
 	}
-	var problems []string
-	for _, probe := range []struct {
-		name      string
-		latency   stressDistribution
-		mean, max time.Duration
-	}{
-		{"squeue", summary.Squeue, budget.SqueueMean, budget.SqueueMax},
-		{"sinfo", summary.Sinfo, budget.SinfoMean, budget.SinfoMax},
-		{"sdiag", summary.Sdiag, 0, budget.SdiagMax},
-	} {
-		if probe.mean > 0 && probe.latency.Mean > float64(probe.mean.Milliseconds()) {
-			problems = append(problems, fmt.Sprintf("%s mean %.0f ms, budget %s", probe.name, probe.latency.Mean, probe.mean))
-		}
-		if probe.latency.Max > float64(probe.max.Milliseconds()) {
-			problems = append(problems, fmt.Sprintf("%s max %.0f ms, budget %s", probe.name, probe.latency.Max, probe.max))
-		}
-	}
 	if err := joinProblems(problems); err != nil {
-		return fmt.Errorf("controller was not responsive during the load: %w", err)
+		return rows, fmt.Errorf("controller was not responsive during the load: %w", err)
 	}
-	return nil
+	return rows, nil
 }
 
 func parseSdiag(output string) (sdiagStatistics, error) {
@@ -316,36 +319,40 @@ type stressSchedulerBudget struct {
 	MaxServerThreads  int64
 }
 
-func evaluateStressScheduler(summary stressSchedulerSummary, budget stressSchedulerBudget) error {
+func evaluateStressScheduler(summary stressSchedulerSummary, budget stressSchedulerBudget) (rows []stressBudgetRow, err error) {
 	var problems []string
 	// The counters reset at midnight on the controller; a reset inside the submission phase
 	// loses up to one probe interval of submissions, so the count is only a lower bound then.
-	// Accounting has already proven every job individually by this step, so the sdiag count
+	// Accounting has already proven every job individually by this point, so the sdiag count
 	// is only asserted when it is exact.
 	if summary.Resets == 0 && summary.JobsSubmitted < budget.MinSubmitted {
 		problems = append(problems, fmt.Sprintf("controller counted %d submitted jobs, expected at least %d", summary.JobsSubmitted, budget.MinSubmitted))
 	}
 	for _, scheduler := range []struct {
-		name     string
-		cycles   int64
-		meanSecs float64
-		budget   time.Duration
+		name, budgetName string
+		cycles           int64
+		meanSecs         float64
+		budget           time.Duration
 	}{
-		{"main", summary.ScheduleCycles, summary.ScheduleCycleMeanSecs, budget.ScheduleCycleMean},
-		{"backfill", summary.BackfillCycles, summary.BackfillCycleMeanSecs, budget.BackfillCycleMean},
+		{"main", stressBudgetScheduleCycle, summary.ScheduleCycles, summary.ScheduleCycleMeanSecs, budget.ScheduleCycleMean},
+		{"backfill", stressBudgetBackfillCycle, summary.BackfillCycles, summary.BackfillCycleMeanSecs, budget.BackfillCycleMean},
 	} {
+		row := stressDurationBudget(scheduler.budgetName, stressSeconds(scheduler.meanSecs), scheduler.budget)
 		if scheduler.cycles == 0 {
+			row = row.notMeasured()
 			problems = append(problems, fmt.Sprintf("controller recorded no %s scheduler cycles during the load", scheduler.name))
-		} else if scheduler.meanSecs > scheduler.budget.Seconds() {
+		} else if row.Failed {
 			problems = append(problems, fmt.Sprintf("%s scheduler mean cycle %.3fs over %d cycles exceeds budget %s",
 				scheduler.name, scheduler.meanSecs, scheduler.cycles, scheduler.budget))
 		}
+		rows = append(rows, row)
 	}
 	if summary.AgentQueueSize > 0 {
 		problems = append(problems, fmt.Sprintf("controller agent queue still holds %d requests", summary.AgentQueueSize))
 	}
-	if summary.ServerThreadCount > budget.MaxServerThreads {
+	threads := stressCountBudget(stressBudgetServerThreads, summary.ServerThreadCount, budget.MaxServerThreads)
+	if threads.Failed {
 		problems = append(problems, fmt.Sprintf("controller still runs %d server threads, expected at most %d", summary.ServerThreadCount, budget.MaxServerThreads))
 	}
-	return joinProblems(problems)
+	return append(rows, threads), joinProblems(problems)
 }

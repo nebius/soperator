@@ -106,10 +106,10 @@ func TestParseStressSubmitResult(t *testing.T) {
 
 func TestEvaluateStressSubmit(t *testing.T) {
 	good := stressSubmitResult{StartEpoch: 0, EndEpoch: 50, Accepted: 1000}
-	require.NoError(t, evaluateStressSubmit(good, 1000, time.Minute))
+	require.NoError(t, errOnly(evaluateStressSubmit(good, 1000, time.Minute)))
 
 	bad := stressSubmitResult{StartEpoch: 0, EndEpoch: 90, Accepted: 998, ExitStatus: 123}
-	err := evaluateStressSubmit(bad, 1000, time.Minute)
+	_, err := evaluateStressSubmit(bad, 1000, time.Minute)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "accepted 998 of 1000 submissions")
 	assert.Contains(t, err.Error(), "exited with status 123")
