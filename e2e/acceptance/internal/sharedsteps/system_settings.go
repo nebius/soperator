@@ -57,7 +57,6 @@ const (
 	kernelTCPReceiveBufferSize = "net.ipv4.tcp_rmem"
 	kernelTCPSendBufferSize    = "net.ipv4.tcp_wmem"
 
-	slurmdContainerName              = "slurmd"
 	nvidiaDriverCapabilitiesName     = "NVIDIA_DRIVER_CAPABILITIES"
 	nvidiaVisibleDevicesName         = "NVIDIA_VISIBLE_DEVICES"
 	nativeResourceLimitsJobName      = "e2e-system-limits-native"

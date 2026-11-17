@@ -39,6 +39,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewSystemSettings(info, runtime, slurm, kubectl, selector),
 		NewTaskPrologEnv(runtime, selector),
 		NewSoperatorUtils(runtime, selector),
+		NewFilesystemLayout(info, runtime, kubectl, selector),
 		NewNodeSetEphemeralModeTransition(info, runtime, kubectl),
 		NewNodeReplacement(runtime, slurm, selector),
 		NewWorkerRollingUpdate(info, runtime, slurm, kubectl, selector),

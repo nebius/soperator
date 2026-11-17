@@ -19,7 +19,6 @@ const (
 	clusterCreationHelmNamespace    = "flux-system"
 	clusterCreationSmokeJobTimeout  = 2 * time.Minute
 	clusterCreationHCProgramTimeout = 3 * time.Minute
-	containerRuntimeSubmountName    = "image-storage"
 )
 
 type ClusterCreation struct {
