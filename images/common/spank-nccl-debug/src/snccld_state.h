@@ -57,9 +57,6 @@ typedef struct {
     /// Absolute path of the file to store the NCCL debug output.
     char log_path[PATH_MAX + 1];
 
-    /// Absolute path of the Enroot mount configuration.
-    char mounts_path[PATH_MAX + 1];
-
     /**
      * Absolute path of the file to store the NCCL debug output set by user
      * via NCCL_DEBUG_FILE.

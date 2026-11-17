@@ -68,7 +68,6 @@ inline snccld_state_t *snccld_state_new() {
     res->user_uid         = 0;
     res->fifo_path[0]     = '\0';
     res->log_path[0]      = '\0';
-    res->mounts_path[0]   = '\0';
     res->user_log_path[0] = '\0';
     res->tee_pid          = -1;
 
@@ -83,7 +82,7 @@ inline snccld_state_t *snccld_state_new() {
 static inline size_t _snccld_state_file_size(void) {
     const size_t max_len_pid_t     = 10;
     const size_t max_len_gid_uid_t = 64;
-    return (max_len_gid_uid_t * 2) + (PATH_MAX * 4) + max_len_pid_t + 7 + 1;
+    return (max_len_gid_uid_t * 2) + (PATH_MAX * 3) + max_len_pid_t + 6 + 1;
 }
 
 char *snccld_state_to_string(const snccld_state_t *state) {
@@ -93,12 +92,11 @@ char *snccld_state_to_string(const snccld_state_t *state) {
     snprintf(
         res,
         buf_size,
-        "%d\n%d\n%s\n%s\n%s\n%s\n%d\n",
+        "%d\n%d\n%s\n%s\n%s\n%d\n",
         state->user_gid,
         state->user_uid,
         state->fifo_path,
         state->log_path,
-        state->mounts_path,
         state->user_log_path,
         state->tee_pid
     );
@@ -111,7 +109,7 @@ snccld_state_t *snccld_state_from_string(const char *str) {
 
     char *copy = strdup(str);
     char *p    = copy;
-    for (int line = 0; line < 7; ++line) {
+    for (int line = 0; line < 6; ++line) {
         char *field = strsep(&p, "\n");
         if (!field) {
             continue;
@@ -139,15 +137,10 @@ snccld_state_t *snccld_state_from_string(const char *str) {
                 break;
             case 4:
                 {
-                    snprintf(res->mounts_path, PATH_MAX + 1, "%s", field);
-                }
-                break;
-            case 5:
-                {
                     snprintf(res->user_log_path, PATH_MAX + 1, "%s", field);
                 }
                 break;
-            case 6:
+            case 5:
                 {
                     res->tee_pid = (pid_t)atoi(field);
                 }

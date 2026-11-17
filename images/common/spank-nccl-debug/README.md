@@ -91,8 +91,10 @@ If you set `NCCL_DEBUG_FILE=/path/to/log.out`, the plugin will:
 
 ## 🚢 Container Support
 
-Automatically emits **Enroot** mount configurations so that your debug directory is bind-mounted inside the container
-before it launches.
+Passes the current step's resolved logging directories to the permanent Enroot hook
+`/etc/enroot/hooks.d/30-nccl-debug.sh`. The hook appends bind mounts to that container's
+private `ENROOT_MOUNTS` file before it launches. Job steps do not create or delete
+files in the shared `/etc/enroot/mounts.d` directory.
 
 > [!IMPORTANT]
 > No manual `--container-mounts` flags needed - logs just work in both native and containerized Slurm jobs.
@@ -112,6 +114,14 @@ before it launches.
 ---
 
 ## :construction: Development
+
+Run the hook and SPANK environment tests from the repository root:
+
+```shell
+python3 images/common/spank-nccl-debug/tests/test_enroot.py
+```
+
+These tests require Bash, Python 3, and a C compiler. They do not require Slurm or a cluster.
 
 There are 3 Dockerfiles in the [./docker](./docker) directory:
 
@@ -187,7 +197,10 @@ Make sure you have **kubectl** using needed cluster by default.
 
 #### 4. Redeploy
 
-Run `make redeploy` to copy the plugin's `.so` file onto the cluster pods.
+On idle development pods, run `make redeploy` to copy the plugin's `.so` file
+and install its executable Enroot hook. Deploy both together. These temporary
+changes disappear when the pods are recreated; release deployments use the
+worker, login, and Slurm check job images containing both files.
 
 > [!TIP]
 > You can set `NODE_COUNT_WORKER` and `NODE_COUNT_LOGIN` to specify a number of worker and login pods on the cluster.
