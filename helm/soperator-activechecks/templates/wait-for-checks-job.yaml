@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: {{ printf "%s-wait-for-active-checks" .Values.slurmClusterRefName | trunc 63 | trimSuffix "-" }}
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook": post-install
     "helm.sh/hook-delete-policy": hook-succeeded,hook-failed,before-hook-creation
 spec:
   template:
