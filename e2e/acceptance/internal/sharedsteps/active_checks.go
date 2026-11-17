@@ -44,6 +44,8 @@ type ActiveChecks struct {
 	gpuCheckK8sJobName string
 	gpuCheckJobIDs     []string
 	gpuWorkers         []framework.WorkerInfo
+	// Job outputs of the GPU ActiveCheck by Slurm job ID, captured once they report a status.
+	gpuCheckOutputs map[string]activeGPUCheckOutput
 
 	dryRunJobName       string
 	dryRunMarker        string
@@ -67,6 +69,8 @@ func (s *ActiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the GPU ActiveCheck is triggered$`, s.theGPUActiveCheckIsTriggered)
 	sc.Step(`^the GPU ActiveCheck Kubernetes Job succeeds$`, s.theGPUActiveCheckKubernetesJobSucceeds)
 	sc.Step(`^GPU ActiveCheck outputs report PASS on all GPU workers$`, s.gpuActiveCheckOutputsReportPASSOnAllGPUWorkers)
+	sc.Step(`^every GPU ActiveCheck report passed every active-check test for its platform$`, s.everyGPUActiveCheckReportPassedEveryActiveCheckTestForItsPlatform)
+	sc.Step(`^every GPU ActiveCheck report has its raw command outputs$`, s.everyGPUActiveCheckReportHasItsRawCommandOutputs)
 	sc.Step(`^GPU ActiveCheck Slurm jobs complete on all GPU workers$`, s.gpuActiveCheckSlurmJobsCompleteOnAllGPUWorkers)
 	sc.Step(`^the GPU ActiveCheck status is Complete$`, s.theGPUActiveCheckStatusIsComplete)
 	sc.Step(`^the manage-jail-state dry-run ActiveCheck is configured$`, s.theManageJailStateDryRunActiveCheckIsConfigured)
@@ -107,6 +111,7 @@ func (s *ActiveChecks) CleanupAndReset(ctx context.Context) {
 	s.gpuCheckK8sJobName = ""
 	s.gpuCheckJobIDs = nil
 	s.gpuWorkers = nil
+	s.gpuCheckOutputs = nil
 	s.dryRunJobName = ""
 	s.dryRunMarker = ""
 	s.dryRunChecksum = ""
@@ -476,6 +481,7 @@ func (s *ActiveChecks) waitForGPUActiveCheckOutputsPassingOnAllGPUWorkers(ctx co
 		if err := assertGPUActiveCheckSlurmRecordsTargetExpectedWorkers(next, s.gpuCheckJobIDs, s.gpuWorkers); err != nil {
 			return false, err
 		}
+		outputs := make(map[string]activeGPUCheckOutput, len(s.gpuCheckJobIDs))
 		for _, jobID := range s.gpuCheckJobIDs {
 			record := next[jobID]
 			out, exists, err := readWorkerFileIfExists(waitCtx, s.runtime, framework.WorkerInfo{Name: record.NodeList}, activeCheckSlurmJobOutputPath(record))
@@ -491,8 +497,10 @@ func (s *ActiveChecks) waitForGPUActiveCheckOutputsPassingOnAllGPUWorkers(ctx co
 			if err := assertActiveGPUCheckOutputPassing(out); err != nil {
 				return false, err
 			}
+			outputs[jobID] = activeGPUCheckOutput{record: record, output: out}
 		}
 		records = next
+		s.gpuCheckOutputs = outputs
 		return true, nil
 	}); err != nil {
 		return err

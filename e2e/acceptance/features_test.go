@@ -58,6 +58,7 @@ func sharedScenariosTagged(t *testing.T, tag string) []string {
 func TestSharedHeavyScenarios(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"GPU ActiveCheck succeeds on all GPU workers",
+		"nvidia_libraries drains a GPU worker whose <library> is <failure> and recovers after restoration",
 		"Docker containers can access GPUs",
 		"NVIDIA bug report is collected from a worker",
 		"Enroot containers can access GPUs",
@@ -82,6 +83,7 @@ func TestSharedHeavyScenarios(t *testing.T) {
 
 func TestSharedSequentialScenarios(t *testing.T) {
 	assert.ElementsMatch(t, []string{
+		"Periodic HealthCheckProgram passes GPU health checks on all GPU workers",
 		"The provisioned cluster is ready for acceptance tests",
 		"A custom Slurm setting is applied and restored",
 		"Installing and uninstalling cowsay preserves GPU tooling",

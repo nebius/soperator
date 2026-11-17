@@ -450,7 +450,7 @@ func TestNodeReplacementHoldJobCoversBothDrainWaits(t *testing.T) {
 	}
 	err := steps.submitTestJobOnWorker(t.Context(), steps.replacementWorker, framework.WorkerSnapshot{})
 	require.NoError(t, err)
-	assert.Greater(t, nodeReplacementJobHold, nodeReplacementHealthCheckDrainMaxWait+nodeReplacementDrainTimeout+nodeReplacementJobTimeout)
+	assert.Greater(t, nodeReplacementJobHold, periodicHealthCheckMaxWait+nodeReplacementDrainTimeout+nodeReplacementJobTimeout)
 	assert.Contains(t, strings.Join(runtime.calls, "\n"), "--wrap='sleep 1800'")
 	assert.Equal(t, "6", steps.maintenanceJob.ID)
 	assert.LessOrEqual(t, nodeReplacementJobHold, 30*time.Minute)

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -198,36 +197,4 @@ func TestHealthCheckDrainReasonMatchesOnlyTheSimulatedFailure(t *testing.T) {
 	assert.False(t, healthCheckDrainReasonMatches("[software_problem] inject_error [hc_program]"),
 		"only a [node_problem] drain leads to node replacement")
 	assert.False(t, healthCheckDrainReasonMatches(""))
-}
-
-func TestHealthCheckDrainTimeoutFollowsHealthCheckInterval(t *testing.T) {
-	for _, tt := range []struct {
-		name     string
-		interval string
-		want     time.Duration
-		wantErr  string
-	}{
-		{name: "default interval", interval: "120 sec", want: 4 * time.Minute},
-		{name: "short interval floors at the minimum", interval: "10 sec", want: 2 * time.Minute},
-		{name: "at the limit", interval: "300 sec", want: 10 * time.Minute},
-		{name: "too long", interval: "301 sec", wantErr: "too long for this scenario"},
-		{name: "disabled", interval: "0 sec", wantErr: "HealthCheckProgram is disabled"},
-		{name: "unexpected format", interval: "2 min", wantErr: "parse HealthCheckInterval"},
-		{name: "not a number", interval: "abc sec", wantErr: "parse HealthCheckInterval"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			timeout, err := healthCheckDrainTimeout(map[string]string{"HealthCheckInterval": tt.interval})
-			if tt.wantErr != "" {
-				require.ErrorContains(t, err, tt.wantErr)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, timeout)
-		})
-	}
-}
-
-func TestHealthCheckDrainTimeoutRequiresHealthCheckInterval(t *testing.T) {
-	_, err := healthCheckDrainTimeout(map[string]string{"SlurmdTimeout": "180 sec"})
-	require.ErrorContains(t, err, "HealthCheckInterval is missing")
 }

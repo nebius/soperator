@@ -47,12 +47,6 @@ const (
 	nodeReplacementRemoveTimeout = 30 * time.Minute
 	nodeReplacementReadyTimeout  = 20 * time.Minute
 	nodeReplacementJobHold       = 30 * time.Minute
-
-	// Slurm runs HealthCheckProgram on its own schedule: with HealthCheckNodeState=CYCLE
-	// the next run on a node starts within one HealthCheckInterval, and one more
-	// interval covers the check itself and the reason reaching slurmctld.
-	nodeReplacementHealthCheckDrainMinWait = 2 * time.Minute
-	nodeReplacementHealthCheckDrainMaxWait = 10 * time.Minute
 )
 
 type NodeReplacement struct {
@@ -405,7 +399,7 @@ func (s *NodeReplacement) waitForHealthCheckDrain(ctx context.Context, guard fun
 	if err != nil {
 		return err
 	}
-	timeout, err := healthCheckDrainTimeout(configuration)
+	timeout, err := periodicHealthCheckWait(configuration)
 	if err != nil {
 		return err
 	}
@@ -444,28 +438,6 @@ func (s *NodeReplacement) waitForHealthCheckDrain(ctx context.Context, guard fun
 func healthCheckDrainReasonMatches(reason string) bool {
 	return strings.HasPrefix(reason, nodeReplacementHealthCheckReason) &&
 		strings.Contains(reason, healthCheckInjectErrorReasonPart)
-}
-
-// healthCheckDrainTimeout derives the drain wait from the effective HealthCheckInterval.
-// A disabled or very long interval is reported instead of waited out.
-func healthCheckDrainTimeout(configuration map[string]string) (time.Duration, error) {
-	raw, found := configuration["HealthCheckInterval"]
-	if !found {
-		return 0, fmt.Errorf("HealthCheckInterval is missing from the effective Slurm configuration")
-	}
-	interval, err := framework.ParseSlurmSeconds(raw)
-	if err != nil {
-		return 0, fmt.Errorf("parse HealthCheckInterval %q: %w", raw, err)
-	}
-	if interval == 0 {
-		return 0, fmt.Errorf("HealthCheckProgram is disabled: HealthCheckInterval is 0")
-	}
-	timeout := max(2*interval, nodeReplacementHealthCheckDrainMinWait)
-	if timeout > nodeReplacementHealthCheckDrainMaxWait {
-		return 0, fmt.Errorf("HealthCheckInterval %s is too long for this scenario: waiting %s exceeds the %s limit",
-			interval, timeout, nodeReplacementHealthCheckDrainMaxWait)
-	}
-	return timeout, nil
 }
 
 // A simulated failure must end in a replacement unless it never took effect.

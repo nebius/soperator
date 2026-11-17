@@ -85,6 +85,12 @@ func workerReservationFromContext(ctx context.Context) *workerReservation {
 	return r
 }
 
+// HasWorkerReservation reports whether ctx carries a worker ownership scope, in which steps must acquire
+// workers through WorkerSelector.Acquire instead of picking them from a snapshot.
+func HasWorkerReservation(ctx context.Context) bool {
+	return workerReservationFromContext(ctx) != nil
+}
+
 func WithWorkerAcquireTimeout(ctx context.Context, timeout time.Duration) context.Context {
 	return context.WithValue(ctx, workerAcquireTimeoutKey{}, timeout)
 }

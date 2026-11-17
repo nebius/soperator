@@ -183,3 +183,50 @@ func TestRunManualHCProgramRequiresMatchingWorkerPod(t *testing.T) {
 	err := runManualHCProgram(t.Context(), runtime, framework.WorkerInfo{Name: "worker-0"})
 	require.ErrorContains(t, err, `worker pod for Slurm node "worker-0" was not found`)
 }
+
+// recordingRuntime records the commands sent to every scope in one ordered log.
+type recordingRuntime struct {
+	periodicGPURuntime
+	log []string
+}
+
+func newRecordingRuntime(t *testing.T, jail func(command string) (string, error)) *recordingRuntime {
+	return newRecordingRuntimeWithWorker(t, nil, jail, nil)
+}
+
+func newRecordingRuntimeWithWorker(t *testing.T, controller, jail, worker func(command string) (string, error)) *recordingRuntime {
+	t.Helper()
+	runtime := &recordingRuntime{}
+	record := func(scope string, handle func(string) (string, error)) framework.CommandScope {
+		return framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+			runtime.log = append(runtime.log, scope+": "+command)
+			if handle == nil {
+				return "", nil
+			}
+			return handle(command)
+		})
+	}
+	runtime.controller = record("controller", controller)
+	runtime.jail = record("jail", jail)
+	runtime.workers = map[string]framework.CommandScope{"worker-0": record("worker-0", worker)}
+	return runtime
+}
+
+func recordingPassiveChecks(runtime *recordingRuntime) *PassiveChecks {
+	return &PassiveChecks{
+		info:      &framework.ClusterInfo{TargetSoperatorVersion: "5.0.0"},
+		runtime:   runtime,
+		slurm:     framework.NewSlurmClient(runtime),
+		gpuWorker: framework.WorkerInfo{Name: "worker-0"},
+	}
+}
+
+func commandsContaining(log []string, part string) []string {
+	var matches []string
+	for _, entry := range log {
+		if strings.Contains(entry, part) {
+			matches = append(matches, entry)
+		}
+	}
+	return matches
+}
