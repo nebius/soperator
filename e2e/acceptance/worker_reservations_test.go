@@ -2,8 +2,12 @@ package acceptance
 
 import (
 	"context"
+	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -139,33 +143,124 @@ func TestRunnerFinalizesAfterExternalRecoverySmoke(t *testing.T) {
 	assert.Equal(t, []string{"external recovery", "cancel owned job", "delete lease"}, runtime.events)
 }
 func TestRunnerCleanupFailureDoesNotDisappearBehindSkip(t *testing.T) {
+	t.Setenv("TEAMCITY_VERSION", "")
 	for _, reservations := range []bool{false, true} {
-		for _, phase := range []string{"before", "step", "after"} {
+		for _, phase := range []string{"clean", "before", "step", "after"} {
 			t.Run(fmt.Sprintf("reservations=%t/%s", reservations, phase), func(t *testing.T) {
 				cleanupErr := errors.New("restore skipped scenario")
 				suite := reservationTestSuite("skip", func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, _ framework.Runtime) {
-					if phase == "before" {
-						sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
-							framework.RecordWorkerCleanupError(ctx, cleanupErr)
+					var needsCleanup bool
+					sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
+						needsCleanup = strings.Contains(scenario.Steps[0].Text, `"yes"`)
+						if phase == "before" {
+							if needsCleanup {
+								framework.RecordWorkerCleanupError(ctx, cleanupErr)
+							}
 							return ctx, godog.ErrSkip
-						})
-					}
-					sc.Step(`^the test runs$`, func(ctx context.Context) error {
-						if phase == "step" {
+						}
+						return ctx, nil
+					})
+					run := func(ctx context.Context) error {
+						if phase == "step" && needsCleanup {
 							framework.RecordWorkerCleanupError(ctx, cleanupErr)
 						}
 						return godog.ErrSkip
-					})
+					}
+					sc.Step(`^the test runs with cleanup "(?:yes|no)"$`, run)
+					sc.Step(`^the test runs$`, run)
 					if phase == "after" {
 						sc.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
-							return ctx, cleanupErr
+							if needsCleanup {
+								return ctx, cleanupErr
+							}
+							return ctx, nil
 						})
 					}
 				})
+				suite.Source.FS = fstest.MapFS{"test.feature": {Data: []byte(`Feature: cleanup
+  Scenario Outline: test
+    Given the test runs with cleanup "<cleanup>"
+    Then the test runs
+    Examples:
+      | cleanup |
+      | yes     |
+      | no      |
+`)}}
 				suite.WorkerReservations = reservations
-				runner, err := NewRunner(RunnerConfig{KubectlContext: "dev", TargetSoperatorVersion: "5.0.0", Suites: []SuiteConfig{suite}})
+				suite.Concurrency = 2
+				outputDir := t.TempDir()
+				junitDir := outputDir
+				if phase == "after" {
+					t.Setenv("TEAMCITY_VERSION", "2026.1")
+					junitDir = filepath.Join(outputDir, "junit")
+				}
+				runner, err := NewRunner(RunnerConfig{KubectlContext: "dev", TargetSoperatorVersion: "5.0.0", OutputDir: outputDir, Suites: []SuiteConfig{suite}})
 				require.NoError(t, err)
-				require.ErrorIs(t, runner.runConfiguredSuites(t.Context(), testClusterInfo(), nil, runner.suites), cleanupErr)
+				err = runner.runConfiguredSuites(t.Context(), testClusterInfo(), nil, runner.suites)
+				wantFailures := 0
+				if phase == "clean" {
+					require.NoError(t, err)
+				} else {
+					require.ErrorIs(t, err, cleanupErr)
+					wantFailures = 1
+				}
+
+				data, err := os.ReadFile(filepath.Join(outputDir, "skip.cucumber.json"))
+				require.NoError(t, err)
+				var cucumber []struct {
+					Elements []struct {
+						Steps []struct {
+							Result struct {
+								Status       string
+								ErrorMessage string `json:"error_message"`
+							}
+						}
+					}
+				}
+				require.NoError(t, json.Unmarshal(data, &cucumber))
+				require.Len(t, cucumber, 1)
+				require.Len(t, cucumber[0].Elements, 2)
+				for row, element := range cucumber[0].Elements {
+					steps := element.Steps
+					require.Len(t, steps, 2)
+					if phase == "clean" || row == 1 {
+						for _, step := range steps {
+							assert.Equal(t, "skipped", step.Result.Status)
+						}
+					} else {
+						assert.Equal(t, "failed", steps[1].Result.Status)
+						assert.Contains(t, steps[1].Result.ErrorMessage, cleanupErr.Error())
+					}
+				}
+
+				data, err = os.ReadFile(filepath.Join(junitDir, "skip.junit.xml"))
+				require.NoError(t, err)
+				var junit struct {
+					Failures int `xml:"failures,attr"`
+					Suites   []struct {
+						Failures int `xml:"failures,attr"`
+						Cases    []struct {
+							Status  string `xml:"status,attr"`
+							Failure *struct {
+								Message string `xml:"message,attr"`
+							} `xml:"failure"`
+						} `xml:"testcase"`
+					} `xml:"testsuite"`
+				}
+				require.NoError(t, xml.Unmarshal(data, &junit))
+				assert.Equal(t, wantFailures, junit.Failures)
+				require.Len(t, junit.Suites, 1)
+				assert.Equal(t, wantFailures, junit.Suites[0].Failures)
+				require.Len(t, junit.Suites[0].Cases, 2)
+				for row, result := range junit.Suites[0].Cases {
+					if phase == "clean" || row == 1 {
+						assert.Nil(t, result.Failure)
+					} else {
+						assert.Equal(t, "failed", result.Status)
+						require.NotNil(t, result.Failure)
+						assert.Contains(t, result.Failure.Message, cleanupErr.Error())
+					}
+				}
 			})
 		}
 	}

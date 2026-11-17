@@ -74,7 +74,7 @@ func TestRunnerTeamCityReportsCleanupFailuresWithAndWithoutReservations(t *testi
 			suite := godog.TestSuite{
 				Name: config.Name,
 				ScenarioInitializer: func(sc *godog.ScenarioContext) {
-					runner.initializeSuiteScenario(sc, testClusterInfo(), nil, config, framework.NewArtifactsManager("", nil), reporter, func(err error) {
+					runner.initializeSuiteScenario(sc, testClusterInfo(), nil, config, framework.NewArtifactsManager("", nil), reporter, func(_ string, err error) {
 						mu.Lock()
 						defer mu.Unlock()
 						cleanupFailures = append(cleanupFailures, err)
