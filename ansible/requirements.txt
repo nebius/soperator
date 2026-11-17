@@ -3,7 +3,7 @@ ansible-compat==26.8.0
 ansible-core==2.21.3
 ansible-lint==26.8.0
 attrs==26.1.0
-black==26.5.1
+black==26.10.1
 bracex==3.0.1
 cffi==2.1.1
 click==8.4.2
