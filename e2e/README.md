@@ -501,6 +501,11 @@ cleanup. Required restoration failures reported through
 `RecordWorkerCleanupError` fail the suite even when Godog classifies the
 scenario as skipped; TeamCity reports them as failures too.
 
+The runner also treats errors returned by registrar `After` hooks as unsafe
+restoration failures. Return an `After` error only when required cleanup or
+recovery failed; log best-effort diagnostic errors instead. With reservations
+enabled, these errors retain the lease until expiry.
+
 Use `RequireReservedHost` before a host-wide disruption to check ownership of
 sibling workers. Report unsafe restoration with `RecordWorkerCleanupError`.
 When cleanup cannot prove recovery, it returns an error and retains the native

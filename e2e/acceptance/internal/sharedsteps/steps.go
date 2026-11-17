@@ -72,7 +72,6 @@ func cleanupStepFamily(ctx context.Context, family scenarioScopedStepFamily) (er
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("clean up %T: %v", family, recovered)
-			framework.RecordWorkerCleanupError(ctx, err)
 		}
 	}()
 	family.CleanupAndReset(context.WithoutCancel(ctx))

@@ -97,8 +97,9 @@ func (c *CleanupFailures) PromoteReports(dir, suite string) error {
 	for i, feature := range features {
 		scenarios := byURI[feature["uri"].(string)]
 		caseIndex := 0
-		for j, raw := range feature["elements"].([]any) {
-			steps := raw.(map[string]any)["steps"].([]any)
+		elements, _ := feature["elements"].([]any)
+		for j, raw := range elements {
+			steps, _ := raw.(map[string]any)["steps"].([]any)
 			if len(steps) == 0 {
 				continue
 			}

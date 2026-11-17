@@ -102,6 +102,8 @@ func TestSharedSequentialScenarios(t *testing.T) {
 		"A switch limit rejects a cross-leaf allocation",
 		"scontrol topology and SLURM_TOPOLOGY_ADDR agree across workers",
 		"A worker template update preserves running jobs",
+		"An MK8s node group update preserves running jobs",
+		"A worker update preserves maintenance drains before and during handoff",
 		"A failed GPU health check replaces the worker node",
 		"A GPU worker recovers when maintenance arrives during health-check draining",
 		"A GPU worker recovers when maintenance arrives after health-check draining",

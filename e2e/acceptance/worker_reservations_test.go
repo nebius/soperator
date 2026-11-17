@@ -202,6 +202,7 @@ func TestRunnerCleanupFailureDoesNotDisappearBehindSkip(t *testing.T) {
 					require.NoError(t, err)
 				} else {
 					require.ErrorIs(t, err, cleanupErr)
+					assert.Equal(t, 1, strings.Count(err.Error(), cleanupErr.Error()))
 					wantFailures = 1
 				}
 
@@ -262,6 +263,83 @@ func TestRunnerCleanupFailureDoesNotDisappearBehindSkip(t *testing.T) {
 					}
 				}
 			})
+		}
+	}
+}
+
+func TestRunnerCleanupReportsHandleEmptyScenariosAndFeatures(t *testing.T) {
+	t.Setenv("TEAMCITY_VERSION", "")
+	cleanupErr := errors.New("restore skipped scenario")
+	suite := reservationTestSuite("empty", func(sc *godog.ScenarioContext, _ *framework.ClusterInfo, _ framework.Runtime) {
+		sc.Step(`^the test runs$`, func() error { return nil })
+		sc.Step(`^cleanup fails before skipping$`, func(ctx context.Context) error {
+			framework.RecordWorkerCleanupError(ctx, cleanupErr)
+			return godog.ErrSkip
+		})
+	})
+	suite.WorkerReservations = false
+	suite.Source = FeatureSource{
+		FS: fstest.MapFS{
+			"empty.feature": {Data: []byte("Feature: A feature without scenarios\n")},
+			"test.feature": {Data: []byte(`Feature: cleanup
+  Scenario: empty before
+  Scenario: clean
+    Given the test runs
+  Scenario: cleanup failure
+    Given cleanup fails before skipping
+  Scenario: empty after
+`)},
+		},
+		Paths: []string{"empty.feature", "test.feature"},
+	}
+	outputDir := t.TempDir()
+	runner, err := NewRunner(RunnerConfig{KubectlContext: "dev", TargetSoperatorVersion: "5.0.0", OutputDir: outputDir, Suites: []SuiteConfig{suite}})
+	require.NoError(t, err)
+	require.ErrorIs(t, runner.runConfiguredSuites(t.Context(), testClusterInfo(), nil, runner.suites), cleanupErr)
+
+	data, err := os.ReadFile(filepath.Join(outputDir, "empty.cucumber.json"))
+	require.NoError(t, err)
+	var cucumber []struct {
+		Elements []struct {
+			Steps []struct {
+				Result struct{ Status string }
+			}
+		}
+	}
+	require.NoError(t, json.Unmarshal(data, &cucumber))
+	require.Len(t, cucumber, 1)
+	require.Len(t, cucumber[0].Elements, 4)
+	assert.Empty(t, cucumber[0].Elements[0].Steps)
+	assert.Empty(t, cucumber[0].Elements[3].Steps)
+	for i, status := range map[int]string{1: "passed", 2: "failed"} {
+		require.Len(t, cucumber[0].Elements[i].Steps, 1)
+		assert.Equal(t, status, cucumber[0].Elements[i].Steps[0].Result.Status)
+	}
+
+	data, err = os.ReadFile(filepath.Join(outputDir, "empty.junit.xml"))
+	require.NoError(t, err)
+	var junit struct {
+		Failures int `xml:"failures,attr"`
+		Suites   []struct {
+			Cases []struct {
+				Status  string `xml:"status,attr"`
+				Failure *struct {
+					Message string `xml:"message,attr"`
+				} `xml:"failure"`
+			} `xml:"testcase"`
+		} `xml:"testsuite"`
+	}
+	require.NoError(t, xml.Unmarshal(data, &junit))
+	assert.Equal(t, 1, junit.Failures)
+	require.Len(t, junit.Suites, 1)
+	require.Len(t, junit.Suites[0].Cases, 4)
+	for i, result := range junit.Suites[0].Cases {
+		if i == 2 {
+			assert.Equal(t, "failed", result.Status)
+			require.NotNil(t, result.Failure)
+			assert.Contains(t, result.Failure.Message, cleanupErr.Error())
+		} else {
+			assert.Nil(t, result.Failure)
 		}
 	}
 }
