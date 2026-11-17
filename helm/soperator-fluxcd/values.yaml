@@ -1005,6 +1005,33 @@ soperator:
                         - {{ .Values.slurmCluster.namespace }}
     driftDetection:
       mode: warn
+      # OpenKruise manages certificates and webhook definitions at runtime.
+      ignore:
+        - paths:
+            - /data
+            # Kruise replaces the Secret without preserving Helm/Flux metadata maps.
+            - /metadata/labels
+            - /metadata/annotations
+          target:
+            version: v1
+            kind: Secret
+            namespace: kruise-system
+            name: kruise-webhook-certs
+        - paths:
+            - /metadata/annotations/template
+            - /webhooks
+          target:
+            group: admissionregistration.k8s.io
+            version: v1
+            kind: "(Mutating|Validating)WebhookConfiguration"
+            name: "kruise-(mutating|validating)-webhook-configuration"
+        - paths:
+            - /spec/conversion/webhook/clientConfig
+          target:
+            group: apiextensions.k8s.io
+            version: v1
+            kind: CustomResourceDefinition
+            name: "(daemonsets|sidecarsets)\\.apps\\.kruise\\.io"
   soperatorChecks:
     enabled: true
     interval: 5m
