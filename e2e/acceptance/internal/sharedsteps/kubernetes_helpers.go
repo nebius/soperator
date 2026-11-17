@@ -7,7 +7,10 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
 
-const kruiseStatefulSetResource = "statefulsets.apps.kruise.io"
+const (
+	kruiseStatefulSetResource = "statefulsets.apps.kruise.io"
+	slurmdContainerName       = "slurmd"
+)
 
 func findMetaCondition(conditions []metav1.Condition, conditionType string) *metav1.Condition {
 	for i := range conditions {

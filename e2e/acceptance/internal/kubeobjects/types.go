@@ -52,6 +52,7 @@ type SlurmCluster struct {
 }
 
 type SlurmClusterSpec struct {
+	VolumeSources          []corev1.Volume              `json:"volumeSources"`
 	Topology               *SlurmClusterTopology        `json:"topology"`
 	PartitionConfiguration PartitionConfiguration       `json:"partitionConfiguration"`
 	SlurmNodes             SlurmClusterNodes            `json:"slurmNodes"`
@@ -191,6 +192,7 @@ type NodeSetVolumes struct {
 
 type NodeVolumeMount struct {
 	Name                    string               `json:"name"`
+	VolumeSourceName        string               `json:"volumeSourceName"`
 	MountPath               string               `json:"mountPath"`
 	ReadOnly                bool                 `json:"readOnly"`
 	VolumeSource            *corev1.VolumeSource `json:"volumeSource"`
