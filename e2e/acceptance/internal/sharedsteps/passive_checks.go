@@ -49,6 +49,7 @@ type PassiveChecks struct {
 	gpuHooksJob                framework.SbatchJob
 	gpuHealthRunIDs            []string
 	gpuHCProgramBaselineRunIDs []string
+	nvidiaHCProgramBaseline    string
 
 	tmpfsJobID   string
 	tmpfsExisted bool
@@ -92,6 +93,10 @@ func (s *PassiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^HealthCheckProgram runs on the selected GPU worker$`, s.healthCheckProgramRunsOnTheSelectedGPUWorker)
 	sc.Step(`^the GPU HealthCheckProgram report is fresh and passing$`, s.theGPUHealthCheckProgramReportIsFreshAndPassing)
 	sc.Step(`^raw GPU health-check command outputs are present$`, s.rawGPUHealthCheckCommandOutputsArePresent)
+	sc.Step(`^the NVIDIA libraries passive check is enabled for that worker$`, s.nvidiaLibrariesCheckIsEnabled)
+	sc.Step(`^the NVIDIA libraries Prolog check is fresh and passing$`, s.nvidiaLibrariesPrologCheckPasses)
+	sc.Step(`^a fresh HealthCheckProgram run checks the selected GPU worker$`, s.runFreshNVIDIAHealthCheckProgram)
+	sc.Step(`^the NVIDIA libraries HealthCheckProgram check is fresh and passing$`, s.nvidiaLibrariesHCProgramCheckPasses)
 	sc.Step(`^a Slurm job checks its job tmpfs directory on the selected worker$`, s.aSlurmJobChecksItsJobTmpfsDirectoryOnTheSelectedWorker)
 	sc.Step(`^the job tmpfs directory existed during the job$`, s.theJobTmpfsDirectoryExistedDuringTheJob)
 	sc.Step(`^the job tmpfs directory is removed after the job exits$`, s.theJobTmpfsDirectoryIsRemovedAfterTheJobExits)
@@ -116,6 +121,7 @@ func (s *PassiveChecks) CleanupAndReset(ctx context.Context) {
 	s.gpuHooksJob = framework.SbatchJob{}
 	s.gpuHealthRunIDs = nil
 	s.gpuHCProgramBaselineRunIDs = nil
+	s.nvidiaHCProgramBaseline = ""
 	s.gpuCount = 0
 }
 
@@ -343,6 +349,11 @@ func (s *PassiveChecks) aSmallGPUSlurmJobRunsOnTheSelectedGPUWorker(ctx context.
 		return err
 	}
 	if err := framework.WaitForJobSucceeded(ctx, s.runtime, s.slurm, job, passiveGPUJobTimeout); err != nil {
+		runCleanupPhase(ctx, s.runtime, "cancel GPU passive-check job", passiveGPUJobTimeout, func(cleanupCtx context.Context) error {
+			cleanupErr := s.slurm.CancelJob(cleanupCtx, job.ID, passiveGPUJobTimeout)
+			framework.RecordWorkerCleanupError(cleanupCtx, cleanupErr)
+			return cleanupErr
+		})
 		return err
 	}
 	s.gpuHooksJob = job

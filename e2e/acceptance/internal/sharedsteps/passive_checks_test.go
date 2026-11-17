@@ -25,6 +25,7 @@ type passiveCheckRuntime struct {
 func (r *passiveCheckRuntime) Worker(framework.WorkerInfo) framework.CommandScope { return r.worker }
 func (r *passiveCheckRuntime) Jail() framework.CommandScope                       { return r.jail }
 func (r *passiveCheckRuntime) Kubectl() framework.ArgsScope                       { return r.kubectl }
+func (r *passiveCheckRuntime) Logf(string, ...any)                                {}
 func (r *passiveCheckRuntime) WorkerPod(pod framework.WorkerPodInfo) framework.CommandScope {
 	r.selectedPod = pod
 	return r.workerPod

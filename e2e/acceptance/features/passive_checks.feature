@@ -62,3 +62,12 @@ Feature: Passive checks
     And HealthCheckProgram runs on the selected worker
     Then the selected GPU worker no longer has alloc_gpus_busy reason
     And the selected GPU worker is usable after alloc_gpus_busy
+
+  @soperator_version_>=5.0.0
+  Scenario: NVIDIA libraries checks pass in Prolog and HealthCheckProgram
+    Given a GPU worker is selected
+    And the NVIDIA libraries passive check is enabled for that worker
+    When a small GPU Slurm job runs on the selected GPU worker
+    Then the NVIDIA libraries Prolog check is fresh and passing
+    When a fresh HealthCheckProgram run checks the selected GPU worker
+    Then the NVIDIA libraries HealthCheckProgram check is fresh and passing
