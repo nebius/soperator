@@ -14,7 +14,7 @@ jobs:
       id-token: write
     uses: ./.github/workflows/one_job.yml
     with:
-      unstable: 'false'
+      unstable: ${{ 'false' }}
     secrets: inherit
 
   tag:
@@ -36,7 +36,7 @@ jobs:
         run: |
           # Get the latest release tag (semantic version) that's reachable from the current commit
           # Match tags like: 1.2.3 (without 'v' prefix)
-          # Exclude current version to support hotfix re-runs
+          # Exclude the current release version from the previous-tag calculation
           CURRENT_VERSION="$(cat VERSION)"
           PREV_TAG=$(git tag --merged HEAD^ | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${CURRENT_VERSION}$" | sort -V | tail -1)
           if [ -z "$PREV_TAG" ]; then
@@ -53,11 +53,32 @@ jobs:
           VERSION="$(cat VERSION)"
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
 
-      - name: Push new tag (force update if exists)
+      - name: Push new tag
+        shell: bash
         run: |
+          set -euo pipefail
           VERSION="${{ steps.get-version.outputs.version }}"
-          git tag -f "${VERSION}"
-          git push -f origin "${VERSION}"
+
+          set +e
+          git ls-remote --exit-code --tags origin "refs/tags/${VERSION}" >/dev/null
+          TAG_LOOKUP_STATUS=$?
+          set -e
+
+          case "$TAG_LOOKUP_STATUS" in
+            0)
+              echo "Git tag ${VERSION} already exists; refusing to overwrite it" >&2
+              exit 1
+              ;;
+            2)
+              ;;
+            *)
+              echo "Unable to determine whether Git tag ${VERSION} exists" >&2
+              exit "$TAG_LOOKUP_STATUS"
+              ;;
+          esac
+
+          git tag "${VERSION}"
+          git push origin "refs/tags/${VERSION}"
 
     outputs:
       previous-tag: ${{ steps.get-previous-tag.outputs.tag }}
