@@ -16,6 +16,7 @@ func RenderDeployment(
 	namespace,
 	clusterName string,
 	accounting *values.SlurmAccounting,
+	controller *values.SlurmController,
 	nodeFilter []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 ) (deployment *appsv1.Deployment, err error) {
@@ -25,6 +26,7 @@ func RenderDeployment(
 	podTemplate, err := BasePodTemplateSpec(
 		clusterName,
 		accounting,
+		controller,
 		nodeFilter,
 		volumeSources,
 		matchLabels,

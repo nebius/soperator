@@ -4,13 +4,26 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/render/accounting"
+	"nebius.ai/slurm-operator/internal/values"
 )
+
+func TestBasePodTemplateSpecMountsJailReadOnly(t *testing.T) {
+	pod, err := accounting.BasePodTemplateSpec(
+		defaultNameCluster, acc, &values.SlurmController{}, defaultNodeFilter, defaultVolumeSources, matchLabels,
+	)
+	require.NoError(t, err)
+	require.Len(t, pod.Spec.Containers, 1)
+	assert.Contains(t, pod.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+		Name: "jail", MountPath: "/mnt/jail", ReadOnly: true,
+	})
+}
 
 func Test_BasePodTemplateSpec(t *testing.T) {
 	expected := corev1.PodTemplateSpec{
@@ -59,7 +72,7 @@ func Test_BasePodTemplateSpec(t *testing.T) {
 	}
 
 	result, err := accounting.BasePodTemplateSpec(
-		defaultNameCluster, acc, defaultNodeFilter, defaultVolumeSources, matchLabels,
+		defaultNameCluster, acc, &values.SlurmController{}, defaultNodeFilter, defaultVolumeSources, matchLabels,
 	)
 	assert.NoError(t, err)
 
@@ -106,7 +119,7 @@ func Test_BasePodTemplateSpec_PriorityClass(t *testing.T) {
 			testAcc.SlurmNode.PriorityClass = tt.priorityClass
 
 			result, err := accounting.BasePodTemplateSpec(
-				defaultNameCluster, &testAcc, defaultNodeFilter, defaultVolumeSources, matchLabels,
+				defaultNameCluster, &testAcc, &values.SlurmController{}, defaultNodeFilter, defaultVolumeSources, matchLabels,
 			)
 			assert.NoError(t, err)
 

@@ -2,6 +2,10 @@
 
 set -e # Exit immediately if any command returns a non-zero error code
 
+echo "Link users from jail"
+ln -sf /mnt/jail/etc/passwd /etc/passwd
+ln -sf /mnt/jail/etc/group /etc/group
+
 echo "Bind-mount REST JWT key from K8S secret"
 touch /var/spool/slurmdbd/jwt_hs256.key
 mount --bind /mnt/rest-jwt-key/rest_jwt.key /var/spool/slurmdbd/jwt_hs256.key
@@ -15,6 +19,11 @@ chmod 755 /var/spool/slurmdbd # It changes permissions of this shared directory 
 # TODO: Since 1.29 kubernetes supports native sidecar containers. We can remove it in feature releases
 echo "Waiting until munge started"
 while [ ! -S "/run/munge/munge.socket.2" ]; do sleep 2; done
+
+if [ "${SOPERATOR_SSSD_ENABLED:-false}" = "true" ]; then
+    echo "Waiting until SSSD NSS socket is ready"
+    while [ ! -S "/var/lib/sss/pipes/nss" ]; do sleep 2; done
+fi
 
 # Hack with logs: multilog will write log in stdout and in log file, and rotate log file
 # # s100000000 (bytes) - 100MB, n5 - 5 files
