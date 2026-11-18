@@ -75,6 +75,7 @@ func TestSharedHeavyScenarios(t *testing.T) {
 		"Non-responding kubelet recreates a Kubernetes node and recovers the worker",
 		"A burst of batch jobs is accepted and drained within the budget",
 		"Workers recover after their VMs are stopped and started",
+		"A worker recovers after Slurm cannot kill a job",
 	}, sharedScenariosTagged(t, "@heavy"))
 }
 
