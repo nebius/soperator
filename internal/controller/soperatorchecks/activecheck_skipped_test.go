@@ -47,6 +47,7 @@ func TestActiveCheckJobReconciler_SkippedAnnotation(t *testing.T) {
 		podName         = "cuda-samples-12345-abcde"
 		skipReason      = "no GPU nodes in slurm_base.conf.noedit"
 	)
+	jobCreationTime := metav1.NewTime(time.Date(2026, time.April, 13, 9, 58, 0, 0, time.UTC))
 
 	activeCheck := &slurmv1alpha1.ActiveCheck{
 		ObjectMeta: metav1.ObjectMeta{Name: activeCheckName, Namespace: ns},
@@ -66,8 +67,9 @@ func TestActiveCheckJobReconciler_SkippedAnnotation(t *testing.T) {
 
 	k8sJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
-			Namespace: ns,
+			Name:              jobName,
+			Namespace:         ns,
+			CreationTimestamp: jobCreationTime,
 			Annotations: map[string]string{
 				consts.ActiveCheckSkippedReasonAnnotation: skipReason,
 			},
@@ -113,6 +115,8 @@ func TestActiveCheckJobReconciler_SkippedAnnotation(t *testing.T) {
 	assert.Equal(t, consts.ActiveCheckSlurmRunStatusSkipped, updated.Status.SlurmJobsStatus.LastRunStatus)
 	assert.Equal(t, jobName, updated.Status.SlurmJobsStatus.LastRunName)
 	assert.Equal(t, "No slurm job", updated.Status.SlurmJobsStatus.LastRunId)
+	require.NotNil(t, updated.Status.SlurmJobsStatus.LastRunSubmitTime)
+	assert.Equal(t, jobCreationTime.Unix(), updated.Status.SlurmJobsStatus.LastRunSubmitTime.Unix())
 
 	updatedJob := &batchv1.Job{}
 	require.NoError(t, client.Get(ctx, types.NamespacedName{Name: jobName, Namespace: ns}, updatedJob))
