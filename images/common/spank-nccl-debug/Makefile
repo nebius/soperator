@@ -81,10 +81,14 @@ redeploy:
 	$(foreach \
 		i, \
 		$(NODE_RANGE_WORKER), \
+		kubectl -n soperator cp ../enroot/30-nccl-debug.sh worker-$(i):/etc/enroot/hooks.d/30-nccl-debug.sh && \
+		kubectl -n soperator exec worker-$(i) -- chmod 0755 /etc/enroot/hooks.d/30-nccl-debug.sh && \
 		kubectl -n soperator cp ./build/spanknccldebug.so worker-$(i):/usr/lib/x86_64-linux-gnu/slurm/ ; \
 	)
 	$(foreach \
 		i, \
 		$(NODE_RANGE_LOGIN), \
+		kubectl -n soperator cp ../enroot/30-nccl-debug.sh login-$(i):/etc/enroot/hooks.d/30-nccl-debug.sh && \
+		kubectl -n soperator exec login-$(i) -- chmod 0755 /etc/enroot/hooks.d/30-nccl-debug.sh && \
 		kubectl -n soperator cp ./build/spanknccldebug.so login-$(i):/usr/lib/x86_64-linux-gnu/slurm/ ; \
 	)
