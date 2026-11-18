@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -107,6 +108,8 @@ func (r *ServiceReconciler) patch(existing, desired client.Object) (client.Patch
 
 		dst.Spec.Type = src.Spec.Type
 		dst.Spec.Ports = append([]corev1.ServicePort{}, src.Spec.Ports...)
+		dst.Spec.LoadBalancerSourceRanges = slices.Clone(src.Spec.LoadBalancerSourceRanges)
+		dst.Spec.LoadBalancerIP = src.Spec.LoadBalancerIP
 
 		return res
 	}
