@@ -94,6 +94,7 @@ func TestSharedSequentialScenarios(t *testing.T) {
 		"A burst of batch jobs is accepted and drained within the budget",
 		"Workers recover after their VMs are stopped and started",
 		"A static NodeSet can transition to ephemeral mode and back",
+		"A manually powered down static worker returns to service",
 		"Tailscale login sidecars wait for authentication and persist their state",
 		"Partitions and workers use their configured topologies",
 		"Every configured topology can schedule a job",
