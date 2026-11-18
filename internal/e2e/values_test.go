@@ -9,6 +9,95 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestOverrideTestValuesMixedProfile(t *testing.T) {
+	p := mixedGPUProfile()
+	vars := overrideTestValues(map[string]interface{}{}, Config{Profile: p})
+	data, err := json.Marshal(vars)
+	require.NoError(t, err)
+	var rendered struct {
+		Workers []struct {
+			Name     string `json:"name"`
+			Size     int    `json:"size"`
+			Resource struct {
+				Platform string `json:"platform"`
+				Preset   string `json:"preset"`
+			} `json:"resource"`
+			GPUCluster *struct {
+				Fabric string `json:"infiniband_fabric"`
+			} `json:"gpu_cluster"`
+			CreatePartition bool `json:"create_partition"`
+		} `json:"slurm_nodeset_workers"`
+		Partitions []struct {
+			Name             string   `json:"name"`
+			IsAll            bool     `json:"is_all"`
+			SlurmNodeSetRefs []string `json:"slurm_nodeset_refs"`
+			Topology         string   `json:"topology"`
+			Config           string   `json:"config"`
+		} `json:"slurm_nodesets_partitions"`
+	}
+	require.NoError(t, json.Unmarshal(data, &rendered))
+	require.Len(t, rendered.Workers, 3)
+	var total int
+	for i, worker := range rendered.Workers {
+		ns := p.NodeSets[i]
+		assert.Equal(t, ns.Name, worker.Name)
+		assert.Equal(t, ns.Size, worker.Size)
+		assert.Equal(t, ns.Platform, worker.Resource.Platform)
+		assert.Equal(t, ns.Preset, worker.Resource.Preset)
+		assert.True(t, worker.CreatePartition)
+		total += worker.Size
+		if ns.InfinibandFabric == "" {
+			assert.Nil(t, worker.GPUCluster)
+			continue
+		}
+		require.NotNil(t, worker.GPUCluster)
+		assert.Equal(t, ns.InfinibandFabric, worker.GPUCluster.Fabric)
+	}
+	assert.Equal(t, 6, total)
+	require.Len(t, rendered.Partitions, 4)
+	assert.Equal(t, "main", rendered.Partitions[0].Name)
+	assert.True(t, rendered.Partitions[0].IsAll)
+	assert.Contains(t, rendered.Partitions[0].Config, "Default=YES")
+	assert.Equal(t, "hidden", rendered.Partitions[1].Name)
+	assert.True(t, rendered.Partitions[1].IsAll)
+	assert.Contains(t, rendered.Partitions[1].Config, "Hidden=YES")
+	for i, partition := range rendered.Partitions[2:] {
+		assert.Equal(t, p.Partitions[i].Name, partition.Name)
+		assert.Equal(t, p.Partitions[i].NodeSets, partition.SlurmNodeSetRefs)
+		assert.False(t, partition.IsAll)
+		assert.Equal(t, "flat", partition.Topology)
+		assert.Contains(t, partition.Config, "Default=NO")
+	}
+}
+
+func TestOverrideTestValuesDefaultPartitions(t *testing.T) {
+	vars := overrideTestValues(map[string]interface{}{}, Config{Profile: validProfile()})
+	partitions, ok := vars["slurm_nodesets_partitions"].([]interface{})
+	require.True(t, ok)
+	require.Len(t, partitions, 2)
+	assert.Equal(t, "main", partitions[0].(map[string]interface{})["name"])
+	assert.Equal(t, "hidden", partitions[1].(map[string]interface{})["name"])
+}
+
+func TestOverrideTestValuesSSHFeatures(t *testing.T) {
+	for _, profile := range []Profile{validProfile(), mixedGPUProfile()} {
+		vars := overrideTestValues(map[string]interface{}{}, Config{Profile: profile})
+		assert.Equal(t, map[string]interface{}{
+			"enabled": true,
+			"spec": map[string]interface{}{
+				"size_gibibytes":  93,
+				"filesystem_type": "ext4",
+				"disk_type":       "NETWORK_SSD_IO_M3",
+			},
+		}, vars["slurm_login_image_disk"])
+		assert.Equal(t, true, vars["slurm_login_user_isolation_enabled"])
+		policy, ok := vars["pam_slurm_adopt"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, true, policy["enabled"])
+		assert.Equal(t, []string{"bob", "dockeruser"}, policy["exempt_users"])
+	}
+}
+
 func TestOverrideTestValuesNFS(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -33,7 +122,7 @@ func TestOverrideTestValuesNFS(t *testing.T) {
 				SoperatorVersion: "4.1.12-r2012dad5", SoperatorUnstable: tc.unstable, NFSVersion: tc.version,
 			})
 			assert.Equal(t, map[string]interface{}{
-				"enabled": tc.enabled,
+				"enabled": true,
 				"spec": map[string]interface{}{
 					"version": tc.version, "use_stable_repo": !tc.unstable,
 					"size_gibibytes": 3720, "threads": 32, "disk_type": "NETWORK_SSD_IO_M3",
@@ -45,20 +134,20 @@ func TestOverrideTestValuesNFS(t *testing.T) {
 }
 
 func TestOverrideTestValuesWithoutNFS(t *testing.T) {
-	result := overrideTestValues(map[string]interface{}{}, Config{NFSVersion: "1.2.2"})
-	assert.NotContains(t, result, "nfs_in_k8s")
-	result = overrideTestValues(map[string]interface{}{"nfs_in_k8s": nil}, Config{NFSVersion: "1.2.2"})
-	assert.Nil(t, result["nfs_in_k8s"])
 	for _, nfs := range []map[string]interface{}{
+		nil,
 		{"enabled": false},
 		{"enabled": false, "spec": nil},
 	} {
-		expected := map[string]interface{}{}
-		for key, value := range nfs {
-			expected[key] = value
-		}
-		result = overrideTestValues(map[string]interface{}{"nfs_in_k8s": nfs}, Config{NFSVersion: "1.2.2"})
-		assert.Equal(t, expected, result["nfs_in_k8s"])
+		result := overrideTestValues(map[string]interface{}{"nfs_in_k8s": nfs}, Config{NFSVersion: "1.2.2"})
+		assert.Equal(t, map[string]interface{}{
+			"enabled": true,
+			"spec": map[string]interface{}{
+				"version": "1.2.2", "use_stable_repo": true,
+				"size_gibibytes": 3720, "disk_type": "NETWORK_SSD_IO_M3", "filesystem_type": "ext4", "threads": 128,
+				"node_group": map[string]interface{}{"resource": map[string]interface{}{"platform": "cpu-d3"}},
+			},
+		}, result["nfs_in_k8s"])
 	}
 }
 

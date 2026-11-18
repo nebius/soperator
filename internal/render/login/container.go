@@ -32,6 +32,7 @@ func renderContainerSshd(
 		common.RenderVolumeMountInMemory(),
 		common.RenderVolumeMountTmpDisk(),
 		renderVolumeMountSshdConfigs(),
+		renderVolumeMountServiceAccount(),
 	}
 	if userIsolation != nil && ptr.Deref(userIsolation.Enabled, false) {
 		volumeMounts = append(volumeMounts, renderVolumeMountUserIsolation())

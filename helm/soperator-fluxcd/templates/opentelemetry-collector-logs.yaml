@@ -187,6 +187,14 @@ spec:
         readOnly: true
       {{- end }}
 
+    {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
+    {{- with .Values.observability.opentelemetry.logs.values.nodeLogs.supplementalGroups }}
+    podSecurityContext:
+      supplementalGroups:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- end }}
+
     securityContext:
       runAsGroup: 0
       runAsUser: 10001
@@ -209,33 +217,20 @@ spec:
         value: {{ .Values.observability.clusterId | quote }}
       {{- end }}
 
-    {{- if or $logsEnableFileStorage .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
+    {{- if $logsEnableFileStorage }}
     initContainers:
       - name: init-fs
         image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
         volumeMounts:
-          {{- if $logsEnableFileStorage }}
           - name: varlibotelcol
             mountPath: /var/lib/otelcol
-          {{- end }}
-
-          {{- if .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
-          - name: node-logs
-            mountPath: /var/nodelogs
-          {{- end }}
         securityContext:
           runAsGroup: 0
           runAsUser: 0
         command:
           - sh
           - "-c"
-          {{- if and $logsEnableFileStorage .Values.observability.opentelemetry.logs.values.nodeLogs.enabled }}
-          - 'chown -R 10001: /var/lib/otelcol /var/nodelogs'
-          {{- else if $logsEnableFileStorage }}
           - 'chown -R 10001: /var/lib/otelcol'
-          {{- else }}
-          - 'chown -R 10001: /var/nodelogs'
-          {{- end }}
     {{- end }}
 
     {{- if and .Values.observability.opentelemetry.logs.values .Values.observability.opentelemetry.logs.values.resources }}

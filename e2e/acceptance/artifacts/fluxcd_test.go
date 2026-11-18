@@ -11,7 +11,7 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
-func TestFluxCDCollectorCollectsOnlyReconciliationResources(t *testing.T) {
+func TestFluxCDCollectorCollectsReconciliationResourcesAndValues(t *testing.T) {
 	var calls [][]string
 	collector := &fluxCDCollector{kubectl: framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
 		calls = append(calls, args)
@@ -38,6 +38,6 @@ func TestFluxCDCollectorCollectsOnlyReconciliationResources(t *testing.T) {
 	} {
 		assert.FileExists(t, filepath.Join(destination, filename))
 	}
-	assert.NoDirExists(t, filepath.Join(destination, "values-from"))
+	assert.FileExists(t, filepath.Join(destination, "values-from", "configmaps.json"))
 	assert.NoFileExists(t, filepath.Join(destination, "events.txt"))
 }

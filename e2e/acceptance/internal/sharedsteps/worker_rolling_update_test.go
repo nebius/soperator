@@ -231,7 +231,7 @@ func TestWorkerRolloutCleanupSettlesCurrentTemplateBeforeReleasingHolds(t *testi
 			held := true
 			runtime.commands = framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
 				switch command {
-				case "scontrol -o show nodes":
+				case "scontrol -o show node 'worker-0'":
 					return "NodeName=worker-0 State=IDLE CPUAlloc=0", nil
 				case "scontrol show config":
 					if held {
@@ -531,7 +531,7 @@ func TestRolloutIdleStepObservesOnlySelectedSlurmNodes(t *testing.T) {
 	})
 	reads := 0
 	runtime.commands = framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
-		assert.Equal(t, "scontrol -o show nodes", command)
+		assert.Equal(t, "scontrol -o show node 'worker-3,worker-8'", command)
 		reads++
 		state := "ALLOCATED"
 		if reads > 1 {
@@ -726,6 +726,10 @@ func (*rolloutPollRuntime) WaitFor(ctx context.Context, _ string, _, _ time.Dura
 	var last error
 	for range 3 {
 		done, err := condition(ctx)
+		var permanent *framework.PermanentError
+		if errors.As(err, &permanent) {
+			return err
+		}
 		last = err
 		if done && err == nil {
 			return nil
@@ -903,7 +907,7 @@ func (r *rolloutWorkersRuntime) Controller() framework.CommandScope {
 			return "SuspendExcNodes = worker-0,worker-3\n", nil
 		case strings.HasPrefix(command, "scontrol show hostnames "):
 			return "worker-0\nworker-3\n", nil
-		case command == "scontrol -o show nodes":
+		case command == "scontrol -o show nodes", strings.HasPrefix(command, "scontrol -o show node "):
 			nodeSets := r.nodeSets
 			if len(nodeSets) == 0 {
 				nodeSets = []kubeobjects.NodeSet{r.nodeSet}
@@ -1314,7 +1318,11 @@ func TestEphemeralWorkerHoldRejectsInvalidExpansion(t *testing.T) {
 	for _, output := range []string{"", "worker-0 extra", "worker-[0-2]"} {
 		runtime := newRolloutPowerRuntime(t, powerConfigReply("worker-[0-2]"), powerHostsReply("worker-[0-2]", output))
 		s := WorkerRollingUpdate{slurm: framework.NewSlurmClient(runtime), runtime: runtime}
-		require.ErrorContains(t, s.holdEphemeralWorkers(context.Background(), []string{"worker-0"}), "invalid node name")
+		want := "invalid node name"
+		if output == "" {
+			want = "expanded to nothing"
+		}
+		require.ErrorContains(t, s.holdEphemeralWorkers(context.Background(), []string{"worker-0"}), want)
 		assert.Empty(t, s.power.names)
 	}
 }

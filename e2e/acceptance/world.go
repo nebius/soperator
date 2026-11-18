@@ -125,10 +125,7 @@ func (w *world) Run(ctx context.Context, name string, args ...string) (string, e
 	out := stdout.String()
 	errOut := strings.TrimSpace(stderr.String())
 	if err != nil {
-		if errOut != "" {
-			return out, fmt.Errorf("%s %s: %w: %s", name, strings.Join(args, " "), err, errOut)
-		}
-		return out, fmt.Errorf("%s %s: %w", name, strings.Join(args, " "), err)
+		return out, &framework.CommandError{Name: name, Args: args, Err: err, Stderr: errOut}
 	}
 
 	if errOut != "" {
@@ -166,10 +163,17 @@ func (w *world) WaitFor(ctx context.Context, description string, timeout, pollIn
 		}
 
 		done, err := condition(waitCtx)
+		if waitCtx.Err() != nil {
+			continue
+		}
 		if err == nil && done {
 			return nil
 		}
-		if err != nil && waitCtx.Err() == nil {
+		if err != nil {
+			var permanent *framework.PermanentError
+			if errors.As(err, &permanent) {
+				return fmt.Errorf("wait for %s: %w", description, err)
+			}
 			lastErr = err
 			w.logf("wait for %s still pending: %v", description, err)
 		}

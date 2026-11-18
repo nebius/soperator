@@ -3,6 +3,7 @@ package sharedsteps
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,6 +67,103 @@ func TestRunInternalSSHAsTestUser(t *testing.T) {
 			"(ssh-keygen -R 'worker-0' -f ~/.ssh/known_hosts >/dev/null 2>&1 || true) && "+
 			"timeout 30 ssh 'worker-0' 'ulimit -n' </dev/null",
 	), command)
+}
+
+func TestRunInternalSSHAsUser(t *testing.T) {
+	var command string
+	runtime := &sshTestUserRuntime{
+		jail: framework.NewCommandScope(func(_ context.Context, value string) (string, error) {
+			command = value
+			return "worker-0\n", nil
+		}),
+	}
+
+	_, err := runInternalSSHAsUser(t.Context(), runtime, pamSlurmAdoptLimitsUser, "worker-0", 30*time.Second, "ulimit -n")
+	require.NoError(t, err)
+	assert.Contains(t, command, "su - 'soperatoradoptlimits' -c ")
+	assert.NotContains(t, command, "'bob'")
+}
+
+func TestWaitForSSHHolderJobNeedsBatchStart(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		stdout string
+		ready  bool
+	}{
+		{name: "running before batch start"},
+		{name: "batch started", stdout: "SOPERATOR_E2E_SSH_HOLDER_STARTED\n", ready: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			job := framework.SbatchJob{ID: "42", StdoutPath: "/jobs/42.out"}
+			runtime := &sshTestUserRuntime{
+				jail: framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+					switch {
+					case strings.HasPrefix(command, "squeue "):
+						return "RUNNING\n", nil
+					case strings.Contains(command, job.StdoutPath):
+						return tc.stdout, nil
+					default:
+						return "", nil
+					}
+				}),
+			}
+			err := waitForSSHHolderJob(t.Context(), runtime, framework.NewSlurmClient(runtime), job, time.Minute)
+			if tc.ready {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestUnprivilegedSSHUserCreationAndExistingGroupRemoval(t *testing.T) {
+	var commands []string
+	runtime := &sshTestUserRuntime{jail: framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+		commands = append(commands, command)
+		if command == "id -u 'soperatormema' && id -nG 'soperatormema'" {
+			return "1002\nsoperatormema sudo docker\n", nil
+		}
+		if command == "id -nG 'soperatormema'" {
+			return "soperatormema\n", nil
+		}
+		return "", nil
+	})}
+	require.NoError(t, ensureUnprivilegedSSHTestUser(t.Context(), runtime, "soperatormema"))
+	require.Len(t, commands, 5)
+	assert.Contains(t, commands[0], "createuser --without-external-ssh '--without-sudo' '--without-docker' 'soperatormema'")
+	assert.Equal(t, "gpasswd -d 'soperatormema' 'sudo'", commands[2])
+	assert.Equal(t, "gpasswd -d 'soperatormema' 'docker'", commands[3])
+	assert.Equal(t, "id -nG 'soperatormema'", commands[4])
+}
+
+func TestUnprivilegedSSHUserRejectsSystemUIDBeforeGroupMutation(t *testing.T) {
+	var commands []string
+	runtime := &sshTestUserRuntime{jail: framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+		commands = append(commands, command)
+		return "0\nroot sudo docker\n", nil
+	})}
+	err := ensureUnprivilegedSSHTestUser(t.Context(), runtime, "soperatormema")
+	require.ErrorContains(t, err, "require a regular SSH user")
+	assert.Len(t, commands, 2)
+}
+
+func TestUnprivilegedSSHGroupsRejectsRemainingPrivileges(t *testing.T) {
+	for _, groups := range [][]string{nil, {"regular", "sudo"}, {"regular", "docker"}, {"root"}} {
+		require.Error(t, validateUnprivilegedSSHGroups(groups))
+	}
+	require.NoError(t, validateUnprivilegedSSHGroups([]string{"regular", "users"}))
+	problem := errors.New("group database is read-only")
+	runtime := &sshTestUserRuntime{jail: framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+		if command == "id -u 'soperatormema' && id -nG 'soperatormema'" {
+			return "1002\nsoperatormema sudo\n", nil
+		}
+		if command == "gpasswd -d 'soperatormema' 'sudo'" {
+			return "", problem
+		}
+		return "", nil
+	})}
+	require.ErrorIs(t, ensureUnprivilegedSSHTestUser(t.Context(), runtime, "soperatormema"), problem)
 }
 
 func TestWaitForSSHTestUserOnController(t *testing.T) {

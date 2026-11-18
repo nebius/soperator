@@ -197,7 +197,17 @@ func (s *SoperatorUtils) downloadNVIDIABugReport(ctx context.Context) error {
 		framework.ShellQuote(path.Join(soperatorUtilsDir, "worker_nvidia_bug_report.sh")),
 		framework.ShellQuote(s.worker.SlurmNode.InstanceID),
 	)
-	if _, err := s.runtime.Jail().Run(ctx, command); err != nil {
+	output, err := s.runtime.Jail().Run(ctx, command)
+	if err != nil {
+		if artifacts, ok := framework.ScenarioArtifacts(ctx); ok {
+			if len(output) > workerDiagnosticsLimit {
+				output = output[:workerDiagnosticsLimit] + "\n[Output truncated]\n"
+			}
+			if writeErr := artifacts.WriteRunnerFile("nvidia-report-collection.txt", output+"\n"+err.Error()); writeErr != nil {
+				s.runtime.Logf("Write NVIDIA report collection output: %v", writeErr)
+			}
+			collectWorkerDiagnostics(ctx, s.runtime, []framework.WorkerInfo{s.worker}, nvidiaFailureDiagnostics(artifacts, s.worker))
+		}
 		return fmt.Errorf("download NVIDIA bug report from worker %s: %w", s.worker.Name, err)
 	}
 	return nil

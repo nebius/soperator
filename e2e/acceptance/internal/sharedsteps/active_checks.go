@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -260,9 +258,8 @@ func (s *ActiveChecks) captureDryRunJobLogs(ctx context.Context) error {
 	}
 	s.dryRunLogs = logs
 	if artifacts, ok := framework.ScenarioArtifacts(ctx); ok {
-		artifactPath := filepath.Join(artifacts.RunnerDir, manageJailStateDryRunLogsFilename)
-		if err := os.WriteFile(artifactPath, []byte(logs), 0o644); err != nil {
-			return fmt.Errorf("write manage-jail-state dry-run logs to %s: %w", artifactPath, err)
+		if err := artifacts.WriteRunnerFile(manageJailStateDryRunLogsFilename, logs); err != nil {
+			return fmt.Errorf("write manage-jail-state dry-run logs: %w", err)
 		}
 	}
 	return nil

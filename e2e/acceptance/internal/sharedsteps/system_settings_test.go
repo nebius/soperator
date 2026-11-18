@@ -146,6 +146,19 @@ func TestPAMSlurmAdoptRequiresJob(t *testing.T) {
 	}
 }
 
+func TestPAMSlurmAdoptProTestAccounts(t *testing.T) {
+	cluster := framework.SlurmClusterInfo{
+		PAMSlurmAdoptEnabled:     true,
+		PAMSlurmAdoptExemptUsers: []string{"bob", "dockeruser"},
+	}
+	for _, user := range []string{sshTestUserName, dockerSSHUserName} {
+		assert.False(t, pamSlurmAdoptRequiresJob(cluster, user, nil), "%s needs direct SSH without a job", user)
+	}
+	for _, user := range []string{pamSlurmAdoptUser, pamSlurmAdoptLimitsUser} {
+		assert.True(t, pamSlurmAdoptRequiresJob(cluster, user, nil), "%s must exercise PAM adoption", user)
+	}
+}
+
 func TestParseCombinedResourceLimitsAndKernelSettingsFromPTY(t *testing.T) {
 	limits := renderResourceLimitSnapshotsForTest(computeResourceLimitProfile(), computeResourceLimitProfile())
 	kernel := `fs.file-max=9223372036854775807
@@ -179,8 +192,8 @@ func TestValidateRegularUserSlurmResourceLimitSnapshots(t *testing.T) {
 
 func TestSrunProbeCommandForGPUContainers(t *testing.T) {
 	assert.Equal(t,
-		"NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video srun --nodes=1 --ntasks=1 "+
-			"--container-image="+framework.ShellQuote(gpuSmokeEnrootImage)+" bash -lc 'true'",
+		"NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video srun --nodes=1 --ntasks=1 "+
+			"--container-image='docker://cr.nebius.cloud#soperator/ubuntu:noble' bash -lc 'true'",
 		srunProbeCommand("true", probeContainerEnrootGPU),
 	)
 	assert.Equal(t,

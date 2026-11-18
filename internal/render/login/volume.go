@@ -13,6 +13,8 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
+const volumeNameServiceAccount = "service-account"
+
 func renderVolumesAndClaimTemplateSpecs(
 	clusterName string,
 	secrets *slurmv1.Secrets,
@@ -28,6 +30,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeInMemory(login.ContainerSshd.Resources.Memory()),
 		common.RenderVolumeTmpDisk(),
 		renderVolumeSshdConfigs(login.SSHDConfigMapName),
+		renderVolumeServiceAccount(),
 	}
 	if login.UserIsolation != nil && ptr.Deref(login.UserIsolation.Enabled, false) {
 		volumes = append(volumes, renderVolumeUserIsolation(clusterName))
@@ -177,3 +180,29 @@ func renderVolumeMountUserIsolation() corev1.VolumeMount {
 }
 
 // endregion configs
+
+func renderVolumeServiceAccount() corev1.Volume {
+	return corev1.Volume{
+		Name: volumeNameServiceAccount,
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				DefaultMode: ptr.To(int32(0400)),
+				Sources: []corev1.VolumeProjection{
+					{ServiceAccountToken: &corev1.ServiceAccountTokenProjection{Path: "token"}},
+					{ConfigMap: &corev1.ConfigMapProjection{
+						LocalObjectReference: corev1.LocalObjectReference{Name: "kube-root-ca.crt"},
+						Items:                []corev1.KeyToPath{{Key: "ca.crt", Path: "ca.crt"}},
+					}},
+				},
+			},
+		},
+	}
+}
+
+func renderVolumeMountServiceAccount() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      volumeNameServiceAccount,
+		MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+		ReadOnly:  true,
+	}
+}
