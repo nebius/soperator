@@ -2,6 +2,7 @@ package sharedsteps
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cucumber/godog"
 
@@ -26,6 +27,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewSlurmConfig(info, slurm),
 		NewSlurmConfigUpdates(info, runtime, slurm, kubectl),
 		NewLoginAutoscaling(info, runtime, kubectl),
+		NewLoginUserIsolation(info, runtime, kubectl),
 		NewTailscale(info, runtime, kubectl),
 		NewObservability(kubectl),
 		NewInternalSSH(runtime, selector),
@@ -37,6 +39,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewSystemSettings(info, runtime, slurm, kubectl, selector),
 		NewTaskPrologEnv(runtime, selector),
 		NewSoperatorUtils(runtime, selector),
+		NewFilesystemLayout(info, runtime, kubectl, selector),
 		NewNodeSetEphemeralModeTransition(info, runtime, kubectl),
 		NewStaticWorkerPowerDown(info, runtime, slurm, kubectl, selector),
 		NewNodeReplacement(runtime, slurm, selector),
@@ -45,10 +48,13 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewEnrootContainers(info, runtime, slurm, kubectl, selector),
 		NewPassiveChecks(info, runtime, slurm, selector),
 		NewJobTmpfs(info, runtime, slurm, kubectl, selector),
+		NewLocalNVMe(runtime, kubectl, selector),
 		NewActiveChecks(info, runtime, slurm, kubectl, selector),
 		NewSystemChecks(runtime, slurm, kubectl, selector),
 		NewTopology(info, runtime, kubectl, selector),
 		NewTopologyLegacy(runtime, selector),
+		NewPerformance(runtime),
+		NewVMStopStart(runtime, slurm, kubectl, selector),
 	} {
 		registerScenarioScoped(sc, family)
 	}
@@ -56,12 +62,21 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 
 func registerScenarioScoped(sc *godog.ScenarioContext, family scenarioScopedStepFamily) {
 	sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
-		family.CleanupAndReset(context.Background())
-		return ctx, nil
+		return ctx, cleanupStepFamily(ctx, family)
 	})
 	sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
-		family.CleanupAndReset(context.Background())
-		return ctx, nil
+		return ctx, cleanupStepFamily(ctx, family)
 	})
 	family.RegisterSteps(sc)
+}
+
+func cleanupStepFamily(ctx context.Context, family scenarioScopedStepFamily) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("clean up %T: %v", family, recovered)
+			framework.RecordWorkerCleanupError(ctx, err)
+		}
+	}()
+	family.CleanupAndReset(context.WithoutCancel(ctx))
+	return nil
 }

@@ -1,0 +1,40 @@
+suite: test login update policy rendering
+templates:
+  - templates/slurm-cluster-cr.yaml
+tests:
+  - it: should render default login update settings
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.updateStrategy
+          value: delayedRollout
+      - equal:
+          path: spec.slurmNodes.login.updatePolicy
+          value:
+            minNotice: "720h"
+
+  - it: should forward configured login update settings
+    set:
+      slurmNodes.login.updateStrategy: rollingUpdate
+      slurmNodes.login.updatePolicy:
+        minNotice: "0s"
+        schedule: "0 0 1 * *"
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.updateStrategy
+          value: rollingUpdate
+      - equal:
+          path: spec.slurmNodes.login.updatePolicy
+          value:
+            minNotice: "0s"
+            schedule: "0 0 1 * *"
+
+  - it: should default an empty strategy and omit an unset policy
+    set:
+      slurmNodes.login.updateStrategy: ""
+      slurmNodes.login.updatePolicy: null
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.updateStrategy
+          value: delayedRollout
+      - notExists:
+          path: spec.slurmNodes.login.updatePolicy

@@ -3,6 +3,7 @@ package framework
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -96,7 +97,7 @@ func TestSubmitBatchRetriesPreExecutionConnectionErrors(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			runtime := &submitBatchRuntime{results: []submitBatchResult{
-				{err: errors.New(tt.err)},
+				{err: kubectlCommandFailure(tt.err)},
 				{out: "123"},
 			}}
 			client := NewSlurmClient(runtime)
@@ -164,7 +165,7 @@ func TestSubmitBatchDoesNotRetryUncertainFailures(t *testing.T) {
 }
 
 func TestSubmitBatchStopsAfterRetryLimit(t *testing.T) {
-	retryableErr := errors.New("kubectl exec login-0: exit status 1: error: dial tcp [::1]:443: i/o timeout")
+	retryableErr := kubectlCommandFailure("error: dial tcp [::1]:443: i/o timeout")
 	runtime := &submitBatchRuntime{results: []submitBatchResult{
 		{err: retryableErr},
 		{err: retryableErr},
@@ -186,7 +187,7 @@ func TestSubmitBatchStopsAfterRetryLimit(t *testing.T) {
 
 func TestSubmitBatchStopsWhenRetryBecomesUncertain(t *testing.T) {
 	runtime := &submitBatchRuntime{results: []submitBatchResult{
-		{err: errors.New("kubectl exec login-0: exit status 1: error: dial tcp [::1]:443: connect: no route to host")},
+		{err: kubectlCommandFailure("error: dial tcp [::1]:443: connect: no route to host")},
 		{err: errors.New("kubectl exec login-0: exit status 1: error: unexpected EOF")},
 		{out: "123"},
 	}}
@@ -257,4 +258,9 @@ func (r *submitBatchRuntime) Jail() CommandScope {
 		}
 		return "123", nil
 	})
+}
+
+func kubectlCommandFailure(stderr string) error {
+	stderr = strings.TrimPrefix(stderr, "kubectl exec login-0: exit status 1: ")
+	return &CommandError{Name: "kubectl", Args: []string{"exec", "login-0"}, Err: errors.New("exit status 1"), Stderr: stderr}
 }

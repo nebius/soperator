@@ -91,9 +91,7 @@ func (s *Topology) blockNodeRanksFollowConfig(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		selected, blockByWorker, err := pickBlockRankWorkers(entry, base, idle, func(value string) ([]string, error) {
-			return s.expandHostlist(ctx, value)
-		})
+		selected, blockByWorker, err := pickBlockRankWorkers(entry, base, idle, s.hostlists.bind(ctx))
 		if err != nil {
 			return err
 		}
@@ -120,16 +118,18 @@ func (s *Topology) blockNodeRanksFollowConfig(ctx context.Context) error {
 const maxBlockRankNodes = 64
 
 func (s *Topology) idleWorkers(ctx context.Context, partition string) (map[string]bool, error) {
-	out, err := s.runtime.Controller().RunWithDefaultRetry(ctx,
-		"sinfo --Node --noheader --partition="+framework.ShellQuote(partition)+" --format='%N %T'")
+	out, err := s.runtime.Controller().RunWithDefaultRetry(ctx, partitionNodesCommand(partition))
 	if err != nil {
 		return nil, fmt.Errorf("read idle workers of partition %s: %w", partition, err)
 	}
+	nodes, err := parsePartitionNodes(out)
+	if err != nil {
+		return nil, fmt.Errorf("parse idle workers of partition %s: %w", partition, err)
+	}
 	idle := make(map[string]bool)
-	for _, line := range strings.Split(out, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) == 2 && fields[1] == "idle" {
-			idle[fields[0]] = true
+	for _, node := range nodes {
+		if node.State == "idle" {
+			idle[node.Name] = true
 		}
 	}
 	return idle, nil

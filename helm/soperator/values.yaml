@@ -16,6 +16,7 @@ controllerManager:
       # - --static-worker-recreate-delay=100s
     controllersEnabled:
       cluster: true
+      loginupdate: true
       nodeconfigurator: true
       nodeset: true
       rollingupdate: true

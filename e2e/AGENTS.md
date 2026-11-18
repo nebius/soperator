@@ -137,11 +137,12 @@ suite from `main` runs against every supported release, so version-specific
 behavior is expressed with `@soperator_version_...` tags and runtime checks,
 never with per-branch copies of the code.
 
-The shared feature suite has three tag forms that affect execution:
+The shared feature suite has four tag forms that affect execution:
 
 - exactly one scenario-level `@soperator_version_...` constraint;
 - optional `@heavy`;
-- optional `@unstable`.
+- optional `@unstable`;
+- optional `@manual`.
 
 CPU, GPU, topology, and other descriptive tags are allowed, but no current
 runner or workflow consumes them. Ask whether the user wants these tags and
@@ -176,6 +177,20 @@ normally be a ticket queued to stabilize every unstable scenario. Add a `TODO`
 next to the tag in the feature file that explains the current problem, links or
 names the ticket when available, and states what must happen before the tag can
 be removed.
+
+Use `@manual` for a scenario that must never start on its own: it runs only
+when a `--scenario` selector (or the workflow `scenarios` input) names its
+feature file or line, and is excluded from every other run, periodic ones
+included. Typical reasons are side effects outside the test cluster, such as
+reporting a real bare-metal host to Compute, or consuming a shared quota.
+`@manual` is not a substitute for `@unstable`: a flaky scenario stays
+`@unstable`. Keep `@heavy` on a long manual scenario so the duration
+classification stays correct once `@manual` is removed; running it then needs
+`--run-heavy`, `run_heavy=true` or `/e2e-full` in addition to the selector,
+exactly as for any other heavy scenario. Add a comment
+next to the tag that explains the side effect and states what must happen
+before the tag can be removed, and update `TestSharedManualScenarios` in
+`acceptance/features_test.go`.
 
 ## Step implementation
 
