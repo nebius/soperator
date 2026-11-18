@@ -3,16 +3,17 @@
 #ifndef SNCCLD_ENROOT_H
 #define SNCCLD_ENROOT_H
 
-/// Absolute path to the directory of Enroot mount configurations.
-#define SNCCLD_ENROOT_MOUNT_DIR "/etc/enroot/mounts.d"
+#include <slurm/spank.h>
 
-/// Template of the Enroot mount in fstab format.
-#define SNCCLD_ENROOT_MOUNT_TEMPLATE "%s %s none %sbind,rw,nosuid\n"
+#define SNCCLD_ENROOT_STATE_DIR_ENV "_SNCCLD_ENROOT_STATE_DIR"
+#define SNCCLD_ENROOT_LOG_DIR_ENV "_SNCCLD_ENROOT_LOG_DIR"
 
-/// Fstab flag to mount the path as a directory.
-#define SNCCLD_ENROOT_MOUNT_TEMPLATE_DIR "x-create=dir,"
+/// Clear inherited mount requests before evaluating this step's configuration.
+spank_err_t snccld_enroot_clear_mounts(spank_t spank);
 
-/// Fstab flag to mount the path as a file.
-#define SNCCLD_ENROOT_MOUNT_TEMPLATE_FILE "x-create=file,"
+/// Publish resolved directories to the Enroot hook; log_dir may be empty.
+spank_err_t snccld_enroot_set_mounts(
+    spank_t spank, const char *state_dir, const char *log_dir
+);
 
 #endif // SNCCLD_ENROOT_H

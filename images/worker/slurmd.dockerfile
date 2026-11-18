@@ -93,6 +93,7 @@ RUN chmod +x /opt/bin/install_enroot.sh && \
 # Copy enroot configuration
 COPY images/common/enroot/enroot.conf /etc/enroot/
 COPY images/common/enroot/custom-dirs.conf /etc/enroot/enroot.conf.d/
+COPY --chmod=0755 images/common/enroot/30-nccl-debug.sh /etc/enroot/hooks.d/30-nccl-debug.sh
 RUN chown 0:0 /etc/enroot/enroot.conf && \
     chmod 644 /etc/enroot/enroot.conf && \
     chown 0:0 /etc/enroot/enroot.conf.d/custom-dirs.conf && \

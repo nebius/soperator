@@ -247,6 +247,12 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
         snccld_config.out_stdout ? "true" : "false"
     );
 
+    spank_err_t result = snccld_enroot_clear_mounts(spank);
+    if (result != ESPANK_SUCCESS) {
+        snccld_log_error("Clear Enroot mount requests: %s", spank_strerror(result));
+        return result;
+    }
+
     if (!snccld_config.enabled) {
         return ESPANK_SUCCESS;
     }
@@ -314,6 +320,7 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     }
 
     snccld_state_t *state = snccld_state_new();
+    char resolved_out_dir[PATH_MAX + 1] = "";
 
     {
         gid_t user_gid = 0;
@@ -327,7 +334,6 @@ int slurm_spank_user_init(spank_t spank, int argc, char **argv) {
     }
 
     if (snccld_config.out_file) {
-        char resolved_out_dir[PATH_MAX + 1];
         snccld_substitute_hostname(
             snccld_config.out_dir, hostname, resolved_out_dir
         );
@@ -413,13 +419,21 @@ user_init_write_state:
     snccld_log_debug("State: \n%s", str);
     free(str);
 
-    snccld_state_write(key, state, hostname);
+    result = snccld_state_write(key, state, hostname);
+    if (result == ESPANK_SUCCESS) {
+        result = snccld_enroot_set_mounts(
+            spank, SNCCLD_SYSTEM_DIR, resolved_out_dir
+        );
+        if (result != ESPANK_SUCCESS) {
+            snccld_log_error("Publish Enroot mount requests: %s", spank_strerror(result));
+        }
+    }
     free(state);
 
 user_init_exit:
     free(key);
     free(hostname);
-    return ESPANK_SUCCESS;
+    return result;
 }
 
 int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
@@ -489,138 +503,6 @@ int slurm_spank_task_init_privileged(spank_t spank, int argc, char **argv) {
         snccld_ensure_file_exists(
             state->user_log_path, true, state->user_gid, state->user_uid
         );
-    }
-
-    // Create Enroot bind mounts for the state and log files.
-    {
-        if (!snccld_dir_exists(SNCCLD_ENROOT_MOUNT_DIR)) {
-            goto mount_config_end;
-        }
-
-        char mount_config_filename[PATH_MAX + 1] = "";
-        snprintf(
-            mount_config_filename,
-            sizeof(mount_config_filename),
-            "%s/%s-%u-%u.fstab",
-            SNCCLD_ENROOT_MOUNT_DIR,
-            "30-nccl-debug",
-            key->job_id,
-            key->step_id
-        );
-        snccld_log_info(
-            "Creating Enroot mount config '%s'.", mount_config_filename
-        );
-
-        char lock_filename[PATH_MAX + 1] = "";
-        snprintf(
-            lock_filename,
-            sizeof(lock_filename),
-            "%s.lock",
-            mount_config_filename
-        );
-
-        // Write config once.
-        int lock_fd;
-        {
-            lock_fd =
-                open(lock_filename, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE);
-            if (lock_fd < 0) {
-                snccld_log_error("Cannot open %s: %m", lock_filename);
-                goto mount_config_end;
-            }
-            if (snccld_ensure_mode(lock_filename, SNCCLD_DEFAULT_MODE) !=
-                ESPANK_SUCCESS) {
-                close(lock_fd);
-                goto mount_config_end;
-            }
-
-            if (flock(lock_fd, LOCK_EX | LOCK_NB) == -1) {
-                snccld_log_error("Cannot flock %s: %m", lock_filename);
-                close(lock_fd);
-                goto mount_config_end;
-            }
-        }
-
-        const int mount_config_fd = open(
-            mount_config_filename, O_CREAT | O_WRONLY, SNCCLD_DEFAULT_MODE
-        );
-        if (mount_config_fd < 0) {
-            snccld_log_error("Cannot open %s: %m", mount_config_filename);
-            goto mount_config_unflock;
-        }
-        if (snccld_ensure_mode(mount_config_filename, SNCCLD_DEFAULT_MODE) !=
-            ESPANK_SUCCESS) {
-            close(mount_config_fd);
-            goto mount_config_unflock;
-        }
-
-        FILE *mount_config_f = fdopen(mount_config_fd, "w");
-        if (mount_config_f == NULL) {
-            snccld_log_error("Cannot fdopen %s: %m", mount_config_filename);
-            close(mount_config_fd);
-            goto mount_config_unflock;
-        }
-
-        {
-            char  *mounts[2];
-            size_t dir_mount_count    = 0;
-            mounts[dir_mount_count++] = strdup(SNCCLD_SYSTEM_DIR);
-            if (snccld_config.out_file) {
-                char resolved_out_dir[PATH_MAX + 1];
-                snccld_substitute_hostname(
-                    snccld_config.out_dir, hostname, resolved_out_dir
-                );
-                mounts[dir_mount_count++] = strdup(resolved_out_dir);
-            }
-
-            // Write dir mounts to the mount config.
-            const size_t unique_dir_mounts =
-                snccld_remove_string_duplicates(mounts, dir_mount_count);
-            for (size_t i = 0; i < unique_dir_mounts; ++i) {
-                fprintf(
-                    mount_config_f,
-                    SNCCLD_ENROOT_MOUNT_TEMPLATE,
-                    mounts[i],
-                    mounts[i],
-                    SNCCLD_ENROOT_MOUNT_TEMPLATE_DIR
-                );
-                snccld_log_debug("Created mount for %s", mounts[i]);
-                free(mounts[i]);
-            }
-            // Remove duplicate elements.
-            for (size_t i = unique_dir_mounts; i < dir_mount_count; ++i) {
-                free(mounts[i]);
-            }
-
-            // Don't write user file to the mount config.
-            /*
-            if (user_set_debug_file) {
-                fprintf(
-                    mount_config_f,
-                    SNCCLD_ENROOT_MOUNT_TEMPLATE,
-                    user_debug_file,
-                    user_debug_file,
-                    SNCCLD_ENROOT_MOUNT_TEMPLATE_FILE
-                );
-                snccld_log_debug("Created mount for %s", user_debug_file);
-            }
-            */
-        }
-
-        fclose(mount_config_f);
-        snprintf(
-            state->mounts_path,
-            sizeof(state->mounts_path),
-            mount_config_filename
-        );
-        snccld_state_write(key, state, hostname);
-
-    mount_config_unflock:
-        flock(lock_fd, LOCK_UN);
-        close(lock_fd);
-        unlink(lock_filename);
-
-    mount_config_end:
     }
 
     free(state);
@@ -797,14 +679,6 @@ int slurm_spank_task_exit(spank_t spank, int argc, char **argv) {
         unlink(state->fifo_path);
     } else {
         snccld_log_info("No named pipe to remove.");
-    }
-
-    // Remove mount config if created.
-    if (strlen(state->mounts_path) > 0) {
-        snccld_log_info("Removing mount config '%s'.", state->mounts_path);
-        unlink(state->mounts_path);
-    } else {
-        snccld_log_info("No mount config to remove.");
     }
 
     free(state);
