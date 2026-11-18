@@ -28,6 +28,7 @@ type StuckJobRecovery struct {
 	worker        framework.WorkerInfo
 	host          corev1.Node
 	faultInjected bool
+	monitoring    *stuckJobMonitoring
 }
 
 type stuckJobReservationKey struct{}
@@ -42,6 +43,8 @@ func (s *StuckJobRecovery) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the worker goes down and reboots$`, s.waitForReboot)
 	sc.Step(`^the worker returns to service automatically$`, s.waitForRecovery)
 	sc.Step(`^a job can use all GPUs on that worker$`, s.runGPUJob)
+	sc.Step(`^monitoring is recording that worker$`, s.monitoringRecordsWorker)
+	sc.Step(`^monitoring records the stuck-job drain, down state and recovery$`, s.monitoringRecordsRecovery)
 	// SoperatorSuite does not yet enable reservation scopes for the whole suite.
 	// This runs after the family's cleanup, while the lease still protects recovery.
 	sc.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
@@ -62,6 +65,7 @@ func (s *StuckJobRecovery) CleanupAndReset(ctx context.Context) {
 	s.worker = framework.WorkerInfo{}
 	s.host = corev1.Node{}
 	s.faultInjected = false
+	s.monitoring = nil
 }
 
 func (s *StuckJobRecovery) reserveWorker(ctx context.Context) (context.Context, error) {
@@ -99,6 +103,9 @@ func (s *StuckJobRecovery) simulateDrain(ctx context.Context) error {
 		return err
 	}
 	// A lost command response may still have applied the drain.
+	if s.monitoring != nil {
+		s.monitoring.since = time.Now()
+	}
 	s.faultInjected = true
 	_, err := s.runtime.Controller().Run(ctx, framework.ShellJoin("scontrol", "update", "nodename="+s.worker.Name, "state=DRAIN", "reason="+stuckJobDrainReason))
 	return err

@@ -76,6 +76,7 @@ func TestSharedHeavyScenarios(t *testing.T) {
 		"A burst of batch jobs is accepted and drained within the budget",
 		"Workers recover after their VMs are stopped and started",
 		"A worker recovers after Slurm cannot kill a job",
+		"Monitoring records a worker recovering after Slurm cannot kill a job",
 	}, sharedScenariosTagged(t, "@heavy"))
 }
 
