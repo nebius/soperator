@@ -2556,6 +2556,8 @@ spec:
                   and passed to slurmd via --conf "Topology=..." parameter.
                   This mode is designed for cloud/ephemeral worker nodes that may be dynamically
                   added or removed from the cluster.
+                  When false, the NodeSet runs static workers. The static worker feature is deprecated
+                  and will be removed.
                 type: boolean
               ephemeralTopologyWaitTimeout:
                 default: 180

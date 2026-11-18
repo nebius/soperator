@@ -61,11 +61,11 @@ func TestEvaluateStressProbes(t *testing.T) {
 		{At: at.Add(20 * time.Second), SqueueMillis: 300, SinfoMillis: 60},
 	}
 	budget := stressProbeBudget{SqueueMean: time.Second, SinfoMean: time.Second, SqueueMax: 5 * time.Second, SinfoMax: 5 * time.Second, SdiagMax: 5 * time.Second}
-	require.NoError(t, evaluateStressProbes(summarizeStressProbes(samples), budget))
-	require.ErrorContains(t, evaluateStressProbes(summarizeStressProbes(samples[:2]), budget), "only 2 of 2 responsiveness probes ran")
+	require.NoError(t, errOnly(evaluateStressProbes(summarizeStressProbes(samples), budget)))
+	require.ErrorContains(t, errOnly(evaluateStressProbes(summarizeStressProbes(samples[:2]), budget)), "only 2 of 2 responsiveness probes ran")
 
 	samples[2].Error = "kubectl exec: dial tcp: i/o timeout"
-	require.ErrorContains(t, evaluateStressProbes(summarizeStressProbes(samples), budget), "only 2 of 3 responsiveness probes ran",
+	require.ErrorContains(t, errOnly(evaluateStressProbes(summarizeStressProbes(samples), budget)), "only 2 of 3 responsiveness probes ran",
 		"a probe that could not run is not a controller failure, but enough probes must run")
 
 	samples = append(samples, stressSample{At: at.Add(30 * time.Second), SqueueMillis: 100, SinfoMillis: 60})
@@ -76,7 +76,7 @@ func TestEvaluateStressProbes(t *testing.T) {
 		Squeue: stressDistribution{Mean: 2400, P50: 100, P90: 7000, P95: 7000, P99: 7000, Max: 7000},
 		Sinfo:  stressDistribution{Mean: 60, P50: 60, P90: 70, P95: 70, P99: 70, Max: 70},
 	}, summary, "samples with errors are excluded from the latency percentiles")
-	err := evaluateStressProbes(summary, budget)
+	_, err := evaluateStressProbes(summary, budget)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "squeue mean 2400 ms, budget 1s")
 	assert.Contains(t, err.Error(), "squeue max 7000 ms, budget 5s")
@@ -87,25 +87,25 @@ func TestEvaluateStressProbes(t *testing.T) {
 	assert.Equal(t, 1, failedSummary.SlurmErrors)
 	assert.Equal(t, "10:00:30: squeue exited 1 after 60210 ms", failedSummary.FirstSlurmError)
 	assert.Equal(t, float64(60210), failedSummary.Squeue.Max, "a failed probe keeps its measured latency")
-	require.ErrorContains(t, evaluateStressProbes(failedSummary, budget), "controller failed 1 of 4 responsiveness probes during the load, first at 10:00:30: squeue exited 1 after 60210 ms")
+	require.ErrorContains(t, errOnly(evaluateStressProbes(failedSummary, budget)), "controller failed 1 of 4 responsiveness probes during the load, first at 10:00:30: squeue exited 1 after 60210 ms")
 
 	summary.Squeue = stressDistribution{Mean: 1500, P95: 1500, Max: 1500}
-	require.ErrorContains(t, evaluateStressProbes(summary, budget), "squeue mean 1500 ms, budget 1s",
+	require.ErrorContains(t, errOnly(evaluateStressProbes(summary, budget)), "squeue mean 1500 ms, budget 1s",
 		"a slow typical probe fails even below the single-probe budget")
 
 	summary.Squeue = stressDistribution{Mean: 400, P95: 1900, Max: 1900}
 	summary.Sinfo = stressDistribution{Mean: 400, P95: 1900, Max: 1900}
-	require.NoError(t, evaluateStressProbes(summary, budget), "stalls behind the scheduler pass are not a typical-latency failure")
+	require.NoError(t, errOnly(evaluateStressProbes(summary, budget)), "stalls behind the scheduler pass are not a typical-latency failure")
 	summary.Sinfo.Mean = 1200
-	require.ErrorContains(t, evaluateStressProbes(summary, budget), "sinfo mean 1200 ms, budget 1s")
+	require.ErrorContains(t, errOnly(evaluateStressProbes(summary, budget)), "sinfo mean 1200 ms, budget 1s")
 	summary.Sinfo.Mean = 400
 	summary.Sinfo.Max = 6000
-	require.ErrorContains(t, evaluateStressProbes(summary, budget), "sinfo max 6000 ms, budget 5s")
+	require.ErrorContains(t, errOnly(evaluateStressProbes(summary, budget)), "sinfo max 6000 ms, budget 5s")
 	summary.Sinfo.Max = 100
 	summary.Sdiag = stressDistribution{P95: 300, Max: 5500}
-	require.ErrorContains(t, evaluateStressProbes(summary, budget), "sdiag max 5500 ms, budget 5s")
+	require.ErrorContains(t, errOnly(evaluateStressProbes(summary, budget)), "sdiag max 5500 ms, budget 5s")
 	budget.SdiagMax = 6 * time.Second
-	require.NoError(t, evaluateStressProbes(summary, budget), "each command has its own max budget")
+	require.NoError(t, errOnly(evaluateStressProbes(summary, budget)), "each command has its own max budget")
 }
 
 func TestParseSdiag(t *testing.T) {
@@ -192,7 +192,7 @@ func TestEvaluateStressScheduler(t *testing.T) {
 		AgentQueueSize: 4, ServerThreadCount: 20,
 	}
 	budget := stressSchedulerBudget{MinSubmitted: 5, ScheduleCycleMean: time.Second, BackfillCycleMean: 200 * time.Millisecond, MaxServerThreads: 10}
-	err := evaluateStressScheduler(summary, budget)
+	_, err := evaluateStressScheduler(summary, budget)
 	require.Error(t, err)
 	for _, expected := range []string{
 		"counted 3 submitted jobs, expected at least 5",
@@ -204,16 +204,16 @@ func TestEvaluateStressScheduler(t *testing.T) {
 		assert.Contains(t, err.Error(), expected)
 	}
 
-	err = evaluateStressScheduler(stressSchedulerSummary{JobsSubmitted: 5}, budget)
+	_, err = evaluateStressScheduler(stressSchedulerSummary{JobsSubmitted: 5}, budget)
 	require.ErrorContains(t, err, "recorded no main scheduler cycles")
 	require.ErrorContains(t, err, "recorded no backfill scheduler cycles")
 	healthy := stressSchedulerSummary{JobsSubmitted: 5, JobsFailed: 2, JobsCanceled: 1, ScheduleCycles: 10, ScheduleCycleMeanSecs: 0.5, BackfillCycles: 4, BackfillCycleMeanSecs: 0.1}
-	require.NoError(t, evaluateStressScheduler(healthy, budget),
+	require.NoError(t, errOnly(evaluateStressScheduler(healthy, budget)),
 		"failed and canceled jobs of other users are not the load's problem")
-	require.NoError(t, evaluateStressScheduler(stressSchedulerSummary{Resets: 1, JobsSubmitted: 2, ScheduleCycles: 10, ScheduleCycleMeanSecs: 0.5, BackfillCycles: 4},
-		budget),
+	require.NoError(t, errOnly(evaluateStressScheduler(stressSchedulerSummary{Resets: 1, JobsSubmitted: 2, ScheduleCycles: 10, ScheduleCycleMeanSecs: 0.5, BackfillCycles: 4},
+		budget)),
 		"a counter reset during the load loses submissions, so the count is not asserted after one")
-	require.ErrorContains(t, evaluateStressScheduler(stressSchedulerSummary{Resets: 1, JobsSubmitted: 2, ScheduleCycles: 10, ScheduleCycleMeanSecs: 5, BackfillCycles: 4},
-		budget),
+	require.ErrorContains(t, errOnly(evaluateStressScheduler(stressSchedulerSummary{Resets: 1, JobsSubmitted: 2, ScheduleCycles: 10, ScheduleCycleMeanSecs: 5, BackfillCycles: 4},
+		budget)),
 		"main scheduler mean cycle", "the cycle budgets still apply across a reset")
 }

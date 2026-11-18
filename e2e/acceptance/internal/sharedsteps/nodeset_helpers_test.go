@@ -61,3 +61,19 @@ func (e *nodeSetHelperExec) Kubectl() framework.ArgsScope {
 		return output, nil
 	})
 }
+
+func TestIsEphemeralNodeSet(t *testing.T) {
+	ephemeral, static := true, false
+	for _, tt := range []struct {
+		name string
+		set  *bool
+		want bool
+	}{
+		{name: "unset is static"},
+		{name: "false is static", set: &static},
+		{name: "true is ephemeral", set: &ephemeral, want: true},
+	} {
+		nodeSet := kubeobjects.NodeSet{Spec: kubeobjects.NodeSetSpec{EphemeralNodes: tt.set}}
+		assert.Equal(t, tt.want, isEphemeralNodeSet(nodeSet), tt.name)
+	}
+}

@@ -18,6 +18,24 @@ or materially changing an acceptance scenario. Human contributors can read
 tagging, skip-versus-fail, implementation, cleanup, and development-cluster
 validation practices.
 
+## Test accounts
+
+Scenarios create these accounts when needed. Pro E2E enables PAM Slurm adoption
+and exempts the accounts that need worker SSH without a running job:
+
+| Account | Scenarios | Pro PAM policy |
+| --- | --- | --- |
+| `bob` | Internal SSH, Enroot, system settings, NCCL environment and accounting | Exempt |
+| `dockeruser` | Docker over SSH | Exempt |
+| `soperatoradopt` | Adoption denial, cgroup and session lifecycle | Non-exempt |
+| `soperatoradoptlimits` | Resource limits of SSH sessions adopted into a job | Non-exempt |
+
+Account names are defined in `acceptance/internal/sharedsteps/test_users.go`.
+Keep the Pro exemptions in `internal/e2e/values.go` synchronized with this list.
+The non-exempt accounts are separate so adoption jobs and cleanup do not
+interfere with the direct-SSH scenarios or each other. Other environments may
+configure different PAM policies; scenarios inspect the effective policy.
+
 ## Standalone CLI
 
 > !!! WARNING !!!
@@ -272,6 +290,14 @@ partitioning and exclusions to every OR branch.
 When `OutputDir` is set, each scenario receives matching runner and jail paths
 through `framework.ScenarioArtifacts(ctx)`. Product-specific steps can write
 their own files directly to those paths without registering a collector.
+
+Failed NVIDIA report downloads and Enroot image-artifact waits save
+`<worker>-diagnostics.txt` in the runner's scenario directory before cleanup.
+These best-effort snapshots include processes, locks, TCP connections, and
+report/cache file metadata, with a 30-second total collection deadline. NVIDIA
+failures also retain wrapper output there and copy available worker reports to
+the jail scenario directory as `*.partial.log.gz` (at most 16 MiB per file).
+Enroot snapshots include the job's current stdout/stderr tails.
 
 `acceptance.SoperatorSuite(targetSoperatorVersion)` embeds the public Soperator
 feature files, registers public Soperator steps, enables the default shared

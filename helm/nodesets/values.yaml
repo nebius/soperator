@@ -89,6 +89,8 @@ nodesets:
     # Enable ephemeral node behavior for this NodeSet.
     # When true, nodes will use dynamic topology injection instead of the rendered topology.yaml.
     # Topology data is read from the topology-node-labels ConfigMap at runtime.
+    # When false, the NodeSet runs static workers.
+    # Deprecated: static workers will be removed together with the static worker feature.
     # Optional, defaults to false
     ephemeralNodes: false
     # Initial number of nodes when ephemeralNodes is true.

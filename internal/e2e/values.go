@@ -57,14 +57,40 @@ func readTFVars(filename string) (map[string]interface{}, error) {
 func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]interface{} {
 	tfVars["active_checks_scope"] = "testing"
 	tfVars["tailscale_enabled"] = true
+	tfVars["slurm_login_image_disk"] = map[string]interface{}{
+		"enabled": true,
+		"spec": map[string]interface{}{
+			"size_gibibytes":  93,
+			"filesystem_type": "ext4",
+			"disk_type":       "NETWORK_SSD_IO_M3",
+		},
+	}
+	tfVars["slurm_login_user_isolation_enabled"] = true
+	// These accounts need worker SSH without a Slurm job. Adoption checks use
+	// separate non-exempt users; keep this list in sync with e2e/acceptance/internal/sharedsteps/test_users.go.
+	var pamAdoptExemptTestUsers = []string{"bob", "dockeruser"}
+	tfVars["pam_slurm_adopt"] = map[string]interface{}{
+		"enabled":      true,
+		"exempt_users": pamAdoptExemptTestUsers,
+	}
 	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
 	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
-	if nfs, ok := tfVars["nfs_in_k8s"].(map[string]interface{}); ok {
-		if spec, ok := nfs["spec"].(map[string]interface{}); ok && spec != nil {
-			spec["version"] = cfg.NFSVersion
-			spec["use_stable_repo"] = !cfg.SoperatorUnstable
+	nfs, _ := tfVars["nfs_in_k8s"].(map[string]interface{})
+	if nfs == nil {
+		nfs = make(map[string]interface{})
+	}
+	nfs["enabled"] = true
+	spec, _ := nfs["spec"].(map[string]interface{})
+	if spec == nil {
+		spec = map[string]interface{}{
+			"size_gibibytes": 3720, "disk_type": "NETWORK_SSD_IO_M3", "filesystem_type": "ext4", "threads": 128,
+			"node_group": map[string]interface{}{"resource": map[string]interface{}{"platform": "cpu-d3"}},
 		}
 	}
+	spec["version"] = cfg.NFSVersion
+	spec["use_stable_repo"] = !cfg.SoperatorUnstable
+	nfs["spec"] = spec
+	tfVars["nfs_in_k8s"] = nfs
 	tfVars["production"] = false
 	tfVars["company_name"] = "e2e-test"
 

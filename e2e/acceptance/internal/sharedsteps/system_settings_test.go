@@ -146,6 +146,19 @@ func TestPAMSlurmAdoptRequiresJob(t *testing.T) {
 	}
 }
 
+func TestPAMSlurmAdoptProTestAccounts(t *testing.T) {
+	cluster := framework.SlurmClusterInfo{
+		PAMSlurmAdoptEnabled:     true,
+		PAMSlurmAdoptExemptUsers: []string{"bob", "dockeruser"},
+	}
+	for _, user := range []string{sshTestUserName, dockerSSHUserName} {
+		assert.False(t, pamSlurmAdoptRequiresJob(cluster, user, nil), "%s needs direct SSH without a job", user)
+	}
+	for _, user := range []string{pamSlurmAdoptUser, pamSlurmAdoptLimitsUser} {
+		assert.True(t, pamSlurmAdoptRequiresJob(cluster, user, nil), "%s must exercise PAM adoption", user)
+	}
+}
+
 func TestParseCombinedResourceLimitsAndKernelSettingsFromPTY(t *testing.T) {
 	limits := renderResourceLimitSnapshotsForTest(computeResourceLimitProfile(), computeResourceLimitProfile())
 	kernel := `fs.file-max=9223372036854775807

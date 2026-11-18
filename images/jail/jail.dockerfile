@@ -2,8 +2,8 @@
 
 ARG CUDA_VERSION
 ARG SLURM_VERSION
-# https://github.com/nebius/ml-containers/pull/126
-FROM cr.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20261111115029 AS jail
+# https://github.com/nebius/ml-containers/pull/127
+FROM cr.nebius.cloud/ml-containers/slurm_training_diag:slurm${SLURM_VERSION}-cuda${CUDA_VERSION}-ubuntu24.04-20261116105408 AS jail
 
 # Create directory for pivoting host's root
 RUN mkdir -m 555 /mnt/host
@@ -85,6 +85,12 @@ COPY ansible/skel.yml /opt/ansible/skel.yml
 COPY ansible/roles/skel /opt/ansible/roles/skel
 RUN cd /opt/ansible && \
     ansible-playbook -i inventory/ -c local skel.yml
+
+# Configure the SSH client for connecting to workers
+COPY ansible/ssh_client.yml /opt/ansible/ssh_client.yml
+COPY ansible/roles/ssh_client /opt/ansible/roles/ssh_client
+RUN cd /opt/ansible && \
+    ansible-playbook -i inventory/ -c local ssh_client.yml
 
 # Replace SSH "message of the day" scripts
 COPY ansible/motd.yml /opt/ansible/motd.yml

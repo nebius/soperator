@@ -79,6 +79,25 @@ func TestOverrideTestValuesDefaultPartitions(t *testing.T) {
 	assert.Equal(t, "hidden", partitions[1].(map[string]interface{})["name"])
 }
 
+func TestOverrideTestValuesSSHFeatures(t *testing.T) {
+	for _, profile := range []Profile{validProfile(), mixedGPUProfile()} {
+		vars := overrideTestValues(map[string]interface{}{}, Config{Profile: profile})
+		assert.Equal(t, map[string]interface{}{
+			"enabled": true,
+			"spec": map[string]interface{}{
+				"size_gibibytes":  93,
+				"filesystem_type": "ext4",
+				"disk_type":       "NETWORK_SSD_IO_M3",
+			},
+		}, vars["slurm_login_image_disk"])
+		assert.Equal(t, true, vars["slurm_login_user_isolation_enabled"])
+		policy, ok := vars["pam_slurm_adopt"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, true, policy["enabled"])
+		assert.Equal(t, []string{"bob", "dockeruser"}, policy["exempt_users"])
+	}
+}
+
 func TestOverrideTestValuesNFS(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -103,7 +122,7 @@ func TestOverrideTestValuesNFS(t *testing.T) {
 				SoperatorVersion: "4.1.12-r2012dad5", SoperatorUnstable: tc.unstable, NFSVersion: tc.version,
 			})
 			assert.Equal(t, map[string]interface{}{
-				"enabled": tc.enabled,
+				"enabled": true,
 				"spec": map[string]interface{}{
 					"version": tc.version, "use_stable_repo": !tc.unstable,
 					"size_gibibytes": 3720, "threads": 32, "disk_type": "NETWORK_SSD_IO_M3",
@@ -115,20 +134,20 @@ func TestOverrideTestValuesNFS(t *testing.T) {
 }
 
 func TestOverrideTestValuesWithoutNFS(t *testing.T) {
-	result := overrideTestValues(map[string]interface{}{}, Config{NFSVersion: "1.2.2"})
-	assert.NotContains(t, result, "nfs_in_k8s")
-	result = overrideTestValues(map[string]interface{}{"nfs_in_k8s": nil}, Config{NFSVersion: "1.2.2"})
-	assert.Nil(t, result["nfs_in_k8s"])
 	for _, nfs := range []map[string]interface{}{
+		nil,
 		{"enabled": false},
 		{"enabled": false, "spec": nil},
 	} {
-		expected := map[string]interface{}{}
-		for key, value := range nfs {
-			expected[key] = value
-		}
-		result = overrideTestValues(map[string]interface{}{"nfs_in_k8s": nfs}, Config{NFSVersion: "1.2.2"})
-		assert.Equal(t, expected, result["nfs_in_k8s"])
+		result := overrideTestValues(map[string]interface{}{"nfs_in_k8s": nfs}, Config{NFSVersion: "1.2.2"})
+		assert.Equal(t, map[string]interface{}{
+			"enabled": true,
+			"spec": map[string]interface{}{
+				"version": "1.2.2", "use_stable_repo": true,
+				"size_gibibytes": 3720, "disk_type": "NETWORK_SSD_IO_M3", "filesystem_type": "ext4", "threads": 128,
+				"node_group": map[string]interface{}{"resource": map[string]interface{}{"platform": "cpu-d3"}},
+			},
+		}, result["nfs_in_k8s"])
 	}
 }
 

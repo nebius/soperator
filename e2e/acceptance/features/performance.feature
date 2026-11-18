@@ -19,24 +19,26 @@ Feature: Performance
     When the stress test user submits a burst of 5000 jobs with 1 to 3 cores sleeping up to 10 seconds
     # The budgets leave about 2x margin over the values measured on two-worker B200, H100/H200 and B300
     # clusters with Soperator 5.0.0 and Slurm 26.05.4. Acceptance is bounded by the per-user RPC rate limiter
-    # (about 20 sbatch per second). Every 30 s the scheduler pass holds the job and node locks for a few
-    # seconds and stalls the probes it meets, so the means bound the typical latency and the maxima the stalls.
-    Then every job in the burst is accepted within 6 minutes
-    And every job in the burst completes successfully within 20 minutes
-    And the node-side phases of the jobs stay within
+    # (about 20 sbatch per second). Every 30 s the controller background thread holds the job and node locks
+    # for a few seconds and stalls the probes it meets, so the means bound the typical latency and the maxima
+    # the stalls. Every budget is checked even when another one fails, and the log lists them all in one table.
+    Then the burst is handled within the budgets
+      # Submission of the whole burst, and first submission to last job end.
+      | all jobs accepted             | 6m    |
+      | all jobs completed            | 20m   |
       # Job start to first srun step start: prolog, batch script start and step launch.
-      | startup p99  | 10s |
+      | startup p99                   | 10s   |
       # First step start to last step end: the srun sleep itself.
-      | steps p99    | 20s |
+      | steps p99                     | 20s   |
       # Last step end to extern step end: slurmd killing and reaping the job's steps, without epilog.
-      | teardown p99 | 10s |
-    And the controller stays responsive throughout the load within
-      | squeue mean | 1s  |
-      | sinfo mean  | 1s  |
-      | squeue max  | 10s |
-      | sinfo max   | 10s |
-      | sdiag max   | 10s |
-    And the scheduler statistics for the load stay within
+      | teardown p99                  | 10s   |
+      # Read-only commands probed every 10 s throughout the load.
+      | squeue mean                   | 1s    |
+      | sinfo mean                    | 1s    |
+      | squeue max                    | 10s   |
+      | sinfo max                     | 10s   |
+      | sdiag max                     | 10s   |
+      # Controller statistics accumulated over the load.
       | main scheduler cycle mean     | 200ms |
       | backfill scheduler cycle mean | 200ms |
       | server threads at the end     | 5     |

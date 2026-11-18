@@ -49,7 +49,7 @@ type stressSubmitResult struct {
 }
 
 func (r stressSubmitResult) Duration() time.Duration {
-	return time.Duration((r.EndEpoch - r.StartEpoch) * float64(time.Second))
+	return stressSeconds(r.EndEpoch - r.StartEpoch)
 }
 
 // stressSummary is written to summary.json in the scenario artifacts.
@@ -64,6 +64,7 @@ type stressSummary struct {
 	Jobs            stressJobStats         `json:"jobs"`
 	Probes          stressProbeSummary     `json:"probes"`
 	Scheduler       stressSchedulerSummary `json:"scheduler"`
+	Budgets         []stressBudgetRow      `json:"budgets"`
 }
 
 // stressMonitor samples controller responsiveness in the background while a load runs.
@@ -102,6 +103,7 @@ type Performance struct {
 	monitor      *stressMonitor
 	probes       stressProbeSummary
 	scheduler    stressSchedulerSummary
+	budgets      []stressBudgetRow
 }
 
 func NewPerformance(runtime framework.Runtime) *Performance {
@@ -112,11 +114,7 @@ func (s *Performance) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the Slurm queue is idle$`, s.slurmQueueIsIdle)
 	sc.Step(`^(\d+) free cores on (\d+) workers are reserved for the stress test user$`, s.coresAreReserved)
 	sc.Step(`^the stress test user submits a burst of (\d+) jobs with 1 to (\d+) cores sleeping up to (\d+) seconds$`, s.submitBurst)
-	sc.Step(`^every job in the burst is accepted within (\d+) minutes$`, s.burstIsAccepted)
-	sc.Step(`^every job in the burst completes successfully within (\d+) minutes$`, s.burstCompletes)
-	sc.Step(`^the node-side phases of the jobs stay within$`, s.jobPhasesWithinBudget)
-	sc.Step(`^the controller stays responsive throughout the load within$`, s.controllerStaysResponsive)
-	sc.Step(`^the scheduler statistics for the load stay within$`, s.schedulerStatisticsWithinBudget)
+	sc.Step(`^the burst is handled within the budgets$`, s.burstWithinBudgets)
 }
 
 func (s *Performance) CleanupAndReset(ctx context.Context) {
@@ -324,64 +322,81 @@ func (s *Performance) submitBurst(ctx context.Context, jobs, maxCores, maxSleepS
 	return nil
 }
 
-func (s *Performance) burstIsAccepted(ctx context.Context, minutes int) error {
-	if err := evaluateStressSubmit(s.submitResult, s.expectedJobs, time.Duration(minutes)*time.Minute); err != nil {
-		return fmt.Errorf("%w%s", err, s.submissionErrorTail(ctx))
-	}
-	return nil
-}
-
-func (s *Performance) burstCompletes(ctx context.Context, minutes int) error {
-	wall := time.Duration(minutes) * time.Minute
-	if err := s.collectCompletedJobs(ctx, wall+stressDrainGrace); err != nil {
+// burstWithinBudgets waits for the load to finish and checks every budget of the table.
+// A measurement that fails or a budget that is exceeded does not stop the others, so the
+// logged table always lists every budget with whatever was observed for it.
+func (s *Performance) burstWithinBudgets(ctx context.Context, table *godog.Table) error {
+	values, err := parseKeyValueTable(table)
+	if err != nil {
 		return err
 	}
-	return evaluateStressCompletion(s.jobs, stressCompletionBudget{
-		Wall:       wall,
+	acceptedBudget := values.duration(stressBudgetAccepted)
+	completionBudget := stressCompletionBudget{
+		Wall:       values.duration(stressBudgetCompleted),
 		MinWorkers: len(s.reservedWorkers),
-	})
-}
-
-func (s *Performance) jobPhasesWithinBudget(_ context.Context, table *godog.Table) error {
-	values, err := parseKeyValueTable(table)
-	if err != nil {
-		return err
 	}
-	budget := stressPhaseBudget{
-		StartupP99:  values.duration("startup p99"),
-		StepsP99:    values.duration("steps p99"),
-		TeardownP99: values.duration("teardown p99"),
+	phaseBudget := stressPhaseBudget{
+		StartupP99:  values.duration(stressBudgetStartupP99),
+		StepsP99:    values.duration(stressBudgetStepsP99),
+		TeardownP99: values.duration(stressBudgetTeardownP99),
 	}
-	if err := values.done(); err != nil {
-		return err
+	probeBudget := stressProbeBudget{
+		SqueueMean: values.duration(stressBudgetSqueueMean),
+		SinfoMean:  values.duration(stressBudgetSinfoMean),
+		SqueueMax:  values.duration(stressBudgetSqueueMax),
+		SinfoMax:   values.duration(stressBudgetSinfoMax),
+		SdiagMax:   values.duration(stressBudgetSdiagMax),
 	}
-	return evaluateStressJobPhases(s.jobs, budget)
-}
-
-func (s *Performance) controllerStaysResponsive(_ context.Context, table *godog.Table) error {
-	values, err := parseKeyValueTable(table)
-	if err != nil {
-		return err
-	}
-	budget := stressProbeBudget{
-		SqueueMean: values.duration("squeue mean"),
-		SinfoMean:  values.duration("sinfo mean"),
-		SqueueMax:  values.duration("squeue max"),
-		SinfoMax:   values.duration("sinfo max"),
-		SdiagMax:   values.duration("sdiag max"),
+	schedulerBudget := stressSchedulerBudget{
+		MinSubmitted:      int64(s.expectedJobs),
+		ScheduleCycleMean: values.duration(stressBudgetScheduleCycle),
+		BackfillCycleMean: values.duration(stressBudgetBackfillCycle),
+		MaxServerThreads:  values.count(stressBudgetServerThreads),
 	}
 	if err := values.done(); err != nil {
 		return err
 	}
 
+	var report stressBudgetReport
+
+	rows, err := evaluateStressSubmit(s.submitResult, s.expectedJobs, acceptedBudget)
+	if err != nil {
+		err = fmt.Errorf("%w%s", err, s.submissionErrorTail(ctx))
+	}
+	report.add(rows, true, err)
+
+	collectErr := s.collectCompletedJobs(ctx, completionBudget.Wall+stressDrainGrace)
+	report.problem(collectErr)
+	rows, err = evaluateStressCompletion(s.jobs, completionBudget)
+	report.add(rows, collectErr == nil, err)
+	rows, err = evaluateStressJobPhases(s.jobs, phaseBudget)
+	report.add(rows, collectErr == nil, err)
+
+	s.measureProbes(probeBudget)
+	rows, err = evaluateStressProbes(s.probes, probeBudget)
+	report.add(rows, true, err)
+
+	sdiagErr := s.measureScheduler(ctx)
+	report.problem(sdiagErr)
+	rows, err = evaluateStressScheduler(s.scheduler, schedulerBudget)
+	report.add(rows, sdiagErr == nil, err)
+
+	s.budgets = report.rows
+	s.runtime.Logf("Performance: budgets of %s\n%s", s.runName, formatStressBudgets(report.rows))
+	return joinProblems(report.problems)
+}
+
+// Helpers.
+
+// measureProbes stops the monitor, stores the probe statistics in s.probes and logs the probes
+// that failed or exceeded a single-probe budget.
+func (s *Performance) measureProbes(budget stressProbeBudget) {
 	s.stopMonitor()
-	samples := s.monitor.samples
-	summary := summarizeStressProbes(samples)
-	s.probes = summary
+	s.probes = summarizeStressProbes(s.monitor.samples)
 	s.runtime.Logf("Performance: %d probes (%d failed to run, %d failed in Slurm), squeue %s, sinfo %s, sdiag %s, pending max %d, running max %d",
-		summary.Samples, summary.Errors, summary.SlurmErrors, summary.Squeue.format("ms"), summary.Sinfo.format("ms"), summary.Sdiag.format("ms"),
-		summary.PendingMax, summary.RunningMax)
-	for _, sample := range samples {
+		s.probes.Samples, s.probes.Errors, s.probes.SlurmErrors, s.probes.Squeue.format("ms"), s.probes.Sinfo.format("ms"), s.probes.Sdiag.format("ms"),
+		s.probes.PendingMax, s.probes.RunningMax)
+	for _, sample := range s.monitor.samples {
 		at := sample.At.Format(time.TimeOnly)
 		switch {
 		case sample.Error != "":
@@ -394,23 +409,11 @@ func (s *Performance) controllerStaysResponsive(_ context.Context, table *godog.
 				at, sample.SqueueMillis, sample.SinfoMillis, sample.SdiagMillis)
 		}
 	}
-	return evaluateStressProbes(summary, budget)
 }
 
-func (s *Performance) schedulerStatisticsWithinBudget(ctx context.Context, table *godog.Table) error {
-	values, err := parseKeyValueTable(table)
-	if err != nil {
-		return err
-	}
-	budget := stressSchedulerBudget{
-		MinSubmitted:      int64(s.expectedJobs),
-		ScheduleCycleMean: values.duration("main scheduler cycle mean"),
-		BackfillCycleMean: values.duration("backfill scheduler cycle mean"),
-		MaxServerThreads:  values.count("server threads at the end"),
-	}
-	if err := values.done(); err != nil {
-		return err
-	}
+// measureScheduler takes the closing controller statistics snapshot and stores the load's share,
+// derived from it and the snapshots of the stopped monitor, in s.scheduler.
+func (s *Performance) measureScheduler(ctx context.Context) error {
 	after, err := s.readSdiag(ctx, "sdiag-after.json")
 	if err != nil {
 		return err
@@ -421,21 +424,24 @@ func (s *Performance) schedulerStatisticsWithinBudget(ctx context.Context, table
 			snapshots = append(snapshots, *sample.Sdiag)
 		}
 	}
-	summary := summarizeStressScheduler(append(snapshots, after))
-	s.scheduler = summary
+	s.scheduler = summarizeStressScheduler(append(snapshots, after))
 	s.runtime.Logf("Performance: scheduler submitted %d, failed %d, canceled %d, %d main cycles with mean %.3fs, %d backfill cycles with mean %.3fs, agent queue %d, threads %d (resets=%d)",
-		summary.JobsSubmitted, summary.JobsFailed, summary.JobsCanceled, summary.ScheduleCycles, summary.ScheduleCycleMeanSecs,
-		summary.BackfillCycles, summary.BackfillCycleMeanSecs, summary.AgentQueueSize, summary.ServerThreadCount, summary.Resets)
-	return evaluateStressScheduler(summary, budget)
+		s.scheduler.JobsSubmitted, s.scheduler.JobsFailed, s.scheduler.JobsCanceled, s.scheduler.ScheduleCycles, s.scheduler.ScheduleCycleMeanSecs,
+		s.scheduler.BackfillCycles, s.scheduler.BackfillCycleMeanSecs, s.scheduler.AgentQueueSize, s.scheduler.ServerThreadCount, s.scheduler.Resets)
+	return nil
 }
 
-// Helpers.
-
 // collectCompletedJobs waits up to drainTimeout for the load to leave the queue and then for
-// accounting to hold every job with its step records, saves them and stores the statistics in s.jobs.
+// accounting to hold every accepted job with its step records, saves them and stores the statistics
+// in s.jobs. It counts the accepted jobs rather than the submitted ones, so that a partly rejected
+// burst still yields its job statistics instead of waiting for records that cannot appear.
 // The cheap count query absorbs the usual accounting lag before the full records are read, and the
 // full read repeats only while some job's step rows still trail its allocation row.
 func (s *Performance) collectCompletedJobs(ctx context.Context, drainTimeout time.Duration) error {
+	jobs := s.submitResult.Accepted
+	if jobs == 0 {
+		return errors.New("collect completed jobs: no job was accepted")
+	}
 	queueCommand := stressQueueStatesCommand(s.runName)
 	if err := s.runtime.WaitFor(ctx, fmt.Sprintf("jobs %s to leave the queue", s.runName),
 		drainTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
@@ -451,20 +457,20 @@ func (s *Performance) collectCompletedJobs(ctx context.Context, drainTimeout tim
 	const accountingTimeout = 2 * time.Minute
 	lookback := time.Since(time.Unix(int64(s.submitResult.StartEpoch), 0)) + stressAccountingLookback
 	countCommand := stressSacctCountCommand(s.runName, lookback)
-	if err := s.runtime.WaitFor(ctx, fmt.Sprintf("accounting records of %d jobs", s.expectedJobs),
+	if err := s.runtime.WaitFor(ctx, fmt.Sprintf("accounting records of %d jobs", jobs),
 		accountingTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 			output, err := s.runtime.Jail().RunWithDefaultRetry(waitCtx, countCommand)
 			if err != nil {
 				return false, fmt.Errorf("count accounting records of %s: %w", s.runName, err)
 			}
-			return stressAccountingSettled(output, s.expectedJobs)
+			return stressAccountingSettled(output, jobs)
 		}); err != nil {
 		return err
 	}
 
 	var records []stressJobRecord
 	recordsCommand := stressSacctCommand(s.runName, lookback)
-	if err := s.runtime.WaitFor(ctx, fmt.Sprintf("step records of %d jobs", s.expectedJobs),
+	if err := s.runtime.WaitFor(ctx, fmt.Sprintf("step records of %d jobs", jobs),
 		accountingTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
 			raw, err := s.runtime.Jail().RunWithDefaultRetry(waitCtx, recordsCommand)
 			if err != nil {
@@ -475,8 +481,8 @@ func (s *Performance) collectCompletedJobs(ctx context.Context, drainTimeout tim
 			if err != nil {
 				return false, err
 			}
-			if len(parsed) != s.expectedJobs {
-				return false, fmt.Errorf("expected %d accounting records, got %d", s.expectedJobs, len(parsed))
+			if len(parsed) != jobs {
+				return false, fmt.Errorf("expected %d accounting records, got %d", jobs, len(parsed))
 			}
 			records = parsed
 			if missing := stressJobsWithoutSteps(parsed); len(missing) > 0 {
@@ -575,6 +581,7 @@ func (s *Performance) saveSummary() {
 		Jobs:            s.jobs,
 		Probes:          s.probes,
 		Scheduler:       s.scheduler,
+		Budgets:         s.budgets,
 	}
 	encoded, err := json.MarshalIndent(summary, "", "  ")
 	if err != nil {
@@ -824,7 +831,7 @@ func parseStressSubmitResult(output string) (stressSubmitResult, error) {
 	return result, nil
 }
 
-func evaluateStressSubmit(result stressSubmitResult, expected int, budget time.Duration) error {
+func evaluateStressSubmit(result stressSubmitResult, expected int, budget time.Duration) (rows []stressBudgetRow, err error) {
 	var problems []string
 	if result.Accepted != expected {
 		problems = append(problems, fmt.Sprintf("accepted %d of %d submissions", result.Accepted, expected))
@@ -832,8 +839,9 @@ func evaluateStressSubmit(result stressSubmitResult, expected int, budget time.D
 	if result.ExitStatus != 0 {
 		problems = append(problems, fmt.Sprintf("submission loop exited with status %d", result.ExitStatus))
 	}
-	if duration := result.Duration(); duration > budget {
-		problems = append(problems, fmt.Sprintf("submission took %s, budget %s", duration.Round(time.Millisecond), budget))
+	duration := stressDurationBudget(stressBudgetAccepted, result.Duration(), budget)
+	if duration.Failed {
+		problems = append(problems, fmt.Sprintf("submission took %s, budget %s", duration.Observed, budget))
 	}
-	return joinProblems(problems)
+	return []stressBudgetRow{duration}, joinProblems(problems)
 }
