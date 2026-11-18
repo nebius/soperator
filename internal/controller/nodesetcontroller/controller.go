@@ -68,6 +68,8 @@ type NodeSetReconciler struct {
 
 	rollingUpdateEnabled bool
 	// staticRecreateDelay must be SuspendTimeout plus 10s, see DefaultStaticRecreateDelay.
+	//
+	// Deprecated: part of the static worker feature, will be removed together with it.
 	staticRecreateDelay time.Duration
 
 	AdvancedStatefulSet *reconciler.AdvancedStatefulSetReconciler

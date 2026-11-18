@@ -1,4 +1,7 @@
 Feature: Static worker power down
+  # Deprecated: covers the static worker feature, which will be removed. Once a release drops it, limit
+  # this scenario with the version tag to the releases that still have it, and delete the scenario
+  # when none of them is tested.
   # TODO: The first step skips builds whose NodeSetPowerState CRD has no spec.recreateNodes, because main and
   # soperator-release-5.0 are both 5.0.0. Replace that check with a version constraint once the first
   # release that recreates powered down static workers is known.

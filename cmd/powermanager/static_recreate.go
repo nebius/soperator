@@ -7,8 +7,10 @@ package main
 // NodeSet controller to recreate the worker pods (see
 // internal/controller/nodesetcontroller/static_recreate.go).
 //
+// Deprecated: part of the static worker feature, will be removed together with it.
+//
 // To remove the workaround, delete this file and its test, and the staticRequests WaitGroup and the
-// startStaticRecreations call in runPowerAction.
+// startStaticRecreations call in applyPowerAction.
 
 import (
 	"context"

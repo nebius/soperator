@@ -82,9 +82,13 @@ spec:
                   RecreateNodes lists node ordinals whose worker pods must be recreated because Slurm powered
                   the node down. A static node only leaves the powered down state when a fresh slurmd registers.
                   The power-manager binary adds requests and the NodeSet controller removes them once handled.
+
+                  Deprecated: part of the static worker feature, will be removed together with it.
                 items:
-                  description: NodeRecreateRequest asks for the worker pod of a node
-                    to be recreated.
+                  description: |-
+                    NodeRecreateRequest asks for the worker pod of a node to be recreated.
+
+                    Deprecated: part of the static worker feature, will be removed together with it.
                   properties:
                     ordinal:
                       description: Ordinal is the ordinal of the node in the NodeSet.

@@ -3,6 +3,7 @@
 # This script is called by slurmctld when nodes need to be suspended/powered off
 # It calls power-manager which updates NodeSetPowerState CRs: ephemeral nodes are deactivated,
 # and static nodes get their worker pods recreated so that a fresh slurmd registers
+# Deprecated: the static nodes part will be removed together with the static worker feature
 
 log_json() {
     local level="$1"

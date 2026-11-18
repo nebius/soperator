@@ -270,6 +270,9 @@ func (s *NodeSetEphemeralModeTransition) powerStateIfPresent(ctx context.Context
 // checkStaticPowerState accepts the NodeSetPowerState of a static NodeSet. Newer operators keep it
 // with every ordinal active.
 // TODO: Stop accepting a missing NodeSetPowerState once no tested 5.0.0 build deletes it in static mode.
+//
+// Deprecated: covers the static worker feature, which will be removed together with the switch back
+// to static mode.
 func checkStaticPowerState(powerState kubeobjects.NodeSetPowerState, found bool, wantActiveNodes []int32) error {
 	if !found {
 		return nil

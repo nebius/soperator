@@ -4,6 +4,7 @@
 # It calls power-manager which removes the ordinals from NodeSetPowerState CRs,
 # so the worker pods that did not become ready in time are torn down.
 # Worker pods of static nodes are recreated instead.
+# Deprecated: the static nodes part will be removed together with the static worker feature.
 
 log_json() {
     local level="$1"

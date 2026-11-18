@@ -12,6 +12,7 @@ controllerManager:
       # - --topology-reconfigure-debounce=1m
       # - --topology-reconfigure-debounce-cap=15m
       # Must be SuspendTimeout + 10s if the cluster changes SuspendTimeout
+      # Deprecated: will be removed together with the static worker feature
       # - --static-worker-recreate-delay=100s
     controllersEnabled:
       cluster: true

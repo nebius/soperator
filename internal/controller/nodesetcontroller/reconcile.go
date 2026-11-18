@@ -64,6 +64,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 
 	// See static_recreate.go. Runs first, so that failures of the other steps do not block it, and its
 	// own failure is returned after them.
+	// Deprecated: part of the static worker feature, will be removed together with it.
 	recreateAfter, recreateErr := r.recreateRequestedPods(ctx, nodeSet)
 
 	// region Get parental cluster
@@ -127,6 +128,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 			return ctrl.Result{}, fmt.Errorf("reconciling NodeSetPowerState: %w", err)
 		}
 		// See static_recreate.go.
+		// Deprecated: part of the static worker feature, will be removed together with it.
 		if err := r.dropOrdinalsBeyondReplicas(ctx, nodeSet, powerState); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -142,6 +144,7 @@ func (r *NodeSetReconciler) reconcile(ctx context.Context, nodeSet *slurmv1alpha
 
 	// Static NodeSets keep a NodeSetPowerState for worker pod recreation requests, see static_recreate.go.
 	// Apply static replicas and clear reserved ordinals before activating every ordinal.
+	// Deprecated: part of the static worker feature, will be removed together with it.
 	if !ephemeralNodesEnabled {
 		if err = r.reconcileStaticNodeSetPowerState(ctx, nodeSet); err != nil {
 			return ctrl.Result{}, fmt.Errorf("reconcile static NodeSetPowerState: %w", err)

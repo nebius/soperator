@@ -57,6 +57,9 @@ type NodeSetPowerStateSpec struct {
 	// the node down. A static node only leaves the powered down state when a fresh slurmd registers.
 	// The power-manager binary adds requests and the NodeSet controller removes them once handled.
 	//
+	// Deprecated: part of the static worker feature, will be removed together with it.
+	//
+	// +kubebuilder:deprecation:warning="The RecreateNodes field is deprecated and will be removed together with the static worker feature"
 	// +kubebuilder:validation:Optional
 	// +listType=map
 	// +listMapKey=ordinal
@@ -64,6 +67,8 @@ type NodeSetPowerStateSpec struct {
 }
 
 // NodeRecreateRequest asks for the worker pod of a node to be recreated.
+//
+// Deprecated: part of the static worker feature, will be removed together with it.
 type NodeRecreateRequest struct {
 	// Ordinal is the ordinal of the node in the NodeSet.
 	//

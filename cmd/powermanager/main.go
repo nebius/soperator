@@ -222,6 +222,7 @@ func applyPowerAction(ctx context.Context, client ctrlclient.WithWatch, namespac
 
 	targets := make(map[string]*slurmv1alpha1.NodeSetPowerState)
 	// See static_recreate.go. Static requests run beside the ephemeral updates and finish on every return.
+	// Deprecated: part of the static worker feature, will be removed together with it.
 	var staticRequests sync.WaitGroup
 	defer staticRequests.Wait()
 	if !resume {

@@ -29,6 +29,9 @@ const (
 
 // StaticWorkerPowerDown covers a manual Slurm power down of a static worker: Soperator restarts
 // the worker pod once the power down completes, and the fresh slurmd returns the node to service.
+//
+// Deprecated: covers the static worker feature, which will be removed, see
+// features/static_worker_power_down.feature.
 type StaticWorkerPowerDown struct {
 	info     *framework.ClusterInfo
 	runtime  framework.Runtime

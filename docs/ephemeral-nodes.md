@@ -13,7 +13,9 @@ This follows Slurm's power saving model:
 `NodeSet` describes the worker group:
 
 - `spec.replicas` is the maximum node range rendered into `slurm.conf`.
-- `spec.ephemeralNodes: true` enables ephemeral behavior for that group.
+- `spec.ephemeralNodes: true` enables ephemeral behavior for that group. With
+  `false`, the default, the NodeSet runs static workers. The static worker
+  feature is deprecated and will be removed.
 - `spec.initialNumberEphemeralNodes` seeds the first active ordinals when the
   `NodeSetPowerState` is created.
 
@@ -154,6 +156,9 @@ After changing Slurm config, apply the change and reconfigure or restart
 
 ## Static Nodes
 
+> Deprecated: the static worker feature, including the behavior described in
+> this section and the `--static-worker-recreate-delay` flag, will be removed.
+
 Static nodes are excluded from automatic suspend through `SuspendExcNodes`, but
 Slurm still accepts a manual power down for them. A static NodeSet always keeps
 its pods, and Slurm takes a powered down node back only when a fresh `slurmd`
@@ -208,7 +213,7 @@ scontrol power down force worker-gpu-3 Reason="force suspend test"
 ```
 
 Powering down a node of a static NodeSet restarts its worker pod instead of
-removing it, see [Static Nodes](#static-nodes).
+removing it, see [Static Nodes](#static-nodes). Static NodeSets are deprecated.
 
 Equivalent state updates are also supported by Slurm:
 

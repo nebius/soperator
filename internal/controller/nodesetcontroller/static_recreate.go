@@ -10,6 +10,8 @@ package nodesetcontroller
 // request with the power down time to NodeSetPowerState.spec.recreateNodes, and the NodeSet controller
 // recreates the worker pod once the static worker recreate delay has passed since then.
 //
+// Deprecated: part of the static worker feature, will be removed together with it.
+//
 // To remove the workaround:
 //   - delete this file and its test, and cmd/powermanager/static_recreate.go and its test;
 //   - in reconcile.go, delete the NodeSetPowerState of static NodeSets again instead of calling
@@ -18,8 +20,12 @@ package nodesetcontroller
 //   - drop the staticRequests WaitGroup and the startStaticRecreations call in cmd/powermanager/main.go;
 //   - drop the --static-worker-recreate-delay flag in cmd/main.go and its example in
 //     helm/soperator/values.yaml;
-//   - remove NodeSetPowerStateSpec.RecreateNodes and regenerate the CRDs;
-//   - remove the "Static Nodes" section of docs/ephemeral-nodes.md.
+//   - remove NodeSetPowerStateSpec.RecreateNodes and NodeRecreateRequest, drop the static NodeSets
+//     sentence of the ActiveNodes doc, and regenerate the CRDs;
+//   - drop the static nodes lines in images/controller/power_suspend.sh and power_resume_fail.sh;
+//   - remove the "Static Nodes" section of docs/ephemeral-nodes.md and the link to it;
+//   - in e2e, limit features/static_worker_power_down.feature and checkStaticPowerState to the
+//     releases that still have static workers, and delete them once no such release is tested.
 
 import (
 	"context"
@@ -47,6 +53,8 @@ const (
 	// recreated. It must be SuspendTimeout plus 10s: Slurm ignores a slurmd that starts within
 	// SuspendTimeout of the power down, and the 10s cover the clock difference between slurmctld and the
 	// worker nodes. The default matches the default SuspendTimeout of Soperator.
+	//
+	// Deprecated: part of the static worker feature, will be removed together with it.
 	DefaultStaticRecreateDelay = (consts.SlurmDefaultSuspendTimeout + 10) * time.Second
 
 	recreateRetryInterval = 5 * time.Second
