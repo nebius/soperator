@@ -89,6 +89,8 @@ func RenderNodeSetStatefulSet(
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}
 
+	// Static workers run all replicas.
+	// Deprecated: part of the static worker feature, will be removed together with it.
 	replicas := &nodeSet.StatefulSet.Replicas
 	var reserveOrdinals []intstr.IntOrString
 

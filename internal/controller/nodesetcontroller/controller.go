@@ -67,6 +67,10 @@ type NodeSetReconciler struct {
 	*reconciler.Reconciler
 
 	rollingUpdateEnabled bool
+	// staticRecreateDelay must be SuspendTimeout plus 10s, see DefaultStaticRecreateDelay.
+	//
+	// Deprecated: part of the static worker feature, will be removed together with it.
+	staticRecreateDelay time.Duration
 
 	AdvancedStatefulSet *reconciler.AdvancedStatefulSetReconciler
 	Service             *reconciler.ServiceReconciler
@@ -79,12 +83,17 @@ type NodeSetReconciler struct {
 }
 
 func NewNodeSetReconciler(
-	client client.Client, scheme *runtime.Scheme, recorder record.EventRecorder, rollingUpdateEnabled bool,
+	client client.Client,
+	scheme *runtime.Scheme,
+	recorder record.EventRecorder,
+	rollingUpdateEnabled bool,
+	staticRecreateDelay time.Duration,
 ) *NodeSetReconciler {
 	r := reconciler.NewReconciler(client, scheme, recorder)
 	return &NodeSetReconciler{
 		Reconciler:           r,
 		rollingUpdateEnabled: rollingUpdateEnabled,
+		staticRecreateDelay:  staticRecreateDelay,
 		AdvancedStatefulSet:  reconciler.NewAdvancedStatefulSetReconciler(r),
 		Service:              reconciler.NewServiceReconciler(r),
 		ServiceAccount:       reconciler.NewServiceAccountReconciler(r),

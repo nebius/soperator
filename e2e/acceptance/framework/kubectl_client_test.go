@@ -63,6 +63,51 @@ func TestKubectlClientNodeIfPresentRejectsEmptyName(t *testing.T) {
 	assert.Zero(t, exec.kubectlCalls)
 }
 
+func TestKubectlClientPodIfPresent(t *testing.T) {
+	command := "get\x00pod\x00worker-0\x00-n\x00soperator\x00--ignore-not-found\x00-o\x00json"
+	for _, tt := range []struct {
+		name      string
+		output    string
+		queryErr  error
+		present   bool
+		wantError string
+	}{
+		{name: "present", output: `{"metadata":{"name":"worker-0","uid":"pod-uid"}}`, present: true},
+		{name: "absent"},
+		{name: "whitespace means absent", output: " \n\t"},
+		{name: "query error", queryErr: errors.New("forbidden"), wantError: "get pod soperator/worker-0: forbidden"},
+		{name: "malformed response", output: "{", wantError: "decode pod soperator/worker-0"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			exec := &kubectlClientTestExec{
+				kubectl:       map[string]string{command: tt.output},
+				kubectlErrors: map[string]error{command: tt.queryErr},
+			}
+			pod, present, err := NewKubectlClient(exec).PodIfPresent(t.Context(), "soperator", "worker-0")
+			if tt.wantError == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.wantError)
+			}
+			assert.Equal(t, tt.present, present)
+			assert.Equal(t, 1, exec.kubectlCalls, "query must not retry inside a caller's polling loop")
+			if tt.present {
+				assert.Equal(t, "pod-uid", string(pod.UID))
+			} else {
+				assert.Equal(t, corev1.Pod{}, pod)
+			}
+		})
+	}
+}
+
+func TestKubectlClientPodIfPresentRejectsEmptyName(t *testing.T) {
+	exec := &kubectlClientTestExec{}
+	_, present, err := NewKubectlClient(exec).PodIfPresent(t.Context(), "soperator", " ")
+	require.ErrorContains(t, err, "pod name is empty")
+	assert.False(t, present)
+	assert.Zero(t, exec.kubectlCalls)
+}
+
 func TestKubectlClientSlurmCluster(t *testing.T) {
 	customConfig := "JobRequeue=0"
 	exec := &kubectlClientTestExec{kubectl: map[string]string{

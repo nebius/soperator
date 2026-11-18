@@ -38,6 +38,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewTaskPrologEnv(runtime, selector),
 		NewSoperatorUtils(runtime, selector),
 		NewNodeSetEphemeralModeTransition(info, runtime, kubectl),
+		NewStaticWorkerPowerDown(info, runtime, slurm, kubectl, selector),
 		NewNodeReplacement(runtime, slurm, selector),
 		NewWorkerRollingUpdate(info, runtime, slurm, kubectl, selector),
 		NewDockerContainers(info, runtime, slurm, kubectl, selector),
