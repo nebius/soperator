@@ -170,7 +170,10 @@ type NodeSetSpec struct {
 	// and passed to slurmd via --conf "Topology=..." parameter.
 	// This mode is designed for cloud/ephemeral worker nodes that may be dynamically
 	// added or removed from the cluster.
+	// When false, the NodeSet runs static workers. The static worker feature is deprecated
+	// and will be removed.
 	//
+	// +kubebuilder:deprecation:warning="Static workers, when ephemeralNodes is false, are deprecated and will be removed together with the static worker feature"
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	EphemeralNodes *bool `json:"ephemeralNodes,omitempty"`

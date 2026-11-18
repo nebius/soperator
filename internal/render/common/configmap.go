@@ -598,6 +598,8 @@ func generateCustomSlurmConfig(cluster *values.SlurmCluster) renderutils.ConfigF
 // buildSuspendExcNodes builds the list of nodes that should never be suspended.
 // This includes all nodes from NodeSets that do NOT have ephemeralNodes=true.
 // Example output: "static-workers-[0-9],gpu-static-[0-5]"
+//
+// Deprecated: part of the static worker feature, will be removed together with it.
 func buildSuspendExcNodes(cluster *values.SlurmCluster) string {
 	var staticNodeSets []string
 

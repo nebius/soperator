@@ -29,6 +29,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -184,17 +185,20 @@ func runPowerAction(ctx context.Context, namespace, nodes string, timeout time.D
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	client, err := createClient()
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+	return applyPowerAction(ctx, client, namespace, nodes, resume)
+}
+
+func applyPowerAction(ctx context.Context, client ctrlclient.WithWatch, namespace, nodes string, resume bool) error {
 	action := "suspend"
 	if resume {
 		action = "resume"
 	}
 
 	log.Info("Starting power action", "action", action, "nodes", nodes, "namespace", namespace)
-
-	client, err := createClient()
-	if err != nil {
-		return fmt.Errorf("failed to create kubernetes client: %w", err)
-	}
 
 	nodeRefs, err := parseNodeList(nodes)
 	if err != nil {
@@ -217,6 +221,13 @@ func runPowerAction(ctx context.Context, namespace, nodes string, timeout time.D
 	}
 
 	targets := make(map[string]*slurmv1alpha1.NodeSetPowerState)
+	// See static_recreate.go. Static requests run beside the ephemeral updates and finish on every return.
+	// Deprecated: part of the static worker feature, will be removed together with it.
+	var staticRequests sync.WaitGroup
+	defer staticRequests.Wait()
+	if !resume {
+		startStaticRecreations(ctx, &staticRequests, client, namespace, nodeSetMap, nodesByNodeSet)
+	}
 	for nodeSetName, ordinals := range nodesByNodeSet {
 		nodeSet, exists := nodeSetMap[nodeSetName]
 		if !exists {
@@ -244,6 +255,7 @@ func runPowerAction(ctx context.Context, namespace, nodes string, timeout time.D
 			return err
 		}
 	}
+	staticRequests.Wait()
 	log.Info("Power action completed successfully", "action", action)
 	return nil
 }

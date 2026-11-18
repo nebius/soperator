@@ -39,6 +39,12 @@ func listClusterNodeSets(
 	return filtered, nil
 }
 
+// isEphemeralNodeSet reports whether the NodeSet runs in ephemeral mode. A NodeSet without the
+// setting is static.
+func isEphemeralNodeSet(nodeSet kubeobjects.NodeSet) bool {
+	return nodeSet.Spec.EphemeralNodes != nil && *nodeSet.Spec.EphemeralNodes
+}
+
 func nodeSetWorkerPods(
 	ctx context.Context,
 	kubectl *framework.KubectlClient,

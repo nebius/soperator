@@ -387,7 +387,7 @@ func (s *WorkerRollingUpdate) selectNodeSet(ctx context.Context) error {
 			}
 		}
 		*s = candidate
-		if isEphemeralRollout(s.nodeSet) {
+		if isEphemeralNodeSet(s.nodeSet) {
 			if err := s.holdEphemeralWorkers(ctx, s.workerNames); err != nil {
 				return err
 			}
@@ -427,7 +427,7 @@ func (s *WorkerRollingUpdate) snapshotSelectedWorkers(ctx context.Context) error
 		return err
 	}
 	pool := snapshot.WorkersByNodeSet[s.nodeSet.Metadata.Name]
-	if !isEphemeralRollout(s.nodeSet) && len(pool) != len(s.workerNames) {
+	if !isEphemeralNodeSet(s.nodeSet) && len(pool) != len(s.workerNames) {
 		return fmt.Errorf("NodeSet %s has %d Slurm workers in the main partition, expected %d", s.nodeSet.Metadata.Name, len(pool), len(s.workerNames))
 	}
 	s.workers, err = selectRolloutWorkers(s.workerNames, pool)
@@ -686,13 +686,9 @@ func (s *WorkerRollingUpdate) waitForRollout(ctx context.Context, description st
 	})
 }
 
-func isEphemeralRollout(nodeSet kubeobjects.NodeSet) bool {
-	return nodeSet.Spec.EphemeralNodes != nil && *nodeSet.Spec.EphemeralNodes
-}
-
 func (s *WorkerRollingUpdate) rolloutWorkerNames(ctx context.Context, nodeSet kubeobjects.NodeSet) ([]string, error) {
 	var active []int32
-	if isEphemeralRollout(nodeSet) {
+	if isEphemeralNodeSet(nodeSet) {
 		var powerState kubeobjects.NodeSetPowerState
 		if err := s.kubectl.GetJSON(ctx, &powerState, "get", "nodesetpowerstate", nodeSet.Metadata.Name,
 			"-n", nodeSet.Metadata.Namespace, "-o", "json"); err != nil {
@@ -707,7 +703,7 @@ func rolloutWorkerNames(nodeSet kubeobjects.NodeSet, active []int32) ([]string, 
 	if nodeSet.Spec.Replicas < 0 {
 		return nil, fmt.Errorf("validate NodeSet %s replicas: %d", nodeSet.Metadata.Name, nodeSet.Spec.Replicas)
 	}
-	if !isEphemeralRollout(nodeSet) {
+	if !isEphemeralNodeSet(nodeSet) {
 		active = make([]int32, nodeSet.Spec.Replicas)
 		for ordinal := range active {
 			active[ordinal] = int32(ordinal)
@@ -730,7 +726,7 @@ func rolloutWorkerNames(nodeSet kubeobjects.NodeSet, active []int32) ([]string, 
 // Membership must stay fixed while its snapshot defines replacement checks. Idle power saving is excluded, but external power changes can still
 // invalidate the experiment and must not silently reduce its coverage.
 func (s *WorkerRollingUpdate) checkRolloutWorkerSet(ctx context.Context) error {
-	if !isEphemeralRollout(s.nodeSet) || len(s.workerNames) == 0 {
+	if !isEphemeralNodeSet(s.nodeSet) || len(s.workerNames) == 0 {
 		return nil
 	}
 	names, err := s.rolloutWorkerNames(ctx, s.nodeSet)
