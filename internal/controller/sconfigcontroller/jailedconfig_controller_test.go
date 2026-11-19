@@ -40,6 +40,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	v0044 "github.com/SlinkyProject/slurm-client/api/v0044"
 
@@ -54,6 +55,7 @@ func newTestJailedConfigController(
 	t *testing.T,
 	configMap *corev1.ConfigMap,
 	jailedConfig *slurmv1alpha1.JailedConfig,
+	interceptorFuncs *interceptor.Funcs,
 ) (*JailedConfigReconciler, *slurmapifake.MockClient, *fakes.MockFs, *fakes.MockClock, error) {
 	scheme := runtime.NewScheme()
 	err := corev1.AddToScheme(scheme)
@@ -65,13 +67,17 @@ func newTestJailedConfigController(
 		return nil, nil, nil, nil, err
 	}
 
-	fakeClient := fake.NewClientBuilder().
+	clientBuilder := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithStatusSubresource(jailedConfig).
 		WithRuntimeObjects(
 			configMap,
 			jailedConfig,
-		).Build()
+		)
+	if interceptorFuncs != nil {
+		clientBuilder = clientBuilder.WithInterceptorFuncs(*interceptorFuncs)
+	}
+	fakeClient := clientBuilder.Build()
 
 	mgr, err := ctrl.NewManager(&k8srest.Config{}, ctrl.Options{
 		Scheme: scheme,
@@ -110,8 +116,9 @@ const (
 )
 
 type testOptions struct {
-	configMap    corev1.ConfigMap
-	jailedConfig slurmv1alpha1.JailedConfig
+	configMap        corev1.ConfigMap
+	jailedConfig     slurmv1alpha1.JailedConfig
+	interceptorFuncs *interceptor.Funcs
 }
 
 type testOption func(*testOptions)
@@ -143,6 +150,24 @@ func withDefaultMode(defaultMode *int32) testOption {
 func withUpdateActions(actions []slurmv1alpha1.UpdateAction) testOption {
 	return func(args *testOptions) {
 		args.jailedConfig.Spec.UpdateActions = actions
+	}
+}
+
+func withGeneration(generation int64) testOption {
+	return func(args *testOptions) {
+		args.jailedConfig.Generation = generation
+	}
+}
+
+func withStatus(status slurmv1alpha1.JailedConfigStatus) testOption {
+	return func(args *testOptions) {
+		args.jailedConfig.Status = status
+	}
+}
+
+func withInterceptorFuncs(funcs interceptor.Funcs) testOption {
+	return func(args *testOptions) {
+		args.interceptorFuncs = &funcs
 	}
 }
 
@@ -190,31 +215,42 @@ func prepareTest(t *testing.T, options ...testOption) (*JailedConfigReconciler, 
 		},
 	}
 
-	sctrl, apiClient, fakeFs, clock, err := newTestJailedConfigController(t, &opts.configMap, &opts.jailedConfig)
+	sctrl, apiClient, fakeFs, clock, err := newTestJailedConfigController(t, &opts.configMap, &opts.jailedConfig, opts.interceptorFuncs)
 	require.NoError(t, err)
 
 	return sctrl, request, apiClient, fakeFs, clock
 }
 
+// fileReplacement holds the expected calls replacing one file, so a test can act while the new
+// content is staged or at the moment it replaces the file.
+type fileReplacement struct {
+	stage  *mock.Call
+	rename *mock.Call
+}
+
+// prepareFs expects one file to be replaced.
 func prepareFs(
 	fs *fakes.MockFs,
 	dirName string,
 	fileName string,
 	content []byte,
 	fileMode os.FileMode,
-) {
+) fileReplacement {
 	tempFileName := fileName + ".tmp"
 
+	mkdirAll := fs.
+		On("MkdirAll", dirName, os.FileMode(0o755)).
+		Return(nil)
+	stage := fs.
+		On("PrepareNewFile", fileName, content, fileMode).
+		Return(tempFileName, nil)
+	rename := fs.
+		On("RenameExchange", tempFileName, fileName).
+		Return(nil)
 	mock.InOrder(
-		fs.
-			On("MkdirAll", dirName, os.FileMode(0o755)).
-			Return(nil),
-		fs.
-			On("PrepareNewFile", fileName, content, fileMode).
-			Return(tempFileName, nil),
-		fs.
-			On("RenameExchange", tempFileName, fileName).
-			Return(nil),
+		mkdirAll,
+		stage,
+		rename,
 		fs.
 			On("SyncCaches").
 			Return(nil),
@@ -222,12 +258,15 @@ func prepareFs(
 			On("Remove", tempFileName).
 			Return(nil),
 	)
+	return fileReplacement{stage: stage, rename: rename}
 }
 
+// prepareSlurmApi expects one reconfigure with every slurmd restarting after it, and returns the
+// reconfigure call, so a test can act while the reconfigure runs.
 func prepareSlurmApi(
 	slurmapi *slurmapifake.MockClient,
 	clock *fakes.MockClock,
-) {
+) *mock.Call {
 	nodeNames := []string{"node1", "node2", "node3"}
 	slurmdStartTimeBefore := int64(1)
 	slurmdStartTimeAfter := int64(2)
@@ -310,14 +349,16 @@ func prepareSlurmApi(
 		return res
 	}
 
+	getNodesBefore := slurmapi.
+		On("SlurmV0044GetNodesWithResponse", anyContext, emptyGetNodesParams).
+		Return(nodesBeforeResp, nil).
+		Once()
+	reconfigure := slurmapi.
+		On("SlurmV0044GetReconfigureWithResponse", anyContext).
+		Return(reconfigureResponse, nil)
 	mock.InOrder(
-		slurmapi.
-			On("SlurmV0044GetNodesWithResponse", anyContext, emptyGetNodesParams).
-			Return(nodesBeforeResp, nil).
-			Once(),
-		slurmapi.
-			On("SlurmV0044GetReconfigureWithResponse", anyContext).
-			Return(reconfigureResponse, nil),
+		getNodesBefore,
+		reconfigure,
 		slurmapi.
 			On("SlurmV0044GetNodesWithResponse", anyContext, emptyGetNodesParams).
 			Return(nodesBeforeResp, nil).
@@ -338,6 +379,7 @@ func prepareSlurmApi(
 			On("SlurmV0044GetNodesWithResponse", anyContext, emptyGetNodesParams).
 			Return(nodesAfterResp, nil),
 	)
+	return reconfigure
 }
 
 var anyContext = mock.MatchedBy(func(val interface{}) bool {
@@ -602,6 +644,133 @@ func TestJailedConfigReconciler_Reconfigure(t *testing.T) {
 	)
 
 	prepareFs(fs, dirName, fileName, []byte(content), os.FileMode(0o644))
+	prepareSlurmApi(slurmapi, clock)
+
+	_, err := sctrl.Reconcile(context.Background(), request)
+	require.NoError(t, err)
+}
+
+// TestJailedConfigReconciler_ReconfigureRecordsWhatItRead pins what a performed reconfigure reports:
+// the payload it read and the generation that payload was rendered from, written together, even
+// when the spec moves on while the files are being written.
+func TestJailedConfigReconciler_ReconfigureRecordsWhatItRead(t *testing.T) {
+	const renderedGeneration = 3
+	dirName := "/etc"
+	fileName := "/etc/config.txt"
+	content := "config data"
+	writtenHash := jailedpayload.Hash(map[string]jailedpayload.File{
+		fileName: {Data: []byte(content), Mode: slurmv1alpha1.DefaultMode},
+	})
+
+	writes := statusWrites{}
+	sctrl, request, slurmapi, fs, clock := prepareTest(
+		t,
+		withConfigMapData(map[string]string{
+			fileName: content,
+		}),
+		withUpdateActions([]slurmv1alpha1.UpdateAction{slurmv1alpha1.UpdateActionReconfigure}),
+		withGeneration(renderedGeneration),
+		withInterceptorFuncs(writes.interceptor()),
+	)
+
+	prepareFs(fs, dirName, fileName, []byte(content), os.FileMode(0o644)).stage.
+		Run(func(mock.Arguments) { bumpGeneration(t, sctrl.Client, testJailedConfig) })
+	prepareSlurmApi(slurmapi, clock)
+
+	_, err := sctrl.Reconcile(context.Background(), request)
+	require.NoError(t, err)
+
+	performed := writes.performed(testJailedConfig)
+	require.NotEmpty(t, performed, "a performed reconfigure must be reported")
+	for _, write := range performed {
+		assert.Equal(t, writtenHash, write.status.AppliedHash,
+			"ReconfigurePerformed must never be visible next to a hash it did not read")
+		assert.EqualValues(t, renderedGeneration, write.reconfigurePerformed().ObservedGeneration,
+			"the reconfigure read the payload rendered from the spec before the bump")
+		assert.False(t, write.confirms(writtenHash),
+			"the bumped spec was never read, so nothing may confirm it")
+	}
+}
+
+// TestJailedConfigReconciler_ChangedContentRevokesReconfigurePerformed pins that a confirmation of
+// the previous content is gone from the API server before the new content replaces the file, and
+// that the reconfigure over the new content confirms it again.
+func TestJailedConfigReconciler_ChangedContentRevokesReconfigurePerformed(t *testing.T) {
+	const generation = 2
+	dirName := "/etc"
+	fileName := "/etc/config.txt"
+	content := "config data"
+	writtenHash := jailedpayload.Hash(map[string]jailedpayload.File{
+		fileName: {Data: []byte(content), Mode: slurmv1alpha1.DefaultMode},
+	})
+
+	sctrl, request, slurmapi, fs, clock := prepareTest(
+		t,
+		withConfigMapData(map[string]string{
+			fileName: content,
+		}),
+		withUpdateActions([]slurmv1alpha1.UpdateAction{slurmv1alpha1.UpdateActionReconfigure}),
+		withGeneration(generation),
+		withStatus(slurmv1alpha1.JailedConfigStatus{
+			AppliedHash: "hash of the content written before",
+			Conditions: []metav1.Condition{{
+				Type:               string(slurmv1alpha1.ReconfigurePerformed),
+				Status:             metav1.ConditionTrue,
+				Reason:             slurmv1alpha1.ReasonSuccess,
+				ObservedGeneration: generation,
+			}},
+		}),
+	)
+	get := func() *slurmv1alpha1.JailedConfig {
+		jailedConfig := &slurmv1alpha1.JailedConfig{}
+		require.NoError(t, sctrl.Get(context.Background(), request.NamespacedName, jailedConfig))
+		return jailedConfig
+	}
+
+	prepareFs(fs, dirName, fileName, []byte(content), os.FileMode(0o644)).rename.
+		Run(func(mock.Arguments) {
+			condition := meta.FindStatusCondition(get().Status.Conditions, string(slurmv1alpha1.ReconfigurePerformed))
+			require.NotNil(t, condition)
+			assert.Equal(t, metav1.ConditionFalse, condition.Status,
+				"the file is about to change, so the confirmation of its previous content must be gone")
+			assert.EqualValues(t, generation, condition.ObservedGeneration)
+		})
+	prepareSlurmApi(slurmapi, clock)
+
+	_, err := sctrl.Reconcile(context.Background(), request)
+	require.NoError(t, err)
+
+	jailedConfig := get()
+	condition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.ReconfigurePerformed))
+	require.NotNil(t, condition)
+	assert.Equal(t, metav1.ConditionTrue, condition.Status)
+	assert.Equal(t, writtenHash, jailedConfig.Status.AppliedHash)
+}
+
+// TestJailedConfigReconciler_ReconfigureFollowsRenderedSpec pins that the decision to reconfigure
+// follows the spec the payload was rendered from: a request withdrawn once the files are being
+// written still gets the reconfigure the written content was rendered for.
+func TestJailedConfigReconciler_ReconfigureFollowsRenderedSpec(t *testing.T) {
+	dirName := "/etc"
+	fileName := "/etc/config.txt"
+	content := "config data"
+
+	sctrl, request, slurmapi, fs, clock := prepareTest(
+		t,
+		withConfigMapData(map[string]string{
+			fileName: content,
+		}),
+		withUpdateActions([]slurmv1alpha1.UpdateAction{slurmv1alpha1.UpdateActionReconfigure}),
+	)
+
+	prepareFs(fs, dirName, fileName, []byte(content), os.FileMode(0o644)).stage.
+		Run(func(mock.Arguments) {
+			jailedConfig := &slurmv1alpha1.JailedConfig{}
+			require.NoError(t, sctrl.Get(context.Background(), request.NamespacedName, jailedConfig))
+			jailedConfig.Spec.UpdateActions = nil
+			jailedConfig.Generation++
+			require.NoError(t, sctrl.Update(context.Background(), jailedConfig))
+		})
 	prepareSlurmApi(slurmapi, clock)
 
 	_, err := sctrl.Reconcile(context.Background(), request)
