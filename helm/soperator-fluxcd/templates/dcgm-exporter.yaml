@@ -36,6 +36,6 @@ spec:
     daemonSet:
       nvidiaDcgmExporter:
         resources:
-          {{- toYaml .Values.observability.dcgmExporter.values.resources | nindent 8 }}
+          {{- toYaml .Values.observability.dcgmExporter.values.resources | nindent 10 }}
     {{- end }}
 {{- end }}

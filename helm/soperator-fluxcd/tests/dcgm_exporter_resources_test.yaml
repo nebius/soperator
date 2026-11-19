@@ -1,0 +1,23 @@
+suite: test DCGM Exporter resources
+templates:
+  - templates/dcgm-exporter.yaml
+tests:
+  - it: should pass requests and limits in the exporter container resources
+    set:
+      observability.enabled: true
+      observability.dcgmExporter.enabled: true
+      observability.dcgmExporter.values.resources:
+        requests:
+          cpu: 50m
+          memory: 192Mi
+        limits:
+          memory: 256Mi
+    asserts:
+      - equal:
+          path: spec.values.daemonSet.nvidiaDcgmExporter.resources
+          value:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              memory: 256Mi
