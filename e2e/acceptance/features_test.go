@@ -92,6 +92,7 @@ func TestSharedSequentialScenarios(t *testing.T) {
 		"Workers expose local NVMe scratch to jobs",
 		"Login pods scale up without automatic pod scale-down",
 		"A login user exceeding the memory limit is OOM-killed without affecting other users or login services",
+		"Job memory exhaustion leaves neighboring workloads healthy",
 		"A burst of batch jobs is accepted and drained within the budget",
 		"Workers recover after their VMs are stopped and started",
 		"A static NodeSet can transition to ephemeral mode and back",
