@@ -63,6 +63,7 @@ func TestSharedHeavyScenarios(t *testing.T) {
 		"Enroot containers can access GPUs",
 		"Login pods scale up without automatic pod scale-down",
 		"A login user exceeding the memory limit is OOM-killed without affecting other users or login services",
+		"Job memory exhaustion leaves neighboring workloads healthy",
 		"Manage jail dry-run detects drift without modifying the jail",
 		"A worker template update preserves running jobs",
 		"A maintenance event replaces the selected worker node",
