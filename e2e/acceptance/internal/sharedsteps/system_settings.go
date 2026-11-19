@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -27,6 +28,9 @@ const (
 	loginSSHKeyComment = "soperator-e2e-login-ssh"
 
 	jobUserKey = "JOB_USER"
+
+	sessionCgroupKey         = "SESSION_CGROUP"
+	adoptedSSHJobMemoryBytes = int64(1024 * 1024 * 1024)
 
 	limitDirectMarker = "__soperator_acceptance_direct_limits__"
 	limitNestedMarker = "__soperator_acceptance_nested_limits__"
@@ -207,6 +211,9 @@ type SystemSettings struct {
 
 	limits resourceLimitSnapshots
 
+	adoptedSSHJob           framework.SbatchJob
+	adoptedSSHSessionCgroup string
+
 	loginKernel  kernelSettingSnapshot
 	workerKernel kernelSettingSnapshot
 	nativeKernel kernelSettingSnapshot
@@ -247,8 +254,8 @@ func (s *SystemSettings) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^a regular user for adopted SSH checks is available on the worker$`, s.adoptedSSHUserIsAvailableOnWorker)
 	sc.Step(`^worker SSH without a job is allowed for the regular user$`, s.workerSSHWithoutJobIsAllowedForRegularUser)
 	sc.Step(`^PAM Slurm adopt requires a job for the regular user$`, s.pamSlurmAdoptRequiresJobForRegularUser)
-	sc.Step(`^the regular user starts a job on the worker and collects direct and nested Bash resource limits over SSH$`, s.collectAdoptedWorkerResourceLimits)
-	sc.Step(`^direct and nested adopted SSH resource limits match the regular-user Slurm compute profile$`, s.resourceLimitsMatchRegularUserSlurmComputeProfile)
+	sc.Step(`^the regular user starts a memory-limited job on the worker and collects direct and nested Bash resource limits over SSH$`, s.collectAdoptedWorkerResourceLimits)
+	sc.Step(`^the adopted SSH session is confined by the job's memory limit$`, s.adoptedSSHSessionIsConfinedByJobMemoryLimit)
 	sc.Step(`^a regular user has an SSH identity on the login node$`, s.regularUserHasLoginSSHIdentity)
 	sc.Step(`^the regular user collects resource limits and kernel settings over SSH to the login node$`, s.collectRegularUserLoginSettings)
 	sc.Step(`^the regular-user login SSH session exposes the required kernel settings$`, s.regularUserLoginExposesRequiredKernelSettings)
@@ -321,6 +328,8 @@ func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
 	s.worker = framework.WorkerInfo{}
 	s.jobs = nil
 	s.limits = resourceLimitSnapshots{}
+	s.adoptedSSHJob = framework.SbatchJob{}
+	s.adoptedSSHSessionCgroup = ""
 	s.loginKernel = nil
 	s.workerKernel = nil
 	s.nativeKernel = nil
@@ -490,6 +499,7 @@ func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context)
 		Nodes:        1,
 		Nodelist:     []string{s.worker.Name},
 		TasksPerNode: 1,
+		Args:         []string{fmt.Sprintf("--mem=%dM", adoptedSSHJobMemoryBytes/(1024*1024))},
 		Wrap:         "sleep 3600",
 		RunAsUser:    pamSlurmAdoptLimitsUser,
 	})
@@ -509,7 +519,7 @@ func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context)
 		pamSlurmAdoptLimitsUser,
 		s.worker.Name,
 		systemSettingsSSHTimeout,
-		pairedResourceLimitProbe(),
+		adoptedSSHProbe(),
 	)
 	if err != nil {
 		return fmt.Errorf("collect resource limits over SSH adopted into job %s on worker %s: %w", job.ID, s.worker.Name, err)
@@ -517,6 +527,38 @@ func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context)
 	s.limits, err = parseResourceLimitSnapshots(output)
 	if err != nil {
 		return fmt.Errorf("parse adopted SSH resource limits on worker %s: %w", s.worker.Name, err)
+	}
+	s.adoptedSSHJob = job
+	s.adoptedSSHSessionCgroup = parseKeyValueLine(output, sessionCgroupKey)
+	if s.adoptedSSHSessionCgroup == "" {
+		return fmt.Errorf("find cgroup of SSH session adopted into job %s on worker %s; output:\n%s",
+			job.ID, s.worker.Name, strings.TrimSpace(output))
+	}
+	return nil
+}
+
+// adoptedSSHSessionIsConfinedByJobMemoryLimit checks the job cgroup rather than ulimit -m:
+// pam_limits overwrites the RLIMIT_RSS set by ulimit_pam_adopt, and Linux does not enforce RLIMIT_RSS anyway.
+func (s *SystemSettings) adoptedSSHSessionIsConfinedByJobMemoryLimit(ctx context.Context) error {
+	if err := s.requireWorker(); err != nil {
+		return err
+	}
+	jobID := s.adoptedSSHJob.ID
+	cgroup, err := slurmJobCgroup(s.adoptedSSHSessionCgroup, jobID)
+	if err != nil {
+		return fmt.Errorf("locate cgroup of job %s from adopted SSH session on worker %s: %w", jobID, s.worker.Name, err)
+	}
+	pod, err := s.kubectl.WorkerPodForSlurmNode(ctx, s.worker.Name)
+	if err != nil {
+		return err
+	}
+	output, err := s.runtime.WorkerPod(pod).RunWithDefaultRetry(ctx,
+		"cat "+framework.ShellQuote(path.Join(cgroup, "memory.max")))
+	if err != nil {
+		return fmt.Errorf("read memory limit of job %s cgroup %s on worker %s: %w", jobID, cgroup, s.worker.Name, err)
+	}
+	if err := validateAdoptedSSHJobMemoryMax(output); err != nil {
+		return fmt.Errorf("check job %s cgroup %s on worker %s: %w", jobID, cgroup, s.worker.Name, err)
 	}
 	return nil
 }
@@ -638,13 +680,6 @@ func (s *SystemSettings) resourceLimitsMatchRegularUserComputeProfile() error {
 
 func (s *SystemSettings) resourceLimitsMatchSlurmComputeProfile() error {
 	return validateSlurmResourceLimitSnapshots(s.limits, computeResourceLimitProfile())
-}
-
-// resourceLimitsMatchRegularUserSlurmComputeProfile expects pam_limits to apply
-// the regular-user profile to an adopted SSH session, while ulimit_pam_adopt
-// sets max_memory from the job it was adopted into.
-func (s *SystemSettings) resourceLimitsMatchRegularUserSlurmComputeProfile() error {
-	return validateSlurmResourceLimitSnapshots(s.limits, regularUserComputeResourceLimitProfile())
 }
 
 func (s *SystemSettings) submitNativeResourceLimitsJob(ctx context.Context) error {
@@ -995,6 +1030,23 @@ func pairedResourceLimitProbe() string {
 		limitNestedMarker,
 		framework.ShellQuote(probe),
 	)
+}
+
+// adoptedSSHProbe also reports the session cgroup, which locates the job it was adopted into.
+func adoptedSSHProbe() string {
+	return fmt.Sprintf(
+		"printf '%s=%%s\\n' \"$(sed -n 's/^0:://p' /proc/self/cgroup)\"; %s",
+		sessionCgroupKey,
+		pairedResourceLimitProbe(),
+	)
+}
+
+func validateAdoptedSSHJobMemoryMax(output string) error {
+	expected := strconv.FormatInt(adoptedSSHJobMemoryBytes, 10)
+	if actual := strings.TrimSpace(output); actual != expected {
+		return fmt.Errorf("verify memory.max=%q: want %q set from the job memory request", actual, expected)
+	}
+	return nil
 }
 
 func kernelSettingsProbe() string {
