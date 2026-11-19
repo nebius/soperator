@@ -72,6 +72,28 @@ func TestOverrideTestValuesEnablesTailscale(t *testing.T) {
 	assert.Equal(t, true, result["tailscale_enabled"])
 }
 
+func TestOverrideTestValuesSSHFeatures(t *testing.T) {
+	for _, profile := range []Profile{
+		validProfile(),
+		{NodeSets: []NodeSetDef{{Name: "cpu", Platform: "cpu-d3", Preset: "16vcpu-64gb", Size: 1}}},
+	} {
+		vars := overrideTestValues(map[string]interface{}{}, Config{Profile: profile})
+		assert.Equal(t, map[string]interface{}{
+			"enabled": true,
+			"spec": map[string]interface{}{
+				"size_gibibytes":  93,
+				"filesystem_type": "ext4",
+				"disk_type":       "NETWORK_SSD_IO_M3",
+			},
+		}, vars["slurm_login_image_disk"])
+		assert.Equal(t, true, vars["slurm_login_user_isolation_enabled"])
+		policy, ok := vars["pam_slurm_adopt"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, true, policy["enabled"])
+		assert.Equal(t, []string{"bob", "dockeruser"}, policy["exempt_users"])
+	}
+}
+
 func TestOverrideTestValuesCreatesWorkerPartitions(t *testing.T) {
 	tfVars := map[string]interface{}{}
 	cfg := Config{
