@@ -111,9 +111,9 @@ func TestRunRequiresExplicitSubcommand(t *testing.T) {
 
 func TestRunResolvesScenarioAliasesBeforeVersionFiltering(t *testing.T) {
 	for _, selector := range []string{
-		"features/worker_rolling_update.feature:14",
-		"e2e/acceptance/features/worker_rolling_update.feature:14",
-		"/checkout/soperator/e2e/acceptance/features/worker_rolling_update.feature:14",
+		"features/worker_rolling_update.feature:16",
+		"e2e/acceptance/features/worker_rolling_update.feature:16",
+		"/checkout/soperator/e2e/acceptance/features/worker_rolling_update.feature:16",
 	} {
 		t.Run(selector, func(t *testing.T) {
 			err := Run(context.Background(), []string{

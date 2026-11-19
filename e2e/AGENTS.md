@@ -137,12 +137,55 @@ suite from `main` runs against every supported release, so version-specific
 behavior is expressed with `@soperator_version_...` tags and runtime checks,
 never with per-branch copies of the code.
 
-The shared feature suite has four tag forms that affect execution:
+The shared feature suite has five tag forms that affect execution:
 
 - exactly one scenario-level `@soperator_version_...` constraint;
 - optional `@heavy`;
 - optional `@unstable`;
-- optional `@manual`.
+- optional `@manual`;
+- optional scenario-level `@sequential`.
+
+The standalone runner executes `@sequential` exclusions first, then untagged
+scenarios in a separate concurrency-capable suite. Both currently run at
+concurrency 1, with native reservation enforcement opt-in while scenarios are
+migrated. Both suites run even if the first fails. Preserve normal feature and
+scenario declaration order; correctness must not depend on another scenario's
+state or completion order. Untagged membership alone is not a concurrency audit.
+
+Use `@sequential` for a concrete conflict that worker reservations do not
+isolate, such as shared configuration or jail-package mutation, shared login
+restarts, global health assertions, or custom worker selection outside shared
+ownership. A shared read, GPU usage, multiple workers or long runtime alone
+does not require serialization. Do not use `@parallel`.
+
+Every `@sequential` tag must have a `# Sequential: ...` comment immediately
+above its tag line, naming the conflicting resource or assertion. For example:
+
+```gherkin
+  # Sequential: Changes shared Slurm configuration used by every worker job.
+  @soperator_version_>=4.0.0 @sequential
+  Scenario: A custom Slurm setting is applied and restored
+```
+
+Keep the reason accurate and remove the tag and comment when the conflict is
+resolved. Outline examples share their scenario's decision. Update the
+sequential inventory and feature-policy tests when membership changes.
+
+Design worker workloads for native reservation scopes. Acquire the complete
+worker set through `WorkerSelector.Acquire` or `Reserve` before recording
+baselines or changing state, including workers used by indirect smoke jobs.
+Snapshot selection alone does not acquire ownership. Use `SubmitBatch`,
+`RunSlurm` and utility adapters to bind every allocation to the reservation,
+including regular-user and `sudo -iu` paths. Keep explicit nodelists where
+assertions need particular workers. Use `RequireReservedHost` before host-wide
+faults and retain ownership through producer shutdown, job cleanup and recovery.
+
+Create independent step objects inside each registrar invocation. Use
+scenario-specific paths, SSH identities and artifact directories, and track
+owned job IDs for assertions. Scope cleanup to owned resources; cancelling by
+a shared user or job name can stop another scenario. Synchronize unavoidable
+shared initialization over its whole read-modify-write operation. Reservations
+do not protect shared login Pods, configuration or jail files.
 
 CPU, GPU, topology, and other descriptive tags are allowed, but no current
 runner or workflow consumes them. Ask whether the user wants these tags and
@@ -291,6 +334,12 @@ Keep cleanup cheap and idempotent. Do not add complicated cleanup for harmless
 state that satisfies the criteria above. When cleanup is best-effort, log
 failures with enough resource identifiers to handle them manually; cleanup
 must not replace the scenario's original failure.
+
+Report required restoration failures through `framework.RecordWorkerCleanupError`.
+The runner tracks these for leased and unleased scenarios, finalizes native
+ownership only after scenario cleanup, and fails the suite even when the
+scenario otherwise skips. Cleanup must preserve context values needed for
+ownership and artifacts while running independently of scenario cancellation.
 
 If a scenario produces an artifact that should survive the run, such as a
 report, profile, dump, or substantial command output, obtain its assigned paths

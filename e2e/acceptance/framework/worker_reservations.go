@@ -66,7 +66,7 @@ type workerReservation struct {
 	expires         time.Time
 	mayExist        bool
 	uncertainCreate bool
-	cleanupErr      error
+	cleanup         *workerCleanup
 	acquireCancel   context.CancelFunc
 	acquireDone     chan struct{}
 	inFlight        int

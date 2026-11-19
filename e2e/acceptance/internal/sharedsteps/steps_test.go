@@ -30,9 +30,11 @@ func TestCleanupStepFamilyPreservesOwnershipAfterCancellation(t *testing.T) {
 	require.ErrorIs(t, framework.FinishWorkerReservation(ctx, nil), assert.AnError)
 }
 
-func TestCleanupStepFamilyRecordsPanicBeforeFinalization(t *testing.T) {
+func TestCleanupStepFamilyReturnsPanicForFinalization(t *testing.T) {
 	ctx := framework.WithWorkerReservation(t.Context(), framework.NewReservationManager(), "panic")
 	family := &cleanupTestFamily{cleanup: func(context.Context) { panic("restore interrupted") }}
-	require.ErrorContains(t, cleanupStepFamily(ctx, family), "restore interrupted")
-	require.ErrorContains(t, framework.FinishWorkerReservation(ctx, nil), "restore interrupted")
+	err := cleanupStepFamily(ctx, family)
+	require.ErrorContains(t, err, "restore interrupted")
+	framework.RecordWorkerCleanupError(ctx, err)
+	require.EqualError(t, framework.FinishWorkerReservation(ctx, nil), err.Error())
 }

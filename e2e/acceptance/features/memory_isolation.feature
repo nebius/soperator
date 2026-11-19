@@ -1,5 +1,6 @@
 Feature: Job memory isolation
-  @heavy @soperator_version_>=5.0.0
+  # Sequential: Checks host-wide OOM logs and service identities without owning every worker on the host.
+  @heavy @soperator_version_>=5.0.0 @sequential
   Scenario Outline: Job memory exhaustion leaves neighboring workloads healthy
     Given two memory-limited jobs run on the same worker using <execution>
     When one job allocates memory below its limit

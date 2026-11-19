@@ -1,6 +1,7 @@
 Feature: Worker VM stop and start
 
-  @heavy @soperator_version_>=5.0.0
+  # Sequential: Selects VMs and manages its own reservations outside the shared host-ownership guard.
+  @heavy @soperator_version_>=5.0.0 @sequential
   Scenario: Workers recover after their VMs are stopped and started
     # The whole-node reservation keeps periodic and other jobs off the workers under test.
     Given up to 2 workers of every NodeSet are reserved for a VM stop-start
