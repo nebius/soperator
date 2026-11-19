@@ -443,6 +443,10 @@ func (r *workerMK8sTestRuntime) WaitFor(ctx context.Context, _ string, _, _ time
 	for range 5 {
 		r.polls++
 		done, err := condition(ctx)
+		var permanent *framework.PermanentError
+		if errors.As(err, &permanent) {
+			return err
+		}
 		if done && err == nil {
 			return nil
 		}

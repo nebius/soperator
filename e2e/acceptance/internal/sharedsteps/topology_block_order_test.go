@@ -134,9 +134,9 @@ func TestBlockRankCheckTriesAllPartitions(t *testing.T) {
 						return fmt.Sprintf("- topology: second\n  block:\n    blocks:\n      - block: %s\n      - block: %s\n", first, second), nil
 					}
 					if tt.idle && strings.Contains(command, "--partition='ready'") {
-						return "worker-z idle\nworker-a idle\n", nil
+						return "worker-z|2|40|idle\nworker-a|2|40|idle\n", nil
 					}
-					return "worker-z allocated\nworker-a allocated\n", nil
+					return "worker-z|2|40|allocated\nworker-a|2|40|allocated\n", nil
 				}),
 				jail: framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
 					jobs++

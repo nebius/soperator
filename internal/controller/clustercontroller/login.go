@@ -6,12 +6,14 @@ import (
 	"time"
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -242,6 +244,26 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 				},
 			},
 			utils.MultiStepExecutionStep{
+				Name: "Slurm Login Role",
+				Func: func(stepCtx context.Context) error {
+					desired := login.RenderRole(clusterValues.Namespace, clusterValues.Name, &clusterValues.NodeLogin)
+					if err := r.Role.Reconcile(stepCtx, cluster, desired); err != nil {
+						return fmt.Errorf("reconcile login Role: %w", err)
+					}
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
+				Name: "Slurm Login RoleBinding",
+				Func: func(stepCtx context.Context) error {
+					desired := login.RenderRoleBinding(clusterValues.Namespace, clusterValues.Name)
+					if err := r.RoleBinding.Reconcile(stepCtx, cluster, desired); err != nil {
+						return fmt.Errorf("reconcile login RoleBinding: %w", err)
+					}
+					return nil
+				},
+			},
+			utils.MultiStepExecutionStep{
 				Name: "Slurm Login StatefulSet",
 				Func: func(stepCtx context.Context) error {
 					stepLogger := log.FromContext(stepCtx)
@@ -302,6 +324,11 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 					}
 					stepLogger.V(1).Info("Retrieved dependencies")
 
+					if desired.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
+						if err := r.clearLoginUpdateInProgress(stepCtx, client.ObjectKeyFromObject(&desired)); err != nil {
+							return err
+						}
+					}
 					err = r.AdvancedStatefulSet.Reconcile(stepCtx, cluster, &desired, deps...)
 					if err != nil {
 						stepLogger.Error(err, "Failed to reconcile")
@@ -336,6 +363,27 @@ func (r SlurmClusterReconciler) ReconcileLogin(
 		return fmt.Errorf("reconciling Slurm Login: %w", err)
 	}
 	logger.Info("Reconciled Slurm Login")
+	return nil
+}
+
+func (r SlurmClusterReconciler) clearLoginUpdateInProgress(ctx context.Context, key client.ObjectKey) error {
+	current := &kruisev1b1.StatefulSet{}
+	if err := r.Get(ctx, key, current); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("get login StatefulSet before cancelling delayed rollout: %w", err)
+	}
+	activePod := current.Annotations[consts.AnnotationLoginUpdateInProgress]
+	if activePod == "" {
+		return nil
+	}
+	base := current.DeepCopy()
+	delete(current.Annotations, consts.AnnotationLoginUpdateInProgress)
+	if err := r.Patch(ctx, current, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{})); err != nil {
+		return fmt.Errorf("clear active login pod replacement: %w", err)
+	}
+	log.FromContext(ctx).Info("Cancelled active login pod replacement for rolling updates", "statefulSet", current.Name, "activePod", activePod)
 	return nil
 }
 

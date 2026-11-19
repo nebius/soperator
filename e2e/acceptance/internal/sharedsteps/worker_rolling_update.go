@@ -72,6 +72,8 @@ type workerRolloutPrerequisiteError struct{ error }
 
 type rolloutInvariantError struct{ error }
 
+func (e rolloutInvariantError) Unwrap() error { return e.error }
+
 // Exclusions protect the selected active workers without running extra jobs that
 // would block their handoff. Only additions owned by this scenario are removed.
 type workerRolloutPower struct {
@@ -273,7 +275,7 @@ func (s *WorkerRollingUpdate) cleanupRollout(ctx context.Context) {
 			if len(names) == 0 {
 				return true, nil
 			}
-			workers, err := s.slurm.NodeInfosOnce(waitCtx, names)
+			workers, err := s.slurm.NodeInfosNoRetries(waitCtx, names)
 			if err != nil {
 				return false, err
 			}
@@ -587,7 +589,7 @@ func (s *WorkerRollingUpdate) waitForIdle(ctx context.Context, description strin
 	}
 	return s.runtime.WaitFor(ctx, description, timeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
-			nodes, err := s.slurm.NodeInfosOnce(waitCtx, names)
+			nodes, err := s.slurm.NodeInfosNoRetries(waitCtx, names)
 			if err != nil {
 				return false, err
 			}
@@ -672,29 +674,16 @@ func workerRolloutBudget(value *intstr.IntOrString, replicas int) (int, error) {
 }
 
 func rolloutInvariant(format string, args ...any) error {
-	return rolloutInvariantError{fmt.Errorf(format, args...)}
+	return &framework.PermanentError{Err: rolloutInvariantError{fmt.Errorf(format, args...)}}
 }
 
-// WaitFor retries transient errors; an observed safety violation must survive later recovery.
 func (s *WorkerRollingUpdate) waitForRollout(ctx context.Context, description string, timeout, interval time.Duration, condition func(context.Context) (bool, error)) error {
-	var fatal error
-	err := s.runtime.WaitFor(ctx, description, timeout, interval, func(waitCtx context.Context) (bool, error) {
-		err := s.checkRolloutWorkerSet(waitCtx)
-		var done bool
-		if err == nil {
-			done, err = condition(waitCtx)
+	return s.runtime.WaitFor(ctx, description, timeout, interval, func(waitCtx context.Context) (bool, error) {
+		if err := s.checkRolloutWorkerSet(waitCtx); err != nil {
+			return false, err
 		}
-		var invariant rolloutInvariantError
-		if errors.As(err, &invariant) {
-			fatal = err
-			return true, nil
-		}
-		return done, err
+		return condition(waitCtx)
 	})
-	if fatal != nil {
-		return fatal
-	}
-	return err
 }
 
 func (s *WorkerRollingUpdate) rolloutWorkerNames(ctx context.Context, nodeSet kubeobjects.NodeSet) ([]string, error) {

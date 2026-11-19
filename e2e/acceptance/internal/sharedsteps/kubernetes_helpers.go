@@ -3,9 +3,14 @@ package sharedsteps
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/nebius/soperator/e2e/acceptance/internal/kubeobjects"
 )
 
-const kruiseStatefulSetResource = "statefulsets.apps.kruise.io"
+const (
+	kruiseStatefulSetResource = "statefulsets.apps.kruise.io"
+	slurmdContainerName       = "slurmd"
+)
 
 func findMetaCondition(conditions []metav1.Condition, conditionType string) *metav1.Condition {
 	for i := range conditions {
@@ -17,12 +22,7 @@ func findMetaCondition(conditions []metav1.Condition, conditionType string) *met
 }
 
 func k8sNodeReady(node corev1.Node) bool {
-	for _, condition := range node.Status.Conditions {
-		if condition.Type == corev1.NodeReady {
-			return condition.Status == corev1.ConditionTrue
-		}
-	}
-	return false
+	return kubeobjects.NodeReady(node)
 }
 
 type helmReleaseList struct {

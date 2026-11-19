@@ -160,21 +160,22 @@ func TestSlurmClientActiveWorkerStartTimesRequiresActiveWorker(t *testing.T) {
 	assert.ErrorContains(t, err, "find active workers")
 }
 
-func TestSlurmClientNodeInfosOnceParsesAndOrdersSelectedRecords(t *testing.T) {
+func TestSlurmClientNodeInfosNoRetriesParsesAndOrdersSelectedRecords(t *testing.T) {
 	workerOne := "NodeName=worker-1 InstanceId=instance-1 State=ALLOCATED+DRAIN+REBOOT_REQUESTED CPUAlloc=2 AllocMem=128 Reason=soperator rolling update : test reason"
 	workerZero := "NodeName=worker-0 InstanceId=instance-0 State=IDLE CPUAlloc=0 AllocMem=0"
 	runtime := &slurmNodeRuntime{outputs: map[string]string{
-		"scontrol -o show nodes": "\nNodeName=unselected\n" + workerOne + "\n" + workerZero + "\n",
+		"scontrol -o show node 'worker-0,worker-1'": "\nNodeName=unselected\n" + workerOne + "\n" + workerZero + "\n",
 	}}
 
-	nodes, err := NewSlurmClient(runtime).NodeInfosOnce(t.Context(), []string{"worker-0", "worker-1"})
+	nodes, err := NewSlurmClient(runtime).NodeInfosNoRetries(t.Context(), []string{"worker-0", "worker-1"})
 
 	require.NoError(t, err)
 	assert.Equal(t, []SlurmNodeInfo{ParseSlurmNodeInfo("worker-0", workerZero), ParseSlurmNodeInfo("worker-1", workerOne)}, nodes)
-	assert.Equal(t, []string{"scontrol -o show nodes"}, runtime.calls)
+	assert.Equal(t, []string{"scontrol -o show node 'worker-0,worker-1'"}, runtime.calls,
+		"polling a few nodes must not dump every node of a large cluster")
 }
 
-func TestSlurmClientNodeInfosOnceValidatesInputsAndRecords(t *testing.T) {
+func TestSlurmClientNodeInfosNoRetriesValidatesInputsAndRecords(t *testing.T) {
 	for _, test := range []struct {
 		name      string
 		names     []string
@@ -194,9 +195,11 @@ func TestSlurmClientNodeInfosOnceValidatesInputsAndRecords(t *testing.T) {
 		{name: "missing selected state", names: []string{"worker-0"}, output: "NodeName=worker-0 CPUAlloc=0", wantError: "missing state", wantCalls: 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			runtime := &slurmNodeRuntime{outputs: map[string]string{"scontrol -o show nodes": test.output}}
+			runtime := &slurmNodeRuntime{outputs: map[string]string{
+				"scontrol -o show node " + ShellQuote(strings.Join(test.names, ",")): test.output,
+			}}
 
-			nodes, err := NewSlurmClient(runtime).NodeInfosOnce(t.Context(), test.names)
+			nodes, err := NewSlurmClient(runtime).NodeInfosNoRetries(t.Context(), test.names)
 
 			if test.wantError != "" {
 				require.ErrorContains(t, err, test.wantError)
@@ -209,14 +212,54 @@ func TestSlurmClientNodeInfosOnceValidatesInputsAndRecords(t *testing.T) {
 	}
 }
 
-func TestSlurmClientNodeInfosOnceReturnsCommandErrorWithoutRetry(t *testing.T) {
+func TestSlurmClientNodeInfosNoRetriesReturnsCommandErrorWithoutRetry(t *testing.T) {
 	commandErr := errors.New("controller unavailable")
 	runtime := &slurmNodeRuntime{runError: commandErr}
 
-	_, err := NewSlurmClient(runtime).NodeInfosOnce(t.Context(), []string{"worker-0"})
+	_, err := NewSlurmClient(runtime).NodeInfosNoRetries(t.Context(), []string{"worker-0"})
 
 	require.ErrorIs(t, err, commandErr)
-	assert.Equal(t, []string{"scontrol -o show nodes"}, runtime.calls)
+	assert.Equal(t, []string{"scontrol -o show node 'worker-0'"}, runtime.calls)
+}
+
+func TestSlurmClientMissingNodesUseStdoutDiagnostics(t *testing.T) {
+	var many []string
+	var records []string
+	for i := range nodeInfosListLimit + 1 {
+		name := fmt.Sprintf("worker-%d", i)
+		many = append(many, name)
+		if i < nodeInfosListLimit {
+			records = append(records, "NodeName="+name+" State=IDLE")
+		}
+	}
+	for _, test := range []struct {
+		name, output, stderr string
+		names                []string
+		pending              bool
+	}{
+		{name: "single missing", names: []string{"worker-999"}, output: "Node worker-999 not found\n", stderr: "command terminated with exit code 1", pending: true},
+		{name: "mixed", names: []string{"worker-0", "worker-999"}, output: "NodeName=worker-0 State=IDLE\n\nNode worker-999 not found\n", stderr: "command terminated with exit code 1", pending: true},
+		{name: "full listing", names: many, output: strings.Join(records, "\n"), pending: true},
+		{name: "unrequested name", names: []string{"worker-0"}, output: "Node other-0 not found\n", stderr: "command terminated with exit code 1"},
+		{name: "permission error", names: []string{"worker-0"}, stderr: "Forbidden: controller exec"},
+		{name: "transport error", names: []string{"worker-0"}, stderr: "connection refused"},
+		{name: "unrecognized stderr", names: []string{"worker-0"}, stderr: "slurm_load_node error: Invalid node name specified"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			runtime := &slurmNodeRuntime{outputs: map[string]string{nodeInfosCommand(test.names): test.output}}
+			if test.stderr != "" {
+				runtime.runError = kubectlCommandFailure(test.stderr)
+			}
+			nodes, err := NewSlurmClient(runtime).NodeInfosNoRetries(t.Context(), test.names)
+			require.Error(t, err)
+			assert.Equal(t, test.pending, isPendingRecovery(err))
+			assert.Empty(t, nodes, "a partial response must not become a complete allocation")
+			if !test.pending {
+				assert.ErrorIs(t, err, runtime.runError)
+			}
+			assert.Len(t, runtime.calls, 1)
+		})
+	}
 }
 
 type slurmNodeRuntime struct {
@@ -230,7 +273,7 @@ func (r *slurmNodeRuntime) Controller() CommandScope {
 	return NewCommandScope(func(ctx context.Context, command string) (string, error) {
 		r.calls = append(r.calls, command)
 		if r.runError != nil {
-			return "", r.runError
+			return r.outputs[command], r.runError
 		}
 		output, found := r.outputs[command]
 		if !found {
@@ -238,4 +281,39 @@ func (r *slurmNodeRuntime) Controller() CommandScope {
 		}
 		return output, nil
 	})
+}
+
+func TestSlurmNodeInfoIsIdle(t *testing.T) {
+	assert.True(t, SlurmNodeInfo{State: "IDLE+RESERVED"}.IsIdle(), "a reservation does not make an idle node busy")
+	assert.False(t, SlurmNodeInfo{State: "IDLE+POWERED_DOWN"}.IsIdle())
+	assert.False(t, SlurmNodeInfo{State: "IDLE+NOT_RESPONDING"}.IsIdle())
+	assert.False(t, SlurmNodeInfo{State: "MIXED"}.IsIdle())
+}
+
+func TestSlurmNodeInfoStatePredicatesForRestartedNodes(t *testing.T) {
+	assert.True(t, SlurmNodeInfo{State: "IDLE+DRAIN+RESERVED"}.IsIdleIgnoringDrain())
+	assert.True(t, SlurmNodeInfo{State: "IDLE+RESERVED"}.IsIdleIgnoringDrain())
+	assert.False(t, SlurmNodeInfo{State: "DOWN+DRAIN+NOT_RESPONDING"}.IsIdleIgnoringDrain())
+	assert.False(t, SlurmNodeInfo{State: "IDLE+DRAIN+POWERED_DOWN"}.IsIdleIgnoringDrain())
+	assert.False(t, SlurmNodeInfo{State: "MIXED+DRAIN"}.IsIdleIgnoringDrain())
+
+	assert.True(t, SlurmNodeInfo{State: "IDLE+NOT_RESPONDING"}.IsUnreachable())
+	assert.True(t, SlurmNodeInfo{State: "DOWN+DRAIN"}.IsUnreachable())
+	assert.False(t, SlurmNodeInfo{State: "IDLE+RESERVED"}.IsUnreachable())
+
+	drained := SlurmNodeInfo{State: "IDLE+DRAIN", Reason: "e2e manual drain run-1 [root@2026-11-11T10:00:00]"}
+	assert.True(t, drained.IsDrainedFor("e2e manual drain run-1"))
+	assert.False(t, drained.IsDrainedFor("another reason"))
+	assert.False(t, SlurmNodeInfo{State: "IDLE", Reason: "e2e manual drain run-1"}.IsDrainedFor("e2e manual drain run-1"))
+}
+
+func TestNodeInfosCommandListsFewNodesAndReadsAllForMany(t *testing.T) {
+	assert.Equal(t, "scontrol -o show node 'worker-0,worker-1'", nodeInfosCommand([]string{"worker-0", "worker-1"}))
+
+	names := make([]string, nodeInfosListLimit+1)
+	for i := range names {
+		names[i] = fmt.Sprintf("worker-%d", i)
+	}
+	assert.Equal(t, "scontrol -o show nodes", nodeInfosCommand(names), "a long node list is cheaper to read as every node")
+	assert.Contains(t, nodeInfosCommand(names[:nodeInfosListLimit]), "worker-99")
 }

@@ -2,9 +2,12 @@ package values
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -120,4 +123,78 @@ func TestBuildSlurmLoginFromUsesConfiguredStatefulSetNamePrefix(t *testing.T) {
 
 	assert.Equal(t, "test-cluster-login", prefixed.StatefulSet.Name)
 	assert.Equal(t, consts.ComponentTypeLogin.String(), unprefixed.StatefulSet.Name)
+}
+
+func TestBuildSlurmLoginFromUpdateStrategy(t *testing.T) {
+	tests := []struct {
+		name       string
+		configured consts.UpdateStrategy
+		expected   consts.UpdateStrategy
+	}{
+		{"omitted defaults to delayed rollout", "", consts.UpdateStrategyDelayedRollout},
+		{"explicit delayed rollout", consts.UpdateStrategyDelayedRollout, consts.UpdateStrategyDelayedRollout},
+		{"automatic rolling updates", consts.UpdateStrategyRollingUpdate, consts.UpdateStrategyRollingUpdate},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			login := &slurmv1.SlurmNodeLogin{UpdateStrategy: tt.configured}
+			result := buildSlurmLoginFrom("test-cluster", "", nil, login)
+			assert.Equal(t, tt.expected, result.UpdateStrategy)
+			assert.Equal(t, tt.configured, login.UpdateStrategy, "value construction must not mutate the API object")
+		})
+	}
+}
+
+func TestResolveLoginUpdatePolicy(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   *slurmv1.LoginUpdatePolicy
+		notice   time.Duration
+		schedule string
+	}{
+		{"omitted policy", nil, 30 * 24 * time.Hour, ""},
+		{"empty policy", &slurmv1.LoginUpdatePolicy{}, 30 * 24 * time.Hour, ""},
+		{
+			"notice override", &slurmv1.LoginUpdatePolicy{MinNotice: &metav1.Duration{Duration: time.Hour}},
+			time.Hour, "",
+		},
+		{
+			"schedule override", &slurmv1.LoginUpdatePolicy{Schedule: ptr.To("0 3 * * *")},
+			30 * 24 * time.Hour, "0 3 * * *",
+		},
+		{
+			"zero notice", &slurmv1.LoginUpdatePolicy{MinNotice: &metav1.Duration{}},
+			0, "",
+		},
+		{
+			"timezone and surrounding whitespace", &slurmv1.LoginUpdatePolicy{Schedule: ptr.To("  CRON_TZ=Europe/Amsterdam 0 3 * * 2  ")},
+			30 * 24 * time.Hour, "CRON_TZ=Europe/Amsterdam 0 3 * * 2",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			original := tt.config.DeepCopy()
+			notice, schedule, err := ResolveLoginUpdatePolicy(tt.config)
+			require.NoError(t, err)
+			assert.Equal(t, tt.notice, notice)
+			if tt.schedule == "" {
+				assert.Nil(t, schedule, "an omitted schedule must not enable cron scheduling")
+			} else {
+				assert.NotNil(t, schedule)
+			}
+			assert.Equal(t, original, tt.config, "resolving defaults must not mutate the API object")
+		})
+	}
+}
+
+func TestResolveLoginUpdatePolicyRejectsInvalidConfiguration(t *testing.T) {
+	for _, spec := range []string{
+		"", "not a schedule", "@every 1m", "0 0 0 1 * *",
+		"CRON_TZ=UTC", "TZ=UTC", "CRON_TZ= 0 0 1 * *", "TZ= 0 0 1 * *",
+	} {
+		t.Run(spec, func(t *testing.T) {
+			_, _, err := ResolveLoginUpdatePolicy(&slurmv1.LoginUpdatePolicy{Schedule: ptr.To(spec)})
+			require.Error(t, err)
+		})
+	}
 }

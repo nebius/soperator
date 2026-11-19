@@ -85,7 +85,7 @@ kubectl -n soperator patch SlurmCluster soperator \
   }]'
 ```
 
-Wait for login pods to restart:
+Wait for login pods to restart according to the configured [login update policy](login-pod-updates.md). With `delayedRollout`, an administrator can request an earlier restart using `sudo soperator-login-restart` on each outdated host:
 
 ```bash
 kubectl -n soperator get pods -l app.kubernetes.io/component=login -w

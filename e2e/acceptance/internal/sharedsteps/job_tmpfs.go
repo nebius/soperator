@@ -173,7 +173,7 @@ func (s *JobTmpfs) startJobs(ctx context.Context) error {
 		if err != nil {
 			return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, err)
 		}
-		cgroup, err := jobTmpfsJobCgroup(status.TaskCgroup, job.ID)
+		cgroup, err := slurmJobCgroup(status.TaskCgroup, job.ID)
 		if err != nil {
 			return err
 		}
@@ -200,19 +200,6 @@ func (s *JobTmpfs) startJobs(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-func jobTmpfsJobCgroup(taskCgroup, jobID string) (string, error) {
-	cleaned := path.Clean(taskCgroup)
-	if cleaned != taskCgroup || !strings.HasPrefix(cleaned, "/") {
-		return "", fmt.Errorf("validate tmpfs task cgroup %q", taskCgroup)
-	}
-	for current := cleaned; current != "/"; current = path.Dir(current) {
-		if isDockerSlurmStepComponent(path.Base(current)) && dockerCgroupParentBelongsToJob(current+"/user", jobID) {
-			return path.Join("/sys/fs/cgroup", path.Dir(current)), nil
-		}
-	}
-	return "", fmt.Errorf("find job %s cgroup in %q", jobID, taskCgroup)
 }
 
 func (s *JobTmpfs) step(ctx context.Context, job framework.SbatchJob, command string) error {

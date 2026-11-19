@@ -10,6 +10,8 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
+const containerRuntimeSubmountName = "image-storage"
+
 func nodeSetForWorker(
 	ctx context.Context,
 	kubectl *framework.KubectlClient,

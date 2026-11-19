@@ -22,6 +22,13 @@ type NodeSetDef struct {
 	LocalNVMe        *LocalNVMeDef `json:"local_nvme,omitempty"`
 }
 
+// PartitionDef adds a partition spanning the named worker NodeSets.
+// The main, hidden, and per-NodeSet partitions are generated independently.
+type PartitionDef struct {
+	Name     string   `json:"name"`
+	NodeSets []string `json:"nodesets"`
+}
+
 // LocalNVMeDef configures local NVMe storage for a worker nodeset.
 type LocalNVMeDef struct {
 	Enabled                 bool    `json:"enabled"`
@@ -46,6 +53,7 @@ const LabelPrefix = "@"
 
 var (
 	labelRe              = regexp.MustCompile(`^[a-z][a-z0-9._-]*$`)
+	partitionNameRe      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
 	localNVMEMountPathRe = regexp.MustCompile(`^/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$`)
 )
 
@@ -65,6 +73,7 @@ type Profile struct {
 	CapacityStrategy CapacityStrategy `json:"capacity_strategy"`
 	Labels           []string         `json:"labels"`
 	NodeSets         []NodeSetDef     `json:"nodesets"`
+	Partitions       []PartitionDef   `json:"partitions,omitempty"`
 }
 
 // HasLabel reports whether the profile carries the given label.
@@ -136,6 +145,33 @@ func (p *Profile) Validate() error {
 			return fmt.Errorf("nodeset[%d]: duplicate name %q", i, ns.Name)
 		}
 		seen[ns.Name] = struct{}{}
+	}
+
+	partitionNames := map[string]struct{}{"main": {}, "hidden": {}}
+	for name := range seen {
+		partitionNames[name] = struct{}{}
+	}
+	for i, partition := range p.Partitions {
+		if !partitionNameRe.MatchString(partition.Name) {
+			return fmt.Errorf("partition[%d]: name %q must match %s", i, partition.Name, partitionNameRe)
+		}
+		if _, exists := partitionNames[partition.Name]; exists {
+			return fmt.Errorf("partition[%d]: duplicate or generated partition name %q", i, partition.Name)
+		}
+		partitionNames[partition.Name] = struct{}{}
+		if len(partition.NodeSets) == 0 {
+			return fmt.Errorf("partition[%d] %q: nodesets must not be empty", i, partition.Name)
+		}
+		refs := make(map[string]struct{}, len(partition.NodeSets))
+		for _, name := range partition.NodeSets {
+			if _, exists := seen[name]; !exists {
+				return fmt.Errorf("partition[%d] %q: unknown nodeset %q", i, partition.Name, name)
+			}
+			if _, exists := refs[name]; exists {
+				return fmt.Errorf("partition[%d] %q: duplicate nodeset %q", i, partition.Name, name)
+			}
+			refs[name] = struct{}{}
+		}
 	}
 
 	return nil

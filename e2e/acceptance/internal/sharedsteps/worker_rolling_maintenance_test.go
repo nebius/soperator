@@ -134,11 +134,20 @@ func (r *maintenanceTestRuntime) WaitFor(ctx context.Context, label string, _, _
 	r.waitLabels = append(r.waitLabels, label)
 	var last error
 	for r.iteration = 1; r.iteration <= 3; r.iteration++ {
+		if ctx.Err() != nil {
+			break
+		}
 		if r.observe != nil {
 			r.observe(r)
 		}
 		done, err := condition(ctx)
-		last = err
+		if err != nil && ctx.Err() == nil {
+			var permanent *framework.PermanentError
+			if errors.As(err, &permanent) {
+				return err
+			}
+			last = err
+		}
 		if done && err == nil {
 			return nil
 		}
@@ -198,6 +207,9 @@ func TestMaintenanceEventCapturesCleanupIdentitiesOnlyWhenTriggered(t *testing.T
 			target, err := steps.maintenanceTarget(worker)
 			require.NoError(t, err)
 			target.replacement = nil
+			runtime.local = func(args ...string) (string, error) {
+				return fmt.Sprintf(`{"metadata":{"id":%q}}`, args[5]), nil
+			}
 			require.NoError(t, steps.triggerMaintenance(t.Context(), worker))
 			require.NotNil(t, target.replacement)
 			original := target.replacement.original
@@ -207,6 +219,8 @@ func TestMaintenanceEventCapturesCleanupIdentitiesOnlyWhenTriggered(t *testing.T
 			assert.True(t, target.replacement.maintenanceRequested)
 			calls := strings.Join(runtime.calls, "\n")
 			assert.Less(t, strings.Index(calls, "scontrol show node "+framework.ShellQuote(target.worker.Name)), strings.Index(calls, "patch node "+original.NodeName))
+			assert.Contains(t, calls, "nebius compute instance get --id "+original.InstanceID)
+			assert.Less(t, strings.Index(calls, "nebius compute instance get"), strings.Index(calls, "patch node "+original.NodeName))
 			assert.Empty(t, runtime.waitLabels)
 		})
 	}
