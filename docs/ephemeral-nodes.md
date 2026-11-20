@@ -151,6 +151,20 @@ ephemeral `State=CLOUD` nodes eligible for power down. A negative value disables
 automatic power down. Automatic resume for jobs is independent of
 `SuspendTime`.
 
+A NodeSet can override it for its own nodes:
+
+```yaml
+nodeConfig:
+  autoResume: false
+  autoSuspendSeconds: 600
+```
+
+`autoSuspendSeconds` renders `SuspendTime=<value>` on the NodeSet's `NodeName`
+line. Slurm uses the node-level value first, then the partition-level one, then
+the global one. `0` powers nodes down as soon as they become idle. Negative
+values are rejected. When `autoSuspendSeconds` is unset, the setting is omitted
+and the partition-level or global `SuspendTime` applies.
+
 After changing Slurm config, apply the change and reconfigure or restart
 `slurmctld`.
 

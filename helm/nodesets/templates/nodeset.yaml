@@ -105,6 +105,10 @@ spec:
     autoResume: {{ .autoResume }}
     {{- end }}
 
+    {{- if not (kindIs "invalid" .autoSuspendSeconds) }}
+    autoSuspendSeconds: {{ int .autoSuspendSeconds }}
+    {{- end }}
+
     {{- with .static }}
     static: {{ . | quote }}
     {{- end }}
