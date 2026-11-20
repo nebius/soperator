@@ -41,7 +41,56 @@ Feature: Passive checks
     When a small GPU Slurm job runs on the selected GPU worker
     Then the GPU job health-check Prolog report is fresh and passing
     And the GPU job health-check Epilog report is fresh and passing
+    When HealthCheckProgram runs on the selected GPU worker
+    Then the GPU HealthCheckProgram report is fresh and passing
     And raw GPU health-check command outputs are present
+
+  @gpu @soperator_version_>=5.0.0
+  Scenario: A full-node multi-node GPU job runs passive GPU health checks on every node
+    Given two idle GPU workers are selected
+    When a Slurm job using every GPU on both workers runs
+    Then each worker's Prolog GPU health-check report for the job is fresh and passing
+    And each worker's Epilog GPU health-check report for the job is fresh and passing
+
+  @gpu @soperator_version_>=5.0.0
+  Scenario: GPU workers pass the nvidia_libraries check in HealthCheckProgram and Prolog
+    Given a GPU worker is selected
+    When HealthCheckProgram runs on the selected worker
+    Then the nvidia_libraries check passes in HealthCheckProgram on the selected GPU worker
+    When a CPU-only Slurm job runs on the selected worker
+    Then the CPU job Prolog check runner output is fresh and healthy
+    And the nvidia_libraries check passed in the CPU job Prolog
+
+  # The fault is a fake file bind-mounted over the driver library in one worker's slurmd mount namespace;
+  # the shared jail and the other workers keep the real library. "missing" needs a dangling soname
+  # symlink on the shared jail, which would drain every GPU worker, so it is covered by
+  # nvidia_libraries_test.py only.
+  @heavy @gpu @soperator_version_>=5.0.0
+  Scenario Outline: nvidia_libraries drains a GPU worker whose <library> is <failure> and recovers after restoration
+    Given a GPU worker is selected
+    And the periodic HealthCheckProgram has just completed on the selected GPU worker
+    When <library> is replaced with <fault> on the selected GPU worker only
+    And a CPU-only Slurm job is submitted to the selected GPU worker
+    Then the CPU-only job is requeued without running
+    And the selected GPU worker is drained by nvidia_libraries because <library> is <failure> in Prolog
+    When the NVIDIA library fault is removed from the selected GPU worker
+    And HealthCheckProgram runs on the selected worker
+    Then the selected GPU worker no longer has the nvidia_libraries reason
+    And the selected GPU worker is usable after nvidia_libraries
+
+    Examples:
+      | library           | fault            | failure        |
+      | libcuda.so.1      | a truncated file | file too short |
+      | libnvidia-ml.so.1 | a corrupt file   | not loadable   |
+
+  # Sequential: Asserts periodic GPU health on every GPU worker selected outside shared ownership.
+  @gpu @soperator_version_>=5.0.0 @sequential
+  Scenario: Periodic HealthCheckProgram passes GPU health checks on all GPU workers
+    Given the powered-up GPU workers are selected for periodic health checks
+    When a new periodic GPU health check completes on every selected GPU worker
+    Then every new periodic GPU health-check report is passing
+    And every new periodic GPU health-check report has metadata matching its worker
+    And every new periodic GPU health-check report has its raw command outputs
 
   @soperator_version_>=4.0.0,<5.0.0
   Scenario: Job tmpfs directory is scoped to the Slurm job lifetime

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -27,6 +28,9 @@ const (
 	loginSSHKeyComment = "soperator-e2e-login-ssh"
 
 	jobUserKey = "JOB_USER"
+
+	sessionCgroupKey         = "SESSION_CGROUP"
+	adoptedSSHJobMemoryBytes = int64(1024 * 1024 * 1024)
 
 	limitDirectMarker = "__soperator_acceptance_direct_limits__"
 	limitNestedMarker = "__soperator_acceptance_nested_limits__"
@@ -57,8 +61,8 @@ const (
 	kernelTCPReceiveBufferSize = "net.ipv4.tcp_rmem"
 	kernelTCPSendBufferSize    = "net.ipv4.tcp_wmem"
 
-	slurmdContainerName              = "slurmd"
 	nvidiaDriverCapabilitiesName     = "NVIDIA_DRIVER_CAPABILITIES"
+	nvidiaVisibleDevicesName         = "NVIDIA_VISIBLE_DEVICES"
 	nativeResourceLimitsJobName      = "e2e-system-limits-native"
 	enrootResourceLimitsJobName      = "e2e-system-limits-enroot"
 	dockerResourceLimitsJobName      = "e2e-system-limits-docker"
@@ -86,9 +90,11 @@ const (
 	probeContainerNone probeContainer = iota
 	probeContainerEnroot
 	probeContainerDocker
-	// GPU containers ask for the required NVIDIA driver capabilities. The Enroot
-	// NVIDIA hook needs an image that requests driver injection, while Docker
-	// injects the driver for --gpus into any image, so it keeps the small one.
+	// GPU containers ask for the required NVIDIA driver capabilities and use the
+	// small Ubuntu image. The Enroot NVIDIA hook injects the driver only when
+	// NVIDIA_VISIBLE_DEVICES is set, so the job sets it instead of relying on a
+	// multi-GB CUDA image whose cold import can exceed the job timeout. Docker
+	// injects the driver for --gpus into any image.
 	probeContainerEnrootGPU
 	probeContainerDockerGPU
 )
@@ -205,6 +211,9 @@ type SystemSettings struct {
 
 	limits resourceLimitSnapshots
 
+	adoptedSSHJob           framework.SbatchJob
+	adoptedSSHSessionCgroup string
+
 	loginKernel  kernelSettingSnapshot
 	workerKernel kernelSettingSnapshot
 	nativeKernel kernelSettingSnapshot
@@ -242,10 +251,11 @@ func (s *SystemSettings) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^root collects direct and nested Bash resource limits over SSH to the worker$`, s.collectWorkerResourceLimits)
 	sc.Step(`^direct and nested worker SSH resource limits match the compute profile$`, s.resourceLimitsMatchComputeProfile)
 	sc.Step(`^a regular user account is available on the worker$`, s.regularUserIsAvailableOnWorker)
+	sc.Step(`^a regular user for adopted SSH checks is available on the worker$`, s.adoptedSSHUserIsAvailableOnWorker)
 	sc.Step(`^worker SSH without a job is allowed for the regular user$`, s.workerSSHWithoutJobIsAllowedForRegularUser)
 	sc.Step(`^PAM Slurm adopt requires a job for the regular user$`, s.pamSlurmAdoptRequiresJobForRegularUser)
-	sc.Step(`^the regular user starts a job on the worker and collects direct and nested Bash resource limits over SSH$`, s.collectAdoptedWorkerResourceLimits)
-	sc.Step(`^direct and nested adopted SSH resource limits match the regular-user Slurm compute profile$`, s.resourceLimitsMatchRegularUserSlurmComputeProfile)
+	sc.Step(`^the regular user starts a memory-limited job on the worker and collects direct and nested Bash resource limits over SSH$`, s.collectAdoptedWorkerResourceLimits)
+	sc.Step(`^the adopted SSH session is confined by the job's memory limit$`, s.adoptedSSHSessionIsConfinedByJobMemoryLimit)
 	sc.Step(`^a regular user has an SSH identity on the login node$`, s.regularUserHasLoginSSHIdentity)
 	sc.Step(`^the regular user collects resource limits and kernel settings over SSH to the login node$`, s.collectRegularUserLoginSettings)
 	sc.Step(`^the regular-user login SSH session exposes the required kernel settings$`, s.regularUserLoginExposesRequiredKernelSettings)
@@ -318,6 +328,8 @@ func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
 	s.worker = framework.WorkerInfo{}
 	s.jobs = nil
 	s.limits = resourceLimitSnapshots{}
+	s.adoptedSSHJob = framework.SbatchJob{}
+	s.adoptedSSHSessionCgroup = ""
 	s.loginKernel = nil
 	s.workerKernel = nil
 	s.nativeKernel = nil
@@ -408,14 +420,14 @@ func (s *SystemSettings) regularUserIsAvailableOnWorker(ctx context.Context) err
 	if err := s.requireWorker(); err != nil {
 		return err
 	}
-	if err := ensureSSHTestUser(ctx, s.runtime, sshTestUserName); err != nil {
+	return prepareSSHTestUser(ctx, s.runtime, sshTestUserName, s.worker)
+}
+
+func (s *SystemSettings) adoptedSSHUserIsAvailableOnWorker(ctx context.Context) error {
+	if err := s.requireWorker(); err != nil {
 		return err
 	}
-	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, sshTestUserName, s.worker); err != nil {
-		return err
-	}
-	// slurmctld must resolve the user before it accepts a job submitted as them.
-	return waitForSSHTestUserOnController(ctx, s.runtime, sshTestUserName)
+	return prepareSSHTestUser(ctx, s.runtime, pamSlurmAdoptLimitsUser, s.worker)
 }
 
 func (s *SystemSettings) collectRegularUserWorkerResourceLimits(ctx context.Context) error {
@@ -440,7 +452,7 @@ func (s *SystemSettings) collectRegularUserWorkerResourceLimits(ctx context.Cont
 }
 
 func (s *SystemSettings) workerSSHWithoutJobIsAllowedForRegularUser(ctx context.Context) error {
-	requiresJob, err := s.regularUserNeedsJobForWorkerSSH(ctx)
+	requiresJob, err := s.userNeedsJobForWorkerSSH(ctx, sshTestUserName)
 	if err != nil {
 		return err
 	}
@@ -452,18 +464,18 @@ func (s *SystemSettings) workerSSHWithoutJobIsAllowedForRegularUser(ctx context.
 }
 
 func (s *SystemSettings) pamSlurmAdoptRequiresJobForRegularUser(ctx context.Context) error {
-	requiresJob, err := s.regularUserNeedsJobForWorkerSSH(ctx)
+	requiresJob, err := s.userNeedsJobForWorkerSSH(ctx, pamSlurmAdoptLimitsUser)
 	if err != nil {
 		return err
 	}
 	if !requiresJob {
-		s.runtime.Logf("system settings: PAM Slurm adopt is disabled or exempts %s, skipping scenario", sshTestUserName)
+		s.runtime.Logf("system settings: PAM Slurm adopt is disabled or exempts %s, skipping scenario", pamSlurmAdoptLimitsUser)
 		return godog.ErrSkip
 	}
 	return nil
 }
 
-func (s *SystemSettings) regularUserNeedsJobForWorkerSSH(ctx context.Context) (bool, error) {
+func (s *SystemSettings) userNeedsJobForWorkerSSH(ctx context.Context, userName string) (bool, error) {
 	cluster, err := s.kubectl.SlurmCluster(ctx, s.info.SlurmClusterName)
 	if err != nil {
 		return false, err
@@ -471,11 +483,11 @@ func (s *SystemSettings) regularUserNeedsJobForWorkerSSH(ctx context.Context) (b
 	if !cluster.PAMSlurmAdoptEnabled {
 		return false, nil
 	}
-	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, "id -nG "+framework.ShellQuote(sshTestUserName))
+	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, "id -nG "+framework.ShellQuote(userName))
 	if err != nil {
-		return false, fmt.Errorf("list groups of %s: %w", sshTestUserName, err)
+		return false, fmt.Errorf("list groups of %s: %w", userName, err)
 	}
-	return pamSlurmAdoptRequiresJob(cluster, sshTestUserName, strings.Fields(output)), nil
+	return pamSlurmAdoptRequiresJob(cluster, userName, strings.Fields(output)), nil
 }
 
 func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context) error {
@@ -487,25 +499,27 @@ func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context)
 		Nodes:        1,
 		Nodelist:     []string{s.worker.Name},
 		TasksPerNode: 1,
+		Args:         []string{fmt.Sprintf("--mem=%dM", adoptedSSHJobMemoryBytes/(1024*1024))},
 		Wrap:         "sleep 3600",
-		RunAsUser:    sshTestUserName,
+		RunAsUser:    pamSlurmAdoptLimitsUser,
 	})
 	if err != nil {
 		return err
 	}
 	s.trackJob(job, adoptedSSHHolderJobName, probeContainerNone)
 	s.runtime.Logf("system settings: submitted job=%s id=%s worker=%s user=%s",
-		adoptedSSHHolderJobName, job.ID, s.worker.Name, sshTestUserName)
+		adoptedSSHHolderJobName, job.ID, s.worker.Name, pamSlurmAdoptLimitsUser)
 	if err := s.slurm.WaitForJobRunning(ctx, job.ID, systemSettingsJobTimeout); err != nil {
 		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, err)
 	}
 
-	output, err := runInternalSSHAsTestUser(
+	output, err := runInternalSSHAsUser(
 		ctx,
 		s.runtime,
+		pamSlurmAdoptLimitsUser,
 		s.worker.Name,
 		systemSettingsSSHTimeout,
-		pairedResourceLimitProbe(),
+		adoptedSSHProbe(),
 	)
 	if err != nil {
 		return fmt.Errorf("collect resource limits over SSH adopted into job %s on worker %s: %w", job.ID, s.worker.Name, err)
@@ -513,6 +527,38 @@ func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context)
 	s.limits, err = parseResourceLimitSnapshots(output)
 	if err != nil {
 		return fmt.Errorf("parse adopted SSH resource limits on worker %s: %w", s.worker.Name, err)
+	}
+	s.adoptedSSHJob = job
+	s.adoptedSSHSessionCgroup = parseKeyValueLine(output, sessionCgroupKey)
+	if s.adoptedSSHSessionCgroup == "" {
+		return fmt.Errorf("find cgroup of SSH session adopted into job %s on worker %s; output:\n%s",
+			job.ID, s.worker.Name, strings.TrimSpace(output))
+	}
+	return nil
+}
+
+// adoptedSSHSessionIsConfinedByJobMemoryLimit checks the job cgroup rather than ulimit -m:
+// pam_limits overwrites the RLIMIT_RSS set by ulimit_pam_adopt, and Linux does not enforce RLIMIT_RSS anyway.
+func (s *SystemSettings) adoptedSSHSessionIsConfinedByJobMemoryLimit(ctx context.Context) error {
+	if err := s.requireWorker(); err != nil {
+		return err
+	}
+	jobID := s.adoptedSSHJob.ID
+	cgroup, err := slurmJobCgroup(s.adoptedSSHSessionCgroup, jobID)
+	if err != nil {
+		return fmt.Errorf("locate cgroup of job %s from adopted SSH session on worker %s: %w", jobID, s.worker.Name, err)
+	}
+	pod, err := s.kubectl.WorkerPodForSlurmNode(ctx, s.worker.Name)
+	if err != nil {
+		return err
+	}
+	output, err := s.runtime.WorkerPod(pod).RunWithDefaultRetry(ctx,
+		"cat "+framework.ShellQuote(path.Join(cgroup, "memory.max")))
+	if err != nil {
+		return fmt.Errorf("read memory limit of job %s cgroup %s on worker %s: %w", jobID, cgroup, s.worker.Name, err)
+	}
+	if err := validateAdoptedSSHJobMemoryMax(output); err != nil {
+		return fmt.Errorf("check job %s cgroup %s on worker %s: %w", jobID, cgroup, s.worker.Name, err)
 	}
 	return nil
 }
@@ -634,13 +680,6 @@ func (s *SystemSettings) resourceLimitsMatchRegularUserComputeProfile() error {
 
 func (s *SystemSettings) resourceLimitsMatchSlurmComputeProfile() error {
 	return validateSlurmResourceLimitSnapshots(s.limits, computeResourceLimitProfile())
-}
-
-// resourceLimitsMatchRegularUserSlurmComputeProfile expects pam_limits to apply
-// the regular-user profile to an adopted SSH session, while ulimit_pam_adopt
-// sets max_memory from the job it was adopted into.
-func (s *SystemSettings) resourceLimitsMatchRegularUserSlurmComputeProfile() error {
-	return validateSlurmResourceLimitSnapshots(s.limits, regularUserComputeResourceLimitProfile())
 }
 
 func (s *SystemSettings) submitNativeResourceLimitsJob(ctx context.Context) error {
@@ -993,6 +1032,23 @@ func pairedResourceLimitProbe() string {
 	)
 }
 
+// adoptedSSHProbe also reports the session cgroup, which locates the job it was adopted into.
+func adoptedSSHProbe() string {
+	return fmt.Sprintf(
+		"printf '%s=%%s\\n' \"$(sed -n 's/^0:://p' /proc/self/cgroup)\"; %s",
+		sessionCgroupKey,
+		pairedResourceLimitProbe(),
+	)
+}
+
+func validateAdoptedSSHJobMemoryMax(output string) error {
+	expected := strconv.FormatInt(adoptedSSHJobMemoryBytes, 10)
+	if actual := strings.TrimSpace(output); actual != expected {
+		return fmt.Errorf("verify memory.max=%q: want %q set from the job memory request", actual, expected)
+	}
+	return nil
+}
+
 func kernelSettingsProbe() string {
 	lines := make([]string, 0, len(kernelSettingPaths))
 	for _, setting := range kernelSettingPaths {
@@ -1014,17 +1070,15 @@ func srunProbeCommand(probe string, container probeContainer, flags ...string) s
 	var args []string
 	if container == probeContainerEnrootGPU {
 		// Pyxis passes the job environment to the Enroot NVIDIA hook.
-		args = append(args, capabilities)
+		args = append(args, nvidiaVisibleDevicesName+"=all", capabilities)
 	}
 	args = append(args, "srun", "--nodes=1", "--ntasks=1")
 	args = append(args, flags...)
 	// The batch shell expands SLURM_JOB_ID, so cleanup can find a Docker container by job ID.
 	dockerName := systemSettingsDockerContainerPrefix + "${SLURM_JOB_ID}"
 	switch container {
-	case probeContainerEnroot:
+	case probeContainerEnroot, probeContainerEnrootGPU:
 		args = append(args, "--container-image="+framework.ShellQuote(enrootLifecycleImage))
-	case probeContainerEnrootGPU:
-		args = append(args, "--container-image="+framework.ShellQuote(gpuSmokeEnrootImage))
 	case probeContainerDocker:
 		args = append(args, "docker", "run", "--rm", "--name", dockerName, framework.ShellQuote(ubuntuDockerImage))
 	case probeContainerDockerGPU:
@@ -1055,7 +1109,7 @@ func interactiveProbeCommand(userName, workerName, probe string, container probe
 		int(systemSettingsJobTimeout.Seconds()),
 		framework.ShellQuote(srun),
 	)
-	return fmt.Sprintf("su - %s -c %s", framework.ShellQuote(userName), framework.ShellQuote(interactive))
+	return runAsLoginUser(userName, interactive)
 }
 
 // pamSlurmAdoptRequiresJob mirrors the worker PAM account stack: users and

@@ -48,7 +48,7 @@ func (n slurmNodeView) Ready() bool {
 // running someone else's job is ALLOCATED or MIXED, which IsUsable accepts, and asking for it would
 // make a scenario wait out that job.
 func (n slurmNodeView) Idle() bool {
-	return n.Ready() && n.Info.HasStateFlag("IDLE")
+	return n.Info.IsIdle()
 }
 
 // leafPair is two workers of one tree topology, together with the leaf switches Slurm says they
@@ -81,7 +81,7 @@ type Topology struct {
 	snapshot   framework.WorkerSnapshot
 	nodes      map[string]slurmNodeView
 	partitions []partitionInfo
-	hostlists  map[string][]string
+	hostlists  *cachedHostlistExpander
 
 	treeTopology string
 	crossLeaf    *leafPair
@@ -102,10 +102,11 @@ func NewTopology(
 	selector *framework.WorkerSelector,
 ) *Topology {
 	return &Topology{
-		info:     info,
-		runtime:  runtime,
-		kubectl:  kubectl,
-		selector: selector,
+		info:      info,
+		runtime:   runtime,
+		kubectl:   kubectl,
+		selector:  selector,
+		hostlists: newCachedHostlistExpander(runtime),
 	}
 }
 
@@ -177,7 +178,6 @@ func (s *Topology) CleanupAndReset(ctx context.Context) {
 	s.snapshot = framework.WorkerSnapshot{}
 	s.nodes = nil
 	s.partitions = nil
-	s.hostlists = nil
 	s.treeTopology = ""
 	s.crossLeaf = nil
 	s.sameLeaf = nil
@@ -478,18 +478,32 @@ func (s *Topology) readLoadedTopologies(ctx context.Context) error {
 	// topoconf prints every topology slurmctld parsed, in the format of topology.yaml itself.
 	// "scontrol show topology" without a name prints only the cluster default, so it cannot answer
 	// this question.
-	out, err := s.runtime.Controller().RunWithDefaultRetry(ctx, "scontrol show topoconf")
-	if err != nil {
-		return fmt.Errorf("scontrol show topoconf: %w", err)
+	entries, out, err := readLoadedTopologyEntries(ctx, s.runtime)
+	if out != "" {
+		s.runtime.Logf("scontrol show topoconf:\n%s", strings.TrimSpace(out))
 	}
-	s.runtime.Logf("scontrol show topoconf:\n%s", strings.TrimSpace(out))
-
-	entries, err := parseTopologyEntries(out)
 	if err != nil {
-		return fmt.Errorf("parse scontrol show topoconf: %w", err)
+		return err
 	}
 	s.loaded = entries
 	return nil
+}
+
+// readLoadedTopologyEntries returns the topology configuration slurmctld loaded, as `scontrol show topoconf`
+// prints it, together with the raw output.
+// It is the configuration, not the placement the controller schedules by:
+// use it for what is configured, such as the topology names and kinds, and `scontrol show topology <name>`
+// for where nodes are now.
+func readLoadedTopologyEntries(ctx context.Context, runtime framework.Runtime) (entries []topologyEntry, raw string, err error) {
+	raw, err = runtime.Controller().RunWithDefaultRetry(ctx, "scontrol show topoconf")
+	if err != nil {
+		return nil, "", fmt.Errorf("scontrol show topoconf: %w", err)
+	}
+	entries, err = parseTopologyEntries(raw)
+	if err != nil {
+		return nil, raw, fmt.Errorf("parse scontrol show topoconf: %w", err)
+	}
+	return entries, raw, nil
 }
 
 func (s *Topology) loadedMatchesRendered() error {
@@ -605,7 +619,7 @@ func (s *Topology) topologyUnitsByNode(ctx context.Context) (map[string]map[stri
 		switch entry.Kind {
 		case topologyKindTree:
 			for _, sw := range entry.Switches {
-				nodes, err := s.expandHostlist(ctx, sw.Nodes)
+				nodes, err := s.hostlists.expand(ctx, sw.Nodes)
 				if err != nil {
 					return nil, err
 				}
@@ -615,7 +629,7 @@ func (s *Topology) topologyUnitsByNode(ctx context.Context) (map[string]map[stri
 			}
 		case topologyKindBlock:
 			for _, block := range entry.Blocks {
-				nodes, err := s.expandHostlist(ctx, block.Nodes)
+				nodes, err := s.hostlists.expand(ctx, block.Nodes)
 				if err != nil {
 					return nil, err
 				}
@@ -687,7 +701,7 @@ func (s *Topology) pickReadyNodeOfTopology(ctx context.Context, topology string)
 		if partition.Topology != topology {
 			continue
 		}
-		nodes, err := s.expandHostlist(ctx, partition.Nodes)
+		nodes, err := s.hostlists.expand(ctx, partition.Nodes)
 		if err != nil {
 			return "", "", false, err
 		}
@@ -715,7 +729,7 @@ func (s *Topology) topologyWorkerReport(ctx context.Context, topology string) st
 		if partition.Topology != topology {
 			continue
 		}
-		nodes, err := s.expandHostlist(ctx, partition.Nodes)
+		nodes, err := s.hostlists.expand(ctx, partition.Nodes)
 		if err != nil {
 			lines = append(lines, fmt.Sprintf("  expand the nodes of partition %s: %v", partition.Name, err))
 			continue
@@ -975,7 +989,7 @@ func (s *Topology) collectLeafMembership(
 		if !sw.IsLeaf() {
 			continue
 		}
-		nodes, err := s.expandHostlist(ctx, sw.Nodes)
+		nodes, err := s.hostlists.expand(ctx, sw.Nodes)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1357,7 +1371,7 @@ func (s *Topology) partitionNodeSet(ctx context.Context, name string) (map[strin
 		if partition.Name != name {
 			continue
 		}
-		nodes, err := s.expandHostlist(ctx, partition.Nodes)
+		nodes, err := s.hostlists.expand(ctx, partition.Nodes)
 		if err != nil {
 			return nil, err
 		}
@@ -1387,7 +1401,7 @@ func (s *Topology) topologyNodes(ctx context.Context, entry topologyEntry) ([]st
 
 	var nodes []string
 	for _, list := range lists {
-		expanded, err := s.expandHostlist(ctx, list)
+		expanded, err := s.hostlists.expand(ctx, list)
 		if err != nil {
 			return nil, err
 		}
@@ -1409,15 +1423,6 @@ func (s *Topology) slurmBlocksOf(ctx context.Context, topology string) ([]slurmB
 		return nil, fmt.Errorf("parse scontrol show topology %s: %w", topology, err)
 	}
 	return blocks, nil
-}
-
-// expandHostlist turns a Slurm hostlist into node names, asking scontrol only for the values that
-// carry a range.
-func (s *Topology) expandHostlist(ctx context.Context, value string) ([]string, error) {
-	if s.hostlists == nil {
-		s.hostlists = make(map[string][]string)
-	}
-	return expandSlurmHostlist(ctx, s.runtime, value, s.hostlists)
 }
 
 // region srun

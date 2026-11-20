@@ -75,6 +75,12 @@ func TestSuiteFromOptionsFiltersHeavyAndUnstableIndependently(t *testing.T) {
 	}
 }
 
+func TestSuiteFromOptionsRunsManualScenariosOnlyWithSelectors(t *testing.T) {
+	assert.True(t, suiteFromOptions(runOptions{}, "5.0.0").ExcludeManual)
+	assert.True(t, suiteFromOptions(runOptions{RunHeavyTests: true, RunUnstableTests: true}, "5.0.0").ExcludeManual)
+	assert.False(t, suiteFromOptions(runOptions{ScenarioPaths: []string{"features/internal_ssh.feature:3"}}, "5.0.0").ExcludeManual)
+}
+
 func TestParseRunOptionsRequiresCommonOptions(t *testing.T) {
 	_, err := parseRunOptions(nil)
 	require.Error(t, err)
@@ -105,9 +111,9 @@ func TestRunRequiresExplicitSubcommand(t *testing.T) {
 
 func TestRunResolvesScenarioAliasesBeforeVersionFiltering(t *testing.T) {
 	for _, selector := range []string{
-		"features/worker_rolling_update.feature:14",
-		"e2e/acceptance/features/worker_rolling_update.feature:14",
-		"/checkout/soperator/e2e/acceptance/features/worker_rolling_update.feature:14",
+		"features/worker_rolling_update.feature:16",
+		"e2e/acceptance/features/worker_rolling_update.feature:16",
+		"/checkout/soperator/e2e/acceptance/features/worker_rolling_update.feature:16",
 	} {
 		t.Run(selector, func(t *testing.T) {
 			err := Run(context.Background(), []string{

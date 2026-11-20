@@ -144,11 +144,8 @@ tests:
               path: /var/lib/otelcol
               type: DirectoryOrCreate
             name: varlibotelcol
-      - notContains:
-          path: spec.values.initContainers[0].volumeMounts
-          content:
-            mountPath: /var/lib/otelcol
-            name: varlibotelcol
+      - notExists:
+          path: spec.values.initContainers
 
 ---
 suite: test opentelemetry collector events config

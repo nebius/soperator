@@ -1,5 +1,6 @@
 Feature: Tailscale login sidecars
-  @soperator_version_>=5.0.0
+  # Sequential: Restarts the shared login Pod used by other scenarios for commands and diagnostics.
+  @soperator_version_>=5.0.0 @sequential
   Scenario: Tailscale login sidecars wait for authentication and persist their state
     Given Tailscale is enabled on login pods
     When the Tailscale login pods are discovered from the live cluster

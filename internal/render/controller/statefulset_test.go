@@ -29,7 +29,8 @@ func TestRenderStatefulSet(t *testing.T) {
 			namespace:   "test-namespace",
 			clusterName: "test-cluster",
 			controller: &values.SlurmController{
-				K8sNodeFilterName: "test-filter",
+				K8sNodeFilterName:             "test-filter",
+				TerminationGracePeriodSeconds: 240,
 				StatefulSet: values.StatefulSet{
 					Name:           "test-controller-sts",
 					Replicas:       1,
@@ -126,6 +127,8 @@ func TestRenderStatefulSet(t *testing.T) {
 			if err != nil {
 				t.Fatalf("RenderStatefulSet() error = %v", err)
 			}
+
+			assert.Equal(t, ptr.To(int64(240)), result.Spec.Template.Spec.TerminationGracePeriodSeconds)
 
 			// Check basic metadata
 			if result.Name != tt.expectName {

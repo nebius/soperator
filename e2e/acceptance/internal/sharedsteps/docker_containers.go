@@ -25,14 +25,9 @@ const (
 	dockerGPUSmokeTimeout      = 10 * time.Minute
 	dockerSSHSmokeTimeout      = 10 * time.Minute
 
-	dockerSSHUserName   = "dockeruser"
 	dockerSSHKeyName    = "soperator_e2e_docker_ssh"
 	dockerSSHKeyComment = "soperator-e2e-docker-ssh"
 	dockerWorkerSSHOK   = "WORKER_SSH_DOCKER_OK"
-
-	dockerSlurmStepdScope     = "slurmstepd.scope"
-	dockerSLUIDLength         = 14
-	dockerSLUIDBase32Alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 )
 
 type DockerContainers struct {
@@ -436,7 +431,7 @@ func (s *DockerContainers) aDockerContainerFromTheJobUsesTheSlurmJobCgroup(ctx c
 				if err != nil {
 					return false, err
 				}
-				if !dockerCgroupParentBelongsToJob(cgroupParent, s.job.ID) {
+				if !slurmCgroupParentBelongsToJob(cgroupParent, s.job.ID) {
 					return false, fmt.Errorf(
 						"expected Docker cgroup parent for Slurm job %s, got %q",
 						s.job.ID,
@@ -494,7 +489,7 @@ func (s *DockerContainers) aDockerGPUSmokeJobIsSubmittedOnOneGPUWorker(ctx conte
 	s.connectionWorker = workers[0]
 
 	wrap := fmt.Sprintf("srun docker run --name e2e-docker-gpu-${SLURM_JOB_ID}-${SLURM_NODEID} --gpus=all -e NVIDIA_DRIVER_CAPABILITIES=utility %s nvidia-smi -L",
-		framework.ShellQuote(gpuSmokeDockerImage),
+		framework.ShellQuote(ubuntuDockerImage),
 	)
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      "e2e-docker-gpu-smoke",
@@ -707,64 +702,6 @@ func dockerJailVisiblePath(value string) (string, error) {
 		return strings.TrimPrefix(cleaned, dockerHostJailRoot), nil
 	}
 	return cleaned, nil
-}
-
-func dockerCgroupParentBelongsToJob(value, jobID string) bool {
-	cleaned := path.Clean(strings.TrimSpace(value))
-	if cleaned == "." || !strings.HasPrefix(cleaned, "/") || strings.TrimSpace(jobID) == "" {
-		return false
-	}
-
-	components := strings.Split(strings.TrimPrefix(cleaned, "/"), "/")
-	if len(components) < 3 || components[len(components)-1] != "user" {
-		return false
-	}
-
-	stepIndex := len(components) - 2
-	jobIndex := stepIndex - 1
-	if !isDockerSlurmStepComponent(components[stepIndex]) {
-		return false
-	}
-	if components[jobIndex] == "job_"+jobID {
-		return true
-	}
-
-	// Slurm 26.05 uses an opaque SLUID instead of job_<id>. The caller binds the
-	// container to jobID through its name prefix, so validate the strict SLUID
-	// hierarchy here.
-	return jobIndex > 0 && components[jobIndex-1] == dockerSlurmStepdScope && isDockerSLUID(components[jobIndex])
-}
-
-func isDockerSLUID(value string) bool {
-	if len(value) != dockerSLUIDLength || value[0] != 's' {
-		return false
-	}
-	for _, character := range value[1:] {
-		if !strings.ContainsRune(dockerSLUIDBase32Alphabet, character) {
-			return false
-		}
-	}
-	return true
-}
-
-func isDockerSlurmStepComponent(value string) bool {
-	if hasDockerNumericSuffix(value, "step_") {
-		return true
-	}
-	return value == "step_batch" || value == "step_extern" || value == "step_interactive"
-}
-
-func hasDockerNumericSuffix(value, prefix string) bool {
-	suffix, ok := strings.CutPrefix(value, prefix)
-	if !ok || suffix == "" {
-		return false
-	}
-	for _, character := range suffix {
-		if character < '0' || character > '9' {
-			return false
-		}
-	}
-	return true
 }
 
 func pathIsUnder(value, root string) bool {

@@ -19,11 +19,18 @@ func TestPublicRunnerAPIIsImportable(t *testing.T) {
 	suite := acceptance.SoperatorSuite("5.0.0")
 	suite.Tags = "~@custom_only"
 	assert.False(t, suite.ExcludeHeavy, "library callers retain heavy coverage by default")
+	assert.True(t, suite.ExcludeManual, "library callers must name @manual scenarios explicitly")
+	suites := acceptance.ConcurrentSuites(suite, 1)
+	require.Len(t, suites, 2)
+	assert.Equal(t, 1, suites[0].Concurrency)
+	assert.Equal(t, 1, suites[1].Concurrency)
+	assert.False(t, suites[0].WorkerReservations)
+	assert.False(t, suites[1].WorkerReservations)
 
 	runner, err := acceptance.NewRunner(acceptance.RunnerConfig{
 		KubectlContext:         "dev-context",
 		TargetSoperatorVersion: "5.0.0",
-		Suites:                 []acceptance.SuiteConfig{suite},
+		Suites:                 suites,
 	})
 	require.NoError(t, err)
 	assert.NotNil(t, runner)

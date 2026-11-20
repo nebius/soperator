@@ -16,6 +16,20 @@ and obtain approval again.
 
 Use `e2e/README.md` for runner usage.
 
+Include the concurrency decision in the scenario design. The standalone runner
+currently executes sequential exclusions followed by the remaining scenarios,
+both at concurrency 1; native reservation enforcement is opt-in during migration.
+Design independent state and acquire the complete worker set before baselines
+or mutations. Bind all direct and indirect Slurm allocations through the shared
+reservation-aware helpers, including user switches. Retain ownership through
+producer shutdown, cleanup and recovery, and report required restoration
+failures with `RecordWorkerCleanupError`, including on skipped scenarios.
+
+Use `@sequential` for a concrete conflict that reservations do not isolate.
+Put a specific `# Sequential: ...` reason immediately above every scenario-level
+tag line. Follow `e2e/AGENTS.md` for the criteria and inventory tests; do not use
+`@parallel`. Remove the exclusion and reason when the conflict is resolved.
+
 Decide `@heavy` membership during scenario design. Heavy scenarios are excluded
 from manual runs by default and are usually long (about four minutes or more),
 but very important coverage may remain untagged. If a long scenario's importance

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -102,9 +103,39 @@ func (s *SlurmClient) NodeInfoOnce(ctx context.Context, worker string) (SlurmNod
 	return ParseSlurmNodeInfo(worker, out), nil
 }
 
-// NodeInfosOnce reads the requested nodes in one controller query without
-// retries and returns them in the caller's order.
-func (s *SlurmClient) NodeInfosOnce(ctx context.Context, names []string) ([]SlurmNodeInfo, error) {
+// nodeInfosListLimit is the most node names one query lists explicitly; past it, reading every node
+// is the cheaper query and keeps the command line short on large clusters.
+const nodeInfosListLimit = 100
+
+// NodeInfosWithRetries reads nodes in caller order with default command retries.
+// Reservation scopes use short retries for classified transient failures only.
+func (s *SlurmClient) NodeInfosWithRetries(ctx context.Context, names []string) ([]SlurmNodeInfo, error) {
+	run := s.runtime.Controller().RunWithDefaultRetry
+	if workerReservationFromContext(ctx) != nil {
+		run = func(ctx context.Context, command string) (string, error) {
+			return discoveryRead(ctx, func(ctx context.Context) (string, error) {
+				return s.runtime.Controller().Run(ctx, command)
+			})
+		}
+	}
+	return s.nodeInfos(ctx, names, run)
+}
+
+// NodeInfosNoRetries reads the requested nodes in one controller query without retries and returns
+// them in the caller's order. Use it inside a wait, which retries by polling again.
+func (s *SlurmClient) NodeInfosNoRetries(ctx context.Context, names []string) ([]SlurmNodeInfo, error) {
+	return s.nodeInfos(ctx, names, s.runtime.Controller().Run)
+}
+
+// nodeInfosCommand lists the requested nodes, or every node when there are too many to list.
+func nodeInfosCommand(names []string) string {
+	if len(names) > nodeInfosListLimit {
+		return "scontrol -o show nodes"
+	}
+	return "scontrol -o show node " + ShellQuote(strings.Join(names, ","))
+}
+
+func (s *SlurmClient) nodeInfos(ctx context.Context, names []string, run func(context.Context, string) (string, error)) ([]SlurmNodeInfo, error) {
 	if len(names) == 0 {
 		return nil, nil
 	}
@@ -115,8 +146,16 @@ func (s *SlurmClient) NodeInfosOnce(ctx context.Context, names []string) ([]Slur
 		}
 		requested[name] = true
 	}
-	output, err := s.runtime.Controller().Run(ctx, "scontrol -o show nodes")
+	output, err := run(ctx, nodeInfosCommand(names))
 	if err != nil {
+		// scontrol reports missing requested nodes on stdout, alongside any valid records.
+		for _, line := range strings.Split(output, "\n") {
+			for _, name := range names {
+				if strings.TrimSpace(line) == "Node "+name+" not found" {
+					return nil, pendingRecovery("read Slurm nodes: missing record for %s: %v", name, err)
+				}
+			}
+		}
 		return nil, fmt.Errorf("show Slurm nodes: %w", err)
 	}
 	byName := make(map[string]SlurmNodeInfo, len(names))
@@ -145,15 +184,27 @@ func (s *SlurmClient) NodeInfosOnce(ctx context.Context, names []string) ([]Slur
 	for _, name := range names {
 		node, found := byName[name]
 		if !found {
-			return nil, fmt.Errorf("read Slurm nodes: missing record for %s", name)
+			return nil, pendingRecovery("read Slurm nodes: missing record for %s", name)
 		}
 		nodes = append(nodes, node)
 	}
 	return nodes, nil
 }
 
+// MainPartitionName is the default partition Soperator renders for every worker.
+const MainPartitionName = "main"
+
 func (s *SlurmClient) MainPartitionNodeNames(ctx context.Context) ([]string, error) {
-	out, err := s.runtime.Controller().RunWithDefaultRetry(ctx, `sinfo -hN -p main -o '%N'`)
+	command := "sinfo -hN -p " + MainPartitionName + " -o '%N'"
+	var out string
+	var err error
+	if workerReservationFromContext(ctx) == nil {
+		out, err = s.runtime.Controller().RunWithDefaultRetry(ctx, command)
+	} else {
+		out, err = discoveryRead(ctx, func(ctx context.Context) (string, error) {
+			return s.runtime.Controller().Run(ctx, command)
+		})
+	}
 	if err != nil {
 		return nil, fmt.Errorf("list Slurm main partition nodes: %w", err)
 	}
@@ -243,6 +294,34 @@ func (n SlurmNodeInfo) IsReadyForImmediateWork() bool {
 	return true
 }
 
+// IsIdle reports a powered-up, healthy node without allocations.
+func (n SlurmNodeInfo) IsIdle() bool {
+	return n.IsReadyForImmediateWork() && n.HasStateFlag("IDLE")
+}
+
+// IsIdleIgnoringDrain reports a powered-up node without allocations whose only problem may be a drain.
+func (n SlurmNodeInfo) IsIdleIgnoringDrain() bool {
+	if !n.HasStateFlag("IDLE") {
+		return false
+	}
+	for _, flag := range slices.Concat(unhealthySlurmNodeStateFlags, inactiveSlurmNodeStateFlags) {
+		if flag != "DRAIN" && n.HasStateFlag(flag) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsUnreachable reports a node whose slurmd the controller cannot reach.
+func (n SlurmNodeInfo) IsUnreachable() bool {
+	return n.HasStateFlag("NOT_RESPONDING") || n.HasStateFlag("DOWN")
+}
+
+// IsDrainedFor reports a node drained with a reason containing reasonPart.
+func (n SlurmNodeInfo) IsDrainedFor(reasonPart string) bool {
+	return n.HasStateFlag("DRAIN") && n.ReasonContains(reasonPart)
+}
+
 // IsUsable retains the worker-selection semantics: healthy powered-down nodes
 // remain schedulable because Slurm can power them up on demand.
 func (n SlurmNodeInfo) IsUsable() bool {
@@ -259,7 +338,7 @@ func (s *SlurmClient) WaitForNodeReasonContains(ctx context.Context, worker, rea
 		if err != nil {
 			return false, err
 		}
-		return node.HasStateFlag("DRAIN") && node.ReasonContains(reasonPart), nil
+		return node.IsDrainedFor(reasonPart), nil
 	})
 }
 

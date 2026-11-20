@@ -322,9 +322,47 @@ func TestKubectlClientNodeSetsFiltersByClusterName(t *testing.T) {
 		Phase:         "Ready",
 		JailSubMounts: []JailSubMountInfo{
 			{Name: "local-data", MountPath: "/scratch", UsesVolumeClaimTemplate: true},
-			{Name: "config", MountPath: "/etc/config", ReadOnly: true},
+			{Name: "config", MountPath: "/etc/config", ReadOnly: true, VolumeSource: &corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "config"}},
+			}},
 		},
 	}, nodeSets[1])
+}
+
+func TestKubectlClientNodeSetsLocalNVMe(t *testing.T) {
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00nodesets\x00-n\x00soperator\x00-o\x00json": `{
+			"items": [{
+				"metadata": {"name": "worker", "namespace": "soperator"},
+				"spec": {
+					"clusterName": "soperator",
+					"replicas": 2,
+					"slurmd": {
+						"resources": {"cpu": "100", "ephemeral-storage": "11263Gi"},
+						"volumes": {"jailSubMounts": [
+							{"name": "local-nvme", "mountPath": "/scratch", "volumeSource": {"emptyDir": {"sizeLimit": "11263Gi"}}}
+						]}
+					}
+				},
+				"status": {"phase": "Ready", "replicas": 2}
+			}]
+		}`,
+	}}
+
+	nodeSets, err := NewKubectlClient(exec).NodeSets(t.Context(), "soperator")
+	require.NoError(t, err)
+	require.Len(t, nodeSets, 1)
+
+	ephemeral := nodeSets[0].SlurmdResources[corev1.ResourceEphemeralStorage]
+	assert.Equal(t, "11263Gi", ephemeral.String())
+	require.Len(t, nodeSets[0].JailSubMounts, 1)
+	mount := nodeSets[0].JailSubMounts[0]
+	assert.Equal(t, LocalNVMeVolumeName, mount.Name)
+	assert.False(t, mount.UsesVolumeClaimTemplate)
+	require.NotNil(t, mount.VolumeSource)
+	require.NotNil(t, mount.VolumeSource.EmptyDir)
+	require.NotNil(t, mount.VolumeSource.EmptyDir.SizeLimit)
+	assert.Equal(t, "11263Gi", mount.VolumeSource.EmptyDir.SizeLimit.String())
 }
 
 func TestKubectlClientNodeSetsDockerEnabled(t *testing.T) {
@@ -422,6 +460,50 @@ func TestKubectlClientWorkerPods(t *testing.T) {
 	}, pods)
 }
 
+func TestKubectlClientWorkerPodsForSlurmNodesReadsOnlyTheNamedPods(t *testing.T) {
+	pod := func(name string, nvme bool) string {
+		volumes := ""
+		if nvme {
+			volumes = `, "volumes": [{"name": "local-nvme", "emptyDir": {}}]`
+		}
+		return `{"kind": "Pod", "metadata": {"name": "` + name + `", "labels": {"slurm.nebius.ai/nodeset": "worker"}},` +
+			`"spec": {"hostname": "` + name + `", "nodeName": "node-` + name + `"` + volumes + `},` +
+			`"status": {"conditions": [{"type": "Ready", "status": "True"}]}}`
+	}
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00pods\x00-n\x00soperator\x00--ignore-not-found\x00-o\x00json\x00worker-0":                     pod("worker-0", true),
+		"get\x00pods\x00-n\x00soperator\x00--ignore-not-found\x00-o\x00json\x00worker-1\x00worker-0\x00gone": `{"kind": "List", "items": [` + pod("worker-1", false) + `,` + pod("worker-0", true) + `]}`,
+		"get\x00pods\x00-n\x00soperator\x00--ignore-not-found\x00-o\x00json\x00gone":                         "",
+	}}
+	client := NewKubectlClient(exec)
+
+	pods, err := client.WorkerPodsForSlurmNodes(t.Context(), []string{"worker-0"})
+	require.NoError(t, err)
+	assert.Equal(t, []WorkerPodInfo{
+		{SlurmNodeName: "worker-0", PodName: "worker-0", NodeSetName: "worker", KubernetesNodeName: "node-worker-0", Ready: true, HasLocalNVMe: true},
+	}, pods, "kubectl prints a single Pod, not a List, for one name")
+
+	pods, err = client.WorkerPodsForSlurmNodes(t.Context(), []string{"worker-1", "worker-0", "gone"})
+	require.NoError(t, err)
+	require.Len(t, pods, 2, "a node without a pod is left out")
+	assert.Equal(t, "worker-0", pods[0].SlurmNodeName)
+	assert.Equal(t, "worker-1", pods[1].SlurmNodeName)
+
+	pods, err = client.WorkerPodsForSlurmNodes(t.Context(), []string{"gone"})
+	require.NoError(t, err)
+	assert.Empty(t, pods)
+}
+
+func TestKubectlClientWorkerPodsForSlurmNodesRejectsAPodNamedAfterAnotherNode(t *testing.T) {
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00pods\x00-n\x00soperator\x00--ignore-not-found\x00-o\x00json\x00worker-0": `{"kind": "Pod",` +
+			`"metadata": {"name": "worker-0"}, "spec": {"hostname": "worker-7"}}`,
+	}}
+
+	_, err := NewKubectlClient(exec).WorkerPodsForSlurmNodes(t.Context(), []string{"worker-0"})
+	assert.ErrorContains(t, err, `worker pod worker-0 declares spec.hostname="worker-7", expected the pod name`)
+}
+
 func TestKubectlClientWorkerPodsRejectsMissingHostname(t *testing.T) {
 	exec := &kubectlClientTestExec{kubectl: map[string]string{
 		"get\x00pods\x00-n\x00soperator\x00-l\x00slurm.nebius.ai/worker=true\x00-o\x00json": `{
@@ -432,6 +514,25 @@ func TestKubectlClientWorkerPodsRejectsMissingHostname(t *testing.T) {
 	_, err := NewKubectlClient(exec).WorkerPods(t.Context())
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "empty spec.hostname")
+}
+
+func TestKubectlClientWorkerPodsRejectsDeletingPodAsReady(t *testing.T) {
+	pod := `{"kind":"Pod","metadata":{"name":"worker-0","deletionTimestamp":"2026-11-06T12:00:00Z"},
+		"spec":{"hostname":"worker-0","nodeName":"host-0"},
+		"status":{"conditions":[{"type":"Ready","status":"True"}]}}`
+	exec := &kubectlClientTestExec{kubectl: map[string]string{
+		"get\x00pods\x00-n\x00soperator\x00-l\x00slurm.nebius.ai/worker=true\x00-o\x00json": `{"items":[` + pod + `]}`,
+		"get\x00pods\x00-n\x00soperator\x00--ignore-not-found\x00-o\x00json\x00worker-0":    pod,
+	}}
+	client := NewKubectlClient(exec)
+	pods, err := client.WorkerPods(t.Context())
+	require.NoError(t, err)
+	require.Len(t, pods, 1)
+	assert.False(t, pods[0].Ready)
+	pods, err = client.WorkerPodsForSlurmNodes(t.Context(), []string{"worker-0"})
+	require.NoError(t, err)
+	require.Len(t, pods, 1)
+	assert.False(t, pods[0].Ready)
 }
 
 func TestKubectlClientWorkerPodsRejectsDuplicateHostname(t *testing.T) {

@@ -287,6 +287,9 @@ func (s *EnrootContainers) anEnrootImageArtifactIsPresentOnAWorker(ctx context.C
 			s.runtime.Logf("enroot containers: tracked squashfs path=%s", s.squashPath)
 			return true, nil
 		})
+	if err != nil {
+		collectWorkerDiagnostics(ctx, s.runtime, s.workers, enrootFailureDiagnostics(s.job))
+	}
 	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job, err)
 }
 

@@ -16,12 +16,29 @@ const TargetedWorkerSmokeTimeout = targetedWorkerSmokeCommandTimeout + time.Minu
 // GPU allocated on a GPU worker. The worker's HasGPU field selects the command.
 // The check is bounded by TargetedWorkerSmokeTimeout and the caller's context.
 func RunTargetedWorkerSmoke(ctx context.Context, runtime Runtime, worker WorkerInfo) error {
+	if err := requireReservedWorkers(ctx, []string{worker.Name}); err != nil {
+		return err
+	}
 	command, err := targetedWorkerSmokeCommand(worker)
 	if err != nil {
 		return err
 	}
 	jobCtx, cancel := context.WithTimeout(ctx, TargetedWorkerSmokeTimeout)
 	defer cancel()
+	if workerReservationFromContext(ctx) != nil {
+		payload := []string{"hostname"}
+		options := SlurmCommandOptions{Nodelist: []string{worker.Name}, TimeLimit: targetedWorkerSmokeCommandTimeout}
+		if worker.HasGPU {
+			options.Args = []string{"--gpus-per-node=1"}
+			payload = []string{"nvidia-smi", "-L"}
+		}
+		output, err := NewSlurmClient(runtime).RunSlurm(jobCtx, "srun", options, payload...)
+		if err != nil {
+			return fmt.Errorf("run targeted smoke job on worker %s: %w", worker.Name, err)
+		}
+		runtime.Logf("Reserved worker smoke worker=%s output=%s", worker.Name, output)
+		return nil
+	}
 	if _, err := runtime.Jail().Run(jobCtx, command); err != nil {
 		return fmt.Errorf("run targeted smoke job on worker %s: %w", worker.Name, err)
 	}

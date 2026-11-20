@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"strings"
 	"time"
+	_ "time/tzdata"
 
 	mariadbv1alpha1 "github.com/mariadb-operator/mariadb-operator/v25/api/v1alpha1"
 	kruisev1alpha1 "github.com/openkruise/kruise-api/apps/v1alpha1"
@@ -50,6 +51,7 @@ import (
 	"nebius.ai/slurm-operator/internal/cli"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/controller/clustercontroller"
+	"nebius.ai/slurm-operator/internal/controller/loginupdatecontroller"
 	"nebius.ai/slurm-operator/internal/controller/nodeconfigurator"
 	"nebius.ai/slurm-operator/internal/controller/nodesetcontroller"
 	"nebius.ai/slurm-operator/internal/controller/soperatorchecks"
@@ -141,6 +143,7 @@ func main() {
 		requeueAfterRollingUpdate time.Duration
 		idleSlurmAuditInterval    time.Duration
 		staticWorkerRecreateDelay time.Duration
+		requeueAfterLoginUpdate   time.Duration
 
 		topologyReconfigureCooldown    time.Duration
 		topologyReconfigureDebounce    time.Duration
@@ -173,6 +176,7 @@ func main() {
 	flag.StringVar(&logLevel, "log-level", "info", "Log level: debug, info, warn, error, dpanic, panic, fatal")
 	flag.DurationVar(&cacheSyncTimeout, "cache-sync-timeout", 2*time.Minute, "The maximum duration allowed for caching sync")
 	flag.DurationVar(&requeueAfterRollingUpdate, "requeue-after-rolling-update", time.Minute, "The interval between rolling update reconciliations for each worker NodeSet")
+	flag.DurationVar(&requeueAfterLoginUpdate, "requeue-after-login-update", loginupdatecontroller.DefaultRequeueAfter, "The retry interval while login updates wait for StatefulSet revisions or pod readiness/replacement; must be positive")
 	flag.DurationVar(&idleSlurmAuditInterval, "rolling-update-idle-slurm-audit-interval", 15*time.Minute, "The interval between Slurm audits for idle worker NodeSets; must be positive and is checked on regular rolling update reconciliations")
 	// Deprecated: part of the static worker feature, will be removed together with it.
 	flag.DurationVar(&staticWorkerRecreateDelay, "static-worker-recreate-delay", nodesetcontroller.DefaultStaticRecreateDelay, "How long after a Slurm power down of a static node its worker pod is recreated; must be the cluster's SuspendTimeout plus 10s, as Slurm ignores a slurmd that starts earlier. Deprecated: will be removed together with the static worker feature")
@@ -191,6 +195,10 @@ func main() {
 	// Deprecated: part of the static worker feature, will be removed together with it.
 	if staticWorkerRecreateDelay <= 0 {
 		fmt.Fprintln(os.Stderr, "Static worker recreate delay must be positive")
+		os.Exit(1)
+	}
+	if requeueAfterLoginUpdate <= 0 {
+		fmt.Fprintln(os.Stderr, "Login update reconciliation interval must be positive")
 		os.Exit(1)
 	}
 	if topologyReconfigureCooldown < 0 || topologyReconfigureDebounce < 0 || topologyReconfigureDebounceCap < 0 {
@@ -213,7 +221,14 @@ func main() {
 		controllersSpec = controllersFlag
 		controllersSource = "flag"
 	}
-	availableControllers := []string{"cluster", "nodeconfigurator", "nodeset", "rollingupdate", "topology"}
+	availableControllers := []string{
+		"cluster",
+		loginupdatecontroller.ControllerName,
+		"nodeconfigurator",
+		"nodeset",
+		"rollingupdate",
+		"topology",
+	}
 	controllersSet, err := controllersenabled.New(
 		controllersSpec,
 		availableControllers,
@@ -312,6 +327,15 @@ func main() {
 		}
 	}
 	// endregion Reconciler/Cluster
+
+	if controllersSet.Enabled(loginupdatecontroller.ControllerName) {
+		if err = loginupdatecontroller.NewReconciler(
+			mgr.GetClient(), mgr.GetScheme(),
+			mgr.GetEventRecorder(loginupdatecontroller.ControllerName), requeueAfterLoginUpdate,
+		).SetupWithManager(mgr, maxConcurrency, cacheSyncTimeout); err != nil {
+			cli.Fail(setupLog, err, "unable to create controller", "controller", loginupdatecontroller.ControllerName)
+		}
+	}
 
 	// region Reconciler/NodeConfigurator
 	if controllersSet.Enabled("nodeconfigurator") {

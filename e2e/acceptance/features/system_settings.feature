@@ -70,12 +70,13 @@ Feature: System settings
     And it exposes the required kernel settings
 
   @soperator_version_>=5.0.0
-  Scenario: Regular-user worker SSH adopted into a job exposes the Slurm compute profile
+  Scenario: Regular-user worker SSH adopted into a job exposes the compute profile and the job's memory limit
     Given a healthy worker is selected for system-settings checks
-    And a regular user account is available on the worker
+    And a regular user for adopted SSH checks is available on the worker
     And PAM Slurm adopt requires a job for the regular user
-    When the regular user starts a job on the worker and collects direct and nested Bash resource limits over SSH
-    Then direct and nested adopted SSH resource limits match the regular-user Slurm compute profile
+    When the regular user starts a memory-limited job on the worker and collects direct and nested Bash resource limits over SSH
+    Then direct and nested worker SSH resource limits match the regular-user compute profile
+    And the adopted SSH session is confined by the job's memory limit
 
   @soperator_version_>=4.0.0
   Scenario: Regular-user login SSH sessions expose the default resource-limit profile and kernel settings

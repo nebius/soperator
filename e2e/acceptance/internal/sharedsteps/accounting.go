@@ -46,6 +46,7 @@ type Accounting struct {
 	clusterName string
 	worker      framework.WorkerInfo
 	job         framework.SbatchJob
+	privacy     *accountingPrivacyState
 }
 
 type accountingClusterRecord struct {
@@ -93,9 +94,21 @@ func (s *Accounting) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the user association is visible in Slurm accounting$`, s.userAssociationIsVisible)
 	sc.Step(`^the user submits a one-node smoke job to the test account$`, s.submitAccountingSmokeJob)
 	sc.Step(`^the job completes and is recorded with the expected user, account, and allocated resources$`, s.jobIsRecorded)
+	s.registerPrivacySteps(sc)
 }
 
 func (s *Accounting) CleanupAndReset(ctx context.Context) {
+	if s.privacy != nil {
+		runCleanupPhase(ctx, s.runtime, "restore accounting privacy fixtures", 4*accountingPrivacyRolloutTimeout,
+			func(cleanupCtx context.Context) error {
+				err := s.restoreAccountingPrivacy(cleanupCtx)
+				if err != nil {
+					framework.RecordWorkerCleanupError(cleanupCtx, err)
+				}
+				return err
+			})
+		s.privacy = nil
+	}
 	if !s.job.IsZero() {
 		cleanupCtx, cancel := context.WithTimeout(ctx, accountingCleanupTimeout)
 		defer cancel()
@@ -139,13 +152,7 @@ func (s *Accounting) acceptanceTestUserExists(ctx context.Context) error {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	s.worker = workers[0]
-	if err := ensureSSHTestUser(ctx, s.runtime, sshTestUserName); err != nil {
-		return err
-	}
-	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, sshTestUserName, s.worker); err != nil {
-		return err
-	}
-	return waitForSSHTestUserOnController(ctx, s.runtime, sshTestUserName)
+	return prepareSSHTestUser(ctx, s.runtime, sshTestUserName, s.worker)
 }
 
 func (s *Accounting) createTestAccountAndAssociation(ctx context.Context) error {
@@ -205,7 +212,7 @@ func (s *Accounting) slurmAccountingAccountExists(ctx context.Context) (bool, er
 	if err != nil {
 		return false, fmt.Errorf("query Slurm account %s: %w", accountingTestAccount, err)
 	}
-	for _, row := range parseAccountingRows(output) {
+	for _, row := range parsePipeRows(output) {
 		if len(row) > 0 && row[0] == accountingTestAccount {
 			return true, nil
 		}
@@ -221,7 +228,7 @@ func (s *Accounting) slurmAccountingUserExists(ctx context.Context) (bool, error
 	if err != nil {
 		return false, fmt.Errorf("query Slurm user %s: %w", sshTestUserName, err)
 	}
-	for _, row := range parseAccountingRows(output) {
+	for _, row := range parsePipeRows(output) {
 		if len(row) > 0 && row[0] == sshTestUserName {
 			return true, nil
 		}
@@ -265,11 +272,7 @@ func (s *Accounting) submitAccountingSmokeJob(ctx context.Context) error {
 	prepareOutputDir := ""
 	if artifacts, ok := framework.ScenarioArtifacts(ctx); ok {
 		outputDir = artifacts.JailDir
-		prepareOutputDir = fmt.Sprintf("install -d -o %s -g %s -m 0777 %s && ",
-			framework.ShellQuote(sshTestUserName),
-			framework.ShellQuote(sshTestUserName),
-			framework.ShellQuote(outputDir),
-		)
+		prepareOutputDir = userOwnedDirCommand(sshTestUserName, outputDir) + " && "
 	}
 	stdoutPath := outputDir + "/e2e-accounting.out"
 	stderrPath := outputDir + "/e2e-accounting.err"
@@ -334,7 +337,7 @@ func (s *Accounting) jobIsRecorded(ctx context.Context) error {
 }
 
 func findAccountingCluster(output, expectedCluster string) (accountingClusterRecord, error) {
-	for _, row := range parseAccountingRows(output) {
+	for _, row := range parsePipeRows(output) {
 		if len(row) < 3 || row[0] != expectedCluster {
 			continue
 		}
@@ -356,7 +359,7 @@ func findAccountingCluster(output, expectedCluster string) (accountingClusterRec
 }
 
 func accountingAssociationExists(output, cluster, account, user string) bool {
-	for _, row := range parseAccountingRows(output) {
+	for _, row := range parsePipeRows(output) {
 		if len(row) >= 3 && row[0] == cluster && row[1] == account && row[2] == user {
 			return true
 		}
@@ -365,7 +368,7 @@ func accountingAssociationExists(output, cluster, account, user string) bool {
 }
 
 func findAccountingJobRecord(output, jobID string) (accountingJobRecord, bool) {
-	for _, row := range parseAccountingRows(output) {
+	for _, row := range parsePipeRows(output) {
 		if len(row) < len(accountingJobFields) || row[0] != jobID {
 			continue
 		}
@@ -450,23 +453,4 @@ func accountingTRESValue(allocTRES, name string) string {
 		}
 	}
 	return ""
-}
-
-func parseAccountingRows(output string) [][]string {
-	var rows [][]string
-	for _, line := range strings.Split(output, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		fields := strings.Split(line, "|")
-		if len(fields) > 0 && fields[len(fields)-1] == "" {
-			fields = fields[:len(fields)-1]
-		}
-		for i := range fields {
-			fields[i] = strings.TrimSpace(fields[i])
-		}
-		rows = append(rows, fields)
-	}
-	return rows
 }

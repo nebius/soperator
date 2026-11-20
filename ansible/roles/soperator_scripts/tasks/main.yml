@@ -16,10 +16,11 @@
     dest: "/usr/bin/{{ item }}"
     owner: root
     group: root
-    mode: "0755"
+    mode: "{{ '0700' if item == 'soperator-login-restart' else '0755' }}"
   loop:
     - nvidia-smi-hostpid
     - soperator-createuser
+    - soperator-login-restart
   tags:
     - soperator-scripts
 
