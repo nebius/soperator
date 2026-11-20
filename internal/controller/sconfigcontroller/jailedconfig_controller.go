@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -92,15 +93,90 @@ var _ Clock = realClock{}
 
 func (_ realClock) After(duration time.Duration) <-chan time.Time { return time.After(duration) }
 
-// setAppliedHash records the payload as applied. It runs only once the files are written and, when
-// the config asked for them, its update actions have completed, so a failure is retried instead of
-// being marked done.
+// writtenPayload is what one reconciliation wrote for a JailedConfig: the payload hash, and the
+// generation and update actions of the spec the payload was rendered from.
+//
+// The spec is captured when the payload is rendered, not later: every status patch refreshes the
+// object from the API server, so by the time a reconfigure completes the object may already carry
+// a spec this reconciliation never read.
+type writtenPayload struct {
+	hash          string
+	generation    int64
+	updateActions []slurmv1alpha1.UpdateAction
+}
+
+func newWrittenPayload(jailedConfig *slurmv1alpha1.JailedConfig, payload map[string]jailedpayload.File) writtenPayload {
+	return writtenPayload{
+		hash:          jailedpayload.Hash(payload),
+		generation:    jailedConfig.Generation,
+		updateActions: slices.Clone(jailedConfig.Spec.UpdateActions),
+	}
+}
+
+func (w writtenPayload) reconfigureRequested() bool {
+	return slices.Contains(w.updateActions, slurmv1alpha1.UpdateActionReconfigure)
+}
+
+// revokeStaleReconfigure revokes a ReconfigurePerformed confirmation the payload is about to make
+// stale. It must run before the payload replaces any file.
+//
+// A confirmation is read together with AppliedHash as "slurmctld re-read this content", which stops
+// being true the moment the file changes. Left in place while the new content is reconfigured, it
+// confirms the previous content: a topology going A -> B -> A during that reconfigure is then taken
+// as re-read and its request withdrawn, while slurmctld loads B.
+func (r *JailedConfigReconciler) revokeStaleReconfigure(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig, written writtenPayload) error {
+	if written.hash == jailedConfig.Status.AppliedHash {
+		return nil
+	}
+	confirmation := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.ReconfigurePerformed))
+	if confirmation == nil || confirmation.Status != metav1.ConditionTrue {
+		return nil
+	}
+	return r.setConditions(ctx, jailedConfig, metav1.Condition{
+		Type:               string(slurmv1alpha1.ReconfigurePerformed),
+		Status:             metav1.ConditionFalse,
+		Reason:             slurmv1alpha1.ReasonRefresh,
+		Message:            "Files are changing, Slurm was not reconfigured for them yet",
+		ObservedGeneration: written.generation,
+	})
+}
+
+// setAppliedHash records the payload as applied on a pass that ran no reconfigure; after one,
+// setReconfigurePerformed has recorded it already. It runs only once the files are written and the
+// update actions are settled, so a failure is retried instead of being marked done.
 func (r *JailedConfigReconciler) setAppliedHash(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig, hash string) error {
 	if jailedConfig.Status.AppliedHash == hash {
 		return nil
 	}
 	return r.patchStatus(ctx, jailedConfig, func(status *slurmv1alpha1.JailedConfigStatus) {
 		status.AppliedHash = hash
+	})
+}
+
+// setReconfigurePerformed records a completed reconfigure and the payload it read in one status
+// patch, along with any other conditions given.
+//
+// Both must land together. Patched apart, a requester watching the status sees ReconfigurePerformed
+// already current while AppliedHash still names the payload before it. When the published content
+// has meanwhile returned to that earlier payload -- a topology going A -> unknown -> A while the
+// reconfigure for unknown runs -- the requester takes this reconfigure as one over the newer content
+// and withdraws a request Slurm never satisfied.
+func (r *JailedConfigReconciler) setReconfigurePerformed(
+	ctx context.Context,
+	jailedConfig *slurmv1alpha1.JailedConfig,
+	written writtenPayload,
+	conditions ...metav1.Condition,
+) error {
+	conditions = append(conditions, metav1.Condition{
+		Type:               string(slurmv1alpha1.ReconfigurePerformed),
+		Status:             metav1.ConditionTrue,
+		Reason:             slurmv1alpha1.ReasonSuccess,
+		Message:            "Slurm was reconfigured for this generation",
+		ObservedGeneration: written.generation,
+	})
+	return r.patchStatus(ctx, jailedConfig, func(status *slurmv1alpha1.JailedConfigStatus) {
+		applyConditions(status, conditions...)
+		status.AppliedHash = written.hash
 	})
 }
 
@@ -199,6 +275,10 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 	if err != nil {
 		return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("making JailedConfig payload: %w", err))
 	}
+	written := newWrittenPayload(jailedConfig, jailPayload)
+	if err := r.revokeStaleReconfigure(ctx, jailedConfig, written); err != nil {
+		return ctrl.Result{}, fmt.Errorf("revoking stale reconfigure confirmation: %w", err)
+	}
 
 	logger.V(1).Info("Going to write files", logfield.JailedConfigFilesCount, len(jailPayload))
 
@@ -236,9 +316,7 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 
 	logger.V(1).Info("Finished syncing caches for written files")
 
-	hash := jailedpayload.Hash(jailPayload)
-
-	if len(jailedConfig.Spec.UpdateActions) == 0 {
+	if len(written.updateActions) == 0 {
 		logger.V(1).Info("No update actions specified, skipping further processing")
 		err = r.setConditions(
 			ctx,
@@ -253,26 +331,20 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("setting conditions: %w", err)
 		}
-	} else if reconfigureIsDue(jailedConfig, hash) {
+	} else if reconfigureIsDue(jailedConfig, written) {
 		err = r.reconfigureCluster(ctx)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("reconfiguring Slurm cluster: %w", err)
 		}
-		err = r.setConditions(
+		err = r.setReconfigurePerformed(
 			ctx,
 			jailedConfig,
+			written,
 			metav1.Condition{
 				Type:    string(slurmv1alpha1.UpdateActionsCompleted),
 				Status:  metav1.ConditionTrue,
 				Reason:  slurmv1alpha1.ReasonSuccess,
 				Message: "Update actions were called successfully",
-			},
-			metav1.Condition{
-				Type:               string(slurmv1alpha1.ReconfigurePerformed),
-				Status:             metav1.ConditionTrue,
-				Reason:             slurmv1alpha1.ReasonSuccess,
-				Message:            "Slurm was reconfigured for this generation",
-				ObservedGeneration: jailedConfig.Generation,
 			},
 		)
 		if err != nil {
@@ -295,7 +367,7 @@ func (r *JailedConfigReconciler) reconcileIndividual(ctx context.Context, jailed
 		}
 	}
 
-	if err := r.setAppliedHash(ctx, jailedConfig, hash); err != nil {
+	if err := r.setAppliedHash(ctx, jailedConfig, written.hash); err != nil {
 		return ctrl.Result{}, fmt.Errorf("recording applied hash: %w", err)
 	}
 
@@ -348,9 +420,9 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 		}
 	}
 
-	// Payload hashes of the configs whose files were written this pass, used below to tell a real
-	// change from a re-run over identical content.
-	writtenHashes := make(map[string]string, len(jailedConfigs.Items))
+	// Payloads of the configs whose files were written this pass, used below to tell a real change
+	// from a re-run over identical content.
+	writtenPayloads := make(map[string]writtenPayload, len(jailedConfigs.Items))
 
 	var totalFilesCount int
 	filesBatch := NewReplacedFilesBatch(r.fs)
@@ -396,7 +468,11 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 		}
 
 		totalFilesCount += len(jailPayload)
-		writtenHashes[jailedConfig.Name] = jailedpayload.Hash(jailPayload)
+		written := newWrittenPayload(jailedConfig, jailPayload)
+		if err := r.revokeStaleReconfigure(ctx, jailedConfig, written); err != nil {
+			return ctrl.Result{}, fmt.Errorf("revoking stale reconfigure confirmation for %s/%s: %w", jailedConfig.Namespace, jailedConfig.Name, err)
+		}
+		writtenPayloads[jailedConfig.Name] = written
 
 		for path, payload := range jailPayload {
 			err = filesBatch.Replace(path, payload.Data, os.FileMode(payload.Mode))
@@ -435,10 +511,11 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 	needsReconfigure := false
 	for i := range jailedConfigs.Items {
 		jailedConfig := &jailedConfigs.Items[i]
-		if _, written := writtenHashes[jailedConfig.Name]; !written {
+		written, isWritten := writtenPayloads[jailedConfig.Name]
+		if !isWritten {
 			continue
 		}
-		if reconfigureIsDue(jailedConfig, writtenHashes[jailedConfig.Name]) {
+		if reconfigureIsDue(jailedConfig, written) {
 			needsReconfigure = true
 			break
 		}
@@ -447,30 +524,25 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 	if needsReconfigure {
 		logger.V(1).Info("Performing reconfigure for aggregated group", "aggregationKey", aggregationKey)
 		if err = r.reconfigureCluster(ctx); err != nil {
-			r.recordReconfigure(jailedConfigs.Items, writtenHashes, corev1.EventTypeWarning,
+			r.recordReconfigure(jailedConfigs.Items, writtenPayloads, corev1.EventTypeWarning,
 				reasonReconfigureFailed, fmt.Sprintf("Slurm reconfigure failed: %v", err))
 			return ctrl.Result{}, fmt.Errorf("reconfiguring Slurm cluster for aggregated group: %w", err)
 		}
-		r.recordReconfigure(jailedConfigs.Items, writtenHashes, corev1.EventTypeNormal,
+		r.recordReconfigure(jailedConfigs.Items, writtenPayloads, corev1.EventTypeNormal,
 			reasonReconfigured, "slurmctld re-read the configs written for this JailedConfig")
 
-		// Report it against each config's own generation, so whoever asked for the action can tell
-		// this reconfigure from one that ran for an earlier version of the spec.
+		// Report it against the generation each config's payload was rendered from, so whoever asked
+		// for the action can tell this reconfigure from one that ran for another version of the spec.
 		for i := range jailedConfigs.Items {
 			jailedConfig := &jailedConfigs.Items[i]
 			// A member whose ConfigMap was missing wrote nothing, so this reconfigure says nothing
 			// about it. Confirming it anyway would let its requester withdraw a request that was
 			// never satisfied.
-			if _, written := writtenHashes[jailedConfig.Name]; !written {
+			written, isWritten := writtenPayloads[jailedConfig.Name]
+			if !isWritten {
 				continue
 			}
-			err = r.setConditions(ctx, jailedConfig, metav1.Condition{
-				Type:               string(slurmv1alpha1.ReconfigurePerformed),
-				Status:             metav1.ConditionTrue,
-				Reason:             slurmv1alpha1.ReasonSuccess,
-				Message:            "Slurm was reconfigured for this generation",
-				ObservedGeneration: jailedConfig.Generation,
-			})
+			err = r.setReconfigurePerformed(ctx, jailedConfig, written)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("setting reconfigure condition for %s/%s: %w", jailedConfig.Namespace, jailedConfig.Name, err)
 			}
@@ -483,16 +555,15 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 		return ctrl.Result{}, err
 	}
 
-	// One reconfigure covers every file the group just wrote, so all of them are recorded as
-	// applied. Recording only the config that triggered it would leave the others looking changed
-	// and reconfigure the cluster a second time for the same edit.
+	// Every file the group just wrote is recorded as applied. After a reconfigure this is already
+	// done alongside ReconfigurePerformed, so here it only covers a pass that needed none.
 	for i := range jailedConfigs.Items {
 		jailedConfig := &jailedConfigs.Items[i]
-		hash, written := writtenHashes[jailedConfig.Name]
-		if !written {
+		written, isWritten := writtenPayloads[jailedConfig.Name]
+		if !isWritten {
 			continue
 		}
-		if err := r.setAppliedHash(ctx, jailedConfig, hash); err != nil {
+		if err := r.setAppliedHash(ctx, jailedConfig, written.hash); err != nil {
 			return ctrl.Result{}, fmt.Errorf("recording applied hash for %s/%s: %w", jailedConfig.Namespace, jailedConfig.Name, err)
 		}
 	}
@@ -507,25 +578,21 @@ func (r *JailedConfigReconciler) reconcileWithAggregation(ctx context.Context, j
 // It is due when the content changed, and also when the request itself is new: a config can ask for
 // a reconfigure over content that renders identically -- a topology gaining an entry that reaches no
 // node yet, say -- and gating on the hash alone would leave that request permanently unsatisfied.
-func reconfigureIsDue(jailedConfig *slurmv1alpha1.JailedConfig, writtenHash string) bool {
-	requested := false
-	for _, action := range jailedConfig.Spec.UpdateActions {
-		if action == slurmv1alpha1.UpdateActionReconfigure {
-			requested = true
-			break
-		}
-	}
-	if !requested {
+//
+// The request and its generation come from the spec the payload was rendered from, not from the
+// object, which status patches may have refreshed with a newer spec by now.
+func reconfigureIsDue(jailedConfig *slurmv1alpha1.JailedConfig, written writtenPayload) bool {
+	if !written.reconfigureRequested() {
 		return false
 	}
 
-	if writtenHash != jailedConfig.Status.AppliedHash {
+	if written.hash != jailedConfig.Status.AppliedHash {
 		return true
 	}
 
 	condition := meta.FindStatusCondition(jailedConfig.Status.Conditions, string(slurmv1alpha1.ReconfigurePerformed))
 	return condition == nil || condition.Status != metav1.ConditionTrue ||
-		condition.ObservedGeneration != jailedConfig.Generation
+		condition.ObservedGeneration != written.generation
 }
 
 // hasFailedFilesWrittenCondition checks if the JailedConfig has a failed FilesWritten condition.
@@ -641,7 +708,7 @@ const (
 // jailedconfig` then shows when slurmctld last re-read a config and whether it succeeded.
 func (r *JailedConfigReconciler) recordReconfigure(
 	jailedConfigs []slurmv1alpha1.JailedConfig,
-	writtenHashes map[string]string,
+	writtenPayloads map[string]writtenPayload,
 	eventType, reason, note string,
 ) {
 	if r.recorder == nil {
@@ -649,7 +716,7 @@ func (r *JailedConfigReconciler) recordReconfigure(
 	}
 	for i := range jailedConfigs {
 		jailedConfig := &jailedConfigs[i]
-		if _, written := writtenHashes[jailedConfig.Name]; !written {
+		if _, written := writtenPayloads[jailedConfig.Name]; !written {
 			continue
 		}
 		r.recorder.Eventf(jailedConfig, nil, eventType, reason, actionReconfigure, note)
@@ -924,8 +991,12 @@ func (r *JailedConfigReconciler) initializeConditions(ctx context.Context, jaile
 
 func (r *JailedConfigReconciler) setConditions(ctx context.Context, jailedConfig *slurmv1alpha1.JailedConfig, conditions ...metav1.Condition) error {
 	return r.patchStatus(ctx, jailedConfig, func(status *slurmv1alpha1.JailedConfigStatus) {
-		for _, cond := range conditions {
-			_ = meta.SetStatusCondition(&status.Conditions, cond)
-		}
+		applyConditions(status, conditions...)
 	})
+}
+
+func applyConditions(status *slurmv1alpha1.JailedConfigStatus, conditions ...metav1.Condition) {
+	for _, cond := range conditions {
+		_ = meta.SetStatusCondition(&status.Conditions, cond)
+	}
 }

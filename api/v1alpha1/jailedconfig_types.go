@@ -90,7 +90,9 @@ const (
 	// ReconfigurePerformed indicates that a reconfigure actually ran for the generation named by
 	// the condition's ObservedGeneration. UpdateActionsCompleted cannot answer this: it reports
 	// success both when a reconfigure ran and when none was needed. Whoever asked for the action
-	// uses this to know when it is safe to withdraw the request.
+	// uses this to know when it is safe to withdraw the request. True together with AppliedHash
+	// means slurmctld re-read that content; it turns False before files with other content replace
+	// it and stays so until a reconfigure runs over them.
 	ReconfigurePerformed JailedConfigConditionType = "ReconfigurePerformed"
 
 	// ReasonInit means that condition was just initialized
