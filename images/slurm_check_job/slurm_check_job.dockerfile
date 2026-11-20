@@ -2,8 +2,8 @@
 
 ARG SLURM_VERSION
 
-# https://github.com/nebius/ml-containers/pull/128
-FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20261118144315 AS slurm_check_job
+# https://github.com/nebius/ml-containers/pull/129
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20261120080011 AS slurm_check_job
 
 ARG SLURM_VERSION
 
