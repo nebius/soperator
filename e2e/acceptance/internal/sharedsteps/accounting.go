@@ -46,6 +46,7 @@ type Accounting struct {
 	clusterName string
 	worker      framework.WorkerInfo
 	job         framework.SbatchJob
+	privacy     *accountingPrivacyState
 }
 
 type accountingClusterRecord struct {
@@ -93,9 +94,21 @@ func (s *Accounting) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the user association is visible in Slurm accounting$`, s.userAssociationIsVisible)
 	sc.Step(`^the user submits a one-node smoke job to the test account$`, s.submitAccountingSmokeJob)
 	sc.Step(`^the job completes and is recorded with the expected user, account, and allocated resources$`, s.jobIsRecorded)
+	s.registerPrivacySteps(sc)
 }
 
 func (s *Accounting) CleanupAndReset(ctx context.Context) {
+	if s.privacy != nil {
+		runCleanupPhase(ctx, s.runtime, "restore accounting privacy fixtures", 4*accountingPrivacyRolloutTimeout,
+			func(cleanupCtx context.Context) error {
+				err := s.restoreAccountingPrivacy(cleanupCtx)
+				if err != nil {
+					framework.RecordWorkerCleanupError(cleanupCtx, err)
+				}
+				return err
+			})
+		s.privacy = nil
+	}
 	if !s.job.IsZero() {
 		cleanupCtx, cancel := context.WithTimeout(ctx, accountingCleanupTimeout)
 		defer cancel()
