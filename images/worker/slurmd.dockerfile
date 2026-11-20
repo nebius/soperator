@@ -30,8 +30,8 @@ RUN /bin/bash /usr/src/pam-soperator-jail/build_pam_soperator_jail.sh \
     /usr/src/pam-soperator-jail/pam_soperator_jail.c \
     /out
 
-# https://github.com/nebius/ml-containers/pull/128
-FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20261118144315 AS worker_slurmd
+# https://github.com/nebius/ml-containers/pull/129
+FROM cr.nebius.cloud/ml-containers/slurm:${SLURM_VERSION}-20261120080011 AS worker_slurmd
 
 ARG SLURM_VERSION
 
