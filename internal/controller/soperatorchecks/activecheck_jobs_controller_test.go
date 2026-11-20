@@ -275,7 +275,9 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobSubmissionFailureSetsErrorSt
 
 	activeCheck, cronJob, k8sJob, pod := newActiveCheckJobTestObjects("gpu-check", "gpu-check-123", "slurmJob")
 	cronScheduleTime := metav1.NewTime(time.Date(2026, time.April, 13, 9, 59, 0, 0, time.UTC))
+	jobCreationTime := metav1.NewTime(time.Date(2026, time.April, 13, 9, 58, 0, 0, time.UTC))
 	cronJob.Status.LastScheduleTime = &cronScheduleTime
+	k8sJob.CreationTimestamp = jobCreationTime
 	k8sJob.Status.Conditions = []batchv1.JobCondition{{
 		Type:   batchv1.JobFailed,
 		Status: corev1.ConditionTrue,
@@ -293,8 +295,172 @@ func TestActiveCheckJobReconciler_Reconcile_SlurmJobSubmissionFailureSetsErrorSt
 	assert.Equal(t, k8sJob.Name, updatedCheck.Status.SlurmJobsStatus.LastRunName)
 	assert.Equal(t, consts.ActiveCheckSlurmRunStatusError, updatedCheck.Status.SlurmJobsStatus.LastRunStatus)
 	require.NotNil(t, updatedCheck.Status.SlurmJobsStatus.LastRunSubmitTime)
-	assert.Equal(t, cronJob.Status.LastScheduleTime.Unix(), updatedCheck.Status.SlurmJobsStatus.LastRunSubmitTime.Unix())
+	assert.Equal(t, jobCreationTime.Unix(), updatedCheck.Status.SlurmJobsStatus.LastRunSubmitTime.Unix())
 	assert.False(t, updatedCheck.Status.SlurmJobsStatus.LastTransitionTime.IsZero())
+
+	updatedJob := &batchv1.Job{}
+	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(k8sJob), updatedJob))
+	assert.NotEmpty(t, updatedJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime])
+
+	lastTransitionTime := updatedCheck.Status.SlurmJobsStatus.LastTransitionTime
+	result, err = reconciler.Reconcile(ctx, newActiveCheckJobRequest(k8sJob))
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter)
+	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
+	assert.Equal(t, lastTransitionTime, updatedCheck.Status.SlurmJobsStatus.LastTransitionTime)
+}
+
+func TestActiveCheckJobReconciler_Reconcile_OlderFailedK8sJobDoesNotOverwriteStatus(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	scheme := newActiveCheckJobTestScheme(t)
+	activeCheck, cronJob, oldJob, pod := newActiveCheckJobTestObjects("gpu-check", "gpu-check-100", "slurmJob")
+
+	transitionTime := metav1.NewTime(time.Date(2026, time.April, 13, 11, 0, 0, 0, time.UTC))
+	activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
+		LastRunId:          "200",
+		LastRunStatus:      consts.ActiveCheckSlurmRunStatusComplete,
+		LastTransitionTime: transitionTime,
+	}
+	oldJob.CreationTimestamp = metav1.NewTime(transitionTime.Add(-2 * time.Hour))
+	oldJob.Status.Conditions = []batchv1.JobCondition{{
+		Type:   batchv1.JobFailed,
+		Status: corev1.ConditionTrue,
+	}}
+
+	newJob := oldJob.DeepCopy()
+	newJob.Name = "gpu-check-200"
+	newJob.ResourceVersion = ""
+	newJob.UID = ""
+	newJob.CreationTimestamp = metav1.NewTime(transitionTime.Add(-time.Hour))
+	newJob.Status.Conditions = []batchv1.JobCondition{{
+		Type:   batchv1.JobComplete,
+		Status: corev1.ConditionTrue,
+	}}
+
+	reconciler, fakeClient := newActiveCheckJobTestReconciler(
+		t,
+		scheme,
+		activeCheck,
+		cronJob,
+		oldJob,
+		pod,
+		nil,
+		newJob,
+	)
+
+	result, err := reconciler.Reconcile(ctx, newActiveCheckJobRequest(oldJob))
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter)
+
+	updatedCheck := &slurmv1alpha1.ActiveCheck{}
+	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
+	assert.Equal(t, consts.ActiveCheckSlurmRunStatusComplete, updatedCheck.Status.SlurmJobsStatus.LastRunStatus)
+	assert.Equal(t, transitionTime.Unix(), updatedCheck.Status.SlurmJobsStatus.LastTransitionTime.Unix())
+
+	updatedOldJob := &batchv1.Job{}
+	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(oldJob), updatedOldJob))
+	assert.Empty(t, updatedOldJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime])
+}
+
+func TestActiveCheckJobReconciler_Reconcile_NewerJobForAnotherActiveCheckDoesNotBlockStatusUpdate(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	scheme := newActiveCheckJobTestScheme(t)
+	activeCheck, cronJob, currentJob, pod := newActiveCheckJobTestObjects("gpu-check", "gpu-check-100", "slurmJob")
+
+	jobCreationTime := metav1.NewTime(time.Date(2026, time.April, 13, 9, 0, 0, 0, time.UTC))
+	currentJob.CreationTimestamp = jobCreationTime
+	currentJob.Status.Conditions = []batchv1.JobCondition{{
+		Type:   batchv1.JobFailed,
+		Status: corev1.ConditionTrue,
+	}}
+
+	otherCheckJob := currentJob.DeepCopy()
+	otherCheckJob.Name = "network-check-200"
+	otherCheckJob.ResourceVersion = ""
+	otherCheckJob.UID = ""
+	otherCheckJob.CreationTimestamp = metav1.NewTime(jobCreationTime.Add(time.Hour))
+	otherCheckJob.Spec.Template.Annotations = map[string]string{
+		consts.AnnotationActiveCheckName: "network-check",
+	}
+
+	reconciler, fakeClient := newActiveCheckJobTestReconciler(
+		t,
+		scheme,
+		activeCheck,
+		cronJob,
+		currentJob,
+		pod,
+		nil,
+		otherCheckJob,
+	)
+
+	result, err := reconciler.Reconcile(ctx, newActiveCheckJobRequest(currentJob))
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter)
+
+	updatedCheck := &slurmv1alpha1.ActiveCheck{}
+	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
+	assert.Equal(t, currentJob.Name, updatedCheck.Status.SlurmJobsStatus.LastRunName)
+	assert.Equal(t, consts.ActiveCheckSlurmRunStatusError, updatedCheck.Status.SlurmJobsStatus.LastRunStatus)
+	require.NotNil(t, updatedCheck.Status.SlurmJobsStatus.LastRunSubmitTime)
+	assert.Equal(t, jobCreationTime.Unix(), updatedCheck.Status.SlurmJobsStatus.LastRunSubmitTime.Unix())
+
+	updatedCurrentJob := &batchv1.Job{}
+	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(currentJob), updatedCurrentJob))
+	assert.NotEmpty(t, updatedCurrentJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime])
+}
+
+func TestActiveCheckJobReconciler_Reconcile_OlderSlurmJobDoesNotOverwriteStatus(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	scheme := newActiveCheckJobTestScheme(t)
+	activeCheck, cronJob, oldJob, pod := newActiveCheckJobTestObjects("gpu-check", "gpu-check-100", "slurmJob")
+
+	transitionTime := metav1.NewTime(time.Date(2026, time.April, 13, 11, 0, 0, 0, time.UTC))
+	activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
+		LastRunId:          "200",
+		LastRunStatus:      consts.ActiveCheckSlurmRunStatusFailed,
+		LastTransitionTime: transitionTime,
+	}
+	oldJob.CreationTimestamp = metav1.NewTime(transitionTime.Add(-2 * time.Hour))
+	oldJob.Annotations["slurm-job-id"] = "100"
+	oldJob.Annotations["unhandled-slurm-job-id"] = ""
+	oldJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] = "1234567890"
+
+	newJob := oldJob.DeepCopy()
+	newJob.Name = "gpu-check-200"
+	newJob.ResourceVersion = ""
+	newJob.UID = ""
+	newJob.CreationTimestamp = metav1.NewTime(transitionTime.Add(-time.Hour))
+	newJob.Annotations = map[string]string{}
+	newJob.Spec.Template.Annotations = map[string]string{
+		consts.AnnotationActiveCheckName: activeCheck.Name,
+	}
+
+	reconciler, fakeClient := newActiveCheckJobTestReconciler(
+		t,
+		scheme,
+		activeCheck,
+		cronJob,
+		oldJob,
+		pod,
+		nil,
+		newJob,
+	)
+
+	result, err := reconciler.Reconcile(ctx, newActiveCheckJobRequest(oldJob))
+	require.NoError(t, err)
+	assert.Zero(t, result.RequeueAfter)
+
+	updatedCheck := &slurmv1alpha1.ActiveCheck{}
+	require.NoError(t, fakeClient.Get(ctx, client.ObjectKeyFromObject(activeCheck), updatedCheck))
+	assert.Equal(t, consts.ActiveCheckSlurmRunStatusFailed, updatedCheck.Status.SlurmJobsStatus.LastRunStatus)
+	assert.Equal(t, transitionTime.Unix(), updatedCheck.Status.SlurmJobsStatus.LastTransitionTime.Unix())
 }
 
 func TestActiveCheckJobReconciler_Reconcile_SlurmJobAggregatesTerminalResultsInSingleReconcile(t *testing.T) {
@@ -701,6 +867,15 @@ func newActiveCheckJobTestObjects(
 			},
 			Annotations: map[string]string{},
 		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						consts.AnnotationActiveCheckName: activeCheckName,
+					},
+				},
+			},
+		},
 	}
 
 	pod := &corev1.Pod{
@@ -727,13 +902,17 @@ func newActiveCheckJobTestReconciler(
 	k8sJob *batchv1.Job,
 	pod *corev1.Pod,
 	slurmClient slurmapi.Client,
+	extraObjects ...client.Object,
 ) (*ActiveCheckJobReconciler, client.Client) {
 	t.Helper()
+
+	objects := []client.Object{activeCheck, cronJob, k8sJob, pod}
+	objects = append(objects, extraObjects...)
 
 	fakeClient := clientfake.NewClientBuilder().
 		WithScheme(scheme).
 		WithStatusSubresource(activeCheck).
-		WithObjects(activeCheck, cronJob, k8sJob, pod).
+		WithObjects(objects...).
 		Build()
 
 	slurmClients := slurmapi.NewClientSet(context.Background())
