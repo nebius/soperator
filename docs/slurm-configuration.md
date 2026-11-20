@@ -104,6 +104,47 @@ Change the `SlurmCluster` resource and let the operator do the rest.
 If the `SlurmCluster` resource is itself produced by Helm, Flux or Terraform, change the values there.
 Editing the resource directly works until the next sync, which restores it from the values.
 
+## Accounting privacy
+
+Set `privateData` in the accounting configuration to hide other users' accounting data:
+
+```yaml
+spec:
+  slurmNodes:
+    accounting:
+      enabled: true
+      slurmdbdConfig:
+        privateData: jobs,usage,users
+```
+
+These settings apply to `slurmdbd.conf`:
+
+- `jobs`: regular users can view their own jobs in `sacct`, including working directories and submit commands.
+- `usage`: regular users can view their own usage in `sreport`.
+- `users`: regular users can view their own user record and related associations in `sacctmgr`.
+
+Root and users with `AdminLevel=Operator` or `Admin` keep their normal accounting access.
+Account coordinators can view jobs and associations for their accounts. With `users` enabled, they still see only
+their own record when listing users. See the [SlurmDBD PrivateData documentation](https://slurm.schedmd.com/slurmdbd.conf.html#OPT_PrivateData).
+
+Every user needs a matching user record and association in the accounting database. A Slurm administrator can add one,
+using an existing account and the actual Slurm cluster name:
+
+```bash
+sacctmgr add user name=alice account=my-account cluster=my-cluster
+```
+
+The Linux user name must match the name in the accounting database, and its UID must be the same across Slurm components.
+Soperator does not create these records or enable `AccountingStorageEnforce`. Jobs may run without a user record,
+but private accounting queries will return no data for that user. Adding a user does not repair missing associations
+for jobs already recorded without them.
+
+The accounting container mounts the jail read-only and uses its `/etc/passwd` and `/etc/group` files to resolve local users.
+When SSSD is enabled for the controller, accounting uses the same SSSD settings to resolve LDAP users; see
+[SSSD support](sssd.md). Without `privateData`, the default accounting visibility stays unchanged.
+
+This setting does not hide live job data in `squeue`. `PrivateData` in `slurm.conf` is separate and is not configured here.
+
 ## What is not persistent
 
 Slurm offers several ways to change its configuration at runtime, and Soperator adds a few layers on top.

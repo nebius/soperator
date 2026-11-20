@@ -11,7 +11,7 @@ import (
 	"nebius.ai/slurm-operator/internal/values"
 )
 
-// renderContainerAccounting renders [corev1.Container] for slurmctld
+// renderContainerAccounting renders [corev1.Container] for slurmdbd
 func renderContainerAccounting(container values.Container, additionalVolumeMounts []corev1.VolumeMount) corev1.Container {
 	if container.Port == 0 {
 		container.Port = consts.DefaultAccountingPort
@@ -19,6 +19,7 @@ func renderContainerAccounting(container values.Container, additionalVolumeMount
 	container.NodeContainer.Resources.Storage()
 
 	volumeMounts := []corev1.VolumeMount{
+		common.RenderVolumeMountJailReadOnly(),
 		common.RenderVolumeMountSlurmConfigs(),
 		common.RenderVolumeMountMungeSocket(),
 		common.RenderVolumeMountRESTJWTKey(),
