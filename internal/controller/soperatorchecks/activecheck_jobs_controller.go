@@ -151,6 +151,15 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
+	isLatest, err := r.isLatestActiveCheckJob(ctx, k8sJob, activeCheckName)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if !isLatest {
+		logger.Info("Ignoring an older ActiveCheck Job", "active_check", activeCheckName)
+		return ctrl.Result{}, nil
+	}
+
 	cronJob := &batchv1.CronJob{}
 	err = r.Get(ctx, types.NamespacedName{
 		Namespace: req.Namespace,
@@ -186,7 +195,7 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 				LastRunId:          "No slurm job",
 				LastRunName:        k8sJob.Name,
 				LastRunStatus:      consts.ActiveCheckSlurmRunStatusSkipped,
-				LastRunSubmitTime:  cronJob.Status.LastScheduleTime,
+				LastRunSubmitTime:  k8sJob.CreationTimestamp.DeepCopy(),
 				LastTransitionTime: metav1.Now(),
 			}
 			logger = logger.WithValues(logfield.ResourceKV(activeCheck)...)
@@ -207,11 +216,15 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 
 		// Failed k8s job, probably sbatch submission failed
 		if getK8sJobStatus(k8sJob) == consts.ActiveCheckK8sJobStatusFailed {
+			if k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] != "" {
+				return ctrl.Result{}, nil
+			}
+
 			activeCheck.Status.SlurmJobsStatus = slurmv1alpha1.ActiveCheckSlurmJobsStatus{
 				LastRunId:          "No slurm job",
 				LastRunName:        k8sJob.Name,
 				LastRunStatus:      consts.ActiveCheckSlurmRunStatusError,
-				LastRunSubmitTime:  cronJob.Status.LastScheduleTime,
+				LastRunSubmitTime:  k8sJob.CreationTimestamp.DeepCopy(),
 				LastTransitionTime: metav1.Now(),
 			}
 
@@ -222,6 +235,15 @@ func (r *ActiveCheckJobReconciler) Reconcile(
 			if err != nil {
 				logger.Error(err, "Failed to reconcile ActiveCheckJob")
 				return ctrl.Result{}, fmt.Errorf("reconciling ActiveCheckJob: %w", err)
+			}
+
+			k8sJobPatch := client.MergeFrom(k8sJob.DeepCopy())
+			if k8sJob.Annotations == nil {
+				k8sJob.Annotations = make(map[string]string)
+			}
+			k8sJob.Annotations[K8sAnnotationSoperatorChecksFinalStateTime] = fmt.Sprintf("%d", time.Now().Unix())
+			if err := r.Job.Patch(ctx, k8sJob, k8sJobPatch); err != nil {
+				return ctrl.Result{}, fmt.Errorf("patch k8s Job final-state-time: %w", err)
 			}
 			return ctrl.Result{}, nil
 		}
@@ -495,6 +517,10 @@ func updateSlurmNodeWithReactions(
 }
 
 func (r *ActiveCheckJobReconciler) getActiveCheckNameFromJob(ctx context.Context, k8sJob *batchv1.Job) (string, bool, error) {
+	if activeCheckName, ok := k8sJob.Spec.Template.Annotations[consts.AnnotationActiveCheckName]; ok {
+		return activeCheckName, true, nil
+	}
+
 	podList := &corev1.PodList{}
 	err := r.List(ctx, podList, client.InNamespace(k8sJob.Namespace), client.MatchingLabels{"job-name": k8sJob.Name})
 	if err != nil {
@@ -511,6 +537,47 @@ func (r *ActiveCheckJobReconciler) getActiveCheckNameFromJob(ctx context.Context
 	}
 
 	return activeCheckName, true, nil
+}
+
+func (r *ActiveCheckJobReconciler) isLatestActiveCheckJob(
+	ctx context.Context,
+	k8sJob *batchv1.Job,
+	activeCheckName string,
+) (bool, error) {
+	jobs := &batchv1.JobList{}
+	if err := r.List(
+		ctx,
+		jobs,
+		client.InNamespace(k8sJob.Namespace),
+		client.MatchingLabels{consts.LabelComponentKey: consts.ComponentTypeSoperatorChecks.String()},
+	); err != nil {
+		return false, fmt.Errorf("list active check Jobs: %w", err)
+	}
+
+	for i := range jobs.Items {
+		candidate := &jobs.Items[i]
+		candidateActiveCheckName, ok := candidate.Spec.Template.Annotations[consts.AnnotationActiveCheckName]
+		if !ok || candidateActiveCheckName != activeCheckName || candidate.Name == k8sJob.Name {
+			continue
+		}
+
+		if isJobNewer(candidate, k8sJob) {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func isJobNewer(candidate, current *batchv1.Job) bool {
+	switch {
+	case candidate.CreationTimestamp.After(current.CreationTimestamp.Time):
+		return true
+	case current.CreationTimestamp.After(candidate.CreationTimestamp.Time):
+		return false
+	default:
+		return candidate.Name > current.Name
+	}
 }
 
 func getK8sJobStatus(k8sJob *batchv1.Job) consts.ActiveCheckK8sJobStatus {
