@@ -29109,7 +29109,7 @@ spec:
                     type: object
                 type: object
               podNamePrefix:
-                default: enabled
+                default: disabled
                 description: |-
                   PodNamePrefix controls whether pod workload names are prefixed with the SlurmCluster name.
                   It applies to controller, accounting, login, REST, exporter, and sconfigcontroller workloads.
