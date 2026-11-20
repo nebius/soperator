@@ -1,6 +1,6 @@
 # SSSD support
 
-Soperator can optionally run [SSSD](https://sssd.io/) as a sidecar for Slurm login, controller, and worker pods.
+Soperator can optionally run [SSSD](https://sssd.io/) as a sidecar for Slurm login, controller, accounting, and worker pods.
 
 SSSD (System Security Services Daemon) is a Linux service for centralized identity management. It is commonly used to integrate Linux hosts with directory and identity systems such as:
 
@@ -18,9 +18,10 @@ Soperator supports optional SSSD sidecars for:
 
 - login pods
 - controller pods
+- accounting pods
 - worker pods
 
-For these pods, Soperator can:
+When SSSD is enabled, each pod runs its own SSSD sidecar. Soperator can:
 
 - mount an `sssd.conf` file from a Kubernetes Secret
 - create a default `sssd.conf` Secret when no external Secret is provided
@@ -28,6 +29,11 @@ For these pods, Soperator can:
 - share SSSD sockets with the main Slurm container in the pod
 
 This is useful when your Slurm environment needs to work with centrally managed Linux identities instead of local `/etc/passwd` entries only.
+
+Accounting uses the controller's SSSD settings and needs no separate SSSD fields.
+When SSSD is enabled for the controller, `slurmdbd` waits for the NSS socket before starting.
+This lets `slurmdbd` map LDAP user names to UIDs when checking
+[accounting privacy](slurm-configuration.md#accounting-privacy).
 
 ---
 

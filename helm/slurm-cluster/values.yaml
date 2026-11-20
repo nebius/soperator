@@ -313,6 +313,9 @@ slurmNodes:
       priorityWeightFairshare: 0
       priorityWeightQOS: 0
     slurmdbdConfig:
+      # Restrict accounting data to its owner. Each user needs an accounting DB record
+      # and association: sacctmgr add user name=<user> account=<account> cluster=<cluster>.
+      # privateData: "jobs,usage,users"
       archiveEvents: "yes"
       archiveJobs: "yes"
       archiveResvs: "yes"

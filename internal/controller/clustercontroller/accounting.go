@@ -350,6 +350,7 @@ func (r SlurmClusterReconciler) ReconcileAccounting(
 						clusterValues.Namespace,
 						clusterValues.Name,
 						&clusterValues.NodeAccounting,
+						&clusterValues.NodeController,
 						clusterValues.NodeFilters,
 						clusterValues.VolumeSources,
 					)

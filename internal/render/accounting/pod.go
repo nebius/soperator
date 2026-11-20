@@ -16,6 +16,7 @@ import (
 func BasePodTemplateSpec(
 	clusterName string,
 	accounting *values.SlurmAccounting,
+	controller *values.SlurmController,
 	nodeFilters []slurmv1.K8sNodeFilter,
 	volumeSources []slurmv1.VolumeSource,
 	matchLabels map[string]string,
@@ -32,7 +33,20 @@ func BasePodTemplateSpec(
 		RenderVolumeSlurmdbdSpool(accounting),
 	}
 
-	additionalVolumeMounts := make([]corev1.VolumeMount, 0)
+	var additionalVolumeMounts []corev1.VolumeMount
+	if controller.ContainerSSSD != nil {
+		volumes = append(volumes,
+			common.RenderVolumeSSSDSocket(),
+			common.RenderVolumeSSSDConf(controller.SSSDConfSecretName),
+		)
+		additionalVolumeMounts = append(additionalVolumeMounts,
+			common.RenderVolumeMountSSSDSocket(),
+			common.RenderVolumeMountSSSDConf(),
+		)
+		if controller.SSSDLdapCAConfigMapName != "" {
+			volumes = append(volumes, common.RenderVolumeSSSDLdapCA(controller.SSSDLdapCAConfigMapName))
+		}
+	}
 
 	if accounting.ExternalDB.Enabled {
 		if accounting.ExternalDB.TLS.ServerCASecretRef != "" {
@@ -64,6 +78,16 @@ func BasePodTemplateSpec(
 		renderContainerDbwaiter(clusterName, accounting),
 		common.RenderContainerMunge(&accounting.ContainerMunge),
 	)
+	accountingContainer := renderContainerAccounting(accounting.ContainerAccounting, additionalVolumeMounts)
+	if controller.ContainerSSSD != nil {
+		initContainers = append(initContainers, common.RenderContainerSSSD(
+			controller.ContainerSSSD,
+			common.SSSDLdapCAConfigMap(controller.SSSDLdapCAConfigMapName),
+		))
+		accountingContainer.Env = append(slices.Clone(accountingContainer.Env), corev1.EnvVar{
+			Name: "SOPERATOR_SSSD_ENABLED", Value: "true",
+		})
+	}
 
 	res := &corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
@@ -80,7 +104,7 @@ func BasePodTemplateSpec(
 			PriorityClassName: accounting.PriorityClass,
 			InitContainers:    initContainers,
 			Containers: []corev1.Container{
-				renderContainerAccounting(accounting.ContainerAccounting, additionalVolumeMounts),
+				accountingContainer,
 			},
 			Volumes: volumes,
 		},
