@@ -36,7 +36,7 @@ type SlurmClusterSpec struct {
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum=enabled;disabled
-	// +kubebuilder:default=enabled
+	// +kubebuilder:default=disabled
 	PodNamePrefix PodNamePrefixMode `json:"podNamePrefix,omitempty"`
 
 	// Maintenance defines the maintenance window for the cluster.
