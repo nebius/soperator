@@ -328,7 +328,7 @@ func (s *SystemChecks) theSelectedWorkerPodIsRecreatedAndReady(ctx context.Conte
 		if err != nil {
 			return false, err
 		}
-		return string(pod.UID) != s.kubeletWorkerPodUID && pod.Status.Phase == corev1.PodRunning && kubeobjects.PodReady(pod), nil
+		return podRecreatedAndReady(pod, s.kubeletWorkerPodUID), nil
 	})
 }
 
@@ -498,7 +498,7 @@ func (s *SystemChecks) theRestartedWorkerPodIsReady(ctx context.Context) error {
 		pod, found, err := s.kubectl.PodIfPresent(waitCtx, framework.SoperatorNamespace, s.workerPod.Name)
 		if err != nil {
 			lastErr = err
-		} else if found && string(pod.UID) != s.restartedWorkerPodUID && pod.Status.Phase == corev1.PodRunning && kubeobjects.PodReady(pod) {
+		} else if found && podRecreatedAndReady(pod, s.restartedWorkerPodUID) {
 			return nil
 		}
 

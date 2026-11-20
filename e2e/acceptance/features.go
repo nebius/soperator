@@ -65,6 +65,7 @@ func FeaturePaths() []string {
 		"features/worker_rolling_update.feature",
 		"features/docker_containers.feature",
 		"features/enroot_containers.feature",
+		"features/image_storage.feature",
 		"features/passive_checks.feature",
 		"features/job_tmpfs.feature",
 		"features/local_nvme.feature",

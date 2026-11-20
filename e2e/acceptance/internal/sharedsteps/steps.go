@@ -48,6 +48,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewWorkerRollingUpdate(info, runtime, slurm, kubectl, selector),
 		NewDockerContainers(info, runtime, slurm, kubectl, selector),
 		NewEnrootContainers(info, runtime, slurm, kubectl, selector),
+		NewImageStorage(info, runtime, slurm, kubectl, selector),
 		NewPassiveChecks(info, runtime, slurm, selector),
 		NewJobTmpfs(info, runtime, slurm, kubectl, selector),
 		NewLocalNVMe(runtime, kubectl, selector),

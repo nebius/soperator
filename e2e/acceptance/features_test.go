@@ -63,6 +63,7 @@ func TestSharedHeavyScenarios(t *testing.T) {
 		"Docker containers can access GPUs",
 		"NVIDIA bug report is collected from a worker",
 		"Enroot containers can access GPUs",
+		"A worker restarts with user content on image storage and containers keep working for other users",
 		"Login pods scale up without automatic pod scale-down",
 		"A login user exceeding the memory limit is OOM-killed without affecting other users or login services",
 		"Job memory exhaustion leaves neighboring workloads healthy",

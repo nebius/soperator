@@ -25,8 +25,8 @@ and exempts the accounts that need worker SSH without a running job:
 
 | Account | Scenarios | Pro PAM policy |
 | --- | --- | --- |
-| `bob` | Internal SSH, Enroot, system settings, NCCL environment and accounting | Exempt |
-| `dockeruser` | Docker over SSH | Exempt |
+| `bob` | Internal SSH, Enroot, image storage, system settings, NCCL environment and accounting | Exempt |
+| `dockeruser` | Docker over SSH, image storage | Exempt |
 | `soperatoradopt` | Adoption denial, cgroup and session lifecycle | Non-exempt |
 | `soperatoradoptlimits` | Resource limits of SSH sessions adopted into a job | Non-exempt |
 

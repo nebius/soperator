@@ -25,6 +25,11 @@ func k8sNodeReady(node corev1.Node) bool {
 	return kubeobjects.NodeReady(node)
 }
 
+// podRecreatedAndReady reports whether pod replaced the pod that had previousUID and is serving.
+func podRecreatedAndReady(pod corev1.Pod, previousUID string) bool {
+	return string(pod.UID) != previousUID && pod.Status.Phase == corev1.PodRunning && kubeobjects.PodReady(pod)
+}
+
 type helmReleaseList struct {
 	Items []helmRelease `json:"items"`
 }
