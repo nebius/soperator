@@ -46,9 +46,20 @@ type PassiveChecks struct {
 	cpuEpilogOutput string
 	cpuHooksJob     framework.SbatchJob
 
+	// Worker clock right before the last manual HealthCheckProgram run, used to tell its output from older runs.
+	hcProgramStartedAt time.Time
+
 	gpuHooksJob                framework.SbatchJob
 	gpuHealthRunIDs            []string
 	gpuHCProgramBaselineRunIDs []string
+
+	periodicGPUChecks []periodicGPUHealthCheck
+
+	multiNodeGPUWorkers []framework.WorkerInfo
+	multiNodeGPUJob     framework.SbatchJob
+
+	nvidiaLibraryFault *nvidiaLibraryFault
+	nvidiaFaultJob     framework.SbatchJob
 
 	tmpfsJobID   string
 	tmpfsExisted bool
@@ -83,6 +94,8 @@ func (s *PassiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the selected worker is drained by alloc_mem_used$`, s.theSelectedWorkerIsDrainedByAllocMemUsed)
 	sc.Step(`^the memory pressure is removed$`, s.theMemoryPressureIsRemoved)
 	sc.Step(`^HealthCheckProgram runs on the selected worker$`, s.healthCheckProgramRunsOnTheSelectedWorker)
+	sc.Step(`^the nvidia_libraries check passes in HealthCheckProgram on the selected GPU worker$`, s.theNVIDIALibrariesCheckPassesInHealthCheckProgramOnTheSelectedGPUWorker)
+	sc.Step(`^the nvidia_libraries check passed in the CPU job Prolog$`, s.theNVIDIALibrariesCheckPassedInTheCPUJobProlog)
 	sc.Step(`^the selected worker no longer has alloc_mem_used reason$`, s.theSelectedWorkerNoLongerHasAllocMemUsedReason)
 	sc.Step(`^the selected worker is usable after alloc_mem_used$`, s.theSelectedWorkerIsUsableAfterAllocMemUsed)
 	sc.Step(`^a GPU worker is selected$`, s.aGPUWorkerIsSelected)
@@ -92,6 +105,23 @@ func (s *PassiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^HealthCheckProgram runs on the selected GPU worker$`, s.healthCheckProgramRunsOnTheSelectedGPUWorker)
 	sc.Step(`^the GPU HealthCheckProgram report is fresh and passing$`, s.theGPUHealthCheckProgramReportIsFreshAndPassing)
 	sc.Step(`^raw GPU health-check command outputs are present$`, s.rawGPUHealthCheckCommandOutputsArePresent)
+	sc.Step(`^two idle GPU workers are selected$`, s.twoIdleGPUWorkersAreSelected)
+	sc.Step(`^a Slurm job using every GPU on both workers runs$`, s.aSlurmJobUsingEveryGPUOnBothWorkersRuns)
+	sc.Step(`^each worker's Prolog GPU health-check report for the job is fresh and passing$`, s.eachWorkersPrologGPUHealthCheckReportForTheJobIsFreshAndPassing)
+	sc.Step(`^each worker's Epilog GPU health-check report for the job is fresh and passing$`, s.eachWorkersEpilogGPUHealthCheckReportForTheJobIsFreshAndPassing)
+	sc.Step(`^(libcuda\.so\.1|libnvidia-ml\.so\.1) is replaced with (a truncated file|a corrupt file) on the selected GPU worker only$`, s.aLibraryIsReplacedWithAFaultyFileOnTheSelectedGPUWorkerOnly)
+	sc.Step(`^a CPU-only Slurm job is submitted to the selected GPU worker$`, s.aCPUOnlySlurmJobIsSubmittedToTheSelectedGPUWorker)
+	sc.Step(`^the CPU-only job is requeued without running$`, s.theCPUOnlyJobIsRequeuedWithoutRunning)
+	sc.Step(`^the selected GPU worker is drained by nvidia_libraries because (\S+) is (file too short|not loadable) in Prolog$`, s.theSelectedGPUWorkerIsDrainedByNVIDIALibrariesBecauseTheLibraryFailsInProlog)
+	sc.Step(`^the NVIDIA library fault is removed from the selected GPU worker$`, s.theNVIDIALibraryFaultIsRemovedFromTheSelectedGPUWorker)
+	sc.Step(`^the selected GPU worker no longer has the nvidia_libraries reason$`, s.theSelectedGPUWorkerNoLongerHasTheNVIDIALibrariesReason)
+	sc.Step(`^the selected GPU worker is usable after nvidia_libraries$`, s.theSelectedGPUWorkerIsUsableAfterNVIDIALibraries)
+	sc.Step(`^the periodic HealthCheckProgram has just completed on the selected GPU worker$`, s.thePeriodicHealthCheckProgramHasJustCompletedOnTheSelectedGPUWorker)
+	sc.Step(`^the powered-up GPU workers are selected for periodic health checks$`, s.thePoweredUpGPUWorkersAreSelectedForPeriodicHealthChecks)
+	sc.Step(`^a new periodic GPU health check completes on every selected GPU worker$`, s.aNewPeriodicGPUHealthCheckCompletesOnEverySelectedGPUWorker)
+	sc.Step(`^every new periodic GPU health-check report is passing$`, s.everyNewPeriodicGPUHealthCheckReportIsPassing)
+	sc.Step(`^every new periodic GPU health-check report has metadata matching its worker$`, s.everyNewPeriodicGPUHealthCheckReportHasMetadataMatchingItsWorker)
+	sc.Step(`^every new periodic GPU health-check report has its raw command outputs$`, s.everyNewPeriodicGPUHealthCheckReportHasItsRawCommandOutputs)
 	sc.Step(`^a Slurm job checks its job tmpfs directory on the selected worker$`, s.aSlurmJobChecksItsJobTmpfsDirectoryOnTheSelectedWorker)
 	sc.Step(`^the job tmpfs directory existed during the job$`, s.theJobTmpfsDirectoryExistedDuringTheJob)
 	sc.Step(`^the job tmpfs directory is removed after the job exits$`, s.theJobTmpfsDirectoryIsRemovedAfterTheJobExits)
@@ -104,6 +134,13 @@ func (s *PassiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *PassiveChecks) CleanupAndReset(ctx context.Context) {
+	s.cleanupAndResetNVIDIALibraryFault(ctx)
+	if !s.multiNodeGPUJob.IsZero() {
+		// A job that failed or timed out may still hold both workers.
+		if err := s.slurm.CancelJob(ctx, s.multiNodeGPUJob.ID, passiveGPUJobTimeout); err != nil {
+			s.runtime.Logf("cleanup: cancel multi-node GPU job %s: %v", s.multiNodeGPUJob.ID, err)
+		}
+	}
 	s.cleanupAndResetAllocMem(ctx)
 	s.cleanupAndResetAllocGPU(ctx)
 	s.cleanupAndResetTmpfs(ctx)
@@ -113,9 +150,13 @@ func (s *PassiveChecks) CleanupAndReset(ctx context.Context) {
 	s.cpuPrologOutput = ""
 	s.cpuEpilogOutput = ""
 	s.cpuHooksJob = framework.SbatchJob{}
+	s.hcProgramStartedAt = time.Time{}
 	s.gpuHooksJob = framework.SbatchJob{}
 	s.gpuHealthRunIDs = nil
 	s.gpuHCProgramBaselineRunIDs = nil
+	s.periodicGPUChecks = nil
+	s.multiNodeGPUWorkers = nil
+	s.multiNodeGPUJob = framework.SbatchJob{}
 	s.gpuCount = 0
 }
 
@@ -290,6 +331,11 @@ func (s *PassiveChecks) healthCheckProgramRunsOnTheSelectedWorker(ctx context.Co
 	if s.worker.Name == "" {
 		return fmt.Errorf("worker is not selected")
 	}
+	startedAt, err := workerClockNow(ctx, s.runtime, s.worker)
+	if err != nil {
+		return err
+	}
+	s.hcProgramStartedAt = startedAt
 	return runManualHCProgram(ctx, s.runtime, s.worker)
 }
 

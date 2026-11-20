@@ -56,3 +56,32 @@ func readJobFile(ctx context.Context, exec framework.Exec, path string) (string,
 	}
 	return output, nil
 }
+
+// waitForJobRequeuedAfterPrologFailure waits for a job whose Prolog check failed to be requeued: with
+// nohold_on_prolog_fail it returns to PENDING with a restart, and pinned to the drained worker it stays there.
+func waitForJobRequeuedAfterPrologFailure(ctx context.Context, exec framework.Runtime, slurm *framework.SlurmClient, job framework.SbatchJob, timeout time.Duration) error {
+	var latest framework.SlurmJobInfo
+	err := exec.WaitFor(ctx, fmt.Sprintf("Slurm job %s requeued after a Prolog failure", job.ID), timeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+		info, err := slurm.JobInfo(waitCtx, job.ID)
+		if err != nil {
+			return false, err
+		}
+		latest = info
+		if info.CompletedSuccessfully() {
+			return false, &framework.PermanentError{Err: fmt.Errorf("job %s completed successfully although the Prolog check should have failed", job.ID)}
+		}
+		return info.QueueState == "PENDING" && info.Restarts != nil && *info.Restarts >= 1, nil
+	})
+	if err != nil {
+		return framework.AnnotateWithJobLog(ctx, exec, slurm, job,
+			fmt.Errorf("%w; latest: state=%q restarts=%s sacct=%q", err, latest.QueueState, formatRestarts(latest.Restarts), latest.SacctDump))
+	}
+	return nil
+}
+
+func formatRestarts(restarts *int) string {
+	if restarts == nil {
+		return "unknown"
+	}
+	return fmt.Sprint(*restarts)
+}
