@@ -1,7 +1,6 @@
 package sharedsteps
 
 import (
-	"maps"
 	"strings"
 	"testing"
 
@@ -179,15 +178,35 @@ net.ipv4.tcp_wmem=4096	16384	536870912
 	assert.NoError(t, validateKernelSettings("test", settings))
 }
 
-func TestValidateRegularUserSlurmResourceLimitSnapshots(t *testing.T) {
-	limits := regularUserComputeResourceLimitProfile()
-	limits[limitMaxMemory] = "10485760"
-	snapshots := resourceLimitSnapshots{direct: limits, nested: maps.Clone(limits)}
-	assert.NoError(t, validateSlurmResourceLimitSnapshots(snapshots, regularUserComputeResourceLimitProfile()))
+func TestAdoptedSSHProbeReportsSessionCgroupAndLimits(t *testing.T) {
+	probe := adoptedSSHProbe()
+	assert.True(t, strings.HasPrefix(probe, `printf 'SESSION_CGROUP=%s\n' "$(sed -n 's/^0:://p' /proc/self/cgroup)"; `), probe)
+	assert.True(t, strings.HasSuffix(probe, pairedResourceLimitProbe()), probe)
 
-	err := validateSlurmResourceLimitSnapshots(snapshots, computeResourceLimitProfile())
-	require.Error(t, err)
-	assert.ErrorContains(t, err, `scheduling_priority="40": want "unlimited"`)
+	sessionCgroup := "/system.slice/slurmstepd.scope/job_42/step_extern/user/task_special"
+	limits := regularUserComputeResourceLimitProfile()
+	output := "SESSION_CGROUP=" + sessionCgroup + "\n" + renderResourceLimitSnapshotsForTest(limits, limits)
+
+	snapshots, err := parseResourceLimitSnapshots(output)
+	require.NoError(t, err)
+	assert.NoError(t, validateResourceLimitSnapshots(snapshots, regularUserComputeResourceLimitProfile(), false))
+
+	jobCgroup, err := slurmJobCgroup(parseKeyValueLine(output, sessionCgroupKey), "42")
+	require.NoError(t, err)
+	assert.Equal(t, "/sys/fs/cgroup/system.slice/slurmstepd.scope/job_42", jobCgroup)
+
+	_, err = slurmJobCgroup("/kubepods.slice/pod1/sshd", "42")
+	assert.Error(t, err, "a session outside a Slurm job cgroup is not adopted")
+}
+
+func TestValidateAdoptedSSHJobMemoryMax(t *testing.T) {
+	assert.NoError(t, validateAdoptedSSHJobMemoryMax("1073741824\n"))
+
+	for _, output := range []string{"max\n", "2147483648\n", ""} {
+		err := validateAdoptedSSHJobMemoryMax(output)
+		require.Error(t, err, "memory.max=%q", output)
+		assert.ErrorContains(t, err, `want "1073741824"`)
+	}
 }
 
 func TestSrunProbeCommandForGPUContainers(t *testing.T) {
