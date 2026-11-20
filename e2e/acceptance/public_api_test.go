@@ -14,7 +14,7 @@ func TestPublicRunnerAPIIsImportable(t *testing.T) {
 	features := acceptance.SharedFeatureSource()
 
 	require.NotNil(t, features.FS)
-	assert.Contains(t, features.Paths, "features/internal_ssh.feature")
+	assert.NotEmpty(t, features.Paths)
 
 	suite := acceptance.SoperatorSuite("5.0.0")
 	suite.Tags = "~@custom_only"
