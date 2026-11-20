@@ -15,10 +15,10 @@ RUN chmod +x /opt/bin/install_chroot_plugin.sh && \
     rm /opt/bin/install_chroot_plugin.sh
 
 # Install enroot
-COPY images/common/scripts/install_enroot.sh /opt/bin/
+COPY images/common/scripts/install_enroot.sh images/common/scripts/enroot_98-nvidia_ngx.patch /opt/bin/
 RUN chmod +x /opt/bin/install_enroot.sh && \
     /opt/bin/install_enroot.sh && \
-    rm /opt/bin/install_enroot.sh
+    rm /opt/bin/install_enroot.sh /opt/bin/enroot_98-nvidia_ngx.patch
 
 # Copy enroot configuration
 COPY images/common/enroot/enroot.conf /etc/enroot/

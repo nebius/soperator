@@ -1,0 +1,20 @@
+Let containers request the ngx driver capability (libnvidia-ngx), which the stock
+Enroot hook rejects. install_enroot.sh applies this to the hook shipped by the
+enroot package. After an Enroot upgrade, regenerate it against the new hook:
+  diff -u --label 98-nvidia.sh --label 98-nvidia.sh <stock hook> <patched hook>
+
+--- 98-nvidia.sh
++++ 98-nvidia.sh
+@@ -53,10 +53,10 @@
+ for cap in ${NVIDIA_DRIVER_CAPABILITIES//,/ }; do
+     case "${cap}" in
+     all)
+-        cli_args+=("--compute" "--compat32" "--display" "--graphics" "--utility" "--video")
++        cli_args+=("--compute" "--compat32" "--display" "--graphics" "--utility" "--video" "--ngx")
+         break
+         ;;
+-    compute|compat32|display|graphics|utility|video)
++    compute|compat32|display|graphics|utility|video|ngx)
+         cli_args+=("--${cap}") ;;
+     *)
+         common::err "Unknown NVIDIA driver capability: ${cap}" ;;
