@@ -558,6 +558,16 @@ type NodeConfig struct {
 	// +kubebuilder:default=false
 	AutoResume *bool `json:"autoResume,omitempty"`
 
+	// AutoSuspendSeconds is the idle time in seconds after which Slurm powers the nodes down.
+	// It renders SuspendTime=<value> in the NodeName configuration, which takes precedence over
+	// the partition-level and global SuspendTime values. 0 suspends the nodes as soon as they
+	// become idle. When unset, the setting is omitted and the partition-level, then the global
+	// SuspendTime applies.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=0
+	AutoSuspendSeconds *int32 `json:"autoSuspendSeconds,omitempty"`
+
 	// Static provides a possibility to define extra values per Node (e.g. CPU topology).
 	// This line will be provided to the config as is.
 	//
