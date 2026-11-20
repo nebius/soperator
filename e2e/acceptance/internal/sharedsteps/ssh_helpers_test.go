@@ -3,6 +3,10 @@ package sharedsteps
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -63,10 +67,120 @@ func TestRunInternalSSHAsTestUser(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "worker-0\n", output)
 	assert.Equal(t, "su - 'bob' -c "+framework.ShellQuote(
-		"mkdir -p ~/.ssh && touch ~/.ssh/known_hosts && "+
+		"mkdir -p ~/.ssh && flock --wait 60 ~/.ssh/.soperator-e2e-known-hosts.lock bash -ec "+framework.ShellQuote("mkdir -p ~/.ssh && touch ~/.ssh/known_hosts && "+
 			"(ssh-keygen -R 'worker-0' -f ~/.ssh/known_hosts >/dev/null 2>&1 || true) && "+
-			"timeout 30 ssh 'worker-0' 'ulimit -n' </dev/null",
+			"timeout 30 ssh 'worker-0' 'ulimit -n' </dev/null"),
 	), command)
+}
+
+func TestEnsureSSHTestUserLocksCompleteInitialization(t *testing.T) {
+	var command string
+	commandErr := errors.New("initialization failed")
+	runtime := &sshTestUserRuntime{jail: framework.NewCommandScope(func(_ context.Context, value string) (string, error) {
+		command = value
+		return "", commandErr
+	})}
+	err := ensureSSHTestUser(t.Context(), runtime, "bob")
+	require.ErrorIs(t, err, commandErr)
+	assert.Equal(t, "flock --wait 60 '/etc/soperator-e2e-createuser.lock' bash -ec "+framework.ShellQuote(
+		"id 'bob' >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh 'bob'"), command)
+}
+
+func TestSSHInitializationSerializesConcurrentCalls(t *testing.T) {
+	if _, err := exec.LookPath("flock"); err != nil {
+		t.Skip("shell concurrency tests require flock")
+	}
+	for _, tc := range []struct {
+		name, stubs, events string
+		run                 func(context.Context, framework.Runtime, int) error
+	}{
+		{
+			name: "user creation",
+			stubs: `id() { test -f "$HOME/account"; }
+createuser() {
+    echo create >> "$HOME/events"
+    touch "$HOME/account" "$HOME/entered"
+    while [ ! -e "$HOME/release" ]; do sleep 0.01; done
+    echo ready >> "$HOME/events"
+}
+export -f id createuser
+`,
+			events: "create\nready\n",
+			run: func(ctx context.Context, runtime framework.Runtime, _ int) error {
+				return ensureSSHTestUser(ctx, runtime, "bob")
+			},
+		},
+		{
+			name: "known hosts across different workers",
+			stubs: `su() { bash -c "$4"; }
+timeout() { shift; "$@"; }
+ssh-keygen() { echo "remove $2" >> "$HOME/events"; }
+ssh() {
+    echo "ssh $1" >> "$HOME/events"
+    if [ "$1" = worker-0 ]; then
+        touch "$HOME/entered"
+        while [ ! -e "$HOME/release" ]; do sleep 0.01; done
+    fi
+    echo "finished $1" >> "$HOME/events"
+}
+export -f su timeout ssh-keygen ssh
+`,
+			events: "remove worker-0\nssh worker-0\nfinished worker-0\nremove worker-1\nssh worker-1\nfinished worker-1\n",
+			run: func(ctx context.Context, runtime framework.Runtime, index int) error {
+				_, err := runInternalSSHAsUser(ctx, runtime, "bob", fmt.Sprintf("worker-%d", index), time.Second, "hostname")
+				return err
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			directory := t.TempDir()
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			release := filepath.Join(directory, "release")
+			defer func() { _ = os.WriteFile(release, nil, 0o600) }()
+			started := make(chan struct{}, 2)
+			runtime := &sshTestUserRuntime{jail: framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+				// Redirect the shared jail lock into the fixture; never touch host accounts or /etc.
+				command = strings.ReplaceAll(command, sshTestUserLockPath, filepath.Join(directory, "createuser.lock"))
+				cmd := exec.CommandContext(ctx, "bash", "-c", tc.stubs+command)
+				cmd.Env = append(os.Environ(), "HOME="+directory)
+				cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+				if err := cmd.Start(); err != nil {
+					return "", err
+				}
+				started <- struct{}{}
+				return "", cmd.Wait()
+			})}
+
+			first := make(chan error, 1)
+			go func() { first <- tc.run(ctx, runtime, 0) }()
+			require.Eventually(t, func() bool {
+				_, err := os.Stat(filepath.Join(directory, "entered"))
+				return err == nil
+			}, 5*time.Second, 10*time.Millisecond, "first operation must reach its pause point")
+			<-started
+
+			second := make(chan error, 1)
+			go func() { second <- tc.run(ctx, runtime, 1) }()
+			select {
+			case <-started:
+			case <-ctx.Done():
+				t.Fatal("second operation did not start")
+			}
+			select {
+			case err := <-second:
+				t.Fatalf("second operation returned before initialization finished: %v", err)
+			case <-time.After(100 * time.Millisecond):
+			}
+
+			require.NoError(t, os.WriteFile(release, nil, 0o600))
+			require.NoError(t, <-first)
+			require.NoError(t, <-second)
+			events, err := os.ReadFile(filepath.Join(directory, "events"))
+			require.NoError(t, err)
+			assert.Equal(t, tc.events, string(events))
+		})
+	}
 }
 
 func TestRunInternalSSHAsUser(t *testing.T) {
@@ -131,7 +245,8 @@ func TestUnprivilegedSSHUserCreationAndExistingGroupRemoval(t *testing.T) {
 	})}
 	require.NoError(t, ensureUnprivilegedSSHTestUser(t.Context(), runtime, "soperatormema"))
 	require.Len(t, commands, 5)
-	assert.Contains(t, commands[0], "createuser --without-external-ssh '--without-sudo' '--without-docker' 'soperatormema'")
+	assert.Contains(t, commands[0], framework.ShellQuote(
+		"id 'soperatormema' >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh '--without-sudo' '--without-docker' 'soperatormema'"))
 	assert.Equal(t, "gpasswd -d 'soperatormema' 'sudo'", commands[2])
 	assert.Equal(t, "gpasswd -d 'soperatormema' 'docker'", commands[3])
 	assert.Equal(t, "id -nG 'soperatormema'", commands[4])

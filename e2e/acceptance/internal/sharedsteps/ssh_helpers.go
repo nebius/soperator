@@ -13,6 +13,8 @@ import (
 const (
 	soperatorChecksUserName       = "soperatorchecks"
 	sshTestUserPropagationTimeout = time.Minute
+	sshInitializationLockTimeout  = time.Minute
+	sshTestUserLockPath           = "/etc/soperator-e2e-createuser.lock"
 	sshHolderJobStartedMarker     = "SOPERATOR_E2E_SSH_HOLDER_STARTED"
 	sshHolderJobCommand           = "echo " + sshHolderJobStartedMarker + "; exec sleep 3600"
 )
@@ -75,6 +77,9 @@ func createSSHTestUser(ctx context.Context, runtime framework.Runtime, userName 
 	}
 	command := fmt.Sprintf("id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s%s",
 		quotedUserName, options, quotedUserName)
+	// /etc is shared across login nodes; /tmp is bind-mounted locally on each node.
+	command = fmt.Sprintf("flock --wait %.0f %s bash -ec %s", sshInitializationLockTimeout.Seconds(),
+		framework.ShellQuote(sshTestUserLockPath), framework.ShellQuote(command))
 	if _, err := runtime.Jail().Run(ctx, command); err != nil {
 		return fmt.Errorf("create SSH test user %s: %w", userName, err)
 	}
@@ -323,6 +328,9 @@ func runInternalSSHAsUser(
 		quotedHost,
 		framework.ShellQuote(remoteCommand),
 	)
+	// SSH also writes known_hosts, so retain the per-user lock through the connection.
+	sshCommand = fmt.Sprintf("mkdir -p ~/.ssh && flock --wait %.0f ~/.ssh/.soperator-e2e-known-hosts.lock bash -ec %s",
+		sshInitializationLockTimeout.Seconds(), framework.ShellQuote(sshCommand))
 
 	return runtime.Jail().RunWithDefaultRetry(ctx, runAsLoginUser(userName, sshCommand))
 }
