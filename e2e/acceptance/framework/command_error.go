@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -26,6 +27,38 @@ func (e *CommandError) Error() string {
 }
 
 func (e *CommandError) Unwrap() error { return e.Err }
+
+// KubectlExecNotStarted reports failures that prove an exec command never ran.
+// Connection loss after execution starts must not replay commands that change state.
+func KubectlExecNotStarted(output string, err error) bool {
+	if err == nil || strings.TrimSpace(output) != "" || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var command *CommandError
+	if !errors.As(err, &command) || command.Name != "kubectl" {
+		return false
+	}
+	var execCommand bool
+	for _, arg := range command.Args {
+		if arg == "--" {
+			break
+		}
+		if arg == "exec" {
+			execCommand = true
+			break
+		}
+	}
+	if !execCommand {
+		return false
+	}
+	message := strings.ToLower(strings.TrimSpace(command.Stderr))
+	if strings.Contains(message, "command terminated with exit") {
+		return false
+	}
+	return strings.HasPrefix(message, "error: unable to upgrade connection:") ||
+		strings.HasPrefix(message, "error: cannot exec into a container in a completed pod;") ||
+		(strings.HasPrefix(message, "error from server (notfound): pods \"") && strings.HasSuffix(message, "\" not found"))
+}
 
 func commandFailureText(err error) string {
 	var command *CommandError

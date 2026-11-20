@@ -57,6 +57,7 @@ func sharedScenariosTagged(t *testing.T, tag string) []string {
 
 func TestSharedHeavyScenarios(t *testing.T) {
 	assert.ElementsMatch(t, []string{
+		"Accounting privacy preserves access to a Linux user's own records",
 		"GPU ActiveCheck succeeds on all GPU workers",
 		"Docker containers can access GPUs",
 		"NVIDIA bug report is collected from a worker",

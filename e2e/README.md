@@ -36,6 +36,23 @@ The non-exempt accounts are separate so adoption jobs and cleanup do not
 interfere with the direct-SSH scenarios or each other. Other environments may
 configure different PAM policies; scenarios inspect the effective policy.
 
+## Accounting privacy coverage
+
+The heavy [accounting privacy scenario](acceptance/features/accounting.feature)
+enables `PrivateData=jobs,usage,users`. It checks job records with `sacct` and
+access to users and associations with `sacctmgr`, before and after restarting
+accounting.
+
+Behavioral coverage of `PrivateData=usage` through `sreport` is deferred. The
+scenario does not check for non-empty own usage or hidden foreign usage, either
+before or after restart. It does not wait for hourly usage rollups, which would
+make the scenario too slow. Job data from `sacct` does not test `sreport` privacy.
+
+The scenario has `@sequential` because it changes shared SlurmDBD settings,
+reconfigures Slurm, and restarts accounting. The current runner already runs all
+scenarios one at a time; it does not handle this tag separately. The tag records
+the requirement for future parallel execution.
+
 ## Standalone CLI
 
 > !!! WARNING !!!

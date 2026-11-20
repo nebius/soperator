@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	commandTimeout = 10 * time.Minute
+	commandTimeout     = 10 * time.Minute
+	workloadPodTimeout = 2 * time.Minute
 )
 
 type world struct {
@@ -54,22 +55,43 @@ func (w *world) Local() framework.ArgsScope {
 }
 
 func (w *world) Controller() framework.CommandScope {
-	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
-		podName, err := w.readyWorkloadPodName(ctx, "controller", &w.controllerPodName)
-		if err != nil {
-			return "", err
-		}
-		return w.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, podName, "--", "bash", "-lc", command)
-	})
+	return w.workloadPodScope("controller", &w.controllerPodName, "bash", "-lc")
 }
 
 func (w *world) Jail() framework.CommandScope {
+	return w.workloadPodScope("login", &w.loginPodName, "chroot", "/mnt/jail", "bash", "-lc")
+}
+
+func (w *world) workloadPodScope(component string, cachedPodName *string, commandPrefix ...string) framework.CommandScope {
 	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
-		podName, err := w.readyWorkloadPodName(ctx, "login", &w.loginPodName)
-		if err != nil {
-			return "", err
+		var output string
+		var commandErr error
+		var completed bool
+		err := w.WaitFor(ctx, "ready "+component+" pod for exec", workloadPodTimeout, framework.DefaultPollInterval,
+			func(waitCtx context.Context) (bool, error) {
+				podName, err := w.readyWorkloadPodName(waitCtx, component, cachedPodName)
+				if err != nil {
+					return false, err
+				}
+				args := append([]string{"exec", "-n", framework.SoperatorNamespace, podName, "--"}, commandPrefix...)
+				args = append(args, command)
+				// Readiness recovery must not shorten the command's own execution deadline.
+				output, commandErr = w.Kubectl().Run(ctx, args...)
+				if !framework.KubectlExecNotStarted(output, commandErr) {
+					completed = true
+					return true, nil
+				}
+				w.podNamesMu.Lock()
+				if *cachedPodName == podName {
+					*cachedPodName = ""
+				}
+				w.podNamesMu.Unlock()
+				return false, commandErr
+			})
+		if completed && ctx.Err() == nil {
+			return output, commandErr
 		}
-		return w.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, podName, "--", "chroot", "/mnt/jail", "bash", "-lc", command)
+		return output, err
 	})
 }
 
