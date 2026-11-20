@@ -27,12 +27,12 @@ failures with `RecordWorkerCleanupError`, including on skipped scenarios.
 
 Use `@sequential` for a concrete conflict that reservations do not isolate.
 Put a specific `# Sequential: ...` reason immediately above every scenario-level
-tag line. Follow `e2e/AGENTS.md` for the criteria and inventory tests; do not use
-`@parallel`. Remove the exclusion and reason when the conflict is resolved.
+tag line. Follow `e2e/AGENTS.md` for the criteria and feature-policy tests; do not
+use `@parallel`. Remove the exclusion and reason when the conflict is resolved.
 
 Decide `@heavy` membership during scenario design. Heavy scenarios are excluded
 from manual runs by default and are usually long (about four minutes or more),
 but very important coverage may remain untagged. If a long scenario's importance
 is unclear, explicitly ask whether to add `@heavy`, explaining that it excludes
 the scenario from manual runs by default while periodic runs still include it.
-Follow the tag policy in `e2e/AGENTS.md` for opt-in controls and inventory updates.
+Follow the tag policy in `e2e/AGENTS.md` for opt-in controls.
