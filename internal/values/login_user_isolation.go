@@ -40,3 +40,29 @@ func deriveLoginUserIsolationMemory(containerMemory *resource.Quantity, percent 
 
 	return resource.NewQuantity(containerMemory.Value()*percent/100, resource.BinarySI)
 }
+
+const (
+	loginUserIsolationCPUPeriodDefaultUS int64 = 100000
+
+	// LoginUserIsolationCPUQuotaMinUS is the smallest cpu.max quota accepted by the kernel.
+	LoginUserIsolationCPUQuotaMinUS int64 = 1000
+)
+
+// ResolveLoginUserIsolationCPUMax returns the cpu.max quota and period in microseconds.
+// The quota is nil when the per-user CPU usage is not capped.
+func ResolveLoginUserIsolationCPUMax(isolation *slurmv1.LoginUserIsolation) (quotaUS *int64, periodUS int64) {
+	periodUS = loginUserIsolationCPUPeriodDefaultUS
+	if isolation == nil {
+		return nil, periodUS
+	}
+	if isolation.CPUPeriod != 0 {
+		// The CRD defaults cpuPeriod on admission; guard for objects built in code.
+		periodUS = isolation.CPUPeriod
+	}
+	if isolation.CPUQuota == nil {
+		return nil, periodUS
+	}
+
+	quota := isolation.CPUQuota.MilliValue() * periodUS / 1000
+	return &quota, periodUS
+}

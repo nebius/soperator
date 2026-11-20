@@ -1350,6 +1350,22 @@ type LoginUserIsolation struct {
 	// +kubebuilder:validation:Maximum=10000
 	// +kubebuilder:default=100
 	CPUWeight int64 `json:"cpuWeight,omitempty"`
+
+	// CPUQuota is the hard per-user CPU limit in CPUs (cgroup v2 cpu.max quota), e.g. "8" or "500m".
+	// A user cannot use more CPU time than this even when the node is idle.
+	// When unset, the CPU usage of a user is not capped
+	//
+	// +kubebuilder:validation:Optional
+	CPUQuota *resource.Quantity `json:"cpuQuota,omitempty"`
+
+	// CPUPeriod is the enforcement period of cpuQuota in microseconds (cgroup v2 cpu.max period).
+	// Shorter periods make throttling smoother, longer periods tolerate bursts better
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1000
+	// +kubebuilder:validation:Maximum=1000000
+	// +kubebuilder:default=100000
+	CPUPeriod int64 `json:"cpuPeriod,omitempty"`
 }
 
 // SidecarSSSD defines the shared SSSD sidecar configuration for Slurm node pods.
