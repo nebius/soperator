@@ -41,6 +41,20 @@ func TestRenderNodeMetadataEnv(t *testing.T) {
 	assert.Contains(t, env, corev1.EnvVar{Name: "SOPERATOR_NODE_GRES", Value: "gpu:h100:8"})
 	assert.Contains(t, env, corev1.EnvVar{Name: consts.EnvNodePlatformTags, Value: "8xH100,8xGPU"})
 
+	for _, static := range []string{
+		"Feature= Gres=gpu:h100:8 CPUs=128",
+		"State= Gres=gpu:h100:8 CPUs=128",
+		"Weight= Gres=gpu:h100:8 CPUs=128",
+	} {
+		t.Run("empty option before Gres "+static, func(t *testing.T) {
+			env, err := renderNodeMetadataEnv(static, true)
+			require.NoError(t, err)
+			assert.Contains(t, env, corev1.EnvVar{Name: "SOPERATOR_NODE_GRES", Value: "gpu:h100:8"})
+			assert.Contains(t, env, corev1.EnvVar{Name: "SOPERATOR_NODE_CPUS", Value: "128"})
+			assert.Contains(t, env, corev1.EnvVar{Name: consts.EnvNodePlatformTags, Value: "8xH100,8xGPU"})
+		})
+	}
+
 	_, err = renderNodeMetadataEnv("CPUs=128", true)
 	require.ErrorContains(t, err, "provide Gres=gpu")
 }

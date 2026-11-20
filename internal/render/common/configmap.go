@@ -12,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	"k8s.io/utils/strings/slices"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
@@ -152,9 +151,6 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 		return
 	}
 
-	const nodeFeatureKey = "Feature="
-	const stateKey = "State="
-
 	for _, nodeSet := range cluster.NodeSets {
 		if nodeSet.Spec.Replicas == 0 {
 			res.AddComment(fmt.Sprintf("WARNING: NodeSet %s has 0 replicas, skipping", nodeSet.Name))
@@ -186,6 +182,9 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 		if nodeSet.Spec.NodeConfig.AutoResume != nil && !*nodeSet.Spec.NodeConfig.AutoResume {
 			nodeConfigParts = append(nodeConfigParts, "AutoResume=Off")
 		}
+		if nodeSet.Spec.NodeConfig.AutoSuspendSeconds != nil {
+			nodeConfigParts = append(nodeConfigParts, fmt.Sprintf("SuspendTime=%d", *nodeSet.Spec.NodeConfig.AutoSuspendSeconds))
+		}
 		if nodeSet.Spec.Slurmd.Port != 0 {
 			nodeConfigParts = append(nodeConfigParts, fmt.Sprintf("Port=%d", nodeSet.Spec.Slurmd.Port))
 		}
@@ -196,17 +195,9 @@ func AddNodesToSlurmConfig(res *renderutils.PropertiesConfig, cluster *values.Sl
 			nodeConfig = fmt.Sprintf("%s %s%s", nodeConfig, nodeFeatureKey, features)
 		}
 
-		staticConfig := strings.Join(
-			slices.Filter(
-				nil,
-				strings.Split(nodeSet.Spec.NodeConfig.Static, " "),
-				func(s string) bool {
-					return !strings.HasPrefix(s, nodeFeatureKey) &&
-						!strings.HasPrefix(s, stateKey)
-				},
-			),
-			" ",
-		)
+		// The typed autoSuspendSeconds takes precedence over a SuspendTime in Static, which Slurm
+		// would otherwise apply instead because it comes later on the line.
+		staticConfig := filterNodeStatic(nodeSet.Spec.NodeConfig.Static, nodeSet.Spec.NodeConfig.AutoSuspendSeconds != nil)
 
 		if len(nodeConfig) > 0 {
 			nodeConfig = fmt.Sprintf("%s %s", nodeConfig, staticConfig)

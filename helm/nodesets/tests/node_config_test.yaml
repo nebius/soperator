@@ -353,3 +353,349 @@ tests:
       - contains:
           path: spec.nodeConfig.gresConfig
           content: "AutoDetect=off Name=gpu Type=nvidia_h200 File=/dev/nvidia[4-7] Cores=0-31"
+
+  - it: should configure autoSuspendSeconds, keeping zero and omitting null
+    set:
+      nodesets:
+        - name: instant-suspend
+          replicas: 1
+          nodeConfig:
+            autoResume: false
+            autoSuspendSeconds: 0
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+        - name: delayed-suspend
+          replicas: 1
+          nodeConfig:
+            autoSuspendSeconds: 600
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+        - name: no-suspend
+          replicas: 1
+          nodeConfig:
+            autoSuspendSeconds: null
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - equal:
+          path: spec.nodeConfig.autoSuspendSeconds
+          value: 0
+        documentIndex: 0
+      - equal:
+          path: spec.nodeConfig.autoSuspendSeconds
+          value: 600
+        documentIndex: 1
+      - notExists:
+          path: spec.nodeConfig.autoSuspendSeconds
+        documentIndex: 2
+
+  - it: should render large autoSuspendSeconds as an integer
+    set:
+      nodesets:
+        - name: workers
+          replicas: 1
+          nodeConfig:
+            autoSuspendSeconds: 1000000000
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - equal:
+          path: spec.nodeConfig.autoSuspendSeconds
+          value: 1000000000
+
+  - it: should accept the int32 maximum for autoSuspendSeconds
+    set:
+      nodesets:
+        - name: workers
+          replicas: 1
+          nodeConfig:
+            autoSuspendSeconds: 2147483647
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - equal:
+          path: spec.nodeConfig.autoSuspendSeconds
+          value: 2147483647
+
+  - it: should reject a non-numeric autoSuspendSeconds
+    set:
+      nodesets:
+        - name: workers
+          replicas: 1
+          nodeConfig:
+            autoSuspendSeconds: "bogus"
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - failedTemplate:
+          errorPattern: "autoSuspendSeconds must be a whole number between 0 and 2147483647, got \"bogus\" \\(string\\)"
+
+  - it: should reject a numeric string autoSuspendSeconds
+    set:
+      nodesets:
+        - name: workers
+          replicas: 1
+          nodeConfig:
+            autoSuspendSeconds: "600"
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - failedTemplate:
+          errorPattern: "autoSuspendSeconds must be a whole number between 0 and 2147483647, got \"600\" \\(string\\)"
+
+  - it: should reject a boolean autoSuspendSeconds
+    set:
+      nodesets:
+        - name: workers
+          replicas: 1
+          nodeConfig:
+            autoSuspendSeconds: true
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - failedTemplate:
+          errorPattern: "autoSuspendSeconds must be a whole number between 0 and 2147483647, got true \\(bool\\)"
+
+  - it: should reject a positive fractional autoSuspendSeconds
+    set:
+      nodesets:
+        - name: workers
+          replicas: 1
+          nodeConfig:
+            autoSuspendSeconds: 1.5
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - failedTemplate:
+          errorPattern: "autoSuspendSeconds must be a whole number between 0 and 2147483647, got 1.5 \\(float64\\)"
+
+  - it: should reject a negative fractional autoSuspendSeconds
+    set:
+      nodesets:
+        - name: workers
+          replicas: 1
+          nodeConfig:
+            autoSuspendSeconds: -0.5
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - failedTemplate:
+          errorPattern: "autoSuspendSeconds must be a whole number between 0 and 2147483647, got -0.5 \\(float64\\)"
+
+  - it: should reject a negative autoSuspendSeconds
+    set:
+      nodesets:
+        - name: workers
+          replicas: 1
+          nodeConfig:
+            autoSuspendSeconds: -1
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - failedTemplate:
+          errorPattern: "autoSuspendSeconds must be a whole number between 0 and 2147483647, got -1 \\(float64\\)"
+
+  - it: should reject autoSuspendSeconds above the int32 maximum
+    set:
+      nodesets:
+        - name: workers
+          replicas: 1
+          nodeConfig:
+            autoSuspendSeconds: 2147483648
+          slurmd:
+            image:
+              repository: "test/slurm"
+            resources:
+              cpu: "2"
+              memory: "4Gi"
+            volumes:
+              spool:
+                emptyDir: {}
+              jail:
+                emptyDir: {}
+              jailSubMounts: []
+          munge:
+            image:
+              repository: "test/munge"
+            resources:
+              cpu: "50m"
+              memory: "64Mi"
+    asserts:
+      - failedTemplate:
+          errorPattern: "autoSuspendSeconds must be a whole number between 0 and 2147483647, got 2147483648 \\(float64\\)"

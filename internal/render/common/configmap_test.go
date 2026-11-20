@@ -850,6 +850,183 @@ func TestAddNodesToSlurmConfig(t *testing.T) {
 			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 AutoResume=Off",
 		},
 		{
+			name: "Single nodeset with AutoSuspendSeconds set to zero",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeA",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 1,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								AutoResume:         ptr.To(false),
+								AutoSuspendSeconds: ptr.To[int32](0),
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 AutoResume=Off SuspendTime=0",
+		},
+		{
+			name: "Single nodeset with positive AutoSuspendSeconds",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeA",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 1,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								AutoSuspendSeconds: ptr.To[int32](600),
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 SuspendTime=600",
+		},
+		{
+			name: "Single nodeset with AutoSuspendSeconds drops SuspendTime from static",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeA",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 1,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								AutoSuspendSeconds: ptr.To[int32](0),
+								Static:             `CPUs=4 SuspendTime = 600 suspendtime= 700 Boards=1 Reason="keep SuspendTime=600"`,
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 SuspendTime=0 CPUs=4 Boards=1 Reason=\"keep SuspendTime=600\"",
+		},
+		{
+			name: "Single nodeset without AutoSuspendSeconds keeps SuspendTime from static",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeA",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 1,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "CPUs=4 SuspendTime=600",
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 CPUs=4 SuspendTime=600",
+		},
+		{
+			name: "Single nodeset without AutoSuspendSeconds keeps Feature and State filtering unchanged",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeA",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 1,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								Static: "feature=existing-license Feature = existing-license CPUs=4 Feature=dropped State=DOWN",
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 feature=existing-license Feature = existing-license CPUs=4",
+		},
+		{
+			name: "Single nodeset with AutoSuspendSeconds keeps Feature and State filtering unchanged",
+			cluster: &values.SlurmCluster{
+				NamespacedName: types.NamespacedName{
+					Namespace: "soperator",
+					Name:      "slurm-test",
+				},
+				NodeSets: []slurmv1alpha1.NodeSet{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "nodeA",
+							Namespace: "soperator",
+						},
+						Spec: slurmv1alpha1.NodeSetSpec{
+							Replicas: 1,
+							Slurmd: slurmv1alpha1.ContainerSlurmdSpec{
+								Resources: corev1.ResourceList{
+									corev1.ResourceMemory: resource.MustParse("2Gi"),
+								},
+							},
+							NodeConfig: slurmv1alpha1.NodeConfig{
+								AutoSuspendSeconds: ptr.To[int32](0),
+								Static:             "feature=existing-license Feature = existing-license SuspendTime = 600 Feature=dropped State=DOWN CPUs=4\tFeature=existing-license",
+							},
+						},
+					},
+				},
+			},
+			expected: "NodeName=nodeA-0 State=CLOUD NodeAddr=nodeA-0.slurm-test-nodeset-svc.soperator.svc.cluster.local RealMemory=2048 SuspendTime=0 feature=existing-license Feature = existing-license CPUs=4\tFeature=existing-license",
+		},
+		{
 			name: "Single nodeset with multiple replicas and AutoResume unspecified",
 			cluster: &values.SlurmCluster{
 				NamespacedName: types.NamespacedName{

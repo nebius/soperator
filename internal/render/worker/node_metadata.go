@@ -48,6 +48,9 @@ func renderNodeMetadataEnv(static string, gpuEnabled bool) ([]corev1.EnvVar, err
 }
 
 // parseNodeStatic extracts nodeStaticMetadataFields from nodeConfig.static, matching keys case-insensitively.
+//
+// It deliberately splits on whitespace instead of parsing assignments like Slurm: its output becomes worker
+// environment variables, so any change for an existing static restarts the workers or fails GPU worker rendering.
 func parseNodeStatic(static string) map[string]string {
 	fields := make(map[string]string)
 	for _, token := range strings.Fields(static) {
