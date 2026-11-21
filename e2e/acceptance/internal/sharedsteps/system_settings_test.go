@@ -91,7 +91,7 @@ func TestSrunProbeCommand(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, srunProbeCommand("ulimit -n", tt.container))
+			assert.Equal(t, tt.want, srunProbeCommand("ulimit -n", tt.container, nil))
 		})
 	}
 }
@@ -99,7 +99,7 @@ func TestSrunProbeCommand(t *testing.T) {
 func TestSrunProbeCommandAddsFlagsBeforeContainer(t *testing.T) {
 	assert.Equal(t,
 		"srun --nodes=1 --ntasks=1 --pty --container-image='docker://cr.nebius.cloud#soperator/ubuntu:noble' bash -lc 'ulimit -n'",
-		srunProbeCommand("ulimit -n", probeContainerEnroot, "--pty"),
+		srunProbeCommand("ulimit -n", probeContainerEnroot, nil, "--pty"),
 	)
 }
 
@@ -211,36 +211,51 @@ func TestValidateAdoptedSSHJobMemoryMax(t *testing.T) {
 
 func TestSrunProbeCommandForGPUContainers(t *testing.T) {
 	assert.Equal(t,
-		"NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video srun --nodes=1 --ntasks=1 "+
+		"NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=compute,graphics srun --nodes=1 --ntasks=1 "+
 			"--container-image='docker://cr.nebius.cloud#soperator/ubuntu:noble' bash -lc 'true'",
-		srunProbeCommand("true", probeContainerEnrootGPU),
+		srunProbeCommand("true", probeContainerEnrootGPU, []string{"compute", "graphics"}),
 	)
-	assert.Equal(t,
-		"srun --nodes=1 --ntasks=1 docker run --rm --name e2e-system-settings-${SLURM_JOB_ID} "+
-			"--gpus=all -e NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video "+
-			"'cr.nebius.cloud/soperator/ubuntu:noble' bash -lc 'true'",
-		srunProbeCommand("true", probeContainerDockerGPU),
-	)
+	assert.Contains(t, srunProbeCommand("true", probeContainerEnrootGPU, []string{"all"}), "NVIDIA_DRIVER_CAPABILITIES=all srun")
 }
 
 func TestProbeContainerIsDocker(t *testing.T) {
 	assert.True(t, probeContainerDocker.isDocker())
-	assert.True(t, probeContainerDockerGPU.isDocker())
 	assert.False(t, probeContainerNone.isDocker())
 	assert.False(t, probeContainerEnrootGPU.isDocker())
 }
 
-func TestRequiredNVIDIADriverCapabilities(t *testing.T) {
-	assert.Equal(t, []string{"compute", "graphics", "utility", "video"}, requiredNVIDIADriverCapabilities())
+func TestRequiredNVIDIADriverCapabilitiesHaveKnownLibraries(t *testing.T) {
+	assert.Equal(t, []string{"compute", "graphics", "utility", "video"}, requiredNVIDIADriverCapabilities)
+	assert.Equal(t, requiredNVIDIADriverCapabilities, coveredNVIDIADriverCapabilities(requiredNVIDIADriverCapabilities))
 }
 
-func TestNVIDIALibraryProbeLooksUpEveryCapabilityLibrary(t *testing.T) {
-	probe := nvidiaLibraryProbe()
-	for _, entry := range nvidiaCapabilityLibraries {
-		for _, library := range entry.libraries {
-			assert.Contains(t, probe, entry.capability+":"+library)
-		}
-	}
+func TestParseNVIDIADriverCapabilities(t *testing.T) {
+	capabilities, err := parseNVIDIADriverCapabilities(" compute, utility,,video,utility ")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"compute", "utility", "video"}, capabilities)
+
+	capabilities, err = parseNVIDIADriverCapabilities("compute,all")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"all"}, capabilities)
+
+	_, err = parseNVIDIADriverCapabilities(" , ")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "no capabilities")
+}
+
+func TestCoveredNVIDIADriverCapabilitiesSkipsUnknownOnes(t *testing.T) {
+	assert.Equal(t, []string{"compute", "utility"},
+		coveredNVIDIADriverCapabilities([]string{"utility", "display", "ngx", "compat32", "compute"}))
+	assert.Equal(t, []string{"compute", "graphics", "utility", "video"}, coveredNVIDIADriverCapabilities([]string{"all"}))
+	assert.Empty(t, coveredNVIDIADriverCapabilities([]string{"display"}))
+}
+
+func TestNVIDIALibraryProbeLooksUpTheGivenCapabilityLibraries(t *testing.T) {
+	probe := nvidiaLibraryProbe([]string{"compute", "display"})
+	assert.Contains(t, probe, "compute:libcuda.so.1")
+	assert.NotContains(t, probe, "utility:")
+	assert.NotContains(t, probe, "display")
+	assert.Contains(t, nvidiaLibraryProbe([]string{"all"}), "video:libnvcuvid.so.1")
 	assert.Contains(t, probe, `printf 'NVIDIA_LIBRARY=%s %s %s %s\n'`)
 	assert.Contains(t, probe, `capability="${entry%%:*}"`)
 	assert.Contains(t, probe, `stat -Lc %s "$path"`)
@@ -283,7 +298,9 @@ func TestValidateNVIDIALibraryLookups(t *testing.T) {
 		{capability: "video", library: "libnvcuvid.so.1", path: "/lib/libnvcuvid.so.1", size: 13148544},
 		{capability: "video", library: "libnvidia-encode.so.1", path: "/lib/libnvidia-encode.so.1", size: 249000},
 	}
-	assert.NoError(t, validateNVIDIALibraryLookups("native job", lookups))
+	assert.NoError(t, validateNVIDIALibraryLookups("native job", lookups, []string{"compute", "graphics", "utility", "video"}))
+	// Capabilities the job was not asked for are not checked.
+	assert.NoError(t, validateNVIDIALibraryLookups("native job", lookups[:1], []string{"compute", "display"}))
 }
 
 func TestValidateNVIDIALibraryLookupsRejectsPlaceholdersAndMissingLibraries(t *testing.T) {
@@ -294,7 +311,7 @@ func TestValidateNVIDIALibraryLookupsRejectsPlaceholdersAndMissingLibraries(t *t
 		{capability: "utility", library: "libnvidia-ml.so.1", path: "/lib/libnvidia-ml.so.1", size: 2081720},
 	}
 
-	err := validateNVIDIALibraryLookups("native job", lookups)
+	err := validateNVIDIALibraryLookups("native job", lookups, []string{"all"})
 	require.Error(t, err)
 	assert.ErrorContains(t, err,
 		"check native job NVIDIA graphics capability: want a non-placeholder library of at least 1024 bytes, "+
@@ -408,9 +425,10 @@ func TestValidateKernelSettingsRejectsValuesBelowMinimum(t *testing.T) {
 }
 
 func TestValidateNVIDIADriverCapabilities(t *testing.T) {
-	assert.NoError(t, validateNVIDIADriverCapabilities("video,utility,compute,graphics,display"))
+	assert.NoError(t, validateNVIDIADriverCapabilities([]string{"video", "utility", "compute", "graphics", "display"}))
+	assert.NoError(t, validateNVIDIADriverCapabilities([]string{"all"}))
 
-	err := validateNVIDIADriverCapabilities("compute,utility")
+	err := validateNVIDIADriverCapabilities([]string{"compute", "utility"})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "graphics,video")
 }

@@ -39,6 +39,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewNCCLDebug(runtime, slurm, kubectl, selector),
 		NewNCCLDebugStress(runtime, slurm, kubectl, selector),
 		NewSystemSettings(info, runtime, slurm, kubectl, selector),
+		NewNVIDIALibraries(runtime, slurm, kubectl, selector),
 		NewTaskPrologEnv(runtime, selector),
 		NewSoperatorUtils(runtime, selector),
 		NewFilesystemLayout(info, runtime, kubectl, selector),
