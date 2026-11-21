@@ -849,3 +849,112 @@ func TestSlurmNodesController_processK8SNodesMaintenance_readsNodesFromCache(t *
 	require.NoError(t, k8sClient.Get(ctx, types.NamespacedName{Name: "instance-healthy"}, &healthy))
 	require.Empty(t, healthy.Status.Conditions)
 }
+
+func Test_SlurmNodesController_findDegradedNodes_skipsFailingCluster(t *testing.T) {
+	ctx := context.Background()
+	staleClusterName := types.NamespacedName{Namespace: "namespace", Name: "deleted"}
+	healthyClusterName := types.NamespacedName{Namespace: "namespace", Name: "healthy"}
+
+	staleClient := slurmapifake.NewMockClient(t)
+	staleClient.On("ListNodes", ctx).Return(nil, errors.New("connection refused"))
+	healthyClient := slurmapifake.NewMockClient(t)
+	healthyClient.On("ListNodes", ctx).Return([]slurmapi.Node{{
+		Name:       "worker-0",
+		InstanceID: "k8s-node",
+		States:     map[api.V0044NodeState]struct{}{api.V0044NodeStateDRAIN: {}},
+		Reason:     ptr.To(slurmapi.NodeReason{Reason: consts.SlurmNodeReasonKillTaskFailed}),
+	}}, nil)
+
+	slurmAPIClients := slurmapi.NewClientSet(ctx)
+	slurmAPIClients.AddClient(staleClusterName, staleClient)
+	slurmAPIClients.AddClient(healthyClusterName, healthyClient)
+	c := &SlurmNodesController{slurmAPIClients: slurmAPIClients}
+
+	got, err := c.findDegradedNodes(ctx)
+	require.ErrorContains(t, err, "connection refused")
+	require.NotContains(t, got, staleClusterName)
+	require.Len(t, got[healthyClusterName], 1, "degraded nodes of the responsive cluster must still be found")
+}
+
+// A client of a deleted cluster that is still registered must not stop the degraded nodes of
+// the remaining clusters from being remediated.
+func TestSlurmNodesController_Reconcile_staleClientDoesNotBlockRemediation(t *testing.T) {
+	ctx := context.Background()
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	staleClusterName := types.NamespacedName{Namespace: "test-ns", Name: "deleted-cluster"}
+	healthyClusterName := types.NamespacedName{Namespace: "test-ns", Name: "healthy-cluster"}
+	k8sNode := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-k8s-node"}}
+	workerPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: healthyClusterName.Namespace,
+			Name:      "worker-0",
+			Labels: map[string]string{
+				consts.LabelWorkerKey:   consts.LabelWorkerValue,
+				consts.LabelInstanceKey: healthyClusterName.Name,
+			},
+		},
+		Spec: corev1.PodSpec{NodeName: k8sNode.Name},
+	}
+	k8sClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(k8sNode, workerPod).
+		WithStatusSubresource(k8sNode).
+		WithIndex(&corev1.Pod{}, "spec.nodeName", func(obj ctrlclient.Object) []string {
+			return []string{obj.(*corev1.Pod).Spec.NodeName}
+		}).
+		Build()
+
+	degradedNode := slurmapi.Node{
+		Name:       workerPod.Name,
+		InstanceID: k8sNode.Name,
+		States:     map[api.V0044NodeState]struct{}{api.V0044NodeStateIDLE: {}, api.V0044NodeStateDRAIN: {}},
+		Reason:     ptr.To(slurmapi.NodeReason{Reason: consts.SlurmNodeReasonKillTaskFailed}),
+	}
+	staleClient := slurmapifake.NewMockClient(t)
+	staleClient.On("ListNodes", ctx).Return(nil, errors.New("connection refused"))
+	healthyClient := slurmapifake.NewMockClient(t)
+	healthyClient.On("ListNodes", ctx).Return([]slurmapi.Node{degradedNode}, nil)
+	healthyClient.On(
+		"SlurmV0044PostNodeWithResponse",
+		ctx,
+		workerPod.Name,
+		mock.MatchedBy(func(body api.SlurmV0044PostNodeJSONRequestBody) bool {
+			return body.State != nil &&
+				len(*body.State) == 1 &&
+				(*body.State)[0] == api.V0044UpdateNodeMsgStateDRAIN &&
+				body.Reason != nil &&
+				*body.Reason == consts.SlurmNodeReasonNodeReboot
+		}),
+	).Return(&api.SlurmV0044PostNodeResponse{
+		JSON200: &api.V0044OpenapiResp{Errors: &[]api.V0044OpenapiError{}},
+	}, nil).Once()
+	healthyClient.On("GetNode", ctx, workerPod.Name).Return(degradedNode, nil).Once()
+
+	slurmAPIClients := slurmapi.NewClientSet(ctx)
+	slurmAPIClients.AddClient(staleClusterName, staleClient)
+	slurmAPIClients.AddClient(healthyClusterName, healthyClient)
+
+	controller := NewSlurmNodesController(
+		k8sClient,
+		scheme,
+		record.NewFakeRecorder(10),
+		slurmAPIClients,
+		time.Minute,
+		true,
+		k8sClient,
+		"",
+	)
+
+	_, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: healthyClusterName})
+	require.ErrorContains(t, err, "connection refused", "the unreachable cluster must still be reported")
+
+	var remediated corev1.Node
+	require.NoError(t, k8sClient.Get(ctx, types.NamespacedName{Name: k8sNode.Name}, &remediated))
+	require.True(t, slices.ContainsFunc(remediated.Status.Conditions, func(c corev1.NodeCondition) bool {
+		return c.Type == consts.SoperatorChecksK8SNodeDegraded &&
+			c.Status == corev1.ConditionTrue &&
+			c.Reason == string(consts.ReasonNodeNeedReboot)
+	}), "degraded node of the responsive cluster must be remediated")
+}

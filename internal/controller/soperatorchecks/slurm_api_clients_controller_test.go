@@ -18,9 +18,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	clientfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	slurmv1 "nebius.ai/slurm-operator/api/v1"
 	"nebius.ai/slurm-operator/internal/consts"
 	"nebius.ai/slurm-operator/internal/naming"
 	"nebius.ai/slurm-operator/internal/slurmapi"
+	slurmapifake "nebius.ai/slurm-operator/internal/slurmapi/fake"
 )
 
 type slurmClientTransportFunc func(*http.Request) (*http.Response, error)
@@ -29,12 +31,23 @@ func (f slurmClientTransportFunc) RoundTrip(req *http.Request) (*http.Response, 
 	return f(req)
 }
 
+func newSlurmAPIClientsTestScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, slurmv1.AddToScheme(scheme))
+	return scheme
+}
+
 func TestSlurmAPIClientsControllerHTTPTimeout(t *testing.T) {
 	for _, timeout := range []time.Duration{0, 2 * time.Minute} {
 		t.Run(timeout.String(), func(t *testing.T) {
-			scheme := runtime.NewScheme()
-			require.NoError(t, corev1.AddToScheme(scheme))
+			scheme := newSlurmAPIClientsTestScheme(t)
 			cluster := types.NamespacedName{Namespace: "default", Name: "cluster"}
+			slurmCluster := &slurmv1.SlurmCluster{
+				ObjectMeta: metav1.ObjectMeta{Namespace: cluster.Namespace, Name: cluster.Name},
+			}
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: cluster.Namespace,
@@ -42,7 +55,7 @@ func TestSlurmAPIClientsControllerHTTPTimeout(t *testing.T) {
 				},
 				Data: map[string][]byte{consts.SecretRESTJWTKeyFileName: []byte("test-signing-key")},
 			}
-			kubeClient := clientfake.NewClientBuilder().WithScheme(scheme).WithObjects(secret).Build()
+			kubeClient := clientfake.NewClientBuilder().WithScheme(scheme).WithObjects(slurmCluster, secret).Build()
 			clients := slurmapi.NewClientSet(t.Context())
 			httpClient := &http.Client{
 				Timeout: timeout,
@@ -69,4 +82,27 @@ func TestSlurmAPIClientsControllerHTTPTimeout(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestSlurmAPIClientsControllerRemovesClientOfDeletedCluster(t *testing.T) {
+	scheme := newSlurmAPIClientsTestScheme(t)
+	deleted := types.NamespacedName{Namespace: "default", Name: "deleted"}
+	remaining := types.NamespacedName{Namespace: "default", Name: "remaining"}
+	remainingCluster := &slurmv1.SlurmCluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: remaining.Namespace, Name: remaining.Name},
+	}
+	kubeClient := clientfake.NewClientBuilder().WithScheme(scheme).WithObjects(remainingCluster).Build()
+
+	clients := slurmapi.NewClientSet(t.Context())
+	clients.AddClient(deleted, slurmapifake.NewMockClient(t))
+	clients.AddClient(remaining, slurmapifake.NewMockClient(t))
+
+	r := NewSlurmAPIClientsController(kubeClient, scheme, record.NewFakeRecorder(1), clients, nil)
+	_, err := r.Reconcile(t.Context(), ctrl.Request{NamespacedName: deleted})
+	require.NoError(t, err)
+
+	_, found := clients.GetClient(deleted)
+	require.False(t, found, "client of the deleted cluster must be removed")
+	_, found = clients.GetClient(remaining)
+	require.True(t, found, "client of a cluster that still exists must stay registered")
 }
