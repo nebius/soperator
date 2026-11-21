@@ -68,3 +68,22 @@ sequenceDiagram
     L-->>O: Replacement is Ready
     Note over O,T: Continue with the next outdated pod
 ```
+
+## Monitoring
+
+The operator exposes these gauges for delayed login rollouts. They use `resource_namespace` and `slurm_cluster`
+labels, with `controller="loginupdate"`.
+
+| Metric | Description |
+| --- | --- |
+| `soperator_login_rollout_active` | Whether an update or login pod readiness/replacement is still pending. |
+| `soperator_login_rollout_outdated_pods` | Observed login pods outside the target revision. |
+| `soperator_login_rollout_next_restart_timestamp_seconds` | Earliest scheduled restart among remaining outdated pods, or `0` when none exists. |
+| `soperator_login_rollout_waiting{reason}` | Current wait reason, including the notice period, pod readiness, or a reconciliation error. |
+| `soperator_login_rollout_pod_state{login_pod}` | Rollout state for each login host, preserving its name across replacements. |
+
+Pod states are `0` Ready at target revision, `1` notice period, `2` eligible for restart, `3` replacing, `4` target pod not Ready, and `5` awaiting a target revision or schedule.
+
+The [Soperator / Rollouts dashboard](../helm/soperator-monitoring-dashboards/dashboards/operator_rollouts.json)
+includes login panels alongside worker rollouts. Metrics reflect the last controller observation. A pending notice period is expected waiting; early requests and broken pods can trigger
+replacement before the reported scheduled time.
