@@ -122,13 +122,16 @@ class MainTest(unittest.TestCase):
             self.addCleanup(patch.stop)
 
     def test_interactive_confirmation_precedes_write(self):
-        def confirm(prompt):
-            self.assertEqual("Restart login host login-0? Type yes/no: ", prompt)
+        def confirm():
+            self.assertTrue(self.stderr.getvalue().endswith("Restart login host login-0? Type yes/no: "))
             output = self.stdout.getvalue()
-            self.assertIn("Login pod: cluster/login-0", output)
+            self.assertIn("Login host: cluster/login-0", output)
+            self.assertIn("Outdated: yes", output)
             self.assertIn("Update announced: 2026-10-15T12:00:00Z", output)
             self.assertIn("Scheduled restart: 2026-12-04T12:00:00Z", output)
-            self.assertIn(restart.WARNING, output)
+            self.assertNotIn("Warning:", output)
+            self.assertNotIn("Restart login host", output)
+            self.assertIn(restart.WARNING, self.stderr.getvalue())
             self.assertNotIn("Early restart requested:", output)
             self.assertNotIn("Restart requested.", output)
             self.api.request_restart.assert_not_called()
@@ -153,12 +156,15 @@ class MainTest(unittest.TestCase):
                 self.prompt.reset_mock()
                 self.stdout.seek(0)
                 self.stdout.truncate()
-                self.prompt.side_effect = answer if isinstance(answer, BaseException) else lambda prompt: answer
+                self.stderr.seek(0)
+                self.stderr.truncate()
+                self.prompt.side_effect = answer if isinstance(answer, BaseException) else lambda: answer
                 self.assertEqual(0, restart.main([]))
                 self.prompt.assert_called_once()
                 self.api.get_pod.assert_called_once()
                 self.api.request_restart.assert_not_called()
-                self.assertIn("Restart cancelled.", self.stdout.getvalue())
+                self.assertIn("Restart cancelled.", self.stderr.getvalue())
+                self.assertNotIn("Restart cancelled.", self.stdout.getvalue())
                 self.assertNotIn("Restart requested.", self.stdout.getvalue())
 
     def test_status_is_read_only_without_warning_or_prompt(self):
@@ -173,18 +179,60 @@ class MainTest(unittest.TestCase):
                 self.stdout.seek(0)
                 self.stdout.truncate()
                 self.assertEqual(0, restart.main(["--status"]))
-                self.assertIn("Login pod: cluster/login-0", self.stdout.getvalue())
+                self.assertIn("Login host: cluster/login-0", self.stdout.getvalue())
+                self.assertIn("Outdated: yes", self.stdout.getvalue())
                 self.assertIn(f"Early restart requested: {'yes' if requested else 'no'}", self.stdout.getvalue())
                 self.assertNotIn(restart.WARNING, self.stdout.getvalue())
+                self.assertEqual("", self.stderr.getvalue())
                 self.prompt.assert_not_called()
                 self.api.get_pod.assert_called_once()
                 self.api.request_restart.assert_not_called()
+
+    def test_status_uses_existing_announcement_and_schedule(self):
+        for announced, scheduled, expected in (
+            ("2026-10-15T12:00:00Z", "2026-12-04T12:00:00Z", "yes"),
+            (None, None, "no"),
+            (None, "2026-12-04T12:00:00Z", "no"),
+            ("2026-10-15T12:00:00Z", None, "no"),
+            ("", "2026-12-04T12:00:00Z", "no"),
+            ("2026-10-15T12:00:00Z", "", "no"),
+            ("", "", "no"),
+        ):
+            with self.subTest(announced=announced, scheduled=scheduled):
+                document = pod_document()
+                annotations = document["metadata"]["annotations"]
+                for key, value in ((restart.ANNOUNCED_ANNOTATION, announced), (restart.SCHEDULED_ANNOTATION, scheduled)):
+                    if value is None:
+                        del annotations[key]
+                    else:
+                        annotations[key] = value
+                self.api.get_pod.return_value = restart.parse_login_pod(document, IDENTITY)
+                self.api.reset_mock()
+                self.stdout.seek(0)
+                self.stdout.truncate()
+                self.assertEqual(0, restart.main(["--status"]))
+                self.assertIn(f"Outdated: {expected}\n", self.stdout.getvalue())
+                self.api.get_pod.assert_called_once()
+                self.api.request_restart.assert_not_called()
+                self.prompt.assert_not_called()
+
+    def test_action_rejects_empty_schedule_annotations(self):
+        for arguments in ([], ["--yes"]):
+            for annotation in (restart.ANNOUNCED_ANNOTATION, restart.SCHEDULED_ANNOTATION):
+                with self.subTest(arguments=arguments, annotation=annotation):
+                    document = pod_document()
+                    document["metadata"]["annotations"][annotation] = ""
+                    self.api.get_pod.return_value = restart.parse_login_pod(document, IDENTITY)
+                    self.assertEqual(1, restart.main(arguments))
+                    self.prompt.assert_not_called()
+                    self.api.request_restart.assert_not_called()
 
     def test_yes_flag_submits_noninteractively_without_stale_status_line(self):
         self.stdin.isatty.return_value = False
 
         def submit(pod):
-            self.assertIn(restart.WARNING, self.stdout.getvalue())
+            self.assertIn(restart.WARNING, self.stderr.getvalue())
+            self.assertNotIn("Warning:", self.stdout.getvalue())
             self.assertNotIn("Restart requested.", self.stdout.getvalue())
 
         self.api.request_restart.side_effect = submit
@@ -194,6 +242,7 @@ class MainTest(unittest.TestCase):
         self.api.request_restart.assert_called_once_with(self.pod)
         self.assertNotIn("Early restart requested:", self.stdout.getvalue())
         self.assertIn("Restart requested.", self.stdout.getvalue())
+        self.assertNotIn("\033", self.stdout.getvalue() + self.stderr.getvalue())
 
     def test_default_requires_terminal_or_explicit_action(self):
         self.stdin.isatty.return_value = False

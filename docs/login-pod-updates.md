@@ -37,8 +37,11 @@ replacements. Set the global retry interval with `--requeue-after-login-update` 
 ## How a login update works
 
 Run `sudo soperator-login-restart` on a login host to request an early restart and confirm interactively.
-Use `--status` to inspect its restart time, or `--yes` to submit without prompting. An early request bypasses
-the notice and schedule while preserving availability checks.
+Use `--status` to inspect whether the host is outdated and its restart time, or `--yes` to submit without prompting.
+An early request bypasses the notice and schedule while preserving availability checks.
+
+Interactive Bash sessions, including SSH and IDE terminals, display a warning with the scheduled restart time.
+Already-open sessions warn at the next prompt; noninteractive commands stay silent.
 
 ```mermaid
 sequenceDiagram

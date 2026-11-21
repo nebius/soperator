@@ -20,9 +20,9 @@ ANNOUNCED_ANNOTATION = "slurm.nebius.ai/login-update-announced-at"
 SCHEDULED_ANNOTATION = "slurm.nebius.ai/login-update-scheduled-at"
 REQUEST_TIMEOUT_SECONDS = 10
 WARNING = (
-    "WARNING: This requests an early restart of this entire login pod. "
-    "It terminates every user's SSH connections, tmux sessions, and other processes "
-    "on this host, including your connection."
+    "Warning: Early restart of this login host\n"
+    "All SSH connections, tmux sessions, and other processes on this host will end,\n"
+    "including your connection."
 )
 
 
@@ -40,11 +40,15 @@ class LoginPod:
     annotations: dict
     deleting: bool
 
+    @property
+    def has_scheduled_update(self):
+        return all(self.annotations.get(key) for key in (ANNOUNCED_ANNOTATION, SCHEDULED_ANNOTATION))
+
     def require_scheduled_update(self):
-        if not all(self.annotations.get(key) for key in (ANNOUNCED_ANNOTATION, SCHEDULED_ANNOTATION)):
-            raise ValueError("this pod has no announced login update schedule")
+        if not self.has_scheduled_update:
+            raise ValueError("this login host has no announced update schedule")
         if self.deleting:
-            raise ValueError("this pod is already terminating")
+            raise ValueError("this login host is already terminating")
 
 
 def service_account_identity(token):
@@ -55,7 +59,7 @@ def service_account_identity(token):
         pod = kubernetes["pod"]
         return PodIdentity(pod["name"], kubernetes["namespace"], pod["uid"])
     except (IndexError, KeyError, TypeError, ValueError) as error:
-        raise ValueError("read bound pod identity from service account token") from error
+        raise ValueError("read bound login host identity from service account token") from error
 
 
 def read_service_account_file(directory, name):
@@ -65,9 +69,9 @@ def read_service_account_file(directory, name):
 def parse_login_pod(data, expected_identity):
     metadata = data["metadata"]
     if metadata["uid"] != expected_identity.uid:
-        raise ValueError("live Pod does not match this host's bound Pod UID")
+        raise ValueError("login host identity changed")
     if metadata.get("labels", {}).get(COMPONENT_LABEL) != "login":
-        raise ValueError("this host is not a Slurm login pod")
+        raise ValueError("this is not a Slurm login host")
     return LoginPod(expected_identity, metadata["resourceVersion"], metadata.get("annotations") or {}, bool(metadata.get("deletionTimestamp")))
 
 
@@ -106,9 +110,9 @@ class KubernetesAPI:
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="View this login pod and confirm an early restart interactively by default.")
+    parser = argparse.ArgumentParser(description="View this login host and confirm an early restart interactively by default.")
     actions = parser.add_mutually_exclusive_group()
-    actions.add_argument("--status", action="store_true", help="show the current update schedule without requesting a restart")
+    actions.add_argument("--status", action="store_true", help="show whether this login host is outdated and its update schedule without requesting a restart")
     actions.add_argument("--yes", action="store_true", help="skip confirmation and request the restart, acknowledging disruption to all users")
     args = parser.parse_args(argv)
     if os.geteuid() != 0:
@@ -119,7 +123,8 @@ def main(argv=None):
         identity = service_account_identity(read_service_account_file(directory, "token"))
         api = KubernetesAPI(identity, directory)
         pod = api.get_pod()
-        print(f"Login pod: {identity.namespace}/{identity.name}")
+        print(f"Login host: {identity.namespace}/{identity.name}")
+        print(f"Outdated: {'yes' if pod.has_scheduled_update else 'no'}")
         print(f"Update announced: {pod.annotations.get(ANNOUNCED_ANNOTATION, 'none')}")
         print(f"Scheduled restart: {pod.annotations.get(SCHEDULED_ANNOTATION, 'none')}")
         early_restart_requested = pod.annotations.get(REQUESTED_ANNOTATION) == identity.uid
@@ -127,28 +132,33 @@ def main(argv=None):
             print(f"Early restart requested: {'yes' if early_restart_requested else 'no'}")
             return 0
         if early_restart_requested:
-            print("An early restart is already requested for this pod.")
+            print("An early restart is already requested for this login host.")
             return 0
         pod.require_scheduled_update()
-        print(WARNING, flush=True)
+        warning = WARNING
+        if sys.stderr.isatty() and os.environ.get("TERM") not in (None, "", "dumb") and not os.environ.get("NO_COLOR"):
+            heading, details = warning.split("\n", 1)
+            warning = f"\033[1;33m{heading}\033[0m\n{details}"
+        print(warning, file=sys.stderr, flush=True)
         if not args.yes:
             if not sys.stdin.isatty():
                 print("Interactive confirmation requires a terminal; use --yes to request a restart or --status to inspect it.", file=sys.stderr)
                 return 1
             try:
-                confirmed = input(f"Restart login host {identity.name}? Type yes/no: ")
+                print(f"Restart login host {identity.name}? Type yes/no: ", end="", file=sys.stderr, flush=True)
+                confirmed = input()
             except (EOFError, KeyboardInterrupt):
-                print("\nRestart cancelled.")
+                print("\nRestart cancelled.", file=sys.stderr)
                 return 0
             if confirmed.strip().lower() != "yes":
-                print("Restart cancelled.")
+                print("Restart cancelled.", file=sys.stderr)
                 return 0
         api.request_restart(pod)
         print("Restart requested. The operator may terminate this host and your connection shortly.", flush=True)
         return 0
     except HTTPError as error:
         if error.code in (409, 422):
-            print("Pod metadata changed; inspect --status and retry the request.", file=sys.stderr)
+            print("Login host metadata changed; inspect --status and retry the request.", file=sys.stderr)
         else:
             print(f"Kubernetes API request failed (HTTP {error.code}).", file=sys.stderr)
         return 1
