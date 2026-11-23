@@ -1,6 +1,7 @@
 package sharedsteps
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,7 +19,7 @@ func TestNCCLDebugStressContainerLoop(t *testing.T) {
 	for _, tc := range []struct {
 		starts  int
 		failure string
-	}{{5, "none"}, {25, "none"}, {25, "start"}, {25, "marker"}} {
+	}{{5, "none"}, {25, "none"}, {50, "none"}, {25, "start"}, {25, "marker"}} {
 		t.Run(fmt.Sprintf("%d-%s", tc.starts, tc.failure), func(t *testing.T) {
 			dir := filepath.Join(t.TempDir(), "a 'quoted' directory")
 			require.NoError(t, os.Mkdir(dir, 0o700))
@@ -108,5 +109,50 @@ func TestValidateNCCLDebugStressRejectsIncompleteEvidence(t *testing.T) {
 	for _, churn := range []string{"", "CHURN\t1\t0", "CHURN\t10\t1", "CHURN\t10\t0\nCHURN\t11\t0"} {
 		_, err := validateNCCLDebugNativeResults("BATCH_HOST=worker-0\n"+churn, "worker-0")
 		require.Error(t, err, churn)
+	}
+}
+
+type ncclStressCleanupRuntime struct {
+	*privacyCleanupRuntime
+	canceled     map[string]bool
+	stillRunning bool
+}
+
+func (r *ncclStressCleanupRuntime) Jail() framework.CommandScope {
+	return framework.NewCommandScope(func(_ context.Context, command string) (string, error) {
+		r.commands = append(r.commands, command)
+		if strings.HasPrefix(command, "scancel ") {
+			r.canceled[strings.TrimPrefix(command, "scancel ")] = true
+		}
+		if strings.HasPrefix(command, "squeue ") && (len(r.canceled) < 4 || r.stillRunning) {
+			return "COMPLETING\n", nil
+		}
+		return "", nil
+	})
+}
+
+func TestNCCLDebugStressCleanupCancelsAllJobsBeforeWaiting(t *testing.T) {
+	for _, stillRunning := range []bool{false, true} {
+		t.Run(fmt.Sprintf("still-running-%t", stillRunning), func(t *testing.T) {
+			runtime := &ncclStressCleanupRuntime{privacyCleanupRuntime: &privacyCleanupRuntime{},
+				canceled: make(map[string]bool), stillRunning: stillRunning}
+			s := &NCCLDebugStress{runtime: runtime, slurm: framework.NewSlurmClient(runtime),
+				nativeJobs:    []framework.SbatchJob{{ID: "1"}, {ID: "2"}},
+				containerJobs: []framework.SbatchJob{{ID: "3"}, {ID: "4"}}}
+			ctx := framework.WithWorkerCleanup(t.Context())
+			s.CleanupAndReset(ctx)
+			require.GreaterOrEqual(t, len(runtime.commands), 4)
+			assert.Equal(t, []string{"scancel '3'", "scancel '4'", "scancel '1'", "scancel '2'"}, runtime.commands[:4])
+			err := framework.FinishWorkerReservation(ctx, runtime)
+			if stillRunning {
+				require.Error(t, err)
+				assert.Empty(t, runtime.workerCommands)
+			} else {
+				require.NoError(t, err)
+				assert.Len(t, runtime.workerCommands, 4)
+			}
+			assert.Empty(t, s.nativeJobs)
+			assert.Empty(t, s.containerJobs)
+		})
 	}
 }

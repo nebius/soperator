@@ -224,6 +224,9 @@ type privacyCleanupRuntime struct {
 	workerExecFailures       int
 	workerSSHCalls           int
 	kubectlCommands          []string
+	slurmNodeNames           string
+	slurmNodes               []string
+	slurmReads               int
 }
 
 func (r *privacyCleanupRuntime) Logf(string, ...any) {}
@@ -266,7 +269,35 @@ func (r *privacyCleanupRuntime) Jail() framework.CommandScope {
 	})
 }
 
-func (r *privacyCleanupRuntime) Controller() framework.CommandScope { return r.Jail() }
+func (r *privacyCleanupRuntime) Controller() framework.CommandScope {
+	return framework.NewCommandScope(func(ctx context.Context, command string) (string, error) {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		if command == "sinfo -hN -p main -o '%N'" {
+			r.commands = append(r.commands, command)
+			if r.slurmNodeNames != "" {
+				return r.slurmNodeNames, nil
+			}
+			return "worker-0\n", nil
+		}
+		if strings.HasPrefix(command, "scontrol show node ") {
+			r.commands = append(r.commands, command)
+			r.slurmReads++
+			if len(r.slurmNodes) > 0 {
+				name := strings.Trim(strings.TrimPrefix(command, "scontrol show node "), "'")
+				for _, node := range strings.Split(r.slurmNodes[min(r.slurmReads-1, len(r.slurmNodes)-1)], "\n") {
+					if strings.HasPrefix(node, "NodeName="+name+" ") {
+						return node, nil
+					}
+				}
+				return "", fmt.Errorf("unexpected Slurm node query %q", command)
+			}
+			return "NodeName=worker-0 State=IDLE SlurmdStartTime=2026-11-23T00:00:00", nil
+		}
+		return r.Jail().Run(ctx, command)
+	})
+}
 
 func (r *privacyCleanupRuntime) Worker(framework.WorkerInfo) framework.CommandScope {
 	r.workerSSHCalls++
@@ -488,4 +519,46 @@ func TestAccountingPrivacyCleanupWaitsForLoginAfterRestoringConfiguration(t *tes
 	assert.Contains(t, runtime.commands, "getent passwd "+strings.Join(state.userNames(), " ")+` || [ "$?" -eq 2 ]`)
 	assert.Contains(t, runtime.commands, "getent group "+strings.Join(state.userNames(), " ")+` || [ "$?" -eq 2 ]`)
 	assert.Empty(t, state.Observations[len(state.Observations)-1].Error)
+}
+
+func TestAccountingPrivacyCleanupWaitsForAllWorkers(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		state string
+		reads int
+	}{
+		{"drained worker", "IDLE+DRAIN+NOT_RESPONDING", 3},
+		{"healthy suspended worker", "IDLE+POWERED_DOWN", 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			const readyWorker = "NodeName=worker-0 State=IDLE\n"
+			runtime := &privacyCleanupRuntime{ready: true, waitAttempts: 2,
+				workerSnapshots: []corev1.PodList{{Items: []corev1.Pod{privacyTestWorker(true, "worker-uid")}}},
+				slurmNodeNames:  "worker-0\nworker-1\n",
+				slurmNodes: []string{
+					readyWorker + "NodeName=worker-1 State=" + tc.state,
+					readyWorker + "NodeName=worker-1 State=" + tc.state,
+					readyWorker + "NodeName=worker-1 State=IDLE",
+				}}
+			s := newPrivacyCleanupTest(runtime)
+			s.worker.Name = "worker-0"
+			require.NoError(t, s.restoreAccountingPrivacy(t.Context()))
+			assert.Nil(t, s.privacy)
+			assert.Equal(t, tc.reads, runtime.slurmReads)
+			commands := strings.Join(runtime.commands, "\n")
+			assert.Greater(t, strings.Index(commands, "scontrol show node "), strings.LastIndex(commands, "getent group "))
+		})
+	}
+}
+
+func TestAccountingPrivacyCleanupReportsUnrecoveredWorker(t *testing.T) {
+	runtime := &privacyCleanupRuntime{ready: true, waitAttempts: 2,
+		workerSnapshots: []corev1.PodList{{Items: []corev1.Pod{privacyTestWorker(true, "worker-uid")}}},
+		slurmNodes:      []string{"NodeName=worker-0 State=IDLE+DRAIN Reason=soperator rolling update"}}
+	s := newPrivacyCleanupTest(runtime)
+	s.worker.Name = "worker-0"
+	ctx := framework.WithWorkerCleanup(t.Context())
+	s.CleanupAndReset(ctx)
+	require.ErrorContains(t, framework.FinishWorkerReservation(ctx, runtime), "wait for Slurm workers to recover")
+	assert.Equal(t, 2, runtime.slurmReads)
 }
