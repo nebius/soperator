@@ -1,0 +1,12 @@
+nodesets:
+  enabled: true
+notifier:
+  enabled: true
+  values:
+    slack:
+      webhookUrl: https://example.invalid/webhook
+tailscale:
+  enabled: true
+observability:
+  ncclProfiles:
+    enabled: true

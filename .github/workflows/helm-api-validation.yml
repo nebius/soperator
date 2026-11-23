@@ -1,0 +1,39 @@
+name: Helm API Validation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/helm-api-validation.yml"
+      - "helm/soperator-fluxcd/**"
+      - "helm/soperator-fluxcd-bootstrap/**"
+      - "test/helmapi/**"
+      - "Makefile"
+      - "go.mod"
+      - "go.sum"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Apply Flux chart manifests
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install pinned Helm
+        shell: bash
+        run: make install-helm
+
+      - name: Validate the Flux charts against Kubernetes
+        shell: bash
+        run: make test-helm-api
