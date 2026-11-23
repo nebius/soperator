@@ -5,20 +5,12 @@
 ```bash
 # Install tools
 make install-kind
-make install-flux
 
-# Create 5-node cluster (automatically switches kubectl context)
+# Create a cluster and switch kubectl to its context
 make kind-create
 
 # Verify cluster
 kubectl get nodes
-
-# Deploy soperator via Flux CD
-make deploy-flux
-
-# Check deployment status
-flux get all -n flux-system
-kubectl get pods -n soperator-system
 ```
 
 ## Example 2: Custom Configuration
@@ -56,24 +48,12 @@ helm install soperator ./helm/soperator \
   -n soperator-system --create-namespace
 ```
 
-## Example 4: CI/CD Pipeline
+## Example 4 — Chart and Go Validation
 
 ```bash
-#!/bin/bash
-set -e
-
-# Setup
-make kind-create KIND_NODES=3
-
-# Install CRDs
-make install
-
-# Run tests
-make test
 make helmtest
-
-# Cleanup
-make kind-delete
+make test-helm-api
+make test
 ```
 
 ## Example 5: Flux CD Local Development
@@ -81,10 +61,11 @@ make kind-delete
 ```bash
 # Create cluster
 make kind-create
+```
 
-# Deploy via Flux CD
-make deploy-flux
+Follow the [Flux bootstrap instructions](../fluxcd/README.md#bootstrap-with-helm-chart) with values for your local cluster. After bootstrapping, inspect the deployment and reconcile any configuration changes.
 
+```bash
 # Monitor Flux reconciliation
 flux logs --follow
 
@@ -99,9 +80,6 @@ flux reconcile helmrelease soperator-fluxcd -n flux-system
 
 # Check soperator pods
 kubectl get pods -n soperator-system
-
-# Undeploy when done
-make undeploy-flux
 ```
 
 ## Example 6: Flux CD with GitRepository (Advanced)
@@ -119,10 +97,9 @@ make kind-create
   --repository=<your-repo> \
   --path=clusters/dev \
   --personal
-
-# Deploy soperator via Flux
-kubectl apply -f helm/soperator-fluxcd/
 ```
+
+Follow the [Flux bootstrap instructions](../fluxcd/README.md#bootstrap-with-helm-chart) to deploy Soperator on this cluster.
 
 ## Example 7: Multi-node Worker Testing
 
