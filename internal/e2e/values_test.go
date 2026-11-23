@@ -156,6 +156,22 @@ func TestOverrideTestValuesUsesTestingActiveChecksScope(t *testing.T) {
 	assert.Equal(t, "testing", result["active_checks_scope"])
 }
 
+func TestOverrideTestValuesDefaultSSSD(t *testing.T) {
+	for _, profile := range []Profile{
+		validProfile(),
+		{NodeSets: []NodeSetDef{{Name: "cpu", Platform: "cpu-d3", Preset: "16vcpu-64gb", Size: 1}}},
+	} {
+		vars := overrideTestValues(map[string]interface{}{
+			"slurm_sssd_enabled":                     false,
+			"slurm_sssd_conf_secret_ref_name":        "external-config",
+			"slurm_sssd_ldap_ca_config_map_ref_name": "external-ca",
+		}, Config{Profile: profile})
+		assert.Equal(t, true, vars["slurm_sssd_enabled"])
+		assert.Equal(t, "", vars["slurm_sssd_conf_secret_ref_name"])
+		assert.Equal(t, "", vars["slurm_sssd_ldap_ca_config_map_ref_name"])
+	}
+}
+
 func TestOverrideTestValuesEnablesTailscale(t *testing.T) {
 	result := overrideTestValues(map[string]interface{}{"tailscale_enabled": false}, Config{})
 	assert.Equal(t, true, result["tailscale_enabled"])
