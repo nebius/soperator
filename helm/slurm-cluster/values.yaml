@@ -254,7 +254,7 @@ plugStackConfig:
   ncclInspectorPreConf:
     required: false
     enabled: false
-    profilerPlugin: "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so"
+    # profilerPlugin is left unset: the plugin picks /usr/lib/<arch>-linux-gnu/libnccl-profiler-inspector.so per worker.
     dumpDir: "/opt/soperator-outputs/shared/nccl_profiles/%j/%s"
     dumpVerbose: false
     dumpThreadIntervalMicroseconds: 1000000

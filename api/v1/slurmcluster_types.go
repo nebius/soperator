@@ -388,7 +388,7 @@ type PlugStackConfig struct {
 	// NcclInspectorPreConf represents the NCCL Inspector Pre-Configuration SPANK plugin configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ required: false, enabled: false, profilerPlugin: "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so", dumpDir: "/opt/soperator-outputs/shared/nccl_profiles/%j/%s", dumpVerbose: false, dumpThreadIntervalMicroseconds: 1000000 }
+	// +kubebuilder:default={ required: false, enabled: false, dumpDir: "/opt/soperator-outputs/shared/nccl_profiles/%j/%s", dumpVerbose: false, dumpThreadIntervalMicroseconds: 1000000 }
 	NcclInspectorPreConf PluginConfigNcclInspectorPreConf `json:"ncclInspectorPreConf,omitempty"`
 
 	// PluginConfigCustom represents a configuration of custom SPANK plugins.
@@ -503,8 +503,10 @@ type PluginConfigNcclInspectorPreConf struct {
 
 	// ProfilerPlugin defines a file path to NCCL Inspector's SO file.
 	//
+	// If empty, the plugin picks the path for the worker's architecture
+	// (/usr/lib/<arch>-linux-gnu/libnccl-profiler-inspector.so).
+	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so"
 	ProfilerPlugin string `json:"profilerPlugin,omitempty"`
 
 	// DumpDir defines a directory path where NCCL profiles will be dumped into.

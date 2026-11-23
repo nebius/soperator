@@ -648,7 +648,7 @@ func TestRenderPlugstack(t *testing.T) {
 			},
 		}).Render()
 		assert.NotEmpty(t, result)
-		assert.Contains(t, result, "optional spank_nccl_inspector_preconf.so enabled=0 profiler-plugin=/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so dump-dir=/opt/soperator-outputs/shared/nccl_profiles/%j/%s dump-verbose=0 dump-thread-interval-microseconds=1000000")
+		assert.Contains(t, result, "optional spank_nccl_inspector_preconf.so enabled=0 dump-dir=/opt/soperator-outputs/shared/nccl_profiles/%j/%s dump-verbose=0 dump-thread-interval-microseconds=1000000")
 	})
 
 	t.Run("NCCL Inspector Pre-Configuration options", func(t *testing.T) {
