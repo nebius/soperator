@@ -672,7 +672,8 @@ observability:
     driftDetection:
       mode: warn
   ncclProfiles:
-    enabled: false
+    # Ships NCCL Inspector dumps to VictoriaMetrics; only jobs that set NCCL_INSPECTOR_ENABLE=1 produce them.
+    enabled: true
     interval: 5m
     timeout: 5m
     version:
@@ -696,10 +697,11 @@ observability:
     values:
       # or nodeLocal
       mode: shared
+      # Idle unless jobs opt in to NCCL Inspector; no CPU limit, so it bursts when they do.
       resources:
         requests:
           memory: 200Mi
-          cpu: 500m
+          cpu: 100m
         limits:
           memory: 1Gi
       useGoMemLimit: true
@@ -720,6 +722,7 @@ observability:
         enabled: true
         interval: 30s
         scrapeTimeout: 10s
+      # Must match the SPANK plugin dump dir (plugStackConfig.ncclInspectorPreConf.dumpDir) seen from /mnt/jail.
       dumpDir: /mnt/jail/opt/soperator-outputs/shared/nccl_profiles
       pollInterval: 30s
       exportLabels:

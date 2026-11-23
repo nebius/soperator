@@ -160,6 +160,14 @@ tests:
           path: spec.plugStackConfig.ncclDebug.outputDirectory
           value: "/opt/soperator-outputs/local/nccl_logs"
       - equal:
+          path: spec.plugStackConfig.ncclInspectorPreConf.required
+          value: false
+      - equal:
+          path: spec.plugStackConfig.ncclInspectorPreConf.enabled
+          value: true
+      - notExists:
+          path: spec.plugStackConfig.ncclInspectorPreConf.profilerPlugin
+      - equal:
           path: spec.plugStackConfig.customPlugins
           value: []
 
