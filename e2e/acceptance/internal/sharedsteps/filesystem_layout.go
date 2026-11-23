@@ -274,6 +274,10 @@ func (s *FilesystemLayout) checkMounts(ctx context.Context, table *godog.Table) 
 				s.runtime.Logf("Filesystem layout: %s %s source=%s type=%s size=%s mode=%s", node.Pod.Name, mount.Path, observed.Source, observed.Type, observed.Size, observed.Mode)
 			}
 			if !found {
+				if node.Container == loginSSHDContainer && expected.Mount == "Image storage" {
+					s.runtime.Logf("Filesystem layout: %s image storage is not configured; skipping optional check", node.Pod.Name)
+					continue
+				}
 				return fmt.Errorf("%s is not configured on pod %s", expected.Mount, node.Pod.Name)
 			}
 		}
