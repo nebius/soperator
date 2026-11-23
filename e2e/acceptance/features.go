@@ -56,6 +56,7 @@ func FeaturePaths() []string {
 		"features/nccl.feature",
 		"features/nccl_debug.feature",
 		"features/system_settings.feature",
+		"features/nvidia_libraries.feature",
 		"features/task_prolog_env.feature",
 		"features/soperator_utils.feature",
 		"features/filesystem_layout.feature",

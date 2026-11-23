@@ -77,3 +77,49 @@ func gpuWorkerAvailability(snapshot framework.WorkerSnapshot, count int) string 
 	sort.Strings(details)
 	return framework.WorkerAvailability(allWorkers, configured, count, "GPU workers", framework.WorkerInfo.IsIdle) + "; " + strings.Join(details, "; ")
 }
+
+// pickIdleGPUWorkersFromEveryNodeSet takes one idle worker from every GPU
+// NodeSet with configured replicas and tops the selection up to minTotal from
+// the remaining idle GPU workers. A GPU NodeSet without an idle worker fails
+// the selection; a cluster configured with fewer than minTotal GPU workers
+// reports insufficient workers.
+func pickIdleGPUWorkersFromEveryNodeSet(snapshot framework.WorkerSnapshot, minTotal int) ([]framework.WorkerInfo, error) {
+	if minTotal < 1 {
+		return nil, fmt.Errorf("select idle GPU workers: invalid minimum %d", minTotal)
+	}
+	var configured int
+	var nodeSets []framework.NodeSetInfo
+	for _, nodeSet := range snapshot.NodeSets {
+		if nodeSet.HasGPU && nodeSet.Replicas > 0 {
+			configured += nodeSet.Replicas
+			nodeSets = append(nodeSets, nodeSet)
+		}
+	}
+	if configured < minTotal {
+		return nil, &framework.InsufficientWorkersError{Label: "GPU workers", Found: configured, Need: minTotal}
+	}
+	var selected, spare []framework.WorkerInfo
+	for _, nodeSet := range nodeSets {
+		pool := snapshot.WorkersByNodeSet[nodeSet.Name]
+		workers, err := framework.PickWorkers(pool, nodeSet.Replicas, 1, "GPU workers", framework.WorkerInfo.IsIdle)
+		if err != nil {
+			return nil, fmt.Errorf("select an idle GPU worker in NodeSet %s: %w", nodeSet.Name, err)
+		}
+		selected = append(selected, workers[0])
+		for _, worker := range pool {
+			if worker.Name != workers[0].Name && worker.IsIdle() {
+				spare = append(spare, worker)
+			}
+		}
+	}
+	for _, index := range rand.Perm(len(spare)) {
+		if len(selected) >= minTotal {
+			break
+		}
+		selected = append(selected, spare[index])
+	}
+	if len(selected) < minTotal {
+		return nil, fmt.Errorf("select %d idle GPU workers: %s", minTotal, gpuWorkerAvailability(snapshot, minTotal))
+	}
+	return selected, nil
+}
