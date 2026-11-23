@@ -30,95 +30,6 @@ func TestSharedFeaturesParseWithGherkin(t *testing.T) {
 	}
 }
 
-// sharedScenariosTagged returns the names of default-suite scenarios carrying the tag.
-func sharedScenariosTagged(t *testing.T, tag string) []string {
-	t.Helper()
-
-	var names []string
-	for _, path := range FeaturePaths() {
-		content, err := fs.ReadFile(acceptanceFeatures, path)
-		require.NoError(t, err)
-		assert.NotContains(t, string(content), "@essential")
-		doc, err := gherkin.ParseGherkinDocument(strings.NewReader(string(content)), (&messages.Incrementing{}).NewId)
-		require.NoError(t, err)
-		for _, child := range doc.Feature.Children {
-			if child.Scenario == nil {
-				continue
-			}
-			for _, scenarioTag := range child.Scenario.Tags {
-				if scenarioTag.Name == tag {
-					names = append(names, child.Scenario.Name)
-				}
-			}
-		}
-	}
-	return names
-}
-
-func TestSharedHeavyScenarios(t *testing.T) {
-	assert.ElementsMatch(t, []string{
-		"Accounting privacy preserves access to a Linux user's own records",
-		"GPU ActiveCheck succeeds on all GPU workers",
-		"nvidia_libraries drains a GPU worker whose <library> is <failure> and recovers after restoration",
-		"Docker containers can access GPUs",
-		"NVIDIA bug report is collected from a worker",
-		"Enroot containers can access GPUs",
-		"A worker restarts with user content on image storage and containers keep working for other users",
-		"Login pods scale up without automatic pod scale-down",
-		"A login user exceeding the memory limit is OOM-killed without affecting other users or login services",
-		"Job memory exhaustion leaves neighboring workloads healthy",
-		"Manage jail dry-run detects drift without modifying the jail",
-		"A worker template update preserves running jobs",
-		"A maintenance event replaces the selected worker node",
-		"A maintenance event replaces a CPU worker node when CPU and GPU workers exist",
-		"A failed GPU health check replaces the worker node",
-		"A GPU worker recovers when maintenance arrives during health-check draining",
-		"A GPU worker recovers when maintenance arrives after health-check draining",
-		"An MK8s node group update preserves running jobs",
-		"A worker update preserves maintenance drains before and during handoff",
-		"Non-responding kubelet recreates a Kubernetes node and recovers the worker",
-		"A manually powered down static worker returns to service",
-		"A burst of batch jobs is accepted and drained within the budget",
-		"Workers recover after their VMs are stopped and started",
-	}, sharedScenariosTagged(t, "@heavy"))
-}
-
-func TestSharedSequentialScenarios(t *testing.T) {
-	assert.ElementsMatch(t, []string{
-		"Periodic HealthCheckProgram passes GPU health checks on all GPU workers",
-		"The provisioned cluster is ready for acceptance tests",
-		"A custom Slurm setting is applied and restored",
-		"Installing and uninstalling cowsay preserves GPU tooling",
-		"Installing and uninstalling nvitop preserves GPU tooling",
-		"Docker containers can run over login SSH",
-		"Docker containers can run over SSH on <worker_type> workers",
-		"Enroot containers can run over SSH",
-		"Workers expose local NVMe scratch to jobs",
-		"Login pods scale up without automatic pod scale-down",
-		"A login user exceeding the memory limit is OOM-killed without affecting other users or login services",
-		"Job memory exhaustion leaves neighboring workloads healthy",
-		"A burst of batch jobs is accepted and drained within the budget",
-		"Workers recover after their VMs are stopped and started",
-		"A static NodeSet can transition to ephemeral mode and back",
-		"A manually powered down static worker returns to service",
-		"Tailscale login sidecars wait for authentication and persist their state",
-		"Partitions and workers use their configured topologies",
-		"Every configured topology can schedule a job",
-		"A job assigns task ranks in rendered block order",
-		"Blocks are sorted according to IB topology labels",
-		"A block topology schedules jobs after its base size changes",
-		"A switch limit rejects a cross-leaf allocation",
-		"scontrol topology and SLURM_TOPOLOGY_ADDR agree across workers",
-		"A worker template update preserves running jobs",
-		"An MK8s node group update preserves running jobs",
-		"A worker update preserves maintenance drains before and during handoff",
-		"A failed GPU health check replaces the worker node",
-		"A GPU worker recovers when maintenance arrives during health-check draining",
-		"A GPU worker recovers when maintenance arrives after health-check draining",
-		"GPU ActiveCheck succeeds on all GPU workers",
-	}, sharedScenariosTagged(t, "@sequential"))
-}
-
 func TestSequentialTagsHaveScenarioLevelReasons(t *testing.T) {
 	paths, err := fs.Glob(acceptanceFeatures, "features/*.feature")
 	require.NoError(t, err)
@@ -163,16 +74,6 @@ func TestSequentialTagsHaveScenarioLevelReasons(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Manual scenarios never run unless named with --scenario; keep the list short and
-// every entry justified by a comment next to the tag in its feature file.
-func TestSharedManualScenarios(t *testing.T) {
-	assert.ElementsMatch(t, []string{
-		"A failed GPU health check replaces the worker node",
-		"A GPU worker recovers when maintenance arrives during health-check draining",
-		"A GPU worker recovers when maintenance arrives after health-check draining",
-	}, sharedScenariosTagged(t, "@manual"))
 }
 
 func TestSharedFeaturesHaveValidVersionTags(t *testing.T) {

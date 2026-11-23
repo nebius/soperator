@@ -36,10 +36,10 @@ Feature: Docker containers
 
   @soperator_version_>=5.0.0
   Scenario Outline: Docker container lifecycle on <worker_type> workers uses local storage and the Slurm job cgroup
-    Given a long-running Docker container job is submitted on two <worker_type> workers
+    Given a long-running Docker container job with several tasks per worker is launched directly from the login node on two <worker_type> workers
     When the Docker container job is running
     Then Docker image and runtime storage is populated on a worker
-    And a Docker container from the job uses the Slurm job cgroup
+    And every Docker container from the job uses the Slurm job cgroup
     And Docker containers from the job are running on selected workers
     When the Docker container job is cancelled
     And Docker containers from the job are stopped explicitly

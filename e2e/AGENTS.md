@@ -115,8 +115,7 @@ again.
   `/e2e-full`, and always included in periodic runs. If a long scenario's
   importance is unclear, explicitly ask the user whether to add `@heavy` and
   explain its default manual exclusion, manual opt-in, and periodic inclusion.
-  Classify heavy independently of unstable and version constraints. Update
-  the expectations in `acceptance/features_test.go` when changing membership.
+  Classify heavy independently of unstable and version constraints.
 - Decide skip versus failure explicitly for every prerequisite. Return
   `godog.ErrSkip` only when a valid target cluster does not provide an optional
   prerequisite, such as GPU capacity or a particular topology. Fail when the
@@ -145,6 +144,9 @@ The shared feature suite has five tag forms that affect execution:
 - optional `@manual`;
 - optional scenario-level `@sequential`.
 
+Keep tag membership in feature files. Tests should validate tag behavior and
+policy without duplicating scenario names in hardcoded inventories.
+
 The standalone runner executes `@sequential` exclusions first, then untagged
 scenarios in a separate concurrency-capable suite. Both currently run at
 concurrency 1, with native reservation enforcement opt-in while scenarios are
@@ -168,8 +170,8 @@ above its tag line, naming the conflicting resource or assertion. For example:
 ```
 
 Keep the reason accurate and remove the tag and comment when the conflict is
-resolved. Outline examples share their scenario's decision. Update the
-sequential inventory and feature-policy tests when membership changes.
+resolved. Outline examples share their scenario's decision. Run the
+feature-policy and concurrent-suite tests when membership changes.
 
 Design worker workloads for native reservation scopes. Acquire the complete
 worker set through `WorkerSelector.Acquire` or `Reserve` before recording
@@ -232,8 +234,7 @@ classification stays correct once `@manual` is removed; running it then needs
 `--run-heavy`, `run_heavy=true` or `/e2e-full` in addition to the selector,
 exactly as for any other heavy scenario. Add a comment
 next to the tag that explains the side effect and states what must happen
-before the tag can be removed, and update `TestSharedManualScenarios` in
-`acceptance/features_test.go`.
+before the tag can be removed.
 
 ## Step implementation
 

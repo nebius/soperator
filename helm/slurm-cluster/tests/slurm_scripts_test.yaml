@@ -86,6 +86,12 @@ tests:
           path: data["task_prolog.sh"]
           pattern: "printf 'export %s=%s\\\\n' \"\\$env_var\" \"\\$env_value\""
 
+  - it: should export the Docker proxy socket to every task, not only the first one on a node
+    asserts:
+      - matchRegex:
+          path: data["task_prolog.sh"]
+          pattern: 'echo export "DOCKER_HOST=unix:///var/run/soperator-docker\.sock"\n\nif \[ "\$\{SLURM_LOCALID\}" = "0" \]; then\n    export CHECKS_OUTPUTS_BASE_DIR'
+
   - it: should reject task prolog env with a custom task prolog script
     set:
       slurmScripts:
