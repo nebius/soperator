@@ -697,10 +697,11 @@ observability:
     values:
       # or nodeLocal
       mode: shared
+      # Idle unless jobs opt in to NCCL Inspector; no CPU limit, so it bursts when they do.
       resources:
         requests:
           memory: 200Mi
-          cpu: 500m
+          cpu: 100m
         limits:
           memory: 1Gi
       useGoMemLimit: true
