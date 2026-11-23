@@ -192,18 +192,25 @@ func TestFilesystemLayoutChecksGherkinExpectationsOnApplicableNodes(t *testing.T
 	for _, tc := range []struct {
 		name, homeType, homeMode, wantError string
 		missingLoginImage                   bool
+		brokenLoginImage                    bool
+		missingWorkerImage                  bool
 		missingWorkerScratch                bool
 	}{
 		{name: "both nodes and worker-only mounts", homeType: "nfs4", homeMode: "2500"},
 		{name: "mode comes from Gherkin", homeType: "nfs4", homeMode: "2755", wantError: "expected type=nfs4 mode=2755"},
 		{name: "type comes from Gherkin", homeType: "ext4", homeMode: "2500", wantError: "expected type=ext4"},
-		{name: "login image storage is required", homeType: "nfs4", homeMode: "2500", missingLoginImage: true, wantError: "Image storage is not configured on pod login-0"},
+		{name: "unconfigured login image storage is optional", homeType: "nfs4", homeMode: "2500", missingLoginImage: true},
+		{name: "broken configured login image storage fails", homeType: "nfs4", homeMode: "2500", brokenLoginImage: true, wantError: "probe mount /mnt/jail/images on login-0"},
+		{name: "missing worker image storage fails", homeType: "nfs4", homeMode: "2500", missingWorkerImage: true, wantError: "Image storage is not configured on pod worker-0"},
 		{name: "missing worker storage fails", homeType: "nfs4", homeMode: "2500", missingWorkerScratch: true, wantError: "Scratch is not configured on pod worker-0"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls []string
 			runtime := filesystemLayoutRuntime{kubectl: framework.NewArgsScope(func(_ context.Context, args ...string) (string, error) {
 				command := args[len(args)-1]
+				if tc.brokenLoginImage && args[3] == "login-0" && strings.Contains(command, framework.ShellQuote("/mnt/jail/images")) {
+					return "", errors.New("mount not found")
+				}
 				probes := map[string]struct{ fsType, mode string }{
 					"/mnt/jail/users":             {"nfs4", "2500"},
 					"/mnt/jail/images":            {"ext4", "755"},
@@ -228,6 +235,9 @@ func TestFilesystemLayoutChecksGherkinExpectationsOnApplicableNodes(t *testing.T
 			loginMounts, err := filesystemLayoutMounts(loginConfig, false)
 			require.NoError(t, err)
 			workerConfig := config
+			if tc.missingWorkerImage {
+				workerConfig = append(append([]kubeobjects.NodeVolumeMount(nil), config[:2]...), config[3:]...)
+			}
 			if tc.missingWorkerScratch {
 				workerConfig = config[:3]
 			}
@@ -252,12 +262,18 @@ func TestFilesystemLayoutChecksGherkinExpectationsOnApplicableNodes(t *testing.T
 				return
 			}
 			require.NoError(t, err)
-			assert.ElementsMatch(t, []string{
-				"login-0:/mnt/jail/users", "login-0:/mnt/jail/images", "login-0:/mnt/jail/test-tmp",
+			var wantCalls = []string{
+				"login-0:/mnt/jail/users", "login-0:/mnt/jail/test-tmp",
 				"worker-0:/mnt/jail/users", "worker-0:/mnt/jail/images", "worker-0:/mnt/jail/scratch",
 				"worker-0:/mnt/jail/mnt/local-nvme", "worker-0:/mnt/jail/run/nvidia/driver", "worker-0:/mnt/jail/test-tmp",
-			}, calls)
-			assert.Len(t, s.nodes[0].Mounts, 3)
+			}
+			wantLoginMounts := 2
+			if !tc.missingLoginImage {
+				wantCalls = append(wantCalls, "login-0:/mnt/jail/images")
+				wantLoginMounts++
+			}
+			assert.ElementsMatch(t, wantCalls, calls)
+			assert.Len(t, s.nodes[0].Mounts, wantLoginMounts)
 			assert.Len(t, s.nodes[1].Mounts, 6)
 			assert.Equal(t, json.Number("1000"), s.nodes[0].Mounts[0].Observed.Size)
 		})

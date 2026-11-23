@@ -3,6 +3,7 @@ Feature: Filesystem layout
   Scenario: Login and GPU worker expose the configured filesystem layout
     Given a GPU worker is available for filesystem checks
     When the filesystem layout is inspected on one login node and one GPU worker
+    # Image storage is required on workers and checked on login only when configured.
     Then the following mounts have their expected filesystem types and permissions:
       | Mount             | Path               | Filesystem | Mode |
       | Jail root         | /                  | virtiofs   | 755  |
