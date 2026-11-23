@@ -57,6 +57,9 @@ func readTFVars(filename string) (map[string]interface{}, error) {
 func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]interface{} {
 	tfVars["active_checks_scope"] = "testing"
 	tfVars["tailscale_enabled"] = true
+	tfVars["slurm_sssd_enabled"] = true
+	tfVars["slurm_sssd_conf_secret_ref_name"] = ""
+	tfVars["slurm_sssd_ldap_ca_config_map_ref_name"] = ""
 	tfVars["slurm_login_image_disk"] = map[string]interface{}{
 		"enabled": true,
 		"spec": map[string]interface{}{
