@@ -2,7 +2,7 @@
 
 Soperator delays login pod updates to give users time to prepare. It replaces outdated pods one at a time,
 waiting for each replacement to become Ready at the latest revision before moving on. A newer template change
-continues the same replacement without another notice period. Administrators can request an earlier restart from the login host.
+continues the same replacement without another notice period. Administrators can request an earlier restart from the login node.
 Outdated pods that are not Ready are repaired immediately, ahead of healthy pods, without waiting for notice or cron.
 Replacing a pod ends its SSH connections, tmux sessions and other processes.
 
@@ -36,9 +36,13 @@ replacements. Set the global retry interval with `--requeue-after-login-update` 
 
 ## How a login update works
 
-Run `sudo soperator-login-restart` on a login host to request an early restart and confirm interactively.
-Use `--status` to inspect its restart time, or `--yes` to submit without prompting. An early request bypasses
-the notice and schedule while preserving availability checks.
+Run `sudo soperator-login-restart` on a login node to request an early restart and confirm interactively.
+Use `--status` to inspect whether the node is outdated and its restart time, or `--yes` to submit without prompting.
+An early request bypasses the notice and schedule while preserving availability checks.
+
+Interactive Bash sessions in SSH and IDE terminals warn about scheduled restarts.
+Already-open sessions warn at the next prompt; noninteractive commands stay silent.
+Displayed times use the login node's local timezone and omit fractional seconds.
 
 ```mermaid
 sequenceDiagram
@@ -68,3 +72,32 @@ sequenceDiagram
     L-->>O: Replacement is Ready
     Note over O,T: Continue with the next outdated pod
 ```
+
+## Other shells
+
+Automatic warnings are currently configured only for Bash. The
+[Bash adapter](../ansible/roles/soperator_scripts/files/login_warning_profile.sh) is installed at
+`/etc/profile.d/soperator-login-warning.sh`. Login Bash shells load it through `/etc/profile`; the loader in
+`/etc/bash.bashrc` also covers non-login interactive terminals, including IDE terminals.
+
+To integrate another shell:
+
+1. Add an adapter to that shell's startup configuration in the shared jail. No image rebuild is needed.
+2. Register its native before-prompt hook only for interactive sessions where `/run/soperator-login-state` exists.
+3. Call the shared checker from that hook, preserving existing hooks and the previous command's exit status.
+
+For shells with compatible syntax, follow the Bash adapter: source `/usr/lib/soperator/login_warning.sh --source`
+once during startup, then call `_soperator_warn_outdated_login "$?"` from the native prompt hook, passing the
+previous command's exit status. The checker remembers the schedule inside the shell; no separate marker is needed.
+
+Shells that cannot source the checker can execute it with `--check` instead. Start with an empty schedule
+marker, then save stdout and pass that value back at the next prompt. For example, in shell-style pseudocode:
+
+```sh
+previous_schedule=""
+# Before each prompt:
+previous_schedule=$(/usr/lib/soperator/login_warning.sh --check "$previous_schedule")
+```
+
+Keep this variable unexported. Warnings go to stderr, which should remain connected to the terminal.
+Open a new terminal, or source the adapter once in an existing terminal, to activate the integration.
