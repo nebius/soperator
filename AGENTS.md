@@ -26,7 +26,7 @@ Kubernetes operator for Slurm, built with kubebuilder. Manages Slurm cluster lif
 - `config/` — raw K8s manifests (CRDs, RBAC, webhooks, cert-manager, samples)
 - `docs/` — documentation (architecture, features, active-checks, local-development, release-flow, etc.)
 - `.github/workflows/` — CI: e2e_test, one_job, nightly_build, github_release, etc.
-- `test/integration/` — Helm deployment integration tests
+- `test/helmapi/` — Kubernetes API validation for the Flux Helm charts
 - `images/` — Dockerfiles for component images
 - `ansible/` — operational playbooks
 - `fluxcd/` — FluxCD configuration. This is legacy configuration and will be removed in the future. Please ignore it when making changes.

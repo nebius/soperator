@@ -72,8 +72,7 @@ make kind-create KIND_CLUSTER_NAME=my-cluster KIND_NODES=5
 | `make kind-list` | List all kind clusters |
 | `make kind-restart` | Restart cluster (delete + create) |
 | `make kind-status` | Check kind cluster status and deployments |
-| `make deploy-flux` | Deploy soperator via Flux CD |
-| `make undeploy-flux` | Remove Flux CD configuration |
+| `make test-helm-api` | Validate Flux chart manifests against an isolated Kubernetes API server |
 | `make jail-shell` | Open interactive shell in jail environment via login pod |
 
 > **Note:** The `kind-create` command automatically switches your kubectl context to the newly created cluster, so you can immediately start using `kubectl` commands without manually switching contexts.
@@ -82,19 +81,9 @@ make kind-create KIND_CLUSTER_NAME=my-cluster KIND_NODES=5
 
 ### Deploy Operator
 
-Deploy soperator to the kind cluster using Flux CD:
+For a Flux-managed deployment, follow the [Flux bootstrap instructions](../fluxcd/README.md#bootstrap-with-helm-chart) and supply values for your local cluster.
 
-```bash
-# Deploy via Flux CD (recommended for local development)
-make deploy-flux
-
-# This will:
-# 1. Install Flux CD
-# 2. Deploy soperator-fluxcd configuration
-# 3. Set up minimal local environment
-```
-
-Alternative: Deploy directly without Flux:
+To deploy directly, install the CRDs and start the operator in the current kubectl context.
 
 ```bash
 # Install CRDs
