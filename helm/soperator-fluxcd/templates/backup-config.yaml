@@ -22,8 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ default .Chart.AppVersion .Values.backup.config.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.backup.config "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.backup.config.install | nindent 4 }}
   interval: {{ default .Values.backup.interval .Values.backup.config.interval }}
@@ -33,7 +32,7 @@ spec:
   upgrade:
     {{- toYaml .Values.backup.config.upgrade | nindent 4 }}
   values:
-  {{- if .Values.backup.config.values }}
+  {{- if ne .Values.backup.config.values nil }}
   {{- toYaml .Values.backup.config.values | nindent 4 }}
   {{- end }}
 {{- end }}

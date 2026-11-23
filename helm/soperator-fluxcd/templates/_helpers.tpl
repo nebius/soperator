@@ -15,6 +15,36 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 
 {{/*
+Resolve dependency names in the chart context, preserving the rest of each reference.
+*/}}
+{{- define "soperator-fluxcd.dependsOn" -}}
+{{- if hasKey .component "dependsOn" -}}
+  {{- $dependencies := .component.dependsOn -}}
+  {{- if and (ne $dependencies nil) (not (kindIs "slice" $dependencies)) -}}
+    {{- fail "dependsOn must be a list or null" -}}
+  {{- end -}}
+  {{- $references := list -}}
+  {{- range $dependencies -}}
+    {{- $reference := deepCopy . -}}
+    {{- $_ := set $reference "name" (tpl .name $.root) -}}
+    {{- $references = append $references $reference -}}
+  {{- end -}}
+  {{- toYaml (dict "dependsOn" $references) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Keep existing overrides effective until their callers can switch to values.
+*/}}
+{{- define "soperator-fluxcd.valuesWithLegacyOverride" -}}
+{{- if ne .values nil -}}
+  {{- toYaml .values -}}
+{{- else if .overrideValues -}}
+  {{- toYaml .overrideValues -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "soperator-fluxcd.chart" -}}

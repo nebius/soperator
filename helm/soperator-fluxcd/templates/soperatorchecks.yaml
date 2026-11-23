@@ -22,8 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.soperator.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.soperator.soperatorChecks "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.soperator.soperatorChecks.install | nindent 4 }}
   upgrade:
@@ -32,7 +31,7 @@ spec:
   timeout: {{ .Values.soperator.soperatorChecks.timeout }}
   releaseName: {{ .Values.soperator.soperatorChecks.releaseName }}
   targetNamespace: {{ .Values.soperator.namespace }}
-  {{- if .Values.soperator.soperatorChecks.values }}
+  {{- if ne .Values.soperator.soperatorChecks.values nil }}
   values:
     {{- toYaml .Values.soperator.soperatorChecks.values | nindent 4 }}
   {{- end }}

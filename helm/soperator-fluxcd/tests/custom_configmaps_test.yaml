@@ -115,7 +115,7 @@ tests:
             optional: true
             valuesKey: values.yaml
 
-  - it: should merge overrideValues when provided
+  - it: should keep using legacy overrideValues when values are absent
     set:
       customConfigmaps:
         enabled: true

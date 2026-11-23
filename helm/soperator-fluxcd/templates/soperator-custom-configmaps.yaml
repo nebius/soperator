@@ -22,8 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.customConfigmaps.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.customConfigmaps "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.customConfigmaps.install | nindent 4 }}
   upgrade:
@@ -33,8 +32,8 @@ spec:
   releaseName: {{ .Values.customConfigmaps.releaseName }}
   targetNamespace: {{ .Values.customConfigmaps.namespace }}
   values:
-  {{- if .Values.customConfigmaps.overrideValues }}
-    {{- toYaml .Values.customConfigmaps.overrideValues | nindent 4 }}
+  {{- with include "soperator-fluxcd.valuesWithLegacyOverride" .Values.customConfigmaps }}
+    {{- . | nindent 4 }}
   {{- end }}
   valuesFrom:
   - kind: ConfigMap

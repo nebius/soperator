@@ -22,8 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.storageClasses.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.storageClasses "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.storageClasses.install | nindent 4 }}
   upgrade:
@@ -33,7 +32,7 @@ spec:
   releaseName: {{ .Values.storageClasses.releaseName }}
   targetNamespace: {{ .Values.storageClasses.namespace }}
   values:
-  {{- if .Values.storageClasses.values }}
+  {{- if ne .Values.storageClasses.values nil }}
     {{- toYaml .Values.storageClasses.values | nindent 4 }}
   {{- end }}
 {{- end }}

@@ -1,3 +1,18 @@
+backup:
+  config:
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+        namespace: flux-all-enabled
+    values:
+      bucket:
+        name: flux-api-validation
+storageClasses:
+  dependsOn: []
+  values:
+    allowVolumeExpansion: false
+mariadbOperator:
+  crds:
+    dependsOn: null
 nodesets:
   enabled: true
 notifier:
