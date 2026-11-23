@@ -75,12 +75,15 @@ func (s *SlurmConfigUpdates) CleanupAndReset(ctx context.Context) {
 }
 
 func (s *SlurmConfigUpdates) recordActiveWorkerStartTimes(ctx context.Context) error {
-	startTimes, err := s.slurm.ActiveWorkerStartTimes(ctx)
-	if err != nil {
-		return err
-	}
-	s.workerStartTimes = startTimes
-	return nil
+	return s.runtime.WaitFor(ctx, "active workers available for Slurm reconfiguration",
+		slurmConfigUpdateTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
+			startTimes, err := s.slurm.ActiveWorkerStartTimes(waitCtx)
+			if err != nil {
+				return false, err
+			}
+			s.workerStartTimes = startTimes
+			return true, nil
+		})
 }
 
 func (s *SlurmConfigUpdates) recordCurrentConfig(ctx context.Context) error {

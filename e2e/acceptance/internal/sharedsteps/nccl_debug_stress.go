@@ -334,9 +334,15 @@ func (s *NCCLDebugStress) CleanupAndReset(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, ncclDebugCleanup)
 	defer cancel()
 	for _, job := range jobs {
-		if err := s.slurm.CancelJob(ctx, job.ID, ncclDebugCleanup); err != nil {
+		if err := s.slurm.CancelJob(ctx, job.ID, 0); err != nil {
 			framework.RecordWorkerCleanupError(ctx, err)
 			s.runtime.Logf("Cleanup: cancel concurrent logging job %s: %v", job.ID, err)
+		}
+	}
+	for _, job := range jobs {
+		if err := s.slurm.WaitForJobGone(ctx, job.ID, ncclDebugCleanup); err != nil {
+			framework.RecordWorkerCleanupError(ctx, err)
+			s.runtime.Logf("Cleanup: wait for concurrent logging job %s: %v", job.ID, err)
 			continue
 		}
 		if _, err := s.runtime.WorkerPod(s.pod).Run(ctx, ncclDebugRemoveResourcesCommand(job.ID)); err != nil {
