@@ -32,6 +32,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewTailscale(info, runtime, kubectl),
 		NewObservability(kubectl),
 		NewInternalSSH(runtime, selector),
+		NewSSSD(info, runtime, slurm, kubectl, selector),
 		NewPAMSlurmAdopt(info, runtime, slurm, kubectl, selector),
 		NewPackageInstallation(runtime, selector),
 		NewGPUProfiling(runtime, slurm, selector),

@@ -64,6 +64,13 @@ type SlurmClusterSpec struct {
 type SlurmClusterNodes struct {
 	Accounting SlurmClusterAccounting `json:"accounting"`
 	Login      SlurmClusterLogin      `json:"login"`
+	Controller SSSDConfig             `json:"controller"`
+}
+
+type SSSDConfig struct {
+	SSSD                       *struct{} `json:"sssd"`
+	SSSDConfSecretRefName      string    `json:"sssdConfSecretRefName"`
+	SSSDLdapCAConfigMapRefName string    `json:"sssdLdapCAConfigMapRefName"`
 }
 
 type SlurmClusterAccounting struct {
@@ -71,6 +78,7 @@ type SlurmClusterAccounting struct {
 }
 
 type SlurmClusterLogin struct {
+	SSSDConfig
 	Size          int32           `json:"size"`
 	UserIsolation json.RawMessage `json:"userIsolation"`
 	Autoscaling   json.RawMessage `json:"autoscaling"`
@@ -169,6 +177,7 @@ type NodeSet struct {
 }
 
 type NodeSetSpec struct {
+	SSSDConfig
 	ClusterName                 string              `json:"clusterName"`
 	Replicas                    int32               `json:"replicas"`
 	EphemeralNodes              *bool               `json:"ephemeralNodes"`

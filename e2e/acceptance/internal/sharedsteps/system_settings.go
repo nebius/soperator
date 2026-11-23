@@ -27,8 +27,6 @@ const (
 	loginSSHKeyName    = "soperator_e2e_login_ssh"
 	loginSSHKeyComment = "soperator-e2e-login-ssh"
 
-	jobUserKey = "JOB_USER"
-
 	sessionCgroupKey         = "SESSION_CGROUP"
 	adoptedSSHJobMemoryBytes = int64(1024 * 1024 * 1024)
 
@@ -1085,10 +1083,6 @@ func kernelSettingsProbe() string {
 	return strings.Join(lines, "; ")
 }
 
-func jobUserProbe() string {
-	return fmt.Sprintf("printf '%s=%%s\\n' \"$(id -un)\"", jobUserKey)
-}
-
 // srunProbeCommand runs probe in container through srun. GPU containers ask
 // their runtime for nvidiaCapabilities, so the job sees the libraries of
 // exactly those capabilities instead of the runtime's own default.
@@ -1150,14 +1144,6 @@ func pamSlurmAdoptRequiresJob(cluster framework.SlurmClusterInfo, userName strin
 
 func systemSettingsDockerContainerName(jobID string) string {
 	return systemSettingsDockerContainerPrefix + jobID
-}
-
-func validateJobUser(output, expected string) error {
-	actual := parseKeyValueLine(output, jobUserKey)
-	if actual != expected {
-		return fmt.Errorf("check Slurm job task user %q: want %q", actual, expected)
-	}
-	return nil
 }
 
 func parseResourceLimitSnapshots(output string) (resourceLimitSnapshots, error) {
