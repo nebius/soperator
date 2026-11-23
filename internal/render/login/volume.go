@@ -31,6 +31,7 @@ func renderVolumesAndClaimTemplateSpecs(
 		common.RenderVolumeTmpDisk(),
 		renderVolumeSshdConfigs(login.SSHDConfigMapName),
 		renderVolumeServiceAccount(),
+		renderVolumeLoginState(),
 	}
 	if login.UserIsolation != nil && ptr.Deref(login.UserIsolation.Enabled, false) {
 		volumes = append(volumes, renderVolumeUserIsolation(clusterName))
@@ -129,6 +130,41 @@ func resolveDockerImageStorageMount(login *values.SlurmLogin) (slurmv1.NodeVolum
 }
 
 // region configs
+
+func renderVolumeLoginState() corev1.Volume {
+	return corev1.Volume{
+		Name: consts.VolumeNameLoginState,
+		VolumeSource: corev1.VolumeSource{
+			DownwardAPI: &corev1.DownwardAPIVolumeSource{
+				DefaultMode: ptr.To(int32(0444)),
+				Items: []corev1.DownwardAPIVolumeFile{
+					{
+						Path: "announced-at",
+						FieldRef: &corev1.ObjectFieldSelector{
+							APIVersion: "v1",
+							FieldPath:  fmt.Sprintf("metadata.annotations['%s']", consts.AnnotationLoginUpdateAnnouncedAt),
+						},
+					},
+					{
+						Path: "scheduled-at",
+						FieldRef: &corev1.ObjectFieldSelector{
+							APIVersion: "v1",
+							FieldPath:  fmt.Sprintf("metadata.annotations['%s']", consts.AnnotationLoginUpdateScheduledAt),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func renderVolumeMountLoginState() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      consts.VolumeNameLoginState,
+		MountPath: consts.VolumeMountPathLoginState,
+		ReadOnly:  true,
+	}
+}
 
 // RenderVolumeSshdConfigs renders [corev1.Volume] containing SSHD configs contents
 func renderVolumeSshdConfigs(sshdConfigMapName string) corev1.Volume {

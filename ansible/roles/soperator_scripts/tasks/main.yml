@@ -61,3 +61,40 @@
     mode: '0755'
   tags:
     - soperator-scripts
+
+- name: Ensure the login warning checker directory exists
+  ansible.builtin.file:
+    path: /usr/lib/soperator
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  tags:
+    - soperator-scripts
+
+- name: Install the shared login warning checker
+  ansible.builtin.copy:
+    src: login_warning.sh
+    dest: /usr/lib/soperator/login_warning.sh
+    mode: '0755'
+    owner: root
+    group: root
+  tags:
+    - soperator-scripts
+
+- name: Install the Bash login warning adapter
+  ansible.builtin.copy:
+    src: login_warning_profile.sh
+    dest: /etc/profile.d/soperator-login-warning.sh
+    mode: '0644'
+    owner: root
+    group: root
+  tags:
+    - soperator-scripts
+
+- name: Load login warnings in interactive non-login Bash shells
+  ansible.builtin.lineinfile:
+    path: /etc/bash.bashrc
+    line: '[ ! -r /etc/profile.d/soperator-login-warning.sh ] || . /etc/profile.d/soperator-login-warning.sh'
+  tags:
+    - soperator-scripts
