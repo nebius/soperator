@@ -388,7 +388,7 @@ type PlugStackConfig struct {
 	// NcclInspectorPreConf represents the NCCL Inspector Pre-Configuration SPANK plugin configuration.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={ required: false, enabled: false, dumpDir: "/opt/soperator-outputs/shared/nccl_profiles/%j/%s", dumpVerbose: false, dumpThreadIntervalMicroseconds: 1000000 }
+	// +kubebuilder:default={ required: false, enabled: true, dumpDir: "/opt/soperator-outputs/shared/nccl_profiles/%j/%s", dumpVerbose: false, dumpThreadIntervalMicroseconds: 1000000 }
 	NcclInspectorPreConf PluginConfigNcclInspectorPreConf `json:"ncclInspectorPreConf,omitempty"`
 
 	// PluginConfigCustom represents a configuration of custom SPANK plugins.

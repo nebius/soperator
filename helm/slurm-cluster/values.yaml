@@ -253,7 +253,8 @@ plugStackConfig:
     outputDirectory: "/opt/soperator-outputs/local/nccl_logs"
   ncclInspectorPreConf:
     required: false
-    enabled: false
+    # Only registers the plugin; a job is profiled only when it sets NCCL_INSPECTOR_ENABLE=1.
+    enabled: true
     # profilerPlugin is left unset: the plugin picks /usr/lib/<arch>-linux-gnu/libnccl-profiler-inspector.so per worker.
     dumpDir: "/opt/soperator-outputs/shared/nccl_profiles/%j/%s"
     dumpVerbose: false

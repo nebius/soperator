@@ -29030,7 +29030,7 @@ spec:
                       dumpDir: /opt/soperator-outputs/shared/nccl_profiles/%j/%s
                       dumpThreadIntervalMicroseconds: 1000000
                       dumpVerbose: false
-                      enabled: false
+                      enabled: true
                       required: false
                     description: NcclInspectorPreConf represents the NCCL Inspector
                       Pre-Configuration SPANK plugin configuration.
