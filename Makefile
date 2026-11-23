@@ -702,6 +702,13 @@ helmtest: check-helm
 	@echo "Running helm unittest"
 	@helm unittest $(CHART_PATH)/*/
 
+.PHONY: test-helm-api
+test-helm-api: envtest install-flux ## Apply the rendered Flux charts to an isolated Kubernetes API server.
+	@if ! command -v helm >/dev/null 2>&1; then $(MAKE) install-helm; fi
+	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)"; \
+	export KUBEBUILDER_ASSETS; \
+	FLUX="$(FLUX)" go test -tags=helmapi -count=1 -v ./test/helmapi
+
 check-helm:
 	@echo "Checking Helm installation..."
 	@if ! command -v helm >/dev/null 2>&1; then \
