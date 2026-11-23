@@ -22,5 +22,10 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
       version: {{ .Values.observability.prometheusOperator.version }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.observability.prometheusOperator "root" $) | nindent 2 }}
   interval: 60m
+  {{- if ne .Values.observability.prometheusOperator.values nil }}
+  values:
+    {{- toYaml .Values.observability.prometheusOperator.values | nindent 4 }}
+  {{- end }}
 {{- end }}

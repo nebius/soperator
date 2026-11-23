@@ -1,0 +1,213 @@
+suite: test HelmRelease values and dependencies
+templates:
+  - templates/backup-config.yaml
+  - templates/storageclasses.yaml
+  - templates/soperatorchecks.yaml
+  - templates/monitoring-dashboards.yaml
+  - templates/soperator-custom-configmaps.yaml
+  - templates/prometheus-operator-crds.yaml
+  - templates/mariadb-operator-crds.yaml
+  - templates/victoria-metrics-operator-crds.yaml
+set:
+  fullnameOverride: values-contract
+tests:
+  - it: should use the generated namespace release name for default dependencies
+    templates:
+      - templates/backup-config.yaml
+      - templates/storageclasses.yaml
+      - templates/monitoring-dashboards.yaml
+      - templates/soperator-custom-configmaps.yaml
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: values-contract-ns
+
+  - it: should use the generated operator release name for checks
+    template: templates/soperatorchecks.yaml
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: values-contract-soperator
+
+  - it: should omit dependencies and inline values by default for the CRDs
+    templates:
+      - templates/prometheus-operator-crds.yaml
+      - templates/mariadb-operator-crds.yaml
+      - templates/victoria-metrics-operator-crds.yaml
+    asserts:
+      - notExists:
+          path: spec.dependsOn
+      - notExists:
+          path: spec.values
+
+  - it: should render the configured dependency lists verbatim after resolving names
+    set:
+      backup.config.dependsOn: &dependencies
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-cert-manager'
+          namespace: flux-system
+          readyExpr: dep.metadata.generation == dep.status.observedGeneration
+        - name: external-release
+      storageClasses.dependsOn: *dependencies
+      soperator.soperatorChecks.dependsOn: *dependencies
+      soperator.monitoringDashboards.dependsOn: *dependencies
+      customConfigmaps.dependsOn: *dependencies
+      observability.prometheusOperator.dependsOn: *dependencies
+      mariadbOperator.crds.dependsOn: *dependencies
+      observability.vmStack.crds.dependsOn: *dependencies
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: values-contract-cert-manager
+              namespace: flux-system
+              readyExpr: dep.metadata.generation == dep.status.observedGeneration
+            - name: external-release
+
+  - it: should clear dependencies with an explicit empty list
+    set:
+      backup.config.dependsOn: []
+      storageClasses.dependsOn: []
+      soperator.soperatorChecks.dependsOn: []
+      soperator.monitoringDashboards.dependsOn: []
+      customConfigmaps.dependsOn: []
+      observability.prometheusOperator.dependsOn: []
+      mariadbOperator.crds.dependsOn: []
+      observability.vmStack.crds.dependsOn: []
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value: []
+
+  - it: should omit dependencies when Helm removes a default key set to null
+    templates:
+      - templates/backup-config.yaml
+      - templates/storageclasses.yaml
+      - templates/soperatorchecks.yaml
+      - templates/monitoring-dashboards.yaml
+      - templates/soperator-custom-configmaps.yaml
+    set:
+      backup.config.dependsOn: null
+      storageClasses.dependsOn: null
+      soperator.soperatorChecks.dependsOn: null
+      soperator.monitoringDashboards.dependsOn: null
+      customConfigmaps.dependsOn: null
+    asserts:
+      - notExists:
+          path: spec.dependsOn
+
+  - it: should render an empty dependency list when Helm retains a null key
+    template: templates/mariadb-operator-crds.yaml
+    set:
+      mariadbOperator.crds.dependsOn: null
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value: []
+
+  - it: should forward backup configuration and its defaults
+    template: templates/backup-config.yaml
+    set:
+      backup.config.values.bucket.name: test-backups
+    asserts:
+      - equal:
+          path: spec.values.bucket.name
+          value: test-backups
+      - equal:
+          path: spec.values.secret.name
+          value: jail-backup
+
+  - it: should forward a boolean storage class override
+    template: templates/storageclasses.yaml
+    set:
+      storageClasses.values.allowVolumeExpansion: false
+    asserts:
+      - equal:
+          path: spec.values.allowVolumeExpansion
+          value: false
+
+  - it: should forward the checks configuration
+    template: templates/soperatorchecks.yaml
+    set:
+      soperator.soperatorChecks.values.checks.replicas: 2
+    asserts:
+      - equal:
+          path: spec.values.checks.replicas
+          value: 2
+      - equal:
+          path: spec.values.checks.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: system
+
+  - it: should prefer dashboard values over legacy overrides
+    template: templates/monitoring-dashboards.yaml
+    set:
+      soperator.monitoringDashboards.values.namePrefix: test-dashboards
+      soperator.monitoringDashboards.overrideValues.namePrefix: legacy-dashboards
+    asserts:
+      - equal:
+          path: spec.values.namePrefix
+          value: test-dashboards
+
+  - it: should use legacy dashboard overrides when values are absent
+    template: templates/monitoring-dashboards.yaml
+    set:
+      soperator.monitoringDashboards.overrideValues.namePrefix: legacy-dashboards
+    asserts:
+      - equal:
+          path: spec.values.namePrefix
+          value: legacy-dashboards
+
+  - it: should forward the native Enroot override from values
+    template: templates/soperator-custom-configmaps.yaml
+    set:
+      customConfigmaps.values.enroot.useDedicatedImageStorage: false
+      customConfigmaps.overrideValues.enroot.useDedicatedImageStorage: true
+    asserts:
+      - equal:
+          path: spec.values.enroot.useDedicatedImageStorage
+          value: false
+
+  - it: should respect an empty values map even with legacy overrides present
+    template: templates/soperator-custom-configmaps.yaml
+    set:
+      customConfigmaps.values: {}
+      customConfigmaps.overrideValues.enroot.useDedicatedImageStorage: false
+    asserts:
+      - equal:
+          path: spec.values
+          value: {}
+
+  - it: should forward Prometheus CRD annotations
+    template: templates/prometheus-operator-crds.yaml
+    set:
+      observability.prometheusOperator.values:
+        crds:
+          annotations:
+            example.com/profile: test
+    asserts:
+      - equal:
+          path: spec.values.crds.annotations["example.com/profile"]
+          value: test
+
+  - it: should forward the MariaDB CRD values map
+    template: templates/mariadb-operator-crds.yaml
+    set:
+      # The pinned MariaDB chart has an empty values.yaml.
+      mariadbOperator.crds.values:
+        testValue: forwarded
+    asserts:
+      - equal:
+          path: spec.values
+          value:
+            testValue: forwarded
+
+  - it: should forward VictoriaMetrics CRD annotations
+    template: templates/victoria-metrics-operator-crds.yaml
+    set:
+      observability.vmStack.crds.values.annotations:
+        example.com/profile: test
+    asserts:
+      - equal:
+          path: spec.values.annotations["example.com/profile"]
+          value: test

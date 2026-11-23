@@ -171,6 +171,8 @@ backup:
     timeout: 5m
     version: 1.23.0
     releaseName: soperator-backups
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     install:
       remediation:
         retries: 3
@@ -247,6 +249,7 @@ mariadbOperator:
       retries: 3
       remediateLastFailure: true
   crds:
+    values: null
     install:
       crds: CreateReplace
       remediation:
@@ -430,6 +433,7 @@ observability:
     timeout: 5m
     version: 19.1.*
     namespace: monitoring-system
+    values: null
     # postRenderers: []
     driftDetection:
       mode: warn
@@ -439,6 +443,7 @@ observability:
       interval: 5m
       timeout: 5m
       version: 0.10.1
+      values: null
       install:
         crds: CreateReplace
         remediation:
@@ -1040,6 +1045,8 @@ soperator:
     interval: 5m
     timeout: 5m
     releaseName: soperator-checks
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-soperator'
     install:
       remediation:
         retries: 3
@@ -1060,7 +1067,6 @@ soperator:
                   labelSelector:
                     matchLabels:
                       control-plane: soperatorchecks
-    overrideValues: null
     # postRenderers: []
     driftDetection:
       mode: warn
@@ -1105,6 +1111,8 @@ soperator:
     timeout: 5m
     releaseName: soperator-monitoring-dashboards
     namespace: monitoring-system
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     install:
       crds: Skip
       remediation:
@@ -1113,7 +1121,7 @@ soperator:
       crds: Skip
       remediation:
         retries: 3
-    overrideValues: null
+    values: null
     # postRenderers: []
     driftDetection:
       mode: warn
@@ -1200,6 +1208,8 @@ storageClasses:
   version: 5.0.0
   namespace: storage-system
   releaseName: soperator-storageclasses
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
   values: null
   install:
     crds: Skip
@@ -1220,7 +1230,8 @@ customConfigmaps:
   version: 5.0.0
   namespace: soperator
   releaseName: soperator-custom-configmaps
-  overrideValues: null
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
   values: null
   install:
     crds: Skip

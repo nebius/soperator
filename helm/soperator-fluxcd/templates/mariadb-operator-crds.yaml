@@ -22,10 +22,15 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator
       version: {{ .Values.mariadbOperator.version }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.mariadbOperator.crds "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.mariadbOperator.crds.install | nindent 4 }}
   interval: {{ .Values.mariadbOperator.interval }}
   timeout: {{ .Values.mariadbOperator.timeout }}
   upgrade:
     {{- toYaml .Values.mariadbOperator.crds.upgrade | nindent 4 }}
+  {{- if ne .Values.mariadbOperator.crds.values nil }}
+  values:
+    {{- toYaml .Values.mariadbOperator.crds.values | nindent 4 }}
+  {{- end }}
 {{- end }}

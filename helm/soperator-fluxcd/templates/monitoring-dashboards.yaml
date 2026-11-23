@@ -22,8 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.soperator.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.soperator.monitoringDashboards "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.soperator.monitoringDashboards.install | nindent 4 }}
   upgrade:
@@ -32,8 +31,8 @@ spec:
   timeout: {{ .Values.soperator.monitoringDashboards.timeout }}
   releaseName: {{ .Values.soperator.monitoringDashboards.releaseName }}
   targetNamespace: {{ .Values.soperator.monitoringDashboards.namespace }}
-  {{- if .Values.soperator.monitoringDashboards.overrideValues }}
+  {{- with include "soperator-fluxcd.valuesWithLegacyOverride" .Values.soperator.monitoringDashboards }}
   values:
-    {{- toYaml .Values.soperator.monitoringDashboards.overrideValues | nindent 4 }}
+    {{- . | nindent 4 }}
   {{- end }}
 {{- end }}
