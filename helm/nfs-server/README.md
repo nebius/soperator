@@ -63,7 +63,7 @@ values = [yamlencode({
 
 `var.nfs_nconnect` must match the actual mount option; this example does not change
 mount options. When provisioning through `helm/soperator-fluxcd`, pass the same
-`nfs.maxConnections` value under `nfsServer.overrideValues`.
+`nfs.maxConnections` value under `nfsServer.values`.
 
 ### Storage Configuration
 

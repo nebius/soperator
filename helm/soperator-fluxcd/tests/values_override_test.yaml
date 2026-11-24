@@ -537,21 +537,25 @@ tests:
 suite: test values override default values nodesets
 templates:
   - templates/nodesets.yaml
+set:
+  nodesets.enabled: true
 tests:
   - it: should use custom values when provided
     set:
-      nodesets.enabled: true
       nodesets.values:
+        clusterName: custom-slurm
         priorityClasses:
           - name: soperator-worker-high-priority
             value: 1000
         nodesets:
-          test-nodeset:
-            nodesetName: "test-nodeset"
-            size: 3
+          - name: test-nodeset
+            replicas: 3
     asserts:
       - hasDocuments:
           count: 1
+      - equal:
+          path: spec.values.clusterName
+          value: custom-slurm
       - equal:
           path: spec.values.priorityClasses[0].name
           value: soperator-worker-high-priority
@@ -559,24 +563,90 @@ tests:
           path: spec.values.priorityClasses[0].value
           value: 1000
       - equal:
-          path: spec.values.nodesets.test-nodeset.size
+          path: spec.values.nodesets[0].replicas
           value: 3
 
-  - it: should use override values when provided
+  - it: should omit the inline cluster name when cleared
     set:
-      nodesets.enabled: true
-      nodesets.overrideValues:
-        customConfig: true
-        nodesets:
-          gpu-nodeset:
-            nodesetName: "gpu-workers"
-            size: 5
+      nodesets.values.clusterName: null
     asserts:
-      - hasDocuments:
-          count: 1
+      - notExists:
+          path: spec.values.clusterName
+
+---
+
+suite: test native storage values
+templates:
+  - templates/nfs-server.yaml
+  - templates/slurm-cluster-storage.yaml
+tests:
+  - it: should use the child chart defaults when no storage values are configured
+    asserts:
+      - notExists:
+          path: spec.values
+
+  - it: should forward the NFS server settings
+    template: templates/nfs-server.yaml
+    set:
+      nfsServer.values: &nfsValues
+        storage:
+          existingClaim: nfs-data
+        nfs:
+          permitted: [10.0.0.0/24]
+    asserts:
       - equal:
-          path: spec.values.customConfig
-          value: true
+          path: spec.values
+          value: *nfsValues
+
+  - it: should forward the Slurm storage settings
+    template: templates/slurm-cluster-storage.yaml
+    set:
+      slurmCluster.slurmClusterStorage.values: &storageValues
+        volume:
+          jail:
+            size: 3Ti
+          controllerSpool:
+            enabled: false
+    asserts:
       - equal:
-          path: spec.values.nodesets.gpu-nodeset.nodesetName
-          value: "gpu-workers"
+          path: spec.values
+          value: *storageValues
+
+---
+
+suite: test SlurmCluster names and references
+templates:
+  - templates/slurm-cluster.yaml
+  - templates/soperator-activechecks.yaml
+tests:
+  - it: should keep the default SlurmCluster name
+    template: templates/slurm-cluster.yaml
+    asserts:
+      - equal:
+          path: spec.values.clusterName
+          value: soperator
+
+  - it: should forward a custom SlurmCluster name
+    template: templates/slurm-cluster.yaml
+    set:
+      slurmCluster.values.clusterName: custom-slurm
+    asserts:
+      - equal:
+          path: spec.values.clusterName
+          value: custom-slurm
+
+  - it: should let the ActiveChecks child chart or valuesFrom supply the default reference
+    template: templates/soperator-activechecks.yaml
+    asserts:
+      - notExists:
+          path: spec.values
+
+  - it: should forward the native ActiveChecks cluster reference
+    template: templates/soperator-activechecks.yaml
+    set:
+      soperatorActiveChecks.values.slurmClusterRefName: custom-slurm
+    asserts:
+      - equal:
+          path: spec.values
+          value:
+            slurmClusterRefName: custom-slurm

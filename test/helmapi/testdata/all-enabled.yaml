@@ -16,10 +16,16 @@ mariadbOperator:
 nodesets:
   enabled: true
   namespace: flux-api-slurm
+  values:
+    clusterName: flux-api-cluster
 slurmCluster:
   namespace: flux-api-slurm
+  values:
+    clusterName: flux-api-cluster
 soperatorActiveChecks:
   namespace: flux-api-slurm
+  values:
+    slurmClusterRefName: flux-api-cluster
 customConfigmaps:
   namespace: flux-api-slurm
 notifier:

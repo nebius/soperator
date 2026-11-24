@@ -36,9 +36,9 @@ spec:
   timeout: {{ .Values.slurmCluster.slurmClusterStorage.timeout }}
   releaseName: {{ .Values.slurmCluster.slurmClusterStorage.releaseName }}
   {{- include "soperator-fluxcd.targetNamespace" .Values.slurmCluster.namespace | nindent 2 }}
-  {{- if .Values.slurmCluster.slurmClusterStorage.overrideValues }}
+  {{- with .Values.slurmCluster.slurmClusterStorage.values }}
   values:
-    {{- toYaml .Values.slurmCluster.slurmClusterStorage.overrideValues | nindent 4 }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
   valuesFrom:
   - kind: ConfigMap
