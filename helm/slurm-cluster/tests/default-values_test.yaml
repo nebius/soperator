@@ -201,6 +201,25 @@ tests:
           path: spec.populateJail.overwrite
           value: false
 
+  - it: should build populateJail image for an explicit cudaVersion
+    set:
+      clusterName: test-cluster
+      cudaVersion: "12.9.0"
+    asserts:
+      - matchRegex:
+          path: spec.populateJail.image
+          pattern: -cuda12\.9\.0$
+
+  - it: should use images.populateJail as is when set
+    set:
+      clusterName: test-cluster
+      images:
+        populateJail: "example.com/custom/populate_jail:custom"
+    asserts:
+      - equal:
+          path: spec.populateJail.image
+          value: "example.com/custom/populate_jail:custom"
+
   # Test accounting defaults
   - it: should set accounting default values
     set:
