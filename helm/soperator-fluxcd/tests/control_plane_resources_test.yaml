@@ -112,10 +112,19 @@ tests:
           path: spec.values.rebooter.resources.requests.cpu
           value: 100m
 
-  - it: should omit the rebooter priority class when unset
+  - it: should forward an explicitly empty rebooter priority class name
     template: templates/nodeconfigurator.yaml
     set:
       soperator.nodeConfigurator.values.rebooter.priorityClassName: ""
+    asserts:
+      - equal:
+          path: spec.values.rebooter.priorityClassName
+          value: ""
+
+  - it: should omit the rebooter priority class name when set to null
+    template: templates/nodeconfigurator.yaml
+    set:
+      soperator.nodeConfigurator.values.rebooter.priorityClassName: null
     asserts:
       - notExists:
           path: spec.values.rebooter.priorityClassName

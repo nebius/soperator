@@ -37,49 +37,7 @@ spec:
   releaseName: {{ .Values.soperator.releaseName }}
   {{- include "soperator-fluxcd.targetNamespace" .Values.soperator.namespace | nindent 2 }}
   values:
-  {{- if .Values.soperator.overrideValues }}
-    {{- toYaml .Values.soperator.overrideValues | nindent 4 }}
-  {{- else }}
-    {{- if .Values.soperator.values.serviceMonitor }}
-    serviceMonitor:
-      {{- toYaml .Values.soperator.values.serviceMonitor | nindent 6 }}
-    {{- end }}
-    {{- if .Values.certManager.enabled }}
-    certManager:
-      enabled: true
-    {{- end }}
-    controllerManager:
-      {{- with (.Values.soperator.values.controllerManager | default dict).nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with (.Values.soperator.values.controllerManager | default dict).affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      manager:
-        {{- if and .Values.soperator.values .Values.soperator.values.manager .Values.soperator.values.manager.resources }}
-        resources: {{- toYaml .Values.soperator.values.manager.resources | nindent 10 }}
-        {{- end }}
-        {{- if or
-          .Values.observability.enabled
-          .Values.observability.prometheusOperator.enabled
-          .Values.mariadbOperator.enabled
-        }}
-        env:
-          {{- if .Values.mariadbOperator.enabled }}
-          isMariadbCrdInstalled: true
-          {{- end }}
-          {{- if and
-            .Values.observability.enabled
-            .Values.observability.prometheusOperator.enabled
-          }}
-          isPrometheusCrdInstalled: true
-          {{- end }}
-      kruise:
-        installOperator: false
-    {{- end }}
-  {{- end }}
+    {{- toYaml .Values.soperator.values | nindent 4 }}
   valuesFrom:
   - kind: ConfigMap
     name: terraform-soperator

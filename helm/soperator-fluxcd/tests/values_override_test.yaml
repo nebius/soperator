@@ -2,46 +2,80 @@ suite: test values override default values soperator
 templates:
   - templates/soperator.yaml
 tests:
-  - it: should use custom values when provided
+  - it: should forward native operator values
     set:
-      soperator.enabled: true
-      soperator.overrideValues:
-        customKey: customValue
+      soperator.values.controllerManager.manager.args:
+        - --leader-elect
+      soperator.values.controllerManager.nodeSelector:
+        slurm.nebius.ai/nodeset: control-plane
     asserts:
-      - hasDocuments:
-          count: 1
       - equal:
-          path: spec.values.customKey
-          value: customValue
-      - notExists:
-          path:  spec.values.controllerManager
+          path: spec.values.controllerManager.manager.args
+          value:
+            - --leader-elect
+      - equal:
+          path: spec.values.controllerManager.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: control-plane
 
-  - it: should use default values when custom values not provided
-    set:
-      soperator.enabled: true
-      soperator.overrideValues: null
+  - it: should use the operator defaults without overrides
     asserts:
-      - hasDocuments:
-          count: 1
-      - exists:
-          path: spec.values.controllerManager
-  - it: should be requests soperator
-    set:
-      soperator.enabled: true
-      soperator.values:
-        manager:
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-    asserts:
-      - hasDocuments:
-          count: 1
       - equal:
           path: spec.values.controllerManager.manager.resources.requests
           value:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 500m
+            memory: 1Gi
+      - equal:
+          path: spec.values.controllerManager.manager.env
+          value:
+            isMariadbCrdInstalled: true
+            isPrometheusCrdInstalled: true
+      - equal:
+          path: spec.values.certManager.enabled
+          value: true
+
+  - it: should merge native resource overrides with the chart defaults
+    set:
+      soperator.values.controllerManager.manager.resources.requests.cpu: 900m
+    asserts:
+      - equal:
+          path: spec.values.controllerManager.manager.resources
+          value:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: 900m
+              memory: 1Gi
+
+  - it: should pass operator settings independently of integration enablement
+    set:
+      mariadbOperator.enabled: false
+      observability.enabled: false
+      observability.prometheusOperator.enabled: false
+      certManager.enabled: false
+    asserts:
+      - equal:
+          path: spec.values.controllerManager.manager.env
+          value:
+            isMariadbCrdInstalled: true
+            isPrometheusCrdInstalled: true
+      - equal:
+          path: spec.values.certManager.enabled
+          value: true
+
+  - it: should use explicit discovery and cert-manager settings
+    set:
+      soperator.values.controllerManager.manager.env.isMariadbCrdInstalled: false
+      soperator.values.controllerManager.manager.env.isPrometheusCrdInstalled: false
+      soperator.values.certManager.enabled: false
+    asserts:
+      - equal:
+          path: spec.values.controllerManager.manager.env
+          value:
+            isMariadbCrdInstalled: false
+            isPrometheusCrdInstalled: false
+      - equal:
+          path: spec.values.certManager.enabled
+          value: false
 
   - it: should disable serviceMonitor when set to false
     set:
@@ -74,10 +108,6 @@ tests:
       soperator.enabled: true
       soperator.values:
         serviceMonitor: null
-        manager:
-          resources:
-            requests:
-              cpu: 100m
     asserts:
       - hasDocuments:
           count: 1
@@ -103,7 +133,29 @@ suite: test values override default values nodeconfigurator
 templates:
   - templates/nodeconfigurator.yaml
 tests:
-  - it: should be requests nodeconfigurator
+  - it: should keep the default rebooter configuration
+    asserts:
+      - equal:
+          path: spec.values.rebooter
+          value:
+            enabled: true
+            generateRBAC: true
+            logFormat: json
+            tolerations:
+              - operator: Exists
+            priorityClassName: soperator-rebooter
+            priorityClass:
+              create: true
+              name: soperator-rebooter
+              value: 100000
+            resources:
+              requests:
+                cpu: 100m
+                memory: 200Mi
+              limits:
+                memory: 200Mi
+
+  - it: should forward rebooter resource overrides
     set:
       soperator.nodeConfigurator.values.rebooter.resources:
         requests:
@@ -119,6 +171,22 @@ tests:
           value:
             cpu: 100m
             memory: 128Mi
+
+  - it: should forward rebooter options from native values
+    set:
+      soperator.nodeConfigurator.values.rebooter.generateRBAC: false
+      soperator.nodeConfigurator.values.rebooter.serviceAccountName: custom-rebooter
+      soperator.nodeConfigurator.values.rebooter.tolerations: []
+    asserts:
+      - equal:
+          path: spec.values.rebooter.generateRBAC
+          value: false
+      - equal:
+          path: spec.values.rebooter.serviceAccountName
+          value: custom-rebooter
+      - equal:
+          path: spec.values.rebooter.tolerations
+          value: []
 ---
 suite: test values override default values opentelemetry collector events
 templates:
