@@ -12,6 +12,7 @@ import (
 	"github.com/robfig/cron/v3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/events"
@@ -42,13 +43,14 @@ type Reconciler struct {
 	Scheme       *runtime.Scheme
 	Recorder     events.EventRecorder
 	clock        clock.PassiveClock
+	metrics      *rolloutMetrics
 	requeueAfter time.Duration
 }
 
 func NewReconciler(c client.Client, scheme *runtime.Scheme, recorder events.EventRecorder, requeueAfter time.Duration) *Reconciler {
 	return &Reconciler{
 		Client: c, Scheme: scheme, Recorder: recorder,
-		clock: clock.RealClock{}, requeueAfter: requeueAfter,
+		clock: clock.RealClock{}, metrics: defaultRolloutMetrics, requeueAfter: requeueAfter,
 	}
 }
 
@@ -56,7 +58,7 @@ func NewReconciler(c client.Client, scheme *runtime.Scheme, recorder events.Even
 // +kubebuilder:rbac:groups=apps.kruise.io,resources=statefulsets,verbs=get;list;watch;patch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;patch;delete
 
-func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, reconcileErr error) {
 	logger := log.FromContext(ctx).WithName("login-update-reconciler").
 		WithValues("namespace", req.Namespace, "name", req.Name)
 	ctx = log.IntoContext(ctx, logger)
@@ -64,29 +66,45 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	sts := &kruisev1b1.StatefulSet{}
 	if err := r.Get(ctx, req.NamespacedName, sts); err != nil {
+		if apierrors.IsNotFound(err) {
+			r.metrics.forget(req.NamespacedName)
+		} else {
+			r.metrics.readFailed(req.NamespacedName)
+		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	if !enabled(sts) || sts.DeletionTimestamp != nil {
+		r.metrics.forget(req.NamespacedName)
 		logger.V(1).Info("Skipping ineligible login StatefulSet", "updateStrategy", sts.Spec.UpdateStrategy.Type, "deleting", sts.DeletionTimestamp != nil)
 		return ctrl.Result{}, nil
 	}
 	cluster := &slurmv1.SlurmCluster{}
 	owner := metav1.GetControllerOf(sts)
 	if err := r.Get(ctx, client.ObjectKey{Namespace: sts.Namespace, Name: owner.Name}, cluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			r.metrics.forget(req.NamespacedName)
+		} else {
+			r.metrics.readFailed(req.NamespacedName)
+		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	if !clusterEligible(sts, cluster) {
+		r.metrics.forget(req.NamespacedName)
 		logger.V(1).Info("Skipping login updates because the owning SlurmCluster is ineligible")
 		return ctrl.Result{}, nil
 	}
 	logger = logger.WithValues("slurmCluster", cluster.Name, "updateRevision", sts.Status.UpdateRevision)
 	ctx = log.IntoContext(ctx, logger)
 	rollingUpdate := cluster.Spec.SlurmNodes.Login.UpdateStrategy == consts.UpdateStrategyRollingUpdate
+	if rollingUpdate || sts.Spec.UpdateStrategy.Type != appsv1.OnDeleteStatefulSetStrategyType {
+		r.metrics.forget(req.NamespacedName)
+	}
 	if !rollingUpdate && sts.Spec.UpdateStrategy.Type != appsv1.OnDeleteStatefulSetStrategyType {
 		return ctrl.Result{}, nil
 	}
 	pods, err := r.pods(ctx, sts)
 	if err != nil {
+		r.metrics.readFailed(req.NamespacedName)
 		return ctrl.Result{}, err
 	}
 	if rollingUpdate {
@@ -100,11 +118,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 		return ctrl.Result{}, nil
 	}
+	waitReason := ""
+	defer func() {
+		r.metrics.observe(sts, pods, r.clock.Now(), waitReason, reconcileErr != nil)
+	}()
 	minNotice, schedule, err := values.ResolveLoginUpdatePolicy(cluster.Spec.SlurmNodes.Login.UpdatePolicy)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("resolve login update policy for SlurmCluster %s/%s: %w", cluster.Namespace, cluster.Name, err)
 	}
 	if sts.Status.ObservedGeneration < sts.Generation || sts.Status.UpdateRevision == "" {
+		waitReason = waitTargetRevision
 		logger.V(1).Info("Waiting for the login StatefulSet to observe its target revision", "generation", sts.Generation, "observedGeneration", sts.Status.ObservedGeneration)
 		return ctrl.Result{RequeueAfter: r.requeueAfter}, nil
 	}
@@ -118,18 +141,22 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 	if replacementInProgress {
+		waitReason = waitPods
 		return ctrl.Result{RequeueAfter: r.requeueAfter}, nil
 	}
 	if len(updatePlan.restartCandidates) == 0 {
 		if updatePlan.waitingForReplacement {
+			waitReason = waitPods
 			return ctrl.Result{RequeueAfter: r.requeueAfter}, nil
 		}
 		if updatePlan.nextScheduledAt.IsZero() {
 			return ctrl.Result{}, nil
 		}
+		waitReason = waitNotice
 		// A deadline that passed during reconciliation still needs a positive timer.
 		return ctrl.Result{RequeueAfter: max(updatePlan.nextScheduledAt.Sub(r.clock.Now()), time.Nanosecond)}, nil
 	}
+	waitReason = waitPods
 	if err := r.replaceFirstEligiblePod(ctx, sts, pods, updatePlan.restartCandidates); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -247,18 +274,19 @@ func (r *Reconciler) reconcileActiveReplacement(ctx context.Context, sts *kruise
 }
 
 func (r *Reconciler) setActiveReplacement(ctx context.Context, sts *kruisev1b1.StatefulSet, pod *corev1.Pod) error {
-	base := sts.DeepCopy()
+	updated := sts.DeepCopy()
 	if pod == nil {
-		delete(sts.Annotations, consts.AnnotationLoginUpdateInProgress)
+		delete(updated.Annotations, consts.AnnotationLoginUpdateInProgress)
 	} else {
-		if sts.Annotations == nil {
-			sts.Annotations = make(map[string]string)
+		if updated.Annotations == nil {
+			updated.Annotations = make(map[string]string)
 		}
-		sts.Annotations[consts.AnnotationLoginUpdateInProgress] = pod.Name + "/" + string(pod.UID)
+		updated.Annotations[consts.AnnotationLoginUpdateInProgress] = pod.Name + "/" + string(pod.UID)
 	}
-	if err := r.Patch(ctx, sts, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{})); err != nil {
+	if err := r.Patch(ctx, updated, client.MergeFromWithOptions(sts, client.MergeFromWithOptimisticLock{})); err != nil {
 		return fmt.Errorf("persist active login pod replacement: %w", err)
 	}
+	*sts = *updated
 	return nil
 }
 
@@ -326,17 +354,18 @@ func (r *Reconciler) ensureSchedule(ctx context.Context, pod *corev1.Pod, minNot
 	if scheduledAt.Equal(previousScheduledAt) {
 		return scheduledAt, nil
 	}
-	base := pod.DeepCopy()
-	if pod.Annotations == nil {
-		pod.Annotations = make(map[string]string)
+	updated := pod.DeepCopy()
+	if updated.Annotations == nil {
+		updated.Annotations = make(map[string]string)
 	}
 	if announced == "" {
-		pod.Annotations[consts.AnnotationLoginUpdateAnnouncedAt] = announcedAt.Format(time.RFC3339Nano)
+		updated.Annotations[consts.AnnotationLoginUpdateAnnouncedAt] = announcedAt.Format(time.RFC3339Nano)
 	}
-	pod.Annotations[consts.AnnotationLoginUpdateScheduledAt] = scheduledAt.Format(time.RFC3339Nano)
-	if err := r.Patch(ctx, pod, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{})); err != nil {
+	updated.Annotations[consts.AnnotationLoginUpdateScheduledAt] = scheduledAt.Format(time.RFC3339Nano)
+	if err := r.Patch(ctx, updated, client.MergeFromWithOptions(pod, client.MergeFromWithOptimisticLock{})); err != nil {
 		return time.Time{}, fmt.Errorf("persist login update schedule: %w", err)
 	}
+	*pod = *updated
 	log.FromContext(ctx).Info("Scheduled login pod replacement", "pod", pod.Name, "podUID", pod.UID,
 		"announcedAt", announcedAt.Format(time.RFC3339Nano), "scheduledAt", scheduledAt.Format(time.RFC3339Nano), "minNotice", minNotice.String())
 	r.Recorder.Eventf(pod, nil, corev1.EventTypeNormal, "LoginUpdateScheduled", "ScheduleLoginUpdate", "Login pod will be replaced at or after %s; an administrator can request an earlier restart", scheduledAt.Format(time.RFC3339))
@@ -344,16 +373,17 @@ func (r *Reconciler) ensureSchedule(ctx context.Context, pod *corev1.Pod, minNot
 }
 
 func (r *Reconciler) clearSchedule(ctx context.Context, pod *corev1.Pod) error {
-	base := pod.DeepCopy()
+	updated := pod.DeepCopy()
 	for _, annotation := range []string{consts.AnnotationLoginUpdateAnnouncedAt, consts.AnnotationLoginUpdateScheduledAt, consts.AnnotationLoginUpdateRequested} {
-		delete(pod.Annotations, annotation)
+		delete(updated.Annotations, annotation)
 	}
-	if len(base.Annotations) == len(pod.Annotations) {
+	if len(pod.Annotations) == len(updated.Annotations) {
 		return nil
 	}
-	if err := r.Patch(ctx, pod, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{})); err != nil {
+	if err := r.Patch(ctx, updated, client.MergeFromWithOptions(pod, client.MergeFromWithOptimisticLock{})); err != nil {
 		return fmt.Errorf("clear login update schedule: %w", err)
 	}
+	*pod = *updated
 	log.FromContext(ctx).Info("Cleared login update metadata", "pod", pod.Name, "podUID", pod.UID)
 	return nil
 }
