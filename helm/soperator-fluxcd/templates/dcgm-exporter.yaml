@@ -31,12 +31,8 @@ spec:
   {{- include "soperator-fluxcd.targetNamespace" .Values.observability.dcgmExporter.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.observability.dcgmExporter.upgrade | nindent 4 }}
+  {{- with .Values.observability.dcgmExporter.values }}
   values:
-    validateToolkit: {{ .Values.observability.dcgmExporter.values.validateToolkit }}
-    {{- if .Values.observability.dcgmExporter.values.resources }}
-    daemonSet:
-      nvidiaDcgmExporter:
-        resources:
-          {{- toYaml .Values.observability.dcgmExporter.values.resources | nindent 10 }}
-    {{- end }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end }}

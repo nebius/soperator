@@ -3,6 +3,7 @@ templates:
   - templates/notifier.yaml
 
 set:
+  fullnameOverride: notifier-test
   observability:
     enabled: true
     vmStack:
@@ -11,12 +12,9 @@ set:
     enabled: true
 
 tests:
-  - it: should not be created if no VMSingle present
+  - it: should not be created when VMStack is disabled
     set:
-      observability:
-        enabled: false
-        vmStack:
-          enabled: false
+      observability.vmStack.enabled: false
     asserts:
       - notFailedTemplate: {}
       - hasDocuments:
@@ -31,12 +29,25 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: should fail if no webhook provided
+  - it: should allow the webhook URL to come from valuesFrom
     asserts:
-      - failedTemplate:
-          errorMessage: "Slack Webhook is required."
+      - isKind:
+          of: HelmRelease
+      - notExists:
+          path: spec.values.slack
+      - equal:
+          path: spec.valuesFrom
+          value:
+            - kind: ConfigMap
+              name: terraform-soperator-notifier
+              optional: true
+              valuesKey: values.yaml
+            - kind: ConfigMap
+              name: soperator-notifier
+              optional: true
+              valuesKey: values.yaml
 
-  - it: should work with no other values provided
+  - it: should forward an inline webhook URL with the default name override
     set:
       notifier:
         values:
@@ -53,18 +64,47 @@ tests:
           path: spec.values.slack.webhookUrl
           value: *slackUrl
 
-  - it: should handle complex nested custom values
+  - it: should pass custom child chart values
     set:
       notifier:
         values:
           slack:
-            webhookUrl: "http://foo.bar/x/y/z"
-        overrideValues:
-          dataSourceUrl: &dataSourceUrl "http://bar.baz/x/y/z:6969"
+            webhookUrl: *slackUrl
+          dataSourceUrl: &dataSourceUrl http://metrics.example.invalid:8428
+          alertManager:
+            replicas: 2
     asserts:
-      - notFailedTemplate: { }
-      - isKind:
-          of: HelmRelease
       - equal:
           path: spec.values.dataSourceUrl
           value: *dataSourceUrl
+      - equal:
+          path: spec.values.alertManager.replicas
+          value: 2
+
+  - it: should depend on namespaces and VMStack with VictoriaLogs disabled
+    set:
+      observability.vmLogs.enabled: false
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: notifier-test-ns
+            - name: notifier-test-vm-stack
+
+  - it: should replace the default dependencies with the configured list
+    set:
+      notifier.dependsOn: &dependencies
+        - name: external-metrics
+          namespace: observability
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value: *dependencies
+
+  - it: should clear dependencies with an explicit empty list
+    set:
+      notifier.dependsOn: []
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value: []
