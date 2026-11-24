@@ -172,15 +172,13 @@ tests:
           path: spec.values.kube-state-metrics.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.labelSelector.matchLabels["app.kubernetes.io/name"]
           value: kube-state-metrics
 
-  # csi-driver-nfs carries its placement in overrideValues, which the template renders verbatim,
-  # so clearing them is how you opt out.
-  - it: should drop the csi-driver-nfs placement when its overrideValues are cleared
+  - it: should drop the csi-driver-nfs placement when its values are cleared
     template: templates/csi-driver-nfs.yaml
     set:
-      csiDriverNfs.overrideValues: null
+      csiDriverNfs.values: null
     asserts:
       - notExists:
-          path: spec.values.controller
+          path: spec.values
 
   # overrideValues is the documented full escape hatch, so it drops the pin along with
   # everything else the template would have rendered.

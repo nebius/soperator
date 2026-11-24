@@ -805,8 +805,8 @@ slurmCluster:
   version: 5.0.0
   namespace: soperator
   releaseName: soperator
-  values: null
-  overrideValues: null
+  values:
+    clusterName: soperator
   install:
     crds: Skip
     remediation:
@@ -822,7 +822,6 @@ slurmCluster:
     interval: 5m
     timeout: 30m
     values: null
-    overrideValues: null
     install:
       remediation:
         retries: 6
@@ -838,7 +837,6 @@ slurmCluster:
     mode: warn
 nodesets:
   enabled: false
-  clusterName: ""
   # postRenderers: []
   driftDetection:
     mode: warn
@@ -847,8 +845,8 @@ nodesets:
   version: 5.0.0
   namespace: soperator
   releaseName: soperator-nodesets
-  values: null
-  overrideValues: null
+  values:
+    clusterName: ""
   install:
     crds: Skip
     remediation:
@@ -865,7 +863,7 @@ soperatorActiveChecks:
   version: 5.0.0
   releaseName: soperator-activechecks
   namespace: soperator
-  overrideValues: null
+  values: null
   install:
     crds: Skip
     remediation:
@@ -1227,7 +1225,7 @@ csiDriverNfs:
   version: 4.11.0
   namespace: nfs-system
   releaseName: csi-driver-nfs
-  overrideValues:
+  values:
     controller:
       nodeSelector:
         slurm.nebius.ai/nodeset: system
@@ -1259,7 +1257,6 @@ nfsServer:
   version: 1.2.3
   namespace: nfs-system
   releaseName: nfs-server
-  overrideValues: null
   values: null
   install:
     crds: Skip

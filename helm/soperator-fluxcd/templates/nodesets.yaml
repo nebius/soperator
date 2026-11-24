@@ -37,14 +37,9 @@ spec:
   {{- include "soperator-fluxcd.targetNamespace" .Values.nodesets.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.nodesets.upgrade | nindent 4 }}
+  {{- with .Values.nodesets.values }}
   values:
-    clusterName: {{ .Values.nodesets.clusterName | quote }}
-  {{- if .Values.nodesets.overrideValues }}
-    {{- toYaml .Values.nodesets.overrideValues | nindent 4 }}
-  {{- else }}
-    {{- if .Values.nodesets.values }}
-    {{- toYaml .Values.nodesets.values | nindent 4 }}
-    {{- end }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
   valuesFrom:
   - kind: ConfigMap

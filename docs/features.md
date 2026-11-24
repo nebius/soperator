@@ -124,7 +124,7 @@ To override it through the umbrella ConfigMap's `values.yaml`, use:
 
 ```yaml
 slurmCluster:
-  overrideValues:
+  values:
     slurmNodes:
       controller:
         terminationGracePeriodSeconds: 240

@@ -21,6 +21,12 @@ Set `values` on the component to pass the child chart's native keys to `spec.val
 | `kruise` | `soperator.kruise` |
 | `soperator` | `soperator` |
 | `nodeconfigurator` | `soperator.nodeConfigurator` |
+| `csi-driver-nfs` | `csiDriverNfs` |
+| `nfs-server` | `nfsServer` |
+| `slurm-cluster-storage` | `slurmCluster.slurmClusterStorage` |
+| `slurm-cluster` | `slurmCluster` |
+| `nodesets` | `nodesets` |
+| `soperator-activechecks` | `soperatorActiveChecks` |
 
 During migration, `customConfigmaps` and `soperator.monitoringDashboards` read `overrideValues` when `values` is absent or `null`.
 Move existing overrides to `values`. An explicit `values: {}` takes precedence over the legacy override.
@@ -37,6 +43,19 @@ Move controller sizing from `soperator.values.manager.resources` to `soperator.v
 Set `isMariadbCrdInstalled` and `isPrometheusCrdInstalled` under `soperator.values.controllerManager.manager.env` according to the available CRDs.
 Set `soperator.values.certManager.enabled` according to whether the operator uses cert-manager. The component `enabled` flags control which HelmReleases the chart creates.
 An empty `rebooter.priorityClassName` explicitly sets an empty class name. Use `null` to remove the inline key and allow a value from `valuesFrom`.
+
+### Storage and Slurm upgrades
+
+Before upgrading, move `overrideValues` to `values` under `csiDriverNfs`, `nfsServer`, `slurmCluster.slurmClusterStorage`, `slurmCluster`, `nodesets`, and `soperatorActiveChecks`.
+Move `nodesets.clusterName` to `nodesets.values.clusterName` as well.
+Managed and Pro profiles that use the old keys need the same migration before upgrading the chart.
+
+Helm merges `csiDriverNfs.values` with the default controller placement. Use `null` for any default placement setting that should be omitted.
+
+Keep the existing SlurmCluster resource name when migrating a profile.
+A nonempty legacy `slurmCluster.overrideValues` map without `clusterName` took the name from `valuesFrom` or the child chart's `slurm1` default.
+Set `slurmCluster.values.clusterName` to the existing name, or set it to `null` to retain that source.
+For a custom cluster name, set `nodesets.values.clusterName` and `soperatorActiveChecks.values.slurmClusterRefName` to the same name on enabled components.
 
 ## HelmRelease dependencies
 

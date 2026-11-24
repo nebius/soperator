@@ -33,11 +33,9 @@ spec:
   {{- include "soperator-fluxcd.targetNamespace" .Values.soperatorActiveChecks.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.soperatorActiveChecks.upgrade | nindent 4 }}
+  {{- with .Values.soperatorActiveChecks.values }}
   values:
-  {{- if .Values.soperatorActiveChecks.overrideValues }}
-    {{- toYaml .Values.soperatorActiveChecks.overrideValues | nindent 4 }}
-  {{- else }}
-    clusterName: soperator
+    {{- toYaml . | nindent 4 }}
   {{- end }}
   valuesFrom:
   - kind: ConfigMap

@@ -32,8 +32,8 @@ spec:
   timeout: {{ .Values.csiDriverNfs.timeout }}
   releaseName: {{ .Values.csiDriverNfs.releaseName }}
   {{- include "soperator-fluxcd.targetNamespace" .Values.csiDriverNfs.namespace | nindent 2 }}
+  {{- with .Values.csiDriverNfs.values }}
   values:
-  {{- if .Values.csiDriverNfs.overrideValues }}
-    {{- toYaml .Values.csiDriverNfs.overrideValues | nindent 4 }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
 {{- end }}
