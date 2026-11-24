@@ -78,10 +78,16 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	}
 	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
 	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
+	// Newer recipes take the NFS version and registry from the Soperator release and reject
+	// these attributes, so override them only where the recipe still sets them.
 	if nfs, ok := tfVars["nfs_in_k8s"].(map[string]interface{}); ok {
 		if spec, ok := nfs["spec"].(map[string]interface{}); ok && spec != nil {
-			spec["version"] = cfg.NFSVersion
-			spec["use_stable_repo"] = !cfg.SoperatorUnstable
+			if _, ok := spec["version"]; ok {
+				spec["version"] = cfg.NFSVersion
+			}
+			if _, ok := spec["use_stable_repo"]; ok {
+				spec["use_stable_repo"] = !cfg.SoperatorUnstable
+			}
 		}
 	}
 	tfVars["production"] = false
