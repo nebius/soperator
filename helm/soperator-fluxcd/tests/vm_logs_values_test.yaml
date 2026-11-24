@@ -1,0 +1,55 @@
+suite: test VictoriaLogs values
+templates:
+  - templates/vm-logs.yaml
+tests:
+  - it: should keep the default PVC and monitoring configuration
+    asserts:
+      - equal:
+          path: spec.values.server.persistentVolume
+          value:
+            enabled: true
+            size: 30Gi
+            accessModes: [ReadWriteOnce]
+      - equal:
+          path: spec.values.server.vmServiceScrape.enabled
+          value: true
+      - equal:
+          path: spec.values.dashboards
+          value:
+            enabled: true
+            labels:
+              grafana_dashboard: "1"
+      - equal:
+          path: spec.values.vector.enabled
+          value: false
+
+  - it: should pass the native PVC settings
+    set:
+      observability.vmLogs.values.server.persistentVolume:
+        size: 60Gi
+        accessModes: [ReadWriteMany]
+        storageClassName: fast-logs
+    asserts:
+      - equal:
+          path: spec.values.server.persistentVolume
+          value:
+            enabled: true
+            size: 60Gi
+            accessModes: [ReadWriteMany]
+            storageClassName: fast-logs
+
+  - it: should pass through the name of an existing claim
+    set:
+      observability.vmLogs.values.server.persistentVolume.existingClaim: existing-logs
+    asserts:
+      - equal:
+          path: spec.values.server.persistentVolume.existingClaim
+          value: existing-logs
+
+  - it: should pass persistence disabled explicitly
+    set:
+      observability.vmLogs.values.server.persistentVolume.enabled: false
+    asserts:
+      - equal:
+          path: spec.values.server.persistentVolume.enabled
+          value: false

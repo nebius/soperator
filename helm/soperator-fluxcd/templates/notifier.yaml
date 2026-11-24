@@ -22,9 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.notifier.version }}
-  dependsOn:
-    - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-    - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.notifier "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.notifier.install | nindent 4 }}
   upgrade:
@@ -33,14 +31,10 @@ spec:
   timeout: {{ .Values.notifier.timeout }}
   releaseName: {{ .Values.notifier.releaseName }}
   {{- include "soperator-fluxcd.targetNamespace" .Values.notifier.namespace | nindent 2 }}
+  {{- with .Values.notifier.values }}
   values:
-    {{- if .Values.notifier.overrideValues }}
-    {{- toYaml .Values.notifier.overrideValues | nindent 4 }}
-    {{- else }}
-    nameOverride: {{ .Values.notifier.releaseName }}
-    slack:
-      webhookUrl: {{ required "Slack Webhook is required." .Values.notifier.values.slack.webhookUrl | quote }}
-    {{- end }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   valuesFrom:
     - kind: ConfigMap
       name: terraform-soperator-notifier

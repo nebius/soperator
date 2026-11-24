@@ -683,28 +683,37 @@ observability:
         retries: 3
         remediateLastFailure: true
     values:
-      persistentVolume:
+      dashboards:
         enabled: true
-        size: 30Gi
-        accessMode: ReadWriteOnce
-      nodeSelector:
-        slurm.nebius.ai/nodeset: system
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                topologyKey: kubernetes.io/hostname
-                labelSelector:
-                  matchLabels:
-                    app.kubernetes.io/name: victoria-logs-single
-      resources:
-        requests:
-          memory: 2Gi
-          cpu: 1000m
-        limits:
-          memory: 2Gi
-    overrideValues: null
+        labels:
+          grafana_dashboard: "1"
+      server:
+        nodeSelector:
+          slurm.nebius.ai/nodeset: system
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: victoria-logs-single
+        resources:
+          requests:
+            memory: 2Gi
+            cpu: 1000m
+          limits:
+            memory: 2Gi
+        persistentVolume:
+          enabled: true
+          size: 30Gi
+          accessModes:
+            - ReadWriteOnce
+        vmServiceScrape:
+          enabled: true
+      vector:
+        enabled: false
     # postRenderers: []
     driftDetection:
       mode: warn
@@ -728,12 +737,14 @@ observability:
         remediateLastFailure: true
     values:
       validateToolkit: true
-      resources:
-        limits:
-          memory: 128Mi
-        requests:
-          memory: 128Mi
-          cpu: 100m
+      daemonSet:
+        nvidiaDcgmExporter:
+          resources:
+            limits:
+              memory: 128Mi
+            requests:
+              memory: 128Mi
+              cpu: 100m
     # postRenderers: []
     driftDetection:
       mode: warn
@@ -1205,6 +1216,9 @@ notifier:
   version: 5.0.0
   namespace: monitoring-system
   releaseName: soperator-notifier
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-stack'
   install:
     remediation:
       retries: 3
@@ -1213,9 +1227,10 @@ notifier:
       retries: 3
       remediateLastFailure: true
   values:
-    slack:
-      webhookUrl: null
-  overrideValues: null
+    nameOverride: soperator-notifier
+    # Set the Slack webhook here or supply it through valuesFrom.
+    # slack:
+    #   webhookUrl: null
   # postRenderers: []
   driftDetection:
     mode: warn
