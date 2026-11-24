@@ -30,7 +30,7 @@ spec:
   interval: {{ .Values.soperator.monitoringDashboards.interval }}
   timeout: {{ .Values.soperator.monitoringDashboards.timeout }}
   releaseName: {{ .Values.soperator.monitoringDashboards.releaseName }}
-  targetNamespace: {{ .Values.soperator.monitoringDashboards.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.soperator.monitoringDashboards.namespace | nindent 2 }}
   {{- with include "soperator-fluxcd.valuesWithLegacyOverride" .Values.soperator.monitoringDashboards }}
   values:
     {{- . | nindent 4 }}

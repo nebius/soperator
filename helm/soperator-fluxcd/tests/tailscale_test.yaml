@@ -5,7 +5,24 @@ tests:
   - it: should allow Tailscale to persist state for any login pod
     set:
       tailscale.enabled: true
+      tailscale.namespace: workload
     asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: RELEASE-NAME-ns
+      - equal:
+          path: spec.values.resources[0].metadata.namespace
+          value: workload
+      - equal:
+          path: spec.values.resources[1].metadata.namespace
+          value: workload
+      - equal:
+          path: spec.values.resources[1].roleRef.name
+          value: tailscale
+      - equal:
+          path: spec.values.resources[1].subjects[0].name
+          value: default
       - equal:
           path: spec.values.resources[0].rules[0].resources[0]
           value: secrets

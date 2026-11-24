@@ -22,12 +22,13 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-victoriametrics
       version: {{ .Values.observability.vmLogs.version }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.observability.vmLogs "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.observability.vmLogs.install | nindent 4 }}
   interval: {{ .Values.observability.vmLogs.interval }}
   timeout: {{ .Values.observability.vmLogs.timeout }}
   releaseName: {{ .Values.observability.vmLogs.releaseName }}
-  targetNamespace: {{ .Values.observability.vmLogs.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.observability.vmLogs.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.observability.vmLogs.upgrade | nindent 4 }}
   values:

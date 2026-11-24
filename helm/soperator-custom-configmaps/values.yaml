@@ -1,4 +1,4 @@
-namespace: soperator
+namespace: ""
 
 enroot:
   # Store Enroot cache/data/runtime under dedicated image storage disks.

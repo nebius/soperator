@@ -34,7 +34,7 @@ spec:
   interval: {{ .Values.nodesets.interval }}
   timeout: {{ .Values.nodesets.timeout }}
   releaseName: {{ .Values.nodesets.releaseName }}
-  targetNamespace: {{ .Values.nodesets.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.nodesets.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.nodesets.upgrade | nindent 4 }}
   values:

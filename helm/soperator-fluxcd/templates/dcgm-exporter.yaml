@@ -22,12 +22,13 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.observability.dcgmExporter.version }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.observability.dcgmExporter "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.observability.dcgmExporter.install | nindent 4 }}
   interval: {{ .Values.observability.dcgmExporter.interval }}
   timeout: {{ .Values.observability.dcgmExporter.timeout }}
   releaseName: {{ .Values.observability.dcgmExporter.releaseName }}
-  targetNamespace: {{ .Values.observability.dcgmExporter.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.observability.dcgmExporter.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.observability.dcgmExporter.upgrade | nindent 4 }}
   values:

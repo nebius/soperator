@@ -35,7 +35,7 @@ spec:
   interval: {{ .Values.soperator.interval }}
   timeout: {{ .Values.soperator.timeout }}
   releaseName: {{ .Values.soperator.releaseName }}
-  targetNamespace: {{ .Values.soperator.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.soperator.namespace | nindent 2 }}
   values:
   {{- if .Values.soperator.overrideValues }}
     {{- toYaml .Values.soperator.overrideValues | nindent 4 }}

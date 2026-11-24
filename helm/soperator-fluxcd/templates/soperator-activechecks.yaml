@@ -30,7 +30,7 @@ spec:
   interval: {{ .Values.soperatorActiveChecks.interval }}
   timeout: {{ .Values.soperatorActiveChecks.timeout }}
   releaseName: {{ .Values.soperatorActiveChecks.releaseName }}
-  targetNamespace: {{ .Values.soperatorActiveChecks.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.soperatorActiveChecks.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.soperatorActiveChecks.upgrade | nindent 4 }}
   values:

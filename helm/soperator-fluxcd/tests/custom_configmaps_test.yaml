@@ -43,15 +43,21 @@ tests:
           path: spec.chart.spec.version
           value: "1.23.0"
 
-  - it: should use correct namespace from values
+  - it: should set the target namespace without injecting a child chart value
     set:
       customConfigmaps:
         enabled: true
         namespace: custom-namespace
+        values:
+          configMaps:
+            motd:
+              enabled: false
     asserts:
       - equal:
           path: spec.targetNamespace
           value: custom-namespace
+      - notExists:
+          path: spec.values.namespace
 
   - it: should use correct interval and timeout from values
     set:

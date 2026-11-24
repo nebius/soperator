@@ -14,6 +14,12 @@ If release name contains chart name it will be used as a full name.
 {{- default .Release.Name .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "soperator-fluxcd.targetNamespace" -}}
+{{- with . -}}
+targetNamespace: {{ . | quote }}
+{{- end -}}
+{{- end -}}
+
 {{/*
 Resolve dependency names in the chart context, preserving the rest of each reference.
 */}}
@@ -25,11 +31,47 @@ Resolve dependency names in the chart context, preserving the rest of each refer
   {{- end -}}
   {{- $references := list -}}
   {{- range $dependencies -}}
-    {{- $reference := deepCopy . -}}
-    {{- $_ := set $reference "name" (tpl .name $.root) -}}
-    {{- $references = append $references $reference -}}
+    {{- $name := tpl .name $.root | trim -}}
+    {{- if $name -}}
+      {{- $reference := deepCopy . -}}
+      {{- $_ := set $reference "name" $name -}}
+      {{- $references = append $references $reference -}}
+    {{- end -}}
   {{- end -}}
   {{- toYaml (dict "dependsOn" $references) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Apply the platform defaults before the child chart values. Existing legacy maps
+replace the whole inline configuration.
+*/}}
+{{- define "soperator-fluxcd.platformValues" -}}
+{{- with .component.overrideValues -}}
+  {{- toYaml . -}}
+{{- else -}}
+  {{- $defaults := deepCopy (.component.defaultValues | default dict) -}}
+  {{- if .prometheusEnabled -}}
+    {{- $defaults = mustMergeOverwrite $defaults (.component.prometheusValues | default dict) -}}
+  {{- end -}}
+  {{- $resolved := tpl (toYaml $defaults) .root | fromYaml -}}
+  {{- mustMergeOverwrite $resolved (.component.values | default dict) | toYaml -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Merge into a copy of the Kruise values using Helm's null handling for old overrides.
+*/}}
+{{- define "soperator-fluxcd.mergeKruiseOverrides" -}}
+{{- range $key, $override := .overrides -}}
+  {{- $value := get $.values $key -}}
+  {{- if and (eq $override nil) (hasKey $.values $key) -}}
+    {{- $_ := unset $.values $key -}}
+  {{- else if and (kindIs "map" $value) (kindIs "map" $override) -}}
+    {{- include "soperator-fluxcd.mergeKruiseOverrides" (dict "values" $value "overrides" $override) -}}
+  {{- else -}}
+    {{- $_ := set $.values $key $override -}}
+  {{- end -}}
 {{- end -}}
 {{- end -}}
 
@@ -134,9 +176,9 @@ legacy override path for existing installations.
 
 {{- define "soperator-fluxcd.o11yTsaTokenWriterNamespace" -}}
 {{- if .Values.observability.vmStack.enabled -}}
-{{- .Values.observability.vmStack.namespace | default "monitoring-system" -}}
+{{- .Values.observability.vmStack.namespace | default .Release.Namespace -}}
 {{- else -}}
-{{- .Values.observability.opentelemetry.namespace | default "logs-system" -}}
+{{- .Values.observability.opentelemetry.namespace | default .Release.Namespace -}}
 {{- end -}}
 {{- end -}}
 
@@ -159,10 +201,10 @@ legacy override path for existing installations.
 {{- else -}}
 {{- $namespaces := list -}}
 {{- if .Values.observability.vmStack.enabled -}}
-{{- $namespaces = append $namespaces (.Values.observability.vmStack.namespace | default "monitoring-system") -}}
+{{- $namespaces = append $namespaces (.Values.observability.vmStack.namespace | default .Release.Namespace) -}}
 {{- end -}}
 {{- if .Values.observability.opentelemetry.enabled -}}
-{{- $namespaces = append $namespaces (.Values.observability.opentelemetry.namespace | default "logs-system") -}}
+{{- $namespaces = append $namespaces (.Values.observability.opentelemetry.namespace | default .Release.Namespace) -}}
 {{- end -}}
 {{- $namespaces | uniq | toYaml -}}
 {{- end -}}

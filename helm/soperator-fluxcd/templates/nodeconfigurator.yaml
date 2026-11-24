@@ -29,7 +29,7 @@ spec:
   interval: {{ .Values.soperator.nodeConfigurator.interval }}
   timeout: {{ .Values.soperator.nodeConfigurator.timeout }}
   releaseName: {{ .Values.soperator.nodeConfigurator.releaseName }}
-  targetNamespace: {{ .Values.soperator.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.soperator.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.soperator.nodeConfigurator.upgrade | nindent 4 }}
   values:

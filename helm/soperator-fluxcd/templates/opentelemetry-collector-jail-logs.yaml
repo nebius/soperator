@@ -47,7 +47,7 @@ spec:
   interval: {{ .Values.observability.opentelemetry.logs.interval }}
   timeout: {{ .Values.observability.opentelemetry.logs.timeout }}
   releaseName: opentelemetry-collector-jail-logs
-  targetNamespace: {{ .Values.observability.opentelemetry.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.observability.opentelemetry.namespace | nindent 2 }}
 
   values:
   {{- $hasPublicEndpoint := .Values.observability.publicEndpointEnabled }}
