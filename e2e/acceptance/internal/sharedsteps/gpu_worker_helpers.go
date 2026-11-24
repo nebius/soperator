@@ -3,6 +3,7 @@ package sharedsteps
 import (
 	"fmt"
 	"math/rand"
+	"slices"
 	"sort"
 	"strings"
 
@@ -122,4 +123,24 @@ func pickIdleGPUWorkersFromEveryNodeSet(snapshot framework.WorkerSnapshot, minTo
 		return nil, fmt.Errorf("select %d idle GPU workers: %s", minTotal, gpuWorkerAvailability(snapshot, minTotal))
 	}
 	return selected, nil
+}
+
+// gpuNodeSetWithReplicas returns the first GPU NodeSet, by name, configured with at least count workers.
+func gpuNodeSetWithReplicas(snapshot framework.WorkerSnapshot, count int) (string, error) {
+	var names []string
+	most := 0
+	for _, nodeSet := range snapshot.NodeSets {
+		if !nodeSet.HasGPU {
+			continue
+		}
+		most = max(most, nodeSet.Replicas)
+		if nodeSet.Replicas >= count {
+			names = append(names, nodeSet.Name)
+		}
+	}
+	if len(names) == 0 {
+		return "", &framework.InsufficientWorkersError{Label: "GPU workers in one NodeSet", Found: most, Need: count}
+	}
+	slices.Sort(names)
+	return names[0], nil
 }

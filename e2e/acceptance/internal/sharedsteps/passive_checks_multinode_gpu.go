@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
@@ -117,24 +116,4 @@ func formatWorkerGPUCounts(workers []framework.WorkerInfo) string {
 		counts = append(counts, fmt.Sprintf("%s=%d", worker.Name, worker.SlurmNode.GPUCount))
 	}
 	return strings.Join(counts, ", ")
-}
-
-// gpuNodeSetWithReplicas returns the first GPU NodeSet, by name, configured with at least count workers.
-func gpuNodeSetWithReplicas(snapshot framework.WorkerSnapshot, count int) (string, error) {
-	var names []string
-	most := 0
-	for _, nodeSet := range snapshot.NodeSets {
-		if !nodeSet.HasGPU {
-			continue
-		}
-		most = max(most, nodeSet.Replicas)
-		if nodeSet.Replicas >= count {
-			names = append(names, nodeSet.Name)
-		}
-	}
-	if len(names) == 0 {
-		return "", &framework.InsufficientWorkersError{Label: "GPU workers in one NodeSet", Found: most, Need: count}
-	}
-	slices.Sort(names)
-	return names[0], nil
 }

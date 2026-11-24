@@ -162,13 +162,13 @@ func (s *SoperatorUtils) checkInstanceLoginResults() error {
 }
 
 func (s *SoperatorUtils) runTaskInfoProlog(ctx context.Context) error {
-	command := fmt.Sprintf(
-		"timeout %.0f srun -N 1 -w %s --gpus-per-node=1 --ntasks-per-node=1 --cpus-per-task=1 --task-prolog=%s true",
-		soperatorUtilsTaskTimeout.Seconds(),
-		framework.ShellQuote(s.worker.Name),
-		framework.ShellQuote(path.Join(soperatorUtilsDir, "slurm_task_info.sh")),
-	)
-	output, err := s.runtime.Jail().Run(ctx, command)
+	jobCtx, cancel := context.WithTimeout(ctx, soperatorUtilsTaskTimeout)
+	defer cancel()
+	output, err := framework.NewSlurmClient(s.runtime).RunSlurm(jobCtx, "srun", framework.SlurmCommandOptions{
+		Nodes: 1, Nodelist: []string{s.worker.Name}, TimeLimit: soperatorUtilsTaskTimeout,
+		Args: []string{"--gpus-per-node=1", "--ntasks-per-node=1", "--cpus-per-task=1",
+			"--task-prolog=" + path.Join(soperatorUtilsDir, "slurm_task_info.sh")},
+	}, "true")
 	if err != nil {
 		return fmt.Errorf("run one-GPU task with slurm_task_info prolog: %w", err)
 	}

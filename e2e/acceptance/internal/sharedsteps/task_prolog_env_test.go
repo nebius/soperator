@@ -4,19 +4,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nebius/soperator/e2e/acceptance/framework"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTaskPrologNetworkEnvCommand(t *testing.T) {
-	command := taskPrologNetworkEnvCommand("worker-gpu-0", 30*time.Second, 90*time.Second)
-
-	assert.Contains(t, command, "timeout 90 srun")
-	assert.Contains(t, command, "--immediate=30")
-	assert.Contains(t, command, "-w 'worker-gpu-0'")
-	assert.Contains(t, command, "--gpus-per-node=1")
-	assert.Contains(t, command, "bash -c")
-	assert.NotContains(t, command, "bash -lc")
+	runtime := newRecordingRuntime(t, nil)
+	steps := NewTaskPrologEnv(runtime, nil)
+	steps.worker = framework.WorkerInfo{Name: "worker-gpu-0"}
+	require.NoError(t, steps.runGPUJobFromLogin(t.Context()))
+	command := runtime.log[0]
+	assert.Contains(t, command, "'--immediate=120'")
+	assert.Contains(t, command, "'--nodelist=worker-gpu-0'")
+	assert.Contains(t, command, "'--gpus-per-node=1'")
+	assert.Contains(t, command, "'--' 'bash' '-c'")
+	assert.NotContains(t, command, "'bash' '-lc'")
 	assert.Contains(t, command, "UCX_NET_DEVICES")
 	assert.Contains(t, command, "NCCL_IB_HCA")
 	assert.Contains(t, command, taskPrologNCCLNetworkVarsPath)

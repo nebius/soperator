@@ -120,10 +120,10 @@ func TestDockerJailVisiblePathRejectsTraversal(t *testing.T) {
 }
 
 func TestDockerSrunTaskCommandNamesContainersPerTask(t *testing.T) {
-	const want = `exec docker run --rm --name "e2e-docker-${SLURM_JOB_ID}-${SLURM_NODEID}-${SLURM_LOCALID}" ` +
+	const want = `exec docker run --rm --name 'owned-'"${SLURM_NODEID}-${SLURM_LOCALID}" ` +
 		`'cr.nebius.cloud/soperator/busybox' sh -c 'echo ready; sleep 3600'`
 
-	if got := dockerSrunTaskCommand(); got != want {
+	if got := dockerSrunTaskCommand("owned-"); got != want {
 		t.Fatalf("dockerSrunTaskCommand() = %q, want %q", got, want)
 	}
 }

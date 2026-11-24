@@ -65,12 +65,7 @@ func (s *NCCL) CleanupAndReset(context.Context) {
 }
 
 func (s *NCCL) selectIdleGPUWorkers(ctx context.Context) error {
-	snapshot, err := s.selector.Snapshot(ctx)
-	if err != nil {
-		return fmt.Errorf("inspect workers for NCCL validation: %w", err)
-	}
-
-	workers, err := pickIdleGPUWorkers(snapshot, ncclWorkerCount, true)
+	workers, err := selectIdleGPUWorkers(ctx, s.selector, ncclWorkerCount, true)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
@@ -85,7 +80,7 @@ func (s *NCCL) runNCCLTest(ctx context.Context) error {
 	}
 
 	command := ncclTestCommand(s.workers)
-	s.output, s.runErr = s.runtime.Jail().Run(ctx, command)
+	s.output, s.runErr = framework.NewSlurmClient(s.runtime).RunReservationUtility(ctx, "", "bash", "-c", command)
 	if err := writeNCCLOutputArtifact(ctx, s.output); err != nil {
 		return err
 	}

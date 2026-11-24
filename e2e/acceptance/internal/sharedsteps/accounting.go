@@ -113,7 +113,7 @@ func (s *Accounting) CleanupAndReset(ctx context.Context) {
 		cleanupCtx, cancel := context.WithTimeout(ctx, accountingCleanupTimeout)
 		defer cancel()
 		if err := s.slurm.CancelJob(cleanupCtx, s.job.ID, accountingCleanupTimeout); err != nil {
-			s.runtime.Logf("cleanup: cancel accounting job %s: %v", s.job.ID, err)
+			reportCleanupErrorf(ctx, s.runtime, "cancel accounting job %s: %w", s.job.ID, err)
 		}
 	}
 	s.clusterName = ""
@@ -269,41 +269,23 @@ func (s *Accounting) submitAccountingSmokeJob(ctx context.Context) error {
 		return fmt.Errorf("worker for accounting smoke job is not selected")
 	}
 	outputDir := accountingTestUserHome
-	prepareOutputDir := ""
 	if artifacts, ok := framework.ScenarioArtifacts(ctx); ok {
 		outputDir = artifacts.JailDir
-		prepareOutputDir = userOwnedDirCommand(sshTestUserName, outputDir) + " && "
+		if _, err := s.runtime.Jail().Run(ctx, userOwnedDirCommand(sshTestUserName, outputDir)); err != nil {
+			return fmt.Errorf("prepare accounting output directory: %w", err)
+		}
 	}
-	stdoutPath := outputDir + "/e2e-accounting.out"
-	stderrPath := outputDir + "/e2e-accounting.err"
-	command := strings.Join([]string{
-		prepareOutputDir + "sudo", "-iu", framework.ShellQuote(sshTestUserName), "--", "sbatch",
-		"--parsable",
-		"--job-name=" + framework.ShellQuote(accountingTestJobName),
-		"--account=" + framework.ShellQuote(accountingTestAccount),
-		"-N", "1",
-		"--nodelist=" + framework.ShellQuote(s.worker.Name),
-		"--output=" + framework.ShellQuote(stdoutPath),
-		"--error=" + framework.ShellQuote(stderrPath),
-		"--open-mode=truncate",
-		"--wrap=" + framework.ShellQuote("hostname; sleep 2"),
-	}, " ")
-	output, err := s.runtime.Jail().Run(ctx, command)
+	var err error
+	s.job, err = s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
+		JobName: accountingTestJobName,
+		Nodes:   1, Nodelist: []string{s.worker.Name},
+		Args: []string{"--account=" + accountingTestAccount, "--open-mode=truncate"},
+		Wrap: "hostname; sleep 2", RunAsUser: sshTestUserName, OutputDir: outputDir,
+	})
 	if err != nil {
 		return fmt.Errorf("submit accounting smoke job as %s: %w", sshTestUserName, err)
 	}
-	jobID, err := framework.ParseSbatchJobID(output)
-	if err != nil {
-		return fmt.Errorf("parse accounting smoke job ID: %w", err)
-	}
-	s.job = framework.SbatchJob{
-		ID:         jobID,
-		JobName:    accountingTestJobName,
-		StdoutPath: stdoutPath,
-		StderrPath: stderrPath,
-	}
-	s.runtime.Logf("accounting: submitted job=%s user=%s account=%s",
-		jobID, sshTestUserName, accountingTestAccount)
+	s.runtime.Logf("Accounting: submitted job=%s user=%s account=%s", s.job.ID, sshTestUserName, accountingTestAccount)
 	return nil
 }
 

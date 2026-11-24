@@ -50,6 +50,7 @@ type DockerContainers struct {
 	tasksPerWorker      int
 
 	srunCancel context.CancelFunc
+	srunDone   <-chan struct{}
 
 	loginSSHContainerName string
 	loginJailSubMounts    []framework.JailSubMountInfo
@@ -101,7 +102,7 @@ func (s *DockerContainers) CleanupAndReset(ctx context.Context) {
 			framework.ShellQuote(s.loginSSHContainerName),
 		)
 		if _, cleanupErr := s.runtime.Jail().Run(ctx, cleanupCommand); cleanupErr != nil {
-			s.runtime.Logf("cleanup: remove login Docker container: %v", cleanupErr)
+			reportCleanupErrorf(ctx, s.runtime, "remove login Docker container: %w", cleanupErr)
 		}
 	}
 	if s.dockerSSHIdentitySet {
@@ -112,22 +113,36 @@ func (s *DockerContainers) CleanupAndReset(ctx context.Context) {
 			dockerSSHKeyName,
 			dockerSSHKeyComment,
 		); cleanupErr != nil {
-			s.runtime.Logf("cleanup: remove Docker SSH identity: %v", cleanupErr)
+			reportCleanupErrorf(ctx, s.runtime, "remove Docker SSH identity: %w", cleanupErr)
 		}
 	}
 	if cleanupErr := s.requestCurrentJobCancellation(ctx); cleanupErr != nil {
-		s.runtime.Logf("cleanup: cancel Docker job: %v", cleanupErr)
+		reportCleanupErrorf(ctx, s.runtime, "cancel Docker job: %w", cleanupErr)
 	}
 	s.cancelUnidentifiedSrunJob(ctx)
-	s.stopContainersByNamePrefix(ctx)
-	s.removeContainersByNamePrefix(ctx)
-	if cleanupErr := s.waitForCurrentJobGone(ctx); cleanupErr != nil {
-		s.runtime.Logf("cleanup: wait for Docker job to finish: %v", cleanupErr)
-	}
 	if s.srunCancel != nil {
 		s.srunCancel()
 	}
-	s.srunCancel = nil
+	if s.srunDone != nil {
+		settleCtx, cancel := context.WithTimeout(ctx, dockerJobCancelTimeout)
+		select {
+		case <-s.srunDone:
+		case <-settleCtx.Done():
+			reportCleanupErrorf(ctx, s.runtime, "settle Docker srun: %w", settleCtx.Err())
+		}
+		cancel()
+	}
+	s.stopContainersByNamePrefix(ctx)
+	s.removeContainersByNamePrefix(ctx)
+	if cleanupErr := s.waitForCurrentJobGone(ctx); cleanupErr != nil {
+		reportCleanupErrorf(ctx, s.runtime, "wait for Docker job to finish: %w", cleanupErr)
+	}
+	if s.containerNamePrefix != "" {
+		if err := s.waitForTrackedContainersGone(ctx, dockerContainerStopTimeout); err != nil {
+			reportCleanupErrorf(ctx, s.runtime, "verify Docker containers stopped: %w", err)
+		}
+	}
+	s.srunCancel, s.srunDone = nil, nil
 	s.tasksPerWorker = 0
 	s.workers = nil
 	s.job = framework.SbatchJob{}
@@ -362,22 +377,27 @@ func (s *DockerContainers) aLongRunningDockerContainerJobIsLaunchedDirectlyFromT
 		Nodelist: framework.WorkerNames(s.workers),
 	}
 
-	// The job has a name but no ID until squeue reports it; cleanup cancels it by name meanwhile.
 	s.job = framework.SbatchJob{JobName: jobName, StdoutPath: stdoutPath, StderrPath: stderrPath}
+	// Container ownership must be known even if the job ID is never observed.
+	s.containerNamePrefix = jobName + "-"
 
 	// srun blocks until the job ends, so it outlives this step and is stopped in cleanup.
 	srunCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	s.srunCancel = cancel
-	exited := make(chan error, 1)
+	exited := make(chan struct{})
+	s.srunDone = exited
+	var exitErr error
+	task := dockerSrunTaskCommand(s.containerNamePrefix)
 	go func() {
-		output, srunErr := s.slurm.RunSlurm(srunCtx, "srun", options, "sh", "-c", dockerSrunTaskCommand())
-		exited <- fmt.Errorf("srun exited before its job was queued: %v; output: %s", srunErr, strings.TrimSpace(output))
+		defer close(exited)
+		output, srunErr := s.slurm.RunSlurm(srunCtx, "srun", options, "sh", "-c", task)
+		exitErr = fmt.Errorf("srun exited before its job was queued: %v; output: %s", srunErr, strings.TrimSpace(output))
 	}()
 
 	err := s.runtime.WaitFor(ctx, "Docker srun job "+jobName+" in the queue", dockerSrunSubmitTimeout, dockerSrunSubmitPollInterval,
 		func(waitCtx context.Context) (bool, error) {
 			select {
-			case exitErr := <-exited:
+			case <-exited:
 				return false, exitErr
 			default:
 			}
@@ -399,22 +419,21 @@ func (s *DockerContainers) aLongRunningDockerContainerJobIsLaunchedDirectlyFromT
 	if err != nil {
 		return err
 	}
-	s.containerNamePrefix = dockerJobContainerNamePrefix(s.job.ID)
 	s.runtime.Logf("Docker containers: direct srun selected workers=%s tasks_per_worker=%d job_id=%s stdout=%s stderr=%s",
 		strings.Join(framework.WorkerNames(s.workers), ","), s.tasksPerWorker, s.job.ID, stdoutPath, stderrPath)
 	return nil
 }
 
-// Matches the container names of both the sbatch and the direct srun job.
+// Matches the container names of the batch lifecycle job.
 func dockerJobContainerNamePrefix(jobID string) string {
 	return fmt.Sprintf("e2e-docker-%s-", jobID)
 }
 
 // Runs inside each task so that the Slurm variables expand per task.
-func dockerSrunTaskCommand() string {
+func dockerSrunTaskCommand(prefix string) string {
 	return fmt.Sprintf(
-		`exec docker run --rm --name "e2e-docker-${SLURM_JOB_ID}-${SLURM_NODEID}-${SLURM_LOCALID}" %s sh -c %s`,
-		framework.ShellQuote(dockerLifecycleImage),
+		`exec docker run --rm --name %s"${SLURM_NODEID}-${SLURM_LOCALID}" %s sh -c %s`,
+		framework.ShellQuote(prefix), framework.ShellQuote(dockerLifecycleImage),
 		framework.ShellQuote(containerLifecycleCommand),
 	)
 }
@@ -424,8 +443,17 @@ func (s *DockerContainers) cancelUnidentifiedSrunJob(ctx context.Context) {
 	if s.job.JobName == "" || !s.job.IsZero() {
 		return
 	}
-	if _, err := s.runtime.Jail().Run(ctx, "scancel --name="+framework.ShellQuote(s.job.JobName)); err != nil {
-		s.runtime.Logf("cleanup: cancel Docker srun job named %s: %v", s.job.JobName, err)
+	flag := "--name=" + framework.ShellQuote(s.job.JobName)
+	if framework.HasWorkerReservation(ctx) {
+		name, err := framework.WorkerReservationName(ctx)
+		if err != nil {
+			reportCleanupErrorf(ctx, s.runtime, "find Docker reservation: %w", err)
+			return
+		}
+		flag = "--reservation=" + framework.ShellQuote(name)
+	}
+	if _, err := s.runtime.Jail().Run(ctx, "scancel "+flag); err != nil {
+		reportCleanupErrorf(ctx, s.runtime, "cancel Docker srun job named %s: %w", s.job.JobName, err)
 	}
 }
 
@@ -440,11 +468,7 @@ func (s *DockerContainers) selectJobWorkers(ctx context.Context, workerType stri
 }
 
 func (s *DockerContainers) pickWorkers(ctx context.Context, workerType string, count int) ([]framework.WorkerInfo, error) {
-	snapshot, err := s.selector.Snapshot(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return snapshot.WithDocker().PickWorkersByType(workerType, count)
+	return selectDockerWorkers(ctx, s.selector, workerType, count)
 }
 
 func (s *DockerContainers) theDockerContainerJobIsRunning(ctx context.Context) error {
@@ -852,12 +876,12 @@ func (s *DockerContainers) stopContainersByNamePrefix(ctx context.Context) {
 		out, err := s.runtime.Worker(worker).RunWithDefaultRetry(ctx,
 			fmt.Sprintf("sudo docker ps --filter name=%s --format '{{.ID}}'", framework.ShellQuote(s.containerNamePrefix)))
 		if err != nil {
-			s.runtime.Logf("Docker cleanup: list containers on worker %s failed: %v", worker.Name, err)
+			reportCleanupErrorf(ctx, s.runtime, "list containers on worker %s failed: %w", worker.Name, err)
 			continue
 		}
 		for id := range parseIDSet(out) {
-			if _, err := s.runtime.Worker(worker).Run(ctx, fmt.Sprintf("sudo docker stop %s >/dev/null 2>&1 || true", framework.ShellQuote(id))); err != nil {
-				s.runtime.Logf("Docker cleanup: stop container %s on worker %s failed: %v", id, worker.Name, err)
+			if err := runDockerContainerAction(ctx, s.runtime, worker, "stop", id); err != nil {
+				reportCleanupErrorf(ctx, s.runtime, "stop container %s on worker %s failed: %w", id, worker.Name, err)
 			}
 		}
 	}
@@ -871,12 +895,12 @@ func (s *DockerContainers) removeContainersByNamePrefix(ctx context.Context) {
 	for _, worker := range s.workers {
 		ids, err := s.dockerContainerIDsByNamePrefixAll(ctx, worker)
 		if err != nil {
-			s.runtime.Logf("Docker cleanup: list all containers on worker %s failed: %v", worker.Name, err)
+			reportCleanupErrorf(ctx, s.runtime, "list all containers on worker %s failed: %w", worker.Name, err)
 			continue
 		}
 		for id := range ids {
-			if _, err := s.runtime.Worker(worker).Run(ctx, fmt.Sprintf("sudo docker rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(id))); err != nil {
-				s.runtime.Logf("Docker cleanup: remove container %s on worker %s failed: %v", id, worker.Name, err)
+			if err := runDockerContainerAction(ctx, s.runtime, worker, "rm -f", id); err != nil {
+				reportCleanupErrorf(ctx, s.runtime, "remove container %s on worker %s failed: %w", id, worker.Name, err)
 			}
 		}
 	}

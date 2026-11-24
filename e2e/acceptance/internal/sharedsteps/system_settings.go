@@ -305,14 +305,13 @@ func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
 			continue
 		}
 		if err := s.slurm.CancelJob(ctx, tracked.job.ID, systemSettingsCleanup); err != nil {
-			s.runtime.Logf("cleanup: cancel %s job %s: %v", tracked.kind, tracked.job.ID, err)
+			reportCleanupErrorf(ctx, s.runtime, "cancel %s job %s: %w", tracked.kind, tracked.job.ID, err)
 		}
 		if tracked.container.isDocker() && s.worker.Name != "" {
 			// Cancelling the job kills the Docker client, not necessarily the container.
 			name := systemSettingsDockerContainerName(tracked.job.ID)
-			command := fmt.Sprintf("sudo docker rm -f %s >/dev/null 2>&1 || true", framework.ShellQuote(name))
-			if _, err := s.runtime.Worker(s.worker).Run(ctx, command); err != nil {
-				s.runtime.Logf("cleanup: remove Docker container %s on worker %s: %v", name, s.worker.Name, err)
+			if err := runDockerContainerAction(ctx, s.runtime, s.worker, "rm -f", name); err != nil {
+				reportCleanupErrorf(ctx, s.runtime, "remove Docker container %s on worker %s: %w", name, s.worker.Name, err)
 			}
 		}
 	}
@@ -325,7 +324,7 @@ func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
 			loginSSHKeyName,
 			loginSSHKeyComment,
 		); err != nil {
-			s.runtime.Logf("cleanup: remove login SSH identity of %s: %v", sshTestUserName, err)
+			reportCleanupErrorf(ctx, s.runtime, "remove login SSH identity of %s: %w", sshTestUserName, err)
 		}
 	}
 
@@ -366,16 +365,12 @@ func (s *SystemSettings) selectHealthyGPUWorker(ctx context.Context) error {
 }
 
 func (s *SystemSettings) selectHealthyDockerWorker(ctx context.Context) error {
-	snapshot, err := s.selector.Snapshot(ctx)
-	if err != nil {
-		return err
-	}
-	workers, err := snapshot.WithDocker().PickWorkers(1)
+	workers, err := selectDockerWorkers(ctx, s.selector, "", 1)
 	if err != nil {
 		return framework.SkipIfInsufficientWorkers(s.runtime, err)
 	}
 	s.worker = workers[0]
-	s.runtime.Logf("system settings: selected Docker worker=%s", s.worker.Name)
+	s.runtime.Logf("System settings: selected Docker worker=%s", s.worker.Name)
 	return nil
 }
 
@@ -600,13 +595,14 @@ func (s *SystemSettings) runInteractiveJobs(ctx context.Context) error {
 		{kind: "native", container: probeContainerNone},
 		{kind: "Enroot", container: probeContainerEnroot},
 	} {
-		command := interactiveProbeCommand(
-			sshTestUserName,
-			s.worker.Name,
-			resourceLimitsAndKernelSettingsProbe(),
-			jobSpec.container,
-		)
-		output, err := s.runtime.Jail().Run(ctx, command)
+		var output string
+		err := framework.WithWorkerReservationJobFlags(ctx, sshTestUserName, func(flags []string) error {
+			command := interactiveProbeCommand(sshTestUserName, s.worker.Name,
+				resourceLimitsAndKernelSettingsProbe(), jobSpec.container, flags...)
+			var err error
+			output, err = s.runtime.Jail().Run(ctx, command)
+			return err
+		})
 		if err != nil {
 			return fmt.Errorf("run %s interactive job as %s on worker %s: %w; output:\n%s",
 				jobSpec.kind, sshTestUserName, s.worker.Name, err, strings.TrimSpace(output))
@@ -1120,12 +1116,16 @@ func resourceLimitsAndKernelSettingsProbe() string {
 // interactiveProbeCommand runs probe as userName in an interactive srun --pty
 // job on workerName. srun needs a terminal for --pty, which kubectl exec does
 // not provide, so script allocates one.
-func interactiveProbeCommand(userName, workerName, probe string, container probeContainer) string {
-	srun := srunProbeCommand(probe, container, nil,
+func interactiveProbeCommand(userName, workerName, probe string, container probeContainer, reservationFlags ...string) string {
+	flags := []string{
 		"--pty",
 		fmt.Sprintf("--immediate=%d", int(interactiveJobImmediate.Seconds())),
-		"--nodelist="+framework.ShellQuote(workerName),
-	)
+		"--nodelist=" + framework.ShellQuote(workerName),
+	}
+	for _, flag := range reservationFlags {
+		flags = append(flags, framework.ShellQuote(flag))
+	}
+	srun := srunProbeCommand(probe, container, nil, flags...)
 	interactive := fmt.Sprintf("timeout %d script -qec %s /dev/null",
 		int(systemSettingsJobTimeout.Seconds()),
 		framework.ShellQuote(srun),
