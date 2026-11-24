@@ -897,6 +897,8 @@ soperator:
   values:
     serviceMonitor:
       enabled: true
+    certManager:
+      enabled: true
     controllerManager:
       nodeSelector:
         slurm.nebius.ai/nodeset: system
@@ -909,14 +911,16 @@ soperator:
                 labelSelector:
                   matchLabels:
                     control-plane: controller-manager
-    manager:
-      resources:
-        limits:
-          memory: 1Gi
-        requests:
-          cpu: 500m
-          memory: 1Gi
-  overrideValues: null
+      manager:
+        env:
+          isMariadbCrdInstalled: true
+          isPrometheusCrdInstalled: true
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
   kruise:
     enabled: true
     interval: 5m
@@ -1146,7 +1150,15 @@ soperator:
         retries: 6
         remediateLastFailure: true
     values:
+      # Older nodeconfigurator charts use this key for the custom container.
+      nodeConfigurator:
+        enabled: false
       rebooter:
+        enabled: true
+        generateRBAC: true
+        logFormat: json
+        tolerations:
+          - operator: Exists
         # Without a priority class the rebooter runs at 0 and loses a node's spare CPU budget to
         # whatever infrastructure Deployment lands there first, with no way to preempt it. The
         # class sits below every Slurm pod (the lowest is slurm-login at 100002) because this is a
@@ -1162,7 +1174,6 @@ soperator:
             cpu: 100m
           limits:
             memory: 200Mi
-    overrideValues: null
     # postRenderers: []
     driftDetection:
       mode: warn

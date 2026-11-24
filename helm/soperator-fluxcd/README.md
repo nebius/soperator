@@ -19,6 +19,8 @@ Set `values` on the component to pass the child chart's native keys to `spec.val
 | `mariadb-operator` | `mariadbOperator` |
 | `k8up` | `backup` |
 | `kruise` | `soperator.kruise` |
+| `soperator` | `soperator` |
+| `nodeconfigurator` | `soperator.nodeConfigurator` |
 
 During migration, `customConfigmaps` and `soperator.monitoringDashboards` read `overrideValues` when `values` is absent or `null`.
 Move existing overrides to `values`. An explicit `values: {}` takes precedence over the legacy override.
@@ -28,6 +30,13 @@ Cert-manager and k8up also apply `prometheusValues` when `observability.promethe
 Existing nonempty `overrideValues` for these three components still replace the full inline map.
 Kruise merges legacy overrides with its moved defaults so partial resource overrides retain the image and CRD settings.
 Tailscale passes its Raw-chart resources through `tailscale.values.resources` and resolves the namespace references in that map.
+
+For `soperator` and `soperator.nodeConfigurator`, move settings from `overrideValues` to `values` in the same component.
+Helm merges the new `values` maps with the chart defaults.
+Move controller sizing from `soperator.values.manager.resources` to `soperator.values.controllerManager.manager.resources` before upgrading.
+Set `isMariadbCrdInstalled` and `isPrometheusCrdInstalled` under `soperator.values.controllerManager.manager.env` according to the available CRDs.
+Set `soperator.values.certManager.enabled` according to whether the operator uses cert-manager. The component `enabled` flags control which HelmReleases the chart creates.
+An empty `rebooter.priorityClassName` explicitly sets an empty class name. Use `null` to remove the inline key and allow a value from `valuesFrom`.
 
 ## HelmRelease dependencies
 

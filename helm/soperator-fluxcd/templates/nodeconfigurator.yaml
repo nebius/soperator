@@ -33,30 +33,7 @@ spec:
   upgrade:
     {{- toYaml .Values.soperator.nodeConfigurator.upgrade | nindent 4 }}
   values:
-  {{- if .Values.soperator.nodeConfigurator.overrideValues }}
-    {{- toYaml .Values.soperator.nodeConfigurator.overrideValues | nindent 4 }}
-  {{- else }}
-    nodeConfigurator:
-      enabled: false
-  {{- $rebooter := .Values.soperator.nodeConfigurator.values.rebooter | default dict }}
-    rebooter:
-      enabled: true
-      {{- with $rebooter.priorityClassName }}
-      priorityClassName: {{ . | quote }}
-      {{- end }}
-      {{- with $rebooter.priorityClass }}
-      priorityClass:
-      {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with $rebooter.resources }}
-      resources:
-      {{- toYaml . | nindent 8 }}
-      {{- end }}
-      generateRBAC: true
-      logFormat: json
-      tolerations:
-        - operator: Exists
-  {{- end }}
+    {{- toYaml .Values.soperator.nodeConfigurator.values | nindent 4 }}
   valuesFrom:
   - kind: ConfigMap
     name: terraform-nodeconfigurator
