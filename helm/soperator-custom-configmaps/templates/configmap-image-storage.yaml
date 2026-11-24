@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Values.configMaps.imageStorage.name }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Values.namespace | default .Release.Namespace | quote }}
   labels:
     {{- include "soperator-custom-configmaps.labels" . | nindent 4 }}
 data:

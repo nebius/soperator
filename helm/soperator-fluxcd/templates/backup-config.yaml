@@ -28,7 +28,7 @@ spec:
   interval: {{ default .Values.backup.interval .Values.backup.config.interval }}
   timeout: {{ default .Values.backup.timeout .Values.backup.config.timeout }}
   releaseName: {{ .Values.backup.config.releaseName }}
-  targetNamespace: {{ .Values.slurmCluster.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.slurmCluster.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.backup.config.upgrade | nindent 4 }}
   values:

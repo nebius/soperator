@@ -32,7 +32,7 @@ spec:
   interval: {{ .Values.notifier.interval }}
   timeout: {{ .Values.notifier.timeout }}
   releaseName: {{ .Values.notifier.releaseName }}
-  targetNamespace: {{ .Values.notifier.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.notifier.namespace | nindent 2 }}
   values:
     {{- if .Values.notifier.overrideValues }}
     {{- toYaml .Values.notifier.overrideValues | nindent 4 }}

@@ -15,6 +15,13 @@ mariadbOperator:
     dependsOn: null
 nodesets:
   enabled: true
+  namespace: flux-api-slurm
+slurmCluster:
+  namespace: flux-api-slurm
+soperatorActiveChecks:
+  namespace: flux-api-slurm
+customConfigmaps:
+  namespace: flux-api-slurm
 notifier:
   enabled: true
   values:
@@ -22,6 +29,7 @@ notifier:
       webhookUrl: https://example.invalid/webhook
 tailscale:
   enabled: true
+  namespace: flux-api-slurm
 observability:
   ncclProfiles:
     enabled: true

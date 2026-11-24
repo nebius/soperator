@@ -74,6 +74,21 @@ func TestFluxChartsApply(t *testing.T) {
 			}
 			umbrella := renderChart(t, "soperator-fluxcd", profile.namespace, server.GitVersion, flags...)
 			verifyManifests(t, kube, umbrella, profile.namespace)
+
+			namespaces := rawChartManifests(t, umbrella, "helm-soperator-fluxcd/templates/namespaces.yaml")
+			require.NotEmpty(t, namespaces)
+			seen := make(map[string]struct{}, len(namespaces))
+			for _, namespace := range namespaces {
+				name := namespace.object.GetName()
+				require.NotContains(t, seen, name, "duplicate namespace declaration")
+				seen[name] = struct{}{}
+			}
+			verifyManifests(t, kube, namespaces, profile.namespace)
+			tailscale := rawChartManifests(t, umbrella, "helm-soperator-fluxcd/templates/tailscale.yaml")
+			if profile.name == "all-enabled" {
+				require.Len(t, tailscale, 2)
+			}
+			verifyManifests(t, kube, tailscale, profile.namespace)
 		})
 	}
 
@@ -182,6 +197,24 @@ func decodeManifests(output []byte) ([]manifest, error) {
 			manifests = append(manifests, manifest{source: source, object: &unstructured.Unstructured{Object: fields}})
 		}
 	}
+}
+
+func rawChartManifests(t *testing.T, releases []manifest, template string) []manifest {
+	t.Helper()
+	var manifests []manifest
+	for _, release := range releases {
+		if release.source != template {
+			continue
+		}
+		resources, _, err := unstructured.NestedSlice(release.object.Object, "spec", "values", "resources")
+		require.NoError(t, err, template)
+		for _, resource := range resources {
+			fields, ok := resource.(map[string]any)
+			require.True(t, ok, "%s must pass objects to the Raw chart", template)
+			manifests = append(manifests, manifest{source: template, object: &unstructured.Unstructured{Object: fields}})
+		}
+	}
+	return manifests
 }
 
 func verifyManifests(t *testing.T, kube client.Client, manifests []manifest, namespace string) {

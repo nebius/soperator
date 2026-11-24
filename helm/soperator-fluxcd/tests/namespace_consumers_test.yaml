@@ -1,0 +1,71 @@
+suite: test namespace consumers
+templates:
+  - templates/slurm-cluster.yaml
+  - templates/slurm-cluster-storage.yaml
+  - templates/backup-config.yaml
+  - templates/cert-manager.yaml
+  - templates/vm-stack.yaml
+  - templates/o11y-tsa-token-writer.yaml
+tests:
+  - it: should use the Slurm namespace for the cluster and its storage and backup schedule
+    templates:
+      - templates/slurm-cluster.yaml
+      - templates/slurm-cluster-storage.yaml
+      - templates/backup-config.yaml
+    set:
+      slurmCluster.namespace: workload
+    asserts:
+      - equal:
+          path: spec.targetNamespace
+          value: workload
+
+  - it: should use the cert-manager namespace for its leader election defaults
+    template: templates/cert-manager.yaml
+    set:
+      certManager.namespace: certificates
+    asserts:
+      - equal:
+          path: spec.targetNamespace
+          value: certificates
+      - equal:
+          path: spec.values.global.leaderElection.namespace
+          value: certificates
+
+  - it: should use the configured namespaces for metrics endpoints and dashboard discovery
+    template: templates/vm-stack.yaml
+    set:
+      observability.vmStack.namespace: metrics
+      observability.vmLogs.namespace: telemetry
+      observability.opentelemetry.namespace: telemetry
+    asserts:
+      - equal:
+          path: spec.targetNamespace
+          value: metrics
+      - equal:
+          path: spec.values.vmagent.spec.remoteWrite[1].url
+          value: http://vmsingle-metrics-victoria-metrics-k8s-stack.metrics.svc.cluster.local.:8428/api/v1/write
+      - contains:
+          path: spec.values.grafana.sidecar.dashboards.searchNamespace
+          content: metrics
+      - contains:
+          path: spec.values.grafana.sidecar.dashboards.searchNamespace
+          content: telemetry
+
+  - it: should wire token writer roles and subjects to their respective namespaces
+    template: templates/o11y-tsa-token-writer.yaml
+    set:
+      observability.vmStack.namespace: metrics
+      observability.opentelemetry.namespace: telemetry
+    asserts:
+      - equal:
+          path: spec.targetNamespace
+          value: metrics
+      - equal:
+          path: spec.values.resources[1].metadata.namespace
+          value: metrics
+      - equal:
+          path: spec.values.resources[3].metadata.namespace
+          value: telemetry
+      - equal:
+          path: spec.values.resources[4].subjects[0].namespace
+          value: metrics

@@ -27,7 +27,7 @@ helm install soperator-custom-configmaps ./helm/soperator-custom-configmaps \
 You can customize the deployment by modifying `values.yaml`:
 
 ```yaml
-# Namespace where ConfigMaps will be created
+# Override the Helm release namespace
 namespace: soperator
 
 # Enable/disable individual ConfigMaps
@@ -45,7 +45,7 @@ enroot:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `namespace` | Namespace where ConfigMaps will be created | `soperator` |
+| `namespace` | Namespace where ConfigMaps will be created | Helm release namespace |
 | `configMaps.motd.enabled` | Enable MOTD ConfigMap | `true` |
 | `configMaps.motd.name` | Name of MOTD ConfigMap | `motd-nebius-o11y` |
 | `configMaps.imageStorage.enabled` | Enable image storage ConfigMap | `true` |

@@ -30,7 +30,7 @@ spec:
   interval: {{ .Values.customConfigmaps.interval }}
   timeout: {{ .Values.customConfigmaps.timeout }}
   releaseName: {{ .Values.customConfigmaps.releaseName }}
-  targetNamespace: {{ .Values.customConfigmaps.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.customConfigmaps.namespace | nindent 2 }}
   values:
   {{- with include "soperator-fluxcd.valuesWithLegacyOverride" .Values.customConfigmaps }}
     {{- . | nindent 4 }}

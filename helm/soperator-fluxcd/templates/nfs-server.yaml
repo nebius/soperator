@@ -32,7 +32,7 @@ spec:
   interval: {{ .Values.nfsServer.interval }}
   timeout: {{ .Values.nfsServer.timeout }}
   releaseName: {{ .Values.nfsServer.releaseName }}
-  targetNamespace: {{ .Values.nfsServer.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.nfsServer.namespace | nindent 2 }}
   values:
   {{- if .Values.nfsServer.overrideValues }}
     {{- toYaml .Values.nfsServer.overrideValues | nindent 4 }}

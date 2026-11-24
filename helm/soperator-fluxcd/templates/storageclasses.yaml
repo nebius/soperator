@@ -30,7 +30,7 @@ spec:
   interval: {{ .Values.storageClasses.interval }}
   timeout: {{ .Values.storageClasses.timeout }}
   releaseName: {{ .Values.storageClasses.releaseName }}
-  targetNamespace: {{ .Values.storageClasses.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.storageClasses.namespace | nindent 2 }}
   values:
   {{- if ne .Values.storageClasses.values nil }}
     {{- toYaml .Values.storageClasses.values | nindent 4 }}

@@ -40,7 +40,7 @@ spec:
   interval: {{ .Values.observability.ncclProfiles.interval }}
   timeout: {{ .Values.observability.ncclProfiles.timeout }}
   releaseName: {{ .Values.observability.ncclProfiles.releaseName }}-cm
-  targetNamespace: {{ .Values.observability.vmStack.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.observability.vmStack.namespace | nindent 2 }}
 
   values:
   {{- if .Values.observability.ncclProfiles.configMapOverrideValues }}
@@ -72,7 +72,7 @@ spec:
     - apiVersion: v1
       kind: ConfigMap
       metadata:
-        namespace: {{ .Values.observability.vmStack.namespace }}
+        namespace: {{ .Values.observability.vmStack.namespace | default .Release.Namespace | quote }}
         name: {{ .Values.observability.ncclProfiles.releaseName }}-agent
       data:
         relay: |
@@ -224,7 +224,7 @@ spec:
   interval: {{ .Values.observability.ncclProfiles.interval }}
   timeout: {{ .Values.observability.ncclProfiles.timeout }}
   releaseName: {{ .Values.observability.ncclProfiles.releaseName }}
-  targetNamespace: {{ .Values.observability.vmStack.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.observability.vmStack.namespace | nindent 2 }}
 
   values:
   {{- $values := .Values.observability.ncclProfiles.values | default dict }}

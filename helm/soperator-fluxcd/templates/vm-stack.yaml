@@ -2,6 +2,14 @@
 {{- if .Values.observability.publicEndpointEnabled }}
 {{- include "soperator-fluxcd.validatePublicEndpointTokenKind" . -}}
 {{- end }}
+{{- $dashboardNamespaces := .Values.observability.vmStack.values.dashboardNamespaces -}}
+{{- if kindIs "slice" $dashboardNamespaces -}}
+  {{- $resolved := list -}}
+  {{- range $dashboardNamespaces -}}
+    {{- $resolved = append $resolved (tpl . $) -}}
+  {{- end -}}
+  {{- $dashboardNamespaces = compact $resolved | uniq -}}
+{{- end }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -41,9 +49,7 @@ spec:
   interval: {{ .Values.observability.vmStack.interval }}
   timeout: {{ .Values.observability.vmStack.timeout }}
   releaseName: {{ .Values.observability.vmStack.releaseName }}
-  {{- if .Values.observability.vmStack.namespace }}
-  targetNamespace: {{ .Values.observability.vmStack.namespace }}
-  {{- end }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.observability.vmStack.namespace | nindent 2 }}
   values:
   {{- if .Values.observability.vmStack.overrideValues }}
     {{- toYaml .Values.observability.vmStack.overrideValues | nindent 4 }}
@@ -83,9 +89,9 @@ spec:
           - victoriametrics-logs-datasource
         sidecar:
           dashboards:
-            searchNamespace: {{- toYaml .Values.observability.vmStack.values.dashboardNamespaces | nindent 12 }}
+            searchNamespace: {{- toYaml $dashboardNamespaces | nindent 12 }}
           datasources:
-            searchNamespace: {{- toYaml .Values.observability.vmStack.values.dashboardNamespaces | nindent 12 }}
+            searchNamespace: {{- toYaml $dashboardNamespaces | nindent 12 }}
       kube-state-metrics:
         {{- with $kubeStateMetrics.affinity }}
         affinity:
@@ -486,8 +492,19 @@ spec:
           {{- end }}
 
           remoteWrite:
-          {{- $hasRemoteWrite := and $hasVmagentSpec $hasVmagentSpec.remoteWrite }}
-          {{- $remoteWriteNotEmpty := and $hasRemoteWrite (gt (len $hasVmagentSpec.remoteWrite) 0) }}
+          {{- $remoteWrite := and $hasVmagentSpec $hasVmagentSpec.remoteWrite }}
+          {{- $remoteWriteNotEmpty := and $remoteWrite (gt (len $remoteWrite) 0) }}
+          {{- if $remoteWriteNotEmpty }}
+            {{- $resolved := list }}
+            {{- range $remoteWrite }}
+              {{- $entry := deepCopy . }}
+              {{- with .url }}
+                {{- $_ := set $entry "url" (tpl . $) }}
+              {{- end }}
+              {{- $resolved = append $resolved $entry }}
+            {{- end }}
+            {{- $remoteWrite = $resolved }}
+          {{- end }}
           {{- if $hasPublicEndpoint }}
             - url: https://write.monitoring.{{ .Values.observability.region }}.nebius.cloud/projects/{{ .Values.observability.metricsProjectId }}/buckets/soperator/prometheus
               {{- if eq $tokenKind "secret" }}
@@ -501,10 +518,10 @@ spec:
                 - action: labeldrop
                   regex: UUID|DCGM_FI_PROCESS_NAME|pci_bus_id|prometheus|DCGM_FI_DEV_SERIAL|DCGM_FI_DEV_NAME|job
           {{- if $remoteWriteNotEmpty }}
-          {{- toYaml $hasVmagentSpec.remoteWrite | nindent 12 }}
+          {{- toYaml $remoteWrite | nindent 12 }}
           {{- end }}
           {{- else}}
-          {{- toYaml $hasVmagentSpec.remoteWrite | nindent 12 }}
+          {{- toYaml $remoteWrite | nindent 12 }}
           {{- end }}
 
           {{- $hasContainers := and $hasVmagentSpec $hasVmagentSpec.containers }}

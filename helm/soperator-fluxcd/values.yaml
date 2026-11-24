@@ -48,6 +48,24 @@ certManager:
   version: v1.21.*
   namespace: cert-manager-system
   releaseName: cert-manager
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: >-
+        {{ if and .Values.observability.enabled .Values.observability.prometheusOperator.enabled }} {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds {{ end }}
+  defaultValues:
+    enableCertificateOwnerRef: true
+    startupapicheck:
+      enabled: true
+    crds:
+      enabled: true
+    global:
+      leaderElection:
+        namespace: '{{ .Values.certManager.namespace | default .Release.Namespace }}'
+  prometheusValues:
+    prometheus:
+      enabled: true
+      servicemonitor:
+        enabled: false
   values:
     # kubernetes.io/os is the chart's own default and has to be repeated here: setting
     # nodeSelector replaces it wholesale.
@@ -109,7 +127,6 @@ certManager:
       resources:
         requests:
           cpu: 100m
-  overrideValues: null
   install:
     crds: CreateReplace
     remediation:
@@ -132,12 +149,39 @@ backup:
   version: 4.8.*
   namespace: k8up-system
   releaseName: k8up
-  values:
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
+    - name: >-
+        {{ if and .Values.observability.enabled .Values.observability.prometheusOperator.enabled }} {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds {{ end }}
+  defaultValues:
+    image:
+      registry: cr.nebius.cloud
+      repository: soperator/k8up
+      tag: v2.14.0-ca-fix
+    k8up:
+      backupImage:
+        repository: cr.nebius.cloud/soperator/k8up
+        tag: v2.13.1-ca-fix
+      skipWithoutAnnotation: true
+  prometheusValues:
+    k8up:
+      metrics:
+        grafanaDashboard:
+          additionalLabels:
+            grafana_dashboard: "1"
+          enabled: true
+          namespace: '{{ .Values.observability.vmStack.namespace | default .Release.Namespace }}'
+        prometheusRule:
+          enabled: false
+        serviceMonitor:
+          enabled: true
     cleanup:
       pullPolicy: IfNotPresent
       registry: cr.nebius.cloud/soperator-proxy-docker-io
       repository: alpine/k8s
       tag: 1.36.4
+  values:
     nodeSelector:
       slurm.nebius.ai/nodeset: system
     affinity:
@@ -152,7 +196,6 @@ backup:
     resources:
       requests:
         cpu: 50m
-  overrideValues: null
   install:
     crds: CreateReplace
     remediation:
@@ -193,6 +236,16 @@ mariadbOperator:
   version: 25.10.2
   namespace: mariadb-operator-system
   releaseName: mariadb-operator
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-mariadb-operator-crds'
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-cert-manager'
+  defaultValues:
+    webhook:
+      cert:
+        certManager:
+          enabled: true
+      enabled: true
   values:
     nodeSelector:
       slurm.nebius.ai/nodeset: system
@@ -238,7 +291,6 @@ mariadbOperator:
       resources:
         requests:
           cpu: 100m
-  overrideValues: null
   install:
     crds: Skip
     remediation:
@@ -525,11 +577,13 @@ observability:
           requests:
             cpu: 100m
       dashboardNamespaces:
-        - soperator
-        - soperator-system
+        - '{{ .Values.slurmCluster.namespace | default .Release.Namespace }}'
+        - '{{ .Values.soperator.namespace | default .Release.Namespace }}'
         - gpu-operator
-        - monitoring-system
-        - logs-system
+        - '{{ .Values.observability.vmStack.namespace | default .Release.Namespace }}'
+        - '{{ .Values.soperator.monitoringDashboards.namespace | default .Release.Namespace }}'
+        - '{{ .Values.observability.vmLogs.namespace | default .Release.Namespace }}'
+        - '{{ .Values.observability.opentelemetry.namespace | default .Release.Namespace }}'
       grafanaIni:
         feature_toggles:
           # Keep dashboard exports compatible with the o11y Classic JSON workflow.
@@ -562,7 +616,7 @@ observability:
           externalLabels: {}
           remoteWriteSettings: {}
           remoteWrite:
-            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8428/api/v1/write
+            - url: 'http://vmsingle-metrics-victoria-metrics-k8s-stack.{{ .Values.observability.vmStack.namespace | default .Release.Namespace }}.svc.cluster.local.:8428/api/v1/write'
           resources:
             requests:
               memory: 10Gi
@@ -617,6 +671,8 @@ observability:
     version: 0.13.*
     namespace: logs-system
     releaseName: vm-logs
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     install:
       crds: CreateReplace
       remediation:
@@ -659,6 +715,8 @@ observability:
     version: 5.0.0
     namespace: soperator
     releaseName: soperator-dcgm-exporter
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     install:
       crds: CreateReplace
       remediation:
@@ -865,6 +923,9 @@ soperator:
     timeout: 30m
     version: 1.9.1-custom
     releaseName: soperator-kruise
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+      - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
     install:
       crds: CreateReplace
       remediation:
@@ -874,7 +935,7 @@ soperator:
       remediation:
         retries: 6
         remediateLastFailure: true
-    overrideValues:
+    values:
       crds:
         managed: true
       daemon:
@@ -1250,6 +1311,35 @@ tailscale:
   interval: 5m
   timeout: 5m
   version: 2.0.0
+  namespace: soperator
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+  values:
+    resources:
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: Role
+        metadata:
+          name: tailscale
+          namespace: '{{ .Values.tailscale.namespace | default .Release.Namespace }}'
+        rules:
+          - apiGroups: [""]
+            resources: [secrets]
+            verbs: [get, create, update, patch]
+          - apiGroups: [""]
+            resources: [events]
+            verbs: [get, create, patch]
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        metadata:
+          name: tailscale
+          namespace: '{{ .Values.tailscale.namespace | default .Release.Namespace }}'
+        subjects:
+          - kind: ServiceAccount
+            name: default
+        roleRef:
+          kind: Role
+          name: tailscale
+          apiGroup: rbac.authorization.k8s.io
   install:
     crds: Skip
     remediation:

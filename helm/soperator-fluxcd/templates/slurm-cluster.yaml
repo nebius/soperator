@@ -39,7 +39,7 @@ spec:
   interval: {{ .Values.slurmCluster.interval }}
   timeout: {{ .Values.slurmCluster.timeout }}
   releaseName: soperator
-  targetNamespace: soperator
+  {{- include "soperator-fluxcd.targetNamespace" .Values.slurmCluster.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.slurmCluster.upgrade | nindent 4 }}
   values:

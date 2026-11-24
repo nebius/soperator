@@ -22,14 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-k8up
       version: {{ .Values.backup.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  {{- if .Values.certManager.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
-  {{- end }}
-  {{- if and .Values.observability.enabled .Values.observability.prometheusOperator.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
-  {{- end }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.backup "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.backup.install | nindent 4 }}
   upgrade:
@@ -37,51 +30,9 @@ spec:
   interval: {{ .Values.backup.interval }}
   timeout: {{ .Values.backup.timeout }}
   releaseName: {{ .Values.backup.releaseName }}
-  targetNamespace: {{ .Values.backup.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.backup.namespace | nindent 2 }}
   values:
-  {{- if .Values.backup.overrideValues }}
-    {{- toYaml .Values.backup.overrideValues | nindent 4 }}
-  {{- else }}
-    image:
-      registry: cr.nebius.cloud
-      repository: soperator/k8up
-      tag: v2.14.0-ca-fix
-  {{- $backup := .Values.backup.values | default dict }}
-    {{- with $backup.nodeSelector }}
-    nodeSelector:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-    {{- with $backup.affinity }}
-    affinity:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-    {{- with $backup.resources }}
-    resources:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-    k8up:
-      backupImage:
-        repository: cr.nebius.cloud/soperator/k8up
-        tag: v2.13.1-ca-fix
-      skipWithoutAnnotation: true
-    {{- if .Values.observability.prometheusOperator.enabled }}
-      metrics:
-        grafanaDashboard:
-          additionalLabels:
-            grafana_dashboard: "1"
-          enabled: true
-          namespace: monitoring-system
-        prometheusRule:
-          enabled: false
-        serviceMonitor:
-          enabled: true
-    cleanup:
-      pullPolicy: {{ .Values.backup.values.cleanup.pullPolicy }}
-      registry: {{ .Values.backup.values.cleanup.registry }}
-      repository: {{ .Values.backup.values.cleanup.repository }}
-      tag: {{ .Values.backup.values.cleanup.tag }}
-    {{- end }}
-  {{- end }}
+    {{- include "soperator-fluxcd.platformValues" (dict "component" .Values.backup "root" $ "prometheusEnabled" .Values.observability.prometheusOperator.enabled) | nindent 4 }}
   valuesFrom:
   - kind: ConfigMap
     name: backup

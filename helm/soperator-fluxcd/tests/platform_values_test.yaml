@@ -1,0 +1,185 @@
+suite: test platform values and dependencies
+templates:
+  - templates/tailscale.yaml
+  - templates/cert-manager.yaml
+  - templates/mariadb-operator.yaml
+  - templates/backup.yaml
+  - templates/kruise.yaml
+set:
+  tailscale.enabled: true
+  fullnameOverride: platform
+tests:
+  - it: should put operator CRDs and cert-manager before the MariaDB webhook
+    template: templates/mariadb-operator.yaml
+    set:
+      mariadbOperator.values: null
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+            - name: platform-mariadb-operator-crds
+            - name: platform-cert-manager
+      - equal:
+          path: spec.install.crds
+          value: Skip
+      - equal:
+          path: spec.upgrade.crds
+          value: Skip
+      - equal:
+          path: spec.values.webhook.enabled
+          value: true
+      - equal:
+          path: spec.values.webhook.cert.certManager.enabled
+          value: true
+
+  - it: should allow native cert-manager values to override the platform defaults
+    template: templates/cert-manager.yaml
+    set:
+      certManager.values.startupapicheck.enabled: false
+      certManager.values.prometheus.enabled: false
+    asserts:
+      - equal:
+          path: spec.values.startupapicheck.enabled
+          value: false
+      - equal:
+          path: spec.values.prometheus.enabled
+          value: false
+      - equal:
+          path: spec.values.crds.enabled
+          value: true
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+            - name: platform-prometheus-operator-crds
+
+  - it: should skip the CRD dependency when observability is disabled
+    template: templates/cert-manager.yaml
+    set:
+      observability.enabled: false
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+      - equal:
+          path: spec.values.prometheus.enabled
+          value: true
+
+  - it: should omit k8up metrics and cleanup defaults when Prometheus is disabled
+    template: templates/backup.yaml
+    set:
+      observability.prometheusOperator.enabled: false
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+            - name: platform-cert-manager
+      - notExists:
+          path: spec.values.k8up.metrics
+      - notExists:
+          path: spec.values.cleanup
+
+  - it: should apply k8up overrides without losing image and metrics defaults
+    template: templates/backup.yaml
+    set:
+      backup.values.k8up.skipWithoutAnnotation: false
+      backup.values.k8up.metrics.serviceMonitor.enabled: false
+      observability.vmStack.namespace: metrics
+    asserts:
+      - equal:
+          path: spec.values.k8up.skipWithoutAnnotation
+          value: false
+      - equal:
+          path: spec.values.k8up.backupImage.tag
+          value: v2.13.1-ca-fix
+      - equal:
+          path: spec.values.k8up.metrics.serviceMonitor.enabled
+          value: false
+      - equal:
+          path: spec.values.k8up.metrics.grafanaDashboard.namespace
+          value: metrics
+
+  - it: should skip optional cert-manager dependencies when it is disabled
+    templates:
+      - templates/backup.yaml
+      - templates/kruise.yaml
+    set:
+      certManager.enabled: false
+    asserts:
+      - notContains:
+          path: spec.dependsOn
+          content:
+            name: platform-cert-manager
+
+  - it: should merge the Pro Kruise resource override with saved chart defaults
+    template: templates/kruise.yaml
+    set:
+      soperator.kruise.overrideValues.manager.resources.requests.cpu: 2000m
+    asserts:
+      - equal:
+          path: spec.values.manager.resources.requests.cpu
+          value: 2000m
+      - equal:
+          path: spec.values.manager.image.tag
+          value: v1.9.2-ca-fix
+      - equal:
+          path: spec.values.crds.managed
+          value: true
+
+  - it: should allow native Kruise values
+    template: templates/kruise.yaml
+    set:
+      soperator.kruise.values.manager.replicas: 3
+    asserts:
+      - equal:
+          path: spec.values.manager.replicas
+          value: 3
+      - equal:
+          path: spec.values.helmHooks.image.tag
+          value: v0.1.0-ca-fix
+
+  - it: should remove Kruise defaults cleared by a legacy null override
+    template: templates/kruise.yaml
+    set:
+      soperator.kruise.overrideValues.manager.nodeSelector: null
+    asserts:
+      - equal:
+          path: spec.values.manager
+          value:
+            replicas: 2
+            image:
+              repository: cr.nebius.cloud/soperator/kruise-manager
+              tag: v1.9.2-ca-fix
+              pullPolicy: IfNotPresent
+            resources:
+              limits:
+                memory: 2Gi
+              requests:
+                cpu: 1000m
+                memory: 2Gi
+
+  - it: should accept an explicit empty Tailscale resources list
+    template: templates/tailscale.yaml
+    set:
+      tailscale.values.resources: []
+    asserts:
+      - equal:
+          path: spec.values.resources
+          value: []
+
+  - it: should replace the default platform dependencies
+    set:
+      tailscale.dependsOn: &customDependencies
+        - name: prerequisite
+      certManager.dependsOn: *customDependencies
+      mariadbOperator.dependsOn: *customDependencies
+      backup.dependsOn: *customDependencies
+      soperator.kruise.dependsOn: *customDependencies
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: prerequisite
