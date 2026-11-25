@@ -14,7 +14,7 @@ annotations: {}
 # - skipPopulateJail: Skips the execution of the populateJail job during maintenance.
 maintenance: "none"
 # CUDA version used for populate-jail image selection.
-cudaVersion: 13.0.2
+cudaVersion: 13.0.3
 # Default image pull policy used for all Slurm cluster images.
 # Can be overridden per component below (e.g. slurmNodes.controller.slurmctld.imagePullPolicy).
 imagePullPolicy: "IfNotPresent"
@@ -253,8 +253,9 @@ plugStackConfig:
     outputDirectory: "/opt/soperator-outputs/local/nccl_logs"
   ncclInspectorPreConf:
     required: false
-    enabled: false
-    profilerPlugin: "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so"
+    # Only registers the plugin; a job is profiled only when it sets NCCL_INSPECTOR_ENABLE=1.
+    enabled: true
+    # profilerPlugin is left unset: the plugin picks /usr/lib/<arch>-linux-gnu/libnccl-profiler-inspector.so per worker.
     dumpDir: "/opt/soperator-outputs/shared/nccl_profiles/%j/%s"
     dumpVerbose: false
     dumpThreadIntervalMicroseconds: 1000000
@@ -832,18 +833,18 @@ sConfigController:
     # This field is required in the SlurmCluster CR - it will be automatically populated from this value
     name: ""
 images:
-  slurmctld: "cr.nebius.cloud/soperator/controller_slurmctld:5.0.0-slurm26.05.6-nebius-1"
-  slurmrestd: "cr.nebius.cloud/soperator/slurmrestd:5.0.0-slurm26.05.6-nebius-1"
-  slurmd: "cr.nebius.cloud/soperator/worker_slurmd:5.0.0-slurm26.05.6-nebius-1"
-  sshd: "cr.nebius.cloud/soperator/login_sshd:5.0.0-slurm26.05.6-nebius-1"
-  munge: "cr.nebius.cloud/soperator/munge:5.0.0-slurm26.05.6-nebius-1"
+  slurmctld: "cr.nebius.cloud/soperator/controller_slurmctld:5.1.0-slurm26.05.6-nebius-1"
+  slurmrestd: "cr.nebius.cloud/soperator/slurmrestd:5.1.0-slurm26.05.6-nebius-1"
+  slurmd: "cr.nebius.cloud/soperator/worker_slurmd:5.1.0-slurm26.05.6-nebius-1"
+  sshd: "cr.nebius.cloud/soperator/login_sshd:5.1.0-slurm26.05.6-nebius-1"
+  munge: "cr.nebius.cloud/soperator/munge:5.1.0-slurm26.05.6-nebius-1"
   sssd: "cr.nebius.cloud/soperator/sssd:2.9.4-1-68"
   populateJail: ""
   populateJailRepository: "cr.nebius.cloud/soperator/populate_jail"
-  populateJailTag: "5.0.0-slurm26.05.6-nebius-1"
-  slurmdbd: "cr.nebius.cloud/soperator/controller_slurmdbd:5.0.0-slurm26.05.6-nebius-1"
-  soperatorExporter: "cr.nebius.cloud/soperator/soperator-exporter:5.0.0-slurm26.05.6-nebius-1"
-  sConfigController: "cr.nebius.cloud/soperator/sconfigcontroller:5.0.0"
+  populateJailTag: "5.1.0-slurm26.05.6-nebius-1"
+  slurmdbd: "cr.nebius.cloud/soperator/controller_slurmdbd:5.1.0-slurm26.05.6-nebius-1"
+  soperatorExporter: "cr.nebius.cloud/soperator/soperator-exporter:5.1.0-slurm26.05.6-nebius-1"
+  sConfigController: "cr.nebius.cloud/soperator/sconfigcontroller:5.1.0"
   nodeExporter: "cr.nebius.cloud/soperator-proxy-docker-io/prom/node-exporter:v1.10.2"
   mariaDB: "docker-registry1.mariadb.com/library/mariadb:12.1.2"
 # Configuration for slurm scripts.

@@ -29030,8 +29030,7 @@ spec:
                       dumpDir: /opt/soperator-outputs/shared/nccl_profiles/%j/%s
                       dumpThreadIntervalMicroseconds: 1000000
                       dumpVerbose: false
-                      enabled: false
-                      profilerPlugin: /usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so
+                      enabled: true
                       required: false
                     description: NcclInspectorPreConf represents the NCCL Inspector
                       Pre-Configuration SPANK plugin configuration.
@@ -29059,9 +29058,11 @@ spec:
                         description: Enabled defines whether to enable the plugin.
                         type: boolean
                       profilerPlugin:
-                        default: /usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so
-                        description: ProfilerPlugin defines a file path to NCCL Inspector's
-                          SO file.
+                        description: |-
+                          ProfilerPlugin defines a file path to NCCL Inspector's SO file.
+
+                          If empty, the plugin picks the path for the worker's architecture
+                          (/usr/lib/<arch>-linux-gnu/libnccl-profiler-inspector.so).
                         type: string
                       required:
                         default: false

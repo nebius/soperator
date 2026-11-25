@@ -674,6 +674,24 @@ func (s *Accounting) restoreAccountingPrivacy(ctx context.Context) error {
 		}},
 		{"remove privacy DB records", s.removeAccountingPrivacyDB},
 		{"remove privacy Linux users", s.removeAccountingPrivacyUsers},
+		{"wait for Slurm workers to recover", func(phaseCtx context.Context) error {
+			if s.worker.Name == "" {
+				return nil
+			}
+			names, err := s.slurm.MainPartitionNodeNames(phaseCtx)
+			if err != nil {
+				return err
+			}
+			if len(names) == 0 {
+				return fmt.Errorf("find Slurm workers after accounting privacy cleanup")
+			}
+			for _, name := range names {
+				if err := s.slurm.WaitForNodeUsable(phaseCtx, name, accountingPrivacyRolloutTimeout); err != nil {
+					return err
+				}
+			}
+			return nil
+		}},
 	} {
 		phaseCtx, cancel := context.WithTimeout(ctx, accountingPrivacyRolloutTimeout)
 		err := phase.run(phaseCtx)

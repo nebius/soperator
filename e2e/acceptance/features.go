@@ -42,6 +42,7 @@ func FeaturePaths() []string {
 		// VMs were just stopped and started. That extra coverage is opportunistic: the scenario
 		// checks the restarted workers itself and no scenario may depend on this order.
 		"features/vm_stop_start.feature",
+		"features/stuck_job_recovery.feature",
 		"features/accounting.feature",
 		"features/slurm_config.feature",
 		"features/slurm_config_updates.feature",
@@ -51,11 +52,13 @@ func FeaturePaths() []string {
 		"features/tailscale.feature",
 		"features/observability.feature",
 		"features/internal_ssh.feature",
+		"features/sssd.feature",
 		"features/package_installation.feature",
 		"features/gpu_profiling.feature",
 		"features/nccl.feature",
 		"features/nccl_debug.feature",
 		"features/system_settings.feature",
+		"features/nvidia_libraries.feature",
 		"features/task_prolog_env.feature",
 		"features/soperator_utils.feature",
 		"features/filesystem_layout.feature",

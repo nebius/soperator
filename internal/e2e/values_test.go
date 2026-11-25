@@ -133,6 +133,24 @@ func TestOverrideTestValuesNFS(t *testing.T) {
 	}
 }
 
+func TestOverrideTestValuesKeepsReleaseDefaultNFS(t *testing.T) {
+	// A recipe that takes the NFS version and registry from the Soperator release has neither
+	// attribute, and rejects them when set.
+	newSpec := func() map[string]interface{} {
+		return map[string]interface{}{
+			"size_gibibytes": 3720, "threads": 32, "disk_type": "NETWORK_SSD_IO_M3",
+			"node_group": map[string]interface{}{"resource": map[string]interface{}{"platform": "cpu-d3"}},
+		}
+	}
+	for _, unstable := range []bool{false, true} {
+		nfs := map[string]interface{}{"enabled": true, "spec": newSpec()}
+		result := overrideTestValues(map[string]interface{}{"nfs_in_k8s": nfs}, Config{
+			SoperatorVersion: "5.0.0", SoperatorUnstable: unstable, NFSVersion: "1.2.3",
+		})
+		assert.Equal(t, map[string]interface{}{"enabled": true, "spec": newSpec()}, result["nfs_in_k8s"])
+	}
+}
+
 func TestOverrideTestValuesWithoutNFS(t *testing.T) {
 	for _, nfs := range []map[string]interface{}{
 		nil,
@@ -143,7 +161,6 @@ func TestOverrideTestValuesWithoutNFS(t *testing.T) {
 		assert.Equal(t, map[string]interface{}{
 			"enabled": true,
 			"spec": map[string]interface{}{
-				"version": "1.2.2", "use_stable_repo": true,
 				"size_gibibytes": 3720, "disk_type": "NETWORK_SSD_IO_M3", "filesystem_type": "ext4", "threads": 128,
 				"node_group": map[string]interface{}{"resource": map[string]interface{}{"platform": "cpu-d3"}},
 			},
@@ -154,6 +171,22 @@ func TestOverrideTestValuesWithoutNFS(t *testing.T) {
 func TestOverrideTestValuesUsesTestingActiveChecksScope(t *testing.T) {
 	result := overrideTestValues(map[string]interface{}{}, Config{})
 	assert.Equal(t, "testing", result["active_checks_scope"])
+}
+
+func TestOverrideTestValuesDefaultSSSD(t *testing.T) {
+	for _, profile := range []Profile{
+		validProfile(),
+		{NodeSets: []NodeSetDef{{Name: "cpu", Platform: "cpu-d3", Preset: "16vcpu-64gb", Size: 1}}},
+	} {
+		vars := overrideTestValues(map[string]interface{}{
+			"slurm_sssd_enabled":                     false,
+			"slurm_sssd_conf_secret_ref_name":        "external-config",
+			"slurm_sssd_ldap_ca_config_map_ref_name": "external-ca",
+		}, Config{Profile: profile})
+		assert.Equal(t, true, vars["slurm_sssd_enabled"])
+		assert.Equal(t, "", vars["slurm_sssd_conf_secret_ref_name"])
+		assert.Equal(t, "", vars["slurm_sssd_ldap_ca_config_map_ref_name"])
+	}
 }
 
 func TestOverrideTestValuesEnablesTailscale(t *testing.T) {

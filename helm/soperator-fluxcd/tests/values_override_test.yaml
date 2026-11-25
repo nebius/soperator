@@ -395,7 +395,7 @@ tests:
         documentSelector: *defaultCollectorValues
       - equal:
           path: data["values.yaml"].resources.requests.cpu
-          value: 500m
+          value: 100m
         documentSelector: *defaultCollectorValues
 
   - it: should allow the ConfigMap release to defer all values to valuesFrom

@@ -226,3 +226,58 @@ func TestPickIdleGPUWorkersRandomizesNodeSetsAndWorkers(t *testing.T) {
 	assert.Equal(t, "worker-h100-0", snapshot.WorkersByNodeSet["worker-h100"][0].Name)
 	assert.Equal(t, "worker-h200-0", snapshot.WorkersByNodeSet["worker-h200"][0].Name)
 }
+
+func TestPickIdleGPUWorkersFromEveryNodeSet(t *testing.T) {
+	idle := framework.SlurmNodeInfo{State: "IDLE"}
+	snapshot := framework.WorkerSnapshot{
+		NodeSets: []framework.NodeSetInfo{
+			{Name: "cpu", Replicas: 2},
+			{Name: "h100", Replicas: 2, HasGPU: true},
+			{Name: "h200", Replicas: 1, HasGPU: true},
+			{Name: "scaled-down", Replicas: 0, HasGPU: true},
+		},
+		WorkersByNodeSet: map[string][]framework.WorkerInfo{
+			"cpu":  {{Name: "cpu-0", NodeSetName: "cpu", SlurmNode: idle}, {Name: "cpu-1", NodeSetName: "cpu", SlurmNode: idle}},
+			"h100": {{Name: "h100-0", NodeSetName: "h100", SlurmNode: idle}, {Name: "h100-1", NodeSetName: "h100", SlurmNode: framework.SlurmNodeInfo{State: "ALLOCATED"}}},
+			"h200": {{Name: "h200-0", NodeSetName: "h200", SlurmNode: idle}},
+		},
+	}
+
+	workers, err := pickIdleGPUWorkersFromEveryNodeSet(snapshot, 2)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"h100-0", "h200-0"}, framework.WorkerNames(workers))
+
+	_, err = pickIdleGPUWorkersFromEveryNodeSet(snapshot, 3)
+	require.Error(t, err)
+	assert.False(t, framework.IsInsufficientWorkers(err))
+	assert.ErrorContains(t, err, "select 3 idle GPU workers")
+
+	snapshot.WorkersByNodeSet["h200"][0].SlurmNode.State = "DRAINED"
+	_, err = pickIdleGPUWorkersFromEveryNodeSet(snapshot, 2)
+	require.Error(t, err)
+	assert.False(t, framework.IsInsufficientWorkers(err))
+	assert.ErrorContains(t, err, "select an idle GPU worker in NodeSet h200")
+}
+
+func TestPickIdleGPUWorkersFromEveryNodeSetTopsUpFromOneNodeSet(t *testing.T) {
+	idle := framework.SlurmNodeInfo{State: "IDLE"}
+	snapshot := framework.WorkerSnapshot{
+		NodeSets: []framework.NodeSetInfo{{Name: "gpu", Replicas: 3, HasGPU: true}},
+		WorkersByNodeSet: map[string][]framework.WorkerInfo{"gpu": {
+			{Name: "gpu-0", SlurmNode: idle}, {Name: "gpu-1", SlurmNode: idle}, {Name: "gpu-2", SlurmNode: idle},
+		}},
+	}
+	workers, err := pickIdleGPUWorkersFromEveryNodeSet(snapshot, 2)
+	require.NoError(t, err)
+	assert.Len(t, workers, 2)
+	assert.NotEqual(t, workers[0].Name, workers[1].Name)
+
+	_, err = pickIdleGPUWorkersFromEveryNodeSet(framework.WorkerSnapshot{
+		NodeSets: []framework.NodeSetInfo{{Name: "gpu", Replicas: 1, HasGPU: true}},
+	}, 2)
+	assert.True(t, framework.IsInsufficientWorkers(err))
+	_, err = pickIdleGPUWorkersFromEveryNodeSet(framework.WorkerSnapshot{}, 2)
+	assert.True(t, framework.IsInsufficientWorkers(err))
+	_, err = pickIdleGPUWorkersFromEveryNodeSet(snapshot, 0)
+	require.ErrorContains(t, err, "invalid minimum")
+}

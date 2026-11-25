@@ -2069,7 +2069,7 @@ observability:
     enabled: true
     interval: 5m
     timeout: 30m
-    version: 5.0.0
+    version: 5.1.0
     namespace: soperator
     releaseName: soperator-dcgm-exporter
     valuesFrom: []
@@ -2098,7 +2098,8 @@ observability:
     driftDetection:
       mode: warn
   ncclProfiles:
-    enabled: false
+    # Ships NCCL Inspector dumps to VictoriaMetrics; only jobs that set NCCL_INSPECTOR_ENABLE=1 produce them.
+    enabled: true
     interval: 5m
     timeout: 5m
     version:
@@ -2136,6 +2137,7 @@ observability:
             metadata:
               name: opentelemetry-collector-nccl-profiles-agent
             data:
+              # The filelog include path must match the SPANK dump directory under /mnt/jail.
               relay: |
                 receivers:
                   filelog/nccl_metrics:
@@ -2353,11 +2355,12 @@ observability:
               - sh
               - "-c"
               - 'chown -R 10001: /var/lib/otelcol-nccl-profiles'
+        # Idle unless jobs opt in to NCCL Inspector; no CPU limit, so it bursts when they do.
         resources:
           limits:
             memory: 1Gi
           requests:
-            cpu: 500m
+            cpu: 100m
             memory: 200Mi
         useGOMEMLIMIT: true
         command:
@@ -2401,7 +2404,7 @@ slurmCluster:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 5.0.0
+  version: 5.1.0
   namespace: soperator
   releaseName: soperator
   valuesFrom:
@@ -2470,7 +2473,7 @@ nodesets:
     mode: warn
   interval: 5m
   timeout: 5m
-  version: 5.0.0
+  version: 5.1.0
   namespace: soperator
   releaseName: soperator-nodesets
   valuesFrom:
@@ -2501,7 +2504,7 @@ soperatorActiveChecks:
   enabled: true
   interval: 5m
   timeout: 120m
-  version: 5.0.0
+  version: 5.1.0
   releaseName: soperator-activechecks
   namespace: soperator
   valuesFrom:
@@ -2534,7 +2537,7 @@ soperator:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 5.0.0
+  version: 5.1.0
   namespace: "soperator-system"
   releaseName: soperator-controller
   valuesFrom:
@@ -2899,7 +2902,7 @@ notifier:
   enabled: false
   interval: 5m
   timeout: 5m
-  version: 5.0.0
+  version: 5.1.0
   namespace: monitoring-system
   releaseName: soperator-notifier
   valuesFrom:
@@ -2991,7 +2994,7 @@ storageClasses:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 5.0.0
+  version: 5.1.0
   namespace: storage-system
   releaseName: soperator-storageclasses
   valuesFrom: []
@@ -3014,7 +3017,7 @@ customConfigmaps:
   enabled: true
   interval: 5m
   timeout: 5m
-  version: 5.0.0
+  version: 5.1.0
   namespace: soperator
   releaseName: soperator-custom-configmaps
   valuesFrom:

@@ -5,11 +5,7 @@ excludeTemplates:
   - templates/helmrepository.yaml
   - templates/notifier.yaml
 tests:
-  - it: should render nccl profiles config when ncclProfiles.enabled=true
-    set:
-      observability.enabled: true
-      observability.vmStack.enabled: true
-      observability.ncclProfiles.enabled: true
+  - it: should render nccl profiles config by default reading the jail dump dir
     templates:
       - templates/opentelemetry-collector-nccl-profiles.yaml
     documentSelector:
@@ -19,14 +15,11 @@ tests:
       cmd: yq
       args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
     asserts:
-      - exists:
+      - matchRegex:
           path: 'data["values.yaml"].resources[0].data.relay'
+          pattern: '- /mnt/jail/opt/soperator-outputs/shared/nccl_profiles/\*/\*/\*\.log'
 
-  - it: should render nccl profiles collector when ncclProfiles.enabled=true
-    set:
-      observability.enabled: true
-      observability.vmStack.enabled: true
-      observability.ncclProfiles.enabled: true
+  - it: should render nccl profiles collector by default
     templates:
       - templates/opentelemetry-collector-nccl-profiles.yaml
     documentSelector:
@@ -36,6 +29,15 @@ tests:
     asserts:
       - exists:
           path: 'data["values.yaml"].podMonitor'
+
+  - it: should not render nccl profiles when ncclProfiles.enabled=false
+    set:
+      observability.ncclProfiles.enabled: false
+    templates:
+      - templates/opentelemetry-collector-nccl-profiles.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
 
   - it: should render jail logs component when jailLogs.enabled=true
     set:

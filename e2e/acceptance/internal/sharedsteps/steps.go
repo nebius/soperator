@@ -32,6 +32,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewTailscale(info, runtime, kubectl),
 		NewObservability(kubectl),
 		NewInternalSSH(runtime, selector),
+		NewSSSD(info, runtime, slurm, kubectl, selector),
 		NewPAMSlurmAdopt(info, runtime, slurm, kubectl, selector),
 		NewPackageInstallation(runtime, selector),
 		NewGPUProfiling(runtime, slurm, selector),
@@ -39,6 +40,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewNCCLDebug(runtime, slurm, kubectl, selector),
 		NewNCCLDebugStress(runtime, slurm, kubectl, selector),
 		NewSystemSettings(info, runtime, slurm, kubectl, selector),
+		NewNVIDIALibraries(runtime, slurm, kubectl, selector),
 		NewTaskPrologEnv(runtime, selector),
 		NewSoperatorUtils(runtime, selector),
 		NewFilesystemLayout(info, runtime, kubectl, selector),
@@ -57,6 +59,7 @@ func RegisterAll(sc *godog.ScenarioContext, info *framework.ClusterInfo, runtime
 		NewTopologyLegacy(runtime, selector),
 		NewPerformance(runtime),
 		NewVMStopStart(runtime, slurm, kubectl, selector),
+		NewStuckJobRecovery(runtime, slurm, kubectl, selector),
 	} {
 		registerScenarioScoped(sc, family)
 	}

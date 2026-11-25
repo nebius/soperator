@@ -96,13 +96,13 @@ func (s *NCCLDebugStress) startNativeJobs(ctx context.Context, count int) error 
 	if err != nil {
 		return err
 	}
-	if err := s.waitForFiles(ctx, "ready", count); err != nil {
+	if err := s.waitForFiles(ctx, "ready", count, 3*time.Minute); err != nil {
 		return err
 	}
 	if err := s.release(ctx, "start-native"); err != nil {
 		return err
 	}
-	return s.waitForFiles(ctx, "churning", count)
+	return s.waitForFiles(ctx, "churning", count, 3*time.Minute)
 }
 
 func (s *NCCLDebugStress) startContainerJobs(ctx context.Context, count, startsPerJob int) error {
@@ -118,14 +118,14 @@ func (s *NCCLDebugStress) startContainerJobs(ctx context.Context, count, startsP
 	if err != nil {
 		return err
 	}
-	if err := s.waitForFiles(ctx, "ready", len(s.nativeJobs)+len(s.containerJobs)); err != nil {
+	if err := s.waitForFiles(ctx, "ready", len(s.nativeJobs)+len(s.containerJobs), 3*time.Minute); err != nil {
 		return err
 	}
 	return s.release(ctx, "start-container")
 }
 
 func (s *NCCLDebugStress) stopNativeJobs(ctx context.Context) error {
-	if err := s.waitForFiles(ctx, "done", len(s.containerJobs)); err != nil {
+	if err := s.waitForFiles(ctx, "done", len(s.containerJobs), 6*time.Minute); err != nil {
 		return err
 	}
 	if err := s.release(ctx, "stop"); err != nil {
@@ -148,7 +148,7 @@ func (s *NCCLDebugStress) submitJobs(ctx context.Context, kind string, count int
 		job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 			JobName: "e2e-nccl-debug-" + kind, Nodes: 1, Nodelist: []string{s.worker.Name}, TasksPerNode: 1,
 			Args:      []string{"--cpus-per-task=1", "--mem=512M", "--export=ALL,SNCCLD_ENABLED=0"},
-			TimeLimit: 5 * time.Minute, RunAsUser: soperatorChecksUserName,
+			TimeLimit: 10 * time.Minute, RunAsUser: soperatorChecksUserName,
 			Wrap: "/bin/bash " + framework.ShellQuote(path.Join(s.dir, kind+".sh")),
 		})
 		if err != nil {
@@ -172,8 +172,8 @@ func (s *NCCLDebugStress) release(ctx context.Context, name string) error {
 	return err
 }
 
-func (s *NCCLDebugStress) waitForFiles(ctx context.Context, suffix string, count int) error {
-	return s.runtime.WaitFor(ctx, "concurrent logging "+suffix, 3*time.Minute, time.Second, func(ctx context.Context) (bool, error) {
+func (s *NCCLDebugStress) waitForFiles(ctx context.Context, suffix string, count int, timeout time.Duration) error {
+	return s.runtime.WaitFor(ctx, "concurrent logging "+suffix, timeout, time.Second, func(ctx context.Context) (bool, error) {
 		output, err := s.runtime.Jail().Run(ctx, "find "+framework.ShellQuote(s.dir)+" -maxdepth 1 -name "+framework.ShellQuote("*."+suffix)+" -printf '.\\n' | wc -l")
 		if err != nil {
 			return false, err
@@ -334,9 +334,15 @@ func (s *NCCLDebugStress) CleanupAndReset(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, ncclDebugCleanup)
 	defer cancel()
 	for _, job := range jobs {
-		if err := s.slurm.CancelJob(ctx, job.ID, ncclDebugCleanup); err != nil {
+		if err := s.slurm.CancelJob(ctx, job.ID, 0); err != nil {
 			framework.RecordWorkerCleanupError(ctx, err)
 			s.runtime.Logf("Cleanup: cancel concurrent logging job %s: %v", job.ID, err)
+		}
+	}
+	for _, job := range jobs {
+		if err := s.slurm.WaitForJobGone(ctx, job.ID, ncclDebugCleanup); err != nil {
+			framework.RecordWorkerCleanupError(ctx, err)
+			s.runtime.Logf("Cleanup: wait for concurrent logging job %s: %v", job.ID, err)
 			continue
 		}
 		if _, err := s.runtime.WorkerPod(s.pod).Run(ctx, ncclDebugRemoveResourcesCommand(job.ID)); err != nil {

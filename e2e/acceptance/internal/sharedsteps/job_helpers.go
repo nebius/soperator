@@ -9,6 +9,20 @@ import (
 	"github.com/nebius/soperator/e2e/acceptance/framework"
 )
 
+const jobUserKey = "JOB_USER"
+
+func jobUserProbe() string {
+	return fmt.Sprintf("printf '%s=%%s\\n' \"$(id -un)\"", jobUserKey)
+}
+
+func validateJobUser(output, expected string) error {
+	actual := parseKeyValueLine(output, jobUserKey)
+	if actual != expected {
+		return fmt.Errorf("check Slurm job task user %q: want %q", actual, expected)
+	}
+	return nil
+}
+
 func waitForExpectedPrologFailure(
 	ctx context.Context,
 	exec framework.Exec,

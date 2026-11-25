@@ -57,6 +57,9 @@ func readTFVars(filename string) (map[string]interface{}, error) {
 func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]interface{} {
 	tfVars["active_checks_scope"] = "testing"
 	tfVars["tailscale_enabled"] = true
+	tfVars["slurm_sssd_enabled"] = true
+	tfVars["slurm_sssd_conf_secret_ref_name"] = ""
+	tfVars["slurm_sssd_ldap_ca_config_map_ref_name"] = ""
 	tfVars["slurm_login_image_disk"] = map[string]interface{}{
 		"enabled": true,
 		"spec": map[string]interface{}{
@@ -87,8 +90,14 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"node_group": map[string]interface{}{"resource": map[string]interface{}{"platform": "cpu-d3"}},
 		}
 	}
-	spec["version"] = cfg.NFSVersion
-	spec["use_stable_repo"] = !cfg.SoperatorUnstable
+	// Newer recipes take the NFS version and registry from the Soperator release and reject
+	// these attributes, so override them only where the recipe still sets them.
+	if _, ok := spec["version"]; ok {
+		spec["version"] = cfg.NFSVersion
+	}
+	if _, ok := spec["use_stable_repo"]; ok {
+		spec["use_stable_repo"] = !cfg.SoperatorUnstable
+	}
 	nfs["spec"] = spec
 	tfVars["nfs_in_k8s"] = nfs
 	tfVars["production"] = false

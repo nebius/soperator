@@ -2,6 +2,7 @@ package sharedsteps
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -13,9 +14,20 @@ import (
 const (
 	soperatorChecksUserName       = "soperatorchecks"
 	sshTestUserPropagationTimeout = time.Minute
+	sshInitializationLockTimeout  = time.Minute
+	sshLockTimeoutExitCode        = 75
+	sshTestUserLockPath           = "/etc/soperator-e2e-createuser.lock"
 	sshHolderJobStartedMarker     = "SOPERATOR_E2E_SSH_HOLDER_STARTED"
 	sshHolderJobCommand           = "echo " + sshHolderJobStartedMarker + "; exec sleep 3600"
 )
+
+func annotateSSHLockError(err error, resource string) error {
+	var exitErr interface{ ExitCode() int }
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == sshLockTimeoutExitCode {
+		return fmt.Errorf("acquire %s lock: timed out after %s: %w", resource, sshInitializationLockTimeout, err)
+	}
+	return err
+}
 
 // A scheduler RUNNING state can precede prolog completion and extern-step
 // creation. Wait for the batch script itself before attempting PAM adoption.
@@ -75,8 +87,11 @@ func createSSHTestUser(ctx context.Context, runtime framework.Runtime, userName 
 	}
 	command := fmt.Sprintf("id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s%s",
 		quotedUserName, options, quotedUserName)
+	// /etc is shared across login nodes; /tmp is bind-mounted locally on each node.
+	command = fmt.Sprintf("flock --conflict-exit-code %d --wait %.0f %s bash -ec %s", sshLockTimeoutExitCode, sshInitializationLockTimeout.Seconds(),
+		framework.ShellQuote(sshTestUserLockPath), framework.ShellQuote(command))
 	if _, err := runtime.Jail().Run(ctx, command); err != nil {
-		return fmt.Errorf("create SSH test user %s: %w", userName, err)
+		return fmt.Errorf("create SSH test user %s: %w", userName, annotateSSHLockError(err, "test-user initialization"))
 	}
 
 	return nil
@@ -241,6 +256,13 @@ func sshTestIdentityDiagnosticsCommand(userName, groupName string) string {
 	return strings.Join(commands, "\n")
 }
 
+// Every identity for a user shares authorized_keys. Lock a separate file because
+// sed -i replaces authorized_keys rather than updating its inode.
+func withSSHIdentityLock(command string) string {
+	return fmt.Sprintf("mkdir -p ~/.ssh && flock --conflict-exit-code %d --wait %.0f ~/.ssh/.soperator-e2e-identity.lock %s",
+		sshLockTimeoutExitCode, sshInitializationLockTimeout.Seconds(), command)
+}
+
 func ensureSSHTestIdentity(
 	ctx context.Context,
 	runtime framework.Runtime,
@@ -260,9 +282,9 @@ ssh-keygen -q -t ecdsa -N '' -C %s -f "${key}"
 cat "${key}.pub" >> "${authorized_keys}"
 chmod 0600 "${authorized_keys}"
 `, keyName, keyComment, framework.ShellQuote(keyComment))
-	command := runAsLoginUser(userName, framework.BashLC(setupIdentity))
+	command := runAsLoginUser(userName, withSSHIdentityLock(framework.BashLC(setupIdentity)))
 	if _, err := runtime.Jail().Run(ctx, command); err != nil {
-		return fmt.Errorf("prepare SSH identity for %s: %w", userName, err)
+		return fmt.Errorf("prepare SSH identity for %s: %w", userName, annotateSSHLockError(err, "SSH identity"))
 	}
 
 	return nil
@@ -286,10 +308,10 @@ fi
 	command := fmt.Sprintf(
 		"if id %s >/dev/null 2>&1; then %s; fi",
 		framework.ShellQuote(userName),
-		runAsLoginUser(userName, framework.BashLC(cleanupIdentity)),
+		runAsLoginUser(userName, withSSHIdentityLock(framework.BashLC(cleanupIdentity))),
 	)
 	_, err := runtime.Jail().Run(ctx, command)
-	return err
+	return annotateSSHLockError(err, "SSH identity")
 }
 
 // runInternalSSHAsTestUser runs remoteCommand on host over SSH from the login
@@ -317,14 +339,18 @@ func runInternalSSHAsUser(
 	// Remove the host key before each SSH attempt so retries don't depend on
 	// persisted known_hosts state from previous attempts.
 	sshCommand := fmt.Sprintf(
-		"mkdir -p ~/.ssh && touch ~/.ssh/known_hosts && (ssh-keygen -R %s -f ~/.ssh/known_hosts >/dev/null 2>&1 || true) && timeout %.0f ssh %s %s </dev/null",
+		"touch ~/.ssh/known_hosts && (ssh-keygen -R %s -f ~/.ssh/known_hosts >/dev/null 2>&1 || true) && timeout %.0f ssh %s %s </dev/null",
 		quotedHost,
 		timeout.Seconds(),
 		quotedHost,
 		framework.ShellQuote(remoteCommand),
 	)
+	// SSH also writes known_hosts, so retain the per-user lock through the connection.
+	sshCommand = fmt.Sprintf("mkdir -p ~/.ssh && flock --conflict-exit-code %d --wait %.0f ~/.ssh/.soperator-e2e-known-hosts.lock bash -ec %s",
+		sshLockTimeoutExitCode, sshInitializationLockTimeout.Seconds(), framework.ShellQuote(sshCommand))
 
-	return runtime.Jail().RunWithDefaultRetry(ctx, runAsLoginUser(userName, sshCommand))
+	output, err := runtime.Jail().RunWithDefaultRetry(ctx, runAsLoginUser(userName, sshCommand))
+	return output, annotateSSHLockError(err, "SSH known_hosts")
 }
 
 func runSSHCommand(

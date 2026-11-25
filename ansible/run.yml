@@ -38,7 +38,10 @@
     - slurm_divert
     - slurm_client
     - spank_nccl_inspector_preconf
-    - slurm_divert # role doubled here, because we need to do that after Slurm version upgrade
+    # A distinct tag prevents Ansible from deduplicating the post-upgrade pass.
+    - role: slurm_divert
+      tags:
+        - slurm_divert_after_upgrade
     - sssd
     - ssh_client
     - motd

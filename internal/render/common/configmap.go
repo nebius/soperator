@@ -796,18 +796,21 @@ func generateSpankConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 
 	{
 		opts := cluster.PlugStackConfig.NcclInspectorPreConf.DeepCopy()
-		res.AddLine(strings.Join(
-			[]string{
-				formatBoolPtr(opts.Required, "required", "optional"),
-				"spank_nccl_inspector_preconf.so",
-				fmt.Sprintf("enabled=%d", formatBoolPtr(opts.Enabled, 1, 0)),
-				fmt.Sprintf("profiler-plugin=%s", utils.Ternary(opts.ProfilerPlugin != "", opts.ProfilerPlugin, "/usr/lib/x86_64-linux-gnu/libnccl-profiler-inspector.so")),
-				fmt.Sprintf("dump-dir=%s", utils.Ternary(opts.DumpDir != "", opts.DumpDir, "/opt/soperator-outputs/shared/nccl_profiles/%j/%s")),
-				fmt.Sprintf("dump-verbose=%d", formatBoolPtr(opts.DumpVerbose, 1, 0)),
-				fmt.Sprintf("dump-thread-interval-microseconds=%d", utils.Ternary(opts.DumpThreadIntervalMicroseconds > 0, opts.DumpThreadIntervalMicroseconds, 1000000)),
-			},
-			" ",
-		))
+		conf := []string{
+			formatBoolPtr(opts.Required, "required", "optional"),
+			"spank_nccl_inspector_preconf.so",
+			fmt.Sprintf("enabled=%d", formatBoolPtr(opts.Enabled, 1, 0)),
+		}
+		// Without an explicit path the plugin picks the one for the worker's architecture.
+		if opts.ProfilerPlugin != "" {
+			conf = append(conf, fmt.Sprintf("profiler-plugin=%s", opts.ProfilerPlugin))
+		}
+		conf = append(conf,
+			fmt.Sprintf("dump-dir=%s", utils.Ternary(opts.DumpDir != "", opts.DumpDir, "/opt/soperator-outputs/shared/nccl_profiles/%j/%s")),
+			fmt.Sprintf("dump-verbose=%d", formatBoolPtr(opts.DumpVerbose, 1, 0)),
+			fmt.Sprintf("dump-thread-interval-microseconds=%d", utils.Ternary(opts.DumpThreadIntervalMicroseconds > 0, opts.DumpThreadIntervalMicroseconds, 1000000)),
+		)
+		res.AddLine(strings.Join(conf, " "))
 	}
 
 	for _, plugin := range cluster.PlugStackConfig.CustomPlugins {

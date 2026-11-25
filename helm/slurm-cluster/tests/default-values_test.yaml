@@ -160,6 +160,14 @@ tests:
           path: spec.plugStackConfig.ncclDebug.outputDirectory
           value: "/opt/soperator-outputs/local/nccl_logs"
       - equal:
+          path: spec.plugStackConfig.ncclInspectorPreConf.required
+          value: false
+      - equal:
+          path: spec.plugStackConfig.ncclInspectorPreConf.enabled
+          value: true
+      - notExists:
+          path: spec.plugStackConfig.ncclInspectorPreConf.profilerPlugin
+      - equal:
           path: spec.plugStackConfig.customPlugins
           value: []
 
@@ -192,6 +200,25 @@ tests:
       - equal:
           path: spec.populateJail.overwrite
           value: false
+
+  - it: should build populateJail image for an explicit cudaVersion
+    set:
+      clusterName: test-cluster
+      cudaVersion: "12.9.0"
+    asserts:
+      - matchRegex:
+          path: spec.populateJail.image
+          pattern: -cuda12\.9\.0$
+
+  - it: should use images.populateJail as is when set
+    set:
+      clusterName: test-cluster
+      images:
+        populateJail: "example.com/custom/populate_jail:custom"
+    asserts:
+      - equal:
+          path: spec.populateJail.image
+          value: "example.com/custom/populate_jail:custom"
 
   # Test accounting defaults
   - it: should set accounting default values

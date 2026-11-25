@@ -2,5 +2,5 @@
 package consts
 
 const (
-	VersionCR = "5.0.0"
+	VersionCR = "5.1.0"
 )
