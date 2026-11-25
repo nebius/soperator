@@ -106,7 +106,7 @@ Key Metrics:
 - Metrics: Pod, node, PersistentVolume and PersistentVolumeClaim state metrics (filtered subset)
 - Deployment: Single replica deployment in `monitoring-system` namespace
 - Configuration: pod/node/persistentvolume/persistentvolumeclaim collectors with metric allowlist filtering
-- Scrape size: inherits the global vmagent scrape size by default; `observability.vmStack.values.kubeStateMetrics.maxScrapeSize` can raise the main `http` endpoint limit for large clusters
+- The main `http` endpoint inherits vmagent's global scrape size. For large clusters, set `max_scrape_size` on that endpoint in `observability.vmStack.values.kube-state-metrics.vmScrape.spec.endpoints`. Carry over the `metrics` endpoint and the default relabeling rules when supplying this list.
 
 Connection Example:
 ```bash
@@ -235,11 +235,12 @@ curl "http://localhost:8429/api/v1/query?query=up"
 #### Remote Write to Nebius Cloud
 - Endpoint: `https://write.monitoring.{region}.nebius.cloud/projects/{projectId}/buckets/soperator/prometheus`
 - Authentication: Bearer token from the `o11y-writer-sa-token` Secret, populated and refreshed by the shared TSA token writer
-- When: Enabled with `publicEndpointEnabled: true`
+- Configuration: Add the public destination under `observability.vmStack.values.vmagent.spec.remoteWrite`.
 
-The default token writer source is IMDS (`observability.tsaToken.writer.source: imds`).
-Set `observability.publicEndpointTokenKind: hostPath` only when the token should be
-read directly from a host-mounted file such as `/mnt/cloud-metadata/tsa-token`.
+For Secret authentication, set `bearerTokenSecret` on the vmagent destination. With `observability.publicEndpointEnabled: true` and `observability.publicEndpointTokenKind: secret`, the shared writer reads from IMDS by default.
+Set `observability.tsaToken.writer.source: file` to populate the same Secret from a mounted file, or set `observability.tsaToken.writer.enabled: false` when another process maintains the Secret.
+For a host token file, configure vmagent's volume, mount and positional bearer-token argument explicitly.
+Use a list containing only the VMSingle destination for local-only metrics. Managed and Pro profiles supply the destination list according to their telemetry settings. [VMStack upgrades](../helm/soperator-fluxcd/README.md#vmstack-upgrades)
 
 ### Visualization
 

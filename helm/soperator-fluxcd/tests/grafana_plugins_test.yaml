@@ -17,3 +17,37 @@ tests:
       - equal:
           path: spec.values.grafana["grafana.ini"]["auth.basic"].enabled
           value: true
+
+  - it: should pass native Grafana settings and alert rule templates to the child unchanged
+    set:
+      observability.vmStack.values.grafana:
+        grafana.ini:
+          auth.basic: {enabled: false}
+        plugins: [grafana-clock-panel]
+        sidecar:
+          dashboards: {searchNamespace: ALL}
+          datasources: {searchNamespace: [team-a, team-b]}
+      observability.vmStack.values.extraRules:
+        team-alerts:
+          groups:
+            - name: team
+              rules:
+                - alert: TeamUnavailable
+                  expr: up == 0
+                  annotations: {summary: 'Instance {{ $labels.instance }} is down'}
+    asserts:
+      - equal:
+          path: spec.values.grafana["grafana.ini"]["auth.basic"].enabled
+          value: false
+      - equal:
+          path: spec.values.grafana.plugins
+          value: [grafana-clock-panel]
+      - equal:
+          path: spec.values.grafana.sidecar.dashboards.searchNamespace
+          value: ALL
+      - equal:
+          path: spec.values.grafana.sidecar.datasources.searchNamespace
+          value: [team-a, team-b]
+      - equal:
+          path: spec.values.extraRules.team-alerts.groups[0].rules[0].annotations.summary
+          value: 'Instance {{ $labels.instance }} is down'
