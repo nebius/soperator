@@ -22,9 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.soperatorActiveChecks.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster
-  - name: {{ include "soperator-fluxcd.fullname" . }}-soperatorchecks  
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.soperatorActiveChecks "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.soperatorActiveChecks.install | nindent 4 }}
   interval: {{ .Values.soperatorActiveChecks.interval }}

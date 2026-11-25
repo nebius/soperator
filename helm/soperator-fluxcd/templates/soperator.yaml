@@ -22,12 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.soperator.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  - name: {{ include "soperator-fluxcd.fullname" . }}-kruise
-  {{- if .Values.certManager.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
-  {{- end }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.soperator "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.soperator.install | nindent 4 }}
   upgrade:

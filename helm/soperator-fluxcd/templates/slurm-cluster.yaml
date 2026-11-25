@@ -21,19 +21,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.slurmCluster.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
-{{- if .Values.slurmCluster.slurmClusterStorage.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster-storage
-{{- end }}
-{{- if .Values.nfsServer.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-nfs-server
-{{- end }}
-{{- if .Values.tailscale.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-tailscale
-{{- end }}
-
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.slurmCluster "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.slurmCluster.install | nindent 4 }}
   interval: {{ .Values.slurmCluster.interval }}

@@ -22,8 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-csi-driver-nfs
       version: {{ .Values.csiDriverNfs.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.csiDriverNfs "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.csiDriverNfs.install | nindent 4 }}
   upgrade:

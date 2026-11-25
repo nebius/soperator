@@ -22,13 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.nodesets.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
-{{- if .Values.slurmCluster.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster
-{{- end }}
-
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.nodesets "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.nodesets.install | nindent 4 }}
   interval: {{ .Values.nodesets.interval }}

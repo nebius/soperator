@@ -239,7 +239,7 @@ mariadbOperator:
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     - name: '{{ include "soperator-fluxcd.fullname" . }}-mariadb-operator-crds'
-    - name: '{{ include "soperator-fluxcd.fullname" . }}-cert-manager'
+    - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
   defaultValues:
     webhook:
       cert:
@@ -376,9 +376,7 @@ observability:
           remediateLastFailure: true
       dependsOn:
         - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
-        # Add this dependency when the collector uses the Secret maintained by the TSA token writer.
-        # - name: '{{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}'
-        - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-logs'
+        - name: '{{ if .Values.observability.vmLogs.enabled }}{{ include "soperator-fluxcd.fullname" . }}-vm-logs{{ end }}'
       values:
         clusterRole:
           create: true
@@ -801,11 +799,8 @@ observability:
           remediateLastFailure: true
       dependsOn:
         - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
-        # Add this dependency when the collector uses the Secret maintained by the TSA token writer.
-        # - name: '{{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}'
-        # Add this dependency when the umbrella chart creates the NodeSets.
-        # - name: '{{ include "soperator-fluxcd.fullname" . }}-nodesets'
-        - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-logs'
+        - name: '{{ if .Values.observability.vmLogs.enabled }}{{ include "soperator-fluxcd.fullname" . }}-vm-logs{{ end }}'
+        - name: '{{ if .Values.nodesets.enabled }}{{ include "soperator-fluxcd.fullname" . }}-nodesets{{ end }}'
       values:
         clusterRole:
           create: true
@@ -1193,9 +1188,7 @@ observability:
           remediateLastFailure: true
       dependsOn:
         - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
-        # Add this dependency when the collector uses the Secret maintained by the TSA token writer.
-        # - name: '{{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}'
-        - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-logs'
+        - name: '{{ if .Values.observability.vmLogs.enabled }}{{ include "soperator-fluxcd.fullname" . }}-vm-logs{{ end }}'
       values:
         clusterRole:
           create: true
@@ -1449,9 +1442,6 @@ observability:
         remediateLastFailure: true
     dependsOn:
       - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
-      # Add this dependency when publicEndpointEnabled is true and vmagent uses
-      # a Secret maintained by the TSA token writer.
-      # - name: '{{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}'
       - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
       - name: '{{ include "soperator-fluxcd.fullname" . }}-victoria-metrics-operator-crds'
     values:
@@ -2321,6 +2311,13 @@ slurmCluster:
   version: 5.0.0
   namespace: soperator
   releaseName: soperator
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ if .Values.soperator.enabled }}{{ include "soperator-fluxcd.fullname" . }}-soperator{{ end }}'
+    - name: >-
+        {{ if and .Values.slurmCluster.enabled .Values.slurmCluster.slurmClusterStorage.enabled }} {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster-storage {{ end }}
+    - name: '{{ if .Values.nfsServer.enabled }}{{ include "soperator-fluxcd.fullname" . }}-nfs-server{{ end }}'
+    - name: '{{ if .Values.tailscale.enabled }}{{ include "soperator-fluxcd.fullname" . }}-tailscale{{ end }}'
   values:
     clusterName: soperator
   install:
@@ -2337,6 +2334,10 @@ slurmCluster:
     releaseName: slurm-cluster-storage
     interval: 5m
     timeout: 30m
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+      - name: '{{ if .Values.storageClasses.enabled }}{{ include "soperator-fluxcd.fullname" . }}-storageclasses{{ end }}'
+      - name: '{{ if .Values.soperator.enabled }}{{ include "soperator-fluxcd.fullname" . }}-soperator{{ end }}'
     values: null
     install:
       remediation:
@@ -2361,6 +2362,10 @@ nodesets:
   version: 5.0.0
   namespace: soperator
   releaseName: soperator-nodesets
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ if .Values.soperator.enabled }}{{ include "soperator-fluxcd.fullname" . }}-soperator{{ end }}'
+    - name: '{{ if .Values.slurmCluster.enabled }}{{ include "soperator-fluxcd.fullname" . }}-slurm-cluster{{ end }}'
   values:
     clusterName: ""
   install:
@@ -2379,6 +2384,10 @@ soperatorActiveChecks:
   version: 5.0.0
   releaseName: soperator-activechecks
   namespace: soperator
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-slurm-cluster'
+    - name: >-
+        {{ if and .Values.soperator.enabled .Values.soperator.soperatorChecks.enabled }} {{ include "soperator-fluxcd.fullname" . }}-soperatorchecks {{ end }}
   values: null
   install:
     crds: Skip
@@ -2399,6 +2408,10 @@ soperator:
   version: 5.0.0
   namespace: "soperator-system"
   releaseName: soperator-controller
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ if .Values.soperator.kruise.enabled }}{{ include "soperator-fluxcd.fullname" . }}-kruise{{ end }}'
+    - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
   install:
     crds: CreateReplace
     remediation:
@@ -2654,6 +2667,8 @@ soperator:
     interval: 5m
     timeout: 30m
     releaseName: soperator-node-configurator
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-soperator'
     install:
       crds: Skip
       remediation:
@@ -2745,6 +2760,8 @@ csiDriverNfs:
   version: 4.11.0
   namespace: nfs-system
   releaseName: csi-driver-nfs
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
   values:
     controller:
       nodeSelector:
@@ -2777,6 +2794,9 @@ nfsServer:
   version: 1.2.3
   namespace: nfs-system
   releaseName: nfs-server
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-csi-driver-nfs'
   values: null
   install:
     crds: Skip

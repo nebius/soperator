@@ -22,6 +22,32 @@ tests:
       - equal:
           path: metadata.name
           value: RELEASE-NAME-soperator
+
+  - it: should skip the Kruise dependency when the built-in release is disabled
+    set:
+      soperator.kruise.enabled: false
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: RELEASE-NAME-ns
+            - name: RELEASE-NAME-cert-manager
+
+  - it: should replace the default dependencies with the configured references
+    set:
+      fullnameOverride: custom
+      soperator.kruise.enabled: false
+      soperator.dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+        - name: external-kruise
+          namespace: platform
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: custom-ns
+            - name: external-kruise
+              namespace: platform
 ---
 suite: test soperatorchecks dependencies
 templates:
