@@ -90,8 +90,14 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"node_group": map[string]interface{}{"resource": map[string]interface{}{"platform": "cpu-d3"}},
 		}
 	}
-	spec["version"] = cfg.NFSVersion
-	spec["use_stable_repo"] = !cfg.SoperatorUnstable
+	// Newer recipes take the NFS version and registry from the Soperator release and reject
+	// these attributes, so override them only where the recipe still sets them.
+	if _, ok := spec["version"]; ok {
+		spec["version"] = cfg.NFSVersion
+	}
+	if _, ok := spec["use_stable_repo"]; ok {
+		spec["use_stable_repo"] = !cfg.SoperatorUnstable
+	}
 	nfs["spec"] = spec
 	tfVars["nfs_in_k8s"] = nfs
 	tfVars["production"] = false
