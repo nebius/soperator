@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
@@ -184,6 +185,22 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"topology": "flat",
 			"config":   "Default=NO PriorityTier=10 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES",
 		},
+	}
+
+	if version, err := semver.NewVersion(cfg.SoperatorVersion); err == nil && version.Major() >= 5 {
+		login, _ := tfVars["slurm_nodeset_login"].(map[string]any)
+		if login == nil {
+			login = make(map[string]any)
+		}
+		login["size"] = 2
+		// A low test target exercises scale-up without saturating the login nodes.
+		login["autoscaling"] = map[string]any{
+			"enabled":                           true,
+			"min_size":                          2,
+			"max_size":                          3,
+			"target_cpu_utilization_percentage": 10,
+		}
+		tfVars["slurm_nodeset_login"] = login
 	}
 
 	tfVars["slurm_login_ssh_root_public_keys"] = []string{cfg.SSHPublicKey}

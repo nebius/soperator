@@ -240,3 +240,37 @@ func TestOverrideTestValuesLocalNVMe(t *testing.T) {
 		})
 	}
 }
+
+func TestOverrideTestValuesLoginAutoscaling(t *testing.T) {
+	for _, version := range []string{"5.0.0", "5.0.0-rabcdef", "v5.1.0", "6.0.0-rc.1"} {
+		t.Run(version, func(t *testing.T) {
+			for _, original := range []map[string]any{nil, {
+				"size": float64(7), "resource": map[string]any{"platform": "cpu-g1"},
+				"node_group_enabled": false, "placement_policy_nodes": []string{"host"},
+				"autoscaling": map[string]any{"enabled": false, "max_size": 10},
+			}} {
+				vars := map[string]any{"slurm_nodeset_login": original}
+				got := overrideTestValues(vars, Config{SoperatorVersion: version})["slurm_nodeset_login"].(map[string]any)
+				assert.Equal(t, 2, got["size"])
+				assert.Equal(t, map[string]any{
+					"enabled": true, "min_size": 2, "max_size": 3, "target_cpu_utilization_percentage": 10,
+				}, got["autoscaling"])
+				if original != nil {
+					assert.Equal(t, map[string]any{"platform": "cpu-g1"}, got["resource"])
+					assert.Equal(t, false, got["node_group_enabled"])
+					assert.Equal(t, []string{"host"}, got["placement_policy_nodes"])
+				}
+			}
+		})
+	}
+	for _, version := range []string{"4.1.18", "4.1.18-rabcdef", "", "invalid"} {
+		t.Run(version, func(t *testing.T) {
+			vars := map[string]any{}
+			assert.NotContains(t, overrideTestValues(vars, Config{SoperatorVersion: version}), "slurm_nodeset_login")
+			login := map[string]any{"size": 7, "autoscaling": nil}
+			vars["slurm_nodeset_login"] = login
+			assert.Equal(t, map[string]any{"size": 7, "autoscaling": nil},
+				overrideTestValues(vars, Config{SoperatorVersion: version})["slurm_nodeset_login"])
+		})
+	}
+}
