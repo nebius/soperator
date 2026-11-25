@@ -722,7 +722,6 @@ observability:
                 max_elapsed_time: 0
               start_at: end
               storage: file_storage
-            zipkin: null
           processors:
             k8s_attributes:
               extract:
@@ -816,8 +815,6 @@ observability:
                 receivers:
                   - filelog/pods
                   - filelog/nodelogs
-              metrics: null
-              traces: null
       # postRenderers: []
       driftDetection:
         mode: warn
@@ -1123,11 +1120,6 @@ observability:
               delete_after_read: true
               delete_after_read_min_age: 4h
               storage: file_storage # Storage for the state (file offsets).
-            # Disable irrelevant receivers that might be added by valuesFrom ConfigMap:
-            zipkin: null
-            jaeger: null
-            otlp: null
-            prometheus: null
           processors:
             k8s_attributes:
               pod_association:
@@ -1215,8 +1207,6 @@ observability:
                   - memory_limiter
                 exporters:
                   - otlp_http/victorialogs
-              metrics: null
-              traces: null
       # postRenderers: []
       driftDetection:
         mode: warn
@@ -1352,7 +1342,6 @@ observability:
                 - group: events.k8s.io
                   mode: watch
                   name: events
-            zipkin: null
           processors:
             k8s_attributes:
               extract:
@@ -1446,8 +1435,6 @@ observability:
                   - memory_limiter
                 exporters:
                   - otlp_http/victoriametrics
-              metrics: null
-              traces: null
       # postRenderers: []
       driftDetection:
         mode: warn

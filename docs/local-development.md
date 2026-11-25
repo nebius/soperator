@@ -77,6 +77,15 @@ make kind-create KIND_CLUSTER_NAME=my-cluster KIND_NODES=5
 
 > **Note:** The `kind-create` command automatically switches your kubectl context to the newly created cluster, so you can immediately start using `kubectl` commands without manually switching contexts.
 
+To check the OpenTelemetry values against the child chart, use Helm 4.2.4 on `PATH` and a local copy of
+`opentelemetry-collector` 0.149.0 (a chart directory or a `.tgz` archive). This renders the umbrella ConfigMaps
+and then the child collectors for profiles with and without public export.
+
+```bash
+OTEL_COLLECTOR_CHART=/path/to/opentelemetry-collector-0.149.0.tgz \
+  go test -tags=helmapi -run '^TestOTelCollectorRelay$' -count=1 ./test/helmapi
+```
+
 ## Working with the Cluster
 
 ### Deploy Operator

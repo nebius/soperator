@@ -37,6 +37,6 @@ spec:
   valuesFrom:
     {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" $collector.valuesFrom) | nindent 4 }}
 ---
-{{- $valuesYaml := toYaml ($collector.values | default dict) }}
+{{- $valuesYaml := include "soperator-fluxcd.otelCollectorValues" (dict "root" $ "collector" "logs" "values" $collector.values) }}
 {{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

@@ -1,0 +1,17 @@
+logs: &logs
+  config:
+    receivers: &receivers
+      zipkin: null
+    service: &service
+      pipelines:
+        metrics: null
+        traces: null
+events: *logs
+jailLogs:
+  config:
+    receivers:
+      <<: *receivers
+      jaeger: null
+      otlp: null
+      prometheus: null
+    service: *service

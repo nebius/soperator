@@ -8,6 +8,9 @@ tests:
   - it: should collect pod and node logs with local exporter batching and persistent checkpoints
     documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
     asserts:
+      - equal: {path: 'data["values.yaml"].config.receivers.zipkin', value: null}
+      - equal: {path: 'data["values.yaml"].config.service.pipelines.metrics', value: null}
+      - equal: {path: 'data["values.yaml"].config.service.pipelines.traces', value: null}
       - equal:
           path: data["values.yaml"].config.service.pipelines.logs
           value:
@@ -42,6 +45,15 @@ tests:
           content:
             name: varlibotelcol
             hostPath: {path: /var/lib/otelcol, type: DirectoryOrCreate}
+
+  - it: should leave the base values empty when logs values are null
+    set:
+      observability.opentelemetry.logs.values: null
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"]
+          value: {}
 
   - it: should pass an explicit Secret-backed public exporter and its capped queue
     set:
@@ -184,6 +196,9 @@ tests:
   - it: should collect Kubernetes events using the local exporter and its own storage directory
     documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
     asserts:
+      - equal: {path: 'data["values.yaml"].config.receivers.zipkin', value: null}
+      - equal: {path: 'data["values.yaml"].config.service.pipelines.metrics', value: null}
+      - equal: {path: 'data["values.yaml"].config.service.pipelines.traces', value: null}
       - equal:
           path: data["values.yaml"].mode
           value: deployment
@@ -277,6 +292,12 @@ tests:
   - it: should collect jail logs and health checker output with a distinct checkpoint directory
     documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
     asserts:
+      - equal: {path: 'data["values.yaml"].config.receivers.zipkin', value: null}
+      - equal: {path: 'data["values.yaml"].config.receivers.jaeger', value: null}
+      - equal: {path: 'data["values.yaml"].config.receivers.otlp', value: null}
+      - equal: {path: 'data["values.yaml"].config.receivers.prometheus', value: null}
+      - equal: {path: 'data["values.yaml"].config.service.pipelines.metrics', value: null}
+      - equal: {path: 'data["values.yaml"].config.service.pipelines.traces', value: null}
       - equal:
           path: data["values.yaml"].config.service.pipelines.logs
           value:
@@ -308,6 +329,22 @@ tests:
           content:
             name: varlibotelcol
             hostPath: {path: /var/lib/otelcol-jail, type: DirectoryOrCreate}
+
+  - it: should allow native values to enable the OTLP receiver and traces pipeline
+    set:
+      observability.opentelemetry.jailLogs.values.config.receivers.otlp:
+        protocols: {grpc: {endpoint: "0.0.0.0:4317"}}
+      observability.opentelemetry.jailLogs.values.config.service.pipelines.traces:
+        receivers: [otlp]
+        exporters: [debug]
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].config.receivers.otlp
+          value: {protocols: {grpc: {endpoint: "0.0.0.0:4317"}}}
+      - equal:
+          path: data["values.yaml"].config.service.pipelines.traces
+          value: {receivers: [otlp], exporters: [debug]}
 
   - it: should pass an explicit host-mounted token and public exporter
     set:
