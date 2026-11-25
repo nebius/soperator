@@ -1,4 +1,5 @@
 {{- if .Values.certManager.enabled }}
+{{- $valuesName := printf "%s-cert-manager-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -31,15 +32,9 @@ spec:
   {{- include "soperator-fluxcd.targetNamespace" .Values.certManager.namespace | nindent 2 }}
   releaseName: {{ .Values.certManager.releaseName }}
   timeout: {{ .Values.certManager.timeout }}
-  values:
-    {{- include "soperator-fluxcd.platformValues" (dict "component" .Values.certManager "root" $ "prometheusEnabled" .Values.observability.prometheusOperator.enabled) | nindent 4 }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-cert-manager
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: cert-manager
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.certManager.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := include "soperator-fluxcd.platformValues" (dict "component" .Values.certManager "root" $ "prometheusEnabled" .Values.observability.prometheusOperator.enabled) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

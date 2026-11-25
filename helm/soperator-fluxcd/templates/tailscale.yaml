@@ -1,4 +1,5 @@
 {{- if .Values.tailscale.enabled }}
+{{- $valuesName := printf "%s-tailscale-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -29,8 +30,9 @@ spec:
   timeout: {{ .Values.tailscale.timeout }}
   upgrade:
     {{- toYaml .Values.tailscale.upgrade | nindent 4 }}
-  {{- if ne .Values.tailscale.values nil }}
-  values:
-    {{- tpl (toYaml .Values.tailscale.values) $ | nindent 4 }}
-  {{- end }}
+  valuesFrom:
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.tailscale.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := tpl (toYaml (.Values.tailscale.values | default dict)) $ }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

@@ -39,6 +39,7 @@
 {{- range compact $namespaces | uniq -}}
   {{- $resources = append $resources (dict "apiVersion" "v1" "kind" "Namespace" "metadata" (dict "name" .)) -}}
 {{- end -}}
+{{- $valuesName := printf "%s-ns-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -67,5 +68,8 @@ spec:
     remediation:
       retries: 3
   interval: {{ .Values.ns.interval }}
-  values:
-    {{- toYaml (dict "resources" $resources) | nindent 4 }}
+  valuesFrom:
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.ns.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (dict "resources" $resources) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}

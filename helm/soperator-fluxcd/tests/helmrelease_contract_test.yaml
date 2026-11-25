@@ -1,4 +1,7 @@
 suite: test HelmRelease values and dependencies
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/backup-config.yaml
   - templates/storageclasses.yaml
@@ -17,6 +20,7 @@ tests:
       - templates/storageclasses.yaml
       - templates/monitoring-dashboards.yaml
       - templates/soperator-custom-configmaps.yaml
+    documentSelector: &helmRelease {path: kind, value: HelmRelease, matchMany: true}
     asserts:
       - equal:
           path: spec.dependsOn
@@ -25,13 +29,14 @@ tests:
 
   - it: should use the generated operator release name for checks
     template: templates/soperatorchecks.yaml
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn
           value:
             - name: values-contract-soperator
 
-  - it: should omit dependencies and inline values by default for the CRDs
+  - it: should omit dependencies and generate empty values by default for the CRDs
     templates:
       - templates/prometheus-operator-crds.yaml
       - templates/mariadb-operator-crds.yaml
@@ -39,8 +44,21 @@ tests:
     asserts:
       - notExists:
           path: spec.dependsOn
-      - notExists:
-          path: spec.values
+        documentSelector: *helmRelease
+      - equal:
+          path: data["values.yaml"]
+          value: {}
+        documentSelector: &baseConfigMap {path: kind, value: ConfigMap, matchMany: true}
+
+  - it: should preserve a numeric release namespace as a string on the base ConfigMap
+    template: templates/backup-config.yaml
+    release:
+      namespace: "123"
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: "123"
 
   - it: should render the configured dependency lists verbatim after resolving names
     set:
@@ -56,6 +74,7 @@ tests:
       observability.prometheusOperator.dependsOn: *dependencies
       mariadbOperator.crds.dependsOn: *dependencies
       observability.vmStack.crds.dependsOn: *dependencies
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn
@@ -75,6 +94,7 @@ tests:
       observability.prometheusOperator.dependsOn: []
       mariadbOperator.crds.dependsOn: []
       observability.vmStack.crds.dependsOn: []
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn
@@ -93,6 +113,7 @@ tests:
       soperator.soperatorChecks.dependsOn: null
       soperator.monitoringDashboards.dependsOn: null
       customConfigmaps.dependsOn: null
+    documentSelector: *helmRelease
     asserts:
       - notExists:
           path: spec.dependsOn
@@ -101,6 +122,7 @@ tests:
     template: templates/mariadb-operator-crds.yaml
     set:
       mariadbOperator.crds.dependsOn: null
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn
@@ -110,33 +132,36 @@ tests:
     template: templates/backup-config.yaml
     set:
       backup.config.values.bucket.name: test-backups
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.bucket.name
+          path: data["values.yaml"].bucket.name
           value: test-backups
       - equal:
-          path: spec.values.secret.name
+          path: data["values.yaml"].secret.name
           value: jail-backup
 
   - it: should forward a boolean storage class override
     template: templates/storageclasses.yaml
     set:
       storageClasses.values.allowVolumeExpansion: false
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.allowVolumeExpansion
+          path: data["values.yaml"].allowVolumeExpansion
           value: false
 
   - it: should forward the checks configuration
     template: templates/soperatorchecks.yaml
     set:
       soperator.soperatorChecks.values.checks.replicas: 2
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.checks.replicas
+          path: data["values.yaml"].checks.replicas
           value: 2
       - equal:
-          path: spec.values.checks.nodeSelector["slurm.nebius.ai/nodeset"]
+          path: data["values.yaml"].checks.nodeSelector["slurm.nebius.ai/nodeset"]
           value: system
 
   - it: should prefer dashboard values over legacy overrides
@@ -144,18 +169,20 @@ tests:
     set:
       soperator.monitoringDashboards.values.namePrefix: test-dashboards
       soperator.monitoringDashboards.overrideValues.namePrefix: legacy-dashboards
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.namePrefix
+          path: data["values.yaml"].namePrefix
           value: test-dashboards
 
   - it: should use legacy dashboard overrides when values are absent
     template: templates/monitoring-dashboards.yaml
     set:
       soperator.monitoringDashboards.overrideValues.namePrefix: legacy-dashboards
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.namePrefix
+          path: data["values.yaml"].namePrefix
           value: legacy-dashboards
 
   - it: should forward the native Enroot override from values
@@ -163,9 +190,10 @@ tests:
     set:
       customConfigmaps.values.enroot.useDedicatedImageStorage: false
       customConfigmaps.overrideValues.enroot.useDedicatedImageStorage: true
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.enroot.useDedicatedImageStorage
+          path: data["values.yaml"].enroot.useDedicatedImageStorage
           value: false
 
   - it: should respect an empty values map even with legacy overrides present
@@ -173,9 +201,10 @@ tests:
     set:
       customConfigmaps.values: {}
       customConfigmaps.overrideValues.enroot.useDedicatedImageStorage: false
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values
+          path: data["values.yaml"]
           value: {}
 
   - it: should forward Prometheus CRD annotations
@@ -185,9 +214,10 @@ tests:
         crds:
           annotations:
             example.com/profile: test
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.crds.annotations["example.com/profile"]
+          path: data["values.yaml"].crds.annotations["example.com/profile"]
           value: test
 
   - it: should forward the MariaDB CRD values map
@@ -196,9 +226,10 @@ tests:
       # The pinned MariaDB chart has an empty values.yaml.
       mariadbOperator.crds.values:
         testValue: forwarded
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values
+          path: data["values.yaml"]
           value:
             testValue: forwarded
 
@@ -207,7 +238,8 @@ tests:
     set:
       observability.vmStack.crds.values.annotations:
         example.com/profile: test
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.annotations["example.com/profile"]
+          path: data["values.yaml"].annotations["example.com/profile"]
           value: test

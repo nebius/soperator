@@ -1,4 +1,7 @@
 suite: test namespace declarations
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/namespaces.yaml
 tests:
@@ -6,16 +9,19 @@ tests:
     asserts:
       - isKind:
           of: HelmRelease
+        documentSelector: &helmRelease {path: kind, value: HelmRelease}
       - equal:
           path: metadata.name
           value: RELEASE-NAME-ns
+        documentSelector: *helmRelease
       - contains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
             metadata:
               name: storage-system
+        documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
 
   - it: should deduplicate a namespace declared across observability groups
     set:
@@ -25,12 +31,13 @@ tests:
       observability.prometheusOperator.namespace: shared-observability
       soperator.monitoringDashboards.namespace: shared-observability
       notifier.namespace: shared-observability
+    documentSelector: *baseConfigMap
     asserts:
       - lengthEqual:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           count: 8
       - contains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
@@ -46,26 +53,27 @@ tests:
       soperator.monitoringDashboards.namespace: metrics
       notifier.namespace: metrics
       csiDriverNfs.namespace: nfs-driver
+    documentSelector: *baseConfigMap
     asserts:
       - lengthEqual:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           count: 10
       - contains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
             metadata:
               name: metrics
       - contains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
             metadata:
               name: telemetry
       - contains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
@@ -78,23 +86,24 @@ tests:
       nodesets.enabled: false
       nodesets.namespace: unused-nodesets
       storageClasses.enabled: false
+    documentSelector: *baseConfigMap
     asserts:
       - notContains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
             metadata:
               name: cert-manager-system
       - notContains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
             metadata:
               name: unused-nodesets
       - notContains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
@@ -109,23 +118,24 @@ tests:
       notifier.namespace: unused-notifier
       nfsServer.enabled: false
       csiDriverNfs.namespace: unused-nfs-driver
+    documentSelector: *baseConfigMap
     asserts:
       - notContains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
             metadata:
               name: unused-metrics
       - notContains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
             metadata:
               name: unused-notifier
       - notContains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
@@ -136,14 +146,15 @@ tests:
     set:
       observability.opentelemetry.namespace: ""
       observability.vmLogs.namespace: null
+    documentSelector: *baseConfigMap
     asserts:
       - notContains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
             metadata:
               name: logs-system
       - lengthEqual:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           count: 8

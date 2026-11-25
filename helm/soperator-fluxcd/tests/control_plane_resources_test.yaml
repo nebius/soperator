@@ -1,4 +1,7 @@
 suite: test control-plane cpu requests
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/cert-manager.yaml
   - templates/mariadb-operator.yaml
@@ -11,72 +14,78 @@ tests:
   # room, so every control-plane workload carries a floor.
   - it: should request a cpu floor for cert-manager and its companions
     template: templates/cert-manager.yaml
+    documentSelector: &baseConfigMap {path: kind, value: ConfigMap, matchMany: true}
     asserts:
       - equal:
-          path: spec.values.resources.requests.cpu
+          path: data["values.yaml"].resources.requests.cpu
           value: 100m
       - equal:
-          path: spec.values.webhook.resources.requests.cpu
+          path: data["values.yaml"].webhook.resources.requests.cpu
           value: 100m
       - equal:
-          path: spec.values.cainjector.resources.requests.cpu
+          path: data["values.yaml"].cainjector.resources.requests.cpu
           value: 100m
       - equal:
-          path: spec.values.startupapicheck.resources.requests.cpu
+          path: data["values.yaml"].startupapicheck.resources.requests.cpu
           value: 100m
 
   - it: should request a cpu floor for the mariadb operator, its webhook and cert controller
     template: templates/mariadb-operator.yaml
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.resources.requests.cpu
+          path: data["values.yaml"].resources.requests.cpu
           value: 100m
       - equal:
-          path: spec.values.webhook.resources.requests.cpu
+          path: data["values.yaml"].webhook.resources.requests.cpu
           value: 100m
       - equal:
-          path: spec.values.certController.resources.requests.cpu
+          path: data["values.yaml"].certController.resources.requests.cpu
           value: 100m
 
   - it: should request a smaller cpu floor for k8up
     template: templates/backup.yaml
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.resources.requests.cpu
+          path: data["values.yaml"].resources.requests.cpu
           value: 50m
 
   - it: should request a cpu floor for grafana and the vm operator
     template: templates/vm-stack.yaml
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.grafana.resources.requests.cpu
+          path: data["values.yaml"].grafana.resources.requests.cpu
           value: 100m
       - equal:
-          path: spec.values.victoria-metrics-operator.resources.requests.cpu
+          path: data["values.yaml"].victoria-metrics-operator.resources.requests.cpu
           value: 100m
 
   - it: should request a smaller cpu floor for the tsa token writer
     template: templates/o11y-tsa-token-writer.yaml
+    documentSelector: *baseConfigMap
     asserts:
       # The raw chart takes a list: ServiceAccount, a Role/RoleBinding pair per namespace,
       # then the Deployment.
       - equal:
-          path: spec.values.resources[5].kind
+          path: data["values.yaml"].resources[5].kind
           value: Deployment
       - equal:
-          path: spec.values.resources[5].spec.template.spec.containers[0].resources.requests.cpu
+          path: data["values.yaml"].resources[5].spec.template.spec.containers[0].resources.requests.cpu
           value: 50m
       - equal:
-          path: spec.values.resources[5].spec.template.spec.nodeSelector["slurm.nebius.ai/nodeset"]
+          path: data["values.yaml"].resources[5].spec.template.spec.nodeSelector["slurm.nebius.ai/nodeset"]
           value: system
 
   - it: should set no memory floor alongside the cpu request
     template: templates/backup.yaml
+    documentSelector: *baseConfigMap
     asserts:
       - notExists:
-          path: spec.values.resources.requests.memory
+          path: data["values.yaml"].resources.requests.memory
       - notExists:
-          path: spec.values.resources.limits
+          path: data["values.yaml"].resources.limits
 
   - it: should let the cpu floor be overridden
     template: templates/backup.yaml
@@ -85,12 +94,13 @@ tests:
         requests:
           cpu: 250m
           memory: 256Mi
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.resources.requests.cpu
+          path: data["values.yaml"].resources.requests.cpu
           value: 250m
       - equal:
-          path: spec.values.resources.requests.memory
+          path: data["values.yaml"].resources.requests.memory
           value: 256Mi
 
   # The rebooter competes for the sliver of node cpu left over after the Slurm pod, so it needs to
@@ -98,33 +108,36 @@ tests:
   # every Slurm class (the lowest is slurm-login at 100002).
   - it: should give the rebooter a class that outranks infra pods but no Slurm pod
     template: templates/nodeconfigurator.yaml
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.rebooter.priorityClassName
+          path: data["values.yaml"].rebooter.priorityClassName
           value: soperator-rebooter
       - equal:
-          path: spec.values.rebooter.priorityClass.name
+          path: data["values.yaml"].rebooter.priorityClass.name
           value: soperator-rebooter
       - equal:
-          path: spec.values.rebooter.priorityClass.value
+          path: data["values.yaml"].rebooter.priorityClass.value
           value: 100000
       - equal:
-          path: spec.values.rebooter.resources.requests.cpu
+          path: data["values.yaml"].rebooter.resources.requests.cpu
           value: 100m
 
   - it: should forward an explicitly empty rebooter priority class name
     template: templates/nodeconfigurator.yaml
     set:
       soperator.nodeConfigurator.values.rebooter.priorityClassName: ""
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.rebooter.priorityClassName
+          path: data["values.yaml"].rebooter.priorityClassName
           value: ""
 
   - it: should omit the rebooter priority class name when set to null
     template: templates/nodeconfigurator.yaml
     set:
       soperator.nodeConfigurator.values.rebooter.priorityClassName: null
+    documentSelector: *baseConfigMap
     asserts:
       - notExists:
-          path: spec.values.rebooter.priorityClassName
+          path: data["values.yaml"].rebooter.priorityClassName

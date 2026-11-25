@@ -1,4 +1,7 @@
 suite: test Tailscale RBAC
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/tailscale.yaml
 tests:
@@ -11,35 +14,46 @@ tests:
           path: spec.dependsOn
           value:
             - name: RELEASE-NAME-ns
+        documentSelector: {path: kind, value: HelmRelease}
       - equal:
-          path: spec.values.resources[0].metadata.namespace
+          path: data["values.yaml"].resources[0].metadata.namespace
           value: workload
+        documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
       - equal:
-          path: spec.values.resources[1].metadata.namespace
+          path: data["values.yaml"].resources[1].metadata.namespace
           value: workload
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.resources[1].roleRef.name
+          path: data["values.yaml"].resources[1].roleRef.name
           value: tailscale
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.resources[1].subjects[0].name
+          path: data["values.yaml"].resources[1].subjects[0].name
           value: default
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.resources[0].rules[0].resources[0]
+          path: data["values.yaml"].resources[0].rules[0].resources[0]
           value: secrets
+        documentSelector: *baseConfigMap
       - contains:
-          path: spec.values.resources[0].rules[0].verbs
+          path: data["values.yaml"].resources[0].rules[0].verbs
           content: get
+        documentSelector: *baseConfigMap
       - contains:
-          path: spec.values.resources[0].rules[0].verbs
+          path: data["values.yaml"].resources[0].rules[0].verbs
           content: create
+        documentSelector: *baseConfigMap
       - contains:
-          path: spec.values.resources[0].rules[0].verbs
+          path: data["values.yaml"].resources[0].rules[0].verbs
           content: update
+        documentSelector: *baseConfigMap
       - contains:
-          path: spec.values.resources[0].rules[0].verbs
+          path: data["values.yaml"].resources[0].rules[0].verbs
           content: patch
+        documentSelector: *baseConfigMap
       - notExists:
-          path: spec.values.resources[0].rules[0].resourceNames
+          path: data["values.yaml"].resources[0].rules[0].resourceNames
+        documentSelector: *baseConfigMap
 ---
 suite: test Tailscale dependency
 templates:
@@ -48,6 +62,7 @@ tests:
   - it: should make Slurm cluster depend on Tailscale RBAC when enabled
     set:
       tailscale.enabled: true
+    documentSelector: &helmRelease {path: kind, value: HelmRelease}
     asserts:
       - contains:
           path: spec.dependsOn
@@ -57,6 +72,7 @@ tests:
   - it: should not add Tailscale dependency when disabled
     set:
       tailscale.enabled: false
+    documentSelector: *helmRelease
     asserts:
       - notContains:
           path: spec.dependsOn

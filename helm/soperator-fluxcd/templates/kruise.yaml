@@ -1,4 +1,5 @@
 {{ if and .Values.soperator.enabled .Values.soperator.kruise.enabled}}
+{{- $valuesName := printf "%s-kruise-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -41,17 +42,9 @@ spec:
       {{- include "soperator-fluxcd.mergeKruiseOverrides" (dict "values" $values "overrides" $legacyValues) }}
     {{- end }}
   {{- end }}
-  {{- if ne $values nil }}
-  values:
-    {{- toYaml $values | nindent 4 }}
-  {{- end }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-kruise
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: kruise
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.soperator.kruise.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml ($values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

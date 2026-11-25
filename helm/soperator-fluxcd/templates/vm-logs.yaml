@@ -1,4 +1,5 @@
 {{- if and .Values.observability.enabled .Values.observability.vmLogs.enabled }}
+{{- $valuesName := printf "%s-vm-logs-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -31,17 +32,9 @@ spec:
   {{- include "soperator-fluxcd.targetNamespace" .Values.observability.vmLogs.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.observability.vmLogs.upgrade | nindent 4 }}
-  {{- with .Values.observability.vmLogs.values }}
-  values:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-vm-logs
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: vm-logs
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.observability.vmLogs.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.observability.vmLogs.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

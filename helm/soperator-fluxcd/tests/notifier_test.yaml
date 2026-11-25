@@ -1,4 +1,7 @@
 suite: test notifier
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/notifier.yaml
 
@@ -33,11 +36,16 @@ tests:
     asserts:
       - isKind:
           of: HelmRelease
+        documentSelector: &helmRelease {path: kind, value: HelmRelease}
       - notExists:
-          path: spec.values.slack
+          path: data["values.yaml"].slack
+        documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
       - equal:
           path: spec.valuesFrom
           value:
+            - kind: ConfigMap
+              name: notifier-test-notifier-values
+              valuesKey: values.yaml
             - kind: ConfigMap
               name: terraform-soperator-notifier
               optional: true
@@ -46,8 +54,9 @@ tests:
               name: soperator-notifier
               optional: true
               valuesKey: values.yaml
+        documentSelector: *helmRelease
 
-  - it: should forward an inline webhook URL with the default name override
+  - it: should forward a configured webhook URL with the default name override
     set:
       notifier:
         values:
@@ -57,12 +66,15 @@ tests:
       - notFailedTemplate: {}
       - isKind:
           of: HelmRelease
+        documentSelector: *helmRelease
       - equal:
-          path: spec.values.nameOverride
+          path: data["values.yaml"].nameOverride
           value: "soperator-notifier"
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.slack.webhookUrl
+          path: data["values.yaml"].slack.webhookUrl
           value: *slackUrl
+        documentSelector: *baseConfigMap
 
   - it: should pass custom child chart values
     set:
@@ -73,17 +85,28 @@ tests:
           dataSourceUrl: &dataSourceUrl http://metrics.example.invalid:8428
           alertManager:
             replicas: 2
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.dataSourceUrl
+          path: data["values.yaml"].dataSourceUrl
           value: *dataSourceUrl
       - equal:
-          path: spec.values.alertManager.replicas
+          path: data["values.yaml"].alertManager.replicas
           value: 2
+
+  - it: should preserve trailing blank lines in the last chart value
+    set:
+      notifier.values.zzScript: &script "echo hello\n\n"
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].zzScript
+          value: *script
 
   - it: should depend on namespaces and VMStack with VictoriaLogs disabled
     set:
       observability.vmLogs.enabled: false
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn
@@ -96,6 +119,7 @@ tests:
       notifier.dependsOn: &dependencies
         - name: external-metrics
           namespace: observability
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn
@@ -104,7 +128,29 @@ tests:
   - it: should clear dependencies with an explicit empty list
     set:
       notifier.dependsOn: []
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn
           value: []
+
+  - it: should keep only the generated source when the optional references are cleared
+    set:
+      notifier.valuesFrom: []
+    documentSelector: *helmRelease
+    asserts:
+      - equal:
+          path: spec.valuesFrom
+          value: &baseOnly
+            - kind: ConfigMap
+              name: notifier-test-notifier-values
+              valuesKey: values.yaml
+
+  - it: should keep the generated source when the configured references are null
+    set:
+      notifier.valuesFrom: null
+    documentSelector: *helmRelease
+    asserts:
+      - equal:
+          path: spec.valuesFrom
+          value: *baseOnly

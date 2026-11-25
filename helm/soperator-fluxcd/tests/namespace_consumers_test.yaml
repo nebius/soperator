@@ -1,4 +1,7 @@
 suite: test namespace consumers
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/slurm-cluster.yaml
   - templates/slurm-cluster-storage.yaml
@@ -14,6 +17,7 @@ tests:
       - templates/backup-config.yaml
     set:
       slurmCluster.namespace: workload
+    documentSelector: &helmRelease {path: kind, value: HelmRelease, matchMany: true}
     asserts:
       - equal:
           path: spec.targetNamespace
@@ -27,9 +31,11 @@ tests:
       - equal:
           path: spec.targetNamespace
           value: certificates
+        documentSelector: *helmRelease
       - equal:
-          path: spec.values.global.leaderElection.namespace
+          path: data["values.yaml"].global.leaderElection.namespace
           value: certificates
+        documentSelector: &baseConfigMap {path: kind, value: ConfigMap, matchMany: true}
 
   - it: should pass explicit metrics endpoints and Grafana discovery namespaces
     template: templates/vm-stack.yaml
@@ -45,15 +51,19 @@ tests:
       - equal:
           path: spec.targetNamespace
           value: metrics
+        documentSelector: *helmRelease
       - equal:
-          path: spec.values.vmagent.spec.remoteWrite[0].url
+          path: data["values.yaml"].vmagent.spec.remoteWrite[0].url
           value: http://vmsingle-metrics-victoria-metrics-k8s-stack.metrics.svc.cluster.local.:8428/api/v1/write
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.grafana.sidecar.dashboards.searchNamespace
+          path: data["values.yaml"].grafana.sidecar.dashboards.searchNamespace
           value: [metrics, telemetry]
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.grafana.sidecar.datasources.searchNamespace
+          path: data["values.yaml"].grafana.sidecar.datasources.searchNamespace
           value: [metrics, telemetry]
+        documentSelector: *baseConfigMap
 
   - it: should wire token writer roles and subjects to their respective namespaces
     template: templates/o11y-tsa-token-writer.yaml
@@ -64,12 +74,16 @@ tests:
       - equal:
           path: spec.targetNamespace
           value: metrics
+        documentSelector: *helmRelease
       - equal:
-          path: spec.values.resources[1].metadata.namespace
+          path: data["values.yaml"].resources[1].metadata.namespace
           value: metrics
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.resources[3].metadata.namespace
+          path: data["values.yaml"].resources[3].metadata.namespace
           value: telemetry
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.resources[4].subjects[0].namespace
+          path: data["values.yaml"].resources[4].subjects[0].namespace
           value: metrics
+        documentSelector: *baseConfigMap

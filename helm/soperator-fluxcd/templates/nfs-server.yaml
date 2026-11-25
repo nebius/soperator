@@ -1,4 +1,5 @@
 {{- if .Values.nfsServer.enabled }}
+{{- $valuesName := printf "%s-nfs-server-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -31,8 +32,9 @@ spec:
   timeout: {{ .Values.nfsServer.timeout }}
   releaseName: {{ .Values.nfsServer.releaseName }}
   {{- include "soperator-fluxcd.targetNamespace" .Values.nfsServer.namespace | nindent 2 }}
-  {{- with .Values.nfsServer.values }}
-  values:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+  valuesFrom:
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.nfsServer.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.nfsServer.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

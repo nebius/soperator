@@ -1,6 +1,7 @@
 {{- $otel := .Values.observability.opentelemetry }}
 {{- if and .Values.observability.enabled $otel.enabled }}
 {{- $collector := $otel.events }}
+{{- $valuesName := printf "%s-opentelemetry-collector-events-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -33,17 +34,9 @@ spec:
   timeout: {{ $collector.timeout }}
   releaseName: opentelemetry-collector-events
   {{- include "soperator-fluxcd.targetNamespace" $otel.namespace | nindent 2 }}
-  {{- with $collector.values }}
-  values:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
   valuesFrom:
-    - kind: ConfigMap
-      name: terraform-opentelemetry-collector-events
-      optional: true
-      valuesKey: values.yaml
-    - kind: ConfigMap
-      name: opentelemetry-collector-events
-      optional: true
-      valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" $collector.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml ($collector.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}
