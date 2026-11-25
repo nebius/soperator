@@ -192,17 +192,10 @@ curl -k -H "Authorization: Bearer ${TOKEN}" https://localhost:8443/metrics
 Note: Production scraping requires a ServiceMonitor with proper RBAC authentication.
 
 #### 7. NCCL Profiles Collector
-- Purpose: Reads NCCL profile files from the jail filesystem and exports metrics through an OpenTelemetry collector
-- Deployment: Single deployment on system nodes by default, or DaemonSet on worker nodes with `observability.ncclProfiles.values.mode: nodeLocal`
-- Storage: Uses file storage under `/var/lib/otelcol` when `observability.ncclProfiles.values.enableFileStorage` is enabled
-- Runtime limits: Sets `GOMAXPROCS` from `observability.ncclProfiles.values.resources`; passes `useGoMemLimit` through to upstream `useGOMEMLIMIT`
 
-The NCCL profiles collector derives its Go runtime settings from its resource values.
+The collector reads NCCL profile files from the jail filesystem and exports metrics to VictoriaMetrics. By default it runs as one Deployment replica on a system node. Configure the workload under `observability.ncclProfiles.collector.values` and the mounted `data.relay` under `observability.ncclProfiles.configMap.values`. The `file_storage` extension persists receiver checkpoints and the exporter queue under `/var/lib/otelcol-nccl-profiles`.
 
-- CPU limits are preferred over CPU requests; values are rounded up to at least one process (`500m` -> `1`, `2` -> `2`).
-- When `useGoMemLimit` is enabled, the upstream OpenTelemetry collector chart derives `GOMEMLIMIT` from `resources.limits.memory`.
-- Upstream `GOMEMLIMIT` targets about 80% of the memory limit and does not fall back to memory requests.
-- When `spec.values.useGOMEMLIMIT` is false, the upstream chart does not inject a `GOMEMLIMIT` environment variable.
+Set `GOMAXPROCS` explicitly in the collector's `extraEnvs` when tuning CPU allocation. To retain the previous sizing behavior, use the CPU limit or fall back to the request, rounded up to at least one process. With `useGOMEMLIMIT: true`, the upstream chart derives `GOMEMLIMIT` from approximately 80% of `resources.limits.memory`. See the chart guide for the worker DaemonSet values and migration steps. [NCCL profile upgrades](../helm/soperator-fluxcd/README.md#nccl-profile-upgrades)
 
 ### Metrics Processing & Storage
 

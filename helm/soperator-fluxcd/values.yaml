@@ -2052,47 +2052,268 @@ observability:
     driftDetection:
       mode: warn
     releaseName: opentelemetry-collector-nccl-profiles
-    configMapOverrideValues: null
-    collectorOverrideValues: null
-    values:
-      # or nodeLocal
-      mode: shared
-      resources:
-        requests:
-          memory: 200Mi
-          cpu: 500m
-        limits:
-          memory: 1Gi
-      useGoMemLimit: true
-      nebiusO11yAgentVersion: 2.0.10
-      metricsEndpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics
-      metricsExporterTimeout: 15s
-      # These values are rendered as exporter sending_queue.batch settings.
-      # The chart intentionally does not use the batch processor for collector pipelines.
-      batch:
-        timeout: 1s
-        sendBatchSize: 2000
-        sendBatchMaxSize: 5000
-      # Measured in metric data points because the exporter queue uses sizer: items.
-      sendingQueue:
-        queueSize: 30000
-        numConsumers: 10
-      metrics:
-        enabled: true
-        interval: 30s
-        scrapeTimeout: 10s
-      dumpDir: /mnt/jail/opt/soperator-outputs/shared/nccl_profiles
-      pollInterval: 30s
-      exportLabels:
-        slurmJobId: slurm_job_id
-        slurmStepId: slurm_step_id
-        hostnamePid: hostname_pid
-      enableFileStorage: true
-      deleteAfterRead:
-        enabled: true
-        # Nebius O11y agent fork option; not part of upstream filelogreceiver.
-        # Files are deleted only after they have not been modified for at least this duration.
-        minAge: 15m
+    configMap:
+      dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+      values:
+        resources:
+          - apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: opentelemetry-collector-nccl-profiles-agent
+            data:
+              relay: |
+                receivers:
+                  filelog/nccl_metrics:
+                    include:
+                      - /mnt/jail/opt/soperator-outputs/shared/nccl_profiles/*/*/*.log
+                    poll_interval: 30s
+                    retry_on_failure:
+                      enabled: true
+                      max_elapsed_time: 0
+                    include_file_path: true
+                    start_at: beginning
+                    delete_after_read: true
+                    delete_after_read_min_age: 15m
+                    storage: file_storage
+
+                    operators:
+                      - id: parse_nccl_profile_path
+                        type: regex_parser
+                        parse_from: attributes["log.file.path"]
+                        regex: ^.*/(?P<job_id>[^/]+)/(?P<step_id>[^/]+)/(?P<worker_name>.+)-pid(?P<hostname_pid>[^/]+)\.log$
+
+                      - if: attributes["job_id"] != nil
+                        type: copy
+                        from: attributes.job_id
+                        to: resource["slurm_job_id"]
+
+                      - if: attributes["step_id"] != nil
+                        type: copy
+                        from: attributes.step_id
+                        to: resource["slurm_step_id"]
+
+                      - if: attributes["hostname_pid"] != nil
+                        type: copy
+                        from: attributes.hostname_pid
+                        to: resource["hostname_pid"]
+
+                exporters:
+                  otlp_http/victoriametrics:
+                    compression: gzip
+                    encoding: proto
+                    metrics_endpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics
+                    timeout: 15s
+                    retry_on_failure:
+                      enabled: true
+                      initial_interval: 1s
+                      max_interval: 10s
+                      max_elapsed_time: 0
+                    sending_queue:
+                      enabled: true
+                      sizer: items
+                      queue_size: 30000
+                      num_consumers: 10
+                      storage: file_storage
+                      batch:
+                        sizer: items
+                        flush_timeout: 1s
+                        min_size: 2000
+                        max_size: 5000
+
+                connectors:
+                  ncclmetrics:
+
+                extensions:
+                  file_storage:
+                    directory: /var/lib/otelcol-nccl-profiles
+
+                  health_check:
+                    endpoint: 0.0.0.0:13133
+
+                service:
+                  telemetry:
+                    metrics:
+                      readers:
+                        - pull:
+                            exporter:
+                              prometheus:
+                                host: 0.0.0.0
+                                port: 8889
+
+                  extensions:
+                    - health_check
+                    - file_storage
+
+                  pipelines:
+                    logs/nccl_metrics:
+                      receivers:
+                        - filelog/nccl_metrics
+                      exporters:
+                        - ncclmetrics
+
+                    metrics/nccl_metrics:
+                      receivers:
+                        - ncclmetrics
+                      exporters:
+                        - otlp_http/victoriametrics
+    collector:
+      dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-stack'
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-otelcol-nccl-profiles-cm'
+      values:
+        clusterRole:
+          create: true
+          rules:
+            - apiGroups:
+                - ""
+              resources:
+                - pods
+                - namespaces
+              verbs:
+                - get
+                - watch
+                - list
+        image:
+          pullPolicy: IfNotPresent
+          repository: cr.nebius.cloud/observability/nebius-o11y-agent
+          tag: 2.0.10
+        mode: deployment
+        replicaCount: 1 # Only one replica to avoid file lock conflicts on shared storage and prevent log duplication
+        rollout:
+          strategy: Recreate # Ensure old pod terminates before new one starts to maintain max one pod running
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: slurm.nebius.ai/nodeset
+                      operator: In
+                      values:
+                        - "system"
+        extraVolumes:
+          - name: jail
+            hostPath:
+              path: /mnt/jail
+              type: Directory
+          - name: varlibotelcol
+            hostPath:
+              path: /var/lib/otelcol-nccl-profiles
+              type: DirectoryOrCreate
+        extraVolumeMounts:
+          - name: jail
+            mountPath: /mnt/jail
+            readOnly: false
+          - name: varlibotelcol
+            mountPath: /var/lib/otelcol-nccl-profiles
+        securityContext:
+          runAsGroup: 0
+          runAsUser: 10001
+        service:
+          enabled: false
+        serviceAccount:
+          create: true
+        extraEnvs:
+          - name: GOMAXPROCS
+            value: "1"
+        initContainers:
+          - name: wait-jail-populated
+            image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+            volumeMounts:
+              - name: jail
+                mountPath: /mnt/jail
+                readOnly: true
+            securityContext:
+              runAsGroup: 0
+              runAsUser: 0
+            command:
+              - sh
+              - "-c"
+              - |
+                set -eu
+                until [ -f /mnt/jail/etc/soperator-jail-populated ]; do
+                  echo "Waiting for /mnt/jail to be populated"
+                  sleep 5
+                done
+          - name: init-nccl-profiles-dump-dir
+            image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+            volumeMounts:
+              - name: jail
+                mountPath: /mnt/jail
+            securityContext:
+              runAsGroup: 0
+              runAsUser: 0
+            command:
+              - sh
+              - "-c"
+              - |
+                set -eu
+                dump_dir="/mnt/jail/opt/soperator-outputs/shared/nccl_profiles"
+                case "$dump_dir" in
+                  /mnt/jail/*) ;;
+                  *)
+                    echo "NCCL profile dump directory must be under /mnt/jail"
+                    exit 1
+                    ;;
+                esac
+                install -d -m 0777 "$dump_dir"
+          - name: init-fs
+            image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+            volumeMounts:
+              - name: varlibotelcol
+                mountPath: /var/lib/otelcol-nccl-profiles
+            securityContext:
+              runAsGroup: 0
+              runAsUser: 0
+            command:
+              - sh
+              - "-c"
+              - 'chown -R 10001: /var/lib/otelcol-nccl-profiles'
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 200Mi
+        useGOMEMLIMIT: true
+        command:
+          extraArgs:
+            - "--feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress,filelog.allowFileDeletion"
+        ports:
+          jaeger-compact:
+            enabled: false
+          jaeger-grpc:
+            enabled: false
+          jaeger-thrift:
+            enabled: false
+          metrics:
+            enabled: true
+            containerPort: 8889
+            servicePort: 8889
+          otlp:
+            enabled: false
+          otlp-http:
+            enabled: false
+          zipkin:
+            enabled: false
+        podMonitor:
+          enabled: true
+          metricsEndpoints:
+            - port: metrics
+              interval: 30s
+              scrapeTimeout: 10s
+              relabelings:
+                - sourceLabels: [__meta_kubernetes_pod_name]
+                  targetLabel: pod
+                - sourceLabels: [__meta_kubernetes_node_name]
+                  targetLabel: node
+                - replacement: otel-collector-nccl-profiles
+                  targetLabel: collector
+        config: {}
+        configMap:
+          create: false
+          existingName: opentelemetry-collector-nccl-profiles-agent
 slurmCluster:
   enabled: true
   interval: 5m

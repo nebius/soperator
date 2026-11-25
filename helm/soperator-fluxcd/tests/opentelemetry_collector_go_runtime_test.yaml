@@ -98,35 +98,10 @@ tests:
 suite: test opentelemetry collector NCCL profiles Go runtime env
 templates:
   - templates/opentelemetry-collector-nccl-profiles.yaml
+set:
+  observability.ncclProfiles.enabled: true
 tests:
-  - it: should derive GOMAXPROCS and enable upstream GOMEMLIMIT for NCCL collector
-    set:
-      observability.enabled: true
-      observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.values.resources:
-        requests:
-          cpu: "2"
-          memory: 200Mi
-        limits:
-          memory: 500Gi
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles
-    asserts:
-      - contains:
-          path: spec.values.extraEnvs
-          content:
-            name: GOMAXPROCS
-            value: "2"
-      - equal:
-          path: spec.values.useGOMEMLIMIT
-          value: true
-
-  - it: should disable upstream GOMEMLIMIT when useGoMemLimit is false
-    set:
-      observability.enabled: true
-      observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.values.useGoMemLimit: false
+  - it: should keep the default GOMAXPROCS and enable upstream GOMEMLIMIT
     documentSelector:
       path: metadata.name
       value: RELEASE-NAME-otelcol-nccl-profiles
@@ -136,6 +111,25 @@ tests:
           content:
             name: GOMAXPROCS
             value: "1"
+      - equal:
+          path: spec.values.useGOMEMLIMIT
+          value: true
+
+  - it: should pass through explicit runtime settings for the collector
+    set:
+      observability.ncclProfiles.collector.values.extraEnvs:
+        - name: GOMAXPROCS
+          value: "2"
+      observability.ncclProfiles.collector.values.useGOMEMLIMIT: false
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles
+    asserts:
+      - contains:
+          path: spec.values.extraEnvs
+          content:
+            name: GOMAXPROCS
+            value: "2"
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: false
