@@ -52,6 +52,7 @@ func FeaturePaths() []string {
 		"features/tailscale.feature",
 		"features/observability.feature",
 		"features/internal_ssh.feature",
+		"features/sssd.feature",
 		"features/package_installation.feature",
 		"features/gpu_profiling.feature",
 		"features/nccl.feature",
