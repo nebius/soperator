@@ -168,13 +168,13 @@ func TestLoginMemoryRollout(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			sts, pod := memoryTestStatefulSet(), memoryTestPod()
-			require.NoError(t, loginMemoryRolloutReady(sts, []corev1.Pod{pod}, "old", true))
+			require.NoError(t, loginRolloutReady(sts, []corev1.Pod{pod}, "old", true))
 			tc.change(&sts, &pod)
-			require.Error(t, loginMemoryRolloutReady(sts, []corev1.Pod{pod}, "old", true))
+			require.Error(t, loginRolloutReady(sts, []corev1.Pod{pod}, "old", true))
 		})
 	}
-	require.Error(t, loginMemoryRolloutReady(memoryTestStatefulSet(), nil, "old", true))
-	require.NoError(t, loginMemoryRolloutReady(memoryTestStatefulSet(), []corev1.Pod{memoryTestPod()}, "new", false))
+	require.Error(t, loginRolloutReady(memoryTestStatefulSet(), nil, "old", true))
+	require.NoError(t, loginRolloutReady(memoryTestStatefulSet(), []corev1.Pod{memoryTestPod()}, "new", false))
 }
 
 func TestLoginMemoryRolloutWithStaleCurrentRevision(t *testing.T) {
@@ -188,14 +188,14 @@ func TestLoginMemoryRolloutWithStaleCurrentRevision(t *testing.T) {
 			sts.Status.ReadyReplicas, sts.Status.UpdatedReadyReplicas = replicas, replicas
 			pods := []corev1.Pod{memoryTestPod(), memoryTestPod()}
 			pods[1].Name = "login-1"
-			err := loginMemoryRolloutReady(sts, pods, "old", true)
+			err := loginRolloutReady(sts, pods, "old", true)
 			if strategy != "OnDelete" {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
 			pods[1].Labels["controller-revision-hash"] = "old"
-			require.Error(t, loginMemoryRolloutReady(sts, pods, "old", true), "every pod must reach the target revision")
+			require.Error(t, loginRolloutReady(sts, pods, "old", true), "every pod must reach the target revision")
 		})
 	}
 }

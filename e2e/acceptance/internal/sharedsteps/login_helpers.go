@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 
@@ -20,6 +21,9 @@ const (
 	loginInstanceLabel       = "app.kubernetes.io/instance"
 	loginComponentLabel      = "app.kubernetes.io/component"
 	loginComponentLabelValue = "login"
+	loginUpdateAnnounced     = "slurm.nebius.ai/login-update-announced-at"
+	loginUpdateScheduled     = "slurm.nebius.ai/login-update-scheduled-at"
+	loginUpdateRequested     = "slurm.nebius.ai/login-update-requested"
 )
 
 type loginWorkload struct {
@@ -134,4 +138,54 @@ func (s *loginWorkload) waitLoginHPA(ctx context.Context, name string, expected 
 			_, exists, err := s.loginHPA(waitCtx, name)
 			return exists == expected, err
 		})
+}
+
+func (s *loginWorkload) requestLoginPodUpdates(ctx context.Context, sts kubeobjects.LoginStatefulSet, pods []corev1.Pod) error {
+	if sts.Spec.UpdateStrategy.Type != string(appsv1.OnDeleteStatefulSetStrategyType) {
+		return nil
+	}
+	for _, pod := range pods {
+		if pod.DeletionTimestamp != nil || !kubeobjects.PodReady(pod) ||
+			pod.Labels[appsv1.StatefulSetRevisionLabel] == sts.Status.UpdateRevision ||
+			pod.Annotations[loginUpdateAnnounced] == "" || pod.Annotations[loginUpdateScheduled] == "" ||
+			pod.Annotations[loginUpdateRequested] == string(pod.UID) {
+			continue
+		}
+		if err := s.requestLoginPodUpdate(ctx, pod); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *loginWorkload) requestLoginPodUpdate(ctx context.Context, pod corev1.Pod) error {
+	output, err := s.runtime.Kubectl().Run(ctx, "exec", "-n", framework.SoperatorNamespace, pod.Name,
+		"-c", loginSSHDContainer, "--", "chroot", "/mnt/jail", "soperator-login-restart", "--yes")
+	if err != nil {
+		return fmt.Errorf("request early restart for login pod %s (uid=%s): %w", pod.Name, pod.UID, err)
+	}
+	s.runtime.Logf("Requested early restart for login pod %s (uid=%s): %s", pod.Name, pod.UID, strings.TrimSpace(output))
+	return nil
+}
+
+func loginRolloutReady(sts kubeobjects.LoginStatefulSet, pods []corev1.Pod, previous string, changed bool) error {
+	status := sts.Status
+	// OnDelete preserves currentRevision even after every pod reaches updateRevision.
+	currentRevisionReady := sts.Spec.UpdateStrategy.Type == string(appsv1.OnDeleteStatefulSetStrategyType) ||
+		status.CurrentRevision == status.UpdateRevision
+	if sts.Spec.Replicas == nil || *sts.Spec.Replicas < 1 || status.UpdateRevision == "" ||
+		(changed && status.UpdateRevision == previous) || status.ObservedGeneration < sts.Metadata.Generation ||
+		!currentRevisionReady || status.UpdatedReadyReplicas != *sts.Spec.Replicas ||
+		status.ReadyReplicas != *sts.Spec.Replicas || int32(len(pods)) != *sts.Spec.Replicas {
+		return fmt.Errorf("wait for login rollout: previous=%s changed=%t spec=%v generation=%d status=%+v pods=%d",
+			previous, changed, replicaValue(sts.Spec.Replicas), sts.Metadata.Generation, status, len(pods))
+	}
+	for _, pod := range pods {
+		if pod.DeletionTimestamp != nil || pod.Status.Phase != corev1.PodRunning || !kubeobjects.PodReady(pod) ||
+			pod.Labels["controller-revision-hash"] != status.UpdateRevision {
+			return fmt.Errorf("wait for login pod %s: phase=%s ready=%t revision=%s, expected %s",
+				pod.Name, pod.Status.Phase, kubeobjects.PodReady(pod), pod.Labels["controller-revision-hash"], status.UpdateRevision)
+		}
+	}
+	return nil
 }
