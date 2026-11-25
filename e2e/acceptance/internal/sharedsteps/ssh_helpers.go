@@ -2,7 +2,9 @@ package sharedsteps
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -10,22 +12,131 @@ import (
 )
 
 const (
-	sshTestUserName               = "bob"
 	soperatorChecksUserName       = "soperatorchecks"
 	sshTestUserPropagationTimeout = time.Minute
+	sshInitializationLockTimeout  = time.Minute
+	sshLockTimeoutExitCode        = 75
+	sshTestUserLockPath           = "/etc/soperator-e2e-createuser.lock"
+	sshHolderJobStartedMarker     = "SOPERATOR_E2E_SSH_HOLDER_STARTED"
+	sshHolderJobCommand           = "echo " + sshHolderJobStartedMarker + "; exec sleep 3600"
 )
 
+func annotateSSHLockError(err error, resource string) error {
+	var exitErr interface{ ExitCode() int }
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == sshLockTimeoutExitCode {
+		return fmt.Errorf("acquire %s lock: timed out after %s: %w", resource, sshInitializationLockTimeout, err)
+	}
+	return err
+}
+
+// A scheduler RUNNING state can precede prolog completion and extern-step
+// creation. Wait for the batch script itself before attempting PAM adoption.
+func waitForSSHHolderJob(ctx context.Context, runtime framework.Runtime, slurm *framework.SlurmClient, job framework.SbatchJob, timeout time.Duration) error {
+	err := framework.WaitForWithJobAlive(ctx, runtime, slurm, job,
+		"SSH holder job batch script started", timeout, framework.DefaultPollInterval,
+		func(waitCtx context.Context) (bool, error) {
+			output, err := readJobFile(waitCtx, runtime, job.StdoutPath)
+			return strings.Contains(output, sshHolderJobStartedMarker), err
+		})
+	return framework.AnnotateWithJobLog(ctx, runtime, slurm, job, err)
+}
+
+// userOwnedDirCommand creates dir if missing, owned by user and writable by everyone,
+// for files a test user's jobs write into a scenario artifact directory.
+func userOwnedDirCommand(user, dir string) string {
+	return fmt.Sprintf("install --directory --owner=%s --group=%s --mode=0777 %s",
+		framework.ShellQuote(user), framework.ShellQuote(user), framework.ShellQuote(dir))
+}
+
+// runAsLoginUser wraps command in a login shell of userName, run from the jail as root.
+func runAsLoginUser(userName, command string) string {
+	return fmt.Sprintf("su - %s -c %s", framework.ShellQuote(userName), framework.ShellQuote(command))
+}
+
+// prepareSSHTestUser creates userName when missing and waits until the account is resolvable where jobs need it.
+// slurmctld must resolve the user before it accepts a job submitted as them,
+// and each worker must resolve it before the job starts there.
+func prepareSSHTestUser(ctx context.Context, runtime framework.Runtime, userName string, workers ...framework.WorkerInfo) error {
+	if err := ensureSSHTestUser(ctx, runtime, userName); err != nil {
+		return err
+	}
+	if err := waitForSSHTestUserOnController(ctx, runtime, userName); err != nil {
+		return err
+	}
+	for _, worker := range workers {
+		if err := waitForSSHTestUserOnWorker(ctx, runtime, userName, worker); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ensureSSHTestUser(ctx context.Context, runtime framework.Runtime, userName string) error {
+	return createSSHTestUser(ctx, runtime, userName, nil)
+}
+
+func createSSHTestUser(ctx context.Context, runtime framework.Runtime, userName string, flags []string) error {
 	quotedUserName := framework.ShellQuote(userName)
-	command := fmt.Sprintf(
-		"id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s",
-		quotedUserName,
-		quotedUserName,
-	)
+	var quotedFlags []string
+	for _, flag := range flags {
+		quotedFlags = append(quotedFlags, framework.ShellQuote(flag))
+	}
+	options := ""
+	if len(quotedFlags) > 0 {
+		options = strings.Join(quotedFlags, " ") + " "
+	}
+	command := fmt.Sprintf("id %s >/dev/null 2>&1 || printf '\\n' | createuser --without-external-ssh %s%s",
+		quotedUserName, options, quotedUserName)
+	// /etc is shared across login nodes; /tmp is bind-mounted locally on each node.
+	command = fmt.Sprintf("flock --conflict-exit-code %d --wait %.0f %s bash -ec %s", sshLockTimeoutExitCode, sshInitializationLockTimeout.Seconds(),
+		framework.ShellQuote(sshTestUserLockPath), framework.ShellQuote(command))
 	if _, err := runtime.Jail().Run(ctx, command); err != nil {
-		return fmt.Errorf("create SSH test user %s: %w", userName, err)
+		return fmt.Errorf("create SSH test user %s: %w", userName, annotateSSHLockError(err, "test-user initialization"))
 	}
 
+	return nil
+}
+
+func ensureUnprivilegedSSHTestUser(ctx context.Context, runtime framework.Runtime, userName string) error {
+	if err := createSSHTestUser(ctx, runtime, userName, []string{"--without-sudo", "--without-docker"}); err != nil {
+		return err
+	}
+	quoted := framework.ShellQuote(userName)
+	identity, err := runtime.Jail().Run(ctx, "id -u "+quoted+" && id -nG "+quoted)
+	if err != nil {
+		return fmt.Errorf("read unprivileged SSH identity %s: %w", userName, err)
+	}
+	fields := strings.Fields(identity)
+	if len(fields) < 2 {
+		return fmt.Errorf("read unprivileged SSH identity %s: got %q", userName, identity)
+	}
+	uid, err := strconv.ParseUint(fields[0], 10, 32)
+	if err != nil || uid < 1000 {
+		return fmt.Errorf("require a regular SSH user %s: got UID %q", userName, fields[0])
+	}
+	for _, group := range fields[1:] {
+		if group == "sudo" || group == "docker" {
+			if _, err := runtime.Jail().Run(ctx, "gpasswd -d "+quoted+" "+framework.ShellQuote(group)); err != nil {
+				return fmt.Errorf("remove SSH test user %s from group %s: %w", userName, group, err)
+			}
+		}
+	}
+	output, err := runtime.Jail().Run(ctx, "id -nG "+quoted)
+	if err != nil {
+		return fmt.Errorf("verify unprivileged SSH groups for %s: %w", userName, err)
+	}
+	return validateUnprivilegedSSHGroups(strings.Fields(output))
+}
+
+func validateUnprivilegedSSHGroups(groups []string) error {
+	if len(groups) == 0 {
+		return fmt.Errorf("read unprivileged SSH groups: group list is empty")
+	}
+	for _, group := range groups {
+		if group == "sudo" || group == "docker" || group == "root" {
+			return fmt.Errorf("require unprivileged SSH groups: found %s in %v", group, groups)
+		}
+	}
 	return nil
 }
 
@@ -145,6 +256,13 @@ func sshTestIdentityDiagnosticsCommand(userName, groupName string) string {
 	return strings.Join(commands, "\n")
 }
 
+// Every identity for a user shares authorized_keys. Lock a separate file because
+// sed -i replaces authorized_keys rather than updating its inode.
+func withSSHIdentityLock(command string) string {
+	return fmt.Sprintf("mkdir -p ~/.ssh && flock --conflict-exit-code %d --wait %.0f ~/.ssh/.soperator-e2e-identity.lock %s",
+		sshLockTimeoutExitCode, sshInitializationLockTimeout.Seconds(), command)
+}
+
 func ensureSSHTestIdentity(
 	ctx context.Context,
 	runtime framework.Runtime,
@@ -164,13 +282,9 @@ ssh-keygen -q -t ecdsa -N '' -C %s -f "${key}"
 cat "${key}.pub" >> "${authorized_keys}"
 chmod 0600 "${authorized_keys}"
 `, keyName, keyComment, framework.ShellQuote(keyComment))
-	command := fmt.Sprintf(
-		"su - %s -c %s",
-		framework.ShellQuote(userName),
-		framework.ShellQuote(framework.BashLC(setupIdentity)),
-	)
+	command := runAsLoginUser(userName, withSSHIdentityLock(framework.BashLC(setupIdentity)))
 	if _, err := runtime.Jail().Run(ctx, command); err != nil {
-		return fmt.Errorf("prepare SSH identity for %s: %w", userName, err)
+		return fmt.Errorf("prepare SSH identity for %s: %w", userName, annotateSSHLockError(err, "SSH identity"))
 	}
 
 	return nil
@@ -192,13 +306,12 @@ if [ -f "${authorized_keys}" ]; then
 fi
 `, keyName, keyComment)
 	command := fmt.Sprintf(
-		"if id %s >/dev/null 2>&1; then su - %s -c %s; fi",
+		"if id %s >/dev/null 2>&1; then %s; fi",
 		framework.ShellQuote(userName),
-		framework.ShellQuote(userName),
-		framework.ShellQuote(framework.BashLC(cleanupIdentity)),
+		runAsLoginUser(userName, withSSHIdentityLock(framework.BashLC(cleanupIdentity))),
 	)
 	_, err := runtime.Jail().Run(ctx, command)
-	return err
+	return annotateSSHLockError(err, "SSH identity")
 }
 
 // runInternalSSHAsTestUser runs remoteCommand on host over SSH from the login
@@ -211,23 +324,33 @@ func runInternalSSHAsTestUser(
 	timeout time.Duration,
 	remoteCommand string,
 ) (string, error) {
+	return runInternalSSHAsUser(ctx, runtime, sshTestUserName, host, timeout, remoteCommand)
+}
+
+func runInternalSSHAsUser(
+	ctx context.Context,
+	runtime framework.Runtime,
+	userName string,
+	host string,
+	timeout time.Duration,
+	remoteCommand string,
+) (string, error) {
 	quotedHost := framework.ShellQuote(host)
 	// Remove the host key before each SSH attempt so retries don't depend on
 	// persisted known_hosts state from previous attempts.
 	sshCommand := fmt.Sprintf(
-		"mkdir -p ~/.ssh && touch ~/.ssh/known_hosts && (ssh-keygen -R %s -f ~/.ssh/known_hosts >/dev/null 2>&1 || true) && timeout %.0f ssh %s %s </dev/null",
+		"touch ~/.ssh/known_hosts && (ssh-keygen -R %s -f ~/.ssh/known_hosts >/dev/null 2>&1 || true) && timeout %.0f ssh %s %s </dev/null",
 		quotedHost,
 		timeout.Seconds(),
 		quotedHost,
 		framework.ShellQuote(remoteCommand),
 	)
-	command := fmt.Sprintf(
-		"su - %s -c %s",
-		framework.ShellQuote(sshTestUserName),
-		framework.ShellQuote(sshCommand),
-	)
+	// SSH also writes known_hosts, so retain the per-user lock through the connection.
+	sshCommand = fmt.Sprintf("mkdir -p ~/.ssh && flock --conflict-exit-code %d --wait %.0f ~/.ssh/.soperator-e2e-known-hosts.lock bash -ec %s",
+		sshLockTimeoutExitCode, sshInitializationLockTimeout.Seconds(), framework.ShellQuote(sshCommand))
 
-	return runtime.Jail().RunWithDefaultRetry(ctx, command)
+	output, err := runtime.Jail().RunWithDefaultRetry(ctx, runAsLoginUser(userName, sshCommand))
+	return output, annotateSSHLockError(err, "SSH known_hosts")
 }
 
 func runSSHCommand(
@@ -246,11 +369,6 @@ func runSSHCommand(
 		framework.ShellQuote(host),
 		framework.ShellQuote(framework.BashLC(remoteCommand)),
 	)
-	command := fmt.Sprintf(
-		"su - %s -c %s",
-		framework.ShellQuote(userName),
-		framework.ShellQuote(sshCommand),
-	)
 
-	return runtime.Jail().Run(ctx, command)
+	return runtime.Jail().Run(ctx, runAsLoginUser(userName, sshCommand))
 }

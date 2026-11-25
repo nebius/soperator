@@ -119,74 +119,11 @@ func TestDockerJailVisiblePathRejectsTraversal(t *testing.T) {
 	}
 }
 
-func TestDockerCgroupParentBelongsToJob(t *testing.T) {
-	tests := []struct {
-		name   string
-		value  string
-		jobID  string
-		wanted bool
-	}{
-		{
-			name:   "Slurm job user cgroup",
-			value:  "/kubepods.slice/pod.scope/slurm/uid_1000/job_42/step_0/user",
-			jobID:  "42",
-			wanted: true,
-		},
-		{
-			name:   "Slurm 26.05 SLUID user cgroup",
-			value:  "/kubepods.slice/pod.scope/system.slice/slurmstepd.scope/s8G5M22WGXB100/step_0/user",
-			jobID:  "42",
-			wanted: true,
-		},
-		{
-			name:   "different Slurm job",
-			value:  "/kubepods.slice/pod.scope/slurm/uid_1000/job_43/step_0/user",
-			jobID:  "42",
-			wanted: false,
-		},
-		{
-			name:   "task cgroup instead of user parent",
-			value:  "/kubepods.slice/pod.scope/slurm/uid_1000/job_42/step_0/user/task_0",
-			jobID:  "42",
-			wanted: false,
-		},
-		{
-			name:   "SLUID outside slurmstepd scope",
-			value:  "/kubepods.slice/pod.scope/other.scope/s8G5M22WGXB100/step_0/user",
-			jobID:  "42",
-			wanted: false,
-		},
-		{
-			name:   "malformed SLUID",
-			value:  "/kubepods.slice/pod.scope/system.slice/slurmstepd.scope/s8G5M22WGXB10O/step_0/user",
-			jobID:  "42",
-			wanted: false,
-		},
-		{
-			name:   "unknown step",
-			value:  "/kubepods.slice/pod.scope/system.slice/slurmstepd.scope/s8G5M22WGXB100/step_other/user",
-			jobID:  "42",
-			wanted: false,
-		},
-		{
-			name:   "missing job ID",
-			value:  "/kubepods.slice/pod.scope/system.slice/slurmstepd.scope/s8G5M22WGXB100/step_0/user",
-			jobID:  "",
-			wanted: false,
-		},
-		{
-			name:   "dockerd default",
-			value:  "",
-			jobID:  "42",
-			wanted: false,
-		},
-	}
+func TestDockerSrunTaskCommandNamesContainersPerTask(t *testing.T) {
+	const want = `exec docker run --rm --name "e2e-docker-${SLURM_JOB_ID}-${SLURM_NODEID}-${SLURM_LOCALID}" ` +
+		`'cr.nebius.cloud/soperator/busybox' sh -c 'echo ready; sleep 3600'`
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := dockerCgroupParentBelongsToJob(test.value, test.jobID); got != test.wanted {
-				t.Fatalf("dockerCgroupParentBelongsToJob(%q, %q) = %t, want %t", test.value, test.jobID, got, test.wanted)
-			}
-		})
+	if got := dockerSrunTaskCommand(); got != want {
+		t.Fatalf("dockerSrunTaskCommand() = %q, want %q", got, want)
 	}
 }

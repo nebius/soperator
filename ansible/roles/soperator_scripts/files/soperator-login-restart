@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+
+import argparse
+import base64
+import json
+import os
+import re
+import ssl
+import sys
+from dataclasses import dataclass
+from datetime import datetime
+from http.client import HTTPException
+from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+
+SERVICE_ACCOUNT_DIR = Path("/var/run/secrets/kubernetes.io/serviceaccount")
+COMPONENT_LABEL = "app.kubernetes.io/component"
+REQUESTED_ANNOTATION = "slurm.nebius.ai/login-update-requested"
+ANNOUNCED_ANNOTATION = "slurm.nebius.ai/login-update-announced-at"
+SCHEDULED_ANNOTATION = "slurm.nebius.ai/login-update-scheduled-at"
+REQUEST_TIMEOUT_SECONDS = 10
+WARNING = (
+    "Warning: Early restart of this login node\n"
+    "All SSH connections, tmux sessions, and other processes on this node will end,\n"
+    "including your connection."
+)
+
+
+@dataclass(frozen=True)
+class PodIdentity:
+    name: str
+    namespace: str
+    uid: str
+
+
+@dataclass(frozen=True)
+class LoginPod:
+    identity: PodIdentity
+    resource_version: str
+    annotations: dict
+    deleting: bool
+
+    @property
+    def has_scheduled_update(self):
+        return all(self.annotations.get(key) for key in (ANNOUNCED_ANNOTATION, SCHEDULED_ANNOTATION))
+
+    def require_scheduled_update(self):
+        if not self.has_scheduled_update:
+            raise ValueError("this login node has no announced update schedule")
+        if self.deleting:
+            raise ValueError("this login node is already terminating")
+
+
+def service_account_identity(token):
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        kubernetes = json.loads(base64.urlsafe_b64decode(payload))["kubernetes.io"]
+        pod = kubernetes["pod"]
+        return PodIdentity(pod["name"], kubernetes["namespace"], pod["uid"])
+    except (IndexError, KeyError, TypeError, ValueError) as error:
+        raise ValueError("read bound login node identity from service account token") from error
+
+
+def read_service_account_file(directory, name):
+    return (directory / name).read_text().strip()
+
+
+def format_update_time(value):
+    if not value:
+        return "none"
+    try:
+        timestamp = re.sub(r"\.\d+", "", value).replace("Z", "+00:00")
+        return datetime.fromisoformat(timestamp).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+    except ValueError:
+        return value
+
+
+def parse_login_pod(data, expected_identity):
+    metadata = data["metadata"]
+    if metadata["uid"] != expected_identity.uid:
+        raise ValueError("login node identity changed")
+    if metadata.get("labels", {}).get(COMPONENT_LABEL) != "login":
+        raise ValueError("this is not a Slurm login node")
+    return LoginPod(expected_identity, metadata["resourceVersion"], metadata.get("annotations") or {}, bool(metadata.get("deletionTimestamp")))
+
+
+class KubernetesAPI:
+    def __init__(self, identity, directory):
+        self.identity = identity
+        self.directory = directory
+        self.pod_url = (
+            "https://kubernetes.default.svc/api/v1/namespaces/"
+            f"{identity.namespace}/pods/{identity.name}"
+        )
+        self.ssl_context = ssl.create_default_context(cafile=str(directory / "ca.crt"))
+
+    def get_pod(self):
+        return parse_login_pod(json.loads(self._request("GET")), self.identity)
+
+    def request_restart(self, pod):
+        requested_path = "/metadata/annotations/" + REQUESTED_ANNOTATION.replace("/", "~1")
+        self._request("PATCH", payload=[
+            {"op": "test", "path": "/metadata/uid", "value": pod.identity.uid},
+            {"op": "test", "path": "/metadata/resourceVersion", "value": pod.resource_version},
+            {"op": "add", "path": requested_path, "value": pod.identity.uid},
+        ], content_type="application/json-patch+json")
+
+    def _request(self, method, payload=None, content_type=None):
+        token = read_service_account_file(self.directory, "token")
+        headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
+        data = None
+        if payload is not None:
+            data = json.dumps(payload, separators=(",", ":")).encode()
+        if content_type is not None:
+            headers["Content-Type"] = content_type
+        request = Request(self.pod_url, data=data, headers=headers, method=method)
+        with urlopen(request, context=self.ssl_context, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+            return response.read()
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="View this login node and confirm an early restart interactively by default.")
+    actions = parser.add_mutually_exclusive_group()
+    actions.add_argument("--status", action="store_true", help="show whether this login node is outdated and its update schedule without requesting a restart")
+    actions.add_argument("--yes", action="store_true", help="skip confirmation and request the restart, acknowledging disruption to all users")
+    args = parser.parse_args(argv)
+    if os.geteuid() != 0:
+        print("Run this command as root or with sudo on the login node.", file=sys.stderr)
+        return 1
+    try:
+        directory = SERVICE_ACCOUNT_DIR
+        identity = service_account_identity(read_service_account_file(directory, "token"))
+        api = KubernetesAPI(identity, directory)
+        pod = api.get_pod()
+        print(f"Login node: {identity.namespace}/{identity.name}")
+        print(f"Outdated: {'yes' if pod.has_scheduled_update else 'no'}")
+        print(f"Update announced: {format_update_time(pod.annotations.get(ANNOUNCED_ANNOTATION))}")
+        print(f"Scheduled restart: {format_update_time(pod.annotations.get(SCHEDULED_ANNOTATION))}")
+        early_restart_requested = pod.annotations.get(REQUESTED_ANNOTATION) == identity.uid
+        if args.status:
+            print(f"Early restart requested: {'yes' if early_restart_requested else 'no'}")
+            return 0
+        if early_restart_requested:
+            print("An early restart is already requested for this login node.")
+            return 0
+        pod.require_scheduled_update()
+        warning = WARNING
+        if sys.stderr.isatty() and os.environ.get("TERM") not in (None, "", "dumb") and not os.environ.get("NO_COLOR"):
+            heading, details = warning.split("\n", 1)
+            warning = f"\033[1;33m{heading}\033[0m\n{details}"
+        print(warning, file=sys.stderr, flush=True)
+        if not args.yes:
+            if not sys.stdin.isatty():
+                print("Interactive confirmation requires a terminal; use --yes to request a restart or --status to inspect it.", file=sys.stderr)
+                return 1
+            try:
+                print(f"Restart login node {identity.name}? Type yes/no: ", end="", file=sys.stderr, flush=True)
+                confirmed = input()
+            except (EOFError, KeyboardInterrupt):
+                print("\nRestart cancelled.", file=sys.stderr)
+                return 0
+            if confirmed.strip().lower() != "yes":
+                print("Restart cancelled.", file=sys.stderr)
+                return 0
+        api.request_restart(pod)
+        print("Restart requested. The operator may terminate this node and your connection shortly.", flush=True)
+        return 0
+    except HTTPError as error:
+        if error.code in (409, 422):
+            print("Login node metadata changed; inspect --status and retry the request.", file=sys.stderr)
+        else:
+            print(f"Kubernetes API request failed (HTTP {error.code}).", file=sys.stderr)
+        return 1
+    except (HTTPException, OSError, ValueError) as error:
+        print(f"Login restart request failed: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

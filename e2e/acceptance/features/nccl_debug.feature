@@ -8,3 +8,13 @@ Feature: NCCL debug logging
     Then both NCCL debug jobs report correct results
     And their NCCL diagnostic logs reflect the requested verbosity
     And temporary NCCL logging resources are released after each step
+
+  @soperator_version_>=5.0.0
+  Scenario: Concurrent container starts retain NCCL diagnostics
+    Given a worker is selected for concurrent container logging
+    When 2 background jobs repeatedly run short native steps with NCCL logging
+    And 2 batch jobs each start 50 Ubuntu containers with NCCL logging on the same worker
+    And the background jobs are stopped after all container attempts finish
+    Then all 100 container starts succeed
+    And every container's log marker is readable outside the container
+    And the background jobs report no failed steps

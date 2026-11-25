@@ -1,7 +1,6 @@
 package sharedsteps
 
 import (
-	"maps"
 	"strings"
 	"testing"
 
@@ -92,7 +91,7 @@ func TestSrunProbeCommand(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, srunProbeCommand("ulimit -n", tt.container))
+			assert.Equal(t, tt.want, srunProbeCommand("ulimit -n", tt.container, nil))
 		})
 	}
 }
@@ -100,7 +99,7 @@ func TestSrunProbeCommand(t *testing.T) {
 func TestSrunProbeCommandAddsFlagsBeforeContainer(t *testing.T) {
 	assert.Equal(t,
 		"srun --nodes=1 --ntasks=1 --pty --container-image='docker://cr.nebius.cloud#soperator/ubuntu:noble' bash -lc 'ulimit -n'",
-		srunProbeCommand("ulimit -n", probeContainerEnroot, "--pty"),
+		srunProbeCommand("ulimit -n", probeContainerEnroot, nil, "--pty"),
 	)
 }
 
@@ -146,6 +145,19 @@ func TestPAMSlurmAdoptRequiresJob(t *testing.T) {
 	}
 }
 
+func TestPAMSlurmAdoptProTestAccounts(t *testing.T) {
+	cluster := framework.SlurmClusterInfo{
+		PAMSlurmAdoptEnabled:     true,
+		PAMSlurmAdoptExemptUsers: []string{"bob", "dockeruser"},
+	}
+	for _, user := range []string{sshTestUserName, dockerSSHUserName} {
+		assert.False(t, pamSlurmAdoptRequiresJob(cluster, user, nil), "%s needs direct SSH without a job", user)
+	}
+	for _, user := range []string{pamSlurmAdoptUser, pamSlurmAdoptLimitsUser} {
+		assert.True(t, pamSlurmAdoptRequiresJob(cluster, user, nil), "%s must exercise PAM adoption", user)
+	}
+}
+
 func TestParseCombinedResourceLimitsAndKernelSettingsFromPTY(t *testing.T) {
 	limits := renderResourceLimitSnapshotsForTest(computeResourceLimitProfile(), computeResourceLimitProfile())
 	kernel := `fs.file-max=9223372036854775807
@@ -166,49 +178,84 @@ net.ipv4.tcp_wmem=4096	16384	536870912
 	assert.NoError(t, validateKernelSettings("test", settings))
 }
 
-func TestValidateRegularUserSlurmResourceLimitSnapshots(t *testing.T) {
-	limits := regularUserComputeResourceLimitProfile()
-	limits[limitMaxMemory] = "10485760"
-	snapshots := resourceLimitSnapshots{direct: limits, nested: maps.Clone(limits)}
-	assert.NoError(t, validateSlurmResourceLimitSnapshots(snapshots, regularUserComputeResourceLimitProfile()))
+func TestAdoptedSSHProbeReportsSessionCgroupAndLimits(t *testing.T) {
+	probe := adoptedSSHProbe()
+	assert.True(t, strings.HasPrefix(probe, `printf 'SESSION_CGROUP=%s\n' "$(sed -n 's/^0:://p' /proc/self/cgroup)"; `), probe)
+	assert.True(t, strings.HasSuffix(probe, pairedResourceLimitProbe()), probe)
 
-	err := validateSlurmResourceLimitSnapshots(snapshots, computeResourceLimitProfile())
-	require.Error(t, err)
-	assert.ErrorContains(t, err, `scheduling_priority="40": want "unlimited"`)
+	sessionCgroup := "/system.slice/slurmstepd.scope/job_42/step_extern/user/task_special"
+	limits := regularUserComputeResourceLimitProfile()
+	output := "SESSION_CGROUP=" + sessionCgroup + "\n" + renderResourceLimitSnapshotsForTest(limits, limits)
+
+	snapshots, err := parseResourceLimitSnapshots(output)
+	require.NoError(t, err)
+	assert.NoError(t, validateResourceLimitSnapshots(snapshots, regularUserComputeResourceLimitProfile(), false))
+
+	jobCgroup, err := slurmJobCgroup(parseKeyValueLine(output, sessionCgroupKey), "42")
+	require.NoError(t, err)
+	assert.Equal(t, "/sys/fs/cgroup/system.slice/slurmstepd.scope/job_42", jobCgroup)
+
+	_, err = slurmJobCgroup("/kubepods.slice/pod1/sshd", "42")
+	assert.Error(t, err, "a session outside a Slurm job cgroup is not adopted")
+}
+
+func TestValidateAdoptedSSHJobMemoryMax(t *testing.T) {
+	assert.NoError(t, validateAdoptedSSHJobMemoryMax("1073741824\n"))
+
+	for _, output := range []string{"max\n", "2147483648\n", ""} {
+		err := validateAdoptedSSHJobMemoryMax(output)
+		require.Error(t, err, "memory.max=%q", output)
+		assert.ErrorContains(t, err, `want "1073741824"`)
+	}
 }
 
 func TestSrunProbeCommandForGPUContainers(t *testing.T) {
 	assert.Equal(t,
-		"NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video srun --nodes=1 --ntasks=1 "+
-			"--container-image="+framework.ShellQuote(gpuSmokeEnrootImage)+" bash -lc 'true'",
-		srunProbeCommand("true", probeContainerEnrootGPU),
+		"NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=compute,graphics srun --nodes=1 --ntasks=1 "+
+			"--container-image='docker://cr.nebius.cloud#soperator/ubuntu:noble' bash -lc 'true'",
+		srunProbeCommand("true", probeContainerEnrootGPU, []string{"compute", "graphics"}),
 	)
-	assert.Equal(t,
-		"srun --nodes=1 --ntasks=1 docker run --rm --name e2e-system-settings-${SLURM_JOB_ID} "+
-			"--gpus=all -e NVIDIA_DRIVER_CAPABILITIES=compute,graphics,utility,video "+
-			"'cr.nebius.cloud/soperator/ubuntu:noble' bash -lc 'true'",
-		srunProbeCommand("true", probeContainerDockerGPU),
-	)
+	assert.Contains(t, srunProbeCommand("true", probeContainerEnrootGPU, []string{"all"}), "NVIDIA_DRIVER_CAPABILITIES=all srun")
 }
 
 func TestProbeContainerIsDocker(t *testing.T) {
 	assert.True(t, probeContainerDocker.isDocker())
-	assert.True(t, probeContainerDockerGPU.isDocker())
 	assert.False(t, probeContainerNone.isDocker())
 	assert.False(t, probeContainerEnrootGPU.isDocker())
 }
 
-func TestRequiredNVIDIADriverCapabilities(t *testing.T) {
-	assert.Equal(t, []string{"compute", "graphics", "utility", "video"}, requiredNVIDIADriverCapabilities())
+func TestRequiredNVIDIADriverCapabilitiesHaveKnownLibraries(t *testing.T) {
+	assert.Equal(t, []string{"compute", "graphics", "utility", "video"}, requiredNVIDIADriverCapabilities)
+	assert.Equal(t, requiredNVIDIADriverCapabilities, coveredNVIDIADriverCapabilities(requiredNVIDIADriverCapabilities))
 }
 
-func TestNVIDIALibraryProbeLooksUpEveryCapabilityLibrary(t *testing.T) {
-	probe := nvidiaLibraryProbe()
-	for _, entry := range nvidiaCapabilityLibraries {
-		for _, library := range entry.libraries {
-			assert.Contains(t, probe, entry.capability+":"+library)
-		}
-	}
+func TestParseNVIDIADriverCapabilities(t *testing.T) {
+	capabilities, err := parseNVIDIADriverCapabilities(" compute, utility,,video,utility ")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"compute", "utility", "video"}, capabilities)
+
+	capabilities, err = parseNVIDIADriverCapabilities("compute,all")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"all"}, capabilities)
+
+	_, err = parseNVIDIADriverCapabilities(" , ")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "no capabilities")
+}
+
+func TestCoveredNVIDIADriverCapabilitiesSkipsUnknownOnes(t *testing.T) {
+	assert.Equal(t, []string{"compute", "utility"},
+		coveredNVIDIADriverCapabilities([]string{"utility", "display", "ngx", "compat32", "compute"}))
+	assert.Equal(t, []string{"compute", "graphics", "utility", "video"}, coveredNVIDIADriverCapabilities([]string{"all"}))
+	assert.Empty(t, coveredNVIDIADriverCapabilities([]string{"display"}))
+}
+
+func TestNVIDIALibraryProbeLooksUpTheGivenCapabilityLibraries(t *testing.T) {
+	probe := nvidiaLibraryProbe([]string{"compute", "display"})
+	assert.Contains(t, probe, "compute:libcuda.so.1")
+	assert.NotContains(t, probe, "utility:")
+	assert.NotContains(t, probe, "display")
+	assert.Contains(t, nvidiaLibraryProbe([]string{"all"}), "video:libnvcuvid.so.1")
 	assert.Contains(t, probe, `printf 'NVIDIA_LIBRARY=%s %s %s %s\n'`)
 	assert.Contains(t, probe, `capability="${entry%%:*}"`)
 	assert.Contains(t, probe, `stat -Lc %s "$path"`)
@@ -251,7 +298,9 @@ func TestValidateNVIDIALibraryLookups(t *testing.T) {
 		{capability: "video", library: "libnvcuvid.so.1", path: "/lib/libnvcuvid.so.1", size: 13148544},
 		{capability: "video", library: "libnvidia-encode.so.1", path: "/lib/libnvidia-encode.so.1", size: 249000},
 	}
-	assert.NoError(t, validateNVIDIALibraryLookups("native job", lookups))
+	assert.NoError(t, validateNVIDIALibraryLookups("native job", lookups, []string{"compute", "graphics", "utility", "video"}))
+	// Capabilities the job was not asked for are not checked.
+	assert.NoError(t, validateNVIDIALibraryLookups("native job", lookups[:1], []string{"compute", "display"}))
 }
 
 func TestValidateNVIDIALibraryLookupsRejectsPlaceholdersAndMissingLibraries(t *testing.T) {
@@ -262,7 +311,7 @@ func TestValidateNVIDIALibraryLookupsRejectsPlaceholdersAndMissingLibraries(t *t
 		{capability: "utility", library: "libnvidia-ml.so.1", path: "/lib/libnvidia-ml.so.1", size: 2081720},
 	}
 
-	err := validateNVIDIALibraryLookups("native job", lookups)
+	err := validateNVIDIALibraryLookups("native job", lookups, []string{"all"})
 	require.Error(t, err)
 	assert.ErrorContains(t, err,
 		"check native job NVIDIA graphics capability: want a non-placeholder library of at least 1024 bytes, "+
@@ -376,9 +425,10 @@ func TestValidateKernelSettingsRejectsValuesBelowMinimum(t *testing.T) {
 }
 
 func TestValidateNVIDIADriverCapabilities(t *testing.T) {
-	assert.NoError(t, validateNVIDIADriverCapabilities("video,utility,compute,graphics,display"))
+	assert.NoError(t, validateNVIDIADriverCapabilities([]string{"video", "utility", "compute", "graphics", "display"}))
+	assert.NoError(t, validateNVIDIADriverCapabilities([]string{"all"}))
 
-	err := validateNVIDIADriverCapabilities("compute,utility")
+	err := validateNVIDIADriverCapabilities([]string{"compute", "utility"})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "graphics,video")
 }

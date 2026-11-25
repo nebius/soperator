@@ -30,41 +30,50 @@ func TestSharedFeaturesParseWithGherkin(t *testing.T) {
 	}
 }
 
-func TestSharedHeavyScenarios(t *testing.T) {
-	var heavy []string
-	for _, path := range FeaturePaths() {
-		content, err := fs.ReadFile(acceptanceFeatures, path)
-		require.NoError(t, err)
-		assert.NotContains(t, string(content), "@essential")
-		doc, err := gherkin.ParseGherkinDocument(strings.NewReader(string(content)), (&messages.Incrementing{}).NewId)
-		require.NoError(t, err)
-		for _, child := range doc.Feature.Children {
-			if child.Scenario == nil {
-				continue
-			}
-			for _, tag := range child.Scenario.Tags {
-				if tag.Name == "@heavy" {
-					heavy = append(heavy, child.Scenario.Name)
+func TestSequentialTagsHaveScenarioLevelReasons(t *testing.T) {
+	paths, err := fs.Glob(acceptanceFeatures, "features/*.feature")
+	require.NoError(t, err)
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			content, err := fs.ReadFile(acceptanceFeatures, path)
+			require.NoError(t, err)
+			doc, err := gherkin.ParseGherkinDocument(strings.NewReader(string(content)), (&messages.Incrementing{}).NewId)
+			require.NoError(t, err)
+			lines := strings.Split(string(content), "\n")
+			checkTags := func(tags []*messages.Tag, scenarioLevel bool) {
+				for _, tag := range tags {
+					assert.NotEqual(t, "@parallel", tag.Name, "use untagged scenarios for the concurrency-capable suite")
+					if tag.Name != "@sequential" {
+						continue
+					}
+					assert.True(t, scenarioLevel, "@sequential must be on a scenario")
+					require.Greater(t, tag.Location.Line, int64(1))
+					reason := strings.TrimSpace(lines[tag.Location.Line-2])
+					assert.True(t, strings.HasPrefix(reason, "# Sequential: ") && strings.TrimSpace(strings.TrimPrefix(reason, "# Sequential: ")) != "", "line %d: add a concrete # Sequential: reason immediately above the tag", tag.Location.Line)
 				}
 			}
-		}
+			checkTags(doc.Feature.Tags, false)
+			for _, child := range doc.Feature.Children {
+				if child.Scenario != nil {
+					checkTags(child.Scenario.Tags, true)
+					for _, examples := range child.Scenario.Examples {
+						checkTags(examples.Tags, false)
+					}
+				}
+				if child.Rule != nil {
+					checkTags(child.Rule.Tags, false)
+					for _, ruleChild := range child.Rule.Children {
+						if ruleChild.Scenario != nil {
+							checkTags(ruleChild.Scenario.Tags, true)
+							for _, examples := range ruleChild.Scenario.Examples {
+								checkTags(examples.Tags, false)
+							}
+						}
+					}
+				}
+			}
+		})
 	}
-	assert.ElementsMatch(t, []string{
-		"GPU ActiveCheck succeeds on all GPU workers",
-		"Docker containers can access GPUs",
-		"NVIDIA bug report is collected from a worker",
-		"Enroot containers can access GPUs",
-		"Login pods scale up without automatic pod scale-down",
-		"Manage jail dry-run detects drift without modifying the jail",
-		"A worker template update preserves running jobs",
-		"A maintenance event replaces the selected worker node",
-		"A maintenance event replaces a CPU worker node when CPU and GPU workers exist",
-		"A failed GPU health check replaces the worker node",
-		"An MK8s node group update preserves running jobs",
-		"A worker update preserves maintenance drains before and during handoff",
-		"Non-responding kubelet recreates a Kubernetes node and recovers the worker",
-		"A manually powered down static worker returns to service",
-	}, heavy)
 }
 
 func TestSharedFeaturesHaveValidVersionTags(t *testing.T) {

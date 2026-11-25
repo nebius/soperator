@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -27,6 +28,9 @@ const (
 	loginSSHKeyComment = "soperator-e2e-login-ssh"
 
 	jobUserKey = "JOB_USER"
+
+	sessionCgroupKey         = "SESSION_CGROUP"
+	adoptedSSHJobMemoryBytes = int64(1024 * 1024 * 1024)
 
 	limitDirectMarker = "__soperator_acceptance_direct_limits__"
 	limitNestedMarker = "__soperator_acceptance_nested_limits__"
@@ -57,8 +61,6 @@ const (
 	kernelTCPReceiveBufferSize = "net.ipv4.tcp_rmem"
 	kernelTCPSendBufferSize    = "net.ipv4.tcp_wmem"
 
-	slurmdContainerName              = "slurmd"
-	nvidiaDriverCapabilitiesName     = "NVIDIA_DRIVER_CAPABILITIES"
 	nativeResourceLimitsJobName      = "e2e-system-limits-native"
 	enrootResourceLimitsJobName      = "e2e-system-limits-enroot"
 	dockerResourceLimitsJobName      = "e2e-system-limits-docker"
@@ -69,7 +71,6 @@ const (
 	dockerKernelSettingsJobName      = "e2e-system-kernel-docker"
 	nativeNVIDIALibrariesJobName     = "e2e-system-nvidia-native"
 	enrootNVIDIALibrariesJobName     = "e2e-system-nvidia-enroot"
-	dockerNVIDIALibrariesJobName     = "e2e-system-nvidia-docker"
 
 	nvidiaLibraryKey = "NVIDIA_LIBRARY"
 	// Same threshold as MIN_REAL_LIBRARY_SIZE in nvidia_libraries.py: the jail
@@ -86,15 +87,16 @@ const (
 	probeContainerNone probeContainer = iota
 	probeContainerEnroot
 	probeContainerDocker
-	// GPU containers ask for the required NVIDIA driver capabilities. The Enroot
-	// NVIDIA hook needs an image that requests driver injection, while Docker
-	// injects the driver for --gpus into any image, so it keeps the small one.
+	// The GPU container asks for the worker's configured NVIDIA driver
+	// capabilities and uses the small Ubuntu image. The Enroot NVIDIA hook
+	// injects the driver only when NVIDIA_VISIBLE_DEVICES is set, so the job
+	// sets it instead of relying on a multi-GB CUDA image whose cold import can
+	// exceed the job timeout.
 	probeContainerEnrootGPU
-	probeContainerDockerGPU
 )
 
 func (c probeContainer) isDocker() bool {
-	return c == probeContainerDocker || c == probeContainerDockerGPU
+	return c == probeContainerDocker
 }
 
 // probeJobSpec describes a single-task system-settings job on the selected worker.
@@ -106,11 +108,15 @@ type probeJobSpec struct {
 	// task runs as; empty submits as root.
 	user string
 	gpus int
+	// nvidiaCapabilities are the NVIDIA driver capabilities a GPU container is
+	// asked for and an NVIDIA library lookup checks.
+	nvidiaCapabilities []string
 }
 
-// nvidiaCapabilityLibraries lists, per required NVIDIA driver capability, the
-// driver libraries whose presence shows that the capability was delivered to
-// the job. Presence does not prove the libraries load.
+// nvidiaCapabilityLibraries lists, per NVIDIA driver capability the suite knows,
+// the driver libraries whose presence shows that the capability was delivered to
+// the job. Presence does not prove the libraries load. Configured capabilities
+// missing here (compat32, display) are not checked.
 var nvidiaCapabilityLibraries = []struct {
 	capability string
 	libraries  []string
@@ -121,6 +127,10 @@ var nvidiaCapabilityLibraries = []struct {
 	{capability: "video", libraries: []string{"libnvcuvid.so.1", "libnvidia-encode.so.1"}},
 }
 
+// requiredNVIDIADriverCapabilities must be among the capabilities every GPU
+// worker is configured with.
+var requiredNVIDIADriverCapabilities = []string{"compute", "graphics", "utility", "video"}
+
 type nvidiaLibraryLookup struct {
 	capability string
 	library    string
@@ -129,8 +139,9 @@ type nvidiaLibraryLookup struct {
 }
 
 type nvidiaLibraryJobResult struct {
-	kind    string
-	lookups []nvidiaLibraryLookup
+	kind         string
+	capabilities []string
+	lookups      []nvidiaLibraryLookup
 }
 
 var resourceLimitOptions = []struct {
@@ -182,6 +193,9 @@ type systemSettingsJob struct {
 	job       framework.SbatchJob
 	kind      string
 	container probeContainer
+	// nvidiaCapabilities are the NVIDIA driver capabilities an NVIDIA library
+	// lookup job checks; nil for other jobs.
+	nvidiaCapabilities []string
 }
 
 // systemSettingsProbeResult is the raw output of a combined probe and the
@@ -204,6 +218,9 @@ type SystemSettings struct {
 	jobs   []systemSettingsJob
 
 	limits resourceLimitSnapshots
+
+	adoptedSSHJob           framework.SbatchJob
+	adoptedSSHSessionCgroup string
 
 	loginKernel  kernelSettingSnapshot
 	workerKernel kernelSettingSnapshot
@@ -242,10 +259,11 @@ func (s *SystemSettings) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^root collects direct and nested Bash resource limits over SSH to the worker$`, s.collectWorkerResourceLimits)
 	sc.Step(`^direct and nested worker SSH resource limits match the compute profile$`, s.resourceLimitsMatchComputeProfile)
 	sc.Step(`^a regular user account is available on the worker$`, s.regularUserIsAvailableOnWorker)
+	sc.Step(`^a regular user for adopted SSH checks is available on the worker$`, s.adoptedSSHUserIsAvailableOnWorker)
 	sc.Step(`^worker SSH without a job is allowed for the regular user$`, s.workerSSHWithoutJobIsAllowedForRegularUser)
 	sc.Step(`^PAM Slurm adopt requires a job for the regular user$`, s.pamSlurmAdoptRequiresJobForRegularUser)
-	sc.Step(`^the regular user starts a job on the worker and collects direct and nested Bash resource limits over SSH$`, s.collectAdoptedWorkerResourceLimits)
-	sc.Step(`^direct and nested adopted SSH resource limits match the regular-user Slurm compute profile$`, s.resourceLimitsMatchRegularUserSlurmComputeProfile)
+	sc.Step(`^the regular user starts a memory-limited job on the worker and collects direct and nested Bash resource limits over SSH$`, s.collectAdoptedWorkerResourceLimits)
+	sc.Step(`^the adopted SSH session is confined by the job's memory limit$`, s.adoptedSSHSessionIsConfinedByJobMemoryLimit)
 	sc.Step(`^a regular user has an SSH identity on the login node$`, s.regularUserHasLoginSSHIdentity)
 	sc.Step(`^the regular user collects resource limits and kernel settings over SSH to the login node$`, s.collectRegularUserLoginSettings)
 	sc.Step(`^the regular-user login SSH session exposes the required kernel settings$`, s.regularUserLoginExposesRequiredKernelSettings)
@@ -275,14 +293,10 @@ func (s *SystemSettings) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^it exposes the required kernel settings$`, s.dockerJobExposesRequiredKernelSettings)
 	sc.Step(`^a healthy GPU worker is selected for system-settings checks$`, s.selectHealthyGPUWorker)
 	sc.Step(`^a healthy Docker-enabled worker is selected for system-settings checks$`, s.selectHealthyDockerWorker)
-	sc.Step(`^a healthy Docker-enabled GPU worker is selected for system-settings checks$`, s.selectHealthyDockerGPUWorker)
 	sc.Step(`^its Slurm container exposes the required NVIDIA driver capabilities$`, s.slurmContainerExposesRequiredNVIDIADriverCapabilities)
-	sc.Step(`^native and Enroot GPU jobs look up NVIDIA driver libraries for the required capabilities$`, s.submitNVIDIALibrariesJobs)
+	sc.Step(`^native and Enroot GPU jobs look up NVIDIA driver libraries for the worker's configured capabilities$`, s.submitNVIDIALibrariesJobs)
 	sc.Step(`^both NVIDIA library lookup jobs succeed$`, s.nvidiaLibrariesJobsSucceed)
-	sc.Step(`^both jobs find a non-placeholder NVIDIA driver library for every required capability$`, s.nvidiaLibrariesJobsFindNonPlaceholderLibraries)
-	sc.Step(`^a Docker GPU job looks up NVIDIA driver libraries for the required capabilities$`, s.submitDockerNVIDIALibrariesJob)
-	sc.Step(`^the Docker NVIDIA library lookup job succeeds$`, s.nvidiaLibrariesJobsSucceed)
-	sc.Step(`^it finds a non-placeholder NVIDIA driver library for every required capability$`, s.nvidiaLibrariesJobsFindNonPlaceholderLibraries)
+	sc.Step(`^both jobs find a non-placeholder NVIDIA driver library for every configured capability$`, s.nvidiaLibrariesJobsFindNonPlaceholderLibraries)
 }
 
 func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
@@ -318,6 +332,8 @@ func (s *SystemSettings) CleanupAndReset(ctx context.Context) {
 	s.worker = framework.WorkerInfo{}
 	s.jobs = nil
 	s.limits = resourceLimitSnapshots{}
+	s.adoptedSSHJob = framework.SbatchJob{}
+	s.adoptedSSHSessionCgroup = ""
 	s.loginKernel = nil
 	s.workerKernel = nil
 	s.nativeKernel = nil
@@ -363,20 +379,6 @@ func (s *SystemSettings) selectHealthyDockerWorker(ctx context.Context) error {
 	return nil
 }
 
-func (s *SystemSettings) selectHealthyDockerGPUWorker(ctx context.Context) error {
-	snapshot, err := s.selector.Snapshot(ctx)
-	if err != nil {
-		return err
-	}
-	workers, err := snapshot.WithDocker().PickGPUWorkers(1)
-	if err != nil {
-		return framework.SkipIfInsufficientWorkers(s.runtime, err)
-	}
-	s.worker = workers[0]
-	s.runtime.Logf("system settings: selected Docker GPU worker=%s", s.worker.Name)
-	return nil
-}
-
 func (s *SystemSettings) collectLoginResourceLimits(ctx context.Context) error {
 	output, err := s.runLoginSSH(ctx, pairedResourceLimitProbe())
 	if err != nil {
@@ -408,14 +410,14 @@ func (s *SystemSettings) regularUserIsAvailableOnWorker(ctx context.Context) err
 	if err := s.requireWorker(); err != nil {
 		return err
 	}
-	if err := ensureSSHTestUser(ctx, s.runtime, sshTestUserName); err != nil {
+	return prepareSSHTestUser(ctx, s.runtime, sshTestUserName, s.worker)
+}
+
+func (s *SystemSettings) adoptedSSHUserIsAvailableOnWorker(ctx context.Context) error {
+	if err := s.requireWorker(); err != nil {
 		return err
 	}
-	if err := waitForSSHTestUserOnWorker(ctx, s.runtime, sshTestUserName, s.worker); err != nil {
-		return err
-	}
-	// slurmctld must resolve the user before it accepts a job submitted as them.
-	return waitForSSHTestUserOnController(ctx, s.runtime, sshTestUserName)
+	return prepareSSHTestUser(ctx, s.runtime, pamSlurmAdoptLimitsUser, s.worker)
 }
 
 func (s *SystemSettings) collectRegularUserWorkerResourceLimits(ctx context.Context) error {
@@ -440,7 +442,7 @@ func (s *SystemSettings) collectRegularUserWorkerResourceLimits(ctx context.Cont
 }
 
 func (s *SystemSettings) workerSSHWithoutJobIsAllowedForRegularUser(ctx context.Context) error {
-	requiresJob, err := s.regularUserNeedsJobForWorkerSSH(ctx)
+	requiresJob, err := s.userNeedsJobForWorkerSSH(ctx, sshTestUserName)
 	if err != nil {
 		return err
 	}
@@ -452,18 +454,18 @@ func (s *SystemSettings) workerSSHWithoutJobIsAllowedForRegularUser(ctx context.
 }
 
 func (s *SystemSettings) pamSlurmAdoptRequiresJobForRegularUser(ctx context.Context) error {
-	requiresJob, err := s.regularUserNeedsJobForWorkerSSH(ctx)
+	requiresJob, err := s.userNeedsJobForWorkerSSH(ctx, pamSlurmAdoptLimitsUser)
 	if err != nil {
 		return err
 	}
 	if !requiresJob {
-		s.runtime.Logf("system settings: PAM Slurm adopt is disabled or exempts %s, skipping scenario", sshTestUserName)
+		s.runtime.Logf("system settings: PAM Slurm adopt is disabled or exempts %s, skipping scenario", pamSlurmAdoptLimitsUser)
 		return godog.ErrSkip
 	}
 	return nil
 }
 
-func (s *SystemSettings) regularUserNeedsJobForWorkerSSH(ctx context.Context) (bool, error) {
+func (s *SystemSettings) userNeedsJobForWorkerSSH(ctx context.Context, userName string) (bool, error) {
 	cluster, err := s.kubectl.SlurmCluster(ctx, s.info.SlurmClusterName)
 	if err != nil {
 		return false, err
@@ -471,11 +473,11 @@ func (s *SystemSettings) regularUserNeedsJobForWorkerSSH(ctx context.Context) (b
 	if !cluster.PAMSlurmAdoptEnabled {
 		return false, nil
 	}
-	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, "id -nG "+framework.ShellQuote(sshTestUserName))
+	output, err := s.runtime.Jail().RunWithDefaultRetry(ctx, "id -nG "+framework.ShellQuote(userName))
 	if err != nil {
-		return false, fmt.Errorf("list groups of %s: %w", sshTestUserName, err)
+		return false, fmt.Errorf("list groups of %s: %w", userName, err)
 	}
-	return pamSlurmAdoptRequiresJob(cluster, sshTestUserName, strings.Fields(output)), nil
+	return pamSlurmAdoptRequiresJob(cluster, userName, strings.Fields(output)), nil
 }
 
 func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context) error {
@@ -487,25 +489,27 @@ func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context)
 		Nodes:        1,
 		Nodelist:     []string{s.worker.Name},
 		TasksPerNode: 1,
+		Args:         []string{fmt.Sprintf("--mem=%dM", adoptedSSHJobMemoryBytes/(1024*1024))},
 		Wrap:         "sleep 3600",
-		RunAsUser:    sshTestUserName,
+		RunAsUser:    pamSlurmAdoptLimitsUser,
 	})
 	if err != nil {
 		return err
 	}
 	s.trackJob(job, adoptedSSHHolderJobName, probeContainerNone)
 	s.runtime.Logf("system settings: submitted job=%s id=%s worker=%s user=%s",
-		adoptedSSHHolderJobName, job.ID, s.worker.Name, sshTestUserName)
+		adoptedSSHHolderJobName, job.ID, s.worker.Name, pamSlurmAdoptLimitsUser)
 	if err := s.slurm.WaitForJobRunning(ctx, job.ID, systemSettingsJobTimeout); err != nil {
 		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job, err)
 	}
 
-	output, err := runInternalSSHAsTestUser(
+	output, err := runInternalSSHAsUser(
 		ctx,
 		s.runtime,
+		pamSlurmAdoptLimitsUser,
 		s.worker.Name,
 		systemSettingsSSHTimeout,
-		pairedResourceLimitProbe(),
+		adoptedSSHProbe(),
 	)
 	if err != nil {
 		return fmt.Errorf("collect resource limits over SSH adopted into job %s on worker %s: %w", job.ID, s.worker.Name, err)
@@ -513,6 +517,38 @@ func (s *SystemSettings) collectAdoptedWorkerResourceLimits(ctx context.Context)
 	s.limits, err = parseResourceLimitSnapshots(output)
 	if err != nil {
 		return fmt.Errorf("parse adopted SSH resource limits on worker %s: %w", s.worker.Name, err)
+	}
+	s.adoptedSSHJob = job
+	s.adoptedSSHSessionCgroup = parseKeyValueLine(output, sessionCgroupKey)
+	if s.adoptedSSHSessionCgroup == "" {
+		return fmt.Errorf("find cgroup of SSH session adopted into job %s on worker %s; output:\n%s",
+			job.ID, s.worker.Name, strings.TrimSpace(output))
+	}
+	return nil
+}
+
+// adoptedSSHSessionIsConfinedByJobMemoryLimit checks the job cgroup rather than ulimit -m:
+// pam_limits overwrites the RLIMIT_RSS set by ulimit_pam_adopt, and Linux does not enforce RLIMIT_RSS anyway.
+func (s *SystemSettings) adoptedSSHSessionIsConfinedByJobMemoryLimit(ctx context.Context) error {
+	if err := s.requireWorker(); err != nil {
+		return err
+	}
+	jobID := s.adoptedSSHJob.ID
+	cgroup, err := slurmJobCgroup(s.adoptedSSHSessionCgroup, jobID)
+	if err != nil {
+		return fmt.Errorf("locate cgroup of job %s from adopted SSH session on worker %s: %w", jobID, s.worker.Name, err)
+	}
+	pod, err := s.kubectl.WorkerPodForSlurmNode(ctx, s.worker.Name)
+	if err != nil {
+		return err
+	}
+	output, err := s.runtime.WorkerPod(pod).RunWithDefaultRetry(ctx,
+		"cat "+framework.ShellQuote(path.Join(cgroup, "memory.max")))
+	if err != nil {
+		return fmt.Errorf("read memory limit of job %s cgroup %s on worker %s: %w", jobID, cgroup, s.worker.Name, err)
+	}
+	if err := validateAdoptedSSHJobMemoryMax(output); err != nil {
+		return fmt.Errorf("check job %s cgroup %s on worker %s: %w", jobID, cgroup, s.worker.Name, err)
 	}
 	return nil
 }
@@ -636,13 +672,6 @@ func (s *SystemSettings) resourceLimitsMatchSlurmComputeProfile() error {
 	return validateSlurmResourceLimitSnapshots(s.limits, computeResourceLimitProfile())
 }
 
-// resourceLimitsMatchRegularUserSlurmComputeProfile expects pam_limits to apply
-// the regular-user profile to an adopted SSH session, while ulimit_pam_adopt
-// sets max_memory from the job it was adopted into.
-func (s *SystemSettings) resourceLimitsMatchRegularUserSlurmComputeProfile() error {
-	return validateSlurmResourceLimitSnapshots(s.limits, regularUserComputeResourceLimitProfile())
-}
-
 func (s *SystemSettings) submitNativeResourceLimitsJob(ctx context.Context) error {
 	return s.submitProbeJob(ctx, probeJobSpec{name: nativeResourceLimitsJobName, probe: pairedResourceLimitProbe()})
 }
@@ -685,13 +714,18 @@ func (s *SystemSettings) submitProbeJob(ctx context.Context, spec probeJobSpec) 
 		Nodelist:     []string{s.worker.Name},
 		GPUsPerNode:  spec.gpus,
 		TasksPerNode: 1,
-		Wrap:         srunProbeCommand(probe, spec.container),
+		Wrap:         srunProbeCommand(probe, spec.container, spec.nvidiaCapabilities),
 		RunAsUser:    spec.user,
 	})
 	if err != nil {
 		return err
 	}
-	s.trackJob(job, spec.name, spec.container)
+	s.jobs = append(s.jobs, systemSettingsJob{
+		job:                job,
+		kind:               spec.name,
+		container:          spec.container,
+		nvidiaCapabilities: spec.nvidiaCapabilities,
+	})
 	s.runtime.Logf("system settings: submitted job=%s id=%s worker=%s stdout=%s",
 		spec.name, job.ID, s.worker.Name, job.StdoutPath)
 	return nil
@@ -839,12 +873,23 @@ func (s *SystemSettings) jobsExposeRequiredKernelSettings() error {
 }
 
 func (s *SystemSettings) slurmContainerExposesRequiredNVIDIADriverCapabilities(ctx context.Context) error {
-	if err := s.requireWorker(); err != nil {
+	configured, err := s.workerNVIDIADriverCapabilities(ctx)
+	if err != nil {
 		return err
+	}
+	return validateNVIDIADriverCapabilities(configured)
+}
+
+// workerNVIDIADriverCapabilities reads the capabilities configured on the
+// selected worker's slurmd container. The worker entrypoint mounts the driver
+// libraries of exactly these capabilities into the shared jail.
+func (s *SystemSettings) workerNVIDIADriverCapabilities(ctx context.Context) ([]string, error) {
+	if err := s.requireWorker(); err != nil {
+		return nil, err
 	}
 	pod, err := s.kubectl.WorkerPodForSlurmNode(ctx, s.worker.Name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	value, err := s.kubectl.WorkerContainerEnvironmentVariable(
 		ctx,
@@ -853,12 +898,21 @@ func (s *SystemSettings) slurmContainerExposesRequiredNVIDIADriverCapabilities(c
 		nvidiaDriverCapabilitiesName,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return validateNVIDIADriverCapabilities(value)
+	configured, err := parseNVIDIADriverCapabilities(value)
+	if err != nil {
+		return nil, fmt.Errorf("read NVIDIA driver capabilities of worker %s: %w", s.worker.Name, err)
+	}
+	s.runtime.Logf("system settings: worker %s is configured with %s=%q", s.worker.Name, nvidiaDriverCapabilitiesName, value)
+	return configured, nil
 }
 
 func (s *SystemSettings) submitNVIDIALibrariesJobs(ctx context.Context) error {
+	configured, err := s.workerNVIDIADriverCapabilities(ctx)
+	if err != nil {
+		return err
+	}
 	for _, jobSpec := range []struct {
 		name      string
 		container probeContainer
@@ -866,24 +920,29 @@ func (s *SystemSettings) submitNVIDIALibrariesJobs(ctx context.Context) error {
 		{name: nativeNVIDIALibrariesJobName, container: probeContainerNone},
 		{name: enrootNVIDIALibrariesJobName, container: probeContainerEnrootGPU},
 	} {
-		if err := s.submitProbeJob(ctx, probeJobSpec{
-			name:      jobSpec.name,
-			probe:     nvidiaLibraryProbe(),
-			container: jobSpec.container,
-			gpus:      1,
-		}); err != nil {
+		if err := s.submitNVIDIALibrariesJob(ctx, jobSpec.name, jobSpec.container, configured); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *SystemSettings) submitDockerNVIDIALibrariesJob(ctx context.Context) error {
+// submitNVIDIALibrariesJob asks the job's container runtime for the configured
+// capabilities and looks up the libraries of those the suite knows.
+func (s *SystemSettings) submitNVIDIALibrariesJob(ctx context.Context, name string, container probeContainer, configured []string) error {
+	covered := coveredNVIDIADriverCapabilities(configured)
+	if len(covered) == 0 {
+		return fmt.Errorf("look up NVIDIA driver libraries in %s job: no known library for capabilities %s",
+			name, strings.Join(configured, ","))
+	}
+	s.runtime.Logf("system settings: %s job gets NVIDIA driver capabilities %s and looks up libraries for %s",
+		name, strings.Join(configured, ","), strings.Join(covered, ","))
 	return s.submitProbeJob(ctx, probeJobSpec{
-		name:      dockerNVIDIALibrariesJobName,
-		probe:     nvidiaLibraryProbe(),
-		container: probeContainerDockerGPU,
-		gpus:      1,
+		name:               name,
+		probe:              nvidiaLibraryProbe(configured),
+		container:          container,
+		gpus:               1,
+		nvidiaCapabilities: configured,
 	})
 }
 
@@ -902,7 +961,11 @@ func (s *SystemSettings) nvidiaLibrariesJobsSucceed(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("parse NVIDIA library lookups from %s job %s: %w", tracked.kind, tracked.job.ID, err)
 		}
-		s.nvidiaLibraries = append(s.nvidiaLibraries, nvidiaLibraryJobResult{kind: tracked.kind, lookups: lookups})
+		s.nvidiaLibraries = append(s.nvidiaLibraries, nvidiaLibraryJobResult{
+			kind:         tracked.kind,
+			capabilities: tracked.nvidiaCapabilities,
+			lookups:      lookups,
+		})
 	}
 	return nil
 }
@@ -913,7 +976,7 @@ func (s *SystemSettings) nvidiaLibrariesJobsFindNonPlaceholderLibraries() error 
 	}
 	var validationErrors []error
 	for _, result := range s.nvidiaLibraries {
-		validationErrors = append(validationErrors, validateNVIDIALibraryLookups(result.kind+" job", result.lookups))
+		validationErrors = append(validationErrors, validateNVIDIALibraryLookups(result.kind+" job", result.lookups, result.capabilities))
 	}
 	return errors.Join(validationErrors...)
 }
@@ -993,6 +1056,23 @@ func pairedResourceLimitProbe() string {
 	)
 }
 
+// adoptedSSHProbe also reports the session cgroup, which locates the job it was adopted into.
+func adoptedSSHProbe() string {
+	return fmt.Sprintf(
+		"printf '%s=%%s\\n' \"$(sed -n 's/^0:://p' /proc/self/cgroup)\"; %s",
+		sessionCgroupKey,
+		pairedResourceLimitProbe(),
+	)
+}
+
+func validateAdoptedSSHJobMemoryMax(output string) error {
+	expected := strconv.FormatInt(adoptedSSHJobMemoryBytes, 10)
+	if actual := strings.TrimSpace(output); actual != expected {
+		return fmt.Errorf("verify memory.max=%q: want %q set from the job memory request", actual, expected)
+	}
+	return nil
+}
+
 func kernelSettingsProbe() string {
 	lines := make([]string, 0, len(kernelSettingPaths))
 	for _, setting := range kernelSettingPaths {
@@ -1009,30 +1089,25 @@ func jobUserProbe() string {
 	return fmt.Sprintf("printf '%s=%%s\\n' \"$(id -un)\"", jobUserKey)
 }
 
-func srunProbeCommand(probe string, container probeContainer, flags ...string) string {
-	capabilities := nvidiaDriverCapabilitiesName + "=" + strings.Join(requiredNVIDIADriverCapabilities(), ",")
+// srunProbeCommand runs probe in container through srun. GPU containers ask
+// their runtime for nvidiaCapabilities, so the job sees the libraries of
+// exactly those capabilities instead of the runtime's own default.
+func srunProbeCommand(probe string, container probeContainer, nvidiaCapabilities []string, flags ...string) string {
+	capabilities := nvidiaDriverCapabilitiesName + "=" + strings.Join(nvidiaCapabilities, ",")
 	var args []string
 	if container == probeContainerEnrootGPU {
 		// Pyxis passes the job environment to the Enroot NVIDIA hook.
-		args = append(args, capabilities)
+		args = append(args, nvidiaVisibleDevicesName+"=all", capabilities)
 	}
 	args = append(args, "srun", "--nodes=1", "--ntasks=1")
 	args = append(args, flags...)
 	// The batch shell expands SLURM_JOB_ID, so cleanup can find a Docker container by job ID.
 	dockerName := systemSettingsDockerContainerPrefix + "${SLURM_JOB_ID}"
 	switch container {
-	case probeContainerEnroot:
+	case probeContainerEnroot, probeContainerEnrootGPU:
 		args = append(args, "--container-image="+framework.ShellQuote(enrootLifecycleImage))
-	case probeContainerEnrootGPU:
-		args = append(args, "--container-image="+framework.ShellQuote(gpuSmokeEnrootImage))
 	case probeContainerDocker:
 		args = append(args, "docker", "run", "--rm", "--name", dockerName, framework.ShellQuote(ubuntuDockerImage))
-	case probeContainerDockerGPU:
-		args = append(args,
-			"docker", "run", "--rm", "--name", dockerName,
-			"--gpus=all", "-e", capabilities,
-			framework.ShellQuote(ubuntuDockerImage),
-		)
 	}
 	args = append(args, framework.BashLC(probe))
 	return strings.Join(args, " ")
@@ -1046,7 +1121,7 @@ func resourceLimitsAndKernelSettingsProbe() string {
 // job on workerName. srun needs a terminal for --pty, which kubectl exec does
 // not provide, so script allocates one.
 func interactiveProbeCommand(userName, workerName, probe string, container probeContainer) string {
-	srun := srunProbeCommand(probe, container,
+	srun := srunProbeCommand(probe, container, nil,
 		"--pty",
 		fmt.Sprintf("--immediate=%d", int(interactiveJobImmediate.Seconds())),
 		"--nodelist="+framework.ShellQuote(workerName),
@@ -1055,7 +1130,7 @@ func interactiveProbeCommand(userName, workerName, probe string, container probe
 		int(systemSettingsJobTimeout.Seconds()),
 		framework.ShellQuote(srun),
 	)
-	return fmt.Sprintf("su - %s -c %s", framework.ShellQuote(userName), framework.ShellQuote(interactive))
+	return runAsLoginUser(userName, interactive)
 }
 
 // pamSlurmAdoptRequiresJob mirrors the worker PAM account stack: users and
@@ -1345,20 +1420,27 @@ func validateKernelSettings(source string, actual kernelSettingSnapshot) error {
 	return errors.Join(validationErrors...)
 }
 
-func requiredNVIDIADriverCapabilities() []string {
-	capabilities := make([]string, 0, len(nvidiaCapabilityLibraries))
+// coveredNVIDIADriverCapabilities keeps, in table order, the capabilities the
+// suite knows libraries for; "all" covers every one of them.
+func coveredNVIDIADriverCapabilities(capabilities []string) []string {
+	var covered []string
 	for _, entry := range nvidiaCapabilityLibraries {
-		capabilities = append(capabilities, entry.capability)
+		if nvidiaCapabilityRequested(capabilities, entry.capability) {
+			covered = append(covered, entry.capability)
+		}
 	}
-	return capabilities
+	return covered
 }
 
-// nvidiaLibraryProbe resolves each capability library by soname through the
-// dynamic linker cache and reports the resolved file size. It does not load
-// the libraries.
-func nvidiaLibraryProbe() string {
+// nvidiaLibraryProbe resolves each known library of the given capabilities by
+// soname through the dynamic linker cache and reports the resolved file size.
+// It does not load the libraries.
+func nvidiaLibraryProbe(capabilities []string) string {
 	var entries []string
 	for _, entry := range nvidiaCapabilityLibraries {
+		if !nvidiaCapabilityRequested(capabilities, entry.capability) {
+			continue
+		}
 		for _, library := range entry.libraries {
 			entries = append(entries, entry.capability+":"+library)
 		}
@@ -1409,12 +1491,16 @@ func parseNVIDIALibraryLookups(output string) ([]nvidiaLibraryLookup, error) {
 	return lookups, nil
 }
 
-// validateNVIDIALibraryLookups requires every required capability to resolve
-// at least one of its libraries to a file larger than a placeholder. It checks
-// presence only: a corrupt library or one with missing dependencies still passes.
-func validateNVIDIALibraryLookups(source string, lookups []nvidiaLibraryLookup) error {
+// validateNVIDIALibraryLookups requires every given capability with known
+// libraries to resolve at least one of them to a file larger than a
+// placeholder. It checks presence only: a corrupt library or one with missing
+// dependencies still passes.
+func validateNVIDIALibraryLookups(source string, lookups []nvidiaLibraryLookup, capabilities []string) error {
 	var validationErrors []error
 	for _, entry := range nvidiaCapabilityLibraries {
+		if !nvidiaCapabilityRequested(capabilities, entry.capability) {
+			continue
+		}
 		present := false
 		var observed []string
 		for _, lookup := range lookups {
@@ -1446,25 +1532,15 @@ func validateNVIDIALibraryLookups(source string, lookups []nvidiaLibraryLookup) 
 	return errors.Join(validationErrors...)
 }
 
-func validateNVIDIADriverCapabilities(value string) error {
-	actual := make(map[string]struct{})
-	for _, capability := range strings.Split(value, ",") {
-		capability = strings.TrimSpace(capability)
-		if capability != "" {
-			actual[capability] = struct{}{}
-		}
-	}
-	var missing []string
-	for _, required := range requiredNVIDIADriverCapabilities() {
-		if _, found := actual[required]; !found {
-			missing = append(missing, required)
-		}
-	}
+// validateNVIDIADriverCapabilities checks that the configured capabilities
+// include every required one.
+func validateNVIDIADriverCapabilities(configured []string) error {
+	missing := missingNVIDIADriverCapabilities(configured, requiredNVIDIADriverCapabilities)
 	if len(missing) > 0 {
 		return fmt.Errorf(
 			"check %s=%q: missing required capabilities %s",
 			nvidiaDriverCapabilitiesName,
-			value,
+			strings.Join(configured, ","),
 			strings.Join(missing, ","),
 		)
 	}

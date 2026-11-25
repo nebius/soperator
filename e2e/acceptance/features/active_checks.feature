@@ -1,10 +1,13 @@
 Feature: Active checks
-  @heavy @gpu @soperator_version_>=5.0.0
+  # Sequential: The external producer selects all GPU workers and cancels jobs by a shared name.
+  @heavy @gpu @soperator_version_>=5.0.0 @sequential
   Scenario: GPU ActiveCheck succeeds on all GPU workers
     Given healthy GPU workers are available for active checks
     When the GPU ActiveCheck is triggered
     Then the GPU ActiveCheck Kubernetes Job succeeds
     And GPU ActiveCheck outputs report PASS on all GPU workers
+    And every GPU ActiveCheck report passed every active-check test for its platform
+    And every GPU ActiveCheck report has its raw command outputs
     And GPU ActiveCheck Slurm jobs complete on all GPU workers
     And the GPU ActiveCheck status is Complete
 

@@ -70,7 +70,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	}
 	tfVars["slurm_login_user_isolation_enabled"] = true
 	// These accounts need worker SSH without a Slurm job. Adoption checks use
-	// separate non-exempt users; keep this list in sync with the acceptance test users.
+	// separate non-exempt users; keep this list in sync with e2e/acceptance/internal/sharedsteps/test_users.go.
 	var pamAdoptExemptTestUsers = []string{"bob", "dockeruser"}
 	tfVars["pam_slurm_adopt"] = map[string]interface{}{
 		"enabled":      true,
@@ -78,18 +78,28 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	}
 	tfVars["slurm_operator_version"] = cfg.SoperatorVersion
 	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
-	// Newer recipes take the NFS version and registry from the Soperator release and reject
-	// these attributes, so override them only where the recipe still sets them.
-	if nfs, ok := tfVars["nfs_in_k8s"].(map[string]interface{}); ok {
-		if spec, ok := nfs["spec"].(map[string]interface{}); ok && spec != nil {
-			if _, ok := spec["version"]; ok {
-				spec["version"] = cfg.NFSVersion
-			}
-			if _, ok := spec["use_stable_repo"]; ok {
-				spec["use_stable_repo"] = !cfg.SoperatorUnstable
-			}
+	nfs, _ := tfVars["nfs_in_k8s"].(map[string]interface{})
+	if nfs == nil {
+		nfs = make(map[string]interface{})
+	}
+	nfs["enabled"] = true
+	spec, _ := nfs["spec"].(map[string]interface{})
+	if spec == nil {
+		spec = map[string]interface{}{
+			"size_gibibytes": 3720, "disk_type": "NETWORK_SSD_IO_M3", "filesystem_type": "ext4", "threads": 128,
+			"node_group": map[string]interface{}{"resource": map[string]interface{}{"platform": "cpu-d3"}},
 		}
 	}
+	// Newer recipes take the NFS version and registry from the Soperator release and reject
+	// these attributes, so override them only where the recipe still sets them.
+	if _, ok := spec["version"]; ok {
+		spec["version"] = cfg.NFSVersion
+	}
+	if _, ok := spec["use_stable_repo"]; ok {
+		spec["use_stable_repo"] = !cfg.SoperatorUnstable
+	}
+	nfs["spec"] = spec
+	tfVars["nfs_in_k8s"] = nfs
 	tfVars["production"] = false
 	tfVars["company_name"] = "e2e-test"
 
@@ -171,7 +181,8 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	}
 	tfVars["slurm_nodeset_workers"] = nodesetWorkers
 
-	tfVars["slurm_nodesets_partitions"] = []interface{}{
+	var partitions []interface{}
+	partitions = append(partitions,
 		map[string]interface{}{
 			"name":     "main",
 			"is_all":   true,
@@ -184,7 +195,16 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"topology": "flat",
 			"config":   "Default=NO PriorityTier=10 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES",
 		},
+	)
+	for _, partition := range cfg.Profile.Partitions {
+		partitions = append(partitions, map[string]interface{}{
+			"name":               partition.Name,
+			"slurm_nodeset_refs": partition.NodeSets,
+			"topology":           "flat",
+			"config":             "Default=NO PriorityTier=10 PreemptMode=OFF MaxTime=INFINITE State=UP OverSubscribe=YES",
+		})
 	}
+	tfVars["slurm_nodesets_partitions"] = partitions
 
 	tfVars["slurm_login_ssh_root_public_keys"] = []string{cfg.SSHPublicKey}
 	tfVars["cleanup_bucket_on_destroy"] = true

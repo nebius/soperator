@@ -95,12 +95,7 @@ func (s *TopologyLegacy) scontrolTopologyIsParsedIntoASwitchTree(ctx context.Con
 	}
 	workerNames := framework.WorkerNames(workers)
 
-	hostlists := make(map[string][]string)
-	expand := func(hostlist string) ([]string, error) {
-		return expandSlurmHostlist(ctx, s.runtime, hostlist, hostlists)
-	}
-
-	graph, err := parseTopology(raw, workerNames, expand)
+	graph, err := parseTopology(raw, workerNames, newCachedHostlistExpander(s.runtime).bind(ctx))
 	if err != nil {
 		return fmt.Errorf("parse topology: %w", err)
 	}
@@ -194,11 +189,6 @@ func (s *TopologyLegacy) eachTaskAddrMatchesTheTree() error {
 	}
 	return nil
 }
-
-// hostlistExpander turns a Slurm hostlist value that contains `[` into the
-// concrete list of hostnames. Production wires it to `scontrol show hostnames`;
-// tests with plain comma-separated values can pass nil.
-type hostlistExpander func(value string) ([]string, error)
 
 // parseTopology turns `scontrol show topology` output into a topologyGraph.
 // `allWorkers` is consulted only when a switch declares `Nodes=ALL`. `expand`

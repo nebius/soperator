@@ -33,7 +33,17 @@ type Exec interface {
 	WorkerPod(pod WorkerPodInfo) CommandScope
 }
 
+// PermanentError stops polling without retrying the wrapped error.
+type PermanentError struct {
+	Err error
+}
+
+func (e *PermanentError) Error() string { return e.Err.Error() }
+func (e *PermanentError) Unwrap() error { return e.Err }
+
 type Waiter interface {
+	// WaitFor retries condition errors unless they wrap a *PermanentError.
+	// Its context takes precedence over results returned after cancellation or timeout.
 	WaitFor(ctx context.Context, description string, timeout, pollInterval time.Duration, condition func(context.Context) (bool, error)) error
 }
 

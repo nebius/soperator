@@ -24,15 +24,16 @@ const (
 	dockerContainerStopTimeout = 3 * time.Minute
 	dockerGPUSmokeTimeout      = 10 * time.Minute
 	dockerSSHSmokeTimeout      = 10 * time.Minute
+	dockerSrunSubmitTimeout    = 2 * time.Minute
 
-	dockerSSHUserName   = "dockeruser"
+	// srun is already blocking in the background, so a short interval only shortens the step.
+	dockerSrunSubmitPollInterval = 2 * time.Second
+
+	dockerSrunTasksPerWorker = 2
+
 	dockerSSHKeyName    = "soperator_e2e_docker_ssh"
 	dockerSSHKeyComment = "soperator-e2e-docker-ssh"
 	dockerWorkerSSHOK   = "WORKER_SSH_DOCKER_OK"
-
-	dockerSlurmStepdScope     = "slurmstepd.scope"
-	dockerSLUIDLength         = 14
-	dockerSLUIDBase32Alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 )
 
 type DockerContainers struct {
@@ -46,6 +47,9 @@ type DockerContainers struct {
 
 	containerNamePrefix string
 	connectionWorker    framework.WorkerInfo
+	tasksPerWorker      int
+
+	srunCancel context.CancelFunc
 
 	loginSSHContainerName string
 	loginJailSubMounts    []framework.JailSubMountInfo
@@ -78,9 +82,10 @@ func (s *DockerContainers) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the user runs a Docker container over SSH on a (CPU|GPU) worker node$`, s.theUserRunsADockerContainerOverSSHOnAWorkerNode)
 	sc.Step(`^the Docker container succeeds over worker SSH$`, s.theDockerContainerSucceedsOverWorkerSSH)
 	sc.Step(`^a long-running Docker container job is submitted on two (CPU|GPU) workers$`, s.aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers)
+	sc.Step(`^a long-running Docker container job with several tasks per worker is launched directly from the login node on two (CPU|GPU) workers$`, s.aLongRunningDockerContainerJobIsLaunchedDirectlyFromTheLoginNode)
 	sc.Step(`^the Docker container job is running$`, s.theDockerContainerJobIsRunning)
 	sc.Step(`^Docker image and runtime storage is populated on a worker$`, s.dockerImageAndRuntimeStorageIsPopulatedOnAWorker)
-	sc.Step(`^a Docker container from the job uses the Slurm job cgroup$`, s.aDockerContainerFromTheJobUsesTheSlurmJobCgroup)
+	sc.Step(`^every Docker container from the job uses the Slurm job cgroup$`, s.everyDockerContainerFromTheJobUsesTheSlurmJobCgroup)
 	sc.Step(`^Docker containers from the job are running on selected workers$`, s.dockerContainersFromTheJobAreRunningOnSelectedWorkers)
 	sc.Step(`^the Docker container job is cancelled$`, s.theDockerContainerJobIsCancelled)
 	sc.Step(`^Docker containers from the job are stopped explicitly$`, s.dockerContainersFromTheJobAreStoppedExplicitly)
@@ -113,11 +118,17 @@ func (s *DockerContainers) CleanupAndReset(ctx context.Context) {
 	if cleanupErr := s.requestCurrentJobCancellation(ctx); cleanupErr != nil {
 		s.runtime.Logf("cleanup: cancel Docker job: %v", cleanupErr)
 	}
+	s.cancelUnidentifiedSrunJob(ctx)
 	s.stopContainersByNamePrefix(ctx)
 	s.removeContainersByNamePrefix(ctx)
 	if cleanupErr := s.waitForCurrentJobGone(ctx); cleanupErr != nil {
 		s.runtime.Logf("cleanup: wait for Docker job to finish: %v", cleanupErr)
 	}
+	if s.srunCancel != nil {
+		s.srunCancel()
+	}
+	s.srunCancel = nil
+	s.tasksPerWorker = 0
 	s.workers = nil
 	s.job = framework.SbatchJob{}
 	s.containerNamePrefix = ""
@@ -295,12 +306,9 @@ func (s *DockerContainers) theDockerContainerSucceedsOverWorkerSSH() error {
 }
 
 func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers(ctx context.Context, workerType string) error {
-	workers, err := s.pickWorkers(ctx, workerType, 2)
-	if err != nil {
-		return framework.SkipIfInsufficientWorkers(s.runtime, err)
+	if err := s.selectJobWorkers(ctx, workerType, 2); err != nil {
+		return err
 	}
-	s.workers = workers
-	s.connectionWorker = workers[0]
 
 	wrap := fmt.Sprintf("srun docker run --rm --name e2e-docker-${SLURM_JOB_ID}-${SLURM_NODEID} %s sh -c %s",
 		framework.ShellQuote(dockerLifecycleImage),
@@ -317,9 +325,117 @@ func (s *DockerContainers) aLongRunningDockerContainerJobIsSubmittedOnTwoWorkers
 		return err
 	}
 	s.job = job
-	s.containerNamePrefix = fmt.Sprintf("e2e-docker-%s-", job.ID)
+	s.tasksPerWorker = 1
+	s.containerNamePrefix = dockerJobContainerNamePrefix(job.ID)
 	s.runtime.Logf("Docker containers: selected workers=%s job_id=%s stdout=%s stderr=%s",
 		strings.Join(framework.WorkerNames(s.workers), ","), job.ID, job.StdoutPath, job.StderrPath)
+	return nil
+}
+
+// The job is a bare srun from the login node, so its tasks get only the
+// environment Slurm gives each of them, not one inherited from a batch shell.
+func (s *DockerContainers) aLongRunningDockerContainerJobIsLaunchedDirectlyFromTheLoginNode(ctx context.Context, workerType string) error {
+	if err := s.selectJobWorkers(ctx, workerType, 2); err != nil {
+		return err
+	}
+	s.tasksPerWorker = dockerSrunTasksPerWorker
+
+	outputDir := framework.AcceptanceJobOutputDir
+	if artifacts, ok := framework.ScenarioArtifacts(ctx); ok && artifacts.JailDir != "" {
+		outputDir = artifacts.JailDir
+	}
+	if _, err := s.runtime.Jail().Run(ctx, "mkdir -p "+framework.ShellQuote(outputDir)); err != nil {
+		return fmt.Errorf("prepare Docker srun output directory %s: %w", outputDir, err)
+	}
+
+	jobName := fmt.Sprintf("e2e-docker-srun-%d", time.Now().UnixNano())
+	stdoutPath := path.Join(outputDir, jobName+".out")
+	stderrPath := path.Join(outputDir, jobName+".err")
+	options := framework.SlurmCommandOptions{
+		Args: []string{
+			"--job-name=" + jobName,
+			fmt.Sprintf("--ntasks-per-node=%d", s.tasksPerWorker),
+			"--output=" + stdoutPath,
+			"--error=" + stderrPath,
+		},
+		Nodes:    len(s.workers),
+		Nodelist: framework.WorkerNames(s.workers),
+	}
+
+	// The job has a name but no ID until squeue reports it; cleanup cancels it by name meanwhile.
+	s.job = framework.SbatchJob{JobName: jobName, StdoutPath: stdoutPath, StderrPath: stderrPath}
+
+	// srun blocks until the job ends, so it outlives this step and is stopped in cleanup.
+	srunCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	s.srunCancel = cancel
+	exited := make(chan error, 1)
+	go func() {
+		output, srunErr := s.slurm.RunSlurm(srunCtx, "srun", options, "sh", "-c", dockerSrunTaskCommand())
+		exited <- fmt.Errorf("srun exited before its job was queued: %v; output: %s", srunErr, strings.TrimSpace(output))
+	}()
+
+	err := s.runtime.WaitFor(ctx, "Docker srun job "+jobName+" in the queue", dockerSrunSubmitTimeout, dockerSrunSubmitPollInterval,
+		func(waitCtx context.Context) (bool, error) {
+			select {
+			case exitErr := <-exited:
+				return false, exitErr
+			default:
+			}
+			output, queryErr := s.runtime.Jail().RunWithDefaultRetry(waitCtx,
+				"squeue -h --name="+framework.ShellQuote(jobName)+" -o '%i'")
+			if queryErr != nil {
+				return false, queryErr
+			}
+			jobID := strings.TrimSpace(output)
+			if jobID == "" {
+				return false, nil
+			}
+			if strings.ContainsAny(jobID, " \t\n") {
+				return false, fmt.Errorf("expected one job named %s, got %q", jobName, jobID)
+			}
+			s.job.ID = jobID
+			return true, nil
+		})
+	if err != nil {
+		return err
+	}
+	s.containerNamePrefix = dockerJobContainerNamePrefix(s.job.ID)
+	s.runtime.Logf("Docker containers: direct srun selected workers=%s tasks_per_worker=%d job_id=%s stdout=%s stderr=%s",
+		strings.Join(framework.WorkerNames(s.workers), ","), s.tasksPerWorker, s.job.ID, stdoutPath, stderrPath)
+	return nil
+}
+
+// Matches the container names of both the sbatch and the direct srun job.
+func dockerJobContainerNamePrefix(jobID string) string {
+	return fmt.Sprintf("e2e-docker-%s-", jobID)
+}
+
+// Runs inside each task so that the Slurm variables expand per task.
+func dockerSrunTaskCommand() string {
+	return fmt.Sprintf(
+		`exec docker run --rm --name "e2e-docker-${SLURM_JOB_ID}-${SLURM_NODEID}-${SLURM_LOCALID}" %s sh -c %s`,
+		framework.ShellQuote(dockerLifecycleImage),
+		framework.ShellQuote(containerLifecycleCommand),
+	)
+}
+
+// Covers an srun that never reported a job ID; the name is unique to this scenario.
+func (s *DockerContainers) cancelUnidentifiedSrunJob(ctx context.Context) {
+	if s.job.JobName == "" || !s.job.IsZero() {
+		return
+	}
+	if _, err := s.runtime.Jail().Run(ctx, "scancel --name="+framework.ShellQuote(s.job.JobName)); err != nil {
+		s.runtime.Logf("cleanup: cancel Docker srun job named %s: %v", s.job.JobName, err)
+	}
+}
+
+func (s *DockerContainers) selectJobWorkers(ctx context.Context, workerType string, count int) error {
+	workers, err := s.pickWorkers(ctx, workerType, count)
+	if err != nil {
+		return framework.SkipIfInsufficientWorkers(s.runtime, err)
+	}
+	s.workers = workers
+	s.connectionWorker = workers[0]
 	return nil
 }
 
@@ -417,37 +533,52 @@ func (s *DockerContainers) dockerStorageIsPopulatedOnAWorker(
 	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job, err)
 }
 
-func (s *DockerContainers) aDockerContainerFromTheJobUsesTheSlurmJobCgroup(ctx context.Context) error {
-	if s.connectionWorker.Name == "" {
-		return fmt.Errorf("Docker connection worker is not selected")
+func (s *DockerContainers) everyDockerContainerFromTheJobUsesTheSlurmJobCgroup(ctx context.Context) error {
+	if len(s.workers) == 0 {
+		return fmt.Errorf("Docker workers are not selected")
 	}
 	if s.job.IsZero() {
 		return fmt.Errorf("Docker job ID is empty")
 	}
 
-	err := framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, s.job, "Docker container in Slurm job cgroup",
+	err := framework.WaitForWithJobAlive(ctx, s.runtime, s.slurm, s.job, "Docker containers in Slurm job cgroup",
 		dockerProbeTimeout, framework.DefaultPollInterval, func(waitCtx context.Context) (bool, error) {
-			containerIDs, err := s.dockerContainerIDsByNamePrefix(waitCtx, s.connectionWorker)
-			if err != nil {
-				return false, err
-			}
-			for containerID := range containerIDs {
-				cgroupParent, err := s.dockerContainerCgroupParent(waitCtx, s.connectionWorker, containerID)
-				if err != nil {
+			for _, worker := range s.workers {
+				ready, err := s.workerContainersUseJobCgroup(waitCtx, worker)
+				if err != nil || !ready {
 					return false, err
 				}
-				if !dockerCgroupParentBelongsToJob(cgroupParent, s.job.ID) {
-					return false, fmt.Errorf(
-						"expected Docker cgroup parent for Slurm job %s, got %q",
-						s.job.ID,
-						cgroupParent,
-					)
-				}
-				return true, nil
 			}
-			return false, nil
+			return true, nil
 		})
 	return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, s.job, err)
+}
+
+func (s *DockerContainers) workerContainersUseJobCgroup(ctx context.Context, worker framework.WorkerInfo) (ready bool, err error) {
+	containerIDs, err := s.dockerContainerIDsByNamePrefix(ctx, worker)
+	if err != nil {
+		return false, err
+	}
+	if len(containerIDs) < s.tasksPerWorker {
+		return false, nil
+	}
+	for containerID := range containerIDs {
+		cgroupParent, err := s.dockerContainerCgroupParent(ctx, worker, containerID)
+		if err != nil {
+			return false, err
+		}
+		if !slurmCgroupParentBelongsToJob(cgroupParent, s.job.ID) {
+			// The parent is fixed when the container is created, so polling cannot fix it.
+			return false, &framework.PermanentError{Err: fmt.Errorf(
+				"expected Docker cgroup parent for Slurm job %s on worker %s container %s, got %q",
+				s.job.ID,
+				worker.Name,
+				containerID,
+				cgroupParent,
+			)}
+		}
+	}
+	return true, nil
 }
 
 func (s *DockerContainers) dockerContainersFromTheJobAreRunningOnSelectedWorkers(ctx context.Context) error {
@@ -458,7 +589,7 @@ func (s *DockerContainers) dockerContainersFromTheJobAreRunningOnSelectedWorkers
 				if err != nil {
 					return false, err
 				}
-				if len(currentIDs) == 0 {
+				if len(currentIDs) < s.tasksPerWorker {
 					return false, nil
 				}
 			}
@@ -486,15 +617,12 @@ func (s *DockerContainers) dockerContainersFromTheJobAreNoLongerRunning(ctx cont
 func (s *DockerContainers) aDockerGPUSmokeJobIsSubmittedOnOneGPUWorker(ctx context.Context) error {
 	// Future option: omit --nodelist and discover the allocated worker after
 	// submission, letting Slurm avoid busy nodes before Docker log collection.
-	workers, err := s.pickWorkers(ctx, "GPU", 1)
-	if err != nil {
-		return framework.SkipIfInsufficientWorkers(s.runtime, err)
+	if err := s.selectJobWorkers(ctx, "GPU", 1); err != nil {
+		return err
 	}
-	s.workers = workers
-	s.connectionWorker = workers[0]
 
 	wrap := fmt.Sprintf("srun docker run --name e2e-docker-gpu-${SLURM_JOB_ID}-${SLURM_NODEID} --gpus=all -e NVIDIA_DRIVER_CAPABILITIES=utility %s nvidia-smi -L",
-		framework.ShellQuote(gpuSmokeDockerImage),
+		framework.ShellQuote(ubuntuDockerImage),
 	)
 	job, err := s.slurm.SubmitBatch(ctx, framework.SbatchOptions{
 		JobName:      "e2e-docker-gpu-smoke",
@@ -707,64 +835,6 @@ func dockerJailVisiblePath(value string) (string, error) {
 		return strings.TrimPrefix(cleaned, dockerHostJailRoot), nil
 	}
 	return cleaned, nil
-}
-
-func dockerCgroupParentBelongsToJob(value, jobID string) bool {
-	cleaned := path.Clean(strings.TrimSpace(value))
-	if cleaned == "." || !strings.HasPrefix(cleaned, "/") || strings.TrimSpace(jobID) == "" {
-		return false
-	}
-
-	components := strings.Split(strings.TrimPrefix(cleaned, "/"), "/")
-	if len(components) < 3 || components[len(components)-1] != "user" {
-		return false
-	}
-
-	stepIndex := len(components) - 2
-	jobIndex := stepIndex - 1
-	if !isDockerSlurmStepComponent(components[stepIndex]) {
-		return false
-	}
-	if components[jobIndex] == "job_"+jobID {
-		return true
-	}
-
-	// Slurm 26.05 uses an opaque SLUID instead of job_<id>. The caller binds the
-	// container to jobID through its name prefix, so validate the strict SLUID
-	// hierarchy here.
-	return jobIndex > 0 && components[jobIndex-1] == dockerSlurmStepdScope && isDockerSLUID(components[jobIndex])
-}
-
-func isDockerSLUID(value string) bool {
-	if len(value) != dockerSLUIDLength || value[0] != 's' {
-		return false
-	}
-	for _, character := range value[1:] {
-		if !strings.ContainsRune(dockerSLUIDBase32Alphabet, character) {
-			return false
-		}
-	}
-	return true
-}
-
-func isDockerSlurmStepComponent(value string) bool {
-	if hasDockerNumericSuffix(value, "step_") {
-		return true
-	}
-	return value == "step_batch" || value == "step_extern" || value == "step_interactive"
-}
-
-func hasDockerNumericSuffix(value, prefix string) bool {
-	suffix, ok := strings.CutPrefix(value, prefix)
-	if !ok || suffix == "" {
-		return false
-	}
-	for _, character := range suffix {
-		if character < '0' || character > '9' {
-			return false
-		}
-	}
-	return true
 }
 
 func pathIsUnder(value, root string) bool {

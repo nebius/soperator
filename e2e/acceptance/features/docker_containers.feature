@@ -1,12 +1,14 @@
 Feature: Docker containers
-  @soperator_version_>=5.0.0
+  # Sequential: Replaces and removes the same SSH identity as the worker SSH examples.
+  @soperator_version_>=5.0.0 @sequential
   Scenario: Docker containers can run over login SSH
     Given login Docker is enabled
     And a Docker SSH test user exists
     When the user runs Docker lifecycle commands over SSH on the login node
     Then Docker uses the login proxy, image storage, and the user's cgroup
 
-  @soperator_version_>=5.0.0
+  # Sequential: CPU and GPU examples replace and remove the same SSH identity.
+  @soperator_version_>=5.0.0 @sequential
   Scenario Outline: Docker containers can run over SSH on <worker_type> workers
     Given a Docker SSH test user exists
     When the user runs a Docker container over SSH on a <worker_type> worker node
@@ -34,10 +36,10 @@ Feature: Docker containers
 
   @soperator_version_>=5.0.0
   Scenario Outline: Docker container lifecycle on <worker_type> workers uses local storage and the Slurm job cgroup
-    Given a long-running Docker container job is submitted on two <worker_type> workers
+    Given a long-running Docker container job with several tasks per worker is launched directly from the login node on two <worker_type> workers
     When the Docker container job is running
     Then Docker image and runtime storage is populated on a worker
-    And a Docker container from the job uses the Slurm job cgroup
+    And every Docker container from the job uses the Slurm job cgroup
     And Docker containers from the job are running on selected workers
     When the Docker container job is cancelled
     And Docker containers from the job are stopped explicitly

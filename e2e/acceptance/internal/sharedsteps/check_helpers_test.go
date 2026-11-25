@@ -1,8 +1,10 @@
 package sharedsteps
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,6 +42,10 @@ func TestVersionAwareCheckOutputPaths(t *testing.T) {
 	assert.Equal(t,
 		"/opt/soperator-outputs/local/slurm_scripts/worker-0.gpu_health_check.epilog.out",
 		gpuHealthCheckOutputPath("5.0.0", "worker-0", "epilog"),
+	)
+	assert.Equal(t,
+		"/opt/soperator-outputs/local/slurm_scripts/worker-0.nvidia_libraries.hc_program.out",
+		checkLogPath("5.0.0", "worker-0", "nvidia_libraries", "hc_program"),
 	)
 }
 
@@ -207,4 +213,103 @@ func TestParseKubectlDebugPodName(t *testing.T) {
 	output := "Creating debugging pod node-debugger-worker-0-abcd with container debugger on node worker-0.\n"
 	assert.Equal(t, "node-debugger-worker-0-abcd", parseKubectlDebugPodName(output))
 	assert.Empty(t, parseKubectlDebugPodName("debug pod not found"))
+}
+
+func TestPeriodicHealthCheckWaitFollowsHealthCheckInterval(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		interval string
+		want     time.Duration
+		wantErr  string
+	}{
+		{name: "default interval", interval: "120 sec", want: 4 * time.Minute},
+		{name: "short interval floors at the minimum", interval: "10 sec", want: 2 * time.Minute},
+		{name: "at the limit", interval: "300 sec", want: 10 * time.Minute},
+		{name: "too long", interval: "301 sec", wantErr: "too long"},
+		{name: "disabled", interval: "0 sec", wantErr: "HealthCheckProgram is disabled"},
+		{name: "unexpected format", interval: "2 min", wantErr: "parse HealthCheckInterval"},
+		{name: "not a number", interval: "abc sec", wantErr: "parse HealthCheckInterval"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			timeout, err := periodicHealthCheckWait(map[string]string{"HealthCheckInterval": tt.interval})
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, timeout)
+		})
+	}
+}
+
+func TestPeriodicHealthCheckWaitRequiresHealthCheckInterval(t *testing.T) {
+	_, err := periodicHealthCheckWait(map[string]string{"SlurmdTimeout": "180 sec"})
+	require.ErrorContains(t, err, "HealthCheckInterval is missing")
+}
+
+func TestParseUnixSeconds(t *testing.T) {
+	parsed, err := parseUnixSeconds(" 1767225600\n")
+	require.NoError(t, err)
+	assert.Equal(t, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), parsed)
+
+	_, err = parseUnixSeconds("Thu Jan  1 00:00:00 UTC 2026")
+	require.Error(t, err)
+}
+
+func TestWaitForFinishedCheckLog(t *testing.T) {
+	read := func(outputs ...string) *periodicGPURuntime {
+		reads := 0
+		return &periodicGPURuntime{workers: map[string]framework.CommandScope{
+			"worker-0": framework.NewCommandScope(func(context.Context, string) (string, error) {
+				output := outputs[min(reads, len(outputs)-1)]
+				reads++
+				return output, nil
+			}),
+		}}
+	}
+	worker := framework.WorkerInfo{Name: "worker-0"}
+
+	log, err := waitForFinishedCheckLog(t.Context(), read("", "Loaded libcuda.so.1\n", "Loaded libcuda.so.1\nAll 14 NVIDIA libraries are loadable\n"), worker, "/log", nvidiaLibrariesLogFinishedPattern, time.Minute)
+	require.NoError(t, err)
+	assert.Contains(t, log, "All 14 NVIDIA libraries are loadable")
+
+	_, err = waitForFinishedCheckLog(t.Context(), read(""), worker, "/log", nvidiaLibrariesLogFinishedPattern, time.Minute)
+	require.ErrorContains(t, err, "/log on worker-0 stayed empty or missing")
+
+	_, err = waitForFinishedCheckLog(t.Context(), read("partial output"), worker, "/log", nvidiaLibrariesLogFinishedPattern, time.Minute)
+	require.ErrorContains(t, err, "has no finished run")
+	require.ErrorContains(t, err, "partial output")
+}
+
+func TestHealthCheckInterval(t *testing.T) {
+	interval, err := healthCheckInterval(map[string]string{"HealthCheckInterval": "120 sec"})
+	require.NoError(t, err)
+	assert.Equal(t, 2*time.Minute, interval)
+
+	_, err = healthCheckInterval(map[string]string{"HealthCheckInterval": "0 sec"})
+	require.ErrorContains(t, err, "HealthCheckProgram is disabled")
+	_, err = healthCheckInterval(map[string]string{})
+	require.ErrorContains(t, err, "HealthCheckInterval is missing")
+}
+
+func TestHealthCheckReportRawOutputFiles(t *testing.T) {
+	report := parsedPeriodicGPUReport(t, periodicGPUReportOptions{worker: "worker-0", runID: "run-0", status: "PASS", timestamp: periodicTestNotBefore})
+	files, err := healthCheckReportRawOutputFiles(report)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"nvidia_smi.run-0.out", "nvidia_smi_topo.run-0.out"}, files)
+
+	report.Tests[1].State.Stdout = "../etc/passwd"
+	_, err = healthCheckReportRawOutputFiles(report)
+	require.ErrorContains(t, err, "outside the output directory")
+
+	report.Tests = report.Tests[:1]
+	_, err = healthCheckReportRawOutputFiles(report)
+	require.ErrorContains(t, err, "references no raw command outputs")
+}
+
+func TestMissingFilesCommand(t *testing.T) {
+	assert.Equal(t,
+		`cd '/opt/out' && for f in 'a.out' 'b c.out'; do [ -f "$f" ] || printf '%s\n' "$f"; done`,
+		missingFilesCommand("/opt/out", []string{"a.out", "b c.out"}),
+	)
 }

@@ -38,21 +38,29 @@ func SharedFeatureSource() FeatureSource {
 func FeaturePaths() []string {
 	return []string{
 		"features/cluster_creation.feature",
+		// Right after cluster creation so the scenarios that follow also run on workers whose
+		// VMs were just stopped and started. That extra coverage is opportunistic: the scenario
+		// checks the restarted workers itself and no scenario may depend on this order.
+		"features/vm_stop_start.feature",
+		"features/stuck_job_recovery.feature",
 		"features/accounting.feature",
 		"features/slurm_config.feature",
 		"features/slurm_config_updates.feature",
 		"features/login_autoscaling.feature",
+		"features/login_user_isolation.feature",
+		"features/memory_isolation.feature",
 		"features/tailscale.feature",
 		"features/observability.feature",
 		"features/internal_ssh.feature",
-		"features/pam_slurm_adopt.feature",
 		"features/package_installation.feature",
 		"features/gpu_profiling.feature",
 		"features/nccl.feature",
 		"features/nccl_debug.feature",
 		"features/system_settings.feature",
+		"features/nvidia_libraries.feature",
 		"features/task_prolog_env.feature",
 		"features/soperator_utils.feature",
+		"features/filesystem_layout.feature",
 		"features/nodeset_ephemeral_mode_transition.feature",
 		"features/static_worker_power_down.feature",
 		"features/node_replacement.feature",
@@ -61,11 +69,13 @@ func FeaturePaths() []string {
 		"features/enroot_containers.feature",
 		"features/passive_checks.feature",
 		"features/job_tmpfs.feature",
+		"features/local_nvme.feature",
 		"features/active_checks.feature",
 		"features/system_checks.feature",
 		"features/topology.feature",
 		"features/topology_tree.feature",
 		"features/topology_block.feature",
 		"features/topology_legacy.feature",
+		"features/performance.feature",
 	}
 }

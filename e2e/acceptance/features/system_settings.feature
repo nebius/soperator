@@ -34,7 +34,8 @@ Feature: System settings
     Then both kernel-settings jobs succeed
     And both jobs expose the required kernel settings
 
-  @gpu @soperator_version_>=4.0.0
+  # For >=5.0.0, covered in nvidia_libraries.feature
+  @gpu @soperator_version_>=4.0.0,<5.0.0
   Scenario: GPU workers expose the required NVIDIA driver capabilities
     Given a healthy GPU worker is selected for system-settings checks
     Then its Slurm container exposes the required NVIDIA driver capabilities
@@ -70,12 +71,13 @@ Feature: System settings
     And it exposes the required kernel settings
 
   @soperator_version_>=5.0.0
-  Scenario: Regular-user worker SSH adopted into a job exposes the Slurm compute profile
+  Scenario: Regular-user worker SSH adopted into a job exposes the compute profile and the job's memory limit
     Given a healthy worker is selected for system-settings checks
-    And a regular user account is available on the worker
+    And a regular user for adopted SSH checks is available on the worker
     And PAM Slurm adopt requires a job for the regular user
-    When the regular user starts a job on the worker and collects direct and nested Bash resource limits over SSH
-    Then direct and nested adopted SSH resource limits match the regular-user Slurm compute profile
+    When the regular user starts a memory-limited job on the worker and collects direct and nested Bash resource limits over SSH
+    Then direct and nested worker SSH resource limits match the regular-user compute profile
+    And the adopted SSH session is confined by the job's memory limit
 
   @soperator_version_>=4.0.0
   Scenario: Regular-user login SSH sessions expose the default resource-limit profile and kernel settings
@@ -93,16 +95,10 @@ Feature: System settings
     And both interactive jobs' resource limits match the Slurm compute profile
     And both interactive jobs expose the required kernel settings
 
-  @gpu @soperator_version_>=4.0.0
-  Scenario: GPU jobs see non-placeholder NVIDIA driver libraries for the required capabilities
+  # For >=5.0.0, covered in nvidia_libraries.feature
+  @gpu @soperator_version_>=4.0.0,<5.0.0
+  Scenario: GPU jobs see non-placeholder NVIDIA driver libraries for the worker's configured capabilities
     Given a healthy GPU worker is selected for system-settings checks
-    When native and Enroot GPU jobs look up NVIDIA driver libraries for the required capabilities
+    When native and Enroot GPU jobs look up NVIDIA driver libraries for the worker's configured capabilities
     Then both NVIDIA library lookup jobs succeed
-    And both jobs find a non-placeholder NVIDIA driver library for every required capability
-
-  @gpu @soperator_version_>=5.0.0
-  Scenario: Docker GPU jobs see non-placeholder NVIDIA driver libraries for the required capabilities
-    Given a healthy Docker-enabled GPU worker is selected for system-settings checks
-    When a Docker GPU job looks up NVIDIA driver libraries for the required capabilities
-    Then the Docker NVIDIA library lookup job succeeds
-    And it finds a non-placeholder NVIDIA driver library for every required capability
+    And both jobs find a non-placeholder NVIDIA driver library for every configured capability
