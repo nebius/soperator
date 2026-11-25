@@ -44,6 +44,24 @@ func TestOverrideTestValuesNFS(t *testing.T) {
 	}
 }
 
+func TestOverrideTestValuesKeepsReleaseDefaultNFS(t *testing.T) {
+	// A recipe that takes the NFS version and registry from the Soperator release has neither
+	// attribute, and rejects them when set.
+	newSpec := func() map[string]interface{} {
+		return map[string]interface{}{
+			"size_gibibytes": 3720, "threads": 32, "disk_type": "NETWORK_SSD_IO_M3",
+			"node_group": map[string]interface{}{"resource": map[string]interface{}{"platform": "cpu-d3"}},
+		}
+	}
+	for _, unstable := range []bool{false, true} {
+		nfs := map[string]interface{}{"enabled": true, "spec": newSpec()}
+		result := overrideTestValues(map[string]interface{}{"nfs_in_k8s": nfs}, Config{
+			SoperatorVersion: "5.0.0", SoperatorUnstable: unstable, NFSVersion: "1.2.3",
+		})
+		assert.Equal(t, map[string]interface{}{"enabled": true, "spec": newSpec()}, result["nfs_in_k8s"])
+	}
+}
+
 func TestOverrideTestValuesWithoutNFS(t *testing.T) {
 	result := overrideTestValues(map[string]interface{}{}, Config{NFSVersion: "1.2.2"})
 	assert.NotContains(t, result, "nfs_in_k8s")
