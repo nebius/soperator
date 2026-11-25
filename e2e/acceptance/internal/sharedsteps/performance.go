@@ -23,6 +23,12 @@ const stressUserName = "stress"
 const stressReservationPrefix = "e2e-stress-"
 
 const (
+	stressBurstDebugLevel = "debug2"
+	// stressDefaultDebugLevel is the SlurmctldDebug value the operator renders.
+	stressDefaultDebugLevel = "debug"
+)
+
+const (
 	// stressDrainGrace is how long past the completion budget the queue may take to drain,
 	// so a slow load fails on the budget with its statistics instead of on the queue wait.
 	stressDrainGrace = 10 * time.Minute
@@ -104,6 +110,9 @@ type Performance struct {
 	probes       stressProbeSummary
 	scheduler    stressSchedulerSummary
 	budgets      []stressBudgetRow
+
+	// debugRaised is set while slurmctld logs at debug2 for the burst, so cleanup restores the level.
+	debugRaised bool
 }
 
 func NewPerformance(runtime framework.Runtime) *Performance {
@@ -119,6 +128,12 @@ func (s *Performance) RegisterSteps(sc *godog.ScenarioContext) {
 
 func (s *Performance) CleanupAndReset(ctx context.Context) {
 	s.stopMonitor()
+	if s.debugRaised {
+		s.cleanupPhase(ctx, "restore slurmctld log level", func(ctx context.Context) error {
+			_, err := s.runtime.Jail().RunWithDefaultRetry(ctx, "scontrol setdebug "+stressDefaultDebugLevel)
+			return err
+		})
+	}
 	if s.runName != "" {
 		s.saveSummary()
 		// Each phase has its own deadline: a queue that drains slowly must not starve the
@@ -297,6 +312,13 @@ func (s *Performance) submitBurst(ctx context.Context, jobs, maxCores, maxSleepS
 	if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, userOwnedDirCommand(stressUserName, s.workDir)); err != nil {
 		return fmt.Errorf("create stress work directory %s: %w", s.workDir, err)
 	}
+
+	// The debug2 level marks which periodic pass of the controller background thread runs in each stall.
+	if _, err := s.runtime.Jail().RunWithDefaultRetry(ctx, "scontrol setdebug "+stressBurstDebugLevel); err != nil {
+		return fmt.Errorf("raise slurmctld log level to %s: %w", stressBurstDebugLevel, err)
+	}
+	s.debugRaised = true
+	s.runtime.Logf("Performance: slurmctld logs at %s during the burst", stressBurstDebugLevel)
 
 	before, err := s.readSdiag(ctx, "sdiag-before.json")
 	if err != nil {
