@@ -37,7 +37,7 @@ tests:
     set:
       observability.enabled: true
       observability.opentelemetry.enabled: true
-      observability.opentelemetry.logs.values.jailLogs.enabled: true
+      observability.opentelemetry.jailLogs.enabled: true
     templates:
       - templates/opentelemetry-collector-jail-logs.yaml
     asserts:
@@ -47,7 +47,7 @@ tests:
     set:
       observability.enabled: true
       observability.opentelemetry.enabled: true
-      observability.opentelemetry.logs.values.jailLogs.enabled: false
+      observability.opentelemetry.jailLogs.enabled: false
     templates:
       - templates/opentelemetry-collector-jail-logs.yaml
     asserts:

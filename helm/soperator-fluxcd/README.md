@@ -31,6 +31,9 @@ Set `values` on the component to pass the child chart's native keys to `spec.val
 | `dcgm-exporter` | `observability.dcgmExporter` |
 | `soperator-notifier` | `notifier` |
 | `vm-stack` | `observability.vmStack` |
+| `opentelemetry-collector-logs` | `observability.opentelemetry.logs` |
+| `opentelemetry-collector-jail-logs` | `observability.opentelemetry.jailLogs` |
+| `opentelemetry-collector-events` | `observability.opentelemetry.events` |
 
 During migration, `customConfigmaps` and `soperator.monitoringDashboards` read `overrideValues` when `values` is absent or `null`.
 Move existing overrides to `values`. An explicit `values: {}` takes precedence over the legacy override.
@@ -119,7 +122,7 @@ Move `observability.vmStack.overrideValues` to `observability.vmStack.values`. U
 
 Helm replaces lists as a whole. When changing the kube-state-metrics scrape size, carry over both endpoints and their relabeling rules from this chart's defaults. Set the Grafana sidecar namespace lists and remote-write URLs explicitly when changing component namespaces or the VMSingle service name.
 
-VMStack defaults to the local VMSingle. The public endpoint flags configure OpenTelemetry and the shared token writer. Managed and Pro profiles must supply the complete `vmStack.values.vmagent.spec.remoteWrite` list, including the local URL if they use VMSingle. Set the public URL with the resolved region and project ID, the destination's relabel rules, and any write settings and labels in native vmagent values.
+VMStack defaults to the local VMSingle. The public endpoint flags configure the shared token writer. Managed and Pro profiles must supply the complete `vmStack.values.vmagent.spec.remoteWrite` list, including the local URL if they use VMSingle. Set the public URL with the resolved region and project ID, the destination's relabel rules, and any write settings and labels in native vmagent values.
 
 For Secret authentication, set `bearerTokenSecret` on the public destination. If the TSA token writer maintains that Secret, copy the default `vmStack.dependsOn` list and add the commented writer entry in `values.yaml`. For a host token file, set `volumes`, `volumeMounts`, and `extraArgs["remoteWrite.bearerTokenFile"]`. Keep each entry in that argument aligned with its destination and use empty entries for destinations that have their own authentication. This example keeps both a Secret-authenticated destination and local storage.
 
@@ -136,6 +139,33 @@ observability:
 ```
 
 A nonempty legacy `overrideValues` replaced the entire inline configuration. Migrating that map to `values` adds the chart defaults for omitted keys, including Grafana authentication and VMSingle storage. To retain the previous effective values for the whole stack, merge the legacy map over the current contents of the `victoria-metrics-operator` values ConfigMap and set `observability.vmStack.values: null`. Flux reads `terraform-victoria-metrics-operator` first, then `victoria-metrics-operator`. To source only the destination list from those ConfigMaps, set the inline `remoteWrite` field to `null`.
+
+### OpenTelemetry collector upgrades
+
+Each collector passes its own native OpenTelemetry chart values through `observability.opentelemetry.<component>.values`, where the component is `logs`, `jailLogs`, or `events`. All three target `observability.opentelemetry.namespace`. Move `logs.values.jailLogs.enabled` to `jailLogs.enabled` and configure any jail-logs HelmRelease settings such as `version`, `timeout`, and `postRenderers` under `jailLogs`.
+
+Move `events.overrideValues` to `events.values`. The legacy `logs.overrideValues` applied to both log releases. Carry over the values needed by each release into `logs.values` and `jailLogs.values`, and move jail logs resource settings from `logs.values.jailLogs.resources` to `jailLogs.values.resources`.
+
+Nonempty legacy overrides replaced the inline map, while Helm merges the new maps with collector defaults. To retain an existing effective map, put it in the collector's values ConfigMap and set its inline `values` to `null`. For each collector, Flux reads the `terraform-opentelemetry-collector-<suffix>` ConfigMap first, then `opentelemetry-collector-<suffix>`, then applies inline values. The suffix is `logs`, `jail-logs`, or `events`. Set any defaulted inline field supplied by a ConfigMap to `null`.
+
+All three collectors send to VictoriaLogs by default. To keep sending to Nebius Cloud Logging, Managed and Pro profiles must add the public exporter under `values.config.exporters.otlp` with its regional endpoint, resolved `headers.iam-container`, any additional headers, authentication, and queue settings. Include `otlp` in the relevant `config.service.pipelines` exporter list. Enable `bearertokenauth` in both `config.extensions` and `config.service.extensions`, and use `extraVolumes` and `extraVolumeMounts` to mount the Secret or hostPath containing the file named by the authenticator. Add the commented dependency on the TSA token writer when it supplies that Secret.
+
+Move shared `batch`, `publicBatch`, and `sendingQueue` settings into each exporter's `sending_queue`. Keep the public `batch.max_size` at or below 1000 records and `queue_size` at or above `batch.min_size`. Copy cluster-specific labels into the transform statements and any environment variables they reference. Set `GOMAXPROCS` in `extraEnvs` when changing collector CPU sizing, and use the native `useGOMEMLIMIT` and `podMonitor` keys for the former Go memory limit and scrape settings.
+
+To replace `enableFileStorage: false`, remove the `file_storage` extension and its references from `config.service.extensions`, exporter queues, and file receivers that use it. Remove the matching volume, mounts, and initialization container from their lists. To disable node logs, remove `filelog/nodelogs` from the logs receiver map and pipeline along with the node logs mount, volume, and supplemental groups. Configure jail logs polling and file retention under `config.receivers.filelog` and `config.receivers.filelog/health_checker`.
+
+Jail logs waits for the namespaces and VictoriaLogs HelmReleases by default. When this umbrella chart installs NodeSets, add the commented `<fullname>-nodesets` entry to `jailLogs.dependsOn`. For separately supplied NodeSets, add their HelmRelease name and namespace if Flux manages them, or keep the default list if the NodeSet resources are applied directly. Set the reference from the external HelmRelease's `metadata.name` and `metadata.namespace`. Each override replaces the entire dependency list, so include the baseline dependencies in that list.
+
+```yaml
+observability:
+  opentelemetry:
+    jailLogs:
+      dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-logs'
+        - name: worker-nodesets
+          namespace: flux-system
+```
 
 ## HelmRelease dependencies
 

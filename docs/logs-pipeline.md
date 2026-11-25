@@ -36,38 +36,21 @@ The Soperator logs pipeline collects, stores, and provides search capabilities f
 
 ## Cloud Delivery
 
-Logs are delivered to both local VictoriaLogs and Nebius Cloud Logging (when `publicEndpointEnabled: true`), providing immediate local access and long-term cloud storage.
+The three collectors send to local VictoriaLogs on port 9428 by default. Each collector can also send to Nebius Cloud Logging over OTLP/gRPC with bearer token authentication. Specify the regional endpoint and the resolved project ID in the collector's exporter settings.
 
-- Local: VictoriaLogs at port 9428 for direct API queries
-- Cloud: Nebius Cloud Logging via OTLP/gRPC with bearer token authentication
-
-The public logging endpoint defaults to `dns:///write.logging.eu-north1.nebius.cloud.:443` by design.
-`observability.region` does not change the log write region. Set
-`observability.opentelemetry.publicEndpoint` only when an explicit endpoint override is needed.
-
-By default, the o11y TSA token writer fetches the write token from IMDS and
-maintains it in a Kubernetes Secret. The OpenTelemetry log collectors mount that
-Secret and use it through the `bearertokenauth` extension. This avoids requiring
-a pre-existing `/mnt/cloud-metadata` token directory on every collector host.
-`observability.publicEndpointTokenKind: hostPath` remains available for
-installations that intentionally provide the token file from the host.
+With `observability.publicEndpointEnabled: true` and `observability.publicEndpointTokenKind: secret`, the TSA token writer fetches the token from IMDS by default and stores it in a Kubernetes Secret. Each cloud-enabled collector specifies its own token volume, mount, and `bearertokenauth` extension. Configure a Secret volume for the writer-managed token or a hostPath volume when the token is supplied on the node.
 
 ## Components
 
 ### Log Collection
 
 #### 1. OpenTelemetry Collector - Jail Logs
-- Purpose: Collects Slurm workload outputs written to each worker's boot disk
-- Deployment: DaemonSet on worker nodes; each instance reads (and deletes) only the files written on its own node
-- Log Sources: See Centralized Logging Scheme below
-- Poll Interval: 30s (configurable)
-- Retention: files are deleted after collection once unmodified for `deleteAfterRead.minAge` (default 4h), which is also the on-node debugging window
+
+A DaemonSet collects Slurm workload outputs from each worker's boot disk. The two jail log receivers each set `poll_interval` to `30s` by default and use their own `delete_after_read` and `delete_after_read_min_age`. [Centralized Logging Scheme](#centralized-logging-scheme)
 
 #### 2. OpenTelemetry Collector - System Logs
-- Purpose: Collects system logs from nodes
-- Deployment: DaemonSet; host log collection is controlled by `observability.opentelemetry.logs.values.nodeLogs.enabled`
-- Log Sources: Node system logs
-- When to Enable: For debugging node-level issues
+
+A DaemonSet collects Kubernetes pod logs and node system logs through the `filelog/pods` and `filelog/nodelogs` receivers in the `logs` pipeline.
 
 #### 3. OpenTelemetry Collector - Events
 - Purpose: Collects Kubernetes events
@@ -75,15 +58,9 @@ installations that intentionally provide the token file from the host.
 
 ### Collector Runtime Limits
 
-The log collectors set Go runtime limits from their configured pod resources:
+The three log collectors set `GOMAXPROCS` to `"1"` in their default `extraEnvs`. When overriding it for different resources, use the CPU limit or the CPU request when there is no limit, rounded up to at least one process. For example, use `"1"` for `500m` and `"2"` for `2` cores. Carry over the other environment entries when replacing `extraEnvs`.
 
-- `GOMAXPROCS` is derived from CPU limits when present, otherwise CPU requests.
-- CPU quantities are rounded up to a positive whole number: `500m` becomes `1`, `2` stays `2`.
-- When `useGoMemLimit` is enabled, the upstream OpenTelemetry collector chart derives `GOMEMLIMIT` from `resources.limits.memory`.
-- Upstream `GOMEMLIMIT` targets about 80% of the memory limit and does not fall back to memory requests.
-- When `spec.values.useGOMEMLIMIT` is false, the upstream chart does not inject a `GOMEMLIMIT` environment variable.
-
-This applies to the system logs, jail logs, and events collectors. Override values that replace the collector chart values are responsible for setting their own runtime environment.
+With the native `useGOMEMLIMIT` flag enabled, the upstream chart derives `GOMEMLIMIT` from `resources.limits.memory` and targets about 80% of the limit. Both the flag and a memory limit are required for automatic injection.
 
 ### Log Storage
 
@@ -178,42 +155,82 @@ The logging system automatically extracts metadata from filenames and creates th
 
 ## Configuration
 
+Configure the collectors independently under `observability.opentelemetry.logs.values`, `observability.opentelemetry.jailLogs.values`, and `observability.opentelemetry.events.values`. To omit node logs, set `logs.values.config.receivers.filelog/nodelogs` to `null` and remove that receiver from `config.service.pipelines.logs.receivers`. Remove the `node-logs` volume and mount and any supplemental groups used to read those logs.
+
+Each exporter has its own `sending_queue`. By default the VictoriaLogs queues hold 30,000 records, run 10 consumers, and batch 2,000 to 5,000 records. Queue files live under `/var/lib/otelcol`, `/var/lib/otelcol-jail`, and `/var/lib/otelcol-events` for the three collectors, respectively. To disable file storage, set the extension and its receiver and queue `storage` references to `null`. Remove it from `config.service.extensions` and remove its volume, mounts, and initialization container in the same change.
+
+This example adds Cloud Logging to the events collector with the shared Secret. Include the public exporter in the corresponding pipeline for each additional collector. Helm replaces whole lists, so copy the entries for the local pipeline and storage into any overridden lists.
+
 ```yaml
 observability:
-  # Cloud delivery
-  publicEndpointEnabled: true  # Enable/disable cloud export
+  publicEndpointEnabled: true
   publicEndpointTokenKind: secret
-  logsProjectId: "your-nebius-project-id"
-  region: "eu-north1"
-  tsaToken:
-    secretName: o11y-writer-sa-token
-    secretKey: accessToken
-    writer:
-      source: imds
-      namespaces: []  # Defaults to enabled metrics/log collector namespaces
   opentelemetry:
-    # Optional. Defaults to dns:///write.logging.eu-north1.nebius.cloud.:443
-    publicEndpoint: "dns:///write.logging.eu-north1.nebius.cloud.:443"
-    # Exporter batching for the in-cluster (VictoriaLogs) exporters
-    batch:
-      timeout: 1s
-      sendBatchSize: 2000
-      sendBatchMaxSize: 5000
-    # Exporter batching for the public Cloud Logging exporter;
-    # Cloud Logging rejects requests with more than 1000 log records and the collector drops rejected batches,
-    # so keep sendBatchMaxSize <= 1000
-    publicBatch:
-      timeout: 1s
-      sendBatchSize: 500
-      sendBatchMaxSize: 1000
-  
+    events:
+      dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-logs'
+        - name: '{{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}'
+      values:
+        extraVolumes:
+          - name: varlibotelcol
+            hostPath:
+              path: /var/lib/otelcol-events
+              type: DirectoryOrCreate
+          - name: o11ytoken
+            secret:
+              secretName: o11y-writer-sa-token
+        extraVolumeMounts:
+          - name: varlibotelcol
+            mountPath: /var/lib/otelcol-events
+          - name: o11ytoken
+            mountPath: /o11ytoken
+            readOnly: true
+        config:
+          exporters:
+            otlp:
+              endpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
+              balancer_name: round_robin
+              compression: snappy
+              retry_on_failure:
+                enabled: true
+                initial_interval: 200ms
+                max_elapsed_time: 0
+              timeout: 5s
+              headers:
+                iam-container: your-nebius-project-id
+              auth:
+                authenticator: bearertokenauth
+              sending_queue:
+                enabled: true
+                sizer: items
+                queue_size: 30000
+                num_consumers: 10
+                storage: file_storage
+                batch:
+                  sizer: items
+                  flush_timeout: 1s
+                  min_size: 500
+                  max_size: 1000
+          extensions:
+            bearertokenauth:
+              filename: /o11ytoken/accessToken
+          service:
+            extensions: [health_check, file_storage, bearertokenauth]
+            pipelines:
+              logs/events:
+                exporters: [otlp_http/victoriametrics, otlp]
+
   # Storage
   vmLogs:
     values:
-      persistentVolume:
-        enabled: true
-        size: 30Gi  # Adjust based on log volume
+      server:
+        persistentVolume:
+          enabled: true
+          size: 30Gi
 ```
+
+Keep the Cloud Logging batch at or below 1,000 records. For jail-logs dependencies and migration from shared collector settings, see the chart guide. [OpenTelemetry collector upgrades](../helm/soperator-fluxcd/README.md#opentelemetry-collector-upgrades)
 
 ## Log Retention
 
@@ -224,4 +241,4 @@ Check storage usage:
 kubectl exec -n logs-system statefulset/vm-logs-victoria-logs-single-server -- df -h /storage
 ```
 
-On worker boot disks, collected files under `/var/log/soperator-outputs` are deleted by the jail-logs collector after they have been unmodified for `deleteAfterRead.minAge` (default 4h). Replacing a worker node discards any files not yet collected from it.
+On worker boot disks, the jail-logs collector deletes collected files under `/var/log/soperator-outputs` after they have been unmodified for four hours. The minimum age is set by `delete_after_read_min_age` in `jailLogs.values.config.receivers.filelog` and `jailLogs.values.config.receivers.filelog/health_checker`. Keep automatic deletion confined to the worker-local log paths. Set `delete_after_read: false` on both receivers to keep collected files on disk. Replacing a worker node discards any files still on its boot disk.

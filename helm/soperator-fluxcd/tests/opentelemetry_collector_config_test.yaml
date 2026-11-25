@@ -2,29 +2,28 @@ suite: test opentelemetry collector logs config
 templates:
   - templates/opentelemetry-collector-logs.yaml
 tests:
-  - it: should use eu-north public endpoint and cap public exporter batches while keeping large internal batches
-    set:
-      observability.region: eu-west1
+  - it: should collect pod and node logs with local exporter batching and persistent checkpoints
     asserts:
-      - hasDocuments:
-          count: 1
       - equal:
-          path: spec.values.config.exporters.otlp.endpoint
-          value: dns:///write.logging.eu-north1.nebius.cloud.:443
+          path: spec.values.config.service.pipelines.logs
+          value:
+            receivers: [filelog/pods, filelog/nodelogs]
+            processors: [k8s_attributes, transform, memory_limiter]
+            exporters: [otlp_http/victoriametrics]
       - notExists:
-          path: spec.values.config.processors.batch
+          path: spec.values.config.exporters.otlp
       - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.sizer
-          value: items
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].logs_endpoint
+          value: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
       - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.queue_size
-          value: 30000
-      - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.num_consumers
-          value: 10
-      - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.storage
-          value: file_storage
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue
+          value:
+            enabled: true
+            sizer: items
+            queue_size: 30000
+            num_consumers: 10
+            storage: file_storage
+            batch: {sizer: items, flush_timeout: 1s, min_size: 2000, max_size: 5000}
       - equal:
           path: spec.values.config.receivers["filelog/pods"].storage
           value: file_storage
@@ -32,329 +31,360 @@ tests:
           path: spec.values.config.receivers["filelog/nodelogs"].storage
           value: file_storage
       - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.batch.flush_timeout
-          value: 1s
-      - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.batch.min_size
-          value: 500
-      - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.batch.max_size
-          value: 1000
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.batch.flush_timeout
-          value: 1s
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.batch.min_size
-          value: 2000
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.batch.max_size
-          value: 5000
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.queue_size
-          value: 30000
+          path: spec.values.config.extensions.file_storage.directory
+          value: /var/lib/otelcol
+      - contains:
+          path: spec.values.extraVolumes
+          content:
+            name: varlibotelcol
+            hostPath: {path: /var/lib/otelcol, type: DirectoryOrCreate}
 
-  - it: should prefer explicit public endpoint override
-    set:
-      observability.region: eu-west1
-      observability.opentelemetry.publicEndpoint: dns:///write.logging.custom.nebius.cloud.:443
-    asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.values.config.exporters.otlp.endpoint
-          value: dns:///write.logging.custom.nebius.cloud.:443
-
-  - it: should mount the shared token secret with custom name key and namespace
+  - it: should pass an explicit Secret-backed public exporter and its capped queue
     set:
       observability.opentelemetry.namespace: custom-logs
-      observability.tsaToken.secretName: custom-o11y-token
-      observability.tsaToken.secretKey: token
-      observability.tsaToken.mountPath: /var/run/o11y-token
+      observability.opentelemetry.logs.values.config:
+        exporters:
+          otlp:
+            endpoint: dns:///logs.example.test:443
+            auth:
+              authenticator: bearertokenauth
+            headers:
+              iam-container: example-project
+            sending_queue:
+              enabled: true
+              sizer: items
+              queue_size: 30000
+              num_consumers: 10
+              storage: file_storage
+              batch: {sizer: items, flush_timeout: 1s, min_size: 500, max_size: 1000}
+        extensions:
+          bearertokenauth:
+            filename: /var/run/o11y-token/token
+        service:
+          extensions: [health_check, file_storage, bearertokenauth]
+          pipelines:
+            logs:
+              exporters: [otlp_http/victoriametrics, otlp]
+      observability.opentelemetry.logs.values.extraVolumes:
+        - name: varlogpods
+          hostPath: {path: /var/log/pods}
+        - name: varlibdockercontainers
+          hostPath: {path: /var/lib/docker/containers}
+        - name: node-logs
+          hostPath: {path: /var/log, type: Directory}
+        - name: varlibotelcol
+          hostPath: {path: /var/lib/otelcol, type: DirectoryOrCreate}
+        - name: o11ytoken
+          secret: {secretName: custom-o11y-token}
+      observability.opentelemetry.logs.values.extraVolumeMounts:
+        - {name: varlogpods, mountPath: /var/log/pods, readOnly: true}
+        - {name: varlibdockercontainers, mountPath: /var/lib/docker/containers, readOnly: true}
+        - {name: node-logs, mountPath: /var/nodelogs, readOnly: true}
+        - {name: varlibotelcol, mountPath: /var/lib/otelcol}
+        - {name: o11ytoken, mountPath: /var/run/o11y-token, readOnly: true}
     asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.dependsOn[1].name
-          value: RELEASE-NAME-tsa-token-writer
       - equal:
           path: spec.targetNamespace
           value: custom-logs
       - equal:
-          path: spec.values.extraVolumes[4].secret.secretName
-          value: custom-o11y-token
+          path: spec.values.config.exporters.otlp.endpoint
+          value: dns:///logs.example.test:443
       - equal:
-          path: spec.values.extraVolumeMounts[4].mountPath
-          value: /var/run/o11y-token
-      - equal:
-          path: spec.values.config.extensions.bearertokenauth.filename
-          value: /var/run/o11y-token/token
-
-  - it: should fall back to default internal batch settings and keep the public cap when batch config is empty
-    set:
-      observability.opentelemetry.batch: null
-    asserts:
-      - hasDocuments:
-          count: 1
-      - notExists:
-          path: spec.values.config.processors.batch
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.batch.flush_timeout
-          value: 1s
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.batch.min_size
-          value: 2000
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.batch.max_size
-          value: 5000
-      - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.batch.min_size
-          value: 500
+          path: spec.values.config.exporters.otlp.headers.iam-container
+          value: example-project
       - equal:
           path: spec.values.config.exporters.otlp.sending_queue.batch.max_size
           value: 1000
+      - equal:
+          path: spec.values.config.service.pipelines.logs.exporters
+          value: [otlp_http/victoriametrics, otlp]
+      - equal:
+          path: spec.values.config.extensions.bearertokenauth.filename
+          value: /var/run/o11y-token/token
+      - contains:
+          path: spec.values.extraVolumes
+          content:
+            name: o11ytoken
+            secret: {secretName: custom-o11y-token}
+      - contains:
+          path: spec.values.extraVolumeMounts
+          content: {name: o11ytoken, mountPath: /var/run/o11y-token, readOnly: true}
 
-  - it: should omit file storage when log file storage is disabled
+  - it: should remove checkpoints and queue storage when supplied with memory-only settings
     set:
-      observability.opentelemetry.logs.values.enableFileStorage: false
+      observability.opentelemetry.logs.values.config:
+        exporters:
+          otlp_http/victoriametrics:
+            sending_queue:
+              storage: null
+        extensions:
+          file_storage: null
+        receivers:
+          filelog/pods:
+            storage: null
+          filelog/nodelogs:
+            storage: null
+        service:
+          extensions: [health_check]
+      observability.opentelemetry.logs.values.extraVolumes:
+        - name: varlogpods
+          hostPath: {path: /var/log/pods}
+        - name: varlibdockercontainers
+          hostPath: {path: /var/lib/docker/containers}
+        - name: node-logs
+          hostPath: {path: /var/log, type: Directory}
+      observability.opentelemetry.logs.values.extraVolumeMounts:
+        - {name: varlogpods, mountPath: /var/log/pods, readOnly: true}
+        - {name: varlibdockercontainers, mountPath: /var/lib/docker/containers, readOnly: true}
+        - {name: node-logs, mountPath: /var/nodelogs, readOnly: true}
+      observability.opentelemetry.logs.values.initContainers: []
     asserts:
-      - hasDocuments:
-          count: 1
       - notExists:
           path: spec.values.config.extensions.file_storage
-      - notContains:
+      - equal:
           path: spec.values.config.service.extensions
-          content: file_storage
+          value: [health_check]
       - notExists:
           path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.storage
-      - notExists:
-          path: spec.values.config.exporters.otlp.sending_queue.storage
       - notExists:
           path: spec.values.config.receivers["filelog/pods"].storage
       - notExists:
           path: spec.values.config.receivers["filelog/nodelogs"].storage
-      - notContains:
+      - lengthEqual:
           path: spec.values.extraVolumeMounts
-          content:
-            mountPath: /var/lib/otelcol
-            name: varlibotelcol
-      - notContains:
+          count: 3
+      - lengthEqual:
           path: spec.values.extraVolumes
-          content:
-            hostPath:
-              path: /var/lib/otelcol
-              type: DirectoryOrCreate
-            name: varlibotelcol
-      - notExists:
+          count: 3
+      - equal:
           path: spec.values.initContainers
+          value: []
 
 ---
 suite: test opentelemetry collector events config
 templates:
   - templates/opentelemetry-collector-events.yaml
 tests:
-  - it: should render configured queue batch settings
-    set:
-      observability.opentelemetry.batch.timeout: 2s
-      observability.opentelemetry.batch.sendBatchSize: 3000
-      observability.opentelemetry.batch.sendBatchMaxSize: 7000
-      observability.opentelemetry.publicBatch.timeout: 3s
-      observability.opentelemetry.publicBatch.sendBatchSize: 400
-      observability.opentelemetry.publicBatch.sendBatchMaxSize: 800
-      observability.opentelemetry.sendingQueue.queueSize: 9000
-      observability.opentelemetry.sendingQueue.numConsumers: 3
+  - it: should collect Kubernetes events using the local exporter and its own storage directory
     asserts:
-      - hasDocuments:
-          count: 1
+      - equal:
+          path: spec.values.mode
+          value: deployment
+      - equal:
+          path: spec.values.config.service.pipelines["logs/events"]
+          value:
+            receivers: [k8sobjects]
+            processors: [k8s_attributes, transform, memory_limiter]
+            exporters: [otlp_http/victoriametrics]
       - notExists:
-          path: spec.values.config.processors.batch
+          path: spec.values.config.exporters.otlp
       - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.queue_size
-          value: 9000
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue
+          value:
+            enabled: true
+            sizer: items
+            queue_size: 30000
+            num_consumers: 10
+            storage: file_storage
+            batch: {sizer: items, flush_timeout: 1s, min_size: 2000, max_size: 5000}
       - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.num_consumers
-          value: 3
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.storage
-          value: file_storage
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.batch.flush_timeout
-          value: 2s
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.batch.min_size
-          value: 3000
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.batch.max_size
-          value: 7000
-      - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.batch.flush_timeout
-          value: 3s
-      - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.batch.min_size
-          value: 400
-      - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.batch.max_size
-          value: 800
-
-  - it: should mount the shared token secret with custom name key and namespace
-    set:
-      observability.opentelemetry.namespace: custom-logs
-      observability.tsaToken.secretName: custom-o11y-token
-      observability.tsaToken.secretKey: token
-      observability.tsaToken.mountPath: /var/run/o11y-token
-    asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.dependsOn[1].name
-          value: RELEASE-NAME-tsa-token-writer
-      - equal:
-          path: spec.targetNamespace
-          value: custom-logs
-      - equal:
-          path: spec.values.extraVolumes[1].secret.secretName
-          value: custom-o11y-token
-      - equal:
-          path: spec.values.extraVolumeMounts[1].mountPath
-          value: /var/run/o11y-token
-      - equal:
-          path: spec.values.config.extensions.bearertokenauth.filename
-          value: /var/run/o11y-token/token
-
-  - it: should omit file storage when events file storage is disabled
-    set:
-      observability.opentelemetry.events.values.enableFileStorage: false
-    asserts:
-      - hasDocuments:
-          count: 1
-      - notExists:
-          path: spec.values.config.extensions.file_storage
-      - notContains:
-          path: spec.values.config.service.extensions
-          content: file_storage
-      - notExists:
-          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.storage
-      - notExists:
-          path: spec.values.config.exporters.otlp.sending_queue.storage
-      - notExists:
-          path: spec.values.initContainers
-      - notContains:
-          path: spec.values.extraVolumeMounts
-          content:
-            mountPath: /var/lib/otelcol-events
-            name: varlibotelcol
-      - notContains:
+          path: spec.values.config.extensions.file_storage.directory
+          value: /var/lib/otelcol-events
+      - contains:
           path: spec.values.extraVolumes
           content:
-            hostPath:
-              path: /var/lib/otelcol-events
-              type: DirectoryOrCreate
             name: varlibotelcol
+            hostPath: {path: /var/lib/otelcol-events, type: DirectoryOrCreate}
+
+  - it: should render native events queue and batch overrides
+    set:
+      observability.opentelemetry.events.values.config.exporters:
+        otlp_http/victoriametrics:
+          sending_queue:
+            queue_size: 9000
+            num_consumers: 3
+            batch: {flush_timeout: 2s, min_size: 3000, max_size: 7000}
+    asserts:
+      - equal:
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue
+          value:
+            enabled: true
+            sizer: items
+            queue_size: 9000
+            num_consumers: 3
+            storage: file_storage
+            batch: {sizer: items, flush_timeout: 2s, min_size: 3000, max_size: 7000}
+
+  - it: should accept an explicit events configuration without file storage
+    set:
+      observability.opentelemetry.events.values.config:
+        exporters:
+          otlp_http/victoriametrics:
+            sending_queue:
+              storage: null
+        extensions:
+          file_storage: null
+        service:
+          extensions: [health_check]
+      observability.opentelemetry.events.values.extraVolumes: []
+      observability.opentelemetry.events.values.extraVolumeMounts: []
+      observability.opentelemetry.events.values.initContainers: []
+    asserts:
+      - notExists:
+          path: spec.values.config.extensions.file_storage
+      - equal:
+          path: spec.values.config.service.extensions
+          value: [health_check]
+      - notExists:
+          path: spec.values.config.exporters["otlp_http/victoriametrics"].sending_queue.storage
+      - equal:
+          path: spec.values.extraVolumes
+          value: []
+      - equal:
+          path: spec.values.extraVolumeMounts
+          value: []
+      - equal:
+          path: spec.values.initContainers
+          value: []
+
 ---
 suite: test opentelemetry collector jail logs config
 templates:
   - templates/opentelemetry-collector-jail-logs.yaml
 tests:
-  - it: should use eu-north public endpoint regardless of observability region and render default queue batch settings
-    set:
-      observability.region: me-west1
+  - it: should collect jail logs and health checker output with a distinct checkpoint directory
     asserts:
-      - hasDocuments:
-          count: 1
       - equal:
-          path: spec.values.config.exporters.otlp.endpoint
-          value: dns:///write.logging.eu-north1.nebius.cloud.:443
+          path: spec.values.config.service.pipelines.logs
+          value:
+            receivers: [filelog, filelog/health_checker]
+            processors: [k8s_attributes, transform, memory_limiter]
+            exporters: [otlp_http/victorialogs]
       - notExists:
-          path: spec.values.config.processors.batch
+          path: spec.values.config.exporters.otlp
       - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.sizer
-          value: items
+          path: spec.values.config.exporters["otlp_http/victorialogs"].sending_queue
+          value:
+            enabled: true
+            sizer: items
+            queue_size: 30000
+            num_consumers: 10
+            storage: file_storage
+            batch: {sizer: items, flush_timeout: 1s, min_size: 2000, max_size: 5000}
       - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.queue_size
-          value: 30000
-      - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.storage
+          path: spec.values.config.receivers.filelog.storage
           value: file_storage
       - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.batch.flush_timeout
-          value: 1s
+          path: spec.values.config.receivers["filelog/health_checker"].storage
+          value: file_storage
       - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.batch.min_size
-          value: 500
-      - equal:
-          path: spec.values.config.exporters.otlp.sending_queue.batch.max_size
-          value: 1000
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victorialogs"].sending_queue.batch.min_size
-          value: 2000
-      - equal:
-          path: spec.values.config.exporters["otlp_http/victorialogs"].sending_queue.batch.max_size
-          value: 5000
-      - equal:
-          path: spec.values.extraVolumeMounts[0].readOnly
-          value: false
+          path: spec.values.config.extensions.file_storage.directory
+          value: /var/lib/otelcol-jail
+      - contains:
+          path: spec.values.extraVolumes
+          content:
+            name: varlibotelcol
+            hostPath: {path: /var/lib/otelcol-jail, type: DirectoryOrCreate}
 
-  - it: should mount the shared token secret with custom name key and namespace
+  - it: should pass an explicit host-mounted token and public exporter
     set:
-      observability.opentelemetry.namespace: custom-logs
-      observability.tsaToken.secretName: custom-o11y-token
-      observability.tsaToken.secretKey: token
-      observability.tsaToken.mountPath: /var/run/o11y-token
+      observability.publicEndpointTokenKind: hostPath
+      observability.opentelemetry.jailLogs.values.config:
+        exporters:
+          otlp:
+            endpoint: dns:///logs.example.test:443
+            auth:
+              authenticator: bearertokenauth
+        extensions:
+          bearertokenauth:
+            filename: /var/run/o11y-token/agent-token
+        service:
+          extensions: [health_check, file_storage, bearertokenauth]
+          pipelines:
+            logs:
+              exporters: [otlp_http/victorialogs, otlp]
+      observability.opentelemetry.jailLogs.values.extraVolumes:
+        - name: soperator-outputs
+          hostPath: {path: /var/log/soperator-outputs, type: DirectoryOrCreate}
+        - name: varlibotelcol
+          hostPath: {path: /var/lib/otelcol-jail, type: DirectoryOrCreate}
+        - name: o11ytoken
+          hostPath: {path: /var/lib/o11y/token, type: Directory}
+      observability.opentelemetry.jailLogs.values.extraVolumeMounts:
+        - {name: soperator-outputs, mountPath: /var/log/soperator-outputs, readOnly: false}
+        - {name: varlibotelcol, mountPath: /var/lib/otelcol-jail}
+        - {name: o11ytoken, mountPath: /var/run/o11y-token, readOnly: true}
     asserts:
-      - hasDocuments:
-          count: 1
       - equal:
-          path: spec.dependsOn[1].name
-          value: RELEASE-NAME-tsa-token-writer
-      - equal:
-          path: spec.targetNamespace
-          value: custom-logs
-      - equal:
-          path: spec.values.extraVolumes[2].secret.secretName
-          value: custom-o11y-token
-      - equal:
-          path: spec.values.extraVolumeMounts[2].mountPath
-          value: /var/run/o11y-token
+          path: spec.values.config.exporters.otlp.auth.authenticator
+          value: bearertokenauth
       - equal:
           path: spec.values.config.extensions.bearertokenauth.filename
-          value: /var/run/o11y-token/token
+          value: /var/run/o11y-token/agent-token
+      - equal:
+          path: spec.values.config.service.pipelines.logs.exporters
+          value: [otlp_http/victorialogs, otlp]
+      - contains:
+          path: spec.values.extraVolumes
+          content:
+            name: o11ytoken
+            hostPath: {path: /var/lib/o11y/token, type: Directory}
+      - contains:
+          path: spec.values.extraVolumeMounts
+          content: {name: o11ytoken, mountPath: /var/run/o11y-token, readOnly: true}
 
-  - it: should omit file storage when jail log file storage is disabled
+  - it: should omit jail log storage when checkpoints and queue persistence are removed explicitly
     set:
-      observability.opentelemetry.logs.values.jailLogs.enableFileStorage: false
+      observability.opentelemetry.jailLogs.values.config:
+        exporters:
+          otlp_http/victorialogs:
+            sending_queue:
+              storage: null
+        extensions:
+          file_storage: null
+        receivers:
+          filelog:
+            storage: null
+          filelog/health_checker:
+            storage: null
+        service:
+          extensions: [health_check]
+      observability.opentelemetry.jailLogs.values.extraVolumes:
+        - name: soperator-outputs
+          hostPath: {path: /var/log/soperator-outputs, type: DirectoryOrCreate}
+      observability.opentelemetry.jailLogs.values.extraVolumeMounts:
+        - {name: soperator-outputs, mountPath: /var/log/soperator-outputs, readOnly: false}
+      observability.opentelemetry.jailLogs.values.initContainers: []
     asserts:
-      - hasDocuments:
-          count: 1
       - notExists:
           path: spec.values.config.extensions.file_storage
-      - notContains:
+      - equal:
           path: spec.values.config.service.extensions
-          content: file_storage
+          value: [health_check]
       - notExists:
-          path: spec.values.config.exporters.otlp.sending_queue.storage
+          path: spec.values.config.exporters["otlp_http/victorialogs"].sending_queue.storage
       - notExists:
           path: spec.values.config.receivers.filelog.storage
       - notExists:
           path: spec.values.config.receivers["filelog/health_checker"].storage
-      - notContains:
+      - lengthEqual:
           path: spec.values.extraVolumeMounts
-          content:
-            mountPath: /var/lib/otelcol-jail
-            name: varlibotelcol
-      - notContains:
-          path: spec.values.extraVolumes
-          content:
-            hostPath:
-              path: /var/lib/otelcol-jail
-              type: DirectoryOrCreate
-            name: varlibotelcol
-
-  - it: should render delete_after_read when jail log deletion is enabled
-    set:
-      observability.opentelemetry.logs.values.jailLogs.deleteAfterRead.enabled: true
-      observability.opentelemetry.logs.values.jailLogs.deleteAfterRead.minAge: 30m
-    asserts:
-      - hasDocuments:
           count: 1
+      - lengthEqual:
+          path: spec.values.extraVolumes
+          count: 1
+      - equal:
+          path: spec.values.initContainers
+          value: []
+
+  - it: should use native filelog receiver settings for file deletion
+    set:
+      observability.opentelemetry.jailLogs.values.config.receivers:
+        filelog:
+          delete_after_read_min_age: 30m
+        filelog/health_checker:
+          delete_after_read_min_age: 1h
+    asserts:
       - equal:
           path: spec.values.config.receivers.filelog.start_at
           value: beginning
@@ -365,14 +395,8 @@ tests:
           path: spec.values.config.receivers.filelog.delete_after_read_min_age
           value: 30m
       - equal:
-          path: spec.values.config.receivers["filelog/health_checker"].start_at
-          value: beginning
-      - equal:
-          path: spec.values.config.receivers["filelog/health_checker"].delete_after_read
-          value: true
-      - equal:
           path: spec.values.config.receivers["filelog/health_checker"].delete_after_read_min_age
-          value: 30m
+          value: 1h
       - equal:
           path: spec.values.extraVolumeMounts[0].readOnly
           value: false
@@ -382,8 +406,6 @@ tests:
 
   - it: should run as a node-local daemonset on worker nodes reading the boot disk directory
     asserts:
-      - hasDocuments:
-          count: 1
       - equal:
           path: spec.values.mode
           value: daemonset

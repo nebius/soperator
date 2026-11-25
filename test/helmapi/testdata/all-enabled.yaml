@@ -37,6 +37,12 @@ tailscale:
   enabled: true
   namespace: flux-api-slurm
 observability:
+  opentelemetry:
+    jailLogs:
+      dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-logs'
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-nodesets'
   vmStack:
     namespace: logs-system
     values:
