@@ -1,4 +1,5 @@
 {{- if and .Values.slurmCluster.enabled .Values.slurmCluster.slurmClusterStorage.enabled }}
+{{- $valuesName := printf "%s-slurm-cluster-storage-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -31,17 +32,9 @@ spec:
   timeout: {{ .Values.slurmCluster.slurmClusterStorage.timeout }}
   releaseName: {{ .Values.slurmCluster.slurmClusterStorage.releaseName }}
   {{- include "soperator-fluxcd.targetNamespace" .Values.slurmCluster.namespace | nindent 2 }}
-  {{- with .Values.slurmCluster.slurmClusterStorage.values }}
-  values:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-slurm-cluster-storage
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: slurm-cluster-storage
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.slurmCluster.slurmClusterStorage.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.slurmCluster.slurmClusterStorage.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

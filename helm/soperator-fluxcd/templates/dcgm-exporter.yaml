@@ -1,4 +1,5 @@
 {{- if and .Values.observability.enabled .Values.observability.dcgmExporter.enabled }}
+{{- $valuesName := printf "%s-dcgm-exporter-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -31,8 +32,9 @@ spec:
   {{- include "soperator-fluxcd.targetNamespace" .Values.observability.dcgmExporter.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.observability.dcgmExporter.upgrade | nindent 4 }}
-  {{- with .Values.observability.dcgmExporter.values }}
-  values:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+  valuesFrom:
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.observability.dcgmExporter.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.observability.dcgmExporter.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

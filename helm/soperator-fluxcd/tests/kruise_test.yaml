@@ -1,8 +1,12 @@
 suite: test kruise
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/kruise.yaml
 tests:
   - it: should ignore only runtime-managed certificate and webhook fields while warning on other drift
+    documentSelector: &helmRelease {path: kind, value: HelmRelease}
     asserts:
       - equal:
           path: spec.driftDetection
@@ -42,28 +46,32 @@ tests:
       - equal:
           path: spec.chart.spec.version
           value: 1.9.1-custom
+        documentSelector: *helmRelease
       - equal:
-          path: spec.values.manager.image.tag
+          path: data["values.yaml"].manager.image.tag
           value: v1.9.2-ca-fix
+        documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
 
   - it: should set kruise images explicitly
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.manager.image
+          path: data["values.yaml"].manager.image
           value:
             repository: cr.nebius.cloud/soperator/kruise-manager
             tag: v1.9.2-ca-fix
             pullPolicy: IfNotPresent
       - equal:
-          path: spec.values.daemon.image.pullPolicy
+          path: data["values.yaml"].daemon.image.pullPolicy
           value: IfNotPresent
       - equal:
-          path: spec.values.helmHooks.image
+          path: data["values.yaml"].helmHooks.image
           value:
             repository: cr.nebius.cloud/soperator/kruise-helm-hook
             tag: v0.1.0-ca-fix
 
   - it: should scope the kruise pod mutating webhook to the slurm namespace
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.postRenderers[0].kustomize.patches[1].target.kind
@@ -76,6 +84,7 @@ tests:
           pattern: "/webhooks/[1-9]"
 
   - it: should scope only the builtin-resource validating webhooks to the slurm namespace
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.postRenderers[0].kustomize.patches[2].target.kind
@@ -93,6 +102,7 @@ tests:
   - it: should render the slurm namespace into the webhook patches from values
     set:
       slurmCluster.namespace: custom-ns
+    documentSelector: *helmRelease
     asserts:
       - matchRegex:
           path: spec.postRenderers[0].kustomize.patches[1].patch
@@ -105,6 +115,7 @@ tests:
           pattern: "- soperator\\n"
 
   - it: should keep the kruise-daemon rolling update patch
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.postRenderers[0].kustomize.patches[0].target
@@ -120,6 +131,7 @@ tests:
   - it: should omit post-renderers when they are unset
     set:
       soperator.kruise.postRenderers: null
+    documentSelector: *helmRelease
     asserts:
       - notExists:
           path: spec.postRenderers

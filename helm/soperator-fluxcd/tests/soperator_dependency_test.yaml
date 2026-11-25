@@ -16,16 +16,19 @@ tests:
       soperator.nodeConfigurator.enabled: false
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - isKind:
           of: HelmRelease
+        documentSelector: &helmRelease {path: kind, value: HelmRelease}
       - equal:
           path: metadata.name
           value: RELEASE-NAME-soperator
+        documentSelector: *helmRelease
 
   - it: should skip the Kruise dependency when the built-in release is disabled
     set:
       soperator.kruise.enabled: false
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn
@@ -41,6 +44,7 @@ tests:
         - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
         - name: external-kruise
           namespace: platform
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn
@@ -95,14 +99,16 @@ tests:
       soperator.nodeConfigurator.enabled: true
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - isKind:
           of: HelmRelease
           index: 0
+        documentSelector: &helmRelease {path: kind, value: HelmRelease}
       - equal:
           path: metadata.name
           index: 0
           value: RELEASE-NAME-nodeconfigurator
+        documentSelector: *helmRelease
 ---
 suite: test nodeconfigurator dependencies
 templates:
@@ -117,7 +123,7 @@ tests:
       soperator.nodeConfigurator.enabled: true
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
 ---
 suite: test nodesets dependencies
 templates:
@@ -135,16 +141,19 @@ tests:
       nodesets.enabled: true
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - isKind:
           of: HelmRelease
+        documentSelector: &helmRelease {path: kind, value: HelmRelease}
       - equal:
           path: metadata.name
           value: RELEASE-NAME-nodesets
+        documentSelector: *helmRelease
 
   - it: should have dependencies on namespace and soperator
     set:
       nodesets.enabled: true
+    documentSelector: *helmRelease
     asserts:
       - contains:
           path: spec.dependsOn
@@ -159,6 +168,7 @@ tests:
     set:
       nodesets.enabled: true
       slurmCluster.enabled: true
+    documentSelector: *helmRelease
     asserts:
       - contains:
           path: spec.dependsOn
@@ -169,6 +179,7 @@ tests:
     set:
       nodesets.enabled: true
       slurmCluster.enabled: false
+    documentSelector: *helmRelease
     asserts:
       - notContains:
           path: spec.dependsOn

@@ -1,16 +1,20 @@
 suite: test opentelemetry collector logs Go runtime env
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/opentelemetry-collector-logs.yaml
 tests:
   - it: should keep the default GOMAXPROCS and enable upstream GOMEMLIMIT for logs
+    documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
     asserts:
       - contains:
-          path: spec.values.extraEnvs
+          path: data["values.yaml"].extraEnvs
           content:
             name: GOMAXPROCS
             value: "1"
       - equal:
-          path: spec.values.useGOMEMLIMIT
+          path: data["values.yaml"].useGOMEMLIMIT
           value: true
 
   - it: should pass through explicit runtime settings for logs
@@ -19,29 +23,34 @@ tests:
       observability.opentelemetry.logs.values.extraEnvs:
         - name: GOMAXPROCS
           value: "2"
+    documentSelector: *baseConfigMap
     asserts:
       - contains:
-          path: spec.values.extraEnvs
+          path: data["values.yaml"].extraEnvs
           content:
             name: GOMAXPROCS
             value: "2"
       - equal:
-          path: spec.values.useGOMEMLIMIT
+          path: data["values.yaml"].useGOMEMLIMIT
           value: false
 ---
 suite: test opentelemetry collector events Go runtime env
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/opentelemetry-collector-events.yaml
 tests:
   - it: should keep the default GOMAXPROCS and enable upstream GOMEMLIMIT for events
+    documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
     asserts:
       - contains:
-          path: spec.values.extraEnvs
+          path: data["values.yaml"].extraEnvs
           content:
             name: GOMAXPROCS
             value: "1"
       - equal:
-          path: spec.values.useGOMEMLIMIT
+          path: data["values.yaml"].useGOMEMLIMIT
           value: true
 
   - it: should pass through explicit runtime settings for events
@@ -50,29 +59,34 @@ tests:
       observability.opentelemetry.events.values.extraEnvs:
         - name: GOMAXPROCS
           value: "3"
+    documentSelector: *baseConfigMap
     asserts:
       - contains:
-          path: spec.values.extraEnvs
+          path: data["values.yaml"].extraEnvs
           content:
             name: GOMAXPROCS
             value: "3"
       - equal:
-          path: spec.values.useGOMEMLIMIT
+          path: data["values.yaml"].useGOMEMLIMIT
           value: false
 ---
 suite: test opentelemetry collector jail logs Go runtime env
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/opentelemetry-collector-jail-logs.yaml
 tests:
   - it: should keep the default GOMAXPROCS and enable upstream GOMEMLIMIT for jail logs
+    documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
     asserts:
       - contains:
-          path: spec.values.extraEnvs
+          path: data["values.yaml"].extraEnvs
           content:
             name: GOMAXPROCS
             value: "1"
       - equal:
-          path: spec.values.useGOMEMLIMIT
+          path: data["values.yaml"].useGOMEMLIMIT
           value: true
 
   - it: should use jail logs runtime settings independently of logs
@@ -85,17 +99,21 @@ tests:
       observability.opentelemetry.jailLogs.values.extraEnvs:
         - name: GOMAXPROCS
           value: "4"
+    documentSelector: *baseConfigMap
     asserts:
       - contains:
-          path: spec.values.extraEnvs
+          path: data["values.yaml"].extraEnvs
           content:
             name: GOMAXPROCS
             value: "4"
       - equal:
-          path: spec.values.useGOMEMLIMIT
+          path: data["values.yaml"].useGOMEMLIMIT
           value: false
 ---
 suite: test opentelemetry collector NCCL profiles Go runtime env
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/opentelemetry-collector-nccl-profiles.yaml
 set:
@@ -104,15 +122,15 @@ tests:
   - it: should keep the default GOMAXPROCS and enable upstream GOMEMLIMIT
     documentSelector:
       path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles
+      value: RELEASE-NAME-otelcol-nccl-profiles-values
     asserts:
       - contains:
-          path: spec.values.extraEnvs
+          path: data["values.yaml"].extraEnvs
           content:
             name: GOMAXPROCS
             value: "1"
       - equal:
-          path: spec.values.useGOMEMLIMIT
+          path: data["values.yaml"].useGOMEMLIMIT
           value: true
 
   - it: should pass through explicit runtime settings for the collector
@@ -123,13 +141,13 @@ tests:
       observability.ncclProfiles.collector.values.useGOMEMLIMIT: false
     documentSelector:
       path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles
+      value: RELEASE-NAME-otelcol-nccl-profiles-values
     asserts:
       - contains:
-          path: spec.values.extraEnvs
+          path: data["values.yaml"].extraEnvs
           content:
             name: GOMAXPROCS
             value: "2"
       - equal:
-          path: spec.values.useGOMEMLIMIT
+          path: data["values.yaml"].useGOMEMLIMIT
           value: false

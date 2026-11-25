@@ -2,10 +2,39 @@
 
 ## HelmRelease configuration
 
-Set `values` on the component to pass the child chart's native keys to `spec.values` on its HelmRelease.
+Set `<component>.values` in the umbrella chart to configure a child chart using its native keys. Managed and Pro can continue to supply these settings through the umbrella release's own values ConfigMap.
+
+For each child HelmRelease, the umbrella chart creates a ConfigMap named `<fullname>-<component-suffix>-values` in the HelmRelease's namespace. The suffix is the release identifier in the table below, with `notifier` for `soperator-notifier`. The ConfigMap stores the child values as YAML in `data["values.yaml"]`, or `{}` when the child has no values. Flux reads this required ConfigMap first through `spec.valuesFrom`. Child HelmReleases omit `spec.values`.
+
+Use `<component>.valuesFrom` to supply additional ConfigMaps or Secrets in the same namespace as the HelmRelease, even when its workloads use a different `targetNamespace`. References support native Flux fields such as `valuesKey`, `optional`, and `targetPath`. Flux merges the sources in order, so the last source specifying a key wins. Helm merges maps and replaces lists. A profile's `valuesFrom` list replaces the entire list of additional references supplied by the umbrella chart. Set it to `[]` or `null` to keep only the generated ConfigMap.
+
+For example, this profile uses the notifier defaults, the two existing optional overrides, and a Secret containing `slack.webhookUrl` under its `values.yaml` key.
+
+```yaml
+notifier:
+  values:
+    nameOverride: soperator-notifier
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-soperator-notifier
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: soperator-notifier
+      optional: true
+      valuesKey: values.yaml
+    - kind: Secret
+      name: notifier-credentials
+      valuesKey: values.yaml
+```
+
+With `fullnameOverride: prod`, Flux reads `prod-notifier-values`, then the two optional ConfigMaps in the order shown, then `notifier-credentials`. Keep credentials in a referenced Secret because the umbrella chart writes `notifier.values` to a ConfigMap.
+
+When upgrading from inline values, check for overlapping keys in existing external sources. For example, if the umbrella sets a PVC size to `100Gi` and a referenced ConfigMap sets `30Gi`, Flux previously used `100Gi` and now uses `30Gi`. To keep the installed size, update the external source or remove its size setting before upgrading.
 
 | HelmRelease | Component |
 | --- | --- |
+| `ns` | `ns` |
 | `backup-config` | `backup.config` |
 | `storageclasses` | `storageClasses` |
 | `soperatorchecks` | `soperator.soperatorChecks` |
@@ -31,6 +60,7 @@ Set `values` on the component to pass the child chart's native keys to `spec.val
 | `dcgm-exporter` | `observability.dcgmExporter` |
 | `soperator-notifier` | `notifier` |
 | `vm-stack` | `observability.vmStack` |
+| `tsa-token-writer` | `observability.tsaToken.writer` |
 | `opentelemetry-collector-logs` | `observability.opentelemetry.logs` |
 | `opentelemetry-collector-jail-logs` | `observability.opentelemetry.jailLogs` |
 | `opentelemetry-collector-events` | `observability.opentelemetry.events` |
@@ -42,17 +72,17 @@ Move existing overrides to `values`. An explicit `values: {}` takes precedence o
 
 `certManager`, `mariadbOperator`, and `backup` apply their `defaultValues` before the component's native `values`.
 Cert-manager and k8up also apply `prometheusValues` when `observability.prometheusOperator.enabled` is true.
-Existing nonempty `overrideValues` for these three components still replace the full inline map.
+Existing nonempty `overrideValues` for these three components still replace the full map written to their generated ConfigMaps.
 Kruise merges legacy overrides with its moved defaults so partial resource overrides retain the image and CRD settings.
 Tailscale passes its Raw-chart resources through `tailscale.values.resources` and resolves the namespace references in that map.
-The `tsa-token-writer` HelmRelease generates its Deployment and namespace-scoped RBAC for the Bedag Raw chart from `observability.tsaToken`. Its dependency list is configured through `observability.tsaToken.writer.dependsOn`.
+The `ns` and `tsa-token-writer` ConfigMaps hold generated Bedag Raw resources. The former derives its Namespace list from the component namespaces. The latter derives the writer's Deployment and namespace-scoped RBAC from `observability.tsaToken`. Its dependency list is configured through `observability.tsaToken.writer.dependsOn`.
 
 For `soperator` and `soperator.nodeConfigurator`, move settings from `overrideValues` to `values` in the same component.
 Helm merges the new `values` maps with the chart defaults.
 Move controller sizing from `soperator.values.manager.resources` to `soperator.values.controllerManager.manager.resources` before upgrading.
 Set `isMariadbCrdInstalled` and `isPrometheusCrdInstalled` under `soperator.values.controllerManager.manager.env` according to the available CRDs.
 Set `soperator.values.certManager.enabled` according to whether the operator uses cert-manager. The component `enabled` flags control which HelmReleases the chart creates.
-An empty `rebooter.priorityClassName` explicitly sets an empty class name. Use `null` to remove the inline key and allow a value from `valuesFrom`.
+An empty `rebooter.priorityClassName` explicitly sets an empty class name. Use `null` to omit the umbrella default. An additional `valuesFrom` source can override either setting.
 
 ### Storage and Slurm upgrades
 
@@ -64,13 +94,13 @@ Helm merges `csiDriverNfs.values` with the default controller placement. Use `nu
 
 Keep the existing SlurmCluster resource name when migrating a profile.
 A nonempty legacy `slurmCluster.overrideValues` map without `clusterName` took the name from `valuesFrom` or the child chart's `slurm1` default.
-Set `slurmCluster.values.clusterName` to the existing name, or set it to `null` to retain that source.
+Keep the existing name in the highest-priority source that supplies it. To use the child chart's default, set `slurmCluster.values.clusterName` to `null` and omit the key from external sources.
 For a custom cluster name, set `nodesets.values.clusterName` and `soperatorActiveChecks.values.slurmClusterRefName` to the same name on enabled components.
 
 ### VictoriaLogs, DCGM, and Notifier upgrades
 
 Move `observability.vmLogs.overrideValues` to `observability.vmLogs.values` and `notifier.overrideValues` to `notifier.values`.
-The new maps merge with the defaults in this chart. Set a defaulted key to `null` to let `valuesFrom` or the child chart supply it.
+The new maps merge with the defaults in this chart. Setting a defaulted key to `null` lets the child chart supply it when external sources omit it.
 
 For VictoriaLogs profiles using the old `values` layout, move `persistentVolume`, `nodeSelector`, `affinity`, and `resources` under `observability.vmLogs.values.server`.
 Change `persistentVolume.accessMode` to the `persistentVolume.accessModes` list.
@@ -78,8 +108,7 @@ An explicit `server.persistentVolume.enabled: false` now selects `emptyDir`. The
 Check the existing claim before changing this setting. To keep using persistent storage, set `enabled: true` and preserve the active PVC settings.
 
 A legacy `overrideValues` map that set only `server.retentionPeriod` left PVC settings to `valuesFrom` or the child chart.
-Moving that map to `values` adds the inline `30Gi` default. This takes precedence over the size from `valuesFrom` and can block an upgrade of a larger bound PVC.
-Carry over the active PVC settings explicitly, or set `persistentVolume: null` to keep using their previous source.
+Moving that map to `values` adds the umbrella's `30Gi` default for profiles where external sources omit the size. Carry over the active PVC settings explicitly. To keep the child chart's PVC defaults, omit the umbrella defaults as follows.
 
 ```yaml
 observability:
@@ -95,8 +124,7 @@ Use a YAML boolean for `validateToolkit`. The string `"false"` is truthy in the 
 Update the values generated by Managed and Pro as part of the chart upgrade.
 
 For profiles that used `notifier.releaseName` as the resource name prefix, copy that name to `notifier.values.nameOverride`.
-If a legacy `overrideValues` map took its prefix from `valuesFrom` or from the child chart, add `nameOverride: null` to the migrated values to preserve that source.
-With the child chart's default prefix, this keeps names such as `helm-soperator-notifier-slack-webhook`.
+If the prefix comes from an external source, that source continues to set it. To use the child chart's default prefix and keep names such as `helm-soperator-notifier-slack-webhook`, clear the umbrella default.
 
 ```yaml
 notifier:
@@ -104,7 +132,7 @@ notifier:
     nameOverride: null
 ```
 
-The notifier child chart checks `slack.webhookUrl` when it renders the Secret. Omit the inline key when supplying it through `valuesFrom`.
+The notifier child chart checks the merged `slack.webhookUrl` when it renders its Secret.
 The default `notifier.dependsOn` list waits for the namespaces and VMStack HelmReleases.
 
 If the chart and its values ConfigMap are applied separately, suspend the umbrella HelmRelease before publishing either update and resume it after both updates are in place.
@@ -145,7 +173,7 @@ observability:
             - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8428/api/v1/write
 ```
 
-A nonempty legacy `overrideValues` replaced the entire inline configuration. Migrating that map to `values` adds the chart defaults for omitted keys, including Grafana authentication and VMSingle storage. To retain the previous effective values for the whole stack, merge the legacy map over the current contents of the `victoria-metrics-operator` values ConfigMap and set `observability.vmStack.values: null`. Flux reads `terraform-victoria-metrics-operator` first, then `victoria-metrics-operator`. To source only the destination list from those ConfigMaps, set the inline `remoteWrite` field to `null`.
+A nonempty legacy `overrideValues` replaced the entire umbrella configuration for VMStack. Migrating it to `values` adds defaults for omitted keys, including Grafana authentication and VMSingle storage. To keep a complete external configuration, set `observability.vmStack.values: null` and put the desired values in the external sources. Flux reads the empty generated ConfigMap first, then `terraform-victoria-metrics-operator`, then `victoria-metrics-operator`. A later source can replace just the `remoteWrite` list while inheriting the rest of the generated defaults.
 
 ### OpenTelemetry collector upgrades
 
@@ -153,7 +181,7 @@ Each collector passes its own native OpenTelemetry chart values through `observa
 
 Move `events.overrideValues` to `events.values`. The legacy `logs.overrideValues` applied to both log releases. Carry over the values needed by each release into `logs.values` and `jailLogs.values`, and move jail logs resource settings from `logs.values.jailLogs.resources` to `jailLogs.values.resources`.
 
-Nonempty legacy overrides replaced the inline map, while Helm merges the new maps with collector defaults. To retain an existing effective map, put it in the collector's values ConfigMap and set its inline `values` to `null`. For each collector, Flux reads the `terraform-opentelemetry-collector-<suffix>` ConfigMap first, then `opentelemetry-collector-<suffix>`, then applies inline values. The suffix is `logs`, `jail-logs`, or `events`. Set any defaulted inline field supplied by a ConfigMap to `null`.
+Flux reads each collector's generated ConfigMap, then `terraform-opentelemetry-collector-<suffix>`, then `opentelemetry-collector-<suffix>`. The suffix is `logs`, `jail-logs`, or `events`. To retain a complete legacy override without inheriting umbrella defaults, place the desired configuration in the external sources and set that collector's `values` to `null`.
 
 All three collectors send to VictoriaLogs by default and wait for its HelmRelease when the umbrella chart installs it. To keep sending to Nebius Cloud Logging, Managed and Pro profiles must add the public exporter under `values.config.exporters.otlp` with its regional endpoint, resolved `headers.iam-container`, any additional headers, authentication, and queue settings. Include `otlp` in the relevant `config.service.pipelines` exporter list. Enable `bearertokenauth` in both `config.extensions` and `config.service.extensions`, and use `extraVolumes` and `extraVolumeMounts` to mount the Secret or hostPath containing the file named by the authenticator. When the bundled TSA token writer supplies the Secret, add `{{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}` as a dependency name in that collector's `dependsOn` list.
 
@@ -182,7 +210,7 @@ If a Flux `postRenderers` patch selects the Raw ConfigMap with `target.namespace
 
 The Raw release depends on the namespaces release by default. The collector depends on the namespaces, VMStack, and `<fullname>-otelcol-nccl-profiles-cm` HelmReleases. When supplying `configMap.dependsOn` or `collector.dependsOn`, include the prerequisites for that release in the new list.
 
-The former `configMapOverrideValues` and `collectorOverrideValues` replaced the entire inline map for their respective releases. Use `configMap.values` and `collector.values` for partial overrides that should inherit the umbrella chart defaults. For example, when configuring the collector to create its own ConfigMap, clear the default reference to the Raw ConfigMap and provide the desired collector configuration under `collector.values.config`.
+The former `configMapOverrideValues` and `collectorOverrideValues` replaced the entire set of umbrella values for their respective releases. Use `configMap.values` and `collector.values` for partial overrides that should inherit the umbrella chart defaults. For example, when configuring the collector to create its own ConfigMap, clear the default reference to the Raw ConfigMap and provide the desired collector configuration under `collector.values.config`.
 
 ```yaml
 observability:
@@ -194,7 +222,7 @@ observability:
           existingName: null
 ```
 
-To preserve a full legacy override, merge it over the current contents of the `values.yaml` key in the corresponding user `valuesFrom` ConfigMap, then set that release's inline `values` to `null`. Use `opentelemetry-collector-nccl-profiles-cm` for the Raw release or `opentelemetry-collector-nccl-profiles` for the collector. If the ConfigMap is missing, create it in the HelmRelease namespace. Flux reads the corresponding `terraform-` prefixed ConfigMap first, then the user ConfigMap. This preserves the legacy override's precedence and lets the child chart supply its own defaults.
+To preserve a full legacy override, merge it over the `values.yaml` entry in the user ConfigMap and set that release's `values` to `null`. The default user ConfigMap is `opentelemetry-collector-nccl-profiles-cm` for the Raw release and `opentelemetry-collector-nccl-profiles` for the collector. Flux reads the empty generated ConfigMap, then the corresponding `terraform-` prefixed ConfigMap, then the user ConfigMap.
 
 The shared profile runs one Deployment replica on a system node with the `Recreate` rollout strategy. To collect node-local profiles, set native values for a worker DaemonSet.
 

@@ -2,6 +2,7 @@
 {{- if .Values.observability.publicEndpointEnabled }}
 {{- include "soperator-fluxcd.validatePublicEndpointTokenKind" . -}}
 {{- end }}
+{{- $valuesName := printf "%s-vm-stack-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -34,17 +35,9 @@ spec:
   timeout: {{ .Values.observability.vmStack.timeout }}
   releaseName: {{ .Values.observability.vmStack.releaseName }}
   {{- include "soperator-fluxcd.targetNamespace" .Values.observability.vmStack.namespace | nindent 2 }}
-  {{- with .Values.observability.vmStack.values }}
-  values:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-victoria-metrics-operator
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: victoria-metrics-operator
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.observability.vmStack.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.observability.vmStack.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

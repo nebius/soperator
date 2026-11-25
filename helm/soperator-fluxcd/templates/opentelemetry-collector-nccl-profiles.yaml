@@ -1,5 +1,6 @@
 {{- $nccl := .Values.observability.ncclProfiles }}
 {{- if and .Values.observability.enabled .Values.observability.vmStack.enabled $nccl.enabled }}
+{{- $valuesName := printf "%s-otelcol-nccl-profiles-cm-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -32,20 +33,13 @@ spec:
   timeout: {{ $nccl.timeout }}
   releaseName: {{ $nccl.releaseName }}-cm
   {{- include "soperator-fluxcd.targetNamespace" .Values.observability.vmStack.namespace | nindent 2 }}
-  {{- with $nccl.configMap.values }}
-  values:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
   valuesFrom:
-    - kind: ConfigMap
-      name: terraform-opentelemetry-collector-nccl-profiles-cm
-      optional: true
-      valuesKey: values.yaml
-    - kind: ConfigMap
-      name: opentelemetry-collector-nccl-profiles-cm
-      optional: true
-      valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" $nccl.configMap.valuesFrom) | nindent 4 }}
 ---
+{{- $valuesYaml := toYaml ($nccl.configMap.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
+---
+{{- $valuesName := printf "%s-otelcol-nccl-profiles-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -78,17 +72,9 @@ spec:
   timeout: {{ $nccl.timeout }}
   releaseName: {{ $nccl.releaseName }}
   {{- include "soperator-fluxcd.targetNamespace" .Values.observability.vmStack.namespace | nindent 2 }}
-  {{- with $nccl.collector.values }}
-  values:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
   valuesFrom:
-    - kind: ConfigMap
-      name: terraform-opentelemetry-collector-nccl-profiles
-      optional: true
-      valuesKey: values.yaml
-    - kind: ConfigMap
-      name: opentelemetry-collector-nccl-profiles
-      optional: true
-      valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" $nccl.collector.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml ($nccl.collector.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

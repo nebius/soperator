@@ -43,8 +43,40 @@ Resolve dependency names in the chart context, preserving the rest of each refer
 {{- end -}}
 
 {{/*
+Flux merges these references in order. The umbrella owns the first source.
+*/}}
+{{- define "soperator-fluxcd.valuesFrom" -}}
+- kind: ConfigMap
+  name: {{ .name }}
+  valuesKey: values.yaml
+{{- with .references }}
+{{ toYaml . }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Keep metadata after the YAML block so Helm preserves trailing newlines in child values.
+The TSA token writer supplies its generated Raw resources directly under data.values.yaml.
+*/}}
+{{- define "soperator-fluxcd.valuesConfigMap" -}}
+apiVersion: v1
+kind: ConfigMap
+{{- with .yaml }}
+data:
+  values.yaml: |+
+    {{- . | nindent 4 }}
+{{- end }}
+metadata:
+  name: {{ .name }}
+  namespace: {{ .root.Release.Namespace | quote }}
+  labels:
+    {{- include "soperator-fluxcd.labels" .root | nindent 4 }}
+    reconcile.fluxcd.io/watch: Enabled
+{{- end -}}
+
+{{/*
 Apply the platform defaults before the child chart values. Existing legacy maps
-replace the whole inline configuration.
+replace the whole base configuration.
 */}}
 {{- define "soperator-fluxcd.platformValues" -}}
 {{- with .component.overrideValues -}}

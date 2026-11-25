@@ -1,4 +1,5 @@
 {{- if and .Values.observability.enabled .Values.observability.vmStack.enabled }}
+{{- $valuesName := printf "%s-victoria-metrics-operator-crds-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -28,8 +29,9 @@ spec:
   interval: {{ .Values.observability.vmStack.crds.interval }}
   upgrade:
     {{- toYaml .Values.observability.vmStack.crds.upgrade | nindent 4 }}
-  {{- if ne .Values.observability.vmStack.crds.values nil }}
-  values:
-    {{- toYaml .Values.observability.vmStack.crds.values | nindent 4 }}
-  {{- end }}
+  valuesFrom:
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.observability.vmStack.crds.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.observability.vmStack.crds.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

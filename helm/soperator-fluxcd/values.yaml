@@ -34,6 +34,7 @@ helmRepository:
     url: oci://cr.nebius.cloud/soperator
     type: oci
 ns:
+  valuesFrom: []
   enabled: true
   interval: 5m
   timeout: 5m
@@ -48,6 +49,15 @@ certManager:
   version: v1.21.*
   namespace: cert-manager-system
   releaseName: cert-manager
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-cert-manager
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: cert-manager
+      optional: true
+      valuesKey: values.yaml
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     - name: >-
@@ -149,6 +159,11 @@ backup:
   version: 4.8.*
   namespace: k8up-system
   releaseName: k8up
+  valuesFrom:
+    - kind: ConfigMap
+      name: backup
+      optional: true
+      valuesKey: values.yaml
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
@@ -214,6 +229,7 @@ backup:
     timeout: 5m
     version: 1.23.0
     releaseName: soperator-backups
+    valuesFrom: []
     dependsOn:
       - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     install:
@@ -236,6 +252,15 @@ mariadbOperator:
   version: 25.10.2
   namespace: mariadb-operator-system
   releaseName: mariadb-operator
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-mariadb-operator
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: mariadb-operator
+      optional: true
+      valuesKey: values.yaml
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     - name: '{{ include "soperator-fluxcd.fullname" . }}-mariadb-operator-crds'
@@ -301,6 +326,7 @@ mariadbOperator:
       retries: 3
       remediateLastFailure: true
   crds:
+    valuesFrom: []
     values: null
     install:
       crds: CreateReplace
@@ -334,6 +360,7 @@ observability:
       enabled: true
       interval: 5m
       version: 2.0.0
+      valuesFrom: []
       dependsOn:
         - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
       # postRenderers: []
@@ -374,6 +401,15 @@ observability:
         remediation:
           retries: 6
           remediateLastFailure: true
+      valuesFrom:
+        - kind: ConfigMap
+          name: terraform-opentelemetry-collector-logs
+          optional: true
+          valuesKey: values.yaml
+        - kind: ConfigMap
+          name: opentelemetry-collector-logs
+          optional: true
+          valuesKey: values.yaml
       dependsOn:
         - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
         - name: '{{ if .Values.observability.vmLogs.enabled }}{{ include "soperator-fluxcd.fullname" . }}-vm-logs{{ end }}'
@@ -797,6 +833,15 @@ observability:
         remediation:
           retries: 6
           remediateLastFailure: true
+      valuesFrom:
+        - kind: ConfigMap
+          name: terraform-opentelemetry-collector-jail-logs
+          optional: true
+          valuesKey: values.yaml
+        - kind: ConfigMap
+          name: opentelemetry-collector-jail-logs
+          optional: true
+          valuesKey: values.yaml
       dependsOn:
         - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
         - name: '{{ if .Values.observability.vmLogs.enabled }}{{ include "soperator-fluxcd.fullname" . }}-vm-logs{{ end }}'
@@ -1186,6 +1231,15 @@ observability:
         remediation:
           retries: 3
           remediateLastFailure: true
+      valuesFrom:
+        - kind: ConfigMap
+          name: terraform-opentelemetry-collector-events
+          optional: true
+          valuesKey: values.yaml
+        - kind: ConfigMap
+          name: opentelemetry-collector-events
+          optional: true
+          valuesKey: values.yaml
       dependsOn:
         - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
         - name: '{{ if .Values.observability.vmLogs.enabled }}{{ include "soperator-fluxcd.fullname" . }}-vm-logs{{ end }}'
@@ -1403,6 +1457,7 @@ observability:
     timeout: 5m
     version: 19.1.*
     namespace: monitoring-system
+    valuesFrom: []
     values: null
     # postRenderers: []
     driftDetection:
@@ -1413,6 +1468,7 @@ observability:
       interval: 5m
       timeout: 5m
       version: 0.10.1
+      valuesFrom: []
       values: null
       install:
         crds: CreateReplace
@@ -1440,6 +1496,15 @@ observability:
       remediation:
         retries: 6
         remediateLastFailure: true
+    valuesFrom:
+      - kind: ConfigMap
+        name: terraform-victoria-metrics-operator
+        optional: true
+        valuesKey: values.yaml
+      - kind: ConfigMap
+        name: victoria-metrics-operator
+        optional: true
+        valuesKey: values.yaml
     dependsOn:
       - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
       - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
@@ -1945,6 +2010,15 @@ observability:
     version: 0.13.*
     namespace: logs-system
     releaseName: vm-logs
+    valuesFrom:
+      - kind: ConfigMap
+        name: terraform-vm-logs
+        optional: true
+        valuesKey: values.yaml
+      - kind: ConfigMap
+        name: vm-logs
+        optional: true
+        valuesKey: values.yaml
     dependsOn:
       - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     install:
@@ -1998,6 +2072,7 @@ observability:
     version: 5.0.0
     namespace: soperator
     releaseName: soperator-dcgm-exporter
+    valuesFrom: []
     dependsOn:
       - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     install:
@@ -2043,6 +2118,15 @@ observability:
       mode: warn
     releaseName: opentelemetry-collector-nccl-profiles
     configMap:
+      valuesFrom:
+        - kind: ConfigMap
+          name: terraform-opentelemetry-collector-nccl-profiles-cm
+          optional: true
+          valuesKey: values.yaml
+        - kind: ConfigMap
+          name: opentelemetry-collector-nccl-profiles-cm
+          optional: true
+          valuesKey: values.yaml
       dependsOn:
         - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
       values:
@@ -2148,6 +2232,15 @@ observability:
                       exporters:
                         - otlp_http/victoriametrics
     collector:
+      valuesFrom:
+        - kind: ConfigMap
+          name: terraform-opentelemetry-collector-nccl-profiles
+          optional: true
+          valuesKey: values.yaml
+        - kind: ConfigMap
+          name: opentelemetry-collector-nccl-profiles
+          optional: true
+          valuesKey: values.yaml
       dependsOn:
         - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
         - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-stack'
@@ -2311,6 +2404,15 @@ slurmCluster:
   version: 5.0.0
   namespace: soperator
   releaseName: soperator
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-slurm-cluster
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: slurm-cluster
+      optional: true
+      valuesKey: values.yaml
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     - name: '{{ if .Values.soperator.enabled }}{{ include "soperator-fluxcd.fullname" . }}-soperator{{ end }}'
@@ -2334,6 +2436,15 @@ slurmCluster:
     releaseName: slurm-cluster-storage
     interval: 5m
     timeout: 30m
+    valuesFrom:
+      - kind: ConfigMap
+        name: terraform-slurm-cluster-storage
+        optional: true
+        valuesKey: values.yaml
+      - kind: ConfigMap
+        name: slurm-cluster-storage
+        optional: true
+        valuesKey: values.yaml
     dependsOn:
       - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
       - name: '{{ if .Values.storageClasses.enabled }}{{ include "soperator-fluxcd.fullname" . }}-storageclasses{{ end }}'
@@ -2362,6 +2473,15 @@ nodesets:
   version: 5.0.0
   namespace: soperator
   releaseName: soperator-nodesets
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-nodesets
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: nodesets
+      optional: true
+      valuesKey: values.yaml
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     - name: '{{ if .Values.soperator.enabled }}{{ include "soperator-fluxcd.fullname" . }}-soperator{{ end }}'
@@ -2384,6 +2504,15 @@ soperatorActiveChecks:
   version: 5.0.0
   releaseName: soperator-activechecks
   namespace: soperator
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-soperator-activechecks
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: soperator-activechecks
+      optional: true
+      valuesKey: values.yaml
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-slurm-cluster'
     - name: >-
@@ -2408,6 +2537,15 @@ soperator:
   version: 5.0.0
   namespace: "soperator-system"
   releaseName: soperator-controller
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-soperator
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: soperator
+      optional: true
+      valuesKey: values.yaml
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     - name: '{{ if .Values.soperator.kruise.enabled }}{{ include "soperator-fluxcd.fullname" . }}-kruise{{ end }}'
@@ -2454,6 +2592,15 @@ soperator:
     timeout: 30m
     version: 1.9.1-custom
     releaseName: soperator-kruise
+    valuesFrom:
+      - kind: ConfigMap
+        name: terraform-kruise
+        optional: true
+        valuesKey: values.yaml
+      - kind: ConfigMap
+        name: kruise
+        optional: true
+        valuesKey: values.yaml
     dependsOn:
       - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
       - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
@@ -2637,6 +2784,15 @@ soperator:
     interval: 5m
     timeout: 5m
     releaseName: soperator-checks
+    valuesFrom:
+      - kind: ConfigMap
+        name: terraform-soperatorchecks
+        optional: true
+        valuesKey: values.yaml
+      - kind: ConfigMap
+        name: soperatorchecks
+        optional: true
+        valuesKey: values.yaml
     dependsOn:
       - name: '{{ include "soperator-fluxcd.fullname" . }}-soperator'
     install:
@@ -2667,6 +2823,15 @@ soperator:
     interval: 5m
     timeout: 30m
     releaseName: soperator-node-configurator
+    valuesFrom:
+      - kind: ConfigMap
+        name: terraform-nodeconfigurator
+        optional: true
+        valuesKey: values.yaml
+      - kind: ConfigMap
+        name: nodeconfigurator
+        optional: true
+        valuesKey: values.yaml
     dependsOn:
       - name: '{{ include "soperator-fluxcd.fullname" . }}-soperator'
     install:
@@ -2712,6 +2877,7 @@ soperator:
     timeout: 5m
     releaseName: soperator-monitoring-dashboards
     namespace: monitoring-system
+    valuesFrom: []
     dependsOn:
       - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     install:
@@ -2736,6 +2902,15 @@ notifier:
   version: 5.0.0
   namespace: monitoring-system
   releaseName: soperator-notifier
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-soperator-notifier
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: soperator-notifier
+      optional: true
+      valuesKey: values.yaml
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-stack'
@@ -2760,6 +2935,7 @@ csiDriverNfs:
   version: 4.11.0
   namespace: nfs-system
   releaseName: csi-driver-nfs
+  valuesFrom: []
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
   values:
@@ -2794,6 +2970,7 @@ nfsServer:
   version: 1.2.3
   namespace: nfs-system
   releaseName: nfs-server
+  valuesFrom: []
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     - name: '{{ include "soperator-fluxcd.fullname" . }}-csi-driver-nfs'
@@ -2817,6 +2994,7 @@ storageClasses:
   version: 5.0.0
   namespace: storage-system
   releaseName: soperator-storageclasses
+  valuesFrom: []
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
   values: null
@@ -2839,6 +3017,11 @@ customConfigmaps:
   version: 5.0.0
   namespace: soperator
   releaseName: soperator-custom-configmaps
+  valuesFrom:
+    - kind: ConfigMap
+      name: custom-configmaps
+      optional: true
+      valuesKey: values.yaml
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
   values: null
@@ -2860,6 +3043,7 @@ tailscale:
   timeout: 5m
   version: 2.0.0
   namespace: soperator
+  valuesFrom: []
   dependsOn:
     - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
   values:

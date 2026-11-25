@@ -1,14 +1,18 @@
 suite: test DCGM Exporter values
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/dcgm-exporter.yaml
 tests:
   - it: should keep the default requests, limits, and toolkit validation
+    documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
     asserts:
       - equal:
-          path: spec.values.validateToolkit
+          path: data["values.yaml"].validateToolkit
           value: true
       - equal:
-          path: spec.values.daemonSet.nvidiaDcgmExporter.resources
+          path: data["values.yaml"].daemonSet.nvidiaDcgmExporter.resources
           value:
             limits:
               memory: 128Mi
@@ -24,9 +28,10 @@ tests:
           memory: 192Mi
         limits:
           memory: 256Mi
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.daemonSet.nvidiaDcgmExporter.resources
+          path: data["values.yaml"].daemonSet.nvidiaDcgmExporter.resources
           value:
             requests:
               cpu: 50m
@@ -37,7 +42,8 @@ tests:
   - it: should pass toolkit validation disabled as a boolean
     set:
       observability.dcgmExporter.values.validateToolkit: false
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.validateToolkit
+          path: data["values.yaml"].validateToolkit
           value: false

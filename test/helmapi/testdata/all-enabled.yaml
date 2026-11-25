@@ -33,6 +33,13 @@ notifier:
   values:
     slack:
       webhookUrl: https://example.invalid/webhook
+  valuesFrom:
+    - kind: ConfigMap
+      name: team-notifier
+      valuesKey: notifier.yaml
+    - kind: Secret
+      name: site-notifier
+      valuesKey: notifier.yaml
 tailscale:
   enabled: true
   namespace: flux-api-slurm

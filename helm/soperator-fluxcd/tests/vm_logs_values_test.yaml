@@ -1,26 +1,30 @@
 suite: test VictoriaLogs values
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/vm-logs.yaml
 tests:
   - it: should keep the default PVC and monitoring configuration
+    documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
     asserts:
       - equal:
-          path: spec.values.server.persistentVolume
+          path: data["values.yaml"].server.persistentVolume
           value:
             enabled: true
             size: 30Gi
             accessModes: [ReadWriteOnce]
       - equal:
-          path: spec.values.server.vmServiceScrape.enabled
+          path: data["values.yaml"].server.vmServiceScrape.enabled
           value: true
       - equal:
-          path: spec.values.dashboards
+          path: data["values.yaml"].dashboards
           value:
             enabled: true
             labels:
               grafana_dashboard: "1"
       - equal:
-          path: spec.values.vector.enabled
+          path: data["values.yaml"].vector.enabled
           value: false
 
   - it: should pass the native PVC settings
@@ -29,9 +33,10 @@ tests:
         size: 60Gi
         accessModes: [ReadWriteMany]
         storageClassName: fast-logs
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.server.persistentVolume
+          path: data["values.yaml"].server.persistentVolume
           value:
             enabled: true
             size: 60Gi
@@ -41,15 +46,17 @@ tests:
   - it: should pass through the name of an existing claim
     set:
       observability.vmLogs.values.server.persistentVolume.existingClaim: existing-logs
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.server.persistentVolume.existingClaim
+          path: data["values.yaml"].server.persistentVolume.existingClaim
           value: existing-logs
 
   - it: should pass persistence disabled explicitly
     set:
       observability.vmLogs.values.server.persistentVolume.enabled: false
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.server.persistentVolume.enabled
+          path: data["values.yaml"].server.persistentVolume.enabled
           value: false

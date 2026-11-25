@@ -1,16 +1,20 @@
 suite: test VMStack values and dependencies
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/vm-stack.yaml
 
 tests:
   - it: should write to local VMSingle by default
+    documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
     asserts:
       - equal:
-          path: spec.values.vmagent.spec.remoteWrite
+          path: data["values.yaml"].vmagent.spec.remoteWrite
           value:
             - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8428/api/v1/write
       - notExists:
-          path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
+          path: data["values.yaml"].vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
 
   - it: should pass through ordered destinations, per-destination Secrets, and explicit public write settings
     set:
@@ -32,27 +36,28 @@ tests:
         remoteWriteSettings: &writeSettings
           label: {container_id: "12345", cluster: "%{CLUSTER_NAME}", team: ops}
           queues: 8
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.vmagent.spec.remoteWrite
+          path: data["values.yaml"].vmagent.spec.remoteWrite
           value: *secretDestinations
       - equal:
-          path: spec.values.vmagent.spec.remoteWriteSettings
+          path: data["values.yaml"].vmagent.spec.remoteWriteSettings
           value: *writeSettings
       - equal:
-          path: spec.values.vmagent.spec.externalLabels
+          path: data["values.yaml"].vmagent.spec.externalLabels
           value: {team: ops}
       - equal:
-          path: spec.values.vmagent.spec.extraEnvs
+          path: data["values.yaml"].vmagent.spec.extraEnvs
           value: [{name: CLUSTER_NAME, value: example}]
       - equal:
-          path: spec.values.vmagent.spec.extraArgs["remoteWrite.maxRowsPerBlock"]
+          path: data["values.yaml"].vmagent.spec.extraArgs["remoteWrite.maxRowsPerBlock"]
           value: "12000"
       - equal:
-          path: spec.values.vmagent.spec.extraArgs["promscrape.streamParse"]
+          path: data["values.yaml"].vmagent.spec.extraArgs["promscrape.streamParse"]
           value: "true"
       - notExists:
-          path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
+          path: data["values.yaml"].vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
 
   - it: should pass through an explicit host token mount and positional bearer token argument
     set:
@@ -72,20 +77,25 @@ tests:
           - {name: o11ytoken, mountPath: /o11ytoken, readOnly: true}
     asserts:
       - equal:
-          path: spec.values.vmagent.spec.remoteWrite
+          path: data["values.yaml"].vmagent.spec.remoteWrite
           value: *hostPathDestinations
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
+          path: data["values.yaml"].vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
           value: '/o11ytoken/tsa-token,"",""'
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.vmagent.spec.volumes
+          path: data["values.yaml"].vmagent.spec.volumes
           value: *hostPathVolumes
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.vmagent.spec.volumeMounts
+          path: data["values.yaml"].vmagent.spec.volumeMounts
           value: *hostPathMounts
+        documentSelector: *baseConfigMap
       - notContains:
           path: spec.dependsOn
           content: {name: RELEASE-NAME-tsa-token-writer}
+        documentSelector: &helmRelease {path: kind, value: HelmRelease}
 
   - it: should accept the explicit local-only list with the public endpoint flag disabled
     set:
@@ -94,49 +104,60 @@ tests:
         - url: http://local.example.invalid/write
     asserts:
       - equal:
-          path: spec.values.vmagent.spec.remoteWrite
+          path: data["values.yaml"].vmagent.spec.remoteWrite
           value:
             - url: http://local.example.invalid/write
+        documentSelector: *baseConfigMap
       - notExists:
-          path: spec.values.vmagent.spec.extraEnvs
+          path: data["values.yaml"].vmagent.spec.extraEnvs
+        documentSelector: *baseConfigMap
       - notExists:
-          path: spec.values.vmagent.spec.remoteWriteSettings
+          path: data["values.yaml"].vmagent.spec.remoteWriteSettings
+        documentSelector: *baseConfigMap
       - notContains:
           path: spec.dependsOn
           content: {name: RELEASE-NAME-tsa-token-writer}
+        documentSelector: *helmRelease
 
   - it: should leave explicitly configured destinations in place when the public endpoint flag is disabled
     set:
       observability.publicEndpointEnabled: false
       observability.vmStack.values.vmagent.spec.remoteWrite: *secretDestinations
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.vmagent.spec.remoteWrite
+          path: data["values.yaml"].vmagent.spec.remoteWrite
           value: *secretDestinations
 
   - it: should pass an explicit empty remote-write list through
     set:
       observability.vmStack.values.vmagent.spec.remoteWrite: []
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.vmagent.spec.remoteWrite
+          path: data["values.yaml"].vmagent.spec.remoteWrite
           value: []
 
-  - it: should omit inline values and preserve the Flux ConfigMap ordering when values is null
+  - it: should generate an empty values map and preserve the Flux ConfigMap ordering when values is null
     set:
       observability.vmStack.values: null
     asserts:
-      - notExists:
-          path: spec.values
+      - equal:
+          path: data["values.yaml"]
+          value: {}
+        documentSelector: *baseConfigMap
       - equal:
           path: spec.valuesFrom
           value:
+            - {kind: ConfigMap, name: RELEASE-NAME-vm-stack-values, valuesKey: values.yaml}
             - {kind: ConfigMap, name: terraform-victoria-metrics-operator, optional: true, valuesKey: values.yaml}
             - {kind: ConfigMap, name: victoria-metrics-operator, optional: true, valuesKey: values.yaml}
+        documentSelector: *helmRelease
 
   - it: should depend on the generated HelmRelease names
     set:
       fullnameOverride: platform
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn
@@ -150,6 +171,7 @@ tests:
       fullnameOverride: platform
       observability.vmStack.dependsOn:
         - name: '{{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}'
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn
@@ -164,17 +186,20 @@ tests:
           bearerTokenSecret: {name: existing, key: accessToken}
     asserts:
       - equal:
-          path: spec.values.vmagent.spec.remoteWrite[0].bearerTokenSecret
+          path: data["values.yaml"].vmagent.spec.remoteWrite[0].bearerTokenSecret
           value: {name: existing, key: accessToken}
+        documentSelector: *baseConfigMap
       - equal:
           path: spec.dependsOn
           value:
             - {name: RELEASE-NAME-ns}
             - {name: RELEASE-NAME-victoria-metrics-operator-crds}
+        documentSelector: *helmRelease
 
   - it: should accept explicit Flux dependencies
     set:
       observability.vmStack.dependsOn: [{name: metrics-ready, namespace: ops}]
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn
@@ -183,6 +208,7 @@ tests:
   - it: should clear the Flux dependencies with an empty list
     set:
       observability.vmStack.dependsOn: []
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.dependsOn

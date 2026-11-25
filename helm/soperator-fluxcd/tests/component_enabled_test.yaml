@@ -14,10 +14,13 @@ tests:
       - templates/opentelemetry-collector-nccl-profiles.yaml
     documentSelector:
       path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles-cm
+      value: RELEASE-NAME-otelcol-nccl-profiles-cm-values
+    postRenderer: &decodeValues
+      cmd: yq
+      args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
     asserts:
       - exists:
-          path: 'spec.values.resources[0].data.relay'
+          path: 'data["values.yaml"].resources[0].data.relay'
 
   - it: should render nccl profiles collector when ncclProfiles.enabled=true
     set:
@@ -28,10 +31,11 @@ tests:
       - templates/opentelemetry-collector-nccl-profiles.yaml
     documentSelector:
       path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles
+      value: RELEASE-NAME-otelcol-nccl-profiles-values
+    postRenderer: *decodeValues
     asserts:
       - exists:
-          path: 'spec.values.podMonitor'
+          path: 'data["values.yaml"].podMonitor'
 
   - it: should render jail logs component when jailLogs.enabled=true
     set:
@@ -40,9 +44,11 @@ tests:
       observability.opentelemetry.jailLogs.enabled: true
     templates:
       - templates/opentelemetry-collector-jail-logs.yaml
+    documentSelector: {path: kind, value: ConfigMap, matchMany: true}
+    postRenderer: *decodeValues
     asserts:
       - exists:
-          path: spec.values.config.receivers["filelog/health_checker"]
+          path: data["values.yaml"].config.receivers["filelog/health_checker"]
   - it: should not render jail logs component when jailLogs.enabled=false
     set:
       observability.enabled: true
@@ -60,7 +66,7 @@ tests:
       - templates/tailscale.yaml
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
   - it: should not render tailscale component when tailscale.enabled=false
     set:
       tailscale.enabled: false
@@ -76,21 +82,26 @@ tests:
       - templates/nodesets.yaml
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - isKind:
           of: HelmRelease
+        documentSelector: &helmRelease {path: kind, value: HelmRelease, matchMany: true}
       - equal:
           path: metadata.name
           value: RELEASE-NAME-nodesets
+        documentSelector: *helmRelease
       - equal:
           path: spec.chart.spec.chart
           value: helm-nodesets
+        documentSelector: *helmRelease
       - equal:
           path: spec.releaseName
           value: soperator-nodesets
+        documentSelector: *helmRelease
       - equal:
           path: spec.targetNamespace
           value: soperator
+        documentSelector: *helmRelease
   - it: should not render nodesets component when nodesets.enabled=false
     set:
       nodesets.enabled: false

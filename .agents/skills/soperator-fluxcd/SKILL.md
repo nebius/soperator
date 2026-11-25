@@ -9,8 +9,10 @@ Read the repository instructions and `helm/soperator-fluxcd/README.md`. Identify
 
 ## Native chart values
 
-- Put defaults under `<component>.values` using the child chart's actual keys. Pass them directly to `spec.values`. Keep installation metadata such as `enabled`, `namespace`, and `dependsOn` on the component.
-- Preserve the order of existing `valuesFrom` entries. We should not use inline values. Helm merges native maps and replaces lists. Check Managed and Pro generators for the affected keys and coordinate upgrades when their profiles use them.
+- Put defaults under `<component>.values` using the child chart's native keys. Keep installation metadata such as `enabled`, `namespace`, and `dependsOn` on the component.
+- For every child HelmRelease, use the chart's shared helpers to generate a values ConfigMap and its required first `spec.valuesFrom` reference. Omit `spec.values` entirely. Name the ConfigMap `<fullname>-<component-suffix>-values` and keep it in the HelmRelease's namespace. Store an empty map as `{}` under `data["values.yaml"]`.
+- Put additional references in `<component>.valuesFrom`. Preserve their order and native Flux fields. An empty or null list leaves the generated ConfigMap as the sole reference. Use a referenced Secret for credentials.
+- Check Managed and Pro generators for overlapping keys during upgrades. Later references override the umbrella defaults, maps merge, and lists replace earlier lists.
 - Set endpoints, child chart namespaces, and integration flags in values or in the profile that knows the deployment context.
 
 ## HelmRelease dependencies
@@ -28,5 +30,6 @@ For external Flux releases, supply their actual `metadata.name` and `metadata.na
 ## Verification
 
 - Compare default and all-enabled renders. Toggle independently optional prerequisites and check that no default edge points to a missing HelmRelease. Exercise an override with `fullnameOverride`, an external reference, `[]`, and `null` when changing the dependency contract.
+- For every rendered HelmRelease, verify the first reference resolves to its generated ConfigMap and `spec.values` is absent. Decode `data["values.yaml"]` to check child values. Exercise additional ConfigMap and Secret references, list ordering, and an empty external list.
 - Render the affected child charts when changing native values and compare resources that rely on them. The umbrella API check validates generated resources, including HelmRelease objects. A separate child chart render shows the workloads a HelmRelease would install.
 - After chart edits, run `make sync-version-from-scratch`, `make helmtest`, `make test-helm-api`, `make test`, and `make lint` as applicable. Use the Kubernetes version configured in `Makefile` for API validation. Report checks limited by missing cached dependencies when working offline.

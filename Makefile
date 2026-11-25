@@ -621,9 +621,9 @@ install-flux: | $(LOCALBIN) ## Download flux CLI locally if necessary.
 .PHONY: helmtest check-helm install-helm install-unittest
 
 ## helm unittest: Run helm unittest for all charts
-helmtest: check-helm
+helmtest: check-helm yq
 	@echo "Running helm unittest"
-	@helm unittest $(CHART_PATH)/*/
+	@PATH="$(dir $(YQ)):$$PATH" helm unittest $(CHART_PATH)/*/
 
 .PHONY: test-helm-api
 test-helm-api: envtest install-flux ## Apply the rendered Flux charts to an isolated Kubernetes API server.
