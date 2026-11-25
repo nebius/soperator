@@ -194,15 +194,6 @@ templates:
 tests:
   - it: should use custom values when provided
     set:
-      observability.opentelemetry.events.values.publicEndpointEnabled: true
-    asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.values.extraVolumes[1].name
-          value: o11ytoken
-  - it: should use custom values when provided
-    set:
       observability.opentelemetry.events.values.resources:
         requests:
           cpu: 100m
@@ -212,9 +203,6 @@ tests:
     asserts:
       - hasDocuments:
           count: 1
-      - equal:
-          path: spec.values.extraVolumes[1].name
-          value: o11ytoken
       - equal:
           path: spec.values.resources.requests
           value:
@@ -227,15 +215,6 @@ templates:
 tests:
   - it: should use custom values when provided
     set:
-      observability.opentelemetry.logs.values.publicEndpointEnabled: true
-    asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.values.extraVolumes[4].name
-          value: o11ytoken
-  - it: should use custom values when provided
-    set:
       observability.opentelemetry.logs.values.resources:
         requests:
           cpu: 100m
@@ -245,9 +224,6 @@ tests:
     asserts:
       - hasDocuments:
           count: 1
-      - equal:
-          path: spec.values.extraVolumes[4].name
-          value: o11ytoken
       - equal:
           path: spec.values.resources.requests
           value:

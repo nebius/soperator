@@ -197,7 +197,7 @@ Note: Production scraping requires a ServiceMonitor with proper RBAC authenticat
 - Storage: Uses file storage under `/var/lib/otelcol` when `observability.ncclProfiles.values.enableFileStorage` is enabled
 - Runtime limits: Sets `GOMAXPROCS` from `observability.ncclProfiles.values.resources`; passes `useGoMemLimit` through to upstream `useGOMEMLIMIT`
 
-The NCCL profiles collector follows the same Go runtime sizing rules as the log collectors:
+The NCCL profiles collector derives its Go runtime settings from its resource values.
 
 - CPU limits are preferred over CPU requests; values are rounded up to at least one process (`500m` -> `1`, `2` -> `2`).
 - When `useGoMemLimit` is enabled, the upstream OpenTelemetry collector chart derives `GOMEMLIMIT` from `resources.limits.memory`.

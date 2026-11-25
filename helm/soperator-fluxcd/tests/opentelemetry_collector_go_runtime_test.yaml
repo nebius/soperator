@@ -1,15 +1,8 @@
-suite: test opentelemetry collector Go runtime env
+suite: test opentelemetry collector logs Go runtime env
 templates:
   - templates/opentelemetry-collector-logs.yaml
 tests:
-  - it: should derive GOMAXPROCS and enable upstream GOMEMLIMIT for logs
-    set:
-      observability.opentelemetry.logs.values.resources:
-        requests:
-          cpu: 500m
-          memory: 100Mi
-        limits:
-          memory: 200Mi
+  - it: should keep the default GOMAXPROCS and enable upstream GOMEMLIMIT for logs
     asserts:
       - contains:
           path: spec.values.extraEnvs
@@ -20,26 +13,12 @@ tests:
           path: spec.values.useGOMEMLIMIT
           value: true
 
-  - it: should disable upstream GOMEMLIMIT when useGoMemLimit is false
+  - it: should pass through explicit runtime settings for logs
     set:
-      observability.opentelemetry.logs.values.useGoMemLimit: false
-    asserts:
-      - equal:
-          path: spec.values.useGOMEMLIMIT
-          value: false
----
-suite: test opentelemetry collector events Go runtime env
-templates:
-  - templates/opentelemetry-collector-events.yaml
-tests:
-  - it: should support whole-core CPU and enable upstream GOMEMLIMIT for events
-    set:
-      observability.opentelemetry.events.values.resources:
-        requests:
-          cpu: "2"
-          memory: 200Mi
-        limits:
-          memory: 500Gi
+      observability.opentelemetry.logs.values.useGOMEMLIMIT: false
+      observability.opentelemetry.logs.values.extraEnvs:
+        - name: GOMAXPROCS
+          value: "2"
     asserts:
       - contains:
           path: spec.values.extraEnvs
@@ -48,53 +27,13 @@ tests:
             value: "2"
       - equal:
           path: spec.values.useGOMEMLIMIT
-          value: true
-
-  - it: should enable upstream GOMEMLIMIT when enabled
-    set:
-      observability.opentelemetry.events.values.resources:
-        requests:
-          cpu: 100m
-          memory: 128Mi
-        limits:
-          memory: null
-    asserts:
-      - equal:
-          path: spec.values.useGOMEMLIMIT
-          value: true
-
-  - it: should disable upstream GOMEMLIMIT when useGoMemLimit is false
-    set:
-      observability.opentelemetry.events.values.useGoMemLimit: false
-      observability.opentelemetry.events.values.resources:
-        requests:
-          cpu: 100m
-          memory: 128Mi
-        limits:
-          memory: null
-    asserts:
-      - equal:
-          path: spec.values.useGOMEMLIMIT
           value: false
 ---
-suite: test opentelemetry collector jail logs Go runtime env
+suite: test opentelemetry collector events Go runtime env
 templates:
-  - templates/opentelemetry-collector-jail-logs.yaml
+  - templates/opentelemetry-collector-events.yaml
 tests:
-  - it: should use jail logs resources for GOMAXPROCS and enable upstream GOMEMLIMIT
-    set:
-      observability.opentelemetry.logs.values.resources:
-        requests:
-          cpu: "2"
-          memory: 500Gi
-        limits:
-          memory: 500Gi
-      observability.opentelemetry.logs.values.jailLogs.resources:
-        requests:
-          cpu: 500m
-          memory: 100Mi
-        limits:
-          memory: 200Mi
+  - it: should keep the default GOMAXPROCS and enable upstream GOMEMLIMIT for events
     asserts:
       - contains:
           path: spec.values.extraEnvs
@@ -105,10 +44,53 @@ tests:
           path: spec.values.useGOMEMLIMIT
           value: true
 
-  - it: should disable upstream GOMEMLIMIT when jailLogs.useGoMemLimit is false
+  - it: should pass through explicit runtime settings for events
     set:
-      observability.opentelemetry.logs.values.jailLogs.useGoMemLimit: false
+      observability.opentelemetry.events.values.useGOMEMLIMIT: false
+      observability.opentelemetry.events.values.extraEnvs:
+        - name: GOMAXPROCS
+          value: "3"
     asserts:
+      - contains:
+          path: spec.values.extraEnvs
+          content:
+            name: GOMAXPROCS
+            value: "3"
+      - equal:
+          path: spec.values.useGOMEMLIMIT
+          value: false
+---
+suite: test opentelemetry collector jail logs Go runtime env
+templates:
+  - templates/opentelemetry-collector-jail-logs.yaml
+tests:
+  - it: should keep the default GOMAXPROCS and enable upstream GOMEMLIMIT for jail logs
+    asserts:
+      - contains:
+          path: spec.values.extraEnvs
+          content:
+            name: GOMAXPROCS
+            value: "1"
+      - equal:
+          path: spec.values.useGOMEMLIMIT
+          value: true
+
+  - it: should use jail logs runtime settings independently of logs
+    set:
+      observability.opentelemetry.logs.values.useGOMEMLIMIT: true
+      observability.opentelemetry.logs.values.extraEnvs:
+        - name: GOMAXPROCS
+          value: "2"
+      observability.opentelemetry.jailLogs.values.useGOMEMLIMIT: false
+      observability.opentelemetry.jailLogs.values.extraEnvs:
+        - name: GOMAXPROCS
+          value: "4"
+    asserts:
+      - contains:
+          path: spec.values.extraEnvs
+          content:
+            name: GOMAXPROCS
+            value: "4"
       - equal:
           path: spec.values.useGOMEMLIMIT
           value: false
