@@ -113,9 +113,10 @@ func TestEveryEmbeddedFeatureIsRegisteredOrManual(t *testing.T) {
 }
 
 // featureTargetVersions overrides the Soperator version a feature is checked against. A feature
-// bounded to older clusters selects nothing at the current version, which says nothing about
+// whose tag excludes the default version selects nothing there, which says nothing about
 // whether it is runnable, so it is checked at a version its tag actually covers.
 var featureTargetVersions = map[string]string{
+	"features/login_updates.feature":   "5.1.0",
 	"features/topology_legacy.feature": "4.0.0",
 }
 
@@ -145,6 +146,31 @@ func TestEmbeddedFeaturesAreRunnable(t *testing.T) {
 			)
 			require.NoError(t, err)
 			assert.NotEmpty(t, selected)
+		})
+	}
+}
+
+func TestLoginUpdatesVersionAndSequentialFiltering(t *testing.T) {
+	for _, test := range []struct {
+		version string
+		cases   int
+	}{
+		{version: "4.1.14", cases: 0},
+		{version: "5.0.0", cases: 0},
+		{version: "5.0.0-rabcdef", cases: 0},
+		{version: "5.0.1", cases: 0},
+		{version: "5.1.0", cases: 3},
+	} {
+		t.Run(test.version, func(t *testing.T) {
+			suite := SoperatorSuite(test.version)
+			suite.Source.Paths = []string{"features/login_updates.feature"}
+			selected := selectedCases(t, suite, test.version)
+			require.Len(t, selected, test.cases)
+
+			partitions := ConcurrentSuites(suite, 1)
+			require.Len(t, partitions, 2)
+			assert.Equal(t, selected, selectedCases(t, partitions[0], test.version))
+			assert.Empty(t, selectedCases(t, partitions[1], test.version))
 		})
 	}
 }

@@ -79,11 +79,14 @@ type SlurmClusterAccounting struct {
 
 type SlurmClusterLogin struct {
 	SSSDConfig
-	Size          int32           `json:"size"`
-	UserIsolation json.RawMessage `json:"userIsolation"`
-	Autoscaling   json.RawMessage `json:"autoscaling"`
-	Sshd          struct {
+	Size           int32           `json:"size"`
+	UserIsolation  json.RawMessage `json:"userIsolation"`
+	Autoscaling    json.RawMessage `json:"autoscaling"`
+	UpdateStrategy string          `json:"updateStrategy"`
+	UpdatePolicy   json.RawMessage `json:"updatePolicy"`
+	Sshd           struct {
 		Resources corev1.ResourceList `json:"resources"`
+		CustomEnv []corev1.EnvVar     `json:"customEnv"`
 	} `json:"sshd"`
 	CustomInitContainers []corev1.Container       `json:"customInitContainers"`
 	Docker               SlurmClusterLoginDocker  `json:"docker"`
