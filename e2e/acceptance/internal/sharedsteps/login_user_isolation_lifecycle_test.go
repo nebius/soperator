@@ -261,7 +261,7 @@ func TestMemoryScenarioRequestsOnlyAnnouncedOutdatedPods(t *testing.T) {
 				test.mutate(&sts, &pod)
 			}
 			s := NewLoginUserIsolation(&framework.ClusterInfo{}, runtime, framework.NewKubectlClient(runtime))
-			require.NoError(t, s.requestMemoryPodUpdates(t.Context(), sts, []corev1.Pod{pod}))
+			require.NoError(t, s.requestLoginPodUpdates(t.Context(), sts, []corev1.Pod{pod}))
 			assert.Equal(t, test.restart, len(runtime.restarts) == 1)
 		})
 	}
