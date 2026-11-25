@@ -186,3 +186,22 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: should replace the default dependency with a configured HelmRelease reference
+    set:
+      fullnameOverride: storage
+      observability.tsaToken.writer.dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-prerequisite'
+          namespace: ops
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value: [{name: storage-prerequisite, namespace: ops}]
+
+  - it: should clear the default dependency with an empty list
+    set:
+      observability.tsaToken.writer.dependsOn: []
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value: []

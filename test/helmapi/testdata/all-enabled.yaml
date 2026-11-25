@@ -37,5 +37,18 @@ tailscale:
   enabled: true
   namespace: flux-api-slurm
 observability:
+  vmStack:
+    namespace: logs-system
+    values:
+      vmagent:
+        spec:
+          remoteWrite:
+            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.logs-system.svc.cluster.local.:8428/api/v1/write
+      grafana:
+        sidecar:
+          dashboards:
+            searchNamespace: &grafanaSearchNamespaces [flux-api-slurm, soperator-system, gpu-operator, logs-system, monitoring-system]
+          datasources:
+            searchNamespace: *grafanaSearchNamespaces
   ncclProfiles:
     enabled: true

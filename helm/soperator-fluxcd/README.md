@@ -30,6 +30,7 @@ Set `values` on the component to pass the child chart's native keys to `spec.val
 | `vm-logs` | `observability.vmLogs` |
 | `dcgm-exporter` | `observability.dcgmExporter` |
 | `soperator-notifier` | `notifier` |
+| `vm-stack` | `observability.vmStack` |
 
 During migration, `customConfigmaps` and `soperator.monitoringDashboards` read `overrideValues` when `values` is absent or `null`.
 Move existing overrides to `values`. An explicit `values: {}` takes precedence over the legacy override.
@@ -39,6 +40,7 @@ Cert-manager and k8up also apply `prometheusValues` when `observability.promethe
 Existing nonempty `overrideValues` for these three components still replace the full inline map.
 Kruise merges legacy overrides with its moved defaults so partial resource overrides retain the image and CRD settings.
 Tailscale passes its Raw-chart resources through `tailscale.values.resources` and resolves the namespace references in that map.
+The `tsa-token-writer` HelmRelease generates its Deployment and namespace-scoped RBAC for the Bedag Raw chart from `observability.tsaToken`. Its dependency list is configured through `observability.tsaToken.writer.dependsOn`.
 
 For `soperator` and `soperator.nodeConfigurator`, move settings from `overrideValues` to `values` in the same component.
 Helm merges the new `values` maps with the chart defaults.
@@ -102,6 +104,39 @@ The default `notifier.dependsOn` list waits for the namespaces and VMStack HelmR
 
 If the chart and its values ConfigMap are applied separately, suspend the umbrella HelmRelease before publishing either update and resume it after both updates are in place.
 
+### VMStack upgrades
+
+Move `observability.vmStack.overrideValues` to `observability.vmStack.values`. Use native `victoria-metrics-k8s-stack` keys. Managed and Pro profiles use the old kube-state-metrics and node-exporter paths and need the same changes when upgrading.
+
+| Previous path under `observability.vmStack.values` | Native path |
+| --- | --- |
+| `kubeStateMetrics.resources`, `kubeStateMetrics.affinity` | `kube-state-metrics.resources`, `kube-state-metrics.affinity` |
+| `kubeStateMetrics.maxScrapeSize` | `max_scrape_size` on the `http` entry of `kube-state-metrics.vmScrape.spec.endpoints` |
+| `prometheusNodeExporter` | `prometheus-node-exporter` |
+| `victoriaMetricsOperator` | `victoria-metrics-operator` |
+| `grafanaIni` | `grafana["grafana.ini"]` |
+| `dashboardNamespaces` | `grafana.sidecar.dashboards.searchNamespace` and `grafana.sidecar.datasources.searchNamespace` |
+
+Helm replaces lists as a whole. When changing the kube-state-metrics scrape size, carry over both endpoints and their relabeling rules from this chart's defaults. Set the Grafana sidecar namespace lists and remote-write URLs explicitly when changing component namespaces or the VMSingle service name.
+
+VMStack defaults to the local VMSingle. The public endpoint flags configure OpenTelemetry and the shared token writer. Managed and Pro profiles must supply the complete `vmStack.values.vmagent.spec.remoteWrite` list, including the local URL if they use VMSingle. Set the public URL with the resolved region and project ID, the destination's relabel rules, and any write settings and labels in native vmagent values.
+
+For Secret authentication, set `bearerTokenSecret` on the public destination. If the TSA token writer maintains that Secret, copy the default `vmStack.dependsOn` list and add the commented writer entry in `values.yaml`. For a host token file, set `volumes`, `volumeMounts`, and `extraArgs["remoteWrite.bearerTokenFile"]`. Keep each entry in that argument aligned with its destination and use empty entries for destinations that have their own authentication. This example keeps both a Secret-authenticated destination and local storage.
+
+```yaml
+observability:
+  vmStack:
+    values:
+      vmagent:
+        spec:
+          remoteWrite:
+            - url: https://metrics.example.invalid/write
+              bearerTokenSecret: {name: metrics-credentials, key: token}
+            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8428/api/v1/write
+```
+
+A nonempty legacy `overrideValues` replaced the entire inline configuration. Migrating that map to `values` adds the chart defaults for omitted keys, including Grafana authentication and VMSingle storage. To retain the previous effective values for the whole stack, merge the legacy map over the current contents of the `victoria-metrics-operator` values ConfigMap and set `observability.vmStack.values: null`. Flux reads `terraform-victoria-metrics-operator` first, then `victoria-metrics-operator`. To source only the destination list from those ConfigMaps, set the inline `remoteWrite` field to `null`.
+
 ## HelmRelease dependencies
 
 The chart declares its default dependency lists in `values.yaml`. Supply `dependsOn` on a component to replace its list.
@@ -147,7 +182,7 @@ Changing the `targetNamespace` of an installed HelmRelease causes Flux to uninst
 | `csiDriverNfs.namespace` | NFS CSI driver | `<fullname>-ns` |
 | `storageClasses.namespace` | StorageClasses Helm target | `<fullname>-ns` |
 | `notifier.namespace` | Notifier | `<fullname>-ns` |
-| `observability.vmStack.namespace` | VMStack, its local remote-write endpoint, NCCL collectors and the token writer when VMStack is enabled | `<fullname>-ns` |
+| `observability.vmStack.namespace` | VMStack, NCCL collectors and the token writer when VMStack is enabled | `<fullname>-ns` |
 | `observability.vmLogs.namespace` | VictoriaLogs | `<fullname>-ns` |
 | `observability.opentelemetry.namespace` | OpenTelemetry collectors and the token writer when only OpenTelemetry is enabled | `<fullname>-ns` |
 | `observability.prometheusOperator.namespace` | Monitoring namespace declaration for the cluster-scoped Prometheus CRD release | `<fullname>-ns` |
@@ -163,11 +198,22 @@ VictoriaLogs and the OpenTelemetry collectors share a namespace when using the d
 observability:
   vmStack:
     namespace: metrics
+    values:
+      vmagent:
+        spec:
+          remoteWrite:
+            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.metrics.svc.cluster.local.:8428/api/v1/write
+      grafana:
+        sidecar:
+          dashboards:
+            searchNamespace: [soperator, soperator-system, gpu-operator, monitoring-system, metrics, logs]
+          datasources:
+            searchNamespace: [soperator, soperator-system, gpu-operator, monitoring-system, metrics, logs]
   vmLogs:
     namespace: logs
   opentelemetry:
     namespace: logs
 ```
 
-The namespace generator emits `metrics` and `logs` once each. Grafana discovery and token writer references use the component namespaces.
+The namespace generator emits `metrics` and `logs` once each. The Grafana lists also include `monitoring-system`, where monitoring dashboard ConfigMaps are installed by default.
 CRD-only releases use the same release placement in Flux across all namespace profiles.

@@ -31,25 +31,29 @@ tests:
           path: spec.values.global.leaderElection.namespace
           value: certificates
 
-  - it: should use the configured namespaces for metrics endpoints and dashboard discovery
+  - it: should pass explicit metrics endpoints and Grafana discovery namespaces
     template: templates/vm-stack.yaml
     set:
       observability.vmStack.namespace: metrics
       observability.vmLogs.namespace: telemetry
       observability.opentelemetry.namespace: telemetry
+      observability.vmStack.values.vmagent.spec.remoteWrite:
+        - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.metrics.svc.cluster.local.:8428/api/v1/write
+      observability.vmStack.values.grafana.sidecar.dashboards.searchNamespace: [metrics, telemetry]
+      observability.vmStack.values.grafana.sidecar.datasources.searchNamespace: [metrics, telemetry]
     asserts:
       - equal:
           path: spec.targetNamespace
           value: metrics
       - equal:
-          path: spec.values.vmagent.spec.remoteWrite[1].url
+          path: spec.values.vmagent.spec.remoteWrite[0].url
           value: http://vmsingle-metrics-victoria-metrics-k8s-stack.metrics.svc.cluster.local.:8428/api/v1/write
-      - contains:
+      - equal:
           path: spec.values.grafana.sidecar.dashboards.searchNamespace
-          content: metrics
-      - contains:
-          path: spec.values.grafana.sidecar.dashboards.searchNamespace
-          content: telemetry
+          value: [metrics, telemetry]
+      - equal:
+          path: spec.values.grafana.sidecar.datasources.searchNamespace
+          value: [metrics, telemetry]
 
   - it: should wire token writer roles and subjects to their respective namespaces
     template: templates/o11y-tsa-token-writer.yaml

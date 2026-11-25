@@ -22,7 +22,9 @@ tests:
 
   - it: should allow overriding kube-state-metrics scrape size
     set:
-      observability.vmStack.values.kubeStateMetrics.maxScrapeSize: "150554432"
+      observability.vmStack.values.kube-state-metrics.vmScrape.spec.endpoints:
+        - {port: http, max_scrape_size: "150554432"}
+        - {port: metrics}
     asserts:
       - hasDocuments:
           count: 1
@@ -100,7 +102,7 @@ tests:
 
   - it: should pass kube-state-metrics resources through
     set:
-      observability.vmStack.values.kubeStateMetrics.resources:
+      observability.vmStack.values.kube-state-metrics.resources:
         requests:
           cpu: 200m
           memory: 1024Mi

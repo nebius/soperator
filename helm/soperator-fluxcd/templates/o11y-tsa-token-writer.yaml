@@ -45,8 +45,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-bedag
       version: {{ $writer.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" $writer "root" $) | nindent 2 }}
   install:
     remediation:
       retries: 3
