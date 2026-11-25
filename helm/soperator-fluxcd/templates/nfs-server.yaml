@@ -22,9 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-nfs-server
       version: {{ .Values.nfsServer.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  - name: {{ include "soperator-fluxcd.fullname" . }}-csi-driver-nfs
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.nfsServer "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.nfsServer.install | nindent 4 }}
   upgrade:

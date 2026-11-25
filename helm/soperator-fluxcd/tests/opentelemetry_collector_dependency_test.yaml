@@ -19,6 +19,19 @@ tests:
             - name: platform-ns
             - name: platform-vm-logs
 
+  - it: should skip the VictoriaLogs dependency when the bundled release is disabled
+    templates:
+      - templates/opentelemetry-collector-logs.yaml
+      - templates/opentelemetry-collector-jail-logs.yaml
+      - templates/opentelemetry-collector-events.yaml
+    set:
+      observability.vmLogs.enabled: false
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+
   - it: should resolve an explicit dependency on the TSA token writer
     set:
       observability.opentelemetry.events.dependsOn:
@@ -35,13 +48,9 @@ tests:
           content:
             name: platform-tsa-token-writer
 
-  - it: should wait for the umbrella NodeSets release when explicitly requested
+  - it: should wait for the umbrella NodeSets release when enabled
     set:
       nodesets.enabled: true
-      observability.opentelemetry.jailLogs.dependsOn:
-        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
-        - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-logs'
-        - name: '{{ include "soperator-fluxcd.fullname" . }}-nodesets'
     asserts:
       - template: templates/nodesets.yaml
         equal:

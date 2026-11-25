@@ -126,17 +126,22 @@ Helm replaces lists as a whole. When changing the kube-state-metrics scrape size
 
 VMStack defaults to the local VMSingle. The public endpoint flags configure the shared token writer. Managed and Pro profiles must supply the complete `vmStack.values.vmagent.spec.remoteWrite` list, including the local URL if they use VMSingle. Set the public URL with the resolved region and project ID, the destination's relabel rules, and any write settings and labels in native vmagent values.
 
-For Secret authentication, set `bearerTokenSecret` on the public destination. If the TSA token writer maintains that Secret, copy the default `vmStack.dependsOn` list and add the commented writer entry in `values.yaml`. For a host token file, set `volumes`, `volumeMounts`, and `extraArgs["remoteWrite.bearerTokenFile"]`. Keep each entry in that argument aligned with its destination and use empty entries for destinations that have their own authentication. This example keeps both a Secret-authenticated destination and local storage.
+For Secret authentication, set `bearerTokenSecret` on the public destination. If the bundled TSA token writer maintains that Secret, add its HelmRelease to the profile's `vmStack.dependsOn` list while keeping the other prerequisites. For a host token file, set `volumes`, `volumeMounts`, and `extraArgs["remoteWrite.bearerTokenFile"]`. Keep each entry in that argument aligned with its destination and use empty entries for destinations that have their own authentication. This example uses the bundled writer for the public destination and keeps local storage.
 
 ```yaml
 observability:
   vmStack:
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+      - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-victoria-metrics-operator-crds'
+      - name: '{{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}'
     values:
       vmagent:
         spec:
           remoteWrite:
             - url: https://metrics.example.invalid/write
-              bearerTokenSecret: {name: metrics-credentials, key: token}
+              bearerTokenSecret: {name: o11y-writer-sa-token, key: accessToken}
             - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8428/api/v1/write
 ```
 
@@ -150,13 +155,13 @@ Move `events.overrideValues` to `events.values`. The legacy `logs.overrideValues
 
 Nonempty legacy overrides replaced the inline map, while Helm merges the new maps with collector defaults. To retain an existing effective map, put it in the collector's values ConfigMap and set its inline `values` to `null`. For each collector, Flux reads the `terraform-opentelemetry-collector-<suffix>` ConfigMap first, then `opentelemetry-collector-<suffix>`, then applies inline values. The suffix is `logs`, `jail-logs`, or `events`. Set any defaulted inline field supplied by a ConfigMap to `null`.
 
-All three collectors send to VictoriaLogs by default. To keep sending to Nebius Cloud Logging, Managed and Pro profiles must add the public exporter under `values.config.exporters.otlp` with its regional endpoint, resolved `headers.iam-container`, any additional headers, authentication, and queue settings. Include `otlp` in the relevant `config.service.pipelines` exporter list. Enable `bearertokenauth` in both `config.extensions` and `config.service.extensions`, and use `extraVolumes` and `extraVolumeMounts` to mount the Secret or hostPath containing the file named by the authenticator. Add the commented dependency on the TSA token writer when it supplies that Secret.
+All three collectors send to VictoriaLogs by default and wait for its HelmRelease when the umbrella chart installs it. To keep sending to Nebius Cloud Logging, Managed and Pro profiles must add the public exporter under `values.config.exporters.otlp` with its regional endpoint, resolved `headers.iam-container`, any additional headers, authentication, and queue settings. Include `otlp` in the relevant `config.service.pipelines` exporter list. Enable `bearertokenauth` in both `config.extensions` and `config.service.extensions`, and use `extraVolumes` and `extraVolumeMounts` to mount the Secret or hostPath containing the file named by the authenticator. When the bundled TSA token writer supplies the Secret, add `{{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}` as a dependency name in that collector's `dependsOn` list.
 
 Move shared `batch`, `publicBatch`, and `sendingQueue` settings into each exporter's `sending_queue`. Keep the public `batch.max_size` at or below 1000 records and `queue_size` at or above `batch.min_size`. Copy cluster-specific labels into the transform statements and any environment variables they reference. Set `GOMAXPROCS` in `extraEnvs` when changing collector CPU sizing, and use the native `useGOMEMLIMIT` and `podMonitor` keys for the former Go memory limit and scrape settings.
 
 To replace `enableFileStorage: false`, remove the `file_storage` extension and its references from `config.service.extensions`, exporter queues, and file receivers that use it. Remove the matching volume, mounts, and initialization container from their lists. To disable node logs, remove `filelog/nodelogs` from the logs receiver map and pipeline along with the node logs mount, volume, and supplemental groups. Configure jail logs polling and file retention under `config.receivers.filelog` and `config.receivers.filelog/health_checker`.
 
-Jail logs waits for the namespaces and VictoriaLogs HelmReleases by default. When this umbrella chart installs NodeSets, add the commented `<fullname>-nodesets` entry to `jailLogs.dependsOn`. For separately supplied NodeSets, add their HelmRelease name and namespace if Flux manages them, or keep the default list if the NodeSet resources are applied directly. Set the reference from the external HelmRelease's `metadata.name` and `metadata.namespace`. Each override replaces the entire dependency list, so include the baseline dependencies in that list.
+Jail logs also waits for the bundled NodeSets HelmRelease when `nodesets.enabled` is true. For separately supplied NodeSets, add their HelmRelease name and namespace if Flux manages them, or use the default list if the NodeSet resources are applied directly. Set the reference from the external HelmRelease's `metadata.name` and `metadata.namespace`. Each override replaces the entire dependency list, so include the baseline dependencies in that list.
 
 ```yaml
 observability:
@@ -164,7 +169,7 @@ observability:
     jailLogs:
       dependsOn:
         - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
-        - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-logs'
+        - name: '{{ if .Values.observability.vmLogs.enabled }}{{ include "soperator-fluxcd.fullname" . }}-vm-logs{{ end }}'
         - name: worker-nodesets
           namespace: flux-system
 ```
@@ -242,20 +247,18 @@ The chart declares its default dependency lists in `values.yaml`. Supply `depend
 An empty list clears the dependencies and renders `spec.dependsOn: []`. Setting a defaulted key to `null` removes it during Helm's values merge.
 The template renders `spec.dependsOn` only when the merged values contain the key. Any `null` that Helm retains renders as `[]` to satisfy the Flux schema.
 
-Use the chart's fullname helper to reference a HelmRelease in the same chart. The dependency name then follows the release name or `fullnameOverride`.
+Use the chart's fullname helper to reference a HelmRelease in the same chart. The dependency name then follows the release name or `fullnameOverride`. For a bundled HelmRelease that can be independently disabled, guard the name with its render condition. When the condition is false, the helper skips the empty reference.
 
 ```yaml
-backup:
-  config:
-    values:
-      bucket:
-        name: cluster-backups
-    dependsOn:
-      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+soperator:
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ if .Values.soperator.kruise.enabled }}{{ include "soperator-fluxcd.fullname" . }}-kruise{{ end }}'
+    - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
 ```
 
 A literal `name` references an existing HelmRelease by its name. Flux fields such as `namespace` are forwarded as supplied.
-A dependency whose Helm name expression resolves to an empty string is omitted from the rendered list.
+When using an external component, supply its prerequisites and endpoints in the profile. If Flux manages that component, add its HelmRelease name and namespace to the consumer's `dependsOn` along with the other prerequisites.
 
 ## Namespaces
 

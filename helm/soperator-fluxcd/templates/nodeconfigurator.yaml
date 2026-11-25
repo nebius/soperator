@@ -22,8 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.soperator.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.soperator.nodeConfigurator "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.soperator.nodeConfigurator.install | nindent 4 }}
   interval: {{ .Values.soperator.nodeConfigurator.interval }}

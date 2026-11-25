@@ -22,12 +22,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.slurmCluster.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  - name: {{ include "soperator-fluxcd.fullname" . }}-storageclasses
-  {{- if .Values.soperator.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
-  {{- end }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.slurmCluster.slurmClusterStorage "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.slurmCluster.slurmClusterStorage.install | nindent 4 }}
   upgrade:
