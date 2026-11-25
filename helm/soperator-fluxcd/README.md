@@ -34,6 +34,8 @@ Set `values` on the component to pass the child chart's native keys to `spec.val
 | `opentelemetry-collector-logs` | `observability.opentelemetry.logs` |
 | `opentelemetry-collector-jail-logs` | `observability.opentelemetry.jailLogs` |
 | `opentelemetry-collector-events` | `observability.opentelemetry.events` |
+| `otelcol-nccl-profiles-cm` | `observability.ncclProfiles.configMap` |
+| `otelcol-nccl-profiles` | `observability.ncclProfiles.collector` |
 
 During migration, `customConfigmaps` and `soperator.monitoringDashboards` read `overrideValues` when `values` is absent or `null`.
 Move existing overrides to `values`. An explicit `values: {}` takes precedence over the legacy override.
@@ -166,6 +168,73 @@ observability:
         - name: worker-nodesets
           namespace: flux-system
 ```
+
+### NCCL profile upgrades
+
+Set `observability.ncclProfiles.configMap.values` to native Bedag Raw values and `observability.ncclProfiles.collector.values` to native OpenTelemetry values. The Raw release creates a ConfigMap containing the complete collector configuration as a YAML string in `data.relay`. Both releases target `observability.vmStack.namespace`. The ConfigMap inherits that namespace from the Raw release. If a profile uses a custom `ncclProfiles.releaseName`, copy the installed ConfigMap name (previously `<releaseName>-agent`) into both the Raw resource's `metadata.name` and the collector's `configMap.existingName`. Set `configMap.create: false` in the collector to mount that ConfigMap.
+
+If a Flux `postRenderers` patch selects the Raw ConfigMap with `target.namespace`, set `metadata.namespace` explicitly on the ConfigMap in `configMap.values.resources`. Flux applies the patch before Helm assigns the target namespace to a resource without one.
+
+The Raw release depends on the namespaces release by default. The collector depends on the namespaces, VMStack, and `<fullname>-otelcol-nccl-profiles-cm` HelmReleases. When supplying `configMap.dependsOn` or `collector.dependsOn`, include the prerequisites for that release in the new list.
+
+The former `configMapOverrideValues` and `collectorOverrideValues` replaced the entire inline map for their respective releases. Use `configMap.values` and `collector.values` for partial overrides that should inherit the umbrella chart defaults. For example, when configuring the collector to create its own ConfigMap, clear the default reference to the Raw ConfigMap and provide the desired collector configuration under `collector.values.config`.
+
+```yaml
+observability:
+  ncclProfiles:
+    collector:
+      values:
+        configMap:
+          create: true
+          existingName: null
+```
+
+To preserve a full legacy override, merge it over the current contents of the `values.yaml` key in the corresponding user `valuesFrom` ConfigMap, then set that release's inline `values` to `null`. Use `opentelemetry-collector-nccl-profiles-cm` for the Raw release or `opentelemetry-collector-nccl-profiles` for the collector. If the ConfigMap is missing, create it in the HelmRelease namespace. Flux reads the corresponding `terraform-` prefixed ConfigMap first, then the user ConfigMap. This preserves the legacy override's precedence and lets the child chart supply its own defaults.
+
+The shared profile runs one Deployment replica on a system node with the `Recreate` rollout strategy. To collect node-local profiles, set native values for a worker DaemonSet.
+
+```yaml
+observability:
+  ncclProfiles:
+    enabled: true
+    collector:
+      values:
+        mode: daemonset
+        replicaCount: null
+        rollout:
+          strategy: RollingUpdate
+          rollingUpdate:
+            maxUnavailable: 50%
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: slurm.nebius.ai/nodeset
+                      operator: In
+                      values: [worker]
+        tolerations:
+          - effect: NoSchedule
+            key: nvidia.com/gpu
+            operator: Exists
+```
+
+If the profiling directory varies by profile, copy the default Raw `resources` list and collector `initContainers` list. Change the receiver's `include` glob in `data.relay` and the `dump_dir` assigned by `init-nccl-profiles-dump-dir` to point to the same directory under `/mnt/jail` where the Slurm jobs write their profiles.
+
+Before upgrading profiles that supply the old `ncclProfiles.values` map, move the remaining settings to their native fields.
+
+| Former setting | Native setting |
+| --- | --- |
+| `batch.timeout`, `batch.sendBatchSize`, `batch.sendBatchMaxSize` | `sending_queue.batch.flush_timeout`, `min_size`, and `max_size` on the OTLP HTTP exporter inside `data.relay` |
+| `sendingQueue.queueSize`, `sendingQueue.numConsumers` | `sending_queue.queue_size` (effective size after applying the minimum batch size) and `num_consumers` on the same exporter |
+| `metricsEndpoint`, `metricsExporterTimeout` | `metrics_endpoint` and `timeout` on the same exporter |
+| `pollInterval`, `exportLabels` | `poll_interval` and receiver operator labels inside `data.relay` |
+| `metrics` | Collector `ports.metrics`, `podMonitor`, and the telemetry feature gate under `command.extraArgs`, plus `service.telemetry.metrics` inside `data.relay` |
+| `resources`, `useGoMemLimit`, `nebiusO11yAgentVersion` | Collector `resources`, `useGOMEMLIMIT`, and `image.tag`. Set `GOMAXPROCS` in `extraEnvs` when tuning CPU allocation. |
+
+To preserve the previous queue sizing, compute `max(queueSize, batch.min_size)` where the values are generated, such as in Pro or Managed, and write the result to `sending_queue.queue_size`. For example, a queue size of `1000` and a minimum batch size of `2000` produce `queue_size: 2000` in `data.relay`.
+
+To disable file storage, remove `file_storage` from `extensions` and `service.extensions` in `data.relay`. Remove the receiver's `storage` entry and the exporter's `sending_queue.storage`. Remove the storage volume, mount, and `init-fs` container from their respective collector lists. To enable deletion, set `delete_after_read` and `delete_after_read_min_age` on the receiver, include the `filelog.allowFileDeletion` feature gate in the collector command, and set the collector's jail mount to read-write. To disable deletion, remove both receiver settings and that feature gate, and set the collector's jail mount to read-only.
 
 ## HelmRelease dependencies
 
