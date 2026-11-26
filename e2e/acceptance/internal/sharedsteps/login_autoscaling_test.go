@@ -13,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
@@ -253,5 +255,42 @@ func TestLoginAutoscalingRejectsIncorrectHPAWithoutMutation(t *testing.T) {
 		require.Error(t, steps.selectReadyLoginWorkload(t.Context()))
 		steps.CleanupAndReset(t.Context())
 		assert.Zero(t, runtime.patches)
+	}
+}
+
+func TestLoginPressureProcessCount(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		cpu     string
+		want    int32
+		wantErr string
+	}{
+		{name: "missing SSHD", wantErr: "has no sshd container"},
+		{name: "zero request", cpu: "0", wantErr: "no positive SSHD CPU request"},
+		{name: "minimum", cpu: "1m", want: 1},
+		{name: "round up", cpu: "4", want: 2},
+		{name: "safety limit", cpu: "50", want: 15},
+		{name: "exceeds safety limit", cpu: "60", wantErr: "refusing to exceed the safety limit of 16"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var pod corev1.Pod
+			pod.Name = "login-0"
+			pod.Spec.Containers = []corev1.Container{{Name: "munge"}}
+			if tc.cpu != "" {
+				pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
+					Name: loginAutoscalingSSHDContainer,
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse(tc.cpu)},
+					},
+				})
+			}
+			got, err := loginPressureProcessCount(pod)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, got)
+			}
+		})
 	}
 }

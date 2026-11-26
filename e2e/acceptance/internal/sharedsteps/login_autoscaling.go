@@ -265,23 +265,23 @@ func (s *LoginAutoscaling) checkLoginDoesNotScaleDown(ctx context.Context) error
 			if !exists {
 				return false, fmt.Errorf("login HPA %s does not exist", s.statefulSetName)
 			}
-			for _, metric := range hpa.Status.CurrentMetrics {
-				if metric.Type != autoscalingv2.ContainerResourceMetricSourceType || metric.ContainerResource == nil ||
-					metric.ContainerResource.Container != loginAutoscalingSSHDContainer ||
-					metric.ContainerResource.Name != corev1.ResourceCPU {
-					continue
-				}
-				utilization := metric.ContainerResource.Current.AverageUtilization
-				if utilization == nil {
-					return false, fmt.Errorf("login HPA has no current CPU utilization")
-				}
-				if *utilization >= loginAutoscalingTargetCPU {
-					return false, fmt.Errorf("login HPA CPU utilization=%d, target=%d",
-						*utilization, loginAutoscalingTargetCPU)
-				}
-				return true, nil
+			index := slices.IndexFunc(hpa.Status.CurrentMetrics, func(metric autoscalingv2.MetricStatus) bool {
+				return metric.Type == autoscalingv2.ContainerResourceMetricSourceType && metric.ContainerResource != nil &&
+					metric.ContainerResource.Container == loginAutoscalingSSHDContainer &&
+					metric.ContainerResource.Name == corev1.ResourceCPU
+			})
+			if index < 0 {
+				return false, fmt.Errorf("login HPA has no SSHD container CPU metric")
 			}
-			return false, fmt.Errorf("login HPA has no SSHD container CPU metric")
+			utilization := hpa.Status.CurrentMetrics[index].ContainerResource.Current.AverageUtilization
+			if utilization == nil {
+				return false, fmt.Errorf("login HPA has no current CPU utilization")
+			}
+			if *utilization >= loginAutoscalingTargetCPU {
+				return false, fmt.Errorf("login HPA CPU utilization=%d, target=%d",
+					*utilization, loginAutoscalingTargetCPU)
+			}
+			return true, nil
 		},
 	); err != nil {
 		return err
@@ -351,8 +351,7 @@ func (s *LoginAutoscaling) observePodSnapshot(ctx context.Context, expected map[
 	}
 	observationTimer := time.NewTimer(duration)
 	defer observationTimer.Stop()
-	ticker := time.NewTicker(loginAutoscalingObservationPoll)
-	defer ticker.Stop()
+	ticks := time.Tick(loginAutoscalingObservationPoll)
 
 	for {
 		// Use the scenario context for the probe. The observation timer marks a
@@ -377,7 +376,7 @@ func (s *LoginAutoscaling) observePodSnapshot(ctx context.Context, expected map[
 			return ctx.Err()
 		case <-observationTimer.C:
 			return nil
-		case <-ticker.C:
+		case <-ticks:
 		}
 	}
 }
@@ -456,27 +455,24 @@ func (s *LoginAutoscaling) waitForInitialLoginConfig(ctx context.Context) error 
 }
 
 func loginPressureProcessCount(pod corev1.Pod) (int32, error) {
-	for _, container := range pod.Spec.Containers {
-		if container.Name != loginAutoscalingSSHDContainer {
-			continue
-		}
-		cpuRequest := container.Resources.Requests.Cpu().MilliValue()
-		if cpuRequest < 1 {
-			return 0, fmt.Errorf("login pod %s has no positive SSHD CPU request", pod.Name)
-		}
-		processes := int32((cpuRequest*loginAutoscalingPressurePercent + 100_000 - 1) / 100_000)
-		if processes < 1 {
-			processes = 1
-		}
-		if processes > loginAutoscalingMaxPressureProcesses {
-			return 0, fmt.Errorf(
-				"login pod %s requires %d pressure processes; refusing to exceed the safety limit of %d",
-				pod.Name, processes, loginAutoscalingMaxPressureProcesses,
-			)
-		}
-		return processes, nil
+	index := slices.IndexFunc(pod.Spec.Containers, func(container corev1.Container) bool {
+		return container.Name == loginAutoscalingSSHDContainer
+	})
+	if index < 0 {
+		return 0, fmt.Errorf("login pod %s has no %s container", pod.Name, loginAutoscalingSSHDContainer)
 	}
-	return 0, fmt.Errorf("login pod %s has no %s container", pod.Name, loginAutoscalingSSHDContainer)
+	cpuRequest := pod.Spec.Containers[index].Resources.Requests.Cpu().MilliValue()
+	if cpuRequest < 1 {
+		return 0, fmt.Errorf("login pod %s has no positive SSHD CPU request", pod.Name)
+	}
+	processes := max(int32(1), int32((cpuRequest*loginAutoscalingPressurePercent+100_000-1)/100_000))
+	if processes > loginAutoscalingMaxPressureProcesses {
+		return 0, fmt.Errorf(
+			"login pod %s requires %d pressure processes; refusing to exceed the safety limit of %d",
+			pod.Name, processes, loginAutoscalingMaxPressureProcesses,
+		)
+	}
+	return processes, nil
 }
 
 func snapshotPods(pods []corev1.Pod) map[string]string {
