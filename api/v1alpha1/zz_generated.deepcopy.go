@@ -1112,6 +1112,11 @@ func (in *NodeSetSpec) DeepCopyInto(out *NodeSetSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.WorkerInitRandomDelaySeconds != nil {
+		in, out := &in.WorkerInitRandomDelaySeconds, &out.WorkerInitRandomDelaySeconds
+		*out = new(int32)
+		**out = **in
+	}
 	in.Slurmd.DeepCopyInto(&out.Slurmd)
 	in.Munge.DeepCopyInto(&out.Munge)
 	if in.SSSD != nil {

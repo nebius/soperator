@@ -6,6 +6,7 @@ import (
 
 	kruisev1b1 "github.com/openkruise/kruise-api/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	slurmv1 "nebius.ai/slurm-operator/api/v1"
@@ -146,7 +147,7 @@ func BuildSlurmNodeSetFrom(
 		NodeExtra:                    nsSpec.NodeConfig.Dynamic,
 		NodeStatic:                   nsSpec.NodeConfig.Static,
 		EnableHostUserNamespace:      nsSpec.EnableHostUserNamespace,
-		WorkerInitRandomDelaySeconds: nsSpec.WorkerInitRandomDelaySeconds,
+		WorkerInitRandomDelaySeconds: ptr.Deref(nsSpec.WorkerInitRandomDelaySeconds, slurmv1alpha1.DefaultWorkerInitRandomDelaySeconds),
 		//
 		EphemeralNodes:               nsSpec.EphemeralNodes,
 		EphemeralTopologyWaitTimeout: nsSpec.EphemeralTopologyWaitTimeout,
