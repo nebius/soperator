@@ -16,6 +16,24 @@ tests:
       - notExists:
           path: data["values.yaml"].vmagent.spec.extraArgs["remoteWrite.bearerTokenFile"]
 
+  - it: should clear the VMStack chart's default node-exporter arguments
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].prometheus-node-exporter.extraArgs
+          value: []
+
+  - it: should pass through explicit node-exporter arguments
+    set:
+      observability.vmStack.values.prometheus-node-exporter.extraArgs: &nodeExporterArgs
+        - '--collector.ethtool.device-exclude=ibp.*'
+        - '--no-collector.infiniband'
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].prometheus-node-exporter.extraArgs
+          value: *nodeExporterArgs
+
   - it: should pass through ordered destinations, per-destination Secrets, and explicit public write settings
     set:
       observability.vmStack.values.vmagent.spec:

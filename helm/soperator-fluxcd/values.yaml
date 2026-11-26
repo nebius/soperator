@@ -1903,7 +1903,7 @@ observability:
           spec:
             # Legacy Endpoints truncate services with more than 1,000 backends.
             discoveryRole: endpointslice
-        extraArgs: null
+        extraArgs: []
       victoria-metrics-operator:
         nodeSelector:
           slurm.nebius.ai/nodeset: system

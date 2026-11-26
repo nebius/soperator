@@ -54,3 +54,22 @@ jobs:
         if: steps.helm-api.outputs.available == 'true'
         shell: bash
         run: make test-helm-api
+
+      - name: Render the OpenTelemetry collector relay with Helm 4
+        if: hashFiles('test/helmapi/otel_relay_test.go') != ''
+        shell: bash
+        env:
+          COLLECTOR_RELEASE: opentelemetry-collector-0.149.0
+        run: |
+          tools_dir=$(mktemp -d)
+          (
+            cd "$tools_dir"
+            curl --retry 3 -fsSLo helm.tar.gz https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz
+            curl --retry 3 -fsSLo collector.tgz \
+              "https://github.com/open-telemetry/opentelemetry-helm-charts/releases/download/$COLLECTOR_RELEASE/$COLLECTOR_RELEASE.tgz"
+            echo 'c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3  helm.tar.gz' | sha256sum -c -
+            echo 'b2c0068fcc63ea8afb9f4ce4b9def9b68d8d64dc925c91fdb9ad449118f61f6d  collector.tgz' | sha256sum -c -
+            tar -xzf helm.tar.gz linux-amd64/helm
+          )
+          PATH="$tools_dir/linux-amd64:$PATH" OTEL_COLLECTOR_CHART="$tools_dir/collector.tgz" \
+            go test -tags=helmapi -run '^TestOTelCollectorRelay$' -count=1 -v ./test/helmapi
