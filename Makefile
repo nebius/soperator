@@ -535,6 +535,7 @@ GOLANGCI_LINT_VERSION		?= v2.14.0
 HELMIFY_VERSION				?= 0.4.20
 HELM_VERSION				?= v3.22.0
 HELM_UNITTEST_VERSION		?= 1.1.2
+OTEL_RELAY_HELM_VERSION		:= v4.2.4
 YQ_VERSION					?= 4.53.6
 MOCKERY_VERSION				?= 2.53.8
 KIND_VERSION				?= v0.33.0
@@ -631,6 +632,27 @@ test-helm-api: envtest install-flux ## Apply the rendered Flux charts to an isol
 	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)"; \
 	export KUBEBUILDER_ASSETS; \
 	FLUX="$(FLUX)" go test -tags=helmapi -count=1 -v ./test/helmapi
+
+.PHONY: test-otel-relay
+test-otel-relay: ## Render the collector relays with the chart versions requested by the umbrella.
+	@set -e; \
+	platform="$$(go env GOHOSTOS)-$$(go env GOHOSTARCH)"; \
+	case "$$platform" in \
+		linux-amd64)  helm_sha=c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3 ;; \
+		linux-arm64)  helm_sha=564de2191b881e9f71b5606b25345821ea1682f06ab90499d3ab22b530176da1 ;; \
+		darwin-amd64) helm_sha=6c163d687ca03c3b5c01928e53bbbcf9518278f47ce7a2f249a5a08e8bdaa2bc ;; \
+		darwin-arm64) helm_sha=d747eb4e28bd2727173d15b759fa0a17822291ec09db7ced3d55af290a3661a2 ;; \
+		*) echo "Unsupported Helm platform: $$platform" >&2; exit 1 ;; \
+	esac; \
+	tools_dir=$$(mktemp -d); \
+	trap 'rm -rf "$$tools_dir"' EXIT; \
+	( cd "$$tools_dir"; \
+		curl --retry 3 -fsSLo helm.tar.gz "https://get.helm.sh/helm-$(OTEL_RELAY_HELM_VERSION)-$$platform.tar.gz"; \
+		printf '%s  helm.tar.gz\n' "$$helm_sha" | shasum -a 256 -c -; \
+		tar -xzf helm.tar.gz "$$platform/helm"; \
+	); \
+	PATH="$$tools_dir/$$platform:$$PATH" OTEL_RELAY_PULL=1 \
+		go test -tags=helmapi -run '^TestOTelCollectorRelay$$' -count=1 -v ./test/helmapi
 
 check-helm:
 	@echo "Checking Helm installation..."

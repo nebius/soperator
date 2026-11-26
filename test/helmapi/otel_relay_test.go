@@ -14,16 +14,17 @@ import (
 )
 
 func TestOTelCollectorRelay(t *testing.T) {
-	chart := os.Getenv("OTEL_COLLECTOR_CHART")
-	if chart == "" {
-		t.Skip("set OTEL_COLLECTOR_CHART to the cached opentelemetry-collector 0.149.0 chart")
+	localChart := os.Getenv("OTEL_COLLECTOR_CHART")
+	pull := os.Getenv("OTEL_RELAY_PULL") == "1"
+	if !pull {
+		if localChart == "" {
+			t.Skip("run make test-otel-relay or set OTEL_COLLECTOR_CHART to a local collector chart")
+		}
+		_, err := os.Stat(localChart)
+		require.NoError(t, err, "read local collector chart")
 	}
-	_, err := os.Stat(chart)
-	require.NoError(t, err, "read local collector chart")
-	var metadata struct{ Name, Version string }
-	require.NoError(t, yaml.Unmarshal(commandOutput(t, "helm", "show", "chart", chart), &metadata))
-	require.Equal(t, "opentelemetry-collector", metadata.Name)
-	require.Equal(t, "0.149.0", metadata.Version)
+	cacheDir := t.TempDir()
+	archives := make(map[collectorChartSource]string)
 
 	for _, collector := range []struct {
 		key, suffix, pipeline, localExporter string
@@ -38,6 +39,7 @@ func TestOTelCollectorRelay(t *testing.T) {
 				prefix := "observability.opentelemetry." + collector.key
 				flags := []string{
 					"--show-only", "templates/" + release + ".yaml",
+					"--show-only", "templates/helmrepository.yaml",
 					"--set", fmt.Sprintf("observability.publicEndpointEnabled=%t", public),
 				}
 				exporters := []string{collector.localExporter}
@@ -54,6 +56,16 @@ func TestOTelCollectorRelay(t *testing.T) {
 				}
 
 				umbrella := renderChart(t, "soperator-fluxcd", "flux-system", "1.36.0", flags...)
+				source := collectorSource(t, umbrella)
+				chart := localChart
+				if pull {
+					chart = archives[source]
+					if chart == "" {
+						chart = pullCollectorChart(t, cacheDir, source.repository, source.name, source.version)
+						archives[source] = chart
+					}
+				}
+				verifyCollectorChart(t, chart, release, source)
 				relay := renderCollectorRelay(t, chart, release, umbrella)
 				require.NotContains(t, relay.Receivers, "zipkin")
 				if collector.key == "jailLogs" {
@@ -82,6 +94,40 @@ func TestOTelCollectorRelay(t *testing.T) {
 			})
 		}
 	}
+}
+
+type collectorChartSource struct {
+	repository, name, version string
+}
+
+func collectorSource(t *testing.T, manifests []manifest) collectorChartSource {
+	t.Helper()
+	var source collectorChartSource
+	var repositoryName string
+	repositories := make(map[string]string)
+	for _, m := range manifests {
+		obj := m.object
+		switch obj.GetKind() {
+		case "HelmRelease":
+			source.name = requiredString(t, obj, "spec", "chart", "spec", "chart")
+			source.version = requiredString(t, obj, "spec", "chart", "spec", "version")
+			repositoryName = requiredString(t, obj, "spec", "chart", "spec", "sourceRef", "name")
+			require.Equal(t, "HelmRepository", requiredString(t, obj, "spec", "chart", "spec", "sourceRef", "kind"))
+		case "HelmRepository":
+			repositories[obj.GetName()] = requiredString(t, obj, "spec", "url")
+		}
+	}
+	source.repository = repositories[repositoryName]
+	require.NotEmpty(t, source.repository, "HelmRepository %q referenced by the collector", repositoryName)
+	return source
+}
+
+func requiredString(t *testing.T, obj *unstructured.Unstructured, fields ...string) string {
+	t.Helper()
+	value, _, err := unstructured.NestedString(obj.Object, fields...)
+	require.NoError(t, err, obj.GetName())
+	require.NotEmpty(t, value, "%s %s: %v", obj.GetKind(), obj.GetName(), fields)
+	return value
 }
 
 type collectorRelay struct {

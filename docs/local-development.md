@@ -73,17 +73,19 @@ make kind-create KIND_CLUSTER_NAME=my-cluster KIND_NODES=5
 | `make kind-restart` | Restart cluster (delete + create) |
 | `make kind-status` | Check kind cluster status and deployments |
 | `make test-helm-api` | Validate Flux chart manifests against an isolated Kubernetes API server |
+| `make test-otel-relay` | Render the three OpenTelemetry collectors with public export enabled and disabled, using each HelmRelease's chart version |
 | `make jail-shell` | Open interactive shell in jail environment via login pod |
 
 > **Note:** The `kind-create` command automatically switches your kubectl context to the newly created cluster, so you can immediately start using `kubectl` commands without manually switching contexts.
 
-To check the OpenTelemetry values against the child chart, use Helm 4.2.4 on `PATH` and a local copy of
-`opentelemetry-collector` 0.149.0 (a chart directory or a `.tgz` archive). This renders the umbrella ConfigMaps
-and then the child collectors for profiles with and without public export.
+The relay test downloads each collector chart from its rendered HelmRepository using the version constraint
+in its HelmRelease. The output shows the exact chart version used for each collector.
+To run offline, put Helm 4.2.4 on `PATH` and point `OTEL_COLLECTOR_CHART` at a local chart directory
+or archive. Its name and version must match each collector you run.
 
 ```bash
-OTEL_COLLECTOR_CHART=/path/to/opentelemetry-collector-0.149.0.tgz \
-  go test -tags=helmapi -run '^TestOTelCollectorRelay$' -count=1 ./test/helmapi
+OTEL_COLLECTOR_CHART=/path/to/collector.tgz \
+  go test -tags=helmapi -run '^TestOTelCollectorRelay$' -count=1 -v ./test/helmapi
 ```
 
 ## Working with the Cluster
