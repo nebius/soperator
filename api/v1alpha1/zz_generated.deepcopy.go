@@ -785,6 +785,11 @@ func (in *NodeConfig) DeepCopyInto(out *NodeConfig) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.AutoSuspendSeconds != nil {
+		in, out := &in.AutoSuspendSeconds, &out.AutoSuspendSeconds
+		*out = new(int32)
+		**out = **in
+	}
 	if in.GRESConfig != nil {
 		in, out := &in.GRESConfig, &out.GRESConfig
 		*out = make([]string, len(*in))

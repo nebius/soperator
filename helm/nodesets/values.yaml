@@ -141,6 +141,15 @@ nodesets:
       # When true, the setting is omitted and Slurm uses its default AutoResume=On behavior.
       # Optional, defaults to false
       autoResume: false
+      # Idle time in seconds after which Slurm powers the nodes down.
+      # Renders SuspendTime=<value> in the NodeName configuration, which takes precedence over
+      # the partition-level and global SuspendTime. 0 suspends the nodes as soon as they become idle.
+      # Must be a whole number between 0 and 2147483647. When set, a SuspendTime in static is dropped.
+      # Only has an effect with ephemeralNodes: true. Nodes of other NodeSets are listed in
+      # SuspendExcNodes, so Slurm never suspends them.
+      # Optional, defaults to null: the setting is omitted, and a SuspendTime in static, then the
+      # partition-level, then the global SuspendTime applies
+      autoSuspendSeconds: null
       # Static string to be added to the Node's configuration
       # Optional
       static: "Boards=1 SocketsPerBoard=1 CoresPerSocket=8 ThreadsPerCore=1"

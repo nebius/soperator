@@ -105,6 +105,20 @@ spec:
     autoResume: {{ .autoResume }}
     {{- end }}
 
+    {{- $autoSuspendSeconds := .autoSuspendSeconds }}
+    {{- if not (kindIs "invalid" $autoSuspendSeconds) }}
+    {{- /* Validate the original value before converting it, so a string or a fraction is not coerced. */}}
+    {{- $autoSuspendSecondsValid := false }}
+    {{- if or (kindIs "float64" $autoSuspendSeconds) (kindIs "int64" $autoSuspendSeconds) (kindIs "int" $autoSuspendSeconds) }}
+    {{- $autoSuspendSecondsNumber := float64 $autoSuspendSeconds }}
+    {{- $autoSuspendSecondsValid = and (ge $autoSuspendSecondsNumber 0.0) (le $autoSuspendSecondsNumber 2147483647.0) (eq $autoSuspendSecondsNumber (floor $autoSuspendSecondsNumber)) }}
+    {{- end }}
+    {{- if not $autoSuspendSecondsValid }}
+    {{- fail (printf ".Values.nodesets[%s].nodeConfig.autoSuspendSeconds must be a whole number between 0 and 2147483647, got %s (%s)." $ns.name (toJson $autoSuspendSeconds) (kindOf $autoSuspendSeconds)) }}
+    {{- end }}
+    autoSuspendSeconds: {{ int64 $autoSuspendSeconds }}
+    {{- end }}
+
     {{- with .static }}
     static: {{ . | quote }}
     {{- end }}

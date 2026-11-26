@@ -18309,6 +18309,18 @@ spec:
                       When true, the setting is omitted and Slurm uses its default AutoResume=On behavior.
                       Defaults to false.
                     type: boolean
+                  autoSuspendSeconds:
+                    description: |-
+                      AutoSuspendSeconds is the idle time in seconds after which Slurm powers the nodes down.
+                      It renders SuspendTime=<value> in the NodeName configuration, which takes precedence over
+                      the partition-level and global SuspendTime values. 0 suspends the nodes as soon as they
+                      become idle. When set, any SuspendTime in Static is dropped. When unset, the setting is
+                      omitted, and a SuspendTime in Static, then the partition-level, then the global SuspendTime
+                      applies. Only has an effect on ephemeral NodeSets: nodes of other NodeSets are listed in SuspendExcNodes.
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
                   dynamic:
                     default: ""
                     description: |-
