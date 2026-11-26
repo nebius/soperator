@@ -78,6 +78,7 @@ func (s *ActiveChecks) RegisterSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the manage-jail-state dry-run ActiveCheck is triggered$`, s.theManageJailStateDryRunActiveCheckIsTriggered)
 	sc.Step(`^the manage-jail-state dry-run Kubernetes Job succeeds$`, s.theManageJailStateDryRunKubernetesJobSucceeds)
 	sc.Step(`^Ansible reports the managed jail file as changed$`, s.ansibleReportsTheManagedJailFileAsChanged)
+	sc.Step(`^Ansible reports no jail changes$`, s.ansibleReportsNoJailChanges)
 	sc.Step(`^Ansible reports no failed or unreachable hosts$`, s.ansibleReportsNoFailedOrUnreachableHosts)
 	sc.Step(`^the managed jail file remains unchanged by the dry-run$`, s.theManagedJailFileRemainsUnchangedByTheDryRun)
 	sc.Step(`^the manage-jail-state dry-run ActiveCheck status is Complete$`, s.theManageJailStateDryRunActiveCheckStatusIsComplete)
@@ -195,12 +196,21 @@ func (s *ActiveChecks) ansibleReportsTheManagedJailFileAsChanged(ctx context.Con
 	return nil
 }
 
-func (s *ActiveChecks) ansibleReportsNoFailedOrUnreachableHosts(ctx context.Context) error {
+func (s *ActiveChecks) ansibleReportsNoJailChanges(ctx context.Context) error {
 	if err := s.ensureDryRunAnsibleResult(ctx); err != nil {
 		return err
 	}
-	if !s.dryRunAnsibleResult.StatsFound {
-		return fmt.Errorf("Ansible JSONL output does not contain v2_playbook_on_stats")
+	result := s.dryRunAnsibleResult
+	if result.Changed != 0 {
+		return fmt.Errorf("expected no jail changes, got changed=%d failures=%d unreachable=%d; changed tasks=%v",
+			result.Changed, result.Failures, result.Unreachable, result.ChangedTasks)
+	}
+	return nil
+}
+
+func (s *ActiveChecks) ansibleReportsNoFailedOrUnreachableHosts(ctx context.Context) error {
+	if err := s.ensureDryRunAnsibleResult(ctx); err != nil {
+		return err
 	}
 	if s.dryRunAnsibleResult.Failures != 0 || s.dryRunAnsibleResult.Unreachable != 0 {
 		return fmt.Errorf("expected no failed or unreachable Ansible hosts, got failures=%d unreachable=%d",
@@ -632,6 +642,8 @@ type ansibleDryRunResult struct {
 	Parsed             bool
 	StatsFound         bool
 	ManagedFileChanged bool
+	Changed            int
+	ChangedTasks       []string
 	Failures           int
 	Unreachable        int
 }
@@ -645,8 +657,9 @@ type ansibleJSONLEvent struct {
 		Changed bool `json:"changed"`
 	} `json:"hosts"`
 	Stats map[string]struct {
-		Failures    int `json:"failures"`
-		Unreachable int `json:"unreachable"`
+		Changed     *int `json:"changed"`
+		Failures    *int `json:"failures"`
+		Unreachable *int `json:"unreachable"`
 	} `json:"stats"`
 }
 
@@ -665,24 +678,40 @@ func parseAnsibleDryRunJSONL(output string) (ansibleDryRunResult, error) {
 		result.Parsed = true
 		switch event.Event {
 		case "v2_runner_on_ok":
-			if !strings.HasSuffix(event.Task.Name, manageJailStateDryRunTask) {
-				continue
-			}
 			for _, host := range event.Hosts {
-				result.ManagedFileChanged = result.ManagedFileChanged || host.Changed
+				if !host.Changed {
+					continue
+				}
+				if strings.HasSuffix(event.Task.Name, manageJailStateDryRunTask) {
+					result.ManagedFileChanged = true
+				}
+				if !slices.Contains(result.ChangedTasks, event.Task.Name) {
+					result.ChangedTasks = append(result.ChangedTasks, event.Task.Name)
+				}
 			}
 		case "v2_playbook_on_stats":
+			if len(event.Stats) == 0 {
+				return ansibleDryRunResult{}, fmt.Errorf("Ansible recap has no host statistics")
+			}
 			result.StatsFound = true
+			result.Changed = 0
 			result.Failures = 0
 			result.Unreachable = 0
-			for _, stats := range event.Stats {
-				result.Failures += stats.Failures
-				result.Unreachable += stats.Unreachable
+			for host, stats := range event.Stats {
+				if stats.Changed == nil || stats.Failures == nil || stats.Unreachable == nil {
+					return ansibleDryRunResult{}, fmt.Errorf("Ansible recap for host %q is missing changed, failures or unreachable", host)
+				}
+				result.Changed += *stats.Changed
+				result.Failures += *stats.Failures
+				result.Unreachable += *stats.Unreachable
 			}
 		}
 	}
 	if !result.Parsed {
 		return ansibleDryRunResult{}, fmt.Errorf("output does not contain JSONL events")
+	}
+	if !result.StatsFound {
+		return ansibleDryRunResult{}, fmt.Errorf("Ansible JSONL output does not contain v2_playbook_on_stats")
 	}
 	return result, nil
 }

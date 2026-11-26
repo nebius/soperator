@@ -17,3 +17,13 @@ Feature: Cluster creation
     And hidden partition smoke job succeeds
     And each discovered nodeset accepts a targeted smoke job
     And user-configured node-local jail submounts have mode 777
+
+  # Sequential: Other scenarios can modify the shared jail.
+  @heavy @soperator_version_>=5.0.0 @sequential
+  Scenario: A newly provisioned cluster has no jail drift
+    Given the manage-jail-state dry-run ActiveCheck is configured
+    When the manage-jail-state dry-run ActiveCheck is triggered
+    Then the manage-jail-state dry-run Kubernetes Job succeeds
+    And Ansible reports no jail changes
+    And Ansible reports no failed or unreachable hosts
+    And the manage-jail-state dry-run ActiveCheck status is Complete
