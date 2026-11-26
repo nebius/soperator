@@ -8,6 +8,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	slurmv1alpha1 "nebius.ai/slurm-operator/api/v1alpha1"
 	"nebius.ai/slurm-operator/internal/consts"
@@ -71,6 +72,33 @@ func TestBuildSlurmNodeSetFrom_SSSD(t *testing.T) {
 		assert.Empty(t, result.SSSDConfSecretName)
 		assert.False(t, result.IsSSSDSecretDefault)
 	})
+}
+
+func TestBuildSlurmNodeSetFrom_WorkerInitRandomDelaySeconds(t *testing.T) {
+	tests := []struct {
+		name     string
+		delay    *int32
+		expected int32
+	}{
+		{name: "unset falls back to the default", delay: nil, expected: slurmv1alpha1.DefaultWorkerInitRandomDelaySeconds},
+		{name: "explicit zero disables the delay", delay: ptr.To(int32(0)), expected: 0},
+		{name: "explicit value is kept", delay: ptr.To(int32(120)), expected: 120},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeSet := &slurmv1alpha1.NodeSet{
+				ObjectMeta: metav1ObjectMeta("worker-a", "test-ns"),
+				Spec: slurmv1alpha1.NodeSetSpec{
+					WorkerInitRandomDelaySeconds: tt.delay,
+				},
+			}
+
+			result := BuildSlurmNodeSetFrom(nodeSet, "test-cluster", nil, nil)
+
+			assert.Equal(t, tt.expected, result.WorkerInitRandomDelaySeconds)
+		})
+	}
 }
 
 func TestDefaultPersistentVolumeClaimRetentionPolicy(t *testing.T) {

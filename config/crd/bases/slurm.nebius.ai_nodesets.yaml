@@ -12208,7 +12208,7 @@ spec:
                   be added to the worker pods.
                 type: object
               workerInitRandomDelaySeconds:
-                default: 0
+                default: 30
                 description: |-
                   WorkerInitRandomDelaySeconds is the upper bound (in seconds) of a random delay the
                   worker-init container sleeps before running its readiness checks. The actual delay is
@@ -12216,7 +12216,7 @@ spec:
                   across workers to avoid overloading the Slurm controller (thundering herd) when many
                   worker pods start at once, e.g. after a cluster-wide restart.
                   Set to 0 to disable the delay.
-                  Defaults to 0.
+                  Defaults to 30.
                 format: int32
                 minimum: 0
                 type: integer
