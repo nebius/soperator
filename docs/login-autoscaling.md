@@ -35,7 +35,9 @@ by the next deployment.
 ### Helm
 
 Merge this fragment into your existing `slurm-cluster` chart values, retaining the
-rest of your cluster configuration:
+rest of your cluster configuration.
+The chart defaults to disabled, a minimum of 1 pod, a maximum of 10 pods,
+and a CPU utilization target of 70%:
 
 ```yaml
 slurmNodes:
@@ -88,6 +90,10 @@ autoscaling = {
   target_cpu_utilization_percentage = 70
 }
 ```
+
+Omitting `autoscaling` or its `enabled` field leaves autoscaling disabled.
+Within the block, `min_size`, `max_size`, and `target_cpu_utilization_percentage`
+default to 1, 10, and 70 respectively.
 
 These settings configure login-pod autoscaling and map to the HPA bounds and CPU
 target shown above. They do not configure Kubernetes node-group scaling limits.

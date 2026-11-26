@@ -3,8 +3,10 @@ package sharedsteps
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,7 +21,7 @@ import (
 const (
 	loginAutoscalingTargetCPU            = int32(10)
 	loginAutoscalingTimeout              = 10 * time.Minute
-	loginAutoscalingCleanupTimeout       = 5 * time.Minute
+	loginAutoscalingCleanupTimeout       = 30 * time.Minute
 	loginAutoscalingObservationPeriod    = 15 * time.Second
 	loginAutoscalingObservationPoll      = 3 * time.Second
 	loginAutoscalingPressurePercent      = int64(30)
@@ -39,7 +41,7 @@ type LoginAutoscaling struct {
 
 	initialConfigCaptured bool
 	initialSize           int32
-	initialAutoscaling    json.RawMessage
+	initialHelmValues     map[string]any
 	statefulSetName       string
 	maxReplicas           int32
 	pressurePods          []string
@@ -59,16 +61,15 @@ func NewLoginAutoscaling(
 }
 
 func (s *LoginAutoscaling) RegisterSteps(sc *godog.ScenarioContext) {
-	sc.Step(`^the login workload is ready for an autoscaling lifecycle test$`, s.selectReadyLoginWorkload)
-	sc.Step(`^login autoscaling is enabled with one additional replica of capacity$`, s.enableLoginAutoscaling)
-	sc.Step(`^the login workload remains at its default replica count without pressure$`, s.checkLoginDoesNotScaleWithoutPressure)
+	sc.Step(`^login autoscaling was enabled during cluster provisioning$`, s.selectReadyLoginWorkload)
+	sc.Step(`^the login workload remains at its minimum replica count without pressure$`, s.checkLoginDoesNotScaleWithoutPressure)
 	sc.Step(`^CPU pressure is created on the login pods$`, s.createLoginCPUPressure)
 	sc.Step(`^the login workload scales to its autoscaling maximum$`, s.waitForLoginScaleUp)
 	sc.Step(`^CPU pressure is removed from the login pods$`, s.removeLoginCPUPressure)
 	sc.Step(`^the login workload does not scale down automatically$`, s.checkLoginDoesNotScaleDown)
-	sc.Step(`^the fixed login size is changed while autoscaling is enabled$`, s.changeFixedLoginSize)
+	sc.Step(`^the fixed login size is changed through Helm values$`, s.changeFixedLoginSize)
 	sc.Step(`^the autoscaled login pods are preserved without recreation$`, s.checkAutoscaledLoginPodsPreserved)
-	sc.Step(`^login autoscaling is disabled$`, s.disableLoginAutoscaling)
+	sc.Step(`^login autoscaling is disabled through Helm values$`, s.disableLoginAutoscaling)
 	sc.Step(`^the login workload scales down to the fixed size$`, s.waitForLoginScaleDown)
 }
 
@@ -77,19 +78,20 @@ func (s *LoginAutoscaling) CleanupAndReset(ctx context.Context) {
 	defer cancel()
 
 	if err := s.removeLoginCPUPressure(cleanupCtx); err != nil {
-		s.runtime.Logf("cleanup: remove login CPU pressure: %v", err)
+		s.runtime.Logf("Cleanup: remove login CPU pressure: %v", err)
 	}
 	if s.initialConfigCaptured {
 		if err := s.restoreInitialLoginConfig(cleanupCtx); err != nil {
-			s.runtime.Logf("cleanup: restore initial login configuration: %v", err)
-		} else if err := s.waitForInitialLoginConfig(cleanupCtx); err != nil {
-			s.runtime.Logf("cleanup: wait for initial login configuration: %v", err)
+			s.runtime.Logf("Cleanup: restore initial login configuration: %v", err)
+		}
+		if err := s.waitForInitialLoginConfig(cleanupCtx); err != nil {
+			s.runtime.Logf("Cleanup: wait for initial login configuration: %v", err)
 		}
 	}
 
 	s.initialConfigCaptured = false
 	s.initialSize = 0
-	s.initialAutoscaling = nil
+	s.initialHelmValues = nil
 	s.statefulSetName = ""
 	s.maxReplicas = 0
 	s.pressurePods = nil
@@ -97,66 +99,32 @@ func (s *LoginAutoscaling) CleanupAndReset(ctx context.Context) {
 }
 
 func (s *LoginAutoscaling) selectReadyLoginWorkload(ctx context.Context) error {
-	var cluster kubeobjects.LoginAutoscalingCluster
-	if err := s.kubectl.GetJSON(ctx, &cluster,
-		"get", "slurmcluster", s.info.SlurmClusterName,
-		"-n", framework.SoperatorNamespace, "-o", "json",
-	); err != nil {
-		return fmt.Errorf("get SlurmCluster: %w", err)
+	s.initialSize = 2
+	s.maxReplicas = 3
+	if err := s.waitForLoginConfig(ctx, s.initialSize, true); err != nil {
+		return fmt.Errorf("verify provisioned login autoscaling (size=2, min=2, max=3, CPU=10): %w", err)
 	}
-	s.initialSize = cluster.Spec.SlurmNodes.Login.Size
-	if s.initialSize < 1 {
-		s.runtime.Logf("acceptance: login nodes are disabled, skipping login autoscaling scenario")
-		return godog.ErrSkip
-	}
-	s.initialConfigCaptured = true
-	s.initialAutoscaling = append(json.RawMessage(nil), cluster.Spec.SlurmNodes.Login.Autoscaling...)
-	initialAutoscalingEnabled, err := loginAutoscalingEnabled(s.initialAutoscaling)
+	release, err := s.loginHelmRelease(ctx, loginAutoscalingParentRelease)
 	if err != nil {
 		return err
 	}
-	if initialAutoscalingEnabled {
-		if err := s.patchLogin(ctx, map[string]any{
-			"autoscaling": map[string]any{"enabled": false},
-		}); err != nil {
-			return err
-		}
-		s.runtime.Logf("login autoscaling: disabled the initial HPA for the test baseline")
-	}
-
-	if err := s.runtime.WaitFor(ctx, fmt.Sprintf("ready login StatefulSet with its default %d replicas", s.initialSize),
-		loginAutoscalingTimeout, framework.DefaultPollInterval,
-		func(waitCtx context.Context) (bool, error) {
-			statefulSet, err := s.loginStatefulSet(waitCtx)
-			if err != nil {
-				return false, err
-			}
-			pods, err := s.loginPods(waitCtx)
-			if err != nil {
-				return false, err
-			}
-			if statefulSet.Spec.Replicas == nil || *statefulSet.Spec.Replicas != s.initialSize ||
-				statefulSet.Status.ReadyReplicas != s.initialSize || int32(len(pods)) != s.initialSize {
-				return false, fmt.Errorf("StatefulSet spec=%v ready=%d, login pods=%d, expected default size %d",
-					replicaValue(statefulSet.Spec.Replicas), statefulSet.Status.ReadyReplicas, len(pods), s.initialSize)
-			}
-			for _, pod := range pods {
-				if pod.Status.Phase != corev1.PodRunning || !kubeobjects.PodReady(pod) {
-					return false, fmt.Errorf("login pod %s phase=%s ready=%t", pod.Name, pod.Status.Phase, kubeobjects.PodReady(pod))
-				}
-			}
-			s.statefulSetName = statefulSet.Metadata.Name
-			return true, nil
-		},
-	); err != nil {
+	if err := loginHelmReleaseReady(release); err != nil {
 		return err
 	}
-	if err := s.waitForLoginHPARemoval(ctx); err != nil {
+	s.initialHelmValues = release.Spec.Values
+	statefulSet, err := s.loginStatefulSet(ctx)
+	if err != nil {
 		return err
 	}
-	s.maxReplicas = s.initialSize + 1
-	s.runtime.Logf("login autoscaling: selected StatefulSet=%s min=%d max=%d",
-		s.statefulSetName, s.initialSize, s.maxReplicas)
+	s.statefulSetName = statefulSet.Metadata.Name
+	if err := s.waitForReadyLoginReplicas(ctx, s.initialSize); err != nil {
+		return err
+	}
+	if err := s.waitForLoginHPA(ctx); err != nil {
+		return err
+	}
+	// Pressure alone can leave extra pods behind because automatic scale-down is disabled.
+	s.initialConfigCaptured = true
 	return nil
 }
 
@@ -171,25 +139,8 @@ func (s *LoginAutoscaling) checkLoginDoesNotScaleWithoutPressure(ctx context.Con
 	return s.observePodSnapshot(ctx, snapshotPods(pods), loginAutoscalingObservationPeriod)
 }
 
-func (s *LoginAutoscaling) enableLoginAutoscaling(ctx context.Context) error {
-	if s.statefulSetName == "" {
-		return fmt.Errorf("login workload is not selected")
-	}
-	// This intentionally differs from both the live and maximum replica counts. Autoscaling must ignore it until disabled.
-	testFixedSize := s.maxReplicas + 1
-	if err := s.patchLogin(ctx, map[string]any{
-		"size": testFixedSize,
-		"autoscaling": map[string]any{
-			"enabled":                        true,
-			"minReplicas":                    s.initialSize,
-			"maxReplicas":                    s.maxReplicas,
-			"targetCPUUtilizationPercentage": loginAutoscalingTargetCPU,
-		},
-	}); err != nil {
-		return err
-	}
-
-	return s.runtime.WaitFor(ctx, "login HPA with configured replica bounds",
+func (s *LoginAutoscaling) waitForLoginHPA(ctx context.Context) error {
+	return s.runtime.WaitFor(ctx, "login HPA with configured bounds and SSHD CPU target",
 		loginAutoscalingTimeout, framework.DefaultPollInterval,
 		func(waitCtx context.Context) (bool, error) {
 			hpa, exists, err := s.loginHPA(waitCtx)
@@ -199,12 +150,20 @@ func (s *LoginAutoscaling) enableLoginAutoscaling(ctx context.Context) error {
 			if !exists {
 				return false, fmt.Errorf("login HPA %s does not exist", s.statefulSetName)
 			}
-			if hpa.Spec.MinReplicas == nil || *hpa.Spec.MinReplicas != s.initialSize ||
-				hpa.Spec.MaxReplicas != s.maxReplicas {
+			if hpa.Spec.MinReplicas == nil || *hpa.Spec.MinReplicas != s.initialSize || hpa.Spec.MaxReplicas != s.maxReplicas {
 				return false, fmt.Errorf("login HPA bounds min=%v max=%d, expected min=%d max=%d",
 					replicaValue(hpa.Spec.MinReplicas), hpa.Spec.MaxReplicas, s.initialSize, s.maxReplicas)
 			}
-			return true, nil
+			if slices.ContainsFunc(hpa.Spec.Metrics, func(metric autoscalingv2.MetricSpec) bool {
+				cpu := metric.ContainerResource
+				return metric.Type == autoscalingv2.ContainerResourceMetricSourceType && cpu != nil &&
+					cpu.Container == loginAutoscalingSSHDContainer && cpu.Name == corev1.ResourceCPU &&
+					cpu.Target.Type == autoscalingv2.UtilizationMetricType && cpu.Target.AverageUtilization != nil &&
+					*cpu.Target.AverageUtilization == loginAutoscalingTargetCPU
+			}) {
+				return true, nil
+			}
+			return false, fmt.Errorf("login HPA has no SSHD CPU utilization target of %d", loginAutoscalingTargetCPU)
 		},
 	)
 }
@@ -236,7 +195,7 @@ func (s *LoginAutoscaling) createLoginCPUPressure(ctx context.Context) error {
 		); err != nil {
 			return fmt.Errorf("create CPU pressure in login pod %s: %w", pod.Name, err)
 		}
-		s.runtime.Logf("login autoscaling: started %d CPU pressure processes in pod %s", processes, pod.Name)
+		s.runtime.Logf("Login autoscaling: started %d CPU pressure processes in pod %s", processes, pod.Name)
 	}
 	return nil
 }
@@ -306,23 +265,23 @@ func (s *LoginAutoscaling) checkLoginDoesNotScaleDown(ctx context.Context) error
 			if !exists {
 				return false, fmt.Errorf("login HPA %s does not exist", s.statefulSetName)
 			}
-			for _, metric := range hpa.Status.CurrentMetrics {
-				if metric.Type != autoscalingv2.ContainerResourceMetricSourceType || metric.ContainerResource == nil ||
-					metric.ContainerResource.Container != loginAutoscalingSSHDContainer ||
-					metric.ContainerResource.Name != corev1.ResourceCPU {
-					continue
-				}
-				utilization := metric.ContainerResource.Current.AverageUtilization
-				if utilization == nil {
-					return false, fmt.Errorf("login HPA has no current CPU utilization")
-				}
-				if *utilization >= loginAutoscalingTargetCPU {
-					return false, fmt.Errorf("login HPA CPU utilization=%d, target=%d",
-						*utilization, loginAutoscalingTargetCPU)
-				}
-				return true, nil
+			index := slices.IndexFunc(hpa.Status.CurrentMetrics, func(metric autoscalingv2.MetricStatus) bool {
+				return metric.Type == autoscalingv2.ContainerResourceMetricSourceType && metric.ContainerResource != nil &&
+					metric.ContainerResource.Container == loginAutoscalingSSHDContainer &&
+					metric.ContainerResource.Name == corev1.ResourceCPU
+			})
+			if index < 0 {
+				return false, fmt.Errorf("login HPA has no SSHD container CPU metric")
 			}
-			return false, fmt.Errorf("login HPA has no SSHD container CPU metric")
+			utilization := hpa.Status.CurrentMetrics[index].ContainerResource.Current.AverageUtilization
+			if utilization == nil {
+				return false, fmt.Errorf("login HPA has no current CPU utilization")
+			}
+			if *utilization >= loginAutoscalingTargetCPU {
+				return false, fmt.Errorf("login HPA CPU utilization=%d, target=%d",
+					*utilization, loginAutoscalingTargetCPU)
+			}
+			return true, nil
 		},
 	); err != nil {
 		return err
@@ -331,7 +290,7 @@ func (s *LoginAutoscaling) checkLoginDoesNotScaleDown(ctx context.Context) error
 }
 
 func (s *LoginAutoscaling) changeFixedLoginSize(ctx context.Context) error {
-	return s.patchLogin(ctx, map[string]any{"size": s.initialSize})
+	return s.updateLoginHelmValues(ctx, 1, true, false)
 }
 
 func (s *LoginAutoscaling) checkAutoscaledLoginPodsPreserved(ctx context.Context) error {
@@ -339,16 +298,14 @@ func (s *LoginAutoscaling) checkAutoscaledLoginPodsPreserved(ctx context.Context
 }
 
 func (s *LoginAutoscaling) disableLoginAutoscaling(ctx context.Context) error {
-	return s.patchLogin(ctx, map[string]any{
-		"autoscaling": map[string]any{"enabled": false},
-	})
+	return s.updateLoginHelmValues(ctx, 1, false, false)
 }
 
 func (s *LoginAutoscaling) waitForLoginScaleDown(ctx context.Context) error {
 	if err := s.waitForLoginHPARemoval(ctx); err != nil {
 		return err
 	}
-	return s.waitForReadyLoginReplicas(ctx, s.initialSize)
+	return s.waitForReadyLoginReplicas(ctx, 1)
 }
 
 func (s *LoginAutoscaling) waitForLoginHPARemoval(ctx context.Context) error {
@@ -394,8 +351,7 @@ func (s *LoginAutoscaling) observePodSnapshot(ctx context.Context, expected map[
 	}
 	observationTimer := time.NewTimer(duration)
 	defer observationTimer.Stop()
-	ticker := time.NewTicker(loginAutoscalingObservationPoll)
-	defer ticker.Stop()
+	ticks := time.Tick(loginAutoscalingObservationPoll)
 
 	for {
 		// Use the scenario context for the probe. The observation timer marks a
@@ -420,7 +376,7 @@ func (s *LoginAutoscaling) observePodSnapshot(ctx context.Context, expected map[
 			return ctx.Err()
 		case <-observationTimer.C:
 			return nil
-		case <-ticker.C:
+		case <-ticks:
 		}
 	}
 }
@@ -476,105 +432,47 @@ func (s *LoginAutoscaling) loginSelector() string {
 	)
 }
 
-func (s *LoginAutoscaling) patchLogin(ctx context.Context, loginPatch map[string]any) error {
-	patch := map[string]any{
-		"spec": map[string]any{
-			"slurmNodes": map[string]any{
-				"login": loginPatch,
-			},
-		},
-	}
-	data, err := json.Marshal(patch)
-	if err != nil {
-		return fmt.Errorf("marshal login patch: %w", err)
-	}
-	if _, err := s.runtime.Kubectl().RunWithDefaultRetry(ctx,
-		"patch", "slurmcluster", s.info.SlurmClusterName,
-		"-n", framework.SoperatorNamespace, "--type=merge", "-p", string(data),
-	); err != nil {
-		return fmt.Errorf("patch login configuration: %w", err)
-	}
-	return nil
-}
-
 func (s *LoginAutoscaling) restoreInitialLoginConfig(ctx context.Context) error {
-	if err := s.patchLogin(ctx, map[string]any{
-		"size":        s.initialSize,
-		"autoscaling": nil,
-	}); err != nil {
-		return err
+	// Restore the configuration even if reducing the test's extra capacity fails.
+	resetCtx, cancel := context.WithTimeout(ctx, loginAutoscalingTimeout)
+	defer cancel()
+	resetErr := s.updateLoginHelmValues(resetCtx, s.initialSize, false, false)
+	if resetErr == nil {
+		resetErr = s.waitForLoginHPARemoval(resetCtx)
 	}
-	if len(s.initialAutoscaling) == 0 || string(s.initialAutoscaling) == "null" {
-		return nil
+	if resetErr == nil {
+		resetErr = s.waitForReadyLoginReplicas(resetCtx, s.initialSize)
 	}
-	var autoscaling any
-	if err := json.Unmarshal(s.initialAutoscaling, &autoscaling); err != nil {
-		return fmt.Errorf("decode initial login autoscaling configuration: %w", err)
-	}
-	return s.patchLogin(ctx, map[string]any{"autoscaling": autoscaling})
+	restoreErr := s.updateLoginHelmValues(ctx, s.initialSize, true, true)
+	return errors.Join(resetErr, restoreErr)
 }
 
 func (s *LoginAutoscaling) waitForInitialLoginConfig(ctx context.Context) error {
-	enabled, err := loginAutoscalingEnabled(s.initialAutoscaling)
-	if err != nil {
-		return err
-	}
-	if enabled {
-		return s.runtime.WaitFor(ctx, "restored login HPA",
-			loginAutoscalingCleanupTimeout, framework.DefaultPollInterval,
-			func(waitCtx context.Context) (bool, error) {
-				_, exists, err := s.loginHPA(waitCtx)
-				return exists, err
-			},
-		)
-	}
-	if err := s.runtime.WaitFor(ctx, "login HPA cleanup",
-		loginAutoscalingCleanupTimeout, framework.DefaultPollInterval,
-		func(waitCtx context.Context) (bool, error) {
-			_, exists, err := s.loginHPA(waitCtx)
-			return !exists, err
-		},
-	); err != nil {
+	if err := s.waitForLoginHPA(ctx); err != nil {
 		return err
 	}
 	return s.waitForReadyLoginReplicas(ctx, s.initialSize)
 }
 
-func loginAutoscalingEnabled(raw json.RawMessage) (bool, error) {
-	if len(raw) == 0 || string(raw) == "null" {
-		return false, nil
-	}
-	var autoscaling struct {
-		Enabled bool `json:"enabled"`
-	}
-	if err := json.Unmarshal(raw, &autoscaling); err != nil {
-		return false, fmt.Errorf("decode initial login autoscaling state: %w", err)
-	}
-	return autoscaling.Enabled, nil
-}
-
 func loginPressureProcessCount(pod corev1.Pod) (int32, error) {
-	for _, container := range pod.Spec.Containers {
-		if container.Name != loginAutoscalingSSHDContainer {
-			continue
-		}
-		cpuRequest := container.Resources.Requests.Cpu().MilliValue()
-		if cpuRequest < 1 {
-			return 0, fmt.Errorf("login pod %s has no positive SSHD CPU request", pod.Name)
-		}
-		processes := int32((cpuRequest*loginAutoscalingPressurePercent + 100_000 - 1) / 100_000)
-		if processes < 1 {
-			processes = 1
-		}
-		if processes > loginAutoscalingMaxPressureProcesses {
-			return 0, fmt.Errorf(
-				"login pod %s requires %d pressure processes; refusing to exceed the safety limit of %d",
-				pod.Name, processes, loginAutoscalingMaxPressureProcesses,
-			)
-		}
-		return processes, nil
+	index := slices.IndexFunc(pod.Spec.Containers, func(container corev1.Container) bool {
+		return container.Name == loginAutoscalingSSHDContainer
+	})
+	if index < 0 {
+		return 0, fmt.Errorf("login pod %s has no %s container", pod.Name, loginAutoscalingSSHDContainer)
 	}
-	return 0, fmt.Errorf("login pod %s has no %s container", pod.Name, loginAutoscalingSSHDContainer)
+	cpuRequest := pod.Spec.Containers[index].Resources.Requests.Cpu().MilliValue()
+	if cpuRequest < 1 {
+		return 0, fmt.Errorf("login pod %s has no positive SSHD CPU request", pod.Name)
+	}
+	processes := max(int32(1), int32((cpuRequest*loginAutoscalingPressurePercent+100_000-1)/100_000))
+	if processes > loginAutoscalingMaxPressureProcesses {
+		return 0, fmt.Errorf(
+			"login pod %s requires %d pressure processes; refusing to exceed the safety limit of %d",
+			pod.Name, processes, loginAutoscalingMaxPressureProcesses,
+		)
+	}
+	return processes, nil
 }
 
 func snapshotPods(pods []corev1.Pod) map[string]string {

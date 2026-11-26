@@ -575,6 +575,12 @@ slurmNodes:
         # endpoints: []
   login:
     size: 2
+    # Bounds override size when enabled. CPU utilization is relative to SSHD CPU requests.
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
     k8sNodeFilterName: "no-gpu"
     # Controls if the pod containers can use the host user namespace
     # hostUsers: false

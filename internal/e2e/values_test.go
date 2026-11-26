@@ -2,7 +2,11 @@ package e2e
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
+	"maps"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,23 +25,23 @@ func TestOverrideTestValuesNFS(t *testing.T) {
 		{name: "disabled", version: "1.2.2-r2012dad5", unstable: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			nfs := map[string]interface{}{
+			nfs := map[string]any{
 				"enabled": tc.enabled,
-				"spec": map[string]interface{}{
+				"spec": map[string]any{
 					"version": "1.2.0", "use_stable_repo": true,
 					"size_gibibytes": 3720, "threads": 32, "disk_type": "NETWORK_SSD_IO_M3",
-					"node_group": map[string]interface{}{"resource": map[string]interface{}{"platform": "cpu-d3"}},
+					"node_group": map[string]any{"resource": map[string]any{"platform": "cpu-d3"}},
 				},
 			}
-			result := overrideTestValues(map[string]interface{}{"nfs_in_k8s": nfs}, Config{
+			result := overrideTestValues(map[string]any{"nfs_in_k8s": nfs}, Config{
 				SoperatorVersion: "4.1.12-r2012dad5", SoperatorUnstable: tc.unstable, NFSVersion: tc.version,
 			})
-			assert.Equal(t, map[string]interface{}{
+			assert.Equal(t, map[string]any{
 				"enabled": tc.enabled,
-				"spec": map[string]interface{}{
+				"spec": map[string]any{
 					"version": tc.version, "use_stable_repo": !tc.unstable,
 					"size_gibibytes": 3720, "threads": 32, "disk_type": "NETWORK_SSD_IO_M3",
-					"node_group": map[string]interface{}{"resource": map[string]interface{}{"platform": "cpu-d3"}},
+					"node_group": map[string]any{"resource": map[string]any{"platform": "cpu-d3"}},
 				},
 			}, result["nfs_in_k8s"])
 		})
@@ -47,41 +51,38 @@ func TestOverrideTestValuesNFS(t *testing.T) {
 func TestOverrideTestValuesKeepsReleaseDefaultNFS(t *testing.T) {
 	// A recipe that takes the NFS version and registry from the Soperator release has neither
 	// attribute, and rejects them when set.
-	newSpec := func() map[string]interface{} {
-		return map[string]interface{}{
+	newSpec := func() map[string]any {
+		return map[string]any{
 			"size_gibibytes": 3720, "threads": 32, "disk_type": "NETWORK_SSD_IO_M3",
-			"node_group": map[string]interface{}{"resource": map[string]interface{}{"platform": "cpu-d3"}},
+			"node_group": map[string]any{"resource": map[string]any{"platform": "cpu-d3"}},
 		}
 	}
 	for _, unstable := range []bool{false, true} {
-		nfs := map[string]interface{}{"enabled": true, "spec": newSpec()}
-		result := overrideTestValues(map[string]interface{}{"nfs_in_k8s": nfs}, Config{
+		nfs := map[string]any{"enabled": true, "spec": newSpec()}
+		result := overrideTestValues(map[string]any{"nfs_in_k8s": nfs}, Config{
 			SoperatorVersion: "5.0.0", SoperatorUnstable: unstable, NFSVersion: "1.2.3",
 		})
-		assert.Equal(t, map[string]interface{}{"enabled": true, "spec": newSpec()}, result["nfs_in_k8s"])
+		assert.Equal(t, map[string]any{"enabled": true, "spec": newSpec()}, result["nfs_in_k8s"])
 	}
 }
 
 func TestOverrideTestValuesWithoutNFS(t *testing.T) {
-	result := overrideTestValues(map[string]interface{}{}, Config{NFSVersion: "1.2.2"})
+	result := overrideTestValues(map[string]any{}, Config{NFSVersion: "1.2.2"})
 	assert.NotContains(t, result, "nfs_in_k8s")
-	result = overrideTestValues(map[string]interface{}{"nfs_in_k8s": nil}, Config{NFSVersion: "1.2.2"})
+	result = overrideTestValues(map[string]any{"nfs_in_k8s": nil}, Config{NFSVersion: "1.2.2"})
 	assert.Nil(t, result["nfs_in_k8s"])
-	for _, nfs := range []map[string]interface{}{
+	for _, nfs := range []map[string]any{
 		{"enabled": false},
 		{"enabled": false, "spec": nil},
 	} {
-		expected := map[string]interface{}{}
-		for key, value := range nfs {
-			expected[key] = value
-		}
-		result = overrideTestValues(map[string]interface{}{"nfs_in_k8s": nfs}, Config{NFSVersion: "1.2.2"})
+		expected := maps.Clone(nfs)
+		result = overrideTestValues(map[string]any{"nfs_in_k8s": nfs}, Config{NFSVersion: "1.2.2"})
 		assert.Equal(t, expected, result["nfs_in_k8s"])
 	}
 }
 
 func TestOverrideTestValuesUsesTestingActiveChecksScope(t *testing.T) {
-	result := overrideTestValues(map[string]interface{}{}, Config{})
+	result := overrideTestValues(map[string]any{}, Config{})
 	assert.Equal(t, "testing", result["active_checks_scope"])
 }
 
@@ -90,7 +91,7 @@ func TestOverrideTestValuesDefaultSSSD(t *testing.T) {
 		validProfile(),
 		{NodeSets: []NodeSetDef{{Name: "cpu", Platform: "cpu-d3", Preset: "16vcpu-64gb", Size: 1}}},
 	} {
-		vars := overrideTestValues(map[string]interface{}{
+		vars := overrideTestValues(map[string]any{
 			"slurm_sssd_enabled":                     false,
 			"slurm_sssd_conf_secret_ref_name":        "external-config",
 			"slurm_sssd_ldap_ca_config_map_ref_name": "external-ca",
@@ -102,7 +103,7 @@ func TestOverrideTestValuesDefaultSSSD(t *testing.T) {
 }
 
 func TestOverrideTestValuesEnablesTailscale(t *testing.T) {
-	result := overrideTestValues(map[string]interface{}{"tailscale_enabled": false}, Config{})
+	result := overrideTestValues(map[string]any{"tailscale_enabled": false}, Config{})
 	assert.Equal(t, true, result["tailscale_enabled"])
 }
 
@@ -111,17 +112,17 @@ func TestOverrideTestValuesSSHFeatures(t *testing.T) {
 		validProfile(),
 		{NodeSets: []NodeSetDef{{Name: "cpu", Platform: "cpu-d3", Preset: "16vcpu-64gb", Size: 1}}},
 	} {
-		vars := overrideTestValues(map[string]interface{}{}, Config{Profile: profile})
-		assert.Equal(t, map[string]interface{}{
+		vars := overrideTestValues(map[string]any{}, Config{Profile: profile})
+		assert.Equal(t, map[string]any{
 			"enabled": true,
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"size_gibibytes":  93,
 				"filesystem_type": "ext4",
 				"disk_type":       "NETWORK_SSD_IO_M3",
 			},
 		}, vars["slurm_login_image_disk"])
 		assert.Equal(t, true, vars["slurm_login_user_isolation_enabled"])
-		policy, ok := vars["pam_slurm_adopt"].(map[string]interface{})
+		policy, ok := vars["pam_slurm_adopt"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, true, policy["enabled"])
 		assert.Equal(t, []string{"bob", "dockeruser"}, policy["exempt_users"])
@@ -129,7 +130,7 @@ func TestOverrideTestValuesSSHFeatures(t *testing.T) {
 }
 
 func TestOverrideTestValuesCreatesWorkerPartitions(t *testing.T) {
-	tfVars := map[string]interface{}{}
+	tfVars := map[string]any{}
 	cfg := Config{
 		Profile: Profile{
 			NodeSets: []NodeSetDef{
@@ -140,15 +141,15 @@ func TestOverrideTestValuesCreatesWorkerPartitions(t *testing.T) {
 	}
 
 	got := overrideTestValues(tfVars, cfg)
-	workers, ok := got["slurm_nodeset_workers"].([]interface{})
+	workers, ok := got["slurm_nodeset_workers"].([]any)
 	if !ok {
-		t.Fatalf("slurm_nodeset_workers has type %T, want []interface{}", got["slurm_nodeset_workers"])
+		t.Fatalf("slurm_nodeset_workers has type %T, want []any", got["slurm_nodeset_workers"])
 	}
 
 	for i, worker := range workers {
-		values, ok := worker.(map[string]interface{})
+		values, ok := worker.(map[string]any)
 		if !ok {
-			t.Fatalf("slurm_nodeset_workers[%d] has type %T, want map[string]interface{}", i, worker)
+			t.Fatalf("slurm_nodeset_workers[%d] has type %T, want map[string]any", i, worker)
 		}
 		if create, ok := values["create_partition"].(bool); !ok || !create {
 			t.Errorf("slurm_nodeset_workers[%d].create_partition = %#v, want true", i, values["create_partition"])
@@ -218,11 +219,11 @@ func TestOverrideTestValuesLocalNVMe(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, config.Profiles["UK_B300"], profile)
 
-			vars := overrideTestValues(map[string]interface{}{}, Config{Profile: profile})
+			vars := overrideTestValues(map[string]any{}, Config{Profile: profile})
 			data, err := json.Marshal(vars)
 			require.NoError(t, err)
 			var decoded struct {
-				Workers []map[string]json.RawMessage `json:"slurm_nodeset_workers"`
+				Workers []map[string]jsontext.Value `json:"slurm_nodeset_workers"`
 			}
 			require.NoError(t, json.Unmarshal(data, &decoded))
 			require.Len(t, decoded.Workers, 2)
@@ -239,4 +240,62 @@ func TestOverrideTestValuesLocalNVMe(t *testing.T) {
 			assert.JSONEq(t, `true`, string(cpu["create_partition"]))
 		})
 	}
+}
+
+func TestOverrideTestValuesLoginAutoscaling(t *testing.T) {
+	for _, version := range []string{"5.0.0", "5.0.0-rabcdef", "v5.1.0", "6.0.0-rc.1"} {
+		t.Run(version, func(t *testing.T) {
+			for _, original := range []map[string]any{nil, {
+				"size": float64(7), "resource": map[string]any{"platform": "cpu-g1"},
+				"node_group_enabled": false, "placement_policy_nodes": []string{"host"},
+				"autoscaling": map[string]any{"enabled": false, "max_size": 10},
+			}} {
+				vars := map[string]any{"slurm_nodeset_login": original}
+				got := overrideTestValues(vars, Config{SoperatorVersion: version})["slurm_nodeset_login"].(map[string]any)
+				assert.Equal(t, 2, got["size"])
+				assert.Equal(t, map[string]any{
+					"enabled": true, "min_size": 2, "max_size": 3, "target_cpu_utilization_percentage": 10,
+				}, got["autoscaling"])
+				if original != nil {
+					assert.Equal(t, map[string]any{"platform": "cpu-g1"}, got["resource"])
+					assert.Equal(t, false, got["node_group_enabled"])
+					assert.Equal(t, []string{"host"}, got["placement_policy_nodes"])
+				}
+			}
+		})
+	}
+	for _, version := range []string{"4.1.18", "4.1.18-rabcdef", "", "invalid"} {
+		t.Run(version, func(t *testing.T) {
+			vars := map[string]any{}
+			assert.NotContains(t, overrideTestValues(vars, Config{SoperatorVersion: version}), "slurm_nodeset_login")
+			login := map[string]any{"size": 7, "autoscaling": nil}
+			vars["slurm_nodeset_login"] = login
+			assert.Equal(t, map[string]any{"size": 7, "autoscaling": nil},
+				overrideTestValues(vars, Config{SoperatorVersion: version})["slurm_nodeset_login"])
+		})
+	}
+}
+
+func TestReadTFVarsPreservesJSONValues(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "terraform.tfvars")
+	require.NoError(t, os.WriteFile(filename, []byte(`
+slurm_nodeset_login = {
+  size = 2
+  autoscaling = null
+}
+empty_list = []
+empty_object = {}
+enabled = false
+label = "<login>&"
+`), 0o600))
+
+	values, err := readTFVars(filename)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{
+		"slurm_nodeset_login": map[string]any{"size": float64(2), "autoscaling": nil},
+		"empty_list":          []any{},
+		"empty_object":        map[string]any{},
+		"enabled":             false,
+		"label":               "<login>&",
+	}, values)
 }

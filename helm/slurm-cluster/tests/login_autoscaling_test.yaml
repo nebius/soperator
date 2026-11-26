@@ -2,7 +2,31 @@ suite: test login autoscaling rendering
 templates:
   - templates/slurm-cluster-cr.yaml
 tests:
-  - it: should omit login autoscaling by default
+  - it: should disable login autoscaling with default bounds and CPU target
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.autoscaling
+          value:
+            enabled: false
+            minReplicas: 1
+            maxReplicas: 10
+            targetCPUUtilizationPercentage: 70
+
+  - it: should enable login autoscaling with default bounds and CPU target
+    set:
+      slurmNodes.login.autoscaling.enabled: true
+    asserts:
+      - equal:
+          path: spec.slurmNodes.login.autoscaling
+          value:
+            enabled: true
+            minReplicas: 1
+            maxReplicas: 10
+            targetCPUUtilizationPercentage: 70
+
+  - it: should omit explicitly null login autoscaling
+    set:
+      slurmNodes.login.autoscaling: null
     asserts:
       - notExists:
           path: spec.slurmNodes.login.autoscaling

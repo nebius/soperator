@@ -2,15 +2,17 @@ package e2e
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"os"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	ctyjson "github.com/zclconf/go-cty/cty/json"
 )
 
-func readTFVars(filename string) (map[string]interface{}, error) {
+func readTFVars(filename string) (map[string]any, error) {
 	tfVarsFile, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("read tfvars file %s: %w", filename, err)
@@ -26,7 +28,7 @@ func readTFVars(filename string) (map[string]interface{}, error) {
 		return nil, fmt.Errorf("extract HCL attributes from %s: %w", filename, diags)
 	}
 
-	values := make(map[string]json.RawMessage, len(attrs))
+	values := make(map[string]jsontext.Value, len(attrs))
 	for name, attr := range attrs {
 		value, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
@@ -38,15 +40,15 @@ func readTFVars(filename string) (map[string]interface{}, error) {
 			return nil, fmt.Errorf("marshal HCL attribute %q to JSON: %w", name, err)
 		}
 
-		values[name] = json.RawMessage(buf)
+		values[name] = jsontext.Value(buf)
 	}
 
-	output, err := json.MarshalIndent(values, "", "  ")
+	output, err := json.Marshal(values)
 	if err != nil {
 		return nil, fmt.Errorf("marshal values to JSON: %w", err)
 	}
 
-	var varsMap map[string]interface{}
+	var varsMap map[string]any
 	if err := json.Unmarshal(output, &varsMap); err != nil {
 		return nil, fmt.Errorf("unmarshal values from JSON: %w", err)
 	}
@@ -54,15 +56,15 @@ func readTFVars(filename string) (map[string]interface{}, error) {
 	return varsMap, nil
 }
 
-func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]interface{} {
+func overrideTestValues(tfVars map[string]any, cfg Config) map[string]any {
 	tfVars["active_checks_scope"] = "testing"
 	tfVars["tailscale_enabled"] = true
 	tfVars["slurm_sssd_enabled"] = true
 	tfVars["slurm_sssd_conf_secret_ref_name"] = ""
 	tfVars["slurm_sssd_ldap_ca_config_map_ref_name"] = ""
-	tfVars["slurm_login_image_disk"] = map[string]interface{}{
+	tfVars["slurm_login_image_disk"] = map[string]any{
 		"enabled": true,
-		"spec": map[string]interface{}{
+		"spec": map[string]any{
 			"size_gibibytes":  93,
 			"filesystem_type": "ext4",
 			"disk_type":       "NETWORK_SSD_IO_M3",
@@ -72,7 +74,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	// These accounts need worker SSH without a Slurm job. Adoption checks use
 	// separate non-exempt users; keep this list in sync with the acceptance test users.
 	var pamAdoptExemptTestUsers = []string{"bob", "dockeruser"}
-	tfVars["pam_slurm_adopt"] = map[string]interface{}{
+	tfVars["pam_slurm_adopt"] = map[string]any{
 		"enabled":      true,
 		"exempt_users": pamAdoptExemptTestUsers,
 	}
@@ -80,8 +82,8 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	tfVars["slurm_operator_stable"] = !cfg.SoperatorUnstable
 	// Newer recipes take the NFS version and registry from the Soperator release and reject
 	// these attributes, so override them only where the recipe still sets them.
-	if nfs, ok := tfVars["nfs_in_k8s"].(map[string]interface{}); ok {
-		if spec, ok := nfs["spec"].(map[string]interface{}); ok && spec != nil {
+	if nfs, ok := tfVars["nfs_in_k8s"].(map[string]any); ok {
+		if spec, ok := nfs["spec"].(map[string]any); ok && spec != nil {
 			if _, ok := spec["version"]; ok {
 				spec["version"] = cfg.NFSVersion
 			}
@@ -93,19 +95,19 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	tfVars["production"] = false
 	tfVars["company_name"] = "e2e-test"
 
-	tfVars["filesystem_jail"] = map[string]interface{}{
-		"spec": map[string]interface{}{
+	tfVars["filesystem_jail"] = map[string]any{
+		"spec": map[string]any{
 			"type":                 "NETWORK_SSD",
 			"size_gibibytes":       2048,
 			"block_size_kibibytes": 4,
 		},
 	}
 
-	tfVars["filesystem_jail_submounts"] = []interface{}{
-		map[string]interface{}{
+	tfVars["filesystem_jail_submounts"] = []any{
+		map[string]any{
 			"name":       "data",
 			"mount_path": "/data",
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"type":                 "NETWORK_SSD",
 				"size_gibibytes":       2048,
 				"block_size_kibibytes": 4,
@@ -113,19 +115,19 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 		},
 	}
 
-	var nodesetWorkers []interface{}
+	var nodesetWorkers []any
 	for _, ns := range cfg.Profile.NodeSets {
-		entry := map[string]interface{}{
+		entry := map[string]any{
 			"name": ns.Name,
 			"size": ns.Size,
-			"autoscaling": map[string]interface{}{
+			"autoscaling": map[string]any{
 				"enabled": false,
 			},
-			"resource": map[string]interface{}{
+			"resource": map[string]any{
 				"platform": ns.Platform,
 				"preset":   ns.Preset,
 			},
-			"boot_disk": map[string]interface{}{
+			"boot_disk": map[string]any{
 				"type":                 "NETWORK_SSD",
 				"size_gibibytes":       128,
 				"block_size_kibibytes": 4,
@@ -134,7 +136,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			"preemptible":      preemptibleValue(ns.Preemptible),
 			"features":         nil,
 			"create_partition": true,
-			"node_local_jail_submounts": []map[string]interface{}{
+			"node_local_jail_submounts": []map[string]any{
 				{
 					"name":            "local-data",
 					"mount_path":      "/scratch",
@@ -143,9 +145,9 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 					"filesystem_type": "ext4",
 				},
 			},
-			"node_local_image_disk": map[string]interface{}{
+			"node_local_image_disk": map[string]any{
 				"enabled": true,
-				"spec": map[string]interface{}{
+				"spec": map[string]any{
 					"size_gibibytes":  93,
 					"filesystem_type": "ext4",
 					"disk_type":       "NETWORK_SSD_IO_M3",
@@ -153,7 +155,7 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 			},
 		}
 		if nvme := ns.LocalNVMe; nvme != nil {
-			localNVMe := map[string]interface{}{
+			localNVMe := map[string]any{
 				"enabled": nvme.Enabled,
 			}
 			if nvme.MountPath != "" {
@@ -171,19 +173,35 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	}
 	tfVars["slurm_nodeset_workers"] = nodesetWorkers
 
-	tfVars["slurm_nodesets_partitions"] = []interface{}{
-		map[string]interface{}{
+	tfVars["slurm_nodesets_partitions"] = []any{
+		map[string]any{
 			"name":     "main",
 			"is_all":   true,
 			"topology": "flat",
 			"config":   "Default=YES PriorityTier=10 PreemptMode=OFF MaxTime=INFINITE State=UP OverSubscribe=YES",
 		},
-		map[string]interface{}{
+		map[string]any{
 			"name":     "hidden",
 			"is_all":   true,
 			"topology": "flat",
 			"config":   "Default=NO PriorityTier=10 PreemptMode=OFF Hidden=YES MaxTime=INFINITE State=UP OverSubscribe=YES",
 		},
+	}
+
+	if version, err := semver.NewVersion(cfg.SoperatorVersion); err == nil && version.Major() >= 5 {
+		login, _ := tfVars["slurm_nodeset_login"].(map[string]any)
+		if login == nil {
+			login = make(map[string]any)
+		}
+		login["size"] = 2
+		// A low test target exercises scale-up without saturating the login nodes.
+		login["autoscaling"] = map[string]any{
+			"enabled":                           true,
+			"min_size":                          2,
+			"max_size":                          3,
+			"target_cpu_utilization_percentage": 10,
+		}
+		tfVars["slurm_nodeset_login"] = login
 	}
 
 	tfVars["slurm_login_ssh_root_public_keys"] = []string{cfg.SSHPublicKey}
@@ -192,16 +210,16 @@ func overrideTestValues(tfVars map[string]interface{}, cfg Config) map[string]in
 	return tfVars
 }
 
-func gpuClusterValue(infinibandFabric string) interface{} {
+func gpuClusterValue(infinibandFabric string) any {
 	if infinibandFabric == "" {
 		return nil
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"infiniband_fabric": infinibandFabric,
 	}
 }
 
-func preemptibleValue(enabled bool) interface{} {
+func preemptibleValue(enabled bool) any {
 	if enabled {
 		return struct{}{}
 	}
