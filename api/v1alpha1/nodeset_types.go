@@ -135,6 +135,10 @@ const (
 	ConditionNodeSetEphemeralModeApplied = "EphemeralModeApplied"
 )
 
+// DefaultWorkerInitRandomDelaySeconds applies when NodeSetSpec.WorkerInitRandomDelaySeconds is unset.
+// Must match the kubebuilder default of that field.
+const DefaultWorkerInitRandomDelaySeconds int32 = 30
+
 // NodeSetSpec defines the desired state of NodeSet
 // +kubebuilder:validation:XValidation:rule="!has(self.maxUnavailable) || (type(self.maxUnavailable) == int ? (self.maxUnavailable >= 1 && self.maxUnavailable <= 500) : (self.maxUnavailable.matches('^[1-9][0-9]*%$') && int(self.maxUnavailable.find('^[0-9]+')) * self.replicas / 100 <= 500))",message="maxUnavailable must resolve to no more than 500 workers"
 type NodeSetSpec struct {
@@ -212,12 +216,12 @@ type NodeSetSpec struct {
 	// across workers to avoid overloading the Slurm controller (thundering herd) when many
 	// worker pods start at once, e.g. after a cluster-wide restart.
 	// Set to 0 to disable the delay.
-	// Defaults to 0.
+	// Defaults to 30.
 	//
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=0
-	WorkerInitRandomDelaySeconds int32 `json:"workerInitRandomDelaySeconds,omitempty"`
+	// +kubebuilder:default=30
+	WorkerInitRandomDelaySeconds *int32 `json:"workerInitRandomDelaySeconds,omitempty"`
 
 	// Slurmd defines the Slurm worker daemon configuration.
 	//
