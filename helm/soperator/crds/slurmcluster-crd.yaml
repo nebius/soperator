@@ -27711,14 +27711,6 @@ spec:
           spec:
             description: SlurmClusterSpec defines the desired state of SlurmCluster
             properties:
-              cgroupVersion:
-                default: v2
-                description: CgroupVersion defines the version of the cgroup used
-                  by Slurm workers.
-                enum:
-                - v1
-                - v2
-                type: string
               crVersion:
                 description: CRVersion defines the version of the Operator the Custom
                   Resource belongs to
@@ -27729,6 +27721,7 @@ spec:
                   All options are provided as a raw string.
                   Soperator does not guarantee the validity of the raw configuration.
                   Raw config is appended to the generated cgroup.conf content.
+                  CgroupPlugin is managed by Soperator, which always uses cgroup/v2, so a CgroupPlugin line here is ignored.
                 type: string
               customSlurmConfig:
                 description: |-

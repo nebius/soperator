@@ -3,17 +3,14 @@
 set -e # Exit immediately if any command returns a non-zero error code
 
 echo "Starting slurmd entrypoint script"
-if [ -n "${CGROUP_V2}" ]; then
-    CGROUP_PATH=$(cat /proc/self/cgroup | sed 's/^0:://')
-
-    if [ -n "${CGROUP_PATH}" ]; then
-        echo "cgroup v2 detected, creating cgroup for ${CGROUP_PATH}"
-        mkdir -p /sys/fs/cgroup/"${CGROUP_PATH}"/../system.slice
-        echo "1" > /sys/fs/cgroup/${CGROUP_PATH}/../system.slice/memory.oom.group
-    else
-        echo "cgroup v2 detected, but cgroup path is empty"
-        exit 1
-    fi
+CGROUP_PATH=$(sed -n 's/^0:://p' /proc/self/cgroup)
+if [ -n "${CGROUP_PATH}" ]; then
+    echo "Creating system.slice cgroup next to ${CGROUP_PATH}"
+    mkdir -p /sys/fs/cgroup/"${CGROUP_PATH}"/../system.slice
+    echo "1" > /sys/fs/cgroup/${CGROUP_PATH}/../system.slice/memory.oom.group
+else
+    echo "Cannot resolve the cgroup v2 path from /proc/self/cgroup"
+    exit 1
 fi
 
 echo "Link users from jail"

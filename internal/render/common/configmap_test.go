@@ -20,10 +20,8 @@ import (
 )
 
 func Test_GenerateCGroupConfig(t *testing.T) {
-	t.Run("default config v2", func(t *testing.T) {
-		cluster := &values.SlurmCluster{
-			CgroupVersion: consts.CGroupV2,
-		}
+	t.Run("default config", func(t *testing.T) {
+		cluster := &values.SlurmCluster{}
 		got := generateCGroupConfig(cluster).Render()
 		want := `CgroupMountpoint=/sys/fs/cgroup
 ConstrainCores=yes
@@ -36,24 +34,9 @@ IgnoreSystemd=yes`
 		assert.Equal(t, want, got)
 	})
 
-	t.Run("default config v1", func(t *testing.T) {
-		cluster := &values.SlurmCluster{
-			CgroupVersion: consts.CGroupV1,
-		}
-		got := generateCGroupConfig(cluster).Render()
-		want := `CgroupMountpoint=/sys/fs/cgroup
-ConstrainCores=yes
-ConstrainDevices=yes
-ConstrainRAMSpace=yes
-CgroupPlugin=cgroup/v1
-ConstrainSwapSpace=yes`
-		assert.Equal(t, want, got)
-	})
-
 	t.Run("custom overrides defaults", func(t *testing.T) {
-		customConfig := "ConstrainCores=no\nAllowedKmemSpace=yes"
+		customConfig := "ConstrainCores=no\nMaxRAMPercent=95"
 		cluster := &values.SlurmCluster{
-			CgroupVersion:      consts.CGroupV2,
 			CustomCgroupConfig: &customConfig,
 		}
 		got := generateCGroupConfig(cluster).Render()
@@ -68,14 +51,13 @@ IgnoreSystemd=yes
 # Custom config
 ###
 ConstrainCores=no
-AllowedKmemSpace=yes`
+MaxRAMPercent=95`
 		assert.Equal(t, want, got)
 	})
 
 	t.Run("custom config with comments", func(t *testing.T) {
 		customConfig := "# This is a comment\nConstrainCores=no"
 		cluster := &values.SlurmCluster{
-			CgroupVersion:      consts.CGroupV2,
 			CustomCgroupConfig: &customConfig,
 		}
 		got := generateCGroupConfig(cluster).Render()
@@ -95,9 +77,8 @@ ConstrainCores=no`
 	})
 
 	t.Run("custom config with empty lines between entries", func(t *testing.T) {
-		customConfig := "ConstrainCores=no\n   \nAllowedKmemSpace=yes"
+		customConfig := "ConstrainCores=no\n   \nMaxRAMPercent=95"
 		cluster := &values.SlurmCluster{
-			CgroupVersion:      consts.CGroupV2,
 			CustomCgroupConfig: &customConfig,
 		}
 		got := generateCGroupConfig(cluster).Render()
@@ -112,14 +93,13 @@ IgnoreSystemd=yes
 # Custom config
 ###
 ConstrainCores=no
-AllowedKmemSpace=yes`
+MaxRAMPercent=95`
 		assert.Equal(t, want, got)
 	})
 
 	t.Run("custom config with malformed lines", func(t *testing.T) {
 		customConfig := "This line lacks equals"
 		cluster := &values.SlurmCluster{
-			CgroupVersion:      consts.CGroupV2,
 			CustomCgroupConfig: &customConfig,
 		}
 		got := generateCGroupConfig(cluster).Render()
@@ -141,7 +121,6 @@ This line lacks equals`
 	t.Run("empty custom config does not add block", func(t *testing.T) {
 		customConfig := "  \n\t"
 		cluster := &values.SlurmCluster{
-			CgroupVersion:      consts.CGroupV2,
 			CustomCgroupConfig: &customConfig,
 		}
 		got := generateCGroupConfig(cluster).Render()
@@ -157,9 +136,8 @@ IgnoreSystemd=yes`
 	})
 
 	t.Run("custom config adds new keys without overriding defaults", func(t *testing.T) {
-		customConfig := "AllowedKmemSpace=yes"
+		customConfig := "MaxRAMPercent=95"
 		cluster := &values.SlurmCluster{
-			CgroupVersion:      consts.CGroupV2,
 			CustomCgroupConfig: &customConfig,
 		}
 		got := generateCGroupConfig(cluster).Render()
@@ -174,7 +152,44 @@ IgnoreSystemd=yes
 ###
 # Custom config
 ###
-AllowedKmemSpace=yes`
+MaxRAMPercent=95`
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("custom CgroupPlugin cannot override cgroup v2", func(t *testing.T) {
+		customConfig := "CgroupPlugin=cgroup/v1\n  cgroupplugin = autodetect\nConstrainCores=no"
+		cluster := &values.SlurmCluster{
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes
+###
+# Custom config
+###
+ConstrainCores=no`
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("custom config with only CgroupPlugin does not add block", func(t *testing.T) {
+		customConfig := "CgroupPlugin=cgroup/v1"
+		cluster := &values.SlurmCluster{
+			CustomCgroupConfig: &customConfig,
+		}
+		got := generateCGroupConfig(cluster).Render()
+		want := `CgroupMountpoint=/sys/fs/cgroup
+ConstrainCores=yes
+ConstrainDevices=yes
+ConstrainRAMSpace=yes
+CgroupPlugin=cgroup/v2
+ConstrainSwapSpace=no
+EnableControllers=yes
+IgnoreSystemd=yes`
 		assert.Equal(t, want, got)
 	})
 }

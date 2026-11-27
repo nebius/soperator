@@ -1,7 +1,6 @@
 package common
 
 import (
-	"cmp"
 	"fmt"
 	"math/bits"
 	"path/filepath"
@@ -682,14 +681,13 @@ func addSlurmConfigProperties(res *renderutils.PropertiesConfig, config interfac
 }
 
 func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
-	cgroupVersion := cmp.Or(cluster.CgroupVersion, consts.CGroupV2)
-	defaultLines := strings.Split(renderDefaultCGroupConfig(cgroupVersion), "\n")
+	defaultLines := strings.Split(renderDefaultCGroupConfig(), "\n")
 
 	if cluster.CustomCgroupConfig == nil || strings.TrimSpace(*cluster.CustomCgroupConfig) == "" {
 		return renderutils.NewAsIsConfig(strings.Join(defaultLines, "\n"))
 	}
 
-	customLines := []string{}
+	var customLines []string
 	customKeys := map[string]struct{}{}
 	for _, rawLine := range strings.Split(strings.TrimRight(*cluster.CustomCgroupConfig, "\n"), "\n") {
 		line := strings.TrimSpace(rawLine)
@@ -698,9 +696,16 @@ func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 		}
 
 		if key, ok := parseCGroupKV(line); ok {
+			// Slurm matches keys case-insensitively, so no spelling of CgroupPlugin may override cgroup/v2.
+			if strings.EqualFold(key, cgroupPluginKey) {
+				continue
+			}
 			customKeys[key] = struct{}{}
 		}
 		customLines = append(customLines, rawLine)
+	}
+	if len(customLines) == 0 {
+		return renderutils.NewAsIsConfig(strings.Join(defaultLines, "\n"))
 	}
 
 	filteredDefaults := make([]string, 0, len(defaultLines))
@@ -719,22 +724,19 @@ func generateCGroupConfig(cluster *values.SlurmCluster) renderutils.ConfigFile {
 	return renderutils.NewAsIsConfig(strings.Join(allLines, "\n"))
 }
 
-func renderDefaultCGroupConfig(cgroupVersion string) string {
+// cgroupPluginKey is managed by Soperator because cgroup v2 is the only supported cgroup version.
+const cgroupPluginKey = "CgroupPlugin"
+
+func renderDefaultCGroupConfig() string {
 	res := &renderutils.PropertiesConfig{}
 	res.AddProperty("CgroupMountpoint", "/sys/fs/cgroup")
 	res.AddProperty("ConstrainCores", "yes")
 	res.AddProperty("ConstrainDevices", "yes")
 	res.AddProperty("ConstrainRAMSpace", "yes")
-	switch cgroupVersion {
-	case consts.CGroupV1:
-		res.AddProperty("CgroupPlugin", "cgroup/v1")
-		res.AddProperty("ConstrainSwapSpace", "yes")
-	case consts.CGroupV2:
-		res.AddProperty("CgroupPlugin", "cgroup/v2")
-		res.AddProperty("ConstrainSwapSpace", "no")
-		res.AddProperty("EnableControllers", "yes")
-		res.AddProperty("IgnoreSystemd", "yes")
-	}
+	res.AddProperty(cgroupPluginKey, "cgroup/v2")
+	res.AddProperty("ConstrainSwapSpace", "no")
+	res.AddProperty("EnableControllers", "yes")
+	res.AddProperty("IgnoreSystemd", "yes")
 	return res.Render()
 }
 

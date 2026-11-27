@@ -33,7 +33,6 @@ type SlurmCluster struct {
 	SlurmConfig        slurmv1.SlurmConfig
 	CustomSlurmConfig  *string
 	CustomCgroupConfig *string
-	CgroupVersion      string
 	PAMSlurmAdopt      PAMSlurmAdopt
 	NamespaceConfig    NamespaceConfig
 	MPIConfig          slurmv1.MPIConfig
@@ -71,7 +70,6 @@ func BuildSlurmClusterFrom(ctx context.Context, cluster *slurmv1.SlurmCluster, n
 		Topology:               cluster.Spec.Topology,
 		CustomSlurmConfig:      cluster.Spec.CustomSlurmConfig,
 		CustomCgroupConfig:     cluster.Spec.CustomCgroupConfig,
-		CgroupVersion:          cluster.Spec.CgroupVersion,
 		PAMSlurmAdopt:          buildPAMSlurmAdoptFrom(cluster.Spec.PAMSlurmAdopt),
 		NamespaceConfig:        buildNamespaceConfigFrom(cluster.Spec.NamespaceConfig),
 		MPIConfig:              cluster.Spec.MPIConfig,

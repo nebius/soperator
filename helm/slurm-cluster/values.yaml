@@ -224,6 +224,8 @@ slurmConfig:
 #       config: "State=UP"
 topology: null
 customSlurmConfig: ""
+# Raw cgroup.conf lines appended to the generated configuration. Soperator supports only cgroup v2
+# and manages CgroupPlugin=cgroup/v2, so a CgroupPlugin line here is ignored.
 customCgroupConfig: ""
 pamSlurmAdopt:
   enabled: false

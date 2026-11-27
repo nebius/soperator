@@ -100,7 +100,6 @@ func RenderContainerWorkerInit(
 func renderContainerNodeSetSlurmd(
 	nodeSet *values.SlurmNodeSet,
 	topologyEnabled bool,
-	cgroupVersion string,
 	clusterWithGPU bool,
 ) (corev1.Container, error) {
 	volumeMounts := []corev1.VolumeMount{
@@ -208,7 +207,6 @@ func renderContainerNodeSetSlurmd(
 	realMemoryBytes := common.RenderRealMemorySlurmd(resources) * 1024 * 1024
 	env := append(
 		renderNodeSetSlurmdEnv(
-			cgroupVersion,
 			clusterWithGPU,
 			nodeSet.GPU.Enabled,
 			nodeSet.GPU.Nvidia.GDRCopyEnabled,
@@ -343,7 +341,6 @@ func renderNodeSetTopologyEnv(topologyFabric string, waitTimeoutSeconds int32) [
 }
 
 func renderNodeSetSlurmdEnv(
-	cgroupVersion string,
 	clusterWithGPU bool,
 	nodeSetGPUEnabled bool,
 	enableGDRCopy bool,
@@ -383,12 +380,6 @@ func renderNodeSetSlurmdEnv(
 		envVar = append(envVar, corev1.EnvVar{
 			Name:  "SLURM_NODE_EXTRA",
 			Value: slurmNodeExtra,
-		})
-	}
-	if cgroupVersion == consts.CGroupV2 {
-		envVar = append(envVar, corev1.EnvVar{
-			Name:  consts.EnvCGroupV2,
-			Value: "true",
 		})
 	}
 	if enableGDRCopy {

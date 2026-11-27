@@ -20,6 +20,8 @@ full field documentation lives in [api/v1/slurmcluster_types.go](../api/v1/slurm
   - `structured` renders `partitions`, each with `nodeSetRefs` or `isAll`, an optional `topologyRef`
     and a free-form `config` string.
 - `customCgroupConfig` and `plugStackConfig`: `cgroup.conf` and SPANK plugins in `plugstack.conf`.
+  Soperator supports only cgroup v2: it always renders `CgroupPlugin=cgroup/v2` and ignores `CgroupPlugin`
+  in `customCgroupConfig`.
 
 Worker nodes are described by separate `NodeSet` resources (see
 [api/v1alpha1/nodeset_types.go](../api/v1alpha1/nodeset_types.go)). Their `replicas`, `nodeConfig`

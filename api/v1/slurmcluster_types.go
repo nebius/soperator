@@ -106,16 +106,10 @@ type SlurmClusterSpec struct {
 	// All options are provided as a raw string.
 	// Soperator does not guarantee the validity of the raw configuration.
 	// Raw config is appended to the generated cgroup.conf content.
+	// CgroupPlugin is managed by Soperator, which always uses cgroup/v2, so a CgroupPlugin line here is ignored.
 	//
 	// +kubebuilder:validation:Optional
 	CustomCgroupConfig *string `json:"customCgroupConfig,omitempty"`
-
-	// CgroupVersion defines the version of the cgroup used by Slurm workers.
-	//
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="v2"
-	// +kubebuilder:validation:Enum="v1";"v2"
-	CgroupVersion string `json:"cgroupVersion,omitempty"`
 
 	// PAMSlurmAdopt controls whether SSH sessions on worker nodes must belong to a running Slurm job.
 	// Eligible sessions are adopted into the job's external step and inherit its cgroup constraints.

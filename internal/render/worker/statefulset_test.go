@@ -218,7 +218,6 @@ func TestRenderNodeSetStatefulSet_SlurmdGPUEnv(t *testing.T) {
 			result, err := worker.RenderNodeSetStatefulSet(
 				nodeSet,
 				&slurmv1.Secrets{},
-				consts.CGroupV2,
 				tt.clusterWithGPU,
 				false,
 			)
@@ -270,7 +269,6 @@ func TestRenderNodeSetStatefulSet_NvidiaIMEXCLIMount(t *testing.T) {
 	result, err := worker.RenderNodeSetStatefulSet(
 		nodeSet,
 		&slurmv1.Secrets{},
-		consts.CGroupV2,
 		true,
 		false,
 	)
@@ -327,7 +325,6 @@ func TestRenderNodeSetStatefulSet_NvidiaIMEXNotMountedForCPUWorker(t *testing.T)
 	result, err := worker.RenderNodeSetStatefulSet(
 		nodeSet,
 		&slurmv1.Secrets{},
-		consts.CGroupV2,
 		false,
 		false,
 	)
@@ -444,7 +441,6 @@ func TestRenderNodeSetStatefulSet_HostJournalMount(t *testing.T) {
 	result, err := worker.RenderNodeSetStatefulSet(
 		nodeSet,
 		&slurmv1.Secrets{},
-		consts.CGroupV2,
 		false,
 		false,
 	)
@@ -621,7 +617,6 @@ func TestRenderNodeSetStatefulSet_TopologyPlugin(t *testing.T) {
 			result, err := worker.RenderNodeSetStatefulSet(
 				nodeSet,
 				&slurmv1.Secrets{},
-				consts.CGroupV2,
 				true,
 				tt.topologyPluginEnabled,
 			)
@@ -789,7 +784,6 @@ func TestRenderNodeSetStatefulSet_DockerEnabled(t *testing.T) {
 			result, err := worker.RenderNodeSetStatefulSet(
 				createNodeSet(tt.dockerEnabled),
 				&slurmv1.Secrets{},
-				consts.CGroupV2,
 				false,
 				false,
 			)
@@ -844,7 +838,6 @@ func TestRenderNodeSetStatefulSet_PAMSlurmAdopt(t *testing.T) {
 			result, err := worker.RenderNodeSetStatefulSet(
 				createNodeSet(enabled),
 				&slurmv1.Secrets{},
-				consts.CGroupV2,
 				false,
 				false,
 			)
@@ -892,7 +885,6 @@ func TestRenderNodeSetStatefulSet_PAMSlurmAdopt(t *testing.T) {
 			statefulSet, err := worker.RenderNodeSetStatefulSet(
 				nodeSet,
 				&slurmv1.Secrets{},
-				consts.CGroupV2,
 				false,
 				false,
 			)
@@ -962,7 +954,6 @@ func TestRenderNodeSetStatefulSet_SupervisordConfig(t *testing.T) {
 			result, err := worker.RenderNodeSetStatefulSet(
 				createNodeSet(tt.configMapName),
 				&slurmv1.Secrets{},
-				consts.CGroupV2,
 				false,
 				false,
 			)
@@ -1036,7 +1027,6 @@ func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 		result, err := worker.RenderNodeSetStatefulSet(
 			createNodeSet(),
 			&slurmv1.Secrets{},
-			consts.CGroupV2,
 			false,
 			false,
 		)
@@ -1073,7 +1063,6 @@ func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 			_, err := worker.RenderNodeSetStatefulSet(
 				nodeSet,
 				&slurmv1.Secrets{},
-				consts.CGroupV2,
 				false,
 				false,
 			)
@@ -1086,7 +1075,7 @@ func TestRenderNodeSetStatefulSet_NodeRealMemoryMetadata(t *testing.T) {
 			nodeSet := createNodeSet()
 			nodeSet.GPU.Enabled = gpuEnabled
 			nodeSet.NodeStatic = "CPUs=128 Boards=1 SocketsPerBoard=2 CoresPerSocket=32 ThreadsPerCore=2 GRES=gpu:nvidia_h200:8"
-			result, err := worker.RenderNodeSetStatefulSet(nodeSet, &slurmv1.Secrets{}, consts.CGroupV2, true, false)
+			result, err := worker.RenderNodeSetStatefulSet(nodeSet, &slurmv1.Secrets{}, true, false)
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -1210,7 +1199,6 @@ func TestRenderNodeSetStatefulSet_PersistentVolumeClaimRetentionPolicy(t *testin
 			result, err := worker.RenderNodeSetStatefulSet(
 				tt.nodeSet,
 				&slurmv1.Secrets{},
-				consts.CGroupV2,
 				true,
 				false,
 			)
@@ -1276,7 +1264,6 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 			result, err := worker.RenderNodeSetStatefulSet(
 				makeNodeSet(tt.maxUnavailable),
 				&slurmv1.Secrets{},
-				consts.CGroupV2,
 				true,
 				false,
 			)
@@ -1306,7 +1293,6 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 		result, err := worker.RenderNodeSetStatefulSet(
 			nodeSet,
 			&slurmv1.Secrets{},
-			consts.CGroupV2,
 			true,
 			false,
 		)
@@ -1325,7 +1311,6 @@ func TestRenderNodeSetStatefulSet_ScaleStrategy(t *testing.T) {
 		_, err := worker.RenderNodeSetStatefulSet(
 			nodeSet,
 			&slurmv1.Secrets{},
-			consts.CGroupV2,
 			true,
 			false,
 		)
@@ -1427,7 +1412,6 @@ func TestRenderNodeSetStatefulSet_EphemeralNodesReserveOrdinals(t *testing.T) {
 			result, err := worker.RenderNodeSetStatefulSet(
 				nodeSet,
 				&slurmv1.Secrets{},
-				consts.CGroupV2,
 				true,
 				false,
 			)

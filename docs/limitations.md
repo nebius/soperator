@@ -34,6 +34,7 @@ Our list of supported software versions is pretty short right now:
 - Slurm: version [26.05.6-nebius-1](https://github.com/nebius/slurm).
 - CUDA: version [13.0.3](https://developer.nvidia.com/cuda-13-0-3-download-archive).
 - Kubernetes: >= [1.35](https://kubernetes.io/blog/2025/12/31/kubernetes-v1-35-structured-zpages/).
+- Cgroups: v2 (unified hierarchy) on all Kubernetes nodes; cgroup v1 is not supported (see [Cgroups](features.md#cgroups)).
 - Versions of some preinstalled software packages can't be changed.
 
 Other versions may also be supported, but we haven't checked it yet. It would be cool if someone from the community

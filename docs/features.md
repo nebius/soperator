@@ -24,8 +24,24 @@ Worker `NodeSet`s can be configured as Slurm `State=CLOUD` capacity and powered 
 
 
 ### Cgroups
-Cgroups V2 are used for limiting access of jobs to resources on a node. All available cgroups are enabled except for the 
-swap space. Job namespaces require cgroup v2; cgroup v1 is not supported for this feature.
+Soperator supports only cgroup v2 (the unified hierarchy). Slurm limits job access to node resources with the
+`cgroup/v2` plugin; all available controllers are enabled except for swap space. cgroup v1 and hybrid hierarchies are
+not supported.
+
+Every Kubernetes node that runs Slurm workers must use cgroup v2.
+
+Soperator always renders `CgroupPlugin=cgroup/v2` and ignores a `CgroupPlugin` line in `customCgroupConfig`.
+
+#### Migrating nodes from cgroup v1
+Move every node to cgroup v2 before upgrading Soperator to a version that requires it:
+1. On each node, `stat -fc %T /sys/fs/cgroup` must print `cgroup2fs`. `tmpfs` means cgroup v1 or a hybrid hierarchy.
+2. Switch such nodes to cgroup v2, for example with an OS image that uses it by default or the
+   `systemd.unified_cgroup_hierarchy=1` kernel parameter, and reboot them. See
+   [About cgroup v2](https://kubernetes.io/docs/concepts/architecture/cgroups/).
+3. Remove `spec.cgroupVersion` from `SlurmCluster` manifests. The updated CRD no longer has the field, so
+   `kubectl apply` and server-side apply reject it as an unknown field. Helm does not upgrade CRDs from the `crds/`
+   directory of the `soperator` chart; upgrade them with the `soperator-crds` chart. Remove any `CgroupPlugin` line
+   from `customCgroupConfig`, since it is ignored.
 
 
 ### Temporary Filesystems for Jobs
