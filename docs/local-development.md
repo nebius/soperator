@@ -72,29 +72,29 @@ make kind-create KIND_CLUSTER_NAME=my-cluster KIND_NODES=5
 | `make kind-list` | List all kind clusters |
 | `make kind-restart` | Restart cluster (delete + create) |
 | `make kind-status` | Check kind cluster status and deployments |
-| `make deploy-flux` | Deploy soperator via Flux CD |
-| `make undeploy-flux` | Remove Flux CD configuration |
+| `make test-helm-api` | Validate Flux chart manifests against an isolated Kubernetes API server |
+| `make test-otel-relay` | Render the three OpenTelemetry collectors with public export enabled and disabled, using each HelmRelease's chart version |
 | `make jail-shell` | Open interactive shell in jail environment via login pod |
 
 > **Note:** The `kind-create` command automatically switches your kubectl context to the newly created cluster, so you can immediately start using `kubectl` commands without manually switching contexts.
+
+The relay test downloads each collector chart from its rendered HelmRepository using the version constraint
+in its HelmRelease. The output shows the exact chart version used for each collector.
+To run offline, put Helm 4.2.4 on `PATH` and point `OTEL_COLLECTOR_CHART` at a local chart directory
+or archive. Its name and version must match each collector you run.
+
+```bash
+OTEL_COLLECTOR_CHART=/path/to/collector.tgz \
+  go test -tags=helmapi -run '^TestOTelCollectorRelay$' -count=1 -v ./test/helmapi
+```
 
 ## Working with the Cluster
 
 ### Deploy Operator
 
-Deploy soperator to the kind cluster using Flux CD:
+For a Flux-managed deployment, follow the [Flux bootstrap instructions](../fluxcd/README.md#bootstrap-with-helm-chart) and supply values for your local cluster.
 
-```bash
-# Deploy via Flux CD (recommended for local development)
-make deploy-flux
-
-# This will:
-# 1. Install Flux CD
-# 2. Deploy soperator-fluxcd configuration
-# 3. Set up minimal local environment
-```
-
-Alternative: Deploy directly without Flux:
+To deploy directly, install the CRDs and start the operator in the current kubectl context.
 
 ```bash
 # Install CRDs

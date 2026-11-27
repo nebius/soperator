@@ -1,4 +1,5 @@
 {{ if and .Values.soperator.enabled .Values.soperator.kruise.enabled}}
+{{- $valuesName := printf "%s-kruise-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,11 +23,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-kruise
       version: {{ .Values.soperator.kruise.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  {{- if .Values.certManager.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
-  {{- end }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.soperator.kruise "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.soperator.kruise.install | nindent 4 }}
   upgrade:
@@ -34,18 +31,20 @@ spec:
   interval: {{ .Values.soperator.kruise.interval }}
   timeout: {{ .Values.soperator.kruise.timeout }}
   releaseName: {{ .Values.soperator.kruise.releaseName }}
-  targetNamespace: {{ .Values.slurmCluster.namespace }}
-  {{- if .Values.soperator.kruise.overrideValues }}
-  values:
-    {{- toYaml .Values.soperator.kruise.overrideValues | nindent 4 }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.slurmCluster.namespace | nindent 2 }}
+  {{- $values := .Values.soperator.kruise.values }}
+  {{- if hasKey .Values.soperator.kruise "overrideValues" }}
+    {{- $legacyValues := .Values.soperator.kruise.overrideValues }}
+    {{- if eq $legacyValues nil }}
+      {{- $values = $legacyValues }}
+    {{- else }}
+      {{- $values = deepCopy ($values | default dict) }}
+      {{- include "soperator-fluxcd.mergeKruiseOverrides" (dict "values" $values "overrides" $legacyValues) }}
+    {{- end }}
   {{- end }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-kruise
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: kruise
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.soperator.kruise.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml ($values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

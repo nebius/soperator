@@ -106,7 +106,7 @@ Key Metrics:
 - Metrics: Pod, node, PersistentVolume and PersistentVolumeClaim state metrics (filtered subset)
 - Deployment: Single replica deployment in `monitoring-system` namespace
 - Configuration: pod/node/persistentvolume/persistentvolumeclaim collectors with metric allowlist filtering
-- Scrape size: inherits the global vmagent scrape size by default; `observability.vmStack.values.kubeStateMetrics.maxScrapeSize` can raise the main `http` endpoint limit for large clusters
+- The main `http` endpoint inherits vmagent's global scrape size. For large clusters, set `max_scrape_size` on that endpoint in `observability.vmStack.values.kube-state-metrics.vmScrape.spec.endpoints`. Carry over the `metrics` endpoint and the default relabeling rules when supplying this list.
 
 Connection Example:
 ```bash
@@ -192,17 +192,10 @@ curl -k -H "Authorization: Bearer ${TOKEN}" https://localhost:8443/metrics
 Note: Production scraping requires a ServiceMonitor with proper RBAC authentication.
 
 #### 7. NCCL Profiles Collector
-- Purpose: Reads NCCL profile files from the jail filesystem and exports metrics through an OpenTelemetry collector
-- Deployment: Single deployment on system nodes by default, or DaemonSet on worker nodes with `observability.ncclProfiles.values.mode: nodeLocal`
-- Storage: Uses file storage under `/var/lib/otelcol` when `observability.ncclProfiles.values.enableFileStorage` is enabled
-- Runtime limits: Sets `GOMAXPROCS` from `observability.ncclProfiles.values.resources`; passes `useGoMemLimit` through to upstream `useGOMEMLIMIT`
 
-The NCCL profiles collector follows the same Go runtime sizing rules as the log collectors:
+The collector reads NCCL profile files from the jail filesystem and exports metrics to VictoriaMetrics. By default it runs as one Deployment replica on a system node. Configure the workload under `observability.ncclProfiles.collector.values` and the mounted `data.relay` under `observability.ncclProfiles.configMap.values`. The `file_storage` extension persists receiver checkpoints and the exporter queue under `/var/lib/otelcol-nccl-profiles`.
 
-- CPU limits are preferred over CPU requests; values are rounded up to at least one process (`500m` -> `1`, `2` -> `2`).
-- When `useGoMemLimit` is enabled, the upstream OpenTelemetry collector chart derives `GOMEMLIMIT` from `resources.limits.memory`.
-- Upstream `GOMEMLIMIT` targets about 80% of the memory limit and does not fall back to memory requests.
-- When `spec.values.useGOMEMLIMIT` is false, the upstream chart does not inject a `GOMEMLIMIT` environment variable.
+Set `GOMAXPROCS` explicitly in the collector's `extraEnvs` when tuning CPU allocation. To retain the previous sizing behavior, use the CPU limit or fall back to the request, rounded up to at least one process. With `useGOMEMLIMIT: true`, the upstream chart derives `GOMEMLIMIT` from approximately 80% of `resources.limits.memory`. See the chart guide for the worker DaemonSet values and migration steps. [NCCL profile upgrades](../helm/soperator-fluxcd/README.md#nccl-profile-upgrades)
 
 ### Metrics Processing & Storage
 
@@ -235,11 +228,12 @@ curl "http://localhost:8429/api/v1/query?query=up"
 #### Remote Write to Nebius Cloud
 - Endpoint: `https://write.monitoring.{region}.nebius.cloud/projects/{projectId}/buckets/soperator/prometheus`
 - Authentication: Bearer token from the `o11y-writer-sa-token` Secret, populated and refreshed by the shared TSA token writer
-- When: Enabled with `publicEndpointEnabled: true`
+- Configuration: Add the public destination under `observability.vmStack.values.vmagent.spec.remoteWrite`.
 
-The default token writer source is IMDS (`observability.tsaToken.writer.source: imds`).
-Set `observability.publicEndpointTokenKind: hostPath` only when the token should be
-read directly from a host-mounted file such as `/mnt/cloud-metadata/tsa-token`.
+For Secret authentication, set `bearerTokenSecret` on the vmagent destination. With `observability.publicEndpointEnabled: true` and `observability.publicEndpointTokenKind: secret`, the shared writer reads from IMDS by default.
+Set `observability.tsaToken.writer.source: file` to populate the same Secret from a mounted file, or set `observability.tsaToken.writer.enabled: false` when another process maintains the Secret.
+For a host token file, configure vmagent's volume, mount and positional bearer-token argument explicitly.
+Use a list containing only the VMSingle destination for local-only metrics. Managed and Pro profiles supply the destination list according to their telemetry settings. [VMStack upgrades](../helm/soperator-fluxcd/README.md#vmstack-upgrades)
 
 ### Visualization
 

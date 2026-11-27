@@ -1,4 +1,5 @@
 {{- if .Values.customConfigmaps.enabled }}
+{{- $valuesName := printf "%s-custom-configmaps-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,8 +23,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.customConfigmaps.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.customConfigmaps "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.customConfigmaps.install | nindent 4 }}
   upgrade:
@@ -31,14 +31,10 @@ spec:
   interval: {{ .Values.customConfigmaps.interval }}
   timeout: {{ .Values.customConfigmaps.timeout }}
   releaseName: {{ .Values.customConfigmaps.releaseName }}
-  targetNamespace: {{ .Values.customConfigmaps.namespace }}
-  values:
-  {{- if .Values.customConfigmaps.overrideValues }}
-    {{- toYaml .Values.customConfigmaps.overrideValues | nindent 4 }}
-  {{- end }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.customConfigmaps.namespace | nindent 2 }}
   valuesFrom:
-  - kind: ConfigMap
-    name: custom-configmaps
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.customConfigmaps.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := include "soperator-fluxcd.valuesWithLegacyOverride" .Values.customConfigmaps | default "{}" }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

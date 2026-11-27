@@ -22,6 +22,7 @@
 {{- $tokenFilename := include "soperator-fluxcd.o11yTsaTokenHostPathFilename" . }}
 {{- $hostNetwork := and (eq $source "imds") (ne (toString ($writer.hostNetwork | default true)) "false") }}
 {{- $name := include "soperator-fluxcd.o11yTsaTokenWriterName" . }}
+{{- $valuesName := printf "%s-tsa-token-writer-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -45,15 +46,19 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-bedag
       version: {{ $writer.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" $writer "root" $) | nindent 2 }}
   install:
     remediation:
       retries: 3
   interval: {{ $writer.interval }}
   targetNamespace: {{ $ns }}
   releaseName: tsa-token-writer
-  values:
+  valuesFrom:
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" $writer.valuesFrom) | nindent 4 }}
+---
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $) }}
+data:
+  values.yaml: |
     resources:
     - apiVersion: v1
       kind: ServiceAccount

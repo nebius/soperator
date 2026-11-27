@@ -1,4 +1,5 @@
 {{- if .Values.storageClasses.enabled }}
+{{- $valuesName := printf "%s-storageclasses-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,8 +23,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.storageClasses.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.storageClasses "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.storageClasses.install | nindent 4 }}
   upgrade:
@@ -31,9 +31,10 @@ spec:
   interval: {{ .Values.storageClasses.interval }}
   timeout: {{ .Values.storageClasses.timeout }}
   releaseName: {{ .Values.storageClasses.releaseName }}
-  targetNamespace: {{ .Values.storageClasses.namespace }}
-  values:
-  {{- if .Values.storageClasses.values }}
-    {{- toYaml .Values.storageClasses.values | nindent 4 }}
-  {{- end }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.storageClasses.namespace | nindent 2 }}
+  valuesFrom:
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.storageClasses.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.storageClasses.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

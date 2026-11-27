@@ -1,4 +1,5 @@
 {{- if and .Values.observability.enabled .Values.observability.prometheusOperator.enabled }}
+{{- $valuesName := printf "%s-prometheus-operator-crds-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,5 +23,11 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
       version: {{ .Values.observability.prometheusOperator.version }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.observability.prometheusOperator "root" $) | nindent 2 }}
   interval: 60m
+  valuesFrom:
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.observability.prometheusOperator.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.observability.prometheusOperator.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

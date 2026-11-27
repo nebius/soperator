@@ -34,6 +34,7 @@ helmRepository:
     url: oci://cr.nebius.cloud/soperator
     type: oci
 ns:
+  valuesFrom: []
   enabled: true
   interval: 5m
   timeout: 5m
@@ -48,6 +49,33 @@ certManager:
   version: v1.21.*
   namespace: cert-manager-system
   releaseName: cert-manager
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-cert-manager
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: cert-manager
+      optional: true
+      valuesKey: values.yaml
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: >-
+        {{ if and .Values.observability.enabled .Values.observability.prometheusOperator.enabled }} {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds {{ end }}
+  defaultValues:
+    enableCertificateOwnerRef: true
+    startupapicheck:
+      enabled: true
+    crds:
+      enabled: true
+    global:
+      leaderElection:
+        namespace: '{{ .Values.certManager.namespace | default .Release.Namespace }}'
+  prometheusValues:
+    prometheus:
+      enabled: true
+      servicemonitor:
+        enabled: false
   values:
     # kubernetes.io/os is the chart's own default and has to be repeated here: setting
     # nodeSelector replaces it wholesale.
@@ -109,7 +137,6 @@ certManager:
       resources:
         requests:
           cpu: 100m
-  overrideValues: null
   install:
     crds: CreateReplace
     remediation:
@@ -132,12 +159,44 @@ backup:
   version: 4.8.*
   namespace: k8up-system
   releaseName: k8up
-  values:
+  valuesFrom:
+    - kind: ConfigMap
+      name: backup
+      optional: true
+      valuesKey: values.yaml
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
+    - name: >-
+        {{ if and .Values.observability.enabled .Values.observability.prometheusOperator.enabled }} {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds {{ end }}
+  defaultValues:
+    image:
+      registry: cr.nebius.cloud
+      repository: soperator/k8up
+      tag: v2.14.0-ca-fix
+    k8up:
+      backupImage:
+        repository: cr.nebius.cloud/soperator/k8up
+        tag: v2.13.1-ca-fix
+      skipWithoutAnnotation: true
+  prometheusValues:
+    k8up:
+      metrics:
+        grafanaDashboard:
+          additionalLabels:
+            grafana_dashboard: "1"
+          enabled: true
+          namespace: '{{ .Values.observability.vmStack.namespace | default .Release.Namespace }}'
+        prometheusRule:
+          enabled: false
+        serviceMonitor:
+          enabled: true
     cleanup:
       pullPolicy: IfNotPresent
       registry: cr.nebius.cloud/soperator-proxy-docker-io
       repository: alpine/k8s
       tag: 1.36.4
+  values:
     nodeSelector:
       slurm.nebius.ai/nodeset: system
     affinity:
@@ -152,7 +211,6 @@ backup:
     resources:
       requests:
         cpu: 50m
-  overrideValues: null
   install:
     crds: CreateReplace
     remediation:
@@ -171,6 +229,9 @@ backup:
     timeout: 5m
     version: 1.23.0
     releaseName: soperator-backups
+    valuesFrom: []
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     install:
       remediation:
         retries: 3
@@ -191,6 +252,25 @@ mariadbOperator:
   version: 25.10.2
   namespace: mariadb-operator-system
   releaseName: mariadb-operator
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-mariadb-operator
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: mariadb-operator
+      optional: true
+      valuesKey: values.yaml
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-mariadb-operator-crds'
+    - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
+  defaultValues:
+    webhook:
+      cert:
+        certManager:
+          enabled: true
+      enabled: true
   values:
     nodeSelector:
       slurm.nebius.ai/nodeset: system
@@ -236,7 +316,6 @@ mariadbOperator:
       resources:
         requests:
           cpu: 100m
-  overrideValues: null
   install:
     crds: Skip
     remediation:
@@ -247,6 +326,8 @@ mariadbOperator:
       retries: 3
       remediateLastFailure: true
   crds:
+    valuesFrom: []
+    values: null
     install:
       crds: CreateReplace
       remediation:
@@ -264,13 +345,8 @@ mariadbOperator:
     mode: warn
 observability:
   enabled: true
-  clusterName: soperator
-  clusterId: ""
   publicEndpointEnabled: true
   publicEndpointTokenKind: secret
-  logsProjectId: default-project-id
-  metricsProjectId: default-project-id
-  region: eu-north1
   # Source of the o11y write bearer token, consumed per `observability.publicEndpointTokenKind`:
   #   secret   - collectors reference a token Secret (e.g. maintained by the token writer, or created in Terraform)
   #   hostPath - collectors mount a host-provided token file directly
@@ -284,6 +360,9 @@ observability:
       enabled: true
       interval: 5m
       version: 2.0.0
+      valuesFrom: []
+      dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
       # postRenderers: []
       driftDetection:
         mode: warn
@@ -309,33 +388,8 @@ observability:
           cpu: 50m
   opentelemetry:
     enabled: true
-    publicEndpoint: dns:///write.logging.eu-north1.nebius.cloud.:443
     namespace: logs-system
-    extraHeaders: {}
-    # These values are rendered as sending_queue.batch settings for the in-cluster (VictoriaLogs) exporters.
-    # The chart intentionally does not use the batch processor for collector pipelines.
-    # https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/44845#issuecomment-3877056774
-    batch:
-      timeout: 1s
-      sendBatchSize: 2000
-      sendBatchMaxSize: 5000
-    # Batch settings for the public Cloud Logging exporter only.
-    # Cloud Logging rejects requests with more than 1000 log records and the
-    # collector drops rejected batches, so keep sendBatchMaxSize <= 1000.
-    publicBatch:
-      timeout: 1s
-      sendBatchSize: 500
-      sendBatchMaxSize: 1000
-    # Exporter queue sizing shared by logs, events, and jail logs collectors.
-    # queueSize is measured in telemetry items because exporter queues use sizer: items
-    # (log records for logs/events), and it applies separately to each exporter.
-    sendingQueue:
-      queueSize: 30000
-      numConsumers: 10
-    metrics:
-      enabled: true
-      interval: 30s
-      scrapeTimeout: 10s
+    # Collectors write to VictoriaLogs by default. Configure public exporters in each collector's values.
     logs:
       version: 0.149.*
       interval: 15m
@@ -347,44 +401,812 @@ observability:
         remediation:
           retries: 6
           remediateLastFailure: true
+      valuesFrom:
+        - kind: ConfigMap
+          name: terraform-opentelemetry-collector-logs
+          optional: true
+          valuesKey: values.yaml
+        - kind: ConfigMap
+          name: opentelemetry-collector-logs
+          optional: true
+          valuesKey: values.yaml
+      dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+        - name: '{{ if .Values.observability.vmLogs.enabled }}{{ include "soperator-fluxcd.fullname" . }}-vm-logs{{ end }}'
       values:
-        enableFileStorage: true
-        useGoMemLimit: true
-        jailLogs:
-          enabled: true
-          pollInterval: 30s
-          enableFileStorage: true
-          useGoMemLimit: true
-          deleteAfterRead:
-            enabled: true
-            # Nebius O11y agent fork option; not part of upstream filelogreceiver.
-            # Files are deleted only after they have not been modified for at least this duration.
-            # Files are node-local (worker boot disk), so this is also the on-node debugging window.
-            minAge: 4h
-          resources:
-            requests:
-              memory: 512Mi
-              cpu: 100m
-            limits:
-              memory: 512Mi
-        nodeLogs:
-          enabled: true
-          # Supplementary host group IDs for reading node logs; adm is 4 on Ubuntu.
+        clusterRole:
+          create: true
+          rules:
+            - apiGroups:
+                - ""
+              resources:
+                - pods
+                - namespaces
+              verbs:
+                - get
+                - watch
+                - list
+        image:
+          pullPolicy: IfNotPresent
+          repository: cr.nebius.cloud/observability/nebius-o11y-agent
+          tag: 2.0.19
+        mode: daemonset
+        rollout:
+          rollingUpdate:
+            maxUnavailable: 50%
+          strategy: RollingUpdate
+        tolerations:
+          - operator: Exists
+          - effect: NoExecute
+            key: node.kubernetes.io/not-ready
+            operator: Exists
+          - effect: NoExecute
+            key: node.kubernetes.io/unreachable
+            operator: Exists
+          - effect: NoSchedule
+            key: node.kubernetes.io/disk-pressure
+            operator: Exists
+          - effect: NoSchedule
+            key: node.kubernetes.io/memory-pressure
+            operator: Exists
+          - effect: NoSchedule
+            key: node.kubernetes.io/pid-pressure
+            operator: Exists
+          - effect: NoSchedule
+            key: node.kubernetes.io/unschedulable
+            operator: Exists
+          - effect: NoSchedule
+            key: node.kubernetes.io/network-unavailable
+            operator: Exists
+          - effect: NoSchedule
+            key: node.cilium.io/agent-not-ready
+            operator: Exists
+        extraVolumes:
+          - name: varlogpods
+            hostPath:
+              path: /var/log/pods
+          - name: varlibdockercontainers
+            hostPath:
+              path: /var/lib/docker/containers
+          - name: node-logs
+            hostPath:
+              path: /var/log
+              type: Directory
+          - name: varlibotelcol
+            hostPath:
+              path: /var/lib/otelcol
+              type: DirectoryOrCreate
+        extraVolumeMounts:
+          - name: varlogpods
+            mountPath: /var/log/pods
+            readOnly: true
+          - name: varlibdockercontainers
+            mountPath: /var/lib/docker/containers
+            readOnly: true
+          - name: node-logs
+            mountPath: /var/nodelogs
+            readOnly: true
+          - name: varlibotelcol
+            mountPath: /var/lib/otelcol
+        podSecurityContext:
           supplementalGroups:
             - 4
-          resources:
-            requests:
-              memory: 200Mi
-              cpu: 100m
-            limits:
-              memory: 200Mi
+        securityContext:
+          runAsGroup: 0
+          runAsUser: 10001
+        serviceAccount:
+          create: true
+        extraEnvs:
+          - name: GOMAXPROCS
+            value: "1"
+          - name: K8S_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: CLUSTER_NAME
+            value: "soperator"
+        initContainers:
+          - name: init-fs
+            image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+            volumeMounts:
+              - name: varlibotelcol
+                mountPath: /var/lib/otelcol
+            securityContext:
+              runAsGroup: 0
+              runAsUser: 0
+            command:
+              - sh
+              - "-c"
+              - 'chown -R 10001: /var/lib/otelcol'
         resources:
-          requests:
-            memory: 200Mi
-            cpu: 50m
           limits:
             memory: 200Mi
-      overrideValues: null
+          requests:
+            cpu: 50m
+            memory: 200Mi
+        useGOMEMLIMIT: true
+        command:
+          extraArgs:
+            - --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress
+        ports:
+          metrics:
+            enabled: true
+        podMonitor:
+          enabled: true
+          metricsEndpoints:
+            - port: metrics
+              interval: 30s
+              scrapeTimeout: 10s
+              relabelings:
+                - sourceLabels: [__meta_kubernetes_pod_name]
+                  targetLabel: pod
+                - sourceLabels: [__meta_kubernetes_node_name]
+                  targetLabel: node
+                - replacement: otel-collector-logs
+                  targetLabel: collector
+        config:
+          receivers:
+            filelog/nodelogs:
+              include:
+                - '/var/nodelogs/kern.log*'
+                - '/var/nodelogs/syslog*'
+                - '/var/nodelogs/dmesg*'
+                - '/var/nodelogs/fabricmanager.log*'
+              exclude:
+                - '/var/nodelogs/*.gz'
+                - '/var/nodelogs/*.tmp'
+              include_file_name: true
+              operators:
+                - type: add
+                  field: resource["o11y_agent_raw_logs"]
+                  value: 'yes'
+                - type: add
+                  field: resource["workspace.id"]
+                  value: node-system
+                - id: extract_logtype
+                  type: regex_parser
+                  parse_from: attributes["log.file.name"]
+                  regex: '^(?P<logtype>[^.]+).*$'
+                - type: remove
+                  field: attributes["log.file.name"]
+                - id: get-format
+                  type: router
+                  # From ubuntu24:04 syslog format was changed.
+                  routes:
+                    - expr: attributes["logtype"] matches "syslog|kern" && body matches "^[0-9]{4}-[0-9]{2}-[0-9]{2}T"
+                      output: parse-iso8601
+                    - expr: attributes["logtype"] matches "syslog|kern"
+                      output: parse-syslog
+                  default: not-syslog
+                - id: parse-iso8601
+                  type: regex_parser
+                  parse_from: body
+                  # 2025-11-15T23:10:32.025480+00:00 host app: msg
+                  regex: '^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})) (?P<host>\S+) (?P<app>[^:]+): (?P<msg>.*)$'
+                - id: ts-iso8601
+                  type: time_parser
+                  parse_from: attributes.ts
+                  layout_type: gotime
+                  layout: '2006-01-02T15:04:05.999999Z07:00'
+                - id: move-msg
+                  type: move
+                  from: attributes.msg
+                  to: body
+                - type: move
+                  from: attributes.host
+                  to: resource["host.name"]
+                - type: move
+                  from: attributes.app
+                  to: attributes["syslog.appname"]
+                  output: move-logtype
+                - id: parse-syslog
+                  type: syslog_parser
+                  protocol: rfc3164
+                  allow_skip_pri_header: true
+                - type: move
+                  from: attributes["message"]
+                  to: body
+                  if: '"message" in attributes'
+                - id: not-syslog
+                  type: noop
+                - id: move-logtype
+                  type: move
+                  from: attributes["logtype"]
+                  to: resource["app.kubernetes.io/name"]
+              storage: file_storage
+            filelog/pods:
+              exclude:
+                - /var/log/pods/*/otc-container/*.log
+                - /var/log/pods/*/munge/*.log
+                - /var/log/pods/kube-system_hubble-*/**/*.log
+                - /var/log/pods/monitoring-system_*/**/*.log
+                - /var/log/pods/logs-system_*/**/*.log
+              include:
+                - /var/log/pods/gpu-operator_*/**/*.log
+                - /var/log/pods/network-operator_*/**/*.log
+                - /var/log/pods/*-system_*/**/*.log
+                - /var/log/pods/soperator_*/**/*.log
+              include_file_name: false
+              include_file_path: true
+              operators:
+                - id: get-format
+                  routes:
+                    - expr: body matches "^[^ Z]+Z"
+                      output: parser-containerd
+                    - expr: body matches "^\\{"
+                      output: parser-docker
+                  type: router
+                - id: parser-docker
+                  output: extract_metadata_from_filepath
+                  timestamp:
+                    layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+                    parse_from: attributes.timestamp
+                  type: json_parser
+                - combine_field: attributes.log
+                  combine_with: ""
+                  id: crio-recombine
+                  is_last_entry: attributes.logtag == 'F'
+                  max_log_size: 102400
+                  output: extract_metadata_from_filepath
+                  source_identifier: attributes["log.file.path"]
+                  type: recombine
+                - id: parser-containerd
+                  regex: ^(?P<time>[^ ^Z]+Z) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) ?(?P<log>.*)$
+                  timestamp:
+                    layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+                    parse_from: attributes.time
+                  type: regex_parser
+                - combine_field: attributes.log
+                  combine_with: ""
+                  id: containerd-recombine
+                  is_last_entry: attributes.logtag == 'F'
+                  max_log_size: 102400
+                  output: extract_metadata_from_filepath
+                  source_identifier: attributes["log.file.path"]
+                  type: recombine
+                - id: extract_metadata_from_filepath
+                  parse_from: attributes["log.file.path"]
+                  regex: ^.*\/(?P<namespace>[^_]+)_(?P<pod_name>[^_]+)_(?P<uid>[a-f0-9\-]+)\/(?P<container_name>[^\._]+)\/(?P<restart_count>\d+)\.log$
+                  type: regex_parser
+                - from: attributes.stream
+                  to: attributes["log.iostream"]
+                  type: move
+                - from: attributes.container_name
+                  to: resource["k8s.container.name"]
+                  type: move
+                - from: attributes.namespace
+                  to: resource["k8s.namespace.name"]
+                  type: move
+                - from: attributes.pod_name
+                  to: resource["k8s.pod.name"]
+                  type: move
+                - from: attributes.restart_count
+                  to: resource["k8s.container.restart_count"]
+                  type: move
+                - from: attributes.uid
+                  to: resource["k8s.pod.uid"]
+                  type: move
+                - from: attributes.log
+                  to: body
+                  type: move
+                - field: attributes.level
+                  type: add
+                  value: unknown
+                - id: parse-json-logs
+                  if: body matches "^\\{.+\\}$"
+                  parse_from: body
+                  parse_to: attributes
+                  severity:
+                    mapping:
+                      debug:
+                        - debug
+                        - DEBUG
+                      error:
+                        - error
+                        - ERROR
+                      fatal:
+                        - fatal
+                        - FATAL
+                      info:
+                        - info
+                        - INFO
+                      warn:
+                        - warn
+                        - WARN
+                        - warning
+                        - WARNING
+                    parse_from: attributes.level
+                  type: json_parser
+              retry_on_failure:
+                enabled: true
+                max_elapsed_time: 0
+              start_at: end
+              storage: file_storage
+          processors:
+            k8s_attributes:
+              extract:
+                labels:
+                  - from: pod
+                    key: external-o11y
+                    tag_name: external_o11y
+                  - from: namespace
+                    key: o11y_resource_id
+                    tag_name: resource_id
+                  - from: namespace
+                    key: o11y_service_provider
+                    tag_name: service_provider
+                metadata:
+                  - k8s.namespace.name
+                  - k8s.node.name
+                  - k8s.pod.name
+                  - k8s.pod.uid
+                  - k8s.pod.start_time
+              filter:
+                node_from_env_var: K8S_NODE_NAME
+              passthrough: false
+              pod_association:
+                - sources:
+                    - from: resource_attribute
+                      name: k8s.pod.ip
+                - sources:
+                    - from: resource_attribute
+                      name: k8s.pod.uid
+                - sources:
+                    - from: connection
+              wait_for_metadata: true
+              wait_for_metadata_timeout: 30s
+            memory_limiter:
+              check_interval: 5s
+              limit_percentage: 80
+              spike_limit_percentage: 25
+            transform:
+              log_statements:
+                - context: log
+                  error_mode: ignore
+                  statements:
+                    - set(attributes["cluster"], "${env:CLUSTER_NAME}")
+                    - set(attributes["k8s.node.name"], "${env:K8S_NODE_NAME}")
+          exporters:
+            otlp_http/victoriametrics:
+              compression: gzip
+              encoding: proto
+              logs_endpoint: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
+              retry_on_failure:
+                enabled: true
+                initial_interval: 200ms
+                max_elapsed_time: 0
+              timeout: 5s
+              sending_queue:
+                enabled: true
+                sizer: items
+                queue_size: 30000
+                num_consumers: 10
+                storage: file_storage
+                batch:
+                  sizer: items
+                  flush_timeout: 1s
+                  min_size: 2000
+                  max_size: 5000
+          extensions:
+            file_storage:
+              directory: /var/lib/otelcol
+            health_check:
+              endpoint: 0.0.0.0:13133
+          service:
+            telemetry:
+              metrics:
+                readers:
+                  - pull:
+                      exporter:
+                        prometheus:
+                          host: 0.0.0.0
+                          port: 8888
+            extensions:
+              - health_check
+              - file_storage
+            pipelines:
+              logs:
+                exporters:
+                  - otlp_http/victoriametrics
+                processors:
+                  - k8s_attributes
+                  - transform
+                  - memory_limiter
+                receivers:
+                  - filelog/pods
+                  - filelog/nodelogs
+      # postRenderers: []
+      driftDetection:
+        mode: warn
+    jailLogs:
+      enabled: true
+      version: 0.149.*
+      interval: 15m
+      timeout: 30m
+      install:
+        remediation:
+          retries: 6
+      upgrade:
+        remediation:
+          retries: 6
+          remediateLastFailure: true
+      valuesFrom:
+        - kind: ConfigMap
+          name: terraform-opentelemetry-collector-jail-logs
+          optional: true
+          valuesKey: values.yaml
+        - kind: ConfigMap
+          name: opentelemetry-collector-jail-logs
+          optional: true
+          valuesKey: values.yaml
+      dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+        - name: '{{ if .Values.observability.vmLogs.enabled }}{{ include "soperator-fluxcd.fullname" . }}-vm-logs{{ end }}'
+        - name: '{{ if .Values.nodesets.enabled }}{{ include "soperator-fluxcd.fullname" . }}-nodesets{{ end }}'
+      values:
+        clusterRole:
+          create: true
+          rules:
+            - apiGroups:
+                - ""
+              resources:
+                - pods
+                - namespaces
+              verbs:
+                - get
+                - watch
+                - list
+        image:
+          pullPolicy: IfNotPresent
+          repository: cr.nebius.cloud/observability/nebius-o11y-agent
+          tag: 2.0.19
+        # One collector per worker node: each instance reads (and deletes) only the log files
+        # written to its own node's boot disk, so worker count no longer affects any shared storage.
+        mode: daemonset
+        rollout:
+          rollingUpdate:
+            maxUnavailable: 50%
+          strategy: RollingUpdate
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: slurm.nebius.ai/nodeset
+                      operator: In
+                      values:
+                        - "worker"
+        tolerations:
+          - effect: NoSchedule
+            key: nvidia.com/gpu
+            operator: Exists
+        extraVolumes:
+          # Node-local log staging directory; workers bind it into their jail at
+          # /opt/soperator-outputs/local, so the type subdirectories appear here.
+          - name: soperator-outputs
+            hostPath:
+              path: /var/log/soperator-outputs
+              type: DirectoryOrCreate
+          - name: varlibotelcol
+            hostPath:
+              path: /var/lib/otelcol-jail
+              type: DirectoryOrCreate
+        extraVolumeMounts:
+          - name: soperator-outputs
+            mountPath: /var/log/soperator-outputs
+            readOnly: false
+          - name: varlibotelcol
+            mountPath: /var/lib/otelcol-jail
+        securityContext:
+          runAsGroup: 0
+          runAsUser: 10001
+        service: # No external access needed - this collector only reads files and sends to Victoria Logs
+          enabled: false
+        serviceAccount:
+          create: true
+        extraEnvs:
+          - name: GOMAXPROCS
+            value: "1"
+        initContainers:
+          - name: init-fs
+            image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+            volumeMounts:
+              - name: varlibotelcol
+                mountPath: /var/lib/otelcol-jail
+            securityContext:
+              runAsGroup: 0
+              runAsUser: 0
+            command:
+              - sh
+              - "-c"
+              - 'chown -R 10001: /var/lib/otelcol-jail'
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 512Mi
+        useGOMEMLIMIT: true
+        command:
+          extraArgs:
+            - "--feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress,filelog.allowFileDeletion"
+        ports: # Disable all network receivers since this collector only reads files
+          jaeger-compact:
+            enabled: false
+          jaeger-grpc:
+            enabled: false
+          jaeger-thrift:
+            enabled: false
+          otlp:
+            enabled: false
+          otlp-http:
+            enabled: false
+          zipkin:
+            enabled: false
+          metrics:
+            enabled: true
+        podMonitor:
+          enabled: true
+          metricsEndpoints:
+            - port: metrics
+              interval: 30s
+              scrapeTimeout: 10s
+              relabelings:
+                - sourceLabels: [__meta_kubernetes_pod_name]
+                  targetLabel: pod
+                - sourceLabels: [__meta_kubernetes_node_name]
+                  targetLabel: node
+                - replacement: otel-collector-jail-logs
+                  targetLabel: collector
+        config:
+          receivers:
+            filelog:
+              include:
+                - "/var/log/soperator-outputs/*/*.out"
+              exclude:
+                - "/var/log/soperator-outputs/health_checker_cmd_stdout/*.out"
+              include_file_name: true # Adds attributes["log.file.name"]
+              include_file_path: true # Adds attributes["log.file.path"]
+              preserve_leading_whitespaces: true
+              poll_interval: 30s
+              operators:
+                - id: extract_base_name_and_pod
+                  type: regex_parser
+                  parse_from: attributes["log.file.name"]
+                  regex: ^(?P<slurm_node_name>[^.]+)\.(?P<base_name>.+)\.out$
+                - type: copy
+                  from: attributes.slurm_node_name
+                  to: resource["slurm_node_name"]
+                - type: move
+                  from: attributes.slurm_node_name
+                  to: resource["k8s.pod.name"]
+                - type: add
+                  field: resource["k8s.namespace.name"]
+                  value: "soperator"
+                - type: add
+                  field: resource["region"]
+                  value: "eu-north1"
+                - id: extract_directory
+                  type: regex_parser
+                  parse_from: attributes["log.file.path"]
+                  regex: ^.*/(?P<log_directory>nccl_logs|slurm_jobs|slurm_scripts|task_prolog)/.*$
+                - type: move
+                  from: attributes.log_directory
+                  to: resource["log_type"]
+                - id: parse_nccl_log_base_name
+                  type: regex_parser
+                  parse_from: attributes.base_name
+                  regex: ^(?P<job_id>\d+)\.(?P<job_step_id>\d+)$
+                  if: resource["log_type"] == "nccl_logs"
+                - type: move
+                  from: attributes.job_id
+                  to: resource["job_id"]
+                  if: resource["log_type"] == "nccl_logs" and attributes["job_id"] != nil
+                - type: move
+                  from: attributes.job_step_id
+                  to: resource["job_step_id"]
+                  if: resource["log_type"] == "nccl_logs" and attributes["job_step_id"] != nil
+                - id: parse_task_prolog_base_name
+                  type: regex_parser
+                  parse_from: attributes.base_name
+                  regex: ^(?P<job_id>\d+)\.(?P<job_step_id>\d+)?\.(?P<job_array_id>\d+)?$
+                  if: resource["log_type"] == "task_prolog"
+                - type: move
+                  from: attributes.job_id
+                  to: resource["job_id"]
+                  if: resource["log_type"] == "task_prolog" and attributes["job_id"] != nil
+                - type: move
+                  from: attributes.job_step_id
+                  to: resource["job_step_id"]
+                  if: resource["log_type"] == "task_prolog" and attributes["job_step_id"] != nil
+                - type: move
+                  from: attributes.job_array_id
+                  to: resource["job_array_id"]
+                  if: resource["log_type"] == "task_prolog" and attributes["job_array_id"] != nil
+                - id: parse_slurm_job_log_base_name
+                  type: regex_parser
+                  parse_from: attributes.base_name
+                  regex: ^(?P<job_name>[^.]+)\.(?P<job_id>\d+)(?:\.(?P<job_array_id>\d+))?$
+                  if: resource["log_type"] == "slurm_jobs"
+                - type: move
+                  from: attributes.job_name
+                  to: resource["job_name"]
+                  if: resource["log_type"] == "slurm_jobs" and attributes["job_name"] != nil
+                - type: move
+                  from: attributes.job_id
+                  to: resource["job_id"]
+                  if: resource["log_type"] == "slurm_jobs" and attributes["job_id"] != nil
+                - type: move
+                  from: attributes.job_array_id
+                  to: resource["job_array_id"]
+                  if: resource["log_type"] == "slurm_jobs" and attributes["job_array_id"] != nil
+                - id: parse_script_log_base_name
+                  type: regex_parser
+                  parse_from: attributes.base_name
+                  regex: ^(?P<script_name>[^.]+)\.(?P<script_context>[^.]+)$
+                  if: resource["log_type"] == "slurm_scripts"
+                - type: move
+                  from: attributes.script_name
+                  to: resource["slurm_script_name"]
+                  if: resource["log_type"] == "slurm_scripts" and attributes["script_name"] != nil
+                - type: move
+                  from: attributes.script_context
+                  to: resource["slurm_script_context"]
+                  if: resource["log_type"] == "slurm_scripts" and attributes["script_context"] != nil
+                - type: remove
+                  field: attributes.base_name
+                # Files are truncated and rewritten in place by check_runner.py, so the reader can
+                # see partially flushed lines (zero-filled tails). Skip bodies with NUL bytes and
+                # send the entry unparsed instead of logging an error on any parse failure.
+                - id: parse_json_body # parse json body to extract fields
+                  type: json_parser
+                  parse_from: body
+                  parse_to: attributes.hc_json
+                  if: body matches "^\\s*\\{" and not (body matches "\\x00")
+                  on_error: send_quiet
+                - type: move
+                  from: attributes.hc_json.status
+                  to: resource["slurm_run_status"]
+                  if: attributes.hc_json != nil && attributes.hc_json["status"] != nil
+                - type: move
+                  from: attributes.hc_json.resolution
+                  to: resource["slurm_run_resolution"]
+                  if: attributes.hc_json != nil && attributes.hc_json["resolution"] != nil
+                - type: remove # drop the parsed json body
+                  field: attributes.hc_json
+                  if: attributes.hc_json != nil
+              retry_on_failure:
+                enabled: true
+                max_elapsed_time: 0
+              start_at: beginning
+              # The Nebius collector fork waits for the minimum age before deleting consumed files.
+              delete_after_read: true
+              delete_after_read_min_age: 4h
+              storage: file_storage # Storage for the state (file offsets).
+            filelog/health_checker:
+              include:
+                - "/var/log/soperator-outputs/health_checker_cmd_stdout/*.out"
+              include_file_name: true # Adds attributes["log.file.name"]
+              include_file_path: true # Adds attributes["log.file.path"]
+              preserve_leading_whitespaces: true
+              poll_interval: 30s
+              operators:
+                # Extract check_name and run_id
+                - id: extract_check_name_and_run_id
+                  type: regex_parser
+                  parse_from: attributes["log.file.name"]
+                  regex: ^(?P<check_name>.+)\.(?P<run_id>[0-9a-fA-F-]+)\.out$
+                - type: copy
+                  from: attributes.check_name
+                  to: resource["health_checker.check_name"]
+                - type: copy
+                  from: attributes.run_id
+                  to: resource["health_checker.run_id"]
+                # Add namespace
+                - type: add
+                  field: resource["k8s.namespace.name"]
+                  value: "soperator"
+                - type: add
+                  field: resource["region"]
+                  value: "eu-north1"
+                # Add log_type
+                - type: add
+                  field: resource["log_type"]
+                  value: "health_checker_cmd_stdout"
+              retry_on_failure:
+                enabled: true
+                max_elapsed_time: 0
+              start_at: beginning
+              delete_after_read: true
+              delete_after_read_min_age: 4h
+              storage: file_storage # Storage for the state (file offsets).
+          processors:
+            k8s_attributes:
+              pod_association:
+                - sources:
+                    - from: resource_attribute
+                      name: k8s.pod.name
+                    - from: resource_attribute
+                      name: k8s.namespace.name
+              extract:
+                labels: # Copy labels for the managed solution.
+                  - from: pod
+                    key: external-o11y
+                    tag_name: external_o11y
+                  - from: namespace
+                    key: o11y_resource_id
+                    tag_name: resource_id
+                  - from: namespace
+                    key: o11y_service_provider
+                    tag_name: service_provider
+                metadata:
+                  - k8s.namespace.name
+                  - k8s.node.name
+                  - k8s.pod.name
+                  - k8s.pod.uid
+                  - k8s.pod.start_time
+              passthrough: false
+              wait_for_metadata: true # Wait for k8s metadata on startup.
+              wait_for_metadata_timeout: 30s
+            memory_limiter:
+              check_interval: 5s
+              limit_percentage: 80
+              spike_limit_percentage: 25
+            transform:
+              log_statements:
+                - context: log
+                  error_mode: ignore
+                  statements:
+                    - set(attributes["cluster"], "soperator")
+          exporters:
+            otlp_http/victorialogs:
+              compression: gzip
+              encoding: proto
+              logs_endpoint: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
+              retry_on_failure:
+                enabled: true
+                initial_interval: 200ms
+                max_elapsed_time: 0
+              timeout: 5s
+              sending_queue:
+                enabled: true
+                sizer: items
+                queue_size: 30000
+                num_consumers: 10
+                storage: file_storage
+                batch:
+                  sizer: items
+                  flush_timeout: 1s
+                  min_size: 2000
+                  max_size: 5000
+          extensions:
+            file_storage:
+              directory: /var/lib/otelcol-jail
+            health_check:
+              endpoint: 0.0.0.0:13133
+          service:
+            telemetry:
+              metrics:
+                readers:
+                  - pull:
+                      exporter:
+                        prometheus:
+                          host: 0.0.0.0
+                          port: 8888
+            extensions:
+              - health_check
+              - file_storage
+            pipelines:
+              logs:
+                receivers:
+                  - filelog
+                  - filelog/health_checker
+                processors:
+                  - k8s_attributes
+                  - transform
+                  - memory_limiter
+                exporters:
+                  - otlp_http/victorialogs
       # postRenderers: []
       driftDetection:
         mode: warn
@@ -399,28 +1221,220 @@ observability:
         remediation:
           retries: 3
           remediateLastFailure: true
+      valuesFrom:
+        - kind: ConfigMap
+          name: terraform-opentelemetry-collector-events
+          optional: true
+          valuesKey: values.yaml
+        - kind: ConfigMap
+          name: opentelemetry-collector-events
+          optional: true
+          valuesKey: values.yaml
+      dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+        - name: '{{ if .Values.observability.vmLogs.enabled }}{{ include "soperator-fluxcd.fullname" . }}-vm-logs{{ end }}'
       values:
-        enableFileStorage: true
-        useGoMemLimit: true
+        clusterRole:
+          create: true
+          rules:
+            - apiGroups:
+                - ""
+              resources:
+                - pods
+                - namespaces
+              verbs:
+                - get
+                - watch
+                - list
+            - apiGroups:
+                - events.k8s.io
+              resources:
+                - events
+              verbs:
+                - watch
+                - list
+        image:
+          pullPolicy: IfNotPresent
+          repository: cr.nebius.cloud/observability/nebius-o11y-agent
+          tag: 2.0.19
+        mode: deployment
         nodeSelector:
           slurm.nebius.ai/nodeset: system
         affinity:
           podAntiAffinity:
             preferredDuringSchedulingIgnoredDuringExecution:
-              - weight: 100
-                podAffinityTerm:
-                  topologyKey: kubernetes.io/hostname
+              - podAffinityTerm:
                   labelSelector:
                     matchLabels:
                       app.kubernetes.io/name: opentelemetry-collector
                       component: standalone-collector
+                  topologyKey: kubernetes.io/hostname
+                weight: 100
+        rollout:
+          rollingUpdate:
+            maxUnavailable: 50%
+          strategy: RollingUpdate
+        tolerations: []
+        extraVolumes:
+          - name: varlibotelcol
+            hostPath:
+              path: /var/lib/otelcol-events
+              type: DirectoryOrCreate
+        extraVolumeMounts:
+          - name: varlibotelcol
+            mountPath: /var/lib/otelcol-events
+        securityContext:
+          runAsGroup: 10001
+          runAsUser: 10001
+        serviceAccount:
+          create: true
+        extraEnvs:
+          - name: GOMAXPROCS
+            value: "1"
+          - name: K8S_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: CLUSTER_NAME
+            value: "soperator"
+        initContainers:
+          - name: init-fs
+            image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+            volumeMounts:
+              - mountPath: /var/lib/otelcol-events
+                name: varlibotelcol
+            securityContext:
+              runAsGroup: 0
+              runAsUser: 0
+            command:
+              - sh
+              - "-c"
+              - 'chown -R 10001: /var/lib/otelcol-events'
         resources:
-          requests:
-            memory: 128Mi
-            cpu: 100m
           limits:
             memory: 128Mi
-      overrideValues: null
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        useGOMEMLIMIT: true
+        command:
+          extraArgs:
+            - --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress
+        ports:
+          metrics:
+            enabled: true
+        podMonitor:
+          enabled: true
+          metricsEndpoints:
+            - port: metrics
+              interval: 30s
+              scrapeTimeout: 10s
+              relabelings:
+                - sourceLabels: [__meta_kubernetes_pod_name]
+                  targetLabel: pod
+                - replacement: otel-collector-events
+                  targetLabel: collector
+        config:
+          receivers:
+            k8sobjects:
+              auth_type: serviceAccount
+              objects:
+                - group: events.k8s.io
+                  mode: watch
+                  name: events
+          processors:
+            k8s_attributes:
+              extract:
+                labels:
+                  - from: pod
+                    key: external-o11y
+                    tag_name: external_o11y
+                  - from: namespace
+                    key: o11y_resource_id
+                    tag_name: resource_id
+                  - from: namespace
+                    key: o11y_service_provider
+                    tag_name: service_provider
+                metadata:
+                  - k8s.namespace.name
+                  - k8s.node.name
+                  - k8s.pod.name
+                  - k8s.pod.uid
+                  - k8s.pod.start_time
+              filter:
+                node_from_env_var: K8S_NODE_NAME
+              passthrough: false
+              pod_association:
+                - sources:
+                    - from: resource_attribute
+                      name: k8s.pod.ip
+                - sources:
+                    - from: resource_attribute
+                      name: k8s.pod.uid
+                - sources:
+                    - from: connection
+              wait_for_metadata: true
+              wait_for_metadata_timeout: 30s
+            memory_limiter:
+              check_interval: 5s
+              limit_percentage: 80
+              spike_limit_percentage: 25
+            transform:
+              log_statements:
+                - context: log
+                  error_mode: ignore
+                  statements:
+                    - set(attributes["cache"], ParseJSON(body.string)) where IsMatch(body.string, "^\\{")
+                    - set(severity_text, "INFO")
+                    - set(attributes["cluster"], "${env:CLUSTER_NAME}")
+          exporters:
+            otlp_http/victoriametrics:
+              compression: gzip
+              encoding: proto
+              logs_endpoint: http://vm-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
+              retry_on_failure:
+                enabled: true
+                initial_interval: 200ms
+                max_elapsed_time: 0
+              timeout: 5s
+              sending_queue:
+                enabled: true
+                sizer: items
+                queue_size: 30000
+                num_consumers: 10
+                storage: file_storage
+                batch:
+                  sizer: items
+                  flush_timeout: 1s
+                  min_size: 2000
+                  max_size: 5000
+          extensions:
+            file_storage:
+              directory: /var/lib/otelcol-events
+            health_check:
+              endpoint: 0.0.0.0:13133
+          service:
+            telemetry:
+              metrics:
+                readers:
+                  - pull:
+                      exporter:
+                        prometheus:
+                          host: 0.0.0.0
+                          port: 8888
+            extensions:
+              - health_check
+              - file_storage
+            pipelines:
+              logs/events:
+                receivers:
+                  - k8sobjects
+                processors:
+                  - k8s_attributes
+                  - transform
+                  - memory_limiter
+                exporters:
+                  - otlp_http/victoriametrics
       # postRenderers: []
       driftDetection:
         mode: warn
@@ -430,6 +1444,8 @@ observability:
     timeout: 5m
     version: 19.1.*
     namespace: monitoring-system
+    valuesFrom: []
+    values: null
     # postRenderers: []
     driftDetection:
       mode: warn
@@ -439,6 +1455,8 @@ observability:
       interval: 5m
       timeout: 5m
       version: 0.10.1
+      valuesFrom: []
+      values: null
       install:
         crds: CreateReplace
         remediation:
@@ -465,8 +1483,84 @@ observability:
       remediation:
         retries: 6
         remediateLastFailure: true
+    valuesFrom:
+      - kind: ConfigMap
+        name: terraform-victoria-metrics-operator
+        optional: true
+        valuesKey: values.yaml
+      - kind: ConfigMap
+        name: victoria-metrics-operator
+        optional: true
+        valuesKey: values.yaml
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+      - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-victoria-metrics-operator-crds'
     values:
-      kubeStateMetrics:
+      alertmanager:
+        enabled: false
+      crds:
+        enabled: false
+      defaultRules:
+        groups:
+          etcd:
+            create: false
+          vmcluster:
+            create: false
+        rules:
+          KubeHpaMaxedOut:
+            create: false
+          KubeMemoryOvercommit:
+            create: false
+          TooHighChurnRate24h:
+            create: false
+          TooManyScrapeErrors:
+            create: false
+      grafana:
+        enabled: true
+        image:
+          tag: "13.1.4"
+        nodeSelector:
+          slurm.nebius.ai/nodeset: system
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: grafana
+        resources:
+          requests:
+            cpu: 100m
+        grafana.ini:
+          feature_toggles:
+            # Keep dashboard exports compatible with the o11y Classic JSON workflow.
+            dashboardNewLayouts: false
+          auth:
+            disable_login_form: true
+          auth.basic:
+            enabled: true
+          auth.anonymous:
+            enabled: true
+            org_name: Main Org.
+            org_role: Admin
+        assertNoLeakedSecrets: false
+        plugins:
+          - grafana-lokiexplore-app@1.0.14@https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip
+          - victoriametrics-logs-datasource
+        sidecar:
+          dashboards:
+            searchNamespace: &grafanaSearchNamespaces
+              - soperator
+              - soperator-system
+              - gpu-operator
+              - monitoring-system
+              - logs-system
+          datasources:
+            searchNamespace: *grafanaSearchNamespaces
+      kube-state-metrics:
         affinity:
           nodeAffinity:
             requiredDuringSchedulingIgnoredDuringExecution:
@@ -487,24 +1581,330 @@ observability:
         resources:
           requests:
             cpu: 100m
-      grafana:
-        image:
-          tag: "13.1.4"
-        nodeSelector:
-          slurm.nebius.ai/nodeset: system
-        affinity:
-          podAntiAffinity:
-            preferredDuringSchedulingIgnoredDuringExecution:
-              - weight: 100
-                podAffinityTerm:
-                  topologyKey: kubernetes.io/hostname
-                  labelSelector:
-                    matchLabels:
-                      app.kubernetes.io/name: grafana
-        resources:
-          requests:
-            cpu: 100m
-      victoriaMetricsOperator:
+        extraArgs:
+          - '--metric-allowlist=kube_pod_info'
+          - '--metric-allowlist=kube_pod_created'
+          - '--metric-allowlist=kube_pod_status_phase'
+          - '--metric-allowlist=kube_pod_status_qos_class'
+          - '--metric-allowlist=kube_pod_container_status_running'
+          - '--metric-allowlist=kube_pod_container_status_waiting'
+          - '--metric-allowlist=kube_pod_container_status_terminated'
+          - '--metric-allowlist=kube_pod_ips'
+          - '--metric-allowlist=kube_pod_status_reason'
+          - '--metric-allowlist=kube_pod_spec_volumes_persistentvolumeclaims_info'
+          - '--metric-allowlist=kube_pod_container_status_last_terminated_exitcode'
+          - '--metric-allowlist=kube_pod_container_resource_requests'
+          - '--metric-allowlist=kube_pod_container_resource_limits'
+          - '--metric-allowlist=kube_pod_container_status_restarts_total'
+          - '--metric-allowlist=kube_pod_container_status_terminated_reason'
+          - '--metric-allowlist=kube_pod_container_status_terminated_signal'
+          - '--metric-allowlist=kube_node_status_condition'
+          - '--metric-allowlist=kube_node_spec_taint'
+          - '--metric-allowlist=kube_node_info'
+          - '--metric-allowlist=kube_customresource_.*'
+          - '--metric-allowlist=kube_node_labels'
+          - '--metric-allowlist=kube_persistentvolume_info'
+          - '--metric-allowlist=kube_persistentvolume_capacity_bytes'
+          - '--metric-allowlist=kube_persistentvolumeclaim_info'
+          - '--metric-allowlist=kube_persistentvolumeclaim_resource_requests_storage_bytes'
+          - '--metric-allowlist=kube_persistentvolumeclaim_status_phase'
+          - '--metric-labels-allowlist=nodes=[nebius.com/driverful,nebius.com/gpu,nebius.com/gpu-name,nebius.com/node-group-id,topology.nebius.com/nvl-instance-group-id,nebius.com/resource-preset,slurm.nebius.ai/nodeset,slurm.nebius.ai/nodeset-name,slurm.nebius.ai/workload]'
+        rbac:
+          extraRules:
+            - apiGroups:
+                - slurm.nebius.ai
+              resources:
+                - slurmclusters
+              verbs:
+                - get
+                - list
+                - watch
+        customResourceState:
+          enabled: true
+          config:
+            kind: CustomResourceStateMetrics
+            spec:
+              resources:
+                - groupVersionKind:
+                    group: slurm.nebius.ai
+                    version: v1
+                    kind: SlurmCluster
+                  metrics:
+                    # Info metric for static fields like crVersion
+                    - name: slurmcluster_info
+                      help: "Basic static information about the SlurmCluster resource"
+                      each:
+                        type: Info
+                        info:
+                          labelsFromPath:
+                            name: [metadata, name]
+                            namespace: [metadata, namespace]
+                            cr_version: [spec, crVersion]
+                    # Gauge metrics for all numeric counters
+                    - name: slurmcluster_slurmconfig_max_job_count
+                      help: "Max job count from spec.slurmConfig.maxJobCount"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [spec, slurmConfig, maxJobCount]
+                    - name: slurmcluster_slurmconfig_message_timeout
+                      help: "Message timeout from spec.slurmConfig.messageTimeout"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [spec, slurmConfig, messageTimeout]
+                    - name: slurmcluster_slurmconfig_min_job_age
+                      help: "Min job age from spec.slurmConfig.minJobAge"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [spec, slurmConfig, minJobAge]
+                    - name: slurmcluster_slurmnodes_login_size
+                      help: "Login node count from spec.slurmNodes.login.size"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [spec, slurmNodes, login, size]
+                    - name: slurmcluster_slurmnodes_rest_size
+                      help: "Rest node count from spec.slurmNodes.rest.size"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [spec, slurmNodes, rest, size]
+                    - name: slurmcluster_slurmnodes_worker_size
+                      help: "Worker node count from spec.slurmNodes.worker.size"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [spec, slurmNodes, worker, size]
+                    - name: slurmcluster_ready_login
+                      help: "Ready login nodes from status.readyLogin"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [status, readyLogin]
+                    - name: slurmcluster_ready_sconfig_controller
+                      help: "Ready SConfigController nodes from status.readySConfigController"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [status, readySConfigController]
+                    - name: slurmcluster_ready_workers
+                      help: "Ready workers from status.readyWorkers"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [status, readyWorkers]
+                    # Gauge for list of conditions
+                    - name: slurmcluster_status_condition_status
+                      help: "SlurmCluster conditions status"
+                      each:
+                        type: Gauge
+                        gauge:
+                          path: [status, conditions]
+                          labelsFromPath:
+                            type: ["type"]
+                          valueFrom: ["status"]
+                    # StateSet for status.phase
+                    - name: slurmcluster_status_phase
+                      help: "Current phase of the SlurmCluster resource"
+                      each:
+                        type: StateSet
+                        stateSet:
+                          labelName: phase
+                          path: [status, phase]
+                          list: ["Available", "Reconciling", "Not available"]
+        prometheusScrape: false
+        selfMonitor:
+          enabled: true
+        collectors:
+          - pods
+          - nodes
+          - persistentvolumes
+          - persistentvolumeclaims
+        # The victoria-metrics-k8s-stack chart reads this scrape config from the `vmScrape` key,
+        # see https://github.com/VictoriaMetrics/helm-charts/blob/victoria-metrics-k8s-stack-0.80.0/charts/victoria-metrics-k8s-stack/templates/servicemonitors.yaml
+        # Endpoints here fully replace the chart's default list.
+        vmScrape:
+          spec:
+            endpoints:
+              - honorLabels: true
+                metricRelabelConfigs:
+                  - action: drop
+                    if:
+                      - 'kube_node_spec_taint{key!="node.kubernetes.io/unschedulable"}'
+                      - 'kube_node_spec_taint{effect!="NoSchedule"}'
+                  - action: labeldrop
+                    regex: (uid|container_id|image_id)
+                port: http
+              - honorLabels: true
+                metricRelabelConfigs:
+                  - action: labeldrop
+                    regex: (uid|container_id|image_id)
+                port: metrics
+            jobLabel: app.kubernetes.io/name
+      kubeControllerManager:
+        enabled: false
+      kubeEtcd:
+        enabled: false
+      kubeProxy:
+        enabled: false
+        vmScrape:
+          spec:
+            endpoints:
+              - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+                port: http-metrics
+                scheme: http
+            jobLabel: jobLabel
+            namespaceSelector:
+              matchNames:
+                - kube-system
+      kubeScheduler:
+        enabled: false
+      kubelet:
+        enabled: true
+        vmScrapes:
+          kubelet:
+            enabled: true
+            spec:
+              bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+              honorLabels: true
+              honorTimestamps: false
+              interval: 30s
+              metricRelabelConfigs:
+                - action: labeldrop
+                  regex: (uid)
+                - action: labeldrop
+                  regex: (id|name)
+                  source_labels:
+                    - __name__
+              relabelConfigs:
+                - action: labelmap
+                  regex: __meta_kubernetes_node_label_(kubernetes_io_arch|node_kubernetes_io_instance_type)
+                  replacement: ${1}
+                - sourceLabels:
+                    - __meta_kubernetes_node_name
+                  targetLabel: instance
+                - sourceLabels:
+                    - __metrics_path__
+                  targetLabel: metrics_path
+                - replacement: kubelet
+                  targetLabel: job
+              scheme: https
+              scrapeTimeout: 5s
+              selector: {}
+              tlsConfig:
+                caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                insecureSkipVerify: true
+          cadvisor:
+            enabled: true
+            spec:
+              bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+              honorLabels: true
+              honorTimestamps: false
+              interval: 30s
+              metricRelabelConfigs:
+                - action: labeldrop
+                  regex: (uid)
+                - action: labeldrop
+                  regex: (id|name)
+                - action: drop
+                  regex: (rest_client_request_duration_seconds_bucket|rest_client_request_duration_seconds_sum|rest_client_request_duration_seconds_count)
+                  source_labels:
+                    - __name__
+              path: /metrics/cadvisor
+              relabelConfigs:
+                - action: labelmap
+                  regex: __meta_kubernetes_node_label_(kubernetes_io_arch|node_kubernetes_io_instance_type)
+                  replacement: ${1}
+                - sourceLabels:
+                    - __meta_kubernetes_node_name
+                  targetLabel: instance
+                - sourceLabels:
+                    - __metrics_path__
+                  targetLabel: metrics_path
+                - replacement: kubelet
+                  targetLabel: job
+          probes:
+            enabled: true
+            spec:
+              bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+              honorLabels: true
+              honorTimestamps: false
+              interval: 30s
+              metricRelabelConfigs:
+                - action: labeldrop
+                  regex: (uid)
+                - action: labeldrop
+                  regex: (id|name)
+                - action: drop
+                  regex: (rest_client_request_duration_seconds_bucket|rest_client_request_duration_seconds_sum|rest_client_request_duration_seconds_count)
+                  source_labels:
+                    - __name__
+              path: /metrics/probes
+              relabelConfigs:
+                - action: labelmap
+                  regex: __meta_kubernetes_node_label_(kubernetes_io_arch|node_kubernetes_io_instance_type)
+                  replacement: ${1}
+                - sourceLabels:
+                    - __meta_kubernetes_node_name
+                  targetLabel: instance
+                - sourceLabels:
+                    - __metrics_path__
+                  targetLabel: metrics_path
+                - replacement: kubelet
+                  targetLabel: job
+              scheme: https
+              scrapeTimeout: 5s
+              selector: {}
+              tlsConfig:
+                caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                insecureSkipVerify: true
+          resources:
+            enabled: true
+            spec:
+              bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+              honorLabels: true
+              honorTimestamps: false
+              interval: 30s
+              metricRelabelConfigs:
+                - action: labeldrop
+                  regex: (uid)
+                - action: labeldrop
+                  regex: (id|name)
+                - action: drop
+                  regex: (rest_client_request_duration_seconds_bucket|rest_client_request_duration_seconds_sum|rest_client_request_duration_seconds_count)
+                  source_labels:
+                    - __name__
+              path: /metrics/resource
+              relabelConfigs:
+                - action: labelmap
+                  regex: __meta_kubernetes_node_label_(kubernetes_io_arch|node_kubernetes_io_instance_type)
+                  replacement: ${1}
+                - sourceLabels:
+                    - __meta_kubernetes_node_name
+                  targetLabel: instance
+                - sourceLabels:
+                    - __metrics_path__
+                  targetLabel: metrics_path
+                - replacement: kubelet
+                  targetLabel: job
+              scheme: https
+              scrapeTimeout: 5s
+              selector: {}
+              tlsConfig:
+                caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                insecureSkipVerify: true
+      coreDns:
+        enabled: false
+      prometheus-node-exporter:
+        enabled: true
+        vmScrape:
+          spec:
+            # Legacy Endpoints truncate services with more than 1,000 backends.
+            discoveryRole: endpointslice
+        extraArgs: []
+      victoria-metrics-operator:
         nodeSelector:
           slurm.nebius.ai/nodeset: system
         affinity:
@@ -519,24 +1919,15 @@ observability:
         resources:
           requests:
             cpu: 100m
-      dashboardNamespaces:
-        - soperator
-        - soperator-system
-        - gpu-operator
-        - monitoring-system
-        - logs-system
-      grafanaIni:
-        feature_toggles:
-          # Keep dashboard exports compatible with the o11y Classic JSON workflow.
-          dashboardNewLayouts: false
-        auth:
-          disable_login_form: true
-        auth.basic:
-          enabled: true
-        auth.anonymous:
-          enabled: true
-          org_name: Main Org.
-          org_role: Admin
+        admissionWebhooks:
+          enable: true
+        crd:
+          cleanup:
+            enabled: false
+          create: false
+        operator:
+          disable_prometheus_converter: false
+          enable_converter_ownership: true
       vmagent:
         spec:
           nodeSelector:
@@ -554,8 +1945,7 @@ observability:
             promscrape.maxScrapeSize: "33554432"
             promscrape.dropOriginalLabels: "true"
             promscrape.streamParse: "true"
-          externalLabels: {}
-          remoteWriteSettings: {}
+          # Supply the full destination list for deployments that export metrics.
           remoteWrite:
             - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.monitoring-system.svc.cluster.local.:8428/api/v1/write
           resources:
@@ -564,9 +1954,8 @@ observability:
               cpu: 5000m
             limits:
               memory: 10Gi
-          extraEnvs: []
-          volumeMounts: []
-          volumes: []
+      vmalert:
+        enabled: false
       vmsingle:
         spec:
           nodeSelector:
@@ -598,10 +1987,6 @@ observability:
               cpu: 1000m
             limits:
               memory: 2Gi
-      prometheusNodeExporter:
-        enabled: true
-        extraArgs: null
-    overrideValues: null
     # postRenderers: []
     driftDetection:
       mode: warn
@@ -612,6 +1997,17 @@ observability:
     version: 0.13.*
     namespace: logs-system
     releaseName: vm-logs
+    valuesFrom:
+      - kind: ConfigMap
+        name: terraform-vm-logs
+        optional: true
+        valuesKey: values.yaml
+      - kind: ConfigMap
+        name: vm-logs
+        optional: true
+        valuesKey: values.yaml
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     install:
       crds: CreateReplace
       remediation:
@@ -622,28 +2018,37 @@ observability:
         retries: 3
         remediateLastFailure: true
     values:
-      persistentVolume:
+      dashboards:
         enabled: true
-        size: 30Gi
-        accessMode: ReadWriteOnce
-      nodeSelector:
-        slurm.nebius.ai/nodeset: system
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                topologyKey: kubernetes.io/hostname
-                labelSelector:
-                  matchLabels:
-                    app.kubernetes.io/name: victoria-logs-single
-      resources:
-        requests:
-          memory: 2Gi
-          cpu: 1000m
-        limits:
-          memory: 2Gi
-    overrideValues: null
+        labels:
+          grafana_dashboard: "1"
+      server:
+        nodeSelector:
+          slurm.nebius.ai/nodeset: system
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: victoria-logs-single
+        resources:
+          requests:
+            memory: 2Gi
+            cpu: 1000m
+          limits:
+            memory: 2Gi
+        persistentVolume:
+          enabled: true
+          size: 30Gi
+          accessModes:
+            - ReadWriteOnce
+        vmServiceScrape:
+          enabled: true
+      vector:
+        enabled: false
     # postRenderers: []
     driftDetection:
       mode: warn
@@ -654,6 +2059,9 @@ observability:
     version: 5.1.0
     namespace: soperator
     releaseName: soperator-dcgm-exporter
+    valuesFrom: []
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     install:
       crds: CreateReplace
       remediation:
@@ -665,12 +2073,14 @@ observability:
         remediateLastFailure: true
     values:
       validateToolkit: true
-      resources:
-        limits:
-          memory: 128Mi
-        requests:
-          memory: 128Mi
-          cpu: 100m
+      daemonSet:
+        nvidiaDcgmExporter:
+          resources:
+            limits:
+              memory: 128Mi
+            requests:
+              memory: 128Mi
+              cpu: 100m
     # postRenderers: []
     driftDetection:
       mode: warn
@@ -695,49 +2105,288 @@ observability:
     driftDetection:
       mode: warn
     releaseName: opentelemetry-collector-nccl-profiles
-    configMapOverrideValues: null
-    collectorOverrideValues: null
-    values:
-      # or nodeLocal
-      mode: shared
-      # Idle unless jobs opt in to NCCL Inspector; no CPU limit, so it bursts when they do.
-      resources:
-        requests:
-          memory: 200Mi
-          cpu: 100m
-        limits:
-          memory: 1Gi
-      useGoMemLimit: true
-      nebiusO11yAgentVersion: 2.0.10
-      metricsEndpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics
-      metricsExporterTimeout: 15s
-      # These values are rendered as exporter sending_queue.batch settings.
-      # The chart intentionally does not use the batch processor for collector pipelines.
-      batch:
-        timeout: 1s
-        sendBatchSize: 2000
-        sendBatchMaxSize: 5000
-      # Measured in metric data points because the exporter queue uses sizer: items.
-      sendingQueue:
-        queueSize: 30000
-        numConsumers: 10
-      metrics:
-        enabled: true
-        interval: 30s
-        scrapeTimeout: 10s
-      # Must match the SPANK plugin dump dir (plugStackConfig.ncclInspectorPreConf.dumpDir) seen from /mnt/jail.
-      dumpDir: /mnt/jail/opt/soperator-outputs/shared/nccl_profiles
-      pollInterval: 30s
-      exportLabels:
-        slurmJobId: slurm_job_id
-        slurmStepId: slurm_step_id
-        hostnamePid: hostname_pid
-      enableFileStorage: true
-      deleteAfterRead:
-        enabled: true
-        # Nebius O11y agent fork option; not part of upstream filelogreceiver.
-        # Files are deleted only after they have not been modified for at least this duration.
-        minAge: 15m
+    configMap:
+      valuesFrom:
+        - kind: ConfigMap
+          name: terraform-opentelemetry-collector-nccl-profiles-cm
+          optional: true
+          valuesKey: values.yaml
+        - kind: ConfigMap
+          name: opentelemetry-collector-nccl-profiles-cm
+          optional: true
+          valuesKey: values.yaml
+      dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+      values:
+        resources:
+          - apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: opentelemetry-collector-nccl-profiles-agent
+            data:
+              # The filelog include path must match the SPANK dump directory under /mnt/jail.
+              relay: |
+                receivers:
+                  filelog/nccl_metrics:
+                    include:
+                      - /mnt/jail/opt/soperator-outputs/shared/nccl_profiles/*/*/*.log
+                    poll_interval: 30s
+                    retry_on_failure:
+                      enabled: true
+                      max_elapsed_time: 0
+                    include_file_path: true
+                    start_at: beginning
+                    delete_after_read: true
+                    delete_after_read_min_age: 15m
+                    storage: file_storage
+
+                    operators:
+                      - id: parse_nccl_profile_path
+                        type: regex_parser
+                        parse_from: attributes["log.file.path"]
+                        regex: ^.*/(?P<job_id>[^/]+)/(?P<step_id>[^/]+)/(?P<worker_name>.+)-pid(?P<hostname_pid>[^/]+)\.log$
+
+                      - if: attributes["job_id"] != nil
+                        type: copy
+                        from: attributes.job_id
+                        to: resource["slurm_job_id"]
+
+                      - if: attributes["step_id"] != nil
+                        type: copy
+                        from: attributes.step_id
+                        to: resource["slurm_step_id"]
+
+                      - if: attributes["hostname_pid"] != nil
+                        type: copy
+                        from: attributes.hostname_pid
+                        to: resource["hostname_pid"]
+
+                exporters:
+                  otlp_http/victoriametrics:
+                    compression: gzip
+                    encoding: proto
+                    metrics_endpoint: http://vmsingle-metrics-victoria-metrics-k8s-stack:8428/opentelemetry/v1/metrics
+                    timeout: 15s
+                    retry_on_failure:
+                      enabled: true
+                      initial_interval: 1s
+                      max_interval: 10s
+                      max_elapsed_time: 0
+                    sending_queue:
+                      enabled: true
+                      sizer: items
+                      queue_size: 30000
+                      num_consumers: 10
+                      storage: file_storage
+                      batch:
+                        sizer: items
+                        flush_timeout: 1s
+                        min_size: 2000
+                        max_size: 5000
+
+                connectors:
+                  ncclmetrics:
+
+                extensions:
+                  file_storage:
+                    directory: /var/lib/otelcol-nccl-profiles
+
+                  health_check:
+                    endpoint: 0.0.0.0:13133
+
+                service:
+                  telemetry:
+                    metrics:
+                      readers:
+                        - pull:
+                            exporter:
+                              prometheus:
+                                host: 0.0.0.0
+                                port: 8889
+
+                  extensions:
+                    - health_check
+                    - file_storage
+
+                  pipelines:
+                    logs/nccl_metrics:
+                      receivers:
+                        - filelog/nccl_metrics
+                      exporters:
+                        - ncclmetrics
+
+                    metrics/nccl_metrics:
+                      receivers:
+                        - ncclmetrics
+                      exporters:
+                        - otlp_http/victoriametrics
+    collector:
+      valuesFrom:
+        - kind: ConfigMap
+          name: terraform-opentelemetry-collector-nccl-profiles
+          optional: true
+          valuesKey: values.yaml
+        - kind: ConfigMap
+          name: opentelemetry-collector-nccl-profiles
+          optional: true
+          valuesKey: values.yaml
+      dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-stack'
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-otelcol-nccl-profiles-cm'
+      values:
+        clusterRole:
+          create: true
+          rules:
+            - apiGroups:
+                - ""
+              resources:
+                - pods
+                - namespaces
+              verbs:
+                - get
+                - watch
+                - list
+        image:
+          pullPolicy: IfNotPresent
+          repository: cr.nebius.cloud/observability/nebius-o11y-agent
+          tag: 2.0.10
+        mode: deployment
+        replicaCount: 1 # Only one replica to avoid file lock conflicts on shared storage and prevent log duplication
+        rollout:
+          strategy: Recreate # Ensure old pod terminates before new one starts to maintain max one pod running
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: slurm.nebius.ai/nodeset
+                      operator: In
+                      values:
+                        - "system"
+        extraVolumes:
+          - name: jail
+            hostPath:
+              path: /mnt/jail
+              type: Directory
+          - name: varlibotelcol
+            hostPath:
+              path: /var/lib/otelcol-nccl-profiles
+              type: DirectoryOrCreate
+        extraVolumeMounts:
+          - name: jail
+            mountPath: /mnt/jail
+            readOnly: false
+          - name: varlibotelcol
+            mountPath: /var/lib/otelcol-nccl-profiles
+        securityContext:
+          runAsGroup: 0
+          runAsUser: 10001
+        service:
+          enabled: false
+        serviceAccount:
+          create: true
+        extraEnvs:
+          - name: GOMAXPROCS
+            value: "1"
+        initContainers:
+          - name: wait-jail-populated
+            image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+            volumeMounts:
+              - name: jail
+                mountPath: /mnt/jail
+                readOnly: true
+            securityContext:
+              runAsGroup: 0
+              runAsUser: 0
+            command:
+              - sh
+              - "-c"
+              - |
+                set -eu
+                until [ -f /mnt/jail/etc/soperator-jail-populated ]; do
+                  echo "Waiting for /mnt/jail to be populated"
+                  sleep 5
+                done
+          - name: init-nccl-profiles-dump-dir
+            image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+            volumeMounts:
+              - name: jail
+                mountPath: /mnt/jail
+            securityContext:
+              runAsGroup: 0
+              runAsUser: 0
+            command:
+              - sh
+              - "-c"
+              - |
+                set -eu
+                dump_dir="/mnt/jail/opt/soperator-outputs/shared/nccl_profiles"
+                case "$dump_dir" in
+                  /mnt/jail/*) ;;
+                  *)
+                    echo "NCCL profile dump directory must be under /mnt/jail"
+                    exit 1
+                    ;;
+                esac
+                install -d -m 0777 "$dump_dir"
+          - name: init-fs
+            image: cr.nebius.cloud/soperator-proxy-docker-io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+            volumeMounts:
+              - name: varlibotelcol
+                mountPath: /var/lib/otelcol-nccl-profiles
+            securityContext:
+              runAsGroup: 0
+              runAsUser: 0
+            command:
+              - sh
+              - "-c"
+              - 'chown -R 10001: /var/lib/otelcol-nccl-profiles'
+        # Idle unless jobs opt in to NCCL Inspector; no CPU limit, so it bursts when they do.
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        useGOMEMLIMIT: true
+        command:
+          extraArgs:
+            - "--feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress,filelog.allowFileDeletion"
+        ports:
+          jaeger-compact:
+            enabled: false
+          jaeger-grpc:
+            enabled: false
+          jaeger-thrift:
+            enabled: false
+          metrics:
+            enabled: true
+            containerPort: 8889
+            servicePort: 8889
+          otlp:
+            enabled: false
+          otlp-http:
+            enabled: false
+          zipkin:
+            enabled: false
+        podMonitor:
+          enabled: true
+          metricsEndpoints:
+            - port: metrics
+              interval: 30s
+              scrapeTimeout: 10s
+              relabelings:
+                - sourceLabels: [__meta_kubernetes_pod_name]
+                  targetLabel: pod
+                - sourceLabels: [__meta_kubernetes_node_name]
+                  targetLabel: node
+                - replacement: otel-collector-nccl-profiles
+                  targetLabel: collector
+        config: {}
+        configMap:
+          create: false
+          existingName: opentelemetry-collector-nccl-profiles-agent
 slurmCluster:
   enabled: true
   interval: 5m
@@ -745,8 +2394,24 @@ slurmCluster:
   version: 5.1.0
   namespace: soperator
   releaseName: soperator
-  values: null
-  overrideValues: null
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-slurm-cluster
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: slurm-cluster
+      optional: true
+      valuesKey: values.yaml
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ if .Values.soperator.enabled }}{{ include "soperator-fluxcd.fullname" . }}-soperator{{ end }}'
+    - name: >-
+        {{ if and .Values.slurmCluster.enabled .Values.slurmCluster.slurmClusterStorage.enabled }} {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster-storage {{ end }}
+    - name: '{{ if .Values.nfsServer.enabled }}{{ include "soperator-fluxcd.fullname" . }}-nfs-server{{ end }}'
+    - name: '{{ if .Values.tailscale.enabled }}{{ include "soperator-fluxcd.fullname" . }}-tailscale{{ end }}'
+  values:
+    clusterName: soperator
   install:
     crds: Skip
     remediation:
@@ -761,8 +2426,20 @@ slurmCluster:
     releaseName: slurm-cluster-storage
     interval: 5m
     timeout: 30m
+    valuesFrom:
+      - kind: ConfigMap
+        name: terraform-slurm-cluster-storage
+        optional: true
+        valuesKey: values.yaml
+      - kind: ConfigMap
+        name: slurm-cluster-storage
+        optional: true
+        valuesKey: values.yaml
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+      - name: '{{ if .Values.storageClasses.enabled }}{{ include "soperator-fluxcd.fullname" . }}-storageclasses{{ end }}'
+      - name: '{{ if .Values.soperator.enabled }}{{ include "soperator-fluxcd.fullname" . }}-soperator{{ end }}'
     values: null
-    overrideValues: null
     install:
       remediation:
         retries: 6
@@ -778,7 +2455,6 @@ slurmCluster:
     mode: warn
 nodesets:
   enabled: false
-  clusterName: ""
   # postRenderers: []
   driftDetection:
     mode: warn
@@ -787,8 +2463,21 @@ nodesets:
   version: 5.1.0
   namespace: soperator
   releaseName: soperator-nodesets
-  values: null
-  overrideValues: null
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-nodesets
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: nodesets
+      optional: true
+      valuesKey: values.yaml
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ if .Values.soperator.enabled }}{{ include "soperator-fluxcd.fullname" . }}-soperator{{ end }}'
+    - name: '{{ if .Values.slurmCluster.enabled }}{{ include "soperator-fluxcd.fullname" . }}-slurm-cluster{{ end }}'
+  values:
+    clusterName: ""
   install:
     crds: Skip
     remediation:
@@ -805,7 +2494,20 @@ soperatorActiveChecks:
   version: 5.1.0
   releaseName: soperator-activechecks
   namespace: soperator
-  overrideValues: null
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-soperator-activechecks
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: soperator-activechecks
+      optional: true
+      valuesKey: values.yaml
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-slurm-cluster'
+    - name: >-
+        {{ if and .Values.soperator.enabled .Values.soperator.soperatorChecks.enabled }} {{ include "soperator-fluxcd.fullname" . }}-soperatorchecks {{ end }}
+  values: null
   install:
     crds: Skip
     remediation:
@@ -825,6 +2527,19 @@ soperator:
   version: 5.1.0
   namespace: "soperator-system"
   releaseName: soperator-controller
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-soperator
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: soperator
+      optional: true
+      valuesKey: values.yaml
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ if .Values.soperator.kruise.enabled }}{{ include "soperator-fluxcd.fullname" . }}-kruise{{ end }}'
+    - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
   install:
     crds: CreateReplace
     remediation:
@@ -836,6 +2551,8 @@ soperator:
       remediateLastFailure: true
   values:
     serviceMonitor:
+      enabled: true
+    certManager:
       enabled: true
     controllerManager:
       nodeSelector:
@@ -849,20 +2566,34 @@ soperator:
                 labelSelector:
                   matchLabels:
                     control-plane: controller-manager
-    manager:
-      resources:
-        limits:
-          memory: 1Gi
-        requests:
-          cpu: 500m
-          memory: 1Gi
-  overrideValues: null
+      manager:
+        env:
+          isMariadbCrdInstalled: true
+          isPrometheusCrdInstalled: true
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
   kruise:
     enabled: true
     interval: 5m
     timeout: 30m
     version: 1.9.1-custom
     releaseName: soperator-kruise
+    valuesFrom:
+      - kind: ConfigMap
+        name: terraform-kruise
+        optional: true
+        valuesKey: values.yaml
+      - kind: ConfigMap
+        name: kruise
+        optional: true
+        valuesKey: values.yaml
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+      - name: '{{ if .Values.certManager.enabled }}{{ include "soperator-fluxcd.fullname" . }}-cert-manager{{ end }}'
     install:
       crds: CreateReplace
       remediation:
@@ -872,7 +2603,7 @@ soperator:
       remediation:
         retries: 6
         remediateLastFailure: true
-    overrideValues:
+    values:
       crds:
         managed: true
       daemon:
@@ -1043,6 +2774,17 @@ soperator:
     interval: 5m
     timeout: 5m
     releaseName: soperator-checks
+    valuesFrom:
+      - kind: ConfigMap
+        name: terraform-soperatorchecks
+        optional: true
+        valuesKey: values.yaml
+      - kind: ConfigMap
+        name: soperatorchecks
+        optional: true
+        valuesKey: values.yaml
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-soperator'
     install:
       remediation:
         retries: 3
@@ -1063,7 +2805,6 @@ soperator:
                   labelSelector:
                     matchLabels:
                       control-plane: soperatorchecks
-    overrideValues: null
     # postRenderers: []
     driftDetection:
       mode: warn
@@ -1072,6 +2813,17 @@ soperator:
     interval: 5m
     timeout: 30m
     releaseName: soperator-node-configurator
+    valuesFrom:
+      - kind: ConfigMap
+        name: terraform-nodeconfigurator
+        optional: true
+        valuesKey: values.yaml
+      - kind: ConfigMap
+        name: nodeconfigurator
+        optional: true
+        valuesKey: values.yaml
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-soperator'
     install:
       crds: Skip
       remediation:
@@ -1082,7 +2834,15 @@ soperator:
         retries: 6
         remediateLastFailure: true
     values:
+      # Older nodeconfigurator charts use this key for the custom container.
+      nodeConfigurator:
+        enabled: false
       rebooter:
+        enabled: true
+        generateRBAC: true
+        logFormat: json
+        tolerations:
+          - operator: Exists
         # Without a priority class the rebooter runs at 0 and loses a node's spare CPU budget to
         # whatever infrastructure Deployment lands there first, with no way to preempt it. The
         # class sits below every Slurm pod (the lowest is slurm-login at 100002) because this is a
@@ -1098,7 +2858,6 @@ soperator:
             cpu: 100m
           limits:
             memory: 200Mi
-    overrideValues: null
     # postRenderers: []
     driftDetection:
       mode: warn
@@ -1108,6 +2867,9 @@ soperator:
     timeout: 5m
     releaseName: soperator-monitoring-dashboards
     namespace: monitoring-system
+    valuesFrom: []
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
     install:
       crds: Skip
       remediation:
@@ -1116,7 +2878,7 @@ soperator:
       crds: Skip
       remediation:
         retries: 3
-    overrideValues: null
+    values: null
     # postRenderers: []
     driftDetection:
       mode: warn
@@ -1130,6 +2892,18 @@ notifier:
   version: 5.1.0
   namespace: monitoring-system
   releaseName: soperator-notifier
+  valuesFrom:
+    - kind: ConfigMap
+      name: terraform-soperator-notifier
+      optional: true
+      valuesKey: values.yaml
+    - kind: ConfigMap
+      name: soperator-notifier
+      optional: true
+      valuesKey: values.yaml
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-stack'
   install:
     remediation:
       retries: 3
@@ -1138,9 +2912,10 @@ notifier:
       retries: 3
       remediateLastFailure: true
   values:
-    slack:
-      webhookUrl: null
-  overrideValues: null
+    nameOverride: soperator-notifier
+    # Set the Slack webhook here or supply it through valuesFrom.
+    # slack:
+    #   webhookUrl: null
   # postRenderers: []
   driftDetection:
     mode: warn
@@ -1150,7 +2925,10 @@ csiDriverNfs:
   version: 4.11.0
   namespace: nfs-system
   releaseName: csi-driver-nfs
-  overrideValues:
+  valuesFrom: []
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+  values:
     controller:
       nodeSelector:
         slurm.nebius.ai/nodeset: system
@@ -1182,7 +2960,10 @@ nfsServer:
   version: 1.2.3
   namespace: nfs-system
   releaseName: nfs-server
-  overrideValues: null
+  valuesFrom: []
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-csi-driver-nfs'
   values: null
   install:
     crds: Skip
@@ -1203,6 +2984,9 @@ storageClasses:
   version: 5.1.0
   namespace: storage-system
   releaseName: soperator-storageclasses
+  valuesFrom: []
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
   values: null
   install:
     crds: Skip
@@ -1223,7 +3007,13 @@ customConfigmaps:
   version: 5.1.0
   namespace: soperator
   releaseName: soperator-custom-configmaps
-  overrideValues: null
+  valuesFrom:
+    - kind: ConfigMap
+      name: custom-configmaps
+      optional: true
+      valuesKey: values.yaml
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
   values: null
   install:
     crds: Skip
@@ -1242,6 +3032,36 @@ tailscale:
   interval: 5m
   timeout: 5m
   version: 2.0.0
+  namespace: soperator
+  valuesFrom: []
+  dependsOn:
+    - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+  values:
+    resources:
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: Role
+        metadata:
+          name: tailscale
+          namespace: '{{ .Values.tailscale.namespace | default .Release.Namespace }}'
+        rules:
+          - apiGroups: [""]
+            resources: [secrets]
+            verbs: [get, create, update, patch]
+          - apiGroups: [""]
+            resources: [events]
+            verbs: [get, create, patch]
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        metadata:
+          name: tailscale
+          namespace: '{{ .Values.tailscale.namespace | default .Release.Namespace }}'
+        subjects:
+          - kind: ServiceAccount
+            name: default
+        roleRef:
+          kind: Role
+          name: tailscale
+          apiGroup: rbac.authorization.k8s.io
   install:
     crds: Skip
     remediation:

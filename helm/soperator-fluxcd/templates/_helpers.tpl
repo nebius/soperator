@@ -14,6 +14,110 @@ If release name contains chart name it will be used as a full name.
 {{- default .Release.Name .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "soperator-fluxcd.targetNamespace" -}}
+{{- with . -}}
+targetNamespace: {{ . | quote }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Resolve dependency names in the chart context, preserving the rest of each reference.
+*/}}
+{{- define "soperator-fluxcd.dependsOn" -}}
+{{- if hasKey .component "dependsOn" -}}
+  {{- $dependencies := .component.dependsOn -}}
+  {{- if and (ne $dependencies nil) (not (kindIs "slice" $dependencies)) -}}
+    {{- fail "dependsOn must be a list or null" -}}
+  {{- end -}}
+  {{- $references := list -}}
+  {{- range $dependencies -}}
+    {{- $name := tpl .name $.root | trim -}}
+    {{- if $name -}}
+      {{- $reference := deepCopy . -}}
+      {{- $_ := set $reference "name" $name -}}
+      {{- $references = append $references $reference -}}
+    {{- end -}}
+  {{- end -}}
+  {{- toYaml (dict "dependsOn" $references) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Flux merges these references in order. The umbrella owns the first source.
+*/}}
+{{- define "soperator-fluxcd.valuesFrom" -}}
+- kind: ConfigMap
+  name: {{ .name }}
+  valuesKey: values.yaml
+{{- with .references }}
+{{ toYaml . }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Keep metadata after the YAML block so Helm preserves trailing newlines in child values.
+The TSA token writer supplies its generated Raw resources directly under data.values.yaml.
+*/}}
+{{- define "soperator-fluxcd.valuesConfigMap" -}}
+apiVersion: v1
+kind: ConfigMap
+{{- with .yaml }}
+data:
+  values.yaml: |+
+    {{- . | nindent 4 }}
+{{- end }}
+metadata:
+  name: {{ .name }}
+  namespace: {{ .root.Release.Namespace | quote }}
+  labels:
+    {{- include "soperator-fluxcd.labels" .root | nindent 4 }}
+    reconcile.fluxcd.io/watch: Enabled
+{{- end -}}
+
+{{/*
+Apply the platform defaults before the child chart values. Existing legacy maps
+replace the whole base configuration.
+*/}}
+{{- define "soperator-fluxcd.platformValues" -}}
+{{- with .component.overrideValues -}}
+  {{- toYaml . -}}
+{{- else -}}
+  {{- $defaults := deepCopy (.component.defaultValues | default dict) -}}
+  {{- if .prometheusEnabled -}}
+    {{- $defaults = mustMergeOverwrite $defaults (.component.prometheusValues | default dict) -}}
+  {{- end -}}
+  {{- $resolved := tpl (toYaml $defaults) .root | fromYaml -}}
+  {{- mustMergeOverwrite $resolved (.component.values | default dict) | toYaml -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Merge into a copy of the Kruise values using Helm's null handling for old overrides.
+*/}}
+{{- define "soperator-fluxcd.mergeKruiseOverrides" -}}
+{{- range $key, $override := .overrides -}}
+  {{- $value := get $.values $key -}}
+  {{- if and (eq $override nil) (hasKey $.values $key) -}}
+    {{- $_ := unset $.values $key -}}
+  {{- else if and (kindIs "map" $value) (kindIs "map" $override) -}}
+    {{- include "soperator-fluxcd.mergeKruiseOverrides" (dict "values" $value "overrides" $override) -}}
+  {{- else -}}
+    {{- $_ := set $.values $key $override -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Keep existing overrides effective until their callers can switch to values.
+*/}}
+{{- define "soperator-fluxcd.valuesWithLegacyOverride" -}}
+{{- if ne .values nil -}}
+  {{- toYaml .values -}}
+{{- else if .overrideValues -}}
+  {{- toYaml .overrideValues -}}
+{{- end -}}
+{{- end -}}
+
 {{/*
 Create chart name and version as used by the chart label.
 */}}
@@ -104,9 +208,9 @@ legacy override path for existing installations.
 
 {{- define "soperator-fluxcd.o11yTsaTokenWriterNamespace" -}}
 {{- if .Values.observability.vmStack.enabled -}}
-{{- .Values.observability.vmStack.namespace | default "monitoring-system" -}}
+{{- .Values.observability.vmStack.namespace | default .Release.Namespace -}}
 {{- else -}}
-{{- .Values.observability.opentelemetry.namespace | default "logs-system" -}}
+{{- .Values.observability.opentelemetry.namespace | default .Release.Namespace -}}
 {{- end -}}
 {{- end -}}
 
@@ -129,65 +233,11 @@ legacy override path for existing installations.
 {{- else -}}
 {{- $namespaces := list -}}
 {{- if .Values.observability.vmStack.enabled -}}
-{{- $namespaces = append $namespaces (.Values.observability.vmStack.namespace | default "monitoring-system") -}}
+{{- $namespaces = append $namespaces (.Values.observability.vmStack.namespace | default .Release.Namespace) -}}
 {{- end -}}
 {{- if .Values.observability.opentelemetry.enabled -}}
-{{- $namespaces = append $namespaces (.Values.observability.opentelemetry.namespace | default "logs-system") -}}
+{{- $namespaces = append $namespaces (.Values.observability.opentelemetry.namespace | default .Release.Namespace) -}}
 {{- end -}}
 {{- $namespaces | uniq | toYaml -}}
 {{- end -}}
-{{- end -}}
-
-{{/*
-Convert a Kubernetes CPU quantity to a positive GOMAXPROCS value.
-*/}}
-{{- define "soperator-fluxcd.cpuQuantityToGOMAXPROCS" -}}
-{{- $quantity := toString . | trim -}}
-{{- if eq $quantity "" -}}
-1
-{{- else if regexMatch "^[0-9]+(\\.[0-9]+)?m$" $quantity -}}
-{{- max 1 (int (ceil (divf (trimSuffix "m" $quantity | float64) 1000.0))) -}}
-{{- else if regexMatch "^[0-9]+(\\.[0-9]+)?$" $quantity -}}
-{{- max 1 (int (ceil ($quantity | float64))) -}}
-{{- else -}}
-{{- fail (printf "unsupported CPU quantity %q; use cores (2) or millicores (500m)" $quantity) -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Render GOMAXPROCS for opentelemetry-collector from container resources.
-*/}}
-{{- define "soperator-fluxcd.otelCollectorGoMaxProcsEnv" -}}
-{{- $resources := .resources | default dict -}}
-{{- $requests := get $resources "requests" | default dict -}}
-{{- $limits := get $resources "limits" | default dict -}}
-{{- $cpu := coalesce (get $limits "cpu") (get $requests "cpu") -}}
-- name: GOMAXPROCS
-  value: {{ include "soperator-fluxcd.cpuQuantityToGOMAXPROCS" $cpu | quote }}
-{{- end -}}
-
-{{/*
-Render exporter sending_queue settings with exporter-side batching.
-*/}}
-{{- define "soperator-fluxcd.otelExporterSendingQueue" -}}
-{{- $batch := .batch | default dict -}}
-{{- $queue := .queue | default dict -}}
-{{- $timeout := get $batch "timeout" | default "1s" -}}
-{{- $minSize := get $batch "sendBatchSize" | default 2000 | int -}}
-{{- $maxSize := get $batch "sendBatchMaxSize" | default 5000 | int -}}
-{{- $queueSize := get $queue "queueSize" | default 30000 | int -}}
-{{- $numConsumers := get $queue "numConsumers" | default 10 | int -}}
-sending_queue:
-  enabled: true
-  sizer: items
-  queue_size: {{ max $queueSize $minSize }}
-  num_consumers: {{ $numConsumers }}
-  {{- if .storage }}
-  storage: {{ .storage }}
-  {{- end }}
-  batch:
-    sizer: items
-    flush_timeout: {{ $timeout }}
-    min_size: {{ $minSize }}
-    max_size: {{ $maxSize }}
 {{- end -}}

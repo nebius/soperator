@@ -1,4 +1,5 @@
 {{- if .Values.mariadbOperator.enabled }}
+{{- $valuesName := printf "%s-mariadb-operator-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,55 +23,18 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator
       version: {{ .Values.mariadbOperator.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  - name: {{ include "soperator-fluxcd.fullname" . }}-mariadb-operator-crds
-  - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.mariadbOperator "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.mariadbOperator.install | nindent 4 }}
   interval: {{ .Values.mariadbOperator.interval }}
   timeout: {{ .Values.mariadbOperator.timeout }}
   releaseName: {{ .Values.mariadbOperator.releaseName }}
-  targetNamespace: {{ .Values.mariadbOperator.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.mariadbOperator.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.mariadbOperator.upgrade | nindent 4 }}
-  values:
-  {{- if .Values.mariadbOperator.overrideValues }}
-    {{- toYaml .Values.mariadbOperator.overrideValues | nindent 4 }}
-  {{- else }}
-  {{- $mariadbOperator := .Values.mariadbOperator.values | default dict }}
-    {{- with $mariadbOperator.nodeSelector }}
-    nodeSelector:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-    {{- with $mariadbOperator.affinity }}
-    affinity:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-    {{- with $mariadbOperator.resources }}
-    resources:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-    webhook:
-      cert:
-        certManager:
-          enabled: true
-      enabled: true
-      {{- with $mariadbOperator.webhook }}
-      {{- toYaml . | nindent 6 }}
-      {{- end }}
-    {{- with $mariadbOperator.certController }}
-    certController:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-  {{- end }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-mariadb-operator
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: mariadb-operator
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.mariadbOperator.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := include "soperator-fluxcd.platformValues" (dict "component" .Values.mariadbOperator "root" $) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

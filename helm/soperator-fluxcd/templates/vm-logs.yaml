@@ -1,4 +1,5 @@
 {{- if and .Values.observability.enabled .Values.observability.vmLogs.enabled }}
+{{- $valuesName := printf "%s-vm-logs-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,54 +23,18 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-victoriametrics
       version: {{ .Values.observability.vmLogs.version }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.observability.vmLogs "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.observability.vmLogs.install | nindent 4 }}
   interval: {{ .Values.observability.vmLogs.interval }}
   timeout: {{ .Values.observability.vmLogs.timeout }}
   releaseName: {{ .Values.observability.vmLogs.releaseName }}
-  targetNamespace: {{ .Values.observability.vmLogs.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.observability.vmLogs.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.observability.vmLogs.upgrade | nindent 4 }}
-  values:
-  {{- if .Values.observability.vmLogs.overrideValues }}
-    {{- toYaml .Values.observability.vmLogs.overrideValues | nindent 4 }}
-  {{- else }}
-    dashboards:
-      enabled: true
-      labels:
-        grafana_dashboard: "1"
-    server:
-      {{- with .Values.observability.vmLogs.values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.observability.vmLogs.values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- if .Values.observability.vmLogs.values.resources }}
-      resources:
-        {{- toYaml .Values.observability.vmLogs.values.resources | nindent 8 }}
-      {{- end }}
-      {{- if .Values.observability.vmLogs.values.persistentVolume.enabled }}
-      persistentVolume:
-        enabled: true
-        accessModes:
-          - {{ .Values.observability.vmLogs.values.persistentVolume.accessMode }}
-        size: {{ .Values.observability.vmLogs.values.persistentVolume.size }}
-      {{- end }}
-      vmServiceScrape:
-        enabled: true
-    vector:
-      enabled: false
-  {{- end }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-vm-logs
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: vm-logs
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.observability.vmLogs.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.observability.vmLogs.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

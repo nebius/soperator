@@ -1,0 +1,20 @@
+suite: ConfigMap namespaces
+release:
+  namespace: workload
+templates:
+  - templates/configmap-motd.yaml
+  - templates/configmap-image-storage.yaml
+tests:
+  - it: should default to the Helm release namespace
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: workload
+
+  - it: should use the explicit chart namespace when supplied
+    set:
+      namespace: selected
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: selected

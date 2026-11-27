@@ -1,4 +1,5 @@
 {{ if .Values.soperator.enabled }}
+{{- $valuesName := printf "%s-soperator-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,12 +23,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.soperator.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  - name: {{ include "soperator-fluxcd.fullname" . }}-kruise
-  {{- if .Values.certManager.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
-  {{- end }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.soperator "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.soperator.install | nindent 4 }}
   upgrade:
@@ -35,58 +31,10 @@ spec:
   interval: {{ .Values.soperator.interval }}
   timeout: {{ .Values.soperator.timeout }}
   releaseName: {{ .Values.soperator.releaseName }}
-  targetNamespace: {{ .Values.soperator.namespace }}
-  values:
-  {{- if .Values.soperator.overrideValues }}
-    {{- toYaml .Values.soperator.overrideValues | nindent 4 }}
-  {{- else }}
-    {{- if .Values.soperator.values.serviceMonitor }}
-    serviceMonitor:
-      {{- toYaml .Values.soperator.values.serviceMonitor | nindent 6 }}
-    {{- end }}
-    {{- if .Values.certManager.enabled }}
-    certManager:
-      enabled: true
-    {{- end }}
-    controllerManager:
-      {{- with (.Values.soperator.values.controllerManager | default dict).nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with (.Values.soperator.values.controllerManager | default dict).affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      manager:
-        {{- if and .Values.soperator.values .Values.soperator.values.manager .Values.soperator.values.manager.resources }}
-        resources: {{- toYaml .Values.soperator.values.manager.resources | nindent 10 }}
-        {{- end }}
-        {{- if or
-          .Values.observability.enabled
-          .Values.observability.prometheusOperator.enabled
-          .Values.mariadbOperator.enabled
-        }}
-        env:
-          {{- if .Values.mariadbOperator.enabled }}
-          isMariadbCrdInstalled: true
-          {{- end }}
-          {{- if and
-            .Values.observability.enabled
-            .Values.observability.prometheusOperator.enabled
-          }}
-          isPrometheusCrdInstalled: true
-          {{- end }}
-      kruise:
-        installOperator: false
-    {{- end }}
-  {{- end }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.soperator.namespace | nindent 2 }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-soperator
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: soperator
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.soperator.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.soperator.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

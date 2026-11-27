@@ -1,3 +1,45 @@
+{{- $observability := .Values.observability | default dict -}}
+{{- $soperator := .Values.soperator | default dict -}}
+{{- $namespaces := list .Values.slurmCluster.namespace $soperator.namespace -}}
+{{- $components := list
+    .Values.mariadbOperator
+    .Values.certManager
+    .Values.backup
+    .Values.nfsServer
+    .Values.storageClasses
+    .Values.nodesets
+    .Values.soperatorActiveChecks
+    .Values.customConfigmaps
+    .Values.tailscale
+-}}
+{{- if and .Values.nfsServer .Values.nfsServer.enabled .Values.csiDriverNfs -}}
+  {{- $namespaces = append $namespaces .Values.csiDriverNfs.namespace -}}
+{{- end -}}
+{{- if $soperator.enabled -}}
+  {{- $components = append $components $soperator.monitoringDashboards -}}
+{{- end -}}
+{{- if $observability.enabled -}}
+  {{- $components = concat $components (list
+      $observability.opentelemetry
+      $observability.vmLogs
+      $observability.vmStack
+      $observability.prometheusOperator
+      $observability.dcgmExporter
+  ) -}}
+  {{- if and $observability.vmStack $observability.vmStack.enabled -}}
+    {{- $components = append $components .Values.notifier -}}
+  {{- end -}}
+{{- end -}}
+{{- range compact $components -}}
+  {{- if .enabled -}}
+    {{- $namespaces = append $namespaces .namespace -}}
+  {{- end -}}
+{{- end -}}
+{{- $resources := list -}}
+{{- range compact $namespaces | uniq -}}
+  {{- $resources = append $resources (dict "apiVersion" "v1" "kind" "Namespace" "metadata" (dict "name" .)) -}}
+{{- end -}}
+{{- $valuesName := printf "%s-ns-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -21,122 +63,13 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-bedag
       version: {{ .Values.ns.version }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.ns "root" $) | nindent 2 }}
   install:
     remediation:
       retries: 3
   interval: {{ .Values.ns.interval }}
-  values:
-    resources:
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.slurmCluster.namespace | default "soperator" }}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.soperator.namespace | default "soperator-system" }}
-
-    {{- if .Values.mariadbOperator.enabled }}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.mariadbOperator.namespace | default "mariadb-operator-system" }}
-    {{- end }}
-
-    {{- if .Values.observability.enabled }}
-    {{- if or .Values.observability.vmLogs.enabled .Values.observability.opentelemetry.enabled }}
-    {{- /* First, check if at least one component is enabled */}}
-    {{- if and .Values.observability.vmLogs.enabled .Values.observability.opentelemetry.enabled }}
-    {{- /* If both components are enabled, we need to handle namespace logic */}}
-    {{- if eq .Values.observability.vmLogs.namespace .Values.observability.opentelemetry.namespace }}
-    {{- /* If namespaces are the same, create only one */}}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.observability.opentelemetry.namespace }}
-    {{- else }}
-    {{- /* If namespaces are different, create both */}}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.observability.opentelemetry.namespace }}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.observability.vmLogs.namespace }}
-    {{- end }}
-    {{- else }}
-    {{- /* If only one component is enabled, create its namespace */}}
-    {{- if .Values.observability.vmLogs.enabled }}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.observability.vmLogs.namespace }}
-    {{- else if .Values.observability.opentelemetry.enabled }}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.observability.opentelemetry.namespace }}
-    {{- end }}
-    {{- end }}
-    {{- end }}
-
-    {{- if or .Values.observability.vmStack.enabled .Values.observability.prometheusOperator.enabled }}
-    {{- /* First, check if at least one component is enabled */}}
-    {{- if and .Values.observability.vmStack.enabled .Values.observability.prometheusOperator.enabled }}
-    {{- /* If both components are enabled, we need to handle namespace logic */}}
-    {{- if eq .Values.observability.vmStack.namespace .Values.observability.prometheusOperator.namespace }}
-    {{- /* If namespaces are the same, create only one */}}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.observability.vmStack.namespace }}
-    {{- else }}
-    {{- /* If namespaces are different, create both */}}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.observability.vmStack.namespace }}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.observability.prometheusOperator.namespace }}
-    {{- end }}
-    {{- else }}
-    {{- /* If only one component is enabled, create its namespace */}}
-    {{- if .Values.observability.vmStack.enabled }}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.observability.vmStack.namespace }}
-    {{- else if .Values.observability.prometheusOperator.enabled }}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.observability.prometheusOperator.namespace }}
-    {{- end }}
-    {{- end }}
-    {{- end }}
-    {{- end }}
-
-
-    {{- if .Values.certManager.enabled }}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.certManager.namespace }}
-    {{- end }}
-
-    {{- if .Values.backup.enabled }}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.backup.namespace }}
-    {{- end }}
-
-    {{- if .Values.nfsServer.enabled }}
-    - apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: {{ .Values.nfsServer.namespace | default "nfs-system" }}
-    {{- end }}
+  valuesFrom:
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.ns.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (dict "resources" $resources) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}

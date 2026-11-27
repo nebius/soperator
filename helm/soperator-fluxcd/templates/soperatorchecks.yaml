@@ -1,4 +1,5 @@
 {{- if and .Values.soperator.enabled  .Values.soperator.soperatorChecks.enabled }}
+{{- $valuesName := printf "%s-soperatorchecks-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,8 +23,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.soperator.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.soperator.soperatorChecks "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.soperator.soperatorChecks.install | nindent 4 }}
   upgrade:
@@ -31,18 +31,10 @@ spec:
   interval: {{ .Values.soperator.soperatorChecks.interval }}
   timeout: {{ .Values.soperator.soperatorChecks.timeout }}
   releaseName: {{ .Values.soperator.soperatorChecks.releaseName }}
-  targetNamespace: {{ .Values.soperator.namespace }}
-  {{- if .Values.soperator.soperatorChecks.values }}
-  values:
-    {{- toYaml .Values.soperator.soperatorChecks.values | nindent 4 }}
-  {{- end }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.soperator.namespace | nindent 2 }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-soperatorchecks
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: soperatorchecks
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.soperator.soperatorChecks.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.soperator.soperatorChecks.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

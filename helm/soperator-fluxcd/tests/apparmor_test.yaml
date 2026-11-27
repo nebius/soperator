@@ -1,4 +1,7 @@
 suite: AppArmor is supplied by node provisioning
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/slurm-cluster.yaml
   - templates/soperator.yaml
@@ -7,6 +10,7 @@ tests:
     template: templates/slurm-cluster.yaml
     set:
       securityProfilesOperator.enabled: true
+    documentSelector: {path: kind, value: HelmRelease, matchMany: true}
     asserts:
       - notContains:
           path: spec.dependsOn
@@ -16,6 +20,7 @@ tests:
     template: templates/soperator.yaml
     set:
       securityProfilesOperator.enabled: true
+    documentSelector: {path: kind, value: ConfigMap, matchMany: true}
     asserts:
       - notExists:
-          path: spec.values.controllerManager.manager.env.isApparmorCrdInstalled
+          path: data["values.yaml"].controllerManager.manager.env.isApparmorCrdInstalled

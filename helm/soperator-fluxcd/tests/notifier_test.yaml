@@ -1,8 +1,12 @@
 suite: test notifier
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/notifier.yaml
 
 set:
+  fullnameOverride: notifier-test
   observability:
     enabled: true
     vmStack:
@@ -11,12 +15,9 @@ set:
     enabled: true
 
 tests:
-  - it: should not be created if no VMSingle present
+  - it: should not be created when VMStack is disabled
     set:
-      observability:
-        enabled: false
-        vmStack:
-          enabled: false
+      observability.vmStack.enabled: false
     asserts:
       - notFailedTemplate: {}
       - hasDocuments:
@@ -31,12 +32,31 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: should fail if no webhook provided
+  - it: should allow the webhook URL to come from valuesFrom
     asserts:
-      - failedTemplate:
-          errorMessage: "Slack Webhook is required."
+      - isKind:
+          of: HelmRelease
+        documentSelector: &helmRelease {path: kind, value: HelmRelease}
+      - notExists:
+          path: data["values.yaml"].slack
+        documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
+      - equal:
+          path: spec.valuesFrom
+          value:
+            - kind: ConfigMap
+              name: notifier-test-notifier-values
+              valuesKey: values.yaml
+            - kind: ConfigMap
+              name: terraform-soperator-notifier
+              optional: true
+              valuesKey: values.yaml
+            - kind: ConfigMap
+              name: soperator-notifier
+              optional: true
+              valuesKey: values.yaml
+        documentSelector: *helmRelease
 
-  - it: should work with no other values provided
+  - it: should forward a configured webhook URL with the default name override
     set:
       notifier:
         values:
@@ -46,25 +66,91 @@ tests:
       - notFailedTemplate: {}
       - isKind:
           of: HelmRelease
+        documentSelector: *helmRelease
       - equal:
-          path: spec.values.nameOverride
+          path: data["values.yaml"].nameOverride
           value: "soperator-notifier"
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.slack.webhookUrl
+          path: data["values.yaml"].slack.webhookUrl
           value: *slackUrl
+        documentSelector: *baseConfigMap
 
-  - it: should handle complex nested custom values
+  - it: should pass custom child chart values
     set:
       notifier:
         values:
           slack:
-            webhookUrl: "http://foo.bar/x/y/z"
-        overrideValues:
-          dataSourceUrl: &dataSourceUrl "http://bar.baz/x/y/z:6969"
+            webhookUrl: *slackUrl
+          dataSourceUrl: &dataSourceUrl http://metrics.example.invalid:8428
+          alertManager:
+            replicas: 2
+    documentSelector: *baseConfigMap
     asserts:
-      - notFailedTemplate: { }
-      - isKind:
-          of: HelmRelease
       - equal:
-          path: spec.values.dataSourceUrl
+          path: data["values.yaml"].dataSourceUrl
           value: *dataSourceUrl
+      - equal:
+          path: data["values.yaml"].alertManager.replicas
+          value: 2
+
+  - it: should preserve trailing blank lines in the last chart value
+    set:
+      notifier.values.zzScript: &script "echo hello\n\n"
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].zzScript
+          value: *script
+
+  - it: should depend on namespaces and VMStack with VictoriaLogs disabled
+    set:
+      observability.vmLogs.enabled: false
+    documentSelector: *helmRelease
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: notifier-test-ns
+            - name: notifier-test-vm-stack
+
+  - it: should replace the default dependencies with the configured list
+    set:
+      notifier.dependsOn: &dependencies
+        - name: external-metrics
+          namespace: observability
+    documentSelector: *helmRelease
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value: *dependencies
+
+  - it: should clear dependencies with an explicit empty list
+    set:
+      notifier.dependsOn: []
+    documentSelector: *helmRelease
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value: []
+
+  - it: should keep only the generated source when the optional references are cleared
+    set:
+      notifier.valuesFrom: []
+    documentSelector: *helmRelease
+    asserts:
+      - equal:
+          path: spec.valuesFrom
+          value: &baseOnly
+            - kind: ConfigMap
+              name: notifier-test-notifier-values
+              valuesKey: values.yaml
+
+  - it: should keep the generated source when the configured references are null
+    set:
+      notifier.valuesFrom: null
+    documentSelector: *helmRelease
+    asserts:
+      - equal:
+          path: spec.valuesFrom
+          value: *baseOnly

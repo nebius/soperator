@@ -1,0 +1,209 @@
+suite: test platform values and dependencies
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
+templates:
+  - templates/tailscale.yaml
+  - templates/cert-manager.yaml
+  - templates/mariadb-operator.yaml
+  - templates/backup.yaml
+  - templates/kruise.yaml
+set:
+  tailscale.enabled: true
+  fullnameOverride: platform
+tests:
+  - it: should put operator CRDs and cert-manager before the MariaDB webhook
+    template: templates/mariadb-operator.yaml
+    set:
+      mariadbOperator.values: null
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+            - name: platform-mariadb-operator-crds
+            - name: platform-cert-manager
+        documentSelector: &helmRelease {path: kind, value: HelmRelease, matchMany: true}
+      - equal:
+          path: spec.install.crds
+          value: Skip
+        documentSelector: *helmRelease
+      - equal:
+          path: spec.upgrade.crds
+          value: Skip
+        documentSelector: *helmRelease
+      - equal:
+          path: data["values.yaml"].webhook.enabled
+          value: true
+        documentSelector: &baseConfigMap {path: kind, value: ConfigMap, matchMany: true}
+      - equal:
+          path: data["values.yaml"].webhook.cert.certManager.enabled
+          value: true
+        documentSelector: *baseConfigMap
+
+  - it: should allow native cert-manager values to override the platform defaults
+    template: templates/cert-manager.yaml
+    set:
+      certManager.values.startupapicheck.enabled: false
+      certManager.values.prometheus.enabled: false
+    asserts:
+      - equal:
+          path: data["values.yaml"].startupapicheck.enabled
+          value: false
+        documentSelector: *baseConfigMap
+      - equal:
+          path: data["values.yaml"].prometheus.enabled
+          value: false
+        documentSelector: *baseConfigMap
+      - equal:
+          path: data["values.yaml"].crds.enabled
+          value: true
+        documentSelector: *baseConfigMap
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+            - name: platform-prometheus-operator-crds
+        documentSelector: *helmRelease
+
+  - it: should skip the CRD dependency when observability is disabled
+    template: templates/cert-manager.yaml
+    set:
+      observability.enabled: false
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+        documentSelector: *helmRelease
+      - equal:
+          path: data["values.yaml"].prometheus.enabled
+          value: true
+        documentSelector: *baseConfigMap
+
+  - it: should omit k8up metrics and cleanup defaults when Prometheus is disabled
+    template: templates/backup.yaml
+    set:
+      observability.prometheusOperator.enabled: false
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+            - name: platform-cert-manager
+        documentSelector: *helmRelease
+      - notExists:
+          path: data["values.yaml"].k8up.metrics
+        documentSelector: *baseConfigMap
+      - notExists:
+          path: data["values.yaml"].cleanup
+        documentSelector: *baseConfigMap
+
+  - it: should apply k8up overrides without losing image and metrics defaults
+    template: templates/backup.yaml
+    set:
+      backup.values.k8up.skipWithoutAnnotation: false
+      backup.values.k8up.metrics.serviceMonitor.enabled: false
+      observability.vmStack.namespace: metrics
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].k8up.skipWithoutAnnotation
+          value: false
+      - equal:
+          path: data["values.yaml"].k8up.backupImage.tag
+          value: v2.13.1-ca-fix
+      - equal:
+          path: data["values.yaml"].k8up.metrics.serviceMonitor.enabled
+          value: false
+      - equal:
+          path: data["values.yaml"].k8up.metrics.grafanaDashboard.namespace
+          value: metrics
+
+  - it: should skip optional cert-manager dependencies when it is disabled
+    templates:
+      - templates/backup.yaml
+      - templates/kruise.yaml
+    set:
+      certManager.enabled: false
+    documentSelector: *helmRelease
+    asserts:
+      - notContains:
+          path: spec.dependsOn
+          content:
+            name: platform-cert-manager
+
+  - it: should merge the Pro Kruise resource override with saved chart defaults
+    template: templates/kruise.yaml
+    set:
+      soperator.kruise.overrideValues.manager.resources.requests.cpu: 2000m
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].manager.resources.requests.cpu
+          value: 2000m
+      - equal:
+          path: data["values.yaml"].manager.image.tag
+          value: v1.9.2-ca-fix
+      - equal:
+          path: data["values.yaml"].crds.managed
+          value: true
+
+  - it: should allow native Kruise values
+    template: templates/kruise.yaml
+    set:
+      soperator.kruise.values.manager.replicas: 3
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].manager.replicas
+          value: 3
+      - equal:
+          path: data["values.yaml"].helmHooks.image.tag
+          value: v0.1.0-ca-fix
+
+  - it: should remove Kruise defaults cleared by a legacy null override
+    template: templates/kruise.yaml
+    set:
+      soperator.kruise.overrideValues.manager.nodeSelector: null
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].manager
+          value:
+            replicas: 2
+            image:
+              repository: cr.nebius.cloud/soperator/kruise-manager
+              tag: v1.9.2-ca-fix
+              pullPolicy: IfNotPresent
+            resources:
+              limits:
+                memory: 2Gi
+              requests:
+                cpu: 1000m
+                memory: 2Gi
+
+  - it: should accept an explicit empty Tailscale resources list
+    template: templates/tailscale.yaml
+    set:
+      tailscale.values.resources: []
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].resources
+          value: []
+
+  - it: should replace the default platform dependencies
+    set:
+      tailscale.dependsOn: &customDependencies
+        - name: prerequisite
+      certManager.dependsOn: *customDependencies
+      mariadbOperator.dependsOn: *customDependencies
+      backup.dependsOn: *customDependencies
+      soperator.kruise.dependsOn: *customDependencies
+    documentSelector: *helmRelease
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: prerequisite

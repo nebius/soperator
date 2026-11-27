@@ -1,0 +1,66 @@
+name: Helm API Validation
+
+on:
+  workflow_call:
+    inputs:
+      checkout_ref:
+        description: Revision to validate
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Apply Flux chart manifests
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.checkout_ref }}
+          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
+          persist-credentials: false
+
+      # pull_request_target uses the workflow from main even for release-branch PRs.
+      # Older checkouts may predate test/helmapi. Remove this check once all supported
+      # checkouts include test/helmapi and the test-helm-api Make target.
+      - name: Check for Helm API tests
+        id: helm-api
+        shell: bash
+        run: |
+          if [[ -d test/helmapi ]]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo '::notice::Skipping Helm API validation. This checkout predates test/helmapi.'
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Go
+        if: steps.helm-api.outputs.available == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: ${{ github.event_name != 'pull_request_target' }}
+
+      - name: Install pinned Helm
+        if: steps.helm-api.outputs.available == 'true'
+        shell: bash
+        run: make install-helm
+
+      - name: Validate the Flux charts against Kubernetes
+        if: steps.helm-api.outputs.available == 'true'
+        shell: bash
+        run: make test-helm-api
+
+      # Keep the target check until all supported release branches provide test-otel-relay.
+      - name: Render the OpenTelemetry collector relay
+        shell: bash
+        run: |
+          if grep -q '^test-otel-relay:' Makefile; then
+            make test-otel-relay
+          else
+            echo '::notice::Skipping OpenTelemetry relay validation. This checkout predates the test-otel-relay Make target.'
+          fi

@@ -1,0 +1,61 @@
+backup:
+  config:
+    dependsOn:
+      - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+        namespace: flux-all-enabled
+    values:
+      bucket:
+        name: flux-api-validation
+storageClasses:
+  dependsOn: []
+  values:
+    allowVolumeExpansion: false
+mariadbOperator:
+  crds:
+    dependsOn: null
+nodesets:
+  enabled: true
+  namespace: flux-api-slurm
+  values:
+    clusterName: flux-api-cluster
+slurmCluster:
+  namespace: flux-api-slurm
+  values:
+    clusterName: flux-api-cluster
+soperatorActiveChecks:
+  namespace: flux-api-slurm
+  values:
+    slurmClusterRefName: flux-api-cluster
+customConfigmaps:
+  namespace: flux-api-slurm
+notifier:
+  enabled: true
+  values:
+    slack:
+      webhookUrl: https://example.invalid/webhook
+  valuesFrom:
+    - kind: ConfigMap
+      name: team-notifier
+      valuesKey: notifier.yaml
+    - kind: Secret
+      name: site-notifier
+      valuesKey: notifier.yaml
+tailscale:
+  enabled: true
+  namespace: flux-api-slurm
+observability:
+  vmStack:
+    namespace: logs-system
+    values:
+      vmagent:
+        spec:
+          remoteWrite:
+            - url: http://vmsingle-metrics-victoria-metrics-k8s-stack.logs-system.svc.cluster.local.:8428/api/v1/write
+      grafana:
+        sidecar:
+          dashboards:
+            searchNamespace: &grafanaSearchNamespaces [flux-api-slurm, soperator-system, gpu-operator, logs-system, monitoring-system]
+          datasources:
+            searchNamespace: *grafanaSearchNamespaces
+  ncclProfiles:
+    enabled: true

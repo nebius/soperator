@@ -1,47 +1,89 @@
 suite: test values override default values soperator
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/soperator.yaml
 tests:
-  - it: should use custom values when provided
+  - it: should forward native operator values
     set:
-      soperator.enabled: true
-      soperator.overrideValues:
-        customKey: customValue
+      soperator.values.controllerManager.manager.args:
+        - --leader-elect
+      soperator.values.controllerManager.nodeSelector:
+        slurm.nebius.ai/nodeset: control-plane
+    documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
     asserts:
-      - hasDocuments:
-          count: 1
       - equal:
-          path: spec.values.customKey
-          value: customValue
-      - notExists:
-          path:  spec.values.controllerManager
-
-  - it: should use default values when custom values not provided
-    set:
-      soperator.enabled: true
-      soperator.overrideValues: null
-    asserts:
-      - hasDocuments:
-          count: 1
-      - exists:
-          path: spec.values.controllerManager
-  - it: should be requests soperator
-    set:
-      soperator.enabled: true
-      soperator.values:
-        manager:
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-    asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.values.controllerManager.manager.resources.requests
+          path: data["values.yaml"].controllerManager.manager.args
           value:
-            cpu: 100m
-            memory: 128Mi
+            - --leader-elect
+      - equal:
+          path: data["values.yaml"].controllerManager.nodeSelector["slurm.nebius.ai/nodeset"]
+          value: control-plane
+
+  - it: should use the operator defaults without overrides
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].controllerManager.manager.resources.requests
+          value:
+            cpu: 500m
+            memory: 1Gi
+      - equal:
+          path: data["values.yaml"].controllerManager.manager.env
+          value:
+            isMariadbCrdInstalled: true
+            isPrometheusCrdInstalled: true
+      - equal:
+          path: data["values.yaml"].certManager.enabled
+          value: true
+
+  - it: should merge native resource overrides with the chart defaults
+    set:
+      soperator.values.controllerManager.manager.resources.requests.cpu: 900m
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].controllerManager.manager.resources
+          value:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: 900m
+              memory: 1Gi
+
+  - it: should pass operator settings independently of integration enablement
+    set:
+      mariadbOperator.enabled: false
+      observability.enabled: false
+      observability.prometheusOperator.enabled: false
+      certManager.enabled: false
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].controllerManager.manager.env
+          value:
+            isMariadbCrdInstalled: true
+            isPrometheusCrdInstalled: true
+      - equal:
+          path: data["values.yaml"].certManager.enabled
+          value: true
+
+  - it: should use explicit discovery and cert-manager settings
+    set:
+      soperator.values.controllerManager.manager.env.isMariadbCrdInstalled: false
+      soperator.values.controllerManager.manager.env.isPrometheusCrdInstalled: false
+      soperator.values.certManager.enabled: false
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].controllerManager.manager.env
+          value:
+            isMariadbCrdInstalled: false
+            isPrometheusCrdInstalled: false
+      - equal:
+          path: data["values.yaml"].certManager.enabled
+          value: false
 
   - it: should disable serviceMonitor when set to false
     set:
@@ -51,10 +93,11 @@ tests:
           enabled: false
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - equal:
-          path: spec.values.serviceMonitor.enabled
+          path: data["values.yaml"].serviceMonitor.enabled
           value: false
+        documentSelector: *baseConfigMap
 
   - it: should enable serviceMonitor when set to true
     set:
@@ -64,25 +107,23 @@ tests:
           enabled: true
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - equal:
-          path: spec.values.serviceMonitor.enabled
+          path: data["values.yaml"].serviceMonitor.enabled
           value: true
+        documentSelector: *baseConfigMap
 
   - it: should not render serviceMonitor when not provided
     set:
       soperator.enabled: true
       soperator.values:
         serviceMonitor: null
-        manager:
-          resources:
-            requests:
-              cpu: 100m
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - notExists:
-          path: spec.values.serviceMonitor
+          path: data["values.yaml"].serviceMonitor
+        documentSelector: *baseConfigMap
 
   - it: should render serviceMonitor without enabled field when serviceMonitor exists but enabled not set
     set:
@@ -93,17 +134,45 @@ tests:
           interval: 30s
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - exists:
-          path: spec.values.serviceMonitor.interval
+          path: data["values.yaml"].serviceMonitor.interval
+        documentSelector: *baseConfigMap
       - notExists:
-          path: spec.values.serviceMonitor.enabled
+          path: data["values.yaml"].serviceMonitor.enabled
+        documentSelector: *baseConfigMap
 ---
 suite: test values override default values nodeconfigurator
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/nodeconfigurator.yaml
 tests:
-  - it: should be requests nodeconfigurator
+  - it: should keep the default rebooter configuration
+    documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
+    asserts:
+      - equal:
+          path: data["values.yaml"].rebooter
+          value:
+            enabled: true
+            generateRBAC: true
+            logFormat: json
+            tolerations:
+              - operator: Exists
+            priorityClassName: soperator-rebooter
+            priorityClass:
+              create: true
+              name: soperator-rebooter
+              value: 100000
+            resources:
+              requests:
+                cpu: 100m
+                memory: 200Mi
+              limits:
+                memory: 200Mi
+
+  - it: should forward rebooter resource overrides
     set:
       soperator.nodeConfigurator.values.rebooter.resources:
         requests:
@@ -113,26 +182,38 @@ tests:
           memory: 256Mi
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - equal:
-          path: spec.values.rebooter.resources.requests
+          path: data["values.yaml"].rebooter.resources.requests
           value:
             cpu: 100m
             memory: 128Mi
+        documentSelector: *baseConfigMap
+
+  - it: should forward rebooter options from native values
+    set:
+      soperator.nodeConfigurator.values.rebooter.generateRBAC: false
+      soperator.nodeConfigurator.values.rebooter.serviceAccountName: custom-rebooter
+      soperator.nodeConfigurator.values.rebooter.tolerations: []
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].rebooter.generateRBAC
+          value: false
+      - equal:
+          path: data["values.yaml"].rebooter.serviceAccountName
+          value: custom-rebooter
+      - equal:
+          path: data["values.yaml"].rebooter.tolerations
+          value: []
 ---
 suite: test values override default values opentelemetry collector events
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/opentelemetry-collector-events.yaml
 tests:
-  - it: should use custom values when provided
-    set:
-      observability.opentelemetry.events.values.publicEndpointEnabled: true
-    asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.values.extraVolumes[1].name
-          value: o11ytoken
   - it: should use custom values when provided
     set:
       observability.opentelemetry.events.values.resources:
@@ -143,29 +224,21 @@ tests:
           memory: 256Mi
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - equal:
-          path: spec.values.extraVolumes[1].name
-          value: o11ytoken
-      - equal:
-          path: spec.values.resources.requests
+          path: data["values.yaml"].resources.requests
           value:
             cpu: 100m
             memory: 128Mi
+        documentSelector: {path: kind, value: ConfigMap}
 ---
 suite: test values override default values opentelemetry collector logs
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/opentelemetry-collector-logs.yaml
 tests:
-  - it: should use custom values when provided
-    set:
-      observability.opentelemetry.logs.values.publicEndpointEnabled: true
-    asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.values.extraVolumes[4].name
-          value: o11ytoken
   - it: should use custom values when provided
     set:
       observability.opentelemetry.logs.values.resources:
@@ -176,339 +249,501 @@ tests:
           memory: 256Mi
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - equal:
-          path: spec.values.extraVolumes[4].name
-          value: o11ytoken
-      - equal:
-          path: spec.values.resources.requests
+          path: data["values.yaml"].resources.requests
           value:
             cpu: 100m
             memory: 128Mi
+        documentSelector: {path: kind, value: ConfigMap}
 
 ---
 
-suite: test values override default values opentelemetry-collector-nccl-profiles
+suite: test native NCCL profile HelmRelease values
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/opentelemetry-collector-nccl-profiles.yaml
+set:
+  observability.ncclProfiles.enabled: true
 tests:
-  - it: should use override values for nccl profiles configmap chart when provided
+  - it: should keep both default dependency lists and ordered values references
     set:
-      observability.enabled: true
-      observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.configMapOverrideValues:
-        resources:
-          - apiVersion: v1
-            kind: ConfigMap
-            metadata:
-              name: custom-nccl-profiles-agent
-            data:
-              relay: "custom: relay"
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles-cm
+      fullnameOverride: platform
     asserts:
       - equal:
-          path: spec.values.resources[0].metadata.name
-          value: custom-nccl-profiles-agent
+          path: metadata.name
+          value: platform-otelcol-nccl-profiles-cm
+        documentSelector: &platformRelayRelease {path: metadata.name, value: platform-otelcol-nccl-profiles-cm}
       - equal:
-          path: spec.values.resources[0].data.relay
-          value: "custom: relay"
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+        documentSelector: *platformRelayRelease
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+            - name: platform-vm-stack
+            - name: platform-otelcol-nccl-profiles-cm
+        documentSelector: &platformCollectorRelease {path: metadata.name, value: platform-otelcol-nccl-profiles}
+      - equal:
+          path: spec.valuesFrom
+          value:
+            - {kind: ConfigMap, name: platform-otelcol-nccl-profiles-cm-values, valuesKey: values.yaml}
+            - {kind: ConfigMap, name: terraform-opentelemetry-collector-nccl-profiles-cm, optional: true, valuesKey: values.yaml}
+            - {kind: ConfigMap, name: opentelemetry-collector-nccl-profiles-cm, optional: true, valuesKey: values.yaml}
+        documentSelector: *platformRelayRelease
+      - equal:
+          path: spec.valuesFrom
+          value:
+            - {kind: ConfigMap, name: platform-otelcol-nccl-profiles-values, valuesKey: values.yaml}
+            - {kind: ConfigMap, name: terraform-opentelemetry-collector-nccl-profiles, optional: true, valuesKey: values.yaml}
+            - {kind: ConfigMap, name: opentelemetry-collector-nccl-profiles, optional: true, valuesKey: values.yaml}
+        documentSelector: *platformCollectorRelease
 
-  - it: should use collector override values for opentelemetry collector chart when provided
+  - it: should give each NCCL release its own ordered values sources
     set:
-      observability.enabled: true
-      observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.collectorOverrideValues:
-        customConfig: true
+      fullnameOverride: platform
+      observability.ncclProfiles.configMap.valuesFrom:
+        - &relay {kind: ConfigMap, name: relay-config}
+      observability.ncclProfiles.collector.valuesFrom:
+        - &agent {kind: ConfigMap, name: agent-config, valuesKey: collector.yaml}
+        - &token {kind: Secret, name: agent-token, valuesKey: token, targetPath: auth.token, optional: true}
+    asserts:
+      - equal:
+          path: spec.valuesFrom
+          value:
+            - {kind: ConfigMap, name: platform-otelcol-nccl-profiles-cm-values, valuesKey: values.yaml}
+            - *relay
+        documentSelector: *platformRelayRelease
+      - equal:
+          path: spec.valuesFrom
+          value:
+            - {kind: ConfigMap, name: platform-otelcol-nccl-profiles-values, valuesKey: values.yaml}
+            - *agent
+            - *token
+        documentSelector: *platformCollectorRelease
+
+  - it: should allow independent dependency overrides
+    set:
+      fullnameOverride: platform
+      observability.ncclProfiles.configMap.dependsOn: []
+      observability.ncclProfiles.collector.dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-external-config'
+          namespace: platform-ops
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value: []
+        documentSelector: *platformRelayRelease
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-external-config
+              namespace: platform-ops
+        documentSelector: *platformCollectorRelease
+
+  - it: should pass custom values to each child chart and keep the ConfigMap link
+    set:
+      observability.vmStack.namespace: metrics
+      observability.ncclProfiles.releaseName: custom-nccl-profiles
+      observability.ncclProfiles.configMap.values.resources:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: custom-nccl-profiles-agent
+          data:
+            relay: "custom: relay"
+      observability.ncclProfiles.collector.values:
         image:
           repository: example.test/custom-agent
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles
+        configMap:
+          existingName: custom-nccl-profiles-agent
     asserts:
       - equal:
-          path: spec.values.customConfig
-          value: true
+          path: spec.releaseName
+          value: custom-nccl-profiles-cm
+        documentSelector: &defaultRelayRelease {path: metadata.name, value: RELEASE-NAME-otelcol-nccl-profiles-cm}
       - equal:
-          path: spec.values.image.repository
+          path: spec.releaseName
+          value: custom-nccl-profiles
+        documentSelector: &defaultCollectorRelease {path: metadata.name, value: RELEASE-NAME-otelcol-nccl-profiles}
+      - equal:
+          path: spec.targetNamespace
+          value: metrics
+        documentSelector: {path: kind, value: HelmRelease, matchMany: true}
+      - equal:
+          path: data["values.yaml"].resources[0].metadata.name
+          value: custom-nccl-profiles-agent
+        documentSelector: &defaultRelayValues {path: metadata.name, value: RELEASE-NAME-otelcol-nccl-profiles-cm-values}
+      - equal:
+          path: data["values.yaml"].resources[0].data.relay
+          value: "custom: relay"
+        documentSelector: *defaultRelayValues
+      - notExists:
+          path: data["values.yaml"].image
+        documentSelector: *defaultRelayValues
+      - equal:
+          path: data["values.yaml"].configMap
+          value: {create: false, existingName: custom-nccl-profiles-agent}
+        documentSelector: &defaultCollectorValues {path: metadata.name, value: RELEASE-NAME-otelcol-nccl-profiles-values}
+      - equal:
+          path: data["values.yaml"].image.repository
           value: example.test/custom-agent
-      - notExists:
-          path: spec.values.clusterRole
+        documentSelector: *defaultCollectorValues
+      - equal:
+          path: data["values.yaml"].resources.requests.cpu
+          value: 100m
+        documentSelector: *defaultCollectorValues
 
-  - it: should use legacy overrideValues for opentelemetry collector chart when provided
+  - it: should allow the ConfigMap release to defer all values to valuesFrom
     set:
-      observability.enabled: true
-      observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.collectorOverrideValues:
-        legacyConfig: true
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles
+      observability.ncclProfiles.configMap.values: null
     asserts:
       - equal:
-          path: spec.values.legacyConfig
-          value: true
-      - notExists:
-          path: spec.values.clusterRole
+          path: data["values.yaml"]
+          value: {}
+        documentSelector: *defaultRelayValues
+      - equal:
+          path: spec.valuesFrom[1].name
+          value: terraform-opentelemetry-collector-nccl-profiles-cm
+        documentSelector: *defaultRelayRelease
 
-  - it: should use default values for opentelemetry collector chart when override values not provided
-    set:
-      observability.enabled: true
-      observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.configMapOverrideValues: null
-      observability.ncclProfiles.collectorOverrideValues: null
+  - it: should keep the default relay pipelines, queue storage and deletion interval
     documentSelector:
       path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles
+      value: RELEASE-NAME-otelcol-nccl-profiles-cm-values
     asserts:
-      - exists:
-          path: spec.values.clusterRole
       - equal:
-          path: spec.values.mode
+          path: data["values.yaml"].resources[0].metadata.name
+          value: opentelemetry-collector-nccl-profiles-agent
+      - matchRegex:
+          path: data["values.yaml"].resources[0].data.relay
+          pattern: '/mnt/jail/opt/soperator-outputs/shared/nccl_profiles/\*/\*/\*\.log'
+      - matchRegex:
+          path: data["values.yaml"].resources[0].data.relay
+          pattern: 'logs/nccl_metrics:\s+receivers:\s+- filelog/nccl_metrics\s+exporters:\s+- ncclmetrics'
+      - matchRegex:
+          path: data["values.yaml"].resources[0].data.relay
+          pattern: 'metrics/nccl_metrics:\s+receivers:\s+- ncclmetrics\s+exporters:\s+- otlp_http/victoriametrics'
+      - matchRegex:
+          path: data["values.yaml"].resources[0].data.relay
+          pattern: 'queue_size: 30000\s+num_consumers: 10\s+storage: file_storage'
+      - matchRegex:
+          path: data["values.yaml"].resources[0].data.relay
+          pattern: 'delete_after_read: true\s+delete_after_read_min_age: 15m'
+
+  - it: should keep one shared-storage collector on system nodes
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-otelcol-nccl-profiles-values
+    asserts:
+      - equal:
+          path: data["values.yaml"].mode
           value: deployment
       - equal:
-          path: spec.values.replicaCount
+          path: data["values.yaml"].replicaCount
           value: 1
       - equal:
-          path: spec.values.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]
-          value: system
-      - notExists:
-          path: spec.values.tolerations
+          path: data["values.yaml"].rollout.strategy
+          value: Recreate
       - equal:
-          path: spec.values.image.repository
-          value: cr.nebius.cloud/observability/nebius-o11y-agent
+          path: data["values.yaml"].affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values
+          value: [system]
       - equal:
-          path: spec.values.configMap.existingName
-          value: opentelemetry-collector-nccl-profiles-agent
+          path: data["values.yaml"].configMap
+          value: {create: false, existingName: opentelemetry-collector-nccl-profiles-agent}
       - equal:
-          path: spec.values.extraVolumes[0].hostPath.path
+          path: data["values.yaml"].extraVolumes[0].hostPath.path
           value: /mnt/jail
       - equal:
-          path: spec.values.extraVolumes[0].hostPath.type
-          value: Directory
-      - equal:
-          path: spec.values.extraVolumeMounts[0].readOnly
+          path: data["values.yaml"].extraVolumeMounts[0].readOnly
           value: false
       - equal:
-          path: spec.values.initContainers[1].name
-          value: init-nccl-profiles-dump-dir
+          path: data["values.yaml"].extraVolumeMounts[1].mountPath
+          value: /var/lib/otelcol-nccl-profiles
+      - matchRegex:
+          path: data["values.yaml"].initContainers[1].command[2]
+          pattern: '/mnt/jail/opt/soperator-outputs/shared/nccl_profiles'
       - equal:
-          path: spec.values.command.extraArgs[0]
+          path: data["values.yaml"].command.extraArgs[0]
           value: --feature-gates=-telemetry.UseLocalHostAsDefaultMetricsAddress,filelog.allowFileDeletion
 
-  - it: should enable file deletion feature gate when delete after read is enabled
+  - it: should accept a native worker DaemonSet profile for node-local storage
     set:
-      observability.enabled: true
-      observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.values.metrics.enabled: false
-      observability.ncclProfiles.values.deleteAfterRead.enabled: true
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles
+      observability.ncclProfiles.collector.values:
+        mode: daemonset
+        replicaCount: null
+        rollout:
+          strategy: RollingUpdate
+          rollingUpdate:
+            maxUnavailable: 50%
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - {key: slurm.nebius.ai/nodeset, operator: In, values: [worker]}
+        tolerations:
+          - {effect: NoSchedule, key: nvidia.com/gpu, operator: Exists}
     asserts:
       - equal:
-          path: spec.values.command.extraArgs[0]
-          value: --feature-gates=filelog.allowFileDeletion
-      - equal:
-          path: spec.values.extraVolumeMounts[0].readOnly
-          value: false
-
-  - it: should use daemonset mode on worker nodes for node-local storage
-    set:
-      observability.enabled: true
-      observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.values.mode: nodeLocal
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles
-    asserts:
-      - equal:
-          path: spec.values.mode
+          path: data["values.yaml"].mode
           value: daemonset
+        documentSelector: *defaultCollectorValues
       - notExists:
-          path: spec.values.replicaCount
+          path: data["values.yaml"].replicaCount
+        documentSelector: *defaultCollectorValues
       - equal:
-          path: spec.values.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]
-          value: worker
+          path: data["values.yaml"].rollout.strategy
+          value: RollingUpdate
+        documentSelector: *defaultCollectorValues
+      - equal:
+          path: data["values.yaml"].rollout.rollingUpdate.maxUnavailable
+          value: 50%
+        documentSelector: *defaultCollectorValues
+      - equal:
+          path: data["values.yaml"].affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values
+          value: [worker]
+        documentSelector: *defaultCollectorValues
       - contains:
-          path: spec.values.tolerations
-          content:
-            effect: NoSchedule
-            key: nvidia.com/gpu
-            operator: Exists
+          path: data["values.yaml"].tolerations
+          content: {effect: NoSchedule, key: nvidia.com/gpu, operator: Exists}
+        documentSelector: *defaultCollectorValues
+      - equal:
+          path: spec.dependsOn[2].name
+          value: RELEASE-NAME-otelcol-nccl-profiles-cm
+        documentSelector: *defaultCollectorRelease
 
-  - it: should propagate nccl profiles values to opentelemetry collector chart
+  - it: should pass paired relay and collector settings for storage and deletion disabled
     set:
-      observability.enabled: true
-      observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.values.dumpDir: /mnt/jail/custom/nccl
-      observability.ncclProfiles.values.enableFileStorage: false
-      observability.ncclProfiles.values.deleteAfterRead.enabled: false
-      observability.ncclProfiles.values.resources:
-        requests:
-          cpu: 250m
-          memory: 256Mi
-        limits:
-          memory: 512Mi
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles
+      observability.ncclProfiles.configMap.values.resources:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: opentelemetry-collector-nccl-profiles-agent
+          data:
+            relay: |
+              receivers:
+                filelog/nccl_metrics:
+                  include:
+                    - /mnt/jail/custom/nccl/*/*/*.log
+              exporters:
+                otlp_http/victoriametrics:
+                  metrics_endpoint: http://example.test:8428/custom
+                  sending_queue:
+                    enabled: true
+                    sizer: items
+                    queue_size: 4321
+                    num_consumers: 7
+              connectors:
+                ncclmetrics:
+              extensions:
+                health_check:
+                  endpoint: 0.0.0.0:13133
+              service:
+                extensions: [health_check]
+                pipelines:
+                  logs/nccl_metrics:
+                    receivers: [filelog/nccl_metrics]
+                    exporters: [ncclmetrics]
+                  metrics/nccl_metrics:
+                    receivers: [ncclmetrics]
+                    exporters: [otlp_http/victoriametrics]
+      observability.ncclProfiles.collector.values:
+        command:
+          extraArgs: []
+        extraVolumes:
+          - name: jail
+            hostPath:
+              path: /mnt/jail
+              type: Directory
+        extraVolumeMounts:
+          - name: jail
+            mountPath: /mnt/jail
+            readOnly: true
+        initContainers:
+          - name: init-nccl-profiles-dump-dir
+            image: busybox:1.37
+            volumeMounts:
+              - name: jail
+                mountPath: /mnt/jail
+            command: [sh, -ec, 'mkdir -p /mnt/jail/custom/nccl']
+        ports:
+          metrics:
+            enabled: false
+        podMonitor:
+          enabled: false
     asserts:
-      - equal:
-          path: spec.values.extraVolumes[0].hostPath.path
-          value: /mnt/jail
-      - equal:
-          path: spec.values.extraVolumes[0].hostPath.type
-          value: Directory
-      - equal:
-          path: spec.values.initContainers[1].name
-          value: init-nccl-profiles-dump-dir
-      - equal:
-          path: spec.values.initContainers[1].volumeMounts[0].name
-          value: jail
-      - equal:
-          path: spec.values.extraVolumeMounts[0].readOnly
-          value: true
       - matchRegex:
-          path: spec.values.initContainers[1].command[2]
+          path: data["values.yaml"].resources[0].data.relay
+          pattern: '/mnt/jail/custom/nccl/\*/\*/\*\.log'
+        documentSelector: *defaultRelayValues
+      - matchRegex:
+          path: data["values.yaml"].resources[0].data.relay
+          pattern: 'queue_size: 4321\s+num_consumers: 7'
+        documentSelector: *defaultRelayValues
+      - notMatchRegex:
+          path: data["values.yaml"].resources[0].data.relay
+          pattern: 'file_storage|delete_after_read'
+        documentSelector: *defaultRelayValues
+      - lengthEqual:
+          path: data["values.yaml"].extraVolumes
+          count: 1
+        documentSelector: *defaultCollectorValues
+      - equal:
+          path: data["values.yaml"].extraVolumeMounts
+          value: [{name: jail, mountPath: /mnt/jail, readOnly: true}]
+        documentSelector: *defaultCollectorValues
+      - matchRegex:
+          path: data["values.yaml"].initContainers[0].command[2]
           pattern: '/mnt/jail/custom/nccl'
+        documentSelector: *defaultCollectorValues
       - equal:
-          path: spec.values.resources.requests
-          value:
-            cpu: 250m
-            memory: 256Mi
-      - equal:
-          path: spec.values.resources.limits
-          value:
-            memory: 512Mi
-
-  - it: should use custom values when provided
-    set:
-      observability.enabled: true
-      observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.values.enableFileStorage: true
-      observability.ncclProfiles.values.metricsEndpoint: http://example.test:8428/custom
-      observability.ncclProfiles.values.metricsExporterTimeout: 25s
-      observability.ncclProfiles.values.sendingQueue.queueSize: 4321
-      observability.ncclProfiles.values.sendingQueue.numConsumers: 7
-      observability.ncclProfiles.values.deleteAfterRead.enabled: true
-      observability.ncclProfiles.values.deleteAfterRead.minAge: 30m
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles-cm
-    asserts:
-      - matchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'file_storage'
-      - matchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'metrics_endpoint: http://example\.test:8428/custom'
-      - matchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'timeout: 25s'
-      - matchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'max_elapsed_time: 0'
-      - matchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'sizer: items'
-      - matchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'queue_size: 4321'
-      - matchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'num_consumers: 7'
-      - matchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'flush_timeout: 1s'
-      - matchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'min_size: 2000'
-      - matchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'max_size: 5000'
-      - matchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'delete_after_read: true'
-      - matchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'delete_after_read_min_age: 30m'
-
-  - it: should not include file_storage in relay config when disabled
-    set:
-      observability.enabled: true
-      observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.values.enableFileStorage: false
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles-cm
-    asserts:
-      - notMatchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'file_storage'
-
-  - it: should not use delete_after_read in relay config when disabled
-    set:
-      observability.enabled: true
-      observability.ncclProfiles.enabled: true
-      observability.ncclProfiles.values.deleteAfterRead.enabled: false
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-otelcol-nccl-profiles-cm
-    asserts:
-      - notMatchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'delete_after_read'
-      - notMatchRegex:
-          path: spec.values.resources[0].data.relay
-          pattern: 'delete_after_read_min_age'
+          path: data["values.yaml"].command.extraArgs
+          value: []
+        documentSelector: *defaultCollectorValues
 
 ---
 
 suite: test values override default values nodesets
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/nodesets.yaml
+set:
+  nodesets.enabled: true
 tests:
   - it: should use custom values when provided
     set:
-      nodesets.enabled: true
       nodesets.values:
+        clusterName: custom-slurm
         priorityClasses:
           - name: soperator-worker-high-priority
             value: 1000
         nodesets:
-          test-nodeset:
-            nodesetName: "test-nodeset"
-            size: 3
+          - name: test-nodeset
+            replicas: 3
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - equal:
-          path: spec.values.priorityClasses[0].name
+          path: data["values.yaml"].clusterName
+          value: custom-slurm
+        documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
+      - equal:
+          path: data["values.yaml"].priorityClasses[0].name
           value: soperator-worker-high-priority
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.priorityClasses[0].value
+          path: data["values.yaml"].priorityClasses[0].value
           value: 1000
+        documentSelector: *baseConfigMap
       - equal:
-          path: spec.values.nodesets.test-nodeset.size
+          path: data["values.yaml"].nodesets[0].replicas
           value: 3
+        documentSelector: *baseConfigMap
 
-  - it: should use override values when provided
+  - it: should omit the cluster name when cleared
     set:
-      nodesets.enabled: true
-      nodesets.overrideValues:
-        customConfig: true
-        nodesets:
-          gpu-nodeset:
-            nodesetName: "gpu-workers"
-            size: 5
+      nodesets.values.clusterName: null
+    documentSelector: *baseConfigMap
     asserts:
-      - hasDocuments:
-          count: 1
+      - notExists:
+          path: data["values.yaml"].clusterName
+
+---
+
+suite: test native storage values
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
+templates:
+  - templates/nfs-server.yaml
+  - templates/slurm-cluster-storage.yaml
+tests:
+  - it: should use the child chart defaults when no storage values are configured
+    documentSelector: &baseConfigMap {path: kind, value: ConfigMap, matchMany: true}
+    asserts:
       - equal:
-          path: spec.values.customConfig
-          value: true
+          path: data["values.yaml"]
+          value: {}
+
+  - it: should forward the NFS server settings
+    template: templates/nfs-server.yaml
+    set:
+      nfsServer.values: &nfsValues
+        storage:
+          existingClaim: nfs-data
+        nfs:
+          permitted: [10.0.0.0/24]
+    documentSelector: *baseConfigMap
+    asserts:
       - equal:
-          path: spec.values.nodesets.gpu-nodeset.nodesetName
-          value: "gpu-workers"
+          path: data["values.yaml"]
+          value: *nfsValues
+
+  - it: should forward the Slurm storage settings
+    template: templates/slurm-cluster-storage.yaml
+    set:
+      slurmCluster.slurmClusterStorage.values: &storageValues
+        volume:
+          jail:
+            size: 3Ti
+          controllerSpool:
+            enabled: false
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"]
+          value: *storageValues
+
+---
+
+suite: test SlurmCluster names and references
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
+templates:
+  - templates/slurm-cluster.yaml
+  - templates/soperator-activechecks.yaml
+tests:
+  - it: should keep the default SlurmCluster name
+    template: templates/slurm-cluster.yaml
+    documentSelector: &baseConfigMap {path: kind, value: ConfigMap, matchMany: true}
+    asserts:
+      - equal:
+          path: data["values.yaml"].clusterName
+          value: soperator
+
+  - it: should forward a custom SlurmCluster name
+    template: templates/slurm-cluster.yaml
+    set:
+      slurmCluster.values.clusterName: custom-slurm
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"].clusterName
+          value: custom-slurm
+
+  - it: should let the ActiveChecks child chart or valuesFrom supply the default reference
+    template: templates/soperator-activechecks.yaml
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"]
+          value: {}
+
+  - it: should forward the native ActiveChecks cluster reference
+    template: templates/soperator-activechecks.yaml
+    set:
+      soperatorActiveChecks.values.slurmClusterRefName: custom-slurm
+    documentSelector: *baseConfigMap
+    asserts:
+      - equal:
+          path: data["values.yaml"]
+          value:
+            slurmClusterRefName: custom-slurm

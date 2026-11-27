@@ -55,7 +55,7 @@ set:
     vmLogs: {enabled: true}
     vmStack: {enabled: true}
     ncclProfiles: {enabled: true}
-    opentelemetry: {enabled: true, logs: {values: {jailLogs: {enabled: true}}}}
+    opentelemetry: {enabled: true, jailLogs: {enabled: true}}
 tests:
   - it: should not render post-renderers for k8up by default
     template: templates/backup.yaml
@@ -617,13 +617,13 @@ tests:
       - notExists:
           path: spec.postRenderers
 
-  - it: should render post-renderers for opentelemetry-collector-jail-logs from observability.opentelemetry.logs.postRenderers
+  - it: should render post-renderers for opentelemetry-collector-jail-logs from observability.opentelemetry.jailLogs.postRenderers
     template: templates/opentelemetry-collector-jail-logs.yaml
     documentSelector:
       path: metadata.name
       value: t-opentelemetry-collector-jail-logs
     set:
-      observability.opentelemetry.logs.postRenderers:
+      observability.opentelemetry.jailLogs.postRenderers:
         - kustomize:
             patches:
               - target:

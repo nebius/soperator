@@ -1,0 +1,149 @@
+suite: test opentelemetry collector HelmRelease dependencies and values references
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
+templates:
+  - templates/opentelemetry-collector-logs.yaml
+  - templates/opentelemetry-collector-jail-logs.yaml
+  - templates/opentelemetry-collector-events.yaml
+  - templates/nodesets.yaml
+set:
+  fullnameOverride: platform
+tests:
+  - it: should wait for the namespace and VictoriaLogs by default
+    templates:
+      - templates/opentelemetry-collector-logs.yaml
+      - templates/opentelemetry-collector-jail-logs.yaml
+      - templates/opentelemetry-collector-events.yaml
+    documentSelector: &helmRelease {path: kind, value: HelmRelease, matchMany: true}
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+            - name: platform-vm-logs
+
+  - it: should skip the VictoriaLogs dependency when the bundled release is disabled
+    templates:
+      - templates/opentelemetry-collector-logs.yaml
+      - templates/opentelemetry-collector-jail-logs.yaml
+      - templates/opentelemetry-collector-events.yaml
+    set:
+      observability.vmLogs.enabled: false
+    documentSelector: *helmRelease
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+
+  - it: should resolve an explicit dependency on the TSA token writer
+    set:
+      observability.opentelemetry.events.dependsOn:
+        - name: '{{ include "soperator-fluxcd.o11yTsaTokenWriterName" . }}'
+    documentSelector: *helmRelease
+    asserts:
+      - template: templates/opentelemetry-collector-events.yaml
+        equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-tsa-token-writer
+      - template: templates/opentelemetry-collector-logs.yaml
+        notContains:
+          path: spec.dependsOn
+          content:
+            name: platform-tsa-token-writer
+
+  - it: should wait for the umbrella NodeSets release when enabled
+    set:
+      nodesets.enabled: true
+    documentSelector: *helmRelease
+    asserts:
+      - template: templates/nodesets.yaml
+        equal:
+          path: metadata.name
+          value: platform-nodesets
+      - template: templates/opentelemetry-collector-jail-logs.yaml
+        equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+            - name: platform-vm-logs
+            - name: platform-nodesets
+
+  - it: should reference a separately deployed NodeSets HelmRelease by name and namespace
+    set:
+      nodesets.enabled: false
+      observability.opentelemetry.jailLogs.dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-ns'
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-vm-logs'
+        - name: external-nodesets
+          namespace: fleet-releases
+    asserts:
+      - template: templates/nodesets.yaml
+        hasDocuments:
+          count: 0
+      - template: templates/opentelemetry-collector-jail-logs.yaml
+        equal:
+          path: spec.dependsOn
+          value:
+            - name: platform-ns
+            - name: platform-vm-logs
+            - name: external-nodesets
+              namespace: fleet-releases
+        documentSelector: *helmRelease
+
+  - it: should let callers clear the jail-logs dependency list
+    set:
+      nodesets.enabled: false
+      observability.opentelemetry.jailLogs.dependsOn: []
+    asserts:
+      - template: templates/nodesets.yaml
+        hasDocuments:
+          count: 0
+      - template: templates/opentelemetry-collector-jail-logs.yaml
+        equal:
+          path: spec.dependsOn
+          value: []
+        documentSelector: *helmRelease
+
+  - it: should keep the order of optional values ConfigMaps for each collector
+    documentSelector: *helmRelease
+    asserts:
+      - template: templates/opentelemetry-collector-logs.yaml
+        equal:
+          path: spec.valuesFrom
+          value:
+            - {kind: ConfigMap, name: platform-opentelemetry-collector-logs-values, valuesKey: values.yaml}
+            - {kind: ConfigMap, name: terraform-opentelemetry-collector-logs, optional: true, valuesKey: values.yaml}
+            - {kind: ConfigMap, name: opentelemetry-collector-logs, optional: true, valuesKey: values.yaml}
+      - template: templates/opentelemetry-collector-jail-logs.yaml
+        equal:
+          path: spec.valuesFrom
+          value:
+            - {kind: ConfigMap, name: platform-opentelemetry-collector-jail-logs-values, valuesKey: values.yaml}
+            - {kind: ConfigMap, name: terraform-opentelemetry-collector-jail-logs, optional: true, valuesKey: values.yaml}
+            - {kind: ConfigMap, name: opentelemetry-collector-jail-logs, optional: true, valuesKey: values.yaml}
+      - template: templates/opentelemetry-collector-events.yaml
+        equal:
+          path: spec.valuesFrom
+          value:
+            - {kind: ConfigMap, name: platform-opentelemetry-collector-events-values, valuesKey: values.yaml}
+            - {kind: ConfigMap, name: terraform-opentelemetry-collector-events, optional: true, valuesKey: values.yaml}
+            - {kind: ConfigMap, name: opentelemetry-collector-events, optional: true, valuesKey: values.yaml}
+
+  - it: should keep jail-logs enabled when its values come from ConfigMaps
+    template: templates/opentelemetry-collector-jail-logs.yaml
+    set:
+      observability.opentelemetry.jailLogs.values: null
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: data["values.yaml"]
+          value: {}
+        documentSelector: {path: kind, value: ConfigMap, matchMany: true}
+      - equal:
+          path: spec.valuesFrom[2].name
+          value: opentelemetry-collector-jail-logs
+        documentSelector: *helmRelease

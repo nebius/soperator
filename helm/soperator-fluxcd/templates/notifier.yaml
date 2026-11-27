@@ -1,4 +1,5 @@
 {{ if and (and .Values.notifier .Values.notifier.enabled) (and .Values.observability (and .Values.observability.enabled (and .Values.observability.vmStack .Values.observability.vmStack.enabled))) }}
+{{- $valuesName := printf "%s-notifier-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,9 +23,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.notifier.version }}
-  dependsOn:
-    - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-    - name: {{ include "soperator-fluxcd.fullname" . }}-vm-logs
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.notifier "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.notifier.install | nindent 4 }}
   upgrade:
@@ -32,22 +31,10 @@ spec:
   interval: {{ .Values.notifier.interval }}
   timeout: {{ .Values.notifier.timeout }}
   releaseName: {{ .Values.notifier.releaseName }}
-  targetNamespace: {{ .Values.notifier.namespace }}
-  values:
-    {{- if .Values.notifier.overrideValues }}
-    {{- toYaml .Values.notifier.overrideValues | nindent 4 }}
-    {{- else }}
-    nameOverride: {{ .Values.notifier.releaseName }}
-    slack:
-      webhookUrl: {{ required "Slack Webhook is required." .Values.notifier.values.slack.webhookUrl | quote }}
-    {{- end }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.notifier.namespace | nindent 2 }}
   valuesFrom:
-    - kind: ConfigMap
-      name: terraform-soperator-notifier
-      optional: true
-      valuesKey: values.yaml
-    - kind: ConfigMap
-      name: soperator-notifier
-      optional: true
-      valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.notifier.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.notifier.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

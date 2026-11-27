@@ -1,4 +1,5 @@
 {{- if .Values.nodesets.enabled }}
+{{- $valuesName := printf "%s-nodesets-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,37 +23,18 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.nodesets.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
-{{- if .Values.slurmCluster.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster
-{{- end }}
-
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.nodesets "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.nodesets.install | nindent 4 }}
   interval: {{ .Values.nodesets.interval }}
   timeout: {{ .Values.nodesets.timeout }}
   releaseName: {{ .Values.nodesets.releaseName }}
-  targetNamespace: {{ .Values.nodesets.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.nodesets.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.nodesets.upgrade | nindent 4 }}
-  values:
-    clusterName: {{ .Values.nodesets.clusterName | quote }}
-  {{- if .Values.nodesets.overrideValues }}
-    {{- toYaml .Values.nodesets.overrideValues | nindent 4 }}
-  {{- else }}
-    {{- if .Values.nodesets.values }}
-    {{- toYaml .Values.nodesets.values | nindent 4 }}
-    {{- end }}
-  {{- end }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-nodesets
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: nodesets
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.nodesets.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.nodesets.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

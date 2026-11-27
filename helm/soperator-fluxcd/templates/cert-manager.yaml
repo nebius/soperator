@@ -1,4 +1,5 @@
 {{- if .Values.certManager.enabled }}
+{{- $valuesName := printf "%s-cert-manager-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,69 +23,18 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-cert-manager
       version: {{ .Values.certManager.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  {{- if and .Values.observability.enabled .Values.observability.prometheusOperator.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-prometheus-operator-crds
-  {{- end }}
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.certManager "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.certManager.install | nindent 4 }}
   upgrade:
     {{- toYaml .Values.certManager.upgrade | nindent 4 }}
   interval: {{ .Values.certManager.interval }}
-  targetNamespace: {{ .Values.certManager.namespace }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.certManager.namespace | nindent 2 }}
   releaseName: {{ .Values.certManager.releaseName }}
   timeout: {{ .Values.certManager.timeout }}
-  values:
-  {{- if .Values.certManager.overrideValues }}
-    {{- toYaml .Values.certManager.overrideValues | nindent 4 }}
-  {{- else }}
-  {{- $certManager := .Values.certManager.values | default dict }}
-    enableCertificateOwnerRef: true
-    {{- with $certManager.nodeSelector }}
-    nodeSelector:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-    {{- with $certManager.affinity }}
-    affinity:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-    {{- with $certManager.resources }}
-    resources:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-    startupapicheck:
-      enabled: true
-      {{- with $certManager.startupapicheck }}
-      {{- toYaml . | nindent 6 }}
-      {{- end }}
-    {{- with $certManager.webhook }}
-    webhook:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-    {{- with $certManager.cainjector }}
-    cainjector:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
-    crds:
-      enabled: true
-    global:
-      leaderElection:
-        namespace: cert-manager-system
-    {{- if .Values.observability.prometheusOperator.enabled }}
-    prometheus:
-      enabled: true
-      servicemonitor:
-        enabled: false
-    {{- end }}
-  {{- end }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-cert-manager
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: cert-manager
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.certManager.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := include "soperator-fluxcd.platformValues" (dict "component" .Values.certManager "root" $ "prometheusEnabled" .Values.observability.prometheusOperator.enabled) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}

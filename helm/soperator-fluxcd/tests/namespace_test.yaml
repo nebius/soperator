@@ -1,94 +1,160 @@
-suite: test namespace creation logic
+suite: test namespace declarations
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/namespaces.yaml
 tests:
-  - it: should verify namespace creation in HelmRelease values
-    set:
-      observability.vmStack.enabled: false
-      observability.prometheusOperator.enabled: false
+  - it: should declare the storage namespace alongside the existing namespaces
     asserts:
       - isKind:
           of: HelmRelease
+        documentSelector: &helmRelease {path: kind, value: HelmRelease}
       - equal:
           path: metadata.name
           value: RELEASE-NAME-ns
+        documentSelector: *helmRelease
+      - contains:
+          path: data["values.yaml"].resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: storage-system
+        documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
+
+  - it: should deduplicate a namespace declared across observability groups
+    set:
+      observability.opentelemetry.namespace: shared-observability
+      observability.vmLogs.namespace: shared-observability
+      observability.vmStack.namespace: shared-observability
+      observability.prometheusOperator.namespace: shared-observability
+      soperator.monitoringDashboards.namespace: shared-observability
+      notifier.namespace: shared-observability
+    documentSelector: *baseConfigMap
+    asserts:
+      - lengthEqual:
+          path: data["values.yaml"].resources
+          count: 8
+      - contains:
+          path: data["values.yaml"].resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: shared-observability
+
+  - it: should declare separate namespaces when the names differ
+    set:
+      observability.vmStack.namespace: metrics
+      observability.vmLogs.namespace: telemetry
+      observability.opentelemetry.namespace: telemetry
+      observability.prometheusOperator.namespace: metrics
+      soperator.monitoringDashboards.namespace: metrics
+      notifier.namespace: metrics
+      csiDriverNfs.namespace: nfs-driver
+    documentSelector: *baseConfigMap
+    asserts:
+      - lengthEqual:
+          path: data["values.yaml"].resources
+          count: 10
+      - contains:
+          path: data["values.yaml"].resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: metrics
+      - contains:
+          path: data["values.yaml"].resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: telemetry
+      - contains:
+          path: data["values.yaml"].resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: nfs-driver
+
+  - it: should omit namespaces declared only by disabled components
+    set:
+      certManager.enabled: false
+      nodesets.enabled: false
+      nodesets.namespace: unused-nodesets
+      storageClasses.enabled: false
+    documentSelector: *baseConfigMap
+    asserts:
       - notContains:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
             metadata:
-              name: monitoring-system
+              name: cert-manager-system
+      - notContains:
+          path: data["values.yaml"].resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: unused-nodesets
+      - notContains:
+          path: data["values.yaml"].resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: storage-system
 
-  - it: should create vmStack namespace when only vmStack is enabled
+  - it: should omit namespaces when the parent component disables their releases
     set:
-      observability.vmStack.enabled: true
-      observability.vmStack.namespace: monitoring-system
-      observability.prometheusOperator.enabled: false
+      observability.enabled: false
+      observability.vmStack.namespace: unused-metrics
+      notifier.enabled: true
+      notifier.namespace: unused-notifier
+      nfsServer.enabled: false
+      csiDriverNfs.namespace: unused-nfs-driver
+    documentSelector: *baseConfigMap
     asserts:
-      - isKind:
-          of: HelmRelease
-      - contains:
-          path: spec.values.resources
+      - notContains:
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
             metadata:
-              name: monitoring-system
+              name: unused-metrics
+      - notContains:
+          path: data["values.yaml"].resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: unused-notifier
+      - notContains:
+          path: data["values.yaml"].resources
+          content:
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: unused-nfs-driver
 
-  - it: should create prometheusOperator namespace when only prometheusOperator is enabled
+  - it: should omit empty and removed namespace declarations
     set:
-      observability.vmStack.enabled: false
-      observability.prometheusOperator.enabled: true
-      observability.prometheusOperator.namespace: monitoring-system
+      observability.opentelemetry.namespace: ""
+      observability.vmLogs.namespace: null
+    documentSelector: *baseConfigMap
     asserts:
-      - isKind:
-          of: HelmRelease
-      - contains:
-          path: spec.values.resources
+      - notContains:
+          path: data["values.yaml"].resources
           content:
             apiVersion: v1
             kind: Namespace
             metadata:
-              name: monitoring-system
-
-  - it: should create single namespace when both components enabled with same namespace
-    set:
-      observability.vmStack.enabled: true
-      observability.vmStack.namespace: monitoring-system
-      observability.prometheusOperator.enabled: true
-      observability.prometheusOperator.namespace: monitoring-system
-    asserts:
-      - isKind:
-          of: HelmRelease
-      - contains:
-          path: spec.values.resources
-          content:
-            apiVersion: v1
-            kind: Namespace
-            metadata:
-              name: monitoring-system
-
-  - it: should create two namespaces when both components enabled with different namespaces
-    set:
-      observability.vmStack.enabled: true
-      observability.vmStack.namespace: vm-monitoring
-      observability.prometheusOperator.enabled: true
-      observability.prometheusOperator.namespace: prom-monitoring
-    asserts:
-      - isKind:
-          of: HelmRelease
-      - contains:
-          path: spec.values.resources
-          content:
-            apiVersion: v1
-            kind: Namespace
-            metadata:
-              name: vm-monitoring
-      - contains:
-          path: spec.values.resources
-          content:
-            apiVersion: v1
-            kind: Namespace
-            metadata:
-              name: prom-monitoring
+              name: logs-system
+      - lengthEqual:
+          path: data["values.yaml"].resources
+          count: 8

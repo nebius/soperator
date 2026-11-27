@@ -1,3 +1,4 @@
+{{- $valuesName := printf "%s-slurm-cluster-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -21,39 +22,17 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-soperator
       version: {{ .Values.slurmCluster.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  - name: {{ include "soperator-fluxcd.fullname" . }}-soperator
-{{- if .Values.slurmCluster.slurmClusterStorage.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-slurm-cluster-storage
-{{- end }}
-{{- if .Values.nfsServer.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-nfs-server
-{{- end }}
-{{- if .Values.tailscale.enabled }}
-  - name: {{ include "soperator-fluxcd.fullname" . }}-tailscale
-{{- end }}
-
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.slurmCluster "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.slurmCluster.install | nindent 4 }}
   interval: {{ .Values.slurmCluster.interval }}
   timeout: {{ .Values.slurmCluster.timeout }}
   releaseName: soperator
-  targetNamespace: soperator
+  {{- include "soperator-fluxcd.targetNamespace" .Values.slurmCluster.namespace | nindent 2 }}
   upgrade:
     {{- toYaml .Values.slurmCluster.upgrade | nindent 4 }}
-  values:
-  {{- if .Values.slurmCluster.overrideValues }}
-    {{- toYaml .Values.slurmCluster.overrideValues | nindent 4 }}
-  {{- else }}
-    clusterName: soperator
-  {{- end }}
   valuesFrom:
-  - kind: ConfigMap
-    name: terraform-slurm-cluster
-    optional: true
-    valuesKey: values.yaml
-  - kind: ConfigMap
-    name: slurm-cluster
-    optional: true
-    valuesKey: values.yaml
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.slurmCluster.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.slurmCluster.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}

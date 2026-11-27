@@ -895,80 +895,14 @@ jobs:
           make sync-version UNSTABLE=${UNSTABLE}
           make release-helm UNSTABLE="${UNSTABLE}"
 
-  helm-integration-test:
-    name: Helm Chart Integration Test with Built Images
-    needs:
-      - changes
-      - pre-build
-      - manifest-docker-images
-      - manifest-populate-jail
-      - build-helm-charts
+  helm-api-validation:
+    needs: [authorize, changes]
     if: needs.changes.outputs.should_build == 'true'
-    runs-on: ubuntu-24.04
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          allow-unsafe-pr-checkout: true
-
-      - name: Set up Go
-        uses: actions/setup-go@v7.0.0
-        with:
-          go-version-file: "go.mod"
-          cache: true
-
-      - name: Install dependencies
-        run: |
-          go mod download
-          go mod verify
-
-      - name: Install kind
-        run: make install-kind
-
-      - name: Install flux
-        run: make install-flux
-
-      - name: Install yq
-        run: make yq
-
-      - name: Run Helm Integration Tests
-        run: |
-          make sync-version UNSTABLE=${UNSTABLE}
-          go test -v -timeout 10m -tags=integration ./test/integration/
-        env:
-          GO111MODULE: on
-          UNSTABLE: ${{ needs.pre-build.outputs.unstable }}
-
-      - name: Get cluster info
-        if: always()
-        shell: bash
-        run: |
-          mkdir -p ./cluster-info
-          kubectl cluster-info dump --output-directory=./cluster-info || true
-          echo "=== Pods ==="
-          kubectl get pods -A -o wide || true
-          echo "=== HelmReleases ==="
-          kubectl get helmreleases -n flux-system || true
-          echo "=== Flux Resources ==="
-          ./bin/flux get all -n flux-system || true
-
-      - name: Cleanup
-        if: always()
-        run: |
-          make kind-delete || true
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: helm-integration-test-results
-          path: |
-            test/integration/*.log
-            test/integration/*.xml
-            cluster-info/
-          retention-days: 1
+    permissions:
+      contents: read
+    uses: ./.github/workflows/helm-api-validation.yml
+    with:
+      checkout_ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
   ci-success:
     name: CI Success
@@ -984,7 +918,7 @@ jobs:
       - manifest-docker-images
       - manifest-populate-jail
       - build-helm-charts
-      - helm-integration-test
+      - helm-api-validation
     if: always()
     steps:
       - name: Check CI status

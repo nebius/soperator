@@ -1,4 +1,7 @@
 suite: test custom configmaps
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/soperator-custom-configmaps.yaml
 
@@ -9,21 +12,26 @@ tests:
         enabled: true
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - isKind:
           of: HelmRelease
+        documentSelector: &helmRelease {path: kind, value: HelmRelease}
       - equal:
           path: metadata.name
           value: RELEASE-NAME-custom-configmaps
+        documentSelector: *helmRelease
       - equal:
           path: spec.chart.spec.chart
           value: helm-soperator-custom-configmaps
+        documentSelector: *helmRelease
       - equal:
           path: spec.releaseName
           value: soperator-custom-configmaps
+        documentSelector: *helmRelease
       - equal:
           path: spec.targetNamespace
           value: soperator
+        documentSelector: *helmRelease
 
   - it: should not render custom configmaps component when customConfigmaps.enabled=false
     set:
@@ -38,20 +46,29 @@ tests:
       customConfigmaps:
         enabled: true
         version: "1.23.0"
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.chart.spec.version
           value: "1.23.0"
 
-  - it: should use correct namespace from values
+  - it: should set the target namespace without injecting a child chart value
     set:
       customConfigmaps:
         enabled: true
         namespace: custom-namespace
+        values:
+          configMaps:
+            motd:
+              enabled: false
     asserts:
       - equal:
           path: spec.targetNamespace
           value: custom-namespace
+        documentSelector: *helmRelease
+      - notExists:
+          path: data["values.yaml"].namespace
+        documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
 
   - it: should use correct interval and timeout from values
     set:
@@ -59,6 +76,7 @@ tests:
         enabled: true
         interval: 10m
         timeout: 10m
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.interval
@@ -75,6 +93,7 @@ tests:
       customConfigmaps:
         enabled: true
         releaseName: my-custom-release
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.releaseName
@@ -84,6 +103,7 @@ tests:
     set:
       customConfigmaps:
         enabled: true
+    documentSelector: *helmRelease
     asserts:
       - contains:
           path: spec.dependsOn
@@ -94,6 +114,7 @@ tests:
     set:
       customConfigmaps:
         enabled: true
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.chart.spec.sourceRef.kind
@@ -106,6 +127,7 @@ tests:
     set:
       customConfigmaps:
         enabled: true
+    documentSelector: *helmRelease
     asserts:
       - contains:
           path: spec.valuesFrom
@@ -115,7 +137,7 @@ tests:
             optional: true
             valuesKey: values.yaml
 
-  - it: should merge overrideValues when provided
+  - it: should keep using legacy overrideValues when values are absent
     set:
       customConfigmaps:
         enabled: true
@@ -124,18 +146,20 @@ tests:
           configMaps:
             motd:
               enabled: false
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.namespace
+          path: data["values.yaml"].namespace
           value: override-namespace
       - equal:
-          path: spec.values.configMaps.motd.enabled
+          path: data["values.yaml"].configMaps.motd.enabled
           value: false
 
   - it: should have correct install and upgrade settings
     set:
       customConfigmaps:
         enabled: true
+    documentSelector: *helmRelease
     asserts:
       - equal:
           path: spec.install.crds
@@ -154,6 +178,7 @@ tests:
     set:
       customConfigmaps:
         enabled: true
+    documentSelector: *helmRelease
     asserts:
       - isNotEmpty:
           path: metadata.labels

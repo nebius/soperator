@@ -4,6 +4,7 @@ templates:
 
 tests:
   - it: should use requested VictoriaMetrics stack chart version
+    documentSelector: {path: kind, value: HelmRelease}
     asserts:
       - equal:
           path: spec.chart.spec.version
@@ -15,6 +16,7 @@ templates:
 
 tests:
   - it: should use requested VictoriaMetrics operator CRD chart version
+    documentSelector: {path: kind, value: HelmRelease}
     asserts:
       - equal:
           path: spec.chart.spec.version
@@ -26,6 +28,7 @@ templates:
 
 tests:
   - it: should use requested VictoriaLogs chart version from values
+    documentSelector: {path: kind, value: HelmRelease}
     asserts:
       - equal:
           path: spec.chart.spec.version

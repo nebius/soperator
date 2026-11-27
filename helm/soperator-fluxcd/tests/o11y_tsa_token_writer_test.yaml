@@ -1,4 +1,7 @@
 suite: test vmagent tsa-token writer
+postRenderer:
+  cmd: yq
+  args: ['(select(.kind == "ConfigMap").data."values.yaml") |= from_yaml', '-']
 templates:
   - templates/o11y-tsa-token-writer.yaml
 
@@ -14,21 +17,26 @@ tests:
           namespace: monitoring-system
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - isKind:
           of: HelmRelease
+        documentSelector: &helmRelease {path: kind, value: HelmRelease}
       - equal:
           path: metadata.name
           value: RELEASE-NAME-tsa-token-writer
+        documentSelector: *helmRelease
       - equal:
           path: spec.chart.spec.chart
           value: raw
+        documentSelector: *helmRelease
       - equal:
           path: spec.chart.spec.sourceRef.name
           value: RELEASE-NAME-bedag
+        documentSelector: *helmRelease
       - equal:
           path: spec.dependsOn[0].name
           value: RELEASE-NAME-ns
+        documentSelector: *helmRelease
 
   - it: should maintain the token secret with imds source and host networking
     set:
@@ -42,28 +50,29 @@ tests:
           tsaToken:
             writer:
               source: imds
+    documentSelector: &baseConfigMap {path: kind, value: ConfigMap}
     asserts:
       # resources: ServiceAccount + (Role + RoleBinding) for monitoring/logs + Deployment
       - lengthEqual:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           count: 6
       - equal:
-          path: spec.values.resources[0].kind
+          path: data["values.yaml"].resources[0].kind
           value: ServiceAccount
       - equal:
-          path: spec.values.resources[0].metadata.namespace
+          path: data["values.yaml"].resources[0].metadata.namespace
           value: monitoring-system
       - equal:
-          path: spec.values.resources[5].kind
+          path: data["values.yaml"].resources[5].kind
           value: Deployment
       - equal:
-          path: spec.values.resources[5].spec.template.spec.hostNetwork
+          path: data["values.yaml"].resources[5].spec.template.spec.hostNetwork
           value: true
       - equal:
-          path: spec.values.resources[5].spec.template.spec.containers[0].env[0].value
+          path: data["values.yaml"].resources[5].spec.template.spec.containers[0].env[0].value
           value: "imds"
       - equal:
-          path: spec.values.resources[5].spec.template.spec.containers[0].env[3].value
+          path: data["values.yaml"].resources[5].spec.template.spec.containers[0].env[3].value
           value: "monitoring-system logs-system"
 
   - it: should restrict secret access by resourceName but allow create
@@ -75,24 +84,25 @@ tests:
         vmStack:
           enabled: true
           namespace: monitoring-system
+    documentSelector: *baseConfigMap
     asserts:
       - equal:
-          path: spec.values.resources[1].kind
+          path: data["values.yaml"].resources[1].kind
           value: Role
       - equal:
-          path: spec.values.resources[1].rules[0].verbs
+          path: data["values.yaml"].resources[1].rules[0].verbs
           value: ["create"]
       - equal:
-          path: spec.values.resources[1].rules[1].resourceNames
+          path: data["values.yaml"].resources[1].rules[1].resourceNames
           value: ["o11y-writer-sa-token"]
       - equal:
-          path: spec.values.resources[1].rules[1].verbs
+          path: data["values.yaml"].resources[1].rules[1].verbs
           value: ["get", "patch", "update"]
       - equal:
-          path: spec.values.resources[2].kind
+          path: data["values.yaml"].resources[2].kind
           value: RoleBinding
       - equal:
-          path: spec.values.resources[2].subjects[0].namespace
+          path: data["values.yaml"].resources[2].subjects[0].namespace
           value: monitoring-system
 
   - it: should use file source without host networking and mount the host token
@@ -107,17 +117,18 @@ tests:
           tsaToken:
             writer:
               source: file
+    documentSelector: *baseConfigMap
     asserts:
       - notExists:
-          path: spec.values.resources[5].spec.template.spec.hostNetwork
+          path: data["values.yaml"].resources[5].spec.template.spec.hostNetwork
       - equal:
-          path: spec.values.resources[5].spec.template.spec.containers[0].env[0].value
+          path: data["values.yaml"].resources[5].spec.template.spec.containers[0].env[0].value
           value: "file"
       - equal:
-          path: spec.values.resources[5].spec.template.spec.volumes[0].hostPath.path
+          path: data["values.yaml"].resources[5].spec.template.spec.volumes[0].hostPath.path
           value: "/mnt/cloud-metadata"
       - equal:
-          path: spec.values.resources[5].spec.template.spec.containers[0].volumeMounts[0].mountPath
+          path: data["values.yaml"].resources[5].spec.template.spec.containers[0].volumeMounts[0].mountPath
           value: "/o11ytoken"
 
   - it: should maintain the secret in every configured namespace
@@ -134,19 +145,20 @@ tests:
               namespaces:
                 - monitoring-system
                 - logs-system
+    documentSelector: *baseConfigMap
     asserts:
       # SA + (Role + RoleBinding) x2 + Deployment
       - lengthEqual:
-          path: spec.values.resources
+          path: data["values.yaml"].resources
           count: 6
       - equal:
-          path: spec.values.resources[3].metadata.namespace
+          path: data["values.yaml"].resources[3].metadata.namespace
           value: logs-system
       - equal:
-          path: spec.values.resources[5].kind
+          path: data["values.yaml"].resources[5].kind
           value: Deployment
       - equal:
-          path: spec.values.resources[5].spec.template.spec.containers[0].env[3].value
+          path: data["values.yaml"].resources[5].spec.template.spec.containers[0].env[3].value
           value: "monitoring-system logs-system"
 
   - it: should not render when publicEndpointEnabled is false
@@ -186,3 +198,24 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: should replace the default dependency with a configured HelmRelease reference
+    set:
+      fullnameOverride: storage
+      observability.tsaToken.writer.dependsOn:
+        - name: '{{ include "soperator-fluxcd.fullname" . }}-prerequisite'
+          namespace: ops
+    documentSelector: *helmRelease
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value: [{name: storage-prerequisite, namespace: ops}]
+
+  - it: should clear the default dependency with an empty list
+    set:
+      observability.tsaToken.writer.dependsOn: []
+    documentSelector: *helmRelease
+    asserts:
+      - equal:
+          path: spec.dependsOn
+          value: []

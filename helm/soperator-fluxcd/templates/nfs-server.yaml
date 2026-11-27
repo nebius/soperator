@@ -1,4 +1,5 @@
 {{- if .Values.nfsServer.enabled }}
+{{- $valuesName := printf "%s-nfs-server-values" (include "soperator-fluxcd.fullname" .) }}
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -22,9 +23,7 @@ spec:
         kind: HelmRepository
         name: {{ include "soperator-fluxcd.fullname" . }}-nfs-server
       version: {{ .Values.nfsServer.version }}
-  dependsOn:
-  - name: {{ include "soperator-fluxcd.fullname" . }}-ns
-  - name: {{ include "soperator-fluxcd.fullname" . }}-csi-driver-nfs
+  {{- include "soperator-fluxcd.dependsOn" (dict "component" .Values.nfsServer "root" $) | nindent 2 }}
   install:
     {{- toYaml .Values.nfsServer.install | nindent 4 }}
   upgrade:
@@ -32,9 +31,10 @@ spec:
   interval: {{ .Values.nfsServer.interval }}
   timeout: {{ .Values.nfsServer.timeout }}
   releaseName: {{ .Values.nfsServer.releaseName }}
-  targetNamespace: {{ .Values.nfsServer.namespace }}
-  values:
-  {{- if .Values.nfsServer.overrideValues }}
-    {{- toYaml .Values.nfsServer.overrideValues | nindent 4 }}
-  {{- end }}
+  {{- include "soperator-fluxcd.targetNamespace" .Values.nfsServer.namespace | nindent 2 }}
+  valuesFrom:
+    {{- include "soperator-fluxcd.valuesFrom" (dict "name" $valuesName "references" .Values.nfsServer.valuesFrom) | nindent 4 }}
+---
+{{- $valuesYaml := toYaml (.Values.nfsServer.values | default dict) }}
+{{ include "soperator-fluxcd.valuesConfigMap" (dict "name" $valuesName "root" $ "yaml" $valuesYaml) }}
 {{- end }}
