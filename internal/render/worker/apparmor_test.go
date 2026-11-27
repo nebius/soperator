@@ -39,7 +39,7 @@ func TestAppArmorProfile(t *testing.T) {
 				GPU:             &slurmv1alpha1.GPUSpec{},
 				ContainerSlurmd: container,
 			}
-			rendered, err := renderContainerNodeSetSlurmd(nodeSet, false, "v2", false)
+			rendered, err := renderContainerNodeSetSlurmd(nodeSet, false, false)
 			require.NoError(t, err)
 			require.Equal(t, tt.expected, rendered.SecurityContext.AppArmorProfile)
 		})

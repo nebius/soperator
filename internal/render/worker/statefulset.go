@@ -27,7 +27,6 @@ import (
 func RenderNodeSetStatefulSet(
 	nodeSet *values.SlurmNodeSet,
 	secrets *slurmv1.Secrets,
-	cgroupVersion string,
 	clusterWithGPU bool,
 	topologyPluginEnabled bool,
 ) (kruisev1b1.StatefulSet, error) {
@@ -84,7 +83,7 @@ func RenderNodeSetStatefulSet(
 		)
 	}
 
-	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet, topologyPluginEnabled, cgroupVersion, clusterWithGPU)
+	slurmdContainer, err := renderContainerNodeSetSlurmd(nodeSet, topologyPluginEnabled, clusterWithGPU)
 	if err != nil {
 		return kruisev1b1.StatefulSet{}, fmt.Errorf("rendering slurmd container: %w", err)
 	}

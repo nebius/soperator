@@ -14,7 +14,7 @@ tests:
       customCgroupConfig: |
         # Custom configuration
         ConstrainCores=no
-        AllowedKmemSpace=yes
+        MaxRAMPercent=95
     asserts:
       - isNotNull:
           path: spec.customCgroupConfig
@@ -23,4 +23,4 @@ tests:
           pattern: "ConstrainCores=no"
       - matchRegex:
           path: spec.customCgroupConfig
-          pattern: "AllowedKmemSpace=yes"
+          pattern: "MaxRAMPercent=95"

@@ -165,7 +165,7 @@ copies is the filesystem of another container image called [jail](../images/jail
 ### Temporary filesystems for jobs
 
 Soperator enables Slurm's [namespace/linux plugin](https://slurm.schedmd.com/namespace.html) with
-`NamespaceType=namespace/linux` and `PrologFlags=contain`. It requires cgroup v2 (`SlurmCluster.spec.cgroupVersion: v2`).
+`NamespaceType=namespace/linux` and `PrologFlags=contain`. It relies on cgroup v2, the only cgroup version Soperator supports.
 The `namespaceConfig` setting in the `slurm-cluster` Helm chart maps to `SlurmCluster.spec.namespaceConfig`:
 
 | Configuration | Behavior |

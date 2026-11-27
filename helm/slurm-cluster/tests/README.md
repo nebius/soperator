@@ -71,7 +71,6 @@ These tests verify the following kubebuilder default values:
 
 ### Worker Node
 - `maxUnavailable: "20%"`
-- `cgroupVersion: "v2"`
 - `enableGDRCopy: false`
 
 ### Accounting
