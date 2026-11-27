@@ -11,18 +11,20 @@ import (
 )
 
 type ClientSet struct {
-	slurmAPIClients map[types.NamespacedName]Client
-	nodeCaches      map[types.NamespacedName]*NodeCache
-	lifetimeCtx     context.Context
-	mux             *sync.Mutex
+	slurmAPIClients  map[types.NamespacedName]Client
+	nodeCaches       map[types.NamespacedName]*NodeCache
+	nodeCacheCancels map[types.NamespacedName]context.CancelFunc
+	lifetimeCtx      context.Context
+	mux              *sync.Mutex
 }
 
 func NewClientSet(lifetimeCtx context.Context) *ClientSet {
 	return &ClientSet{
-		slurmAPIClients: make(map[types.NamespacedName]Client),
-		nodeCaches:      make(map[types.NamespacedName]*NodeCache),
-		lifetimeCtx:     lifetimeCtx,
-		mux:             &sync.Mutex{},
+		slurmAPIClients:  make(map[types.NamespacedName]Client),
+		nodeCaches:       make(map[types.NamespacedName]*NodeCache),
+		nodeCacheCancels: make(map[types.NamespacedName]context.CancelFunc),
+		lifetimeCtx:      lifetimeCtx,
+		mux:              &sync.Mutex{},
 	}
 }
 
@@ -30,7 +32,26 @@ func (cs *ClientSet) AddClient(name types.NamespacedName, client Client) {
 	cs.mux.Lock()
 	defer cs.mux.Unlock()
 
+	if prev, exists := cs.slurmAPIClients[name]; exists && prev != client {
+		cs.stopNodeCacheLocked(name)
+	}
 	cs.slurmAPIClients[name] = client
+}
+
+func (cs *ClientSet) RemoveClient(name types.NamespacedName) {
+	cs.mux.Lock()
+	defer cs.mux.Unlock()
+
+	delete(cs.slurmAPIClients, name)
+	cs.stopNodeCacheLocked(name)
+}
+
+func (cs *ClientSet) stopNodeCacheLocked(name types.NamespacedName) {
+	if cancel, exists := cs.nodeCacheCancels[name]; exists {
+		cancel()
+		delete(cs.nodeCacheCancels, name)
+	}
+	delete(cs.nodeCaches, name)
 }
 
 func (cs *ClientSet) GetClient(name types.NamespacedName) (Client, bool) {
@@ -63,8 +84,10 @@ func (cs *ClientSet) EnsureNodeCache(name types.NamespacedName, refreshInterval 
 		return nil
 	}
 
-	nc := StartNodeCache(cs.lifetimeCtx, client, refreshInterval, logger)
+	cacheCtx, cancel := context.WithCancel(cs.lifetimeCtx)
+	nc := StartNodeCache(cacheCtx, client, refreshInterval, logger)
 	cs.nodeCaches[name] = nc
+	cs.nodeCacheCancels[name] = cancel
 	return nc
 }
 
