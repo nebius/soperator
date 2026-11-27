@@ -119,6 +119,7 @@ func generateUserIsolationConfig(cluster *values.SlurmCluster) renderutils.Confi
 	res := &renderutils.PropertiesConfig{}
 	res.AddComment(" Managed by soperator. Consumed by sshd_entrypoint.sh and the PAM session hook.")
 	res.AddComment(" Memory values are in bytes (cgroup v2 memory.high / memory.max).")
+	res.AddComment(" CPU quota and period are in microseconds (cgroup v2 cpu.max).")
 	res.AddProperty(consts.EnvDockerEnabled, cluster.NodeLogin.DockerEnabled)
 
 	isolation := cluster.NodeLogin.UserIsolation
@@ -145,6 +146,10 @@ func generateUserIsolationConfig(cluster *values.SlurmCluster) renderutils.Confi
 		cpuWeight = 100
 	}
 	res.AddProperty("SOPERATOR_USER_ISOLATION_CPU_WEIGHT", cpuWeight)
+	if cpuQuotaUS, cpuPeriodUS := values.ResolveLoginUserIsolationCPUMax(isolation); cpuQuotaUS != nil {
+		res.AddProperty("SOPERATOR_USER_ISOLATION_CPU_QUOTA_US", *cpuQuotaUS)
+		res.AddProperty("SOPERATOR_USER_ISOLATION_CPU_PERIOD_US", cpuPeriodUS)
+	}
 	return res
 }
 

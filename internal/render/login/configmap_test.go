@@ -93,6 +93,41 @@ func TestGenerateUserIsolationConfig_Enabled(t *testing.T) {
 	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_CPU_WEIGHT=250")
 }
 
+func TestGenerateUserIsolationConfig_CPUQuota(t *testing.T) {
+	cpuQuota := resource.MustParse("2500m")
+	cluster := &values.SlurmCluster{
+		NodeLogin: values.SlurmLogin{
+			UserIsolation: &slurmv1.LoginUserIsolation{
+				Enabled:   ptr.To(true),
+				CPUQuota:  &cpuQuota,
+				CPUPeriod: 50000,
+			},
+		},
+	}
+
+	rendered := generateUserIsolationConfig(cluster).Render()
+	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_CPU_QUOTA_US=125000")
+	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_CPU_PERIOD_US=50000")
+
+	// The period falls back to 100ms when the CRD default was not applied.
+	cluster.NodeLogin.UserIsolation.CPUPeriod = 0
+	rendered = generateUserIsolationConfig(cluster).Render()
+	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_CPU_QUOTA_US=250000")
+	assert.Contains(t, rendered, "SOPERATOR_USER_ISOLATION_CPU_PERIOD_US=100000")
+}
+
+func TestGenerateUserIsolationConfig_NoCPUQuotaByDefault(t *testing.T) {
+	cluster := &values.SlurmCluster{
+		NodeLogin: values.SlurmLogin{
+			UserIsolation: &slurmv1.LoginUserIsolation{Enabled: ptr.To(true), CPUPeriod: 50000},
+		},
+	}
+
+	rendered := generateUserIsolationConfig(cluster).Render()
+	assert.NotContains(t, rendered, "SOPERATOR_USER_ISOLATION_CPU_QUOTA_US")
+	assert.NotContains(t, rendered, "SOPERATOR_USER_ISOLATION_CPU_PERIOD_US")
+}
+
 func TestGenerateUserIsolationConfig_DerivedMemoryDefaults(t *testing.T) {
 	cluster := &values.SlurmCluster{
 		NodeLogin: values.SlurmLogin{

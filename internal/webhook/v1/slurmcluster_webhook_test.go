@@ -153,6 +153,35 @@ func TestValidateSlurmClusterUserIsolation(t *testing.T) {
 		})
 	}
 
+	t.Run("admits a positive cpuQuota", func(t *testing.T) {
+		cpuQuota := resource.MustParse("8")
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
+			Enabled:  ptr.To(true),
+			CPUQuota: &cpuQuota,
+		}))
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects non-positive cpuQuota", func(t *testing.T) {
+		cpuQuota := resource.MustParse("0")
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
+			Enabled:  ptr.To(true),
+			CPUQuota: &cpuQuota,
+		}))
+		assert.ErrorContains(t, err, "cpuQuota")
+		assert.ErrorContains(t, err, "must be greater than zero")
+	})
+
+	t.Run("rejects cpuQuota below the kernel minimum quota", func(t *testing.T) {
+		cpuQuota := resource.MustParse("5m")
+		_, err := validator.ValidateCreate(context.Background(), clusterWith(&slurmv1.LoginUserIsolation{
+			Enabled:   ptr.To(true),
+			CPUQuota:  &cpuQuota,
+			CPUPeriod: 100000,
+		}))
+		assert.ErrorContains(t, err, "gives a quota below")
+	})
+
 	t.Run("ignores limits when isolation is disabled", func(t *testing.T) {
 		memoryHigh := resource.MustParse("100Gi")
 		memoryMax := resource.MustParse("100Gi")
