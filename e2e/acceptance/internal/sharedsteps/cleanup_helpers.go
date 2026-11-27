@@ -2,6 +2,7 @@ package sharedsteps
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/nebius/soperator/e2e/acceptance/framework"
@@ -15,4 +16,10 @@ func runCleanupPhase(ctx context.Context, logger framework.Logger, name string, 
 	if err := phase(phaseCtx); err != nil {
 		logger.Logf("Cleanup: %s: %v", name, err)
 	}
+}
+
+func reportCleanupErrorf(ctx context.Context, logger framework.Logger, format string, args ...any) {
+	err := fmt.Errorf(format, args...)
+	framework.RecordWorkerCleanupError(ctx, err)
+	logger.Logf("Cleanup: %v", err)
 }

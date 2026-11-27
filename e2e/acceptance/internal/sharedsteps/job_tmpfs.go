@@ -102,7 +102,7 @@ func (s *JobTmpfs) CleanupAndReset(ctx context.Context) {
 	defer cancel()
 	for _, job := range s.jobs {
 		if err := s.slurm.CancelJob(cleanupCtx, job.ID, time.Minute); err != nil {
-			s.runtime.Logf("Cleanup: cancel tmpfs probe job %s: %v", job.ID, err)
+			reportCleanupErrorf(ctx, s.runtime, "cancel tmpfs probe job %s: %w", job.ID, err)
 		}
 	}
 	s.pod = framework.WorkerPodInfo{}
@@ -144,7 +144,8 @@ func (s *JobTmpfs) startJobs(ctx context.Context) error {
 			Nodes:        1,
 			Nodelist:     []string{worker},
 			TasksPerNode: 1,
-			ExtraFlags:   []string{"--cpus-per-task=1", "--mem=512M", "--time=20"},
+			Args:         []string{"--cpus-per-task=1", "--mem=512M"},
+			TimeLimit:    20 * time.Minute,
 			Wrap:         "python3 -u -c " + framework.ShellQuote(jobTmpfsProbe) + " " + framework.ShellQuote(s.marker),
 		})
 		if err != nil {
@@ -202,8 +203,10 @@ func (s *JobTmpfs) startJobs(ctx context.Context) error {
 	return nil
 }
 
-func (s *JobTmpfs) step(ctx context.Context, job framework.SbatchJob, command string) error {
-	output, err := s.runtime.Jail().Run(ctx, "srun --jobid="+framework.ShellQuote(job.ID)+" --overlap -N1 -n1 -c1 "+command)
+func (s *JobTmpfs) step(ctx context.Context, job framework.SbatchJob, command string, flags ...string) error {
+	args := append([]string{"--overlap", "--ntasks=1", "--cpus-per-task=1"}, flags...)
+	output, err := s.slurm.RunSlurm(ctx, "srun", framework.SlurmCommandOptions{JobID: job.ID, Nodes: 1, Args: args},
+		"/bin/sh", "-ec", command)
 	if err != nil {
 		return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
 			fmt.Errorf("run tmpfs verification step: %w; output: %s", err, strings.TrimSpace(output)))
@@ -237,10 +240,6 @@ func (s *JobTmpfs) checkSteps(ctx context.Context) error {
 }
 
 func jobTmpfsBroadcastCommand(jobID, marker string) string {
-	probe := `for directory in /mnt/memory /dev/shm /tmp; do
-    test "$(cat "$directory/$1.broadcast")" = "$2"
-done
-`
 	var commands []string
 	commands = append(commands,
 		"set -eu",
@@ -252,9 +251,6 @@ done
 		commands = append(commands, "sbcast --jobid="+framework.ShellQuote(jobID)+
 			` --force "$source_dir/marker" `+framework.ShellQuote(path.Join("/mnt/jail"+directory, marker+".broadcast")))
 	}
-	commands = append(commands, "srun --jobid="+framework.ShellQuote(jobID)+" --overlap -N1 -n1 -c1 /bin/sh -ec "+
-		framework.ShellQuote(probe)+" sh "+
-		framework.ShellQuote(marker)+" "+framework.ShellQuote(jobID))
 	return strings.Join(commands, "\n")
 }
 
@@ -265,6 +261,12 @@ func (s *JobTmpfs) checkBroadcast(ctx context.Context) error {
 			return framework.AnnotateWithJobLog(ctx, s.runtime, s.slurm, job,
 				fmt.Errorf("broadcast files into job %s tmpfs: %w; output: %s", job.ID, err, output))
 		}
+		probe := "/bin/sh -ec " + framework.ShellQuote(`for directory in /mnt/memory /dev/shm /tmp; do
+    test "$(cat "$directory/$1.broadcast")" = "$2"
+done`) + " sh " + framework.ShellQuote(s.marker) + " " + framework.ShellQuote(job.ID)
+		if err := s.step(ctx, job, probe); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -272,9 +274,10 @@ func (s *JobTmpfs) checkBroadcast(ctx context.Context) error {
 func (s *JobTmpfs) checkPyxis(ctx context.Context) error {
 	job := s.jobs[0]
 	probe := `for directory in /mnt/memory /dev/shm /tmp; do test "$(cat "$directory/$1")" = "$2" || exit 1; done`
-	return s.step(ctx, job, "--container-image="+framework.ShellQuote(enrootLifecycleImage)+
-		" --container-mounts=/mnt/memory:/mnt/memory,/tmp:/tmp,/dev/shm:/dev/shm /bin/sh -ec "+framework.ShellQuote(probe)+
-		" sh "+framework.ShellQuote(s.marker)+" "+framework.ShellQuote(job.ID))
+	return s.step(ctx, job, "/bin/sh -ec "+framework.ShellQuote(probe)+
+		" sh "+framework.ShellQuote(s.marker)+" "+framework.ShellQuote(job.ID),
+		"--container-image="+enrootLifecycleImage,
+		"--container-mounts=/mnt/memory:/mnt/memory,/tmp:/tmp,/dev/shm:/dev/shm")
 }
 
 func (s *JobTmpfs) finishJobs(ctx context.Context) error {

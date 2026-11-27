@@ -38,3 +38,11 @@ func assertGPUListing(output, source string) error {
 	}
 	return fmt.Errorf("expected nvidia-smi GPU listing in %s, got output:\n%s", source, strings.TrimSpace(output))
 }
+
+func runDockerContainerAction(ctx context.Context, runtime framework.Runtime, worker framework.WorkerInfo, action, name string) error {
+	output, err := runtime.Worker(worker).Run(ctx, "sudo docker "+action+" "+framework.ShellQuote(name))
+	if err != nil && !strings.Contains(output+err.Error(), "No such container") {
+		return err
+	}
+	return nil
+}

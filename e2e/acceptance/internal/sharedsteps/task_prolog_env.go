@@ -90,10 +90,14 @@ func (s *TaskPrologEnv) runGPUJobFromLogin(ctx context.Context) error {
 		return err
 	}
 
-	command := taskPrologNetworkEnvCommand(s.worker.Name, taskPrologEnvImmediate, taskPrologEnvTimeout)
-	output, err := s.runtime.Jail().Run(ctx, command)
+	jobCtx, cancel := context.WithTimeout(ctx, taskPrologEnvTimeout)
+	defer cancel()
+	output, err := framework.NewSlurmClient(s.runtime).RunSlurm(jobCtx, "srun", framework.SlurmCommandOptions{
+		Nodes: 1, Nodelist: []string{s.worker.Name}, TimeLimit: taskPrologEnvTimeout,
+		Args: []string{fmt.Sprintf("--immediate=%d", int(taskPrologEnvImmediate.Seconds())), "--ntasks=1", "--gpus-per-node=1"},
+	}, "bash", "-c", taskPrologNetworkEnvProbe())
 	s.jobOutput = output
-	s.runtime.Logf("Task prolog env: %s\n%s", command, strings.TrimSpace(output))
+	s.runtime.Logf("Task prolog env: worker=%s\n%s", s.worker.Name, strings.TrimSpace(output))
 	if err != nil {
 		return fmt.Errorf("run GPU Slurm job from login node on worker %s: %w; output:\n%s",
 			s.worker.Name,
@@ -154,18 +158,6 @@ func (s *TaskPrologEnv) requireWorker() error {
 		return fmt.Errorf("select GPU worker for task-prolog environment checks")
 	}
 	return nil
-}
-
-func taskPrologNetworkEnvCommand(worker string, immediate, timeout time.Duration) string {
-	args := []string{
-		fmt.Sprintf("--immediate=%d", int(immediate.Seconds())),
-		fmt.Sprintf("-w %s", framework.ShellQuote(worker)),
-		"--nodes=1",
-		"--ntasks=1",
-		"--gpus-per-node=1",
-		bashC(taskPrologNetworkEnvProbe()),
-	}
-	return fmt.Sprintf("timeout %d srun %s", int(timeout.Seconds()), strings.Join(args, " "))
 }
 
 func taskPrologWorkerSSHNetworkEnvCommand(user, worker string, timeout time.Duration) string {

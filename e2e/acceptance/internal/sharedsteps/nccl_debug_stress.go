@@ -59,8 +59,10 @@ func (s *NCCLDebugStress) RegisterSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *NCCLDebugStress) selectWorker(ctx context.Context) (context.Context, error) {
-	ctx = context.WithValue(ctx, ncclDebugStressScopeKey{}, true)
-	ctx = framework.WithWorkerReservation(ctx, framework.NewReservationManager(), "NCCL debug container starts")
+	if !framework.HasWorkerReservation(ctx) {
+		ctx = context.WithValue(ctx, ncclDebugStressScopeKey{}, true)
+		ctx = framework.WithWorkerReservation(ctx, framework.NewReservationManager(), "NCCL debug container starts")
+	}
 	workers, err := s.selector.Acquire(ctx, framework.WorkerRequirements{Count: 1, Idle: true})
 	if err != nil {
 		return ctx, err
